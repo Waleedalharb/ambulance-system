@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <meta name="theme-color" content="#1e466e">
-    <link rel="manifest" href="manifest.json">
-    <title>إحصاء بلاغات الفرق الإسعافية - قطاع الجنوب</title>
+    <title>منصة بلاغ - إحصاء الفرق الإسعافية</title>
     <style>
         * {
             box-sizing: border-box;
@@ -21,56 +19,85 @@
             max-width: 1600px;
             margin: auto;
         }
+        /* رأس الصفحة */
         .header {
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
         .header h1 {
             color: #1e466e;
             margin: 0;
-            font-size: 1.3rem;
+            font-size: 1.5rem;
         }
         .header .sub {
             color: #2a7f3e;
-            margin: 2px 0 0;
-            font-size: 0.75rem;
+            margin: 5px 0 0;
+            font-size: 0.8rem;
         }
-        .stats-bar {
+        /* شريط اختيار القطاع */
+        .sector-bar {
             background: white;
-            border-radius: 50px;
-            padding: 5px 15px;
-            margin-bottom: 12px;
+            border-radius: 60px;
+            padding: 8px 15px;
+            margin-bottom: 15px;
             display: flex;
-            justify-content: space-between;
+justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .sector-selector {
+            display: flex;
             gap: 8px;
+            flex-wrap: wrap;
+        }
+        .sector-btn {
+            background: #e0e7ff;
+            color: #1e466e;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .sector-btn.active {
+            background: #1e466e;
+            color: white;
         }
         .total-badge {
             background: #1e466e;
             color: white;
-            padding: 4px 12px;
+            padding: 5px 15px;
             border-radius: 40px;
             font-size: 0.9rem;
             font-weight: bold;
         }
         .total-badge span {
-            font-size: 1.3rem;
-            margin-left: 4px;
+            font-size: 1.4rem;
+            margin-left: 5px;
             color: #ffd966;
         }
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
         .toolbar button {
-            padding: 4px 14px;
+            padding: 5px 12px;
             border-radius: 40px;
             border: none;
             font-weight: bold;
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
         .export-btn { background: #2a7f3e; color: white; }
         .reset-btn { background: #c0392b; color: white; }
         .backup-btn { background: #e67e22; color: white; }
         .restore-btn { background: #2c3e50; color: white; }
+        /* بطاقات المراكز */
         .point-card {
             background: white;
             border-radius: 16px;
@@ -194,11 +221,18 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>قطاع جنوب الرياض</h1>
-        <div class="sub">إحصاء عدد بلاغات الفرق الإسعافية</div>
+        <h1>منصة بلاغ</h1>
+        <div class="sub">إحصاء بلاغات الفرق الإسعافية</div>
     </div>
 
-    <div class="stats-bar">
+    <div class="sector-bar">
+        <div class="sector-selector" id="sectorSelector">
+            <button class="sector-btn active" data-sector="south">📍 الجنوب</button>
+            <button class="sector-btn" data-sector="north">⬆️ الشمال</button>
+            <button class="sector-btn" data-sector="east">➡️ الشرق</button>
+            <button class="sector-btn" data-sector="west">⬅️ الغرب</button>
+            <button class="sector-btn" data-sector="central">🟢 الوسط</button>
+        </div>
         <div class="total-badge">📊 الإجمالي <span id="grandTotal">0</span></div>
         <div class="toolbar">
             <button class="backup-btn" id="backupBtn">📥 نسخة احتياطية</button>
@@ -209,7 +243,7 @@
     </div>
 
     <div id="pointsContainer"></div>
-    <footer>⏱️ ضغطة = بلاغ + وقت | التطبيق يثبت على الجهاز ويعمل بدون نت</footer>
+    <footer>⏱️ ضغطة = بلاغ + وقت | البيانات لكل قطاع منفصلة | يثبت كتطبيق على الجهاز</footer>
 </div>
 
 <div id="timeModal" class="modal">
@@ -221,46 +255,85 @@
 </div>
 
 <script>
-    const data = {
-        "مركز المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-        "مركز الخالدية": ["جنوب 2"],
-        "مركز منفوحة": ["جنوب 3"],
-        "مركز الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-        "مركز الإسكان": ["جنوب 6"],
-        "مركز الحائر": ["جنوب 7"],
-        "مركز ديراب": ["جنوب 10"],
-        "مركز عكاظ": ["جنوب 9"],
-        "مركز الشفاء": ["جنوب 8", "سريع 2"],
-        "Overlap": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-    };
-
-    let reports = {};
-
-    async function load() {
-        // محاولة التحميل من IndexedDB
-        let saved = await loadFromIndexedDB();
-        if (saved) {
-            reports = saved;
-        } else {
-            // محاولة من localStorage كنسخة احتياطية قديمة
-            let old = localStorage.getItem("ambulance_reports_final");
-            if (old) reports = JSON.parse(old);
-        }
-        for (let point in data) {
-            for (let unit of data[point]) {
-                let key = point + "|" + unit;
-                if (!reports[key]) reports[key] = { count: 0, times: [] };
+    // ============================================
+    // بيانات كل قطاع (أضف أو عدل كما تشاء)
+    // ============================================
+    const sectorsData = {
+        south: {
+            name: "الجنوب",
+            centers: {
+                "مركز المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "مركز الخالدية": ["جنوب 2"],
+                "مركز منفوحة": ["جنوب 3"],
+                "مركز الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "مركز الإسكان": ["جنوب 6"],
+                "مركز الحائر": ["جنوب 7"],
+                "مركز ديراب": ["جنوب 10"],
+                "مركز عكاظ": ["جنوب 9"],
+                "مركز الشفاء": ["جنوب 8", "سريع 2"],
+                "Overlap": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            }
+        },
+        north: {
+            name: "الشمال",
+            centers: {
+                "مركز الروضة": ["شمال 1", "شمال 2", "سريع 5"],
+                "مركز النرجس": ["شمال 3", "شمال 4"],
+                "مركز العارض": ["شمال 5", "سريع 6"]
+            }
+        },
+        east: {
+            name: "الشرق",
+            centers: {
+                "مركز النسيم": ["شرق 1", "شرق 2", "سريع 7"],
+                "مركز الروابي": ["شرق 3", "شرق 4"]
+            }
+        },
+        west: {
+            name: "الغرب",
+            centers: {
+                "مركز الدار": ["غرب 1", "غرب 2", "سريع 8"],
+                "مركز السويدي": ["غرب 3", "غرب 4"]
+            }
+        },
+        central: {
+            name: "الوسط",
+            centers: {
+                "مركز البطحاء": ["وسط 1", "وسط 2", "سريع 9"],
+                "مركز المربع": ["وسط 3", "وسط 4"]
             }
         }
-        await save();
+    };
+
+    let currentSector = "south";
+    let allReports = {};
+
+    // تحميل البيانات من IndexedDB
+    async function loadReports() {
+        let saved = await loadFromIndexedDB();
+        if (saved) {
+            allReports = saved;
+        }
+        // تأكد من وجود كل القطاعات والوحدات
+        for (let sector in sectorsData) {
+            if (!allReports[sector]) allReports[sector] = {};
+            for (let center in sectorsData[sector].centers) {
+                for (let unit of sectorsData[sector].centers[center]) {
+                    let key = `${center}|${unit}`;
+                    if (!allReports[sector][key]) {
+                        allReports[sector][key] = { count: 0, times: [] };
+                    }
+                }
+            }
+        }
+        await saveToIndexedDB(allReports);
+        renderCurrentSector();
         updateTotal();
-        render();
     }
 
-    // IndexedDB للتخزين الثابت
     function openDB() {
         return new Promise((resolve, reject) => {
-            let request = indexedDB.open("AmbulanceDB", 1);
+            let request = indexedDB.open("AmbulanceDB_MultiSector", 1);
             request.onupgradeneeded = () => {
                 let db = request.result;
                 if (!db.objectStoreNames.contains("reports")) {
@@ -291,35 +364,46 @@
         });
     }
 
-    async function save() {
-        await saveToIndexedDB(reports);
-        // نسخة احتياطية في localStorage كطبقة ثانية
-        localStorage.setItem("ambulance_reports_final", JSON.stringify(reports));
+    function getCurrentReports() {
+        if (!allReports[currentSector]) allReports[currentSector] = {};
+        return allReports[currentSector];
     }
 
     function updateTotal() {
+        let reports = getCurrentReports();
         let total = 0;
         for (let key in reports) total += reports[key].count;
         document.getElementById("grandTotal").innerText = total;
     }
 
-    async function addReport(point, unit) {
-        let key = point + "|" + unit;
+    async function addReport(center, unit) {
+        let key = `${center}|${unit}`;
+        let reports = getCurrentReports();
+        if (!reports[key]) reports[key] = { count: 0, times: [] };
+        
         let now = new Date();
-        let fullDateTime = now.toISOString().slice(0, 10).replace(/-/g, '-') + " " + 
-                           now.toTimeString().slice(0, 8);
+        let year = now.getFullYear();
+        let month = (now.getMonth()+1).toString().padStart(2,'0');
+        let day = now.getDate().toString().padStart(2,'0');
+        let hours = now.getHours().toString().padStart(2,'0');
+        let minutes = now.getMinutes().toString().padStart(2,'0');
+        let seconds = now.getSeconds().toString().padStart(2,'0');
+        let fullDateTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        
         reports[key].count++;
         reports[key].times.unshift(fullDateTime);
         if (reports[key].times.length > 8) reports[key].times.pop();
-        await save();
+        
+        await saveToIndexedDB(allReports);
+        renderCurrentSector();
         updateTotal();
-        render();
     }
 
-    function showTimes(point, unit) {
-        let key = point + "|" + unit;
-        let times = reports[key].times;
-        document.getElementById("modalUnitName").innerText = `${point} - ${unit}`;
+    function showTimes(center, unit) {
+        let key = `${center}|${unit}`;
+        let reports = getCurrentReports();
+        let times = reports[key]?.times || [];
+        document.getElementById("modalUnitName").innerText = `${center} - ${unit}`;
         let modalList = document.getElementById("modalTimesList");
         modalList.innerHTML = times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p style='color:gray;'>⏳ لا توجد بلاغات</p>";
         document.getElementById("timeModal").style.display = "flex";
@@ -328,29 +412,24 @@
     function closeModal() { document.getElementById("timeModal").style.display = "none"; }
 
     async function resetAll() {
-        if (confirm("⚠️ تصفير جميع البلاغات؟")) {
-            for (let point in data) {
-                for (let unit of data[point]) {
-                    let key = point + "|" + unit;
-                    reports[key] = { count: 0, times: [] };
-                }
-            }
-            await save();
+        if (confirm("⚠️ تصفير جميع البلاغات في قطاع " + sectorsData[currentSector].name + "؟")) {
+            allReports[currentSector] = {};
+            await saveToIndexedDB(allReports);
+            renderCurrentSector();
             updateTotal();
-            render();
         }
     }
 
     async function backupData() {
         let backup = {
             date: new Date().toISOString(),
-            reports: reports,
-            version: "1.0"
+            reports: allReports,
+            version: "2.0"
         };
         let blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
         let a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `ambulance_backup_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+        a.download = `بلاغ_${sectorsData[currentSector].name}_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
     }
@@ -365,10 +444,10 @@
             try {
                 let backup = JSON.parse(text);
                 if (backup.reports) {
-                    reports = backup.reports;
-                    await save();
+                    allReports = backup.reports;
+                    await saveToIndexedDB(allReports);
+                    renderCurrentSector();
                     updateTotal();
-                    render();
                     alert("✅ تم استعادة النسخة الاحتياطية بنجاح");
                 } else {
                     alert("❌ الملف غير صالح");
@@ -381,38 +460,50 @@
     }
 
     function exportExcel() {
-        let rows = [["تقرير بلاغات الفرق - قطاع جنوب الرياض"], ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")], [], ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]];
-        for (let point in data) {
-            for (let unit of data[point]) {
-                let key = point + "|" + unit;
-                let r = reports[key];
-                rows.push([point, unit, r.count, r.times.join(" ؛ ") || "لا يوجد"]);
+        let reports = getCurrentReports();
+        let sectorName = sectorsData[currentSector].name;
+        let rows = [
+            [`تقرير بلاغات الفرق - قطاع ${sectorName}`],
+            ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
+            [],
+            ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
+        ];
+        for (let center in sectorsData[currentSector].centers) {
+            for (let unit of sectorsData[currentSector].centers[center]) {
+                let key = `${center}|${unit}`;
+                let r = reports[key] || { count: 0, times: [] };
+                rows.push([center, unit, r.count, r.times.join(" ؛ ") || "لا يوجد"]);
             }
         }
         let total = 0;
         for (let key in reports) total += reports[key].count;
         rows.push([], ["الإجمالي", "", total, ""]);
+        
         let csv = rows.map(row => row.map(cell => `"${String(cell||"").replace(/"/g,'""')}"`).join(",")).join("\n");
         let blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
         let a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `بلاغات_الفرق_${Date.now()}.csv`;
+        a.download = `بلاغات_${sectorName}_${Date.now()}.csv`;
         a.click();
         URL.revokeObjectURL(a.href);
     }
 
-    function render() {
+    function renderCurrentSector() {
         let container = document.getElementById("pointsContainer");
         container.innerHTML = "";
-        for (let point in data) {
+        let sector = sectorsData[currentSector];
+        let reports = getCurrentReports();
+        
+        for (let center in sector.centers) {
             let pointDiv = document.createElement("div");
             pointDiv.className = "point-card";
-            pointDiv.innerHTML = `<div class="point-title">📍 ${point}</div><div class="units-grid" id="grid-${point.replace(/\s/g, '')}"></div>`;
+            pointDiv.innerHTML = `<div class="point-title">📍 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
             container.appendChild(pointDiv);
+            
             let grid = pointDiv.querySelector(".units-grid");
-            for (let unit of data[point]) {
-                let key = point + "|" + unit;
-                let info = reports[key];
+            for (let unit of sector.centers[center]) {
+                let key = `${center}|${unit}`;
+                let info = reports[key] || { count: 0, times: [] };
                 let unitDiv = document.createElement("div");
                 unitDiv.className = "unit-card";
                 unitDiv.innerHTML = `
@@ -421,25 +512,40 @@
                     <button class="report-btn">➕ بلاغ</button>
                     <button class="show-times-btn">📋 التواقيت</button>
                 `;
-                unitDiv.querySelector(".report-btn").onclick = (() => addReport(point, unit));
-                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(point, unit));
+                unitDiv.querySelector(".report-btn").onclick = (() => addReport(center, unit));
+                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(center, unit));
                 grid.appendChild(unitDiv);
             }
         }
     }
 
+    function switchSector(sectorId) {
+        currentSector = sectorId;
+        // تحديث حالة الأزرار
+        document.querySelectorAll('.sector-btn').forEach(btn => {
+            if (btn.dataset.sector === sectorId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        renderCurrentSector();
+        updateTotal();
+    }
+
+    // ربط الأحداث
     window.onclick = (e) => { if (e.target === document.getElementById("timeModal")) closeModal(); };
     document.getElementById("exportBtn").onclick = exportExcel;
     document.getElementById("resetBtn").onclick = resetAll;
     document.getElementById("backupBtn").onclick = backupData;
     document.getElementById("restoreBtn").onclick = restoreData;
     
-    // تسجيل Service Worker
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered', reg)).catch(err => console.log('SW failed', err));
-    }
+    document.querySelectorAll('.sector-btn').forEach(btn => {
+        btn.onclick = () => switchSector(btn.dataset.sector);
+    });
     
-    load();
+    // بدء التشغيل
+    loadReports();
 </script>
 </body>
 </html>
