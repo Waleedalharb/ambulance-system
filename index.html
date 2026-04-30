@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="theme-color" content="#1e466e">
+    <link rel="manifest" href="manifest.json">
+    <title>إحصاء بلاغات الفرق الإسعافية - قطاع الجنوب</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #eef2f7;
+            margin: 0;
+            padding: 8px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1600px;
+            margin: auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .header h1 {
+            color: #1e466e;
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        .header .sub {
+            color: #2a7f3e;
+            margin: 2px 0 0;
+            font-size: 0.75rem;
+        }
+        .stats-bar {
+            background: white;
+            border-radius: 50px;
+            padding: 5px 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .total-badge {
+            background: #1e466e;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .total-badge span {
+            font-size: 1.3rem;
+            margin-left: 4px;
+            color: #ffd966;
+        }
+        .toolbar button {
+            padding: 4px 14px;
+            border-radius: 40px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .export-btn { background: #2a7f3e; color: white; }
+        .reset-btn { background: #c0392b; color: white; }
+        .backup-btn { background: #e67e22; color: white; }
+        .restore-btn { background: #2c3e50; color: white; }
+        .point-card {
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .point-title {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #1e466e;
+            border-right: 4px solid #b22234;
+            padding-right: 8px;
+        }
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+            gap: 6px;
+        }
+        .unit-card {
+            background: #f9fafc;
+            border-radius: 12px;
+            padding: 5px 4px;
+            text-align: center;
+            border: 1px solid #e8ecf2;
+        }
+        .unit-card:active { transform: scale(0.97); }
+        .unit-name {
+            font-size: 0.75rem;
+            font-weight: bold;
+            background: #1e466e;
+            color: white;
+            padding: 3px;
+            border-radius: 25px;
+            margin-bottom: 4px;
+        }
+        .count-number {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #b22234;
+            margin: 2px 0;
+            line-height: 1.2;
+        }
+        .report-btn {
+            background: #2a7f3e;
+            color: white;
+            border: none;
+            padding: 4px;
+            width: 100%;
+            font-size: 0.65rem;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 3px 0;
+        }
+        .show-times-btn {
+            background: #4a6a8b;
+            color: white;
+            border: none;
+            padding: 3px;
+            width: 100%;
+            font-size: 0.6rem;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            max-width: 350px;
+            width: 85%;
+            padding: 12px;
+            text-align: center;
+        }
+        .modal-content h3 { margin: 0 0 6px 0; font-size: 1rem; }
+        .modal-times {
+            background: #f0f2f5;
+            border-radius: 12px;
+            padding: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            text-align: right;
+            margin: 10px 0;
+        }
+        .modal-times p { margin: 4px 0; font-size: 0.75rem; }
+        .close-modal {
+            background: #4a6a8b;
+            color: white;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.6rem;
+            color: #5a6e7c;
+        }
+        @media (max-width: 550px) {
+            .units-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 4px; }
+            .unit-name { font-size: 0.65rem; }
+            .count-number { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>قطاع جنوب الرياض</h1>
+        <div class="sub">إحصاء عدد بلاغات الفرق الإسعافية</div>
+    </div>
+
+    <div class="stats-bar">
+        <div class="total-badge">📊 الإجمالي <span id="grandTotal">0</span></div>
+        <div class="toolbar">
+            <button class="backup-btn" id="backupBtn">📥 نسخة احتياطية</button>
+            <button class="restore-btn" id="restoreBtn">📤 استعادة نسخة</button>
+            <button class="export-btn" id="exportBtn">📎 تصدير Excel</button>
+            <button class="reset-btn" id="resetBtn">🗑️ تصفير</button>
+        </div>
+    </div>
+
+    <div id="pointsContainer"></div>
+    <footer>⏱️ ضغطة = بلاغ + وقت | التطبيق يثبت على الجهاز ويعمل بدون نت</footer>
+</div>
+
+<div id="timeModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalUnitName">الوحدة</h3>
+        <div id="modalTimesList" class="modal-times"></div>
+        <button class="close-modal" onclick="closeModal()">إغلاق</button>
+    </div>
+</div>
+
+<script>
+    const data = {
+        "مركز المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+        "مركز الخالدية": ["جنوب 2"],
+        "مركز منفوحة": ["جنوب 3"],
+        "مركز الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+        "مركز الإسكان": ["جنوب 6"],
+        "مركز الحائر": ["جنوب 7"],
+        "مركز ديراب": ["جنوب 10"],
+        "مركز عكاظ": ["جنوب 9"],
+        "مركز الشفاء": ["جنوب 8", "سريع 2"],
+        "Overlap": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+    };
+
+    let reports = {};
+
+    async function load() {
+        // محاولة التحميل من IndexedDB
+        let saved = await loadFromIndexedDB();
+        if (saved) {
+            reports = saved;
+        } else {
+            // محاولة من localStorage كنسخة احتياطية قديمة
+            let old = localStorage.getItem("ambulance_reports_final");
+            if (old) reports = JSON.parse(old);
+        }
+        for (let point in data) {
+            for (let unit of data[point]) {
+                let key = point + "|" + unit;
+                if (!reports[key]) reports[key] = { count: 0, times: [] };
+            }
+        }
+        await save();
+        updateTotal();
+        render();
+    }
+
+    // IndexedDB للتخزين الثابت
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            let request = indexedDB.open("AmbulanceDB", 1);
+            request.onupgradeneeded = () => {
+                let db = request.result;
+                if (!db.objectStoreNames.contains("reports")) {
+                    db.createObjectStore("reports", { keyPath: "id" });
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function saveToIndexedDB(data) {
+        let db = await openDB();
+        let tx = db.transaction("reports", "readwrite");
+        let store = tx.objectStore("reports");
+        store.put({ id: "mainData", value: data });
+        return new Promise(resolve => tx.oncomplete = resolve);
+    }
+
+    async function loadFromIndexedDB() {
+        let db = await openDB();
+        let tx = db.transaction("reports", "readonly");
+        let store = tx.objectStore("reports");
+        let request = store.get("mainData");
+        return new Promise(resolve => {
+            request.onsuccess = () => resolve(request.result?.value || null);
+            request.onerror = () => resolve(null);
+        });
+    }
+
+    async function save() {
+        await saveToIndexedDB(reports);
+        // نسخة احتياطية في localStorage كطبقة ثانية
+        localStorage.setItem("ambulance_reports_final", JSON.stringify(reports));
+    }
+
+    function updateTotal() {
+        let total = 0;
+        for (let key in reports) total += reports[key].count;
+        document.getElementById("grandTotal").innerText = total;
+    }
+
+    async function addReport(point, unit) {
+        let key = point + "|" + unit;
+        let now = new Date();
+        let fullDateTime = now.toISOString().slice(0, 10).replace(/-/g, '-') + " " + 
+                           now.toTimeString().slice(0, 8);
+        reports[key].count++;
+        reports[key].times.unshift(fullDateTime);
+        if (reports[key].times.length > 8) reports[key].times.pop();
+        await save();
+        updateTotal();
+        render();
+    }
+
+    function showTimes(point, unit) {
+        let key = point + "|" + unit;
+        let times = reports[key].times;
+        document.getElementById("modalUnitName").innerText = `${point} - ${unit}`;
+        let modalList = document.getElementById("modalTimesList");
+        modalList.innerHTML = times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p style='color:gray;'>⏳ لا توجد بلاغات</p>";
+        document.getElementById("timeModal").style.display = "flex";
+    }
+
+    function closeModal() { document.getElementById("timeModal").style.display = "none"; }
+
+    async function resetAll() {
+        if (confirm("⚠️ تصفير جميع البلاغات؟")) {
+            for (let point in data) {
+                for (let unit of data[point]) {
+                    let key = point + "|" + unit;
+                    reports[key] = { count: 0, times: [] };
+                }
+            }
+            await save();
+            updateTotal();
+            render();
+        }
+    }
+
+    async function backupData() {
+        let backup = {
+            date: new Date().toISOString(),
+            reports: reports,
+            version: "1.0"
+        };
+        let blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `ambulance_backup_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function restoreData() {
+        let input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+        input.onchange = async (e) => {
+            let file = e.target.files[0];
+            let text = await file.text();
+            try {
+                let backup = JSON.parse(text);
+                if (backup.reports) {
+                    reports = backup.reports;
+                    await save();
+                    updateTotal();
+                    render();
+                    alert("✅ تم استعادة النسخة الاحتياطية بنجاح");
+                } else {
+                    alert("❌ الملف غير صالح");
+                }
+            } catch(err) {
+                alert("❌ خطأ في قراءة الملف");
+            }
+        };
+        input.click();
+    }
+
+    function exportExcel() {
+        let rows = [["تقرير بلاغات الفرق - قطاع جنوب الرياض"], ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")], [], ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]];
+        for (let point in data) {
+            for (let unit of data[point]) {
+                let key = point + "|" + unit;
+                let r = reports[key];
+                rows.push([point, unit, r.count, r.times.join(" ؛ ") || "لا يوجد"]);
+            }
+        }
+        let total = 0;
+        for (let key in reports) total += reports[key].count;
+        rows.push([], ["الإجمالي", "", total, ""]);
+        let csv = rows.map(row => row.map(cell => `"${String(cell||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+        let blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `بلاغات_الفرق_${Date.now()}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function render() {
+        let container = document.getElementById("pointsContainer");
+        container.innerHTML = "";
+        for (let point in data) {
+            let pointDiv = document.createElement("div");
+            pointDiv.className = "point-card";
+            pointDiv.innerHTML = `<div class="point-title">📍 ${point}</div><div class="units-grid" id="grid-${point.replace(/\s/g, '')}"></div>`;
+            container.appendChild(pointDiv);
+            let grid = pointDiv.querySelector(".units-grid");
+            for (let unit of data[point]) {
+                let key = point + "|" + unit;
+                let info = reports[key];
+                let unitDiv = document.createElement("div");
+                unitDiv.className = "unit-card";
+                unitDiv.innerHTML = `
+                    <div class="unit-name">${unit}</div>
+                    <div class="count-number">${info.count}</div>
+                    <button class="report-btn">➕ بلاغ</button>
+                    <button class="show-times-btn">📋 التواقيت</button>
+                `;
+                unitDiv.querySelector(".report-btn").onclick = (() => addReport(point, unit));
+                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(point, unit));
+                grid.appendChild(unitDiv);
+            }
+        }
+    }
+
+    window.onclick = (e) => { if (e.target === document.getElementById("timeModal")) closeModal(); };
+    document.getElementById("exportBtn").onclick = exportExcel;
+    document.getElementById("resetBtn").onclick = resetAll;
+    document.getElementById("backupBtn").onclick = backupData;
+    document.getElementById("restoreBtn").onclick = restoreData;
+    
+    // تسجيل Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered', reg)).catch(err => console.log('SW failed', err));
+    }
+    
+    load();
+</script>
+</body>
+</html>
