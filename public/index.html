@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>جدول توزيع البلاغات - قطاع جنوب الرياض</title>
     <style>
         * {
@@ -209,6 +212,12 @@
             padding: 50px;
             font-size: 1rem;
         }
+        .update-status {
+            text-align: left;
+            font-size: 0.65rem;
+            color: #2a7f3e;
+            margin-top: 5px;
+        }
         footer {
             text-align: center;
             margin-top: 25px;
@@ -240,11 +249,12 @@
             <button id="resetBtn">🗑️ تصفير الكل</button>
         </div>
     </div>
+    <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
 
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
     </div>
-    <footer>⏱️ ضغطة واحدة = تسجيل بلاغ مع الوقت الفعلي | جميع الأجهزة تشترك في نفس البيانات</footer>
+    <footer>⏱️ ضغطة واحدة = تسجيل بلاغ مع الوقت الفعلي | جميع الأجهزة تشترك في نفس البيانات | التحديث تلقائي</footer>
 </div>
 
 <div id="timeModal" class="modal">
@@ -261,6 +271,7 @@
     // ============================================
     let centersData = {};
     let reports = {};
+    let lastKnownUpdate = 0;
 
     // ============================================
     // دوال الاتصال بالخادم
@@ -273,9 +284,11 @@
             reports = result.data;
             renderData();
             updateTotal();
+            document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
         } catch (error) {
             console.error("خطأ:", error);
             document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
+            document.getElementById("updateStatus").innerHTML = "🔴 غير متصل | جاري المحاولة...";
         }
     }
 
@@ -288,11 +301,14 @@
             });
             const result = await response.json();
             if (result.success) {
-                await loadAllData();
+                // التحديث سيتم تلقائياً عن طريق checkForUpdates
+                console.log("✅ تم تسجيل البلاغ");
+            } else {
+                alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
             }
         } catch (error) {
             console.error("خطأ:", error);
-            alert("❌ فشل في تسجيل البلاغ");
+            alert("❌ فشل في الاتصال بالخادم");
         }
     }
 
@@ -306,11 +322,14 @@
             });
             const result = await response.json();
             if (result.success) {
-                await loadAllData();
+                console.log("✅ تم تصفير البيانات");
+                // التحديث سيتم تلقائياً
+            } else {
+                alert("❌ فشل في تصفير البيانات");
             }
         } catch (error) {
             console.error("خطأ:", error);
-            alert("❌ فشل في تصفير البيانات");
+            alert("❌ فشل في الاتصال بالخادم");
         }
     }
 
@@ -319,12 +338,31 @@
     }
 
     // ============================================
+    // التحديث التلقائي (Auto-refresh)
+    // ============================================
+    async function checkForUpdates() {
+        try {
+            const response = await fetch('/api/last-update');
+            const data = await response.json();
+            if (data.lastUpdate > lastKnownUpdate) {
+                lastKnownUpdate = data.lastUpdate;
+                await loadAllData();
+                console.log("🔄 تحديث تلقائي - بيانات جديدة");
+            }
+        } catch (error) {
+            console.error("خطأ في التحقق من التحديثات:", error);
+        }
+    }
+
+    // ============================================
     // دوال الواجهة
     // ============================================
     function updateTotal() {
         let total = 0;
         for (let key in reports) {
-            total += reports[key].count;
+            if (reports[key] && reports[key].count) {
+                total += reports[key].count;
+            }
         }
         document.getElementById("grandTotal").innerText = total;
     }
@@ -349,18 +387,20 @@
             for (let unit of centersData[center]) {
                 const key = `${center}|${unit}`;
                 const info = reports[key] || { count: 0, times: [] };
+                const countValue = info.count || 0;
+                const timesValue = info.times || [];
                 
                 const unitDiv = document.createElement("div");
                 unitDiv.className = "unit-card";
                 unitDiv.innerHTML = `
                     <div class="unit-name">${unit}</div>
-                    <div class="count-number">${info.count}</div>
+                    <div class="count-number">${countValue}</div>
                     <button class="report-btn">➕ تسجيل بلاغ</button>
                     <button class="show-times-btn">📋 عرض التواقيت</button>
                 `;
                 
                 unitDiv.querySelector(".report-btn").onclick = (() => addReportToServer(center, unit));
-                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(center, unit, info.times));
+                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(center, unit, timesValue));
                 grid.appendChild(unitDiv);
             }
         }
@@ -382,14 +422,25 @@
     }
 
     // ============================================
-    // التشغيل
+    // بدء التشغيل
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     document.getElementById("exportBtn").onclick = exportExcel;
     document.getElementById("resetBtn").onclick = resetAll;
     window.onclick = (e) => { if (e.target === document.getElementById("timeModal")) closeModal(); };
     
+    // تحميل البيانات أول مرة
     loadAllData();
+    
+    // تفعيل التحديث التلقائي كل ثانية
+    setInterval(checkForUpdates, 1000);
+    
+    // تحديث الساعة في حالة الاتصال
+    setInterval(() => {
+        if (lastKnownUpdate > 0) {
+            document.getElementById("updateStatus").innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
+        }
+    }, 2000);
 </script>
 </body>
 </html>
