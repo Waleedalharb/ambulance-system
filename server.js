@@ -4,12 +4,20 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ============================================
+// مسارات ملفات البيانات
+// ============================================
 const DATA_PATH = '/data/ambulance-data.json';
+const SHIFT_DATA_PATH = '/data/shift-data.json';
 let lastUpdateTime = Date.now();
 
+// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ============================================
+// بيانات قطاع الجنوب
+// ============================================
 const centersData = {
     "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
     "الخالدية": ["جنوب 2"],
@@ -23,6 +31,9 @@ const centersData = {
     "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
 };
 
+// ============================================
+// دوال قراءة وكتابة البيانات
+// ============================================
 async function readData() {
     try {
         const data = await fs.readFile(DATA_PATH, 'utf8');
@@ -38,6 +49,9 @@ async function writeData(data) {
     lastUpdateTime = Date.now();
 }
 
+// ============================================
+// API: جلب البيانات
+// ============================================
 app.get('/api/data', async (req, res) => {
     try {
         const data = await readData();
@@ -51,6 +65,9 @@ app.get('/api/last-update', (req, res) => {
     res.json({ lastUpdate: lastUpdateTime });
 });
 
+// ============================================
+// API: تسجيل بلاغ
+// ============================================
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
@@ -71,6 +88,9 @@ app.post('/api/report', async (req, res) => {
     }
 });
 
+// ============================================
+// API: تصفير البيانات
+// ============================================
 app.post('/api/reset', async (req, res) => {
     try {
         await writeData({});
@@ -80,6 +100,9 @@ app.post('/api/reset', async (req, res) => {
     }
 });
 
+// ============================================
+// API: تصدير Excel
+// ============================================
 app.get('/api/export', async (req, res) => {
     try {
         const reports = await readData();
@@ -118,6 +141,77 @@ app.get('/api/export', async (req, res) => {
     }
 });
 
+// ============================================
+// API: نموذج المناوبة (Shift Form)
+// ============================================
+
+// جلب جميع المناوبات
+app.get('/api/shifts', async (req, res) => {
+    try {
+        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.json([]);
+        } else {
+            res.status(500).json({ error: 'فشل في جلب المناوبات' });
+        }
+    }
+});
+
+// حفظ مناوبة جديدة أو تحديثها
+app.post('/api/shifts', async (req, res) => {
+    try {
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const newShift = req.body;
+        newShift.id = newShift.id || Date.now();
+        newShift.lastUpdate = new Date().toISOString();
+        
+        const index = allShifts.findIndex(s => s.id === newShift.id);
+        if (index !== -1) {
+            allShifts[index] = newShift;
+        } else {
+            allShifts.unshift(newShift);
+        }
+        
+        if (allShifts.length > 50) allShifts.pop();
+        
+        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
+        res.json({ success: true, id: newShift.id });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ المناوبة' });
+    }
+});
+
+// حذف مناوبة
+app.delete('/api/shifts/:id', async (req, res) => {
+    try {
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const id = parseInt(req.params.id);
+        allShifts = allShifts.filter(s => s.id !== id);
+        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف المناوبة' });
+    }
+});
+
+// ============================================
+// تشغيل الخادم
+// ============================================
 app.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
+    console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
+    console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
 });
