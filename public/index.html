@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>نظام البلاغات المركزي - الفرق الإسعافية</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+        }
+        body {
+            background: #ffffff;
+            margin: 0;
+            padding: 20px;
+            color: #000000;
+        }
+        .container {
+            max-width: 1400px;
+            margin: auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+        .header .sub {
+            margin: 8px 0 0;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        .header .date {
+            margin: 10px 0 0;
+            font-size: 0.8rem;
+        }
+        .sector-bar {
+            border: 1px solid #000;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: #f9f9f9;
+        }
+        .sector-selector {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .sector-btn {
+            background: white;
+            border: 1px solid #000;
+            padding: 6px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+        .sector-btn.active {
+            background: #000;
+            color: white;
+        }
+        .total-badge {
+            border: 1px solid #000;
+            padding: 6px 18px;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        .total-badge span {
+            font-size: 1.5rem;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .toolbar button {
+            background: white;
+            border: 1px solid #000;
+            padding: 5px 12px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-family: monospace;
+        }
+        .toolbar button:active {
+            background: #ddd;
+        }
+        .point-card {
+            border: 1px solid #000;
+            margin-bottom: 15px;
+            background: white;
+        }
+        .point-title {
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            background: #f0f0f0;
+            border-bottom: 1px solid #000;
+        }
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0;
+        }
+        .unit-card {
+            padding: 10px 6px;
+            text-align: center;
+            border-left: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            background: white;
+        }
+        .unit-card:nth-child(even) {
+            background: #fafafa;
+        }
+        .unit-name {
+            font-size: 0.9rem;
+            font-weight: bold;
+            padding: 4px;
+            border-bottom: 1px dotted #aaa;
+            margin-bottom: 6px;
+        }
+        .count-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 6px 0;
+        }
+        .report-btn {
+            background: white;
+            border: 1px solid #000;
+            padding: 5px;
+            width: 100%;
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 0;
+        }
+        .report-btn:active {
+            background: #ddd;
+        }
+        .show-times-btn {
+            background: white;
+            border: 1px solid #888;
+            padding: 4px;
+            width: 100%;
+            font-size: 0.65rem;
+            cursor: pointer;
+            margin: 2px 0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border: 2px solid #000;
+            max-width: 380px;
+            width: 85%;
+            padding: 15px;
+            text-align: center;
+        }
+        .modal-content h3 {
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid #000;
+            padding-bottom: 6px;
+        }
+        .modal-times {
+            background: #f9f9f9;
+            border: 1px solid #aaa;
+            padding: 10px;
+            max-height: 260px;
+            overflow-y: auto;
+            text-align: right;
+            margin: 12px 0;
+        }
+        .modal-times p {
+            margin: 5px 0;
+            font-size: 0.8rem;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 3px;
+        }
+        .close-modal {
+            background: white;
+            border: 1px solid #000;
+            padding: 6px 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 12px;
+            border-top: 1px solid #aaa;
+            font-size: 0.65rem;
+            color: #444;
+        }
+        @media (max-width: 650px) {
+            body { padding: 10px; }
+            .units-grid { grid-template-columns: 1fr; }
+            .unit-card { border-left: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>نظام توزيع البلاغات</h1>
+        <div class="sub">إدارة القطاعات بمنطقة الرياض - فريق الجودة والتطوير</div>
+        <div class="sub">جدول توزيع البلاغات على الوحدات الإسعافية</div>
+        <div class="date">📅 <span id="currentDate"></span></div>
+    </div>
+
+    <div class="sector-bar">
+        <div class="sector-selector" id="sectorSelector">
+            <!-- الأزرار ستضاف بواسطة JavaScript -->
+        </div>
+        <div class="total-badge">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
+        <div class="toolbar">
+            <button id="exportBtn">📎 تصدير Excel</button>
+            <button id="resetBtn">🗑️ تصفير القطاع</button>
+        </div>
+    </div>
+
+    <div id="pointsContainer">
+        <div class="loading">⏳ جاري تحميل البيانات...</div>
+    </div>
+    <footer>⏱️ ضغطة واحدة = تسجيل بلاغ مع الوقت الفعلي | جميع الأجهزة تشترك في نفس البيانات</footer>
+</div>
+
+<div id="timeModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalUnitName">الوحدة</h3>
+        <div id="modalTimesList" class="modal-times"></div>
+        <button class="close-modal" onclick="closeModal()">إغلاق</button>
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // المتغيرات العامة
+    // ============================================
+    let currentSector = "south";
+    let sectorsData = {};
+    let reports = {};
+
+    // ============================================
+    // دوال الاتصال بالخادم
+    // ============================================
+    async function loadAllData() {
+        try {
+            const response = await fetch('/api/data');
+            const result = await response.json();
+            sectorsData = result.sectors;
+            reports = result.data;
+            
+            // بناء أزرار القطاعات
+            buildSectorButtons();
+            
+            // عرض القطاع الحالي
+            renderCurrentSector();
+            updateTotal();
+        } catch (error) {
+            console.error("خطأ في تحميل البيانات:", error);
+            document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
+        }
+    }
+
+    async function addReportToServer(center, unit) {
+        try {
+            const response = await fetch('/api/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sector: currentSector, center, unit })
+            });
+            const result = await response.json();
+            if (result.success) {
+                // إعادة تحميل البيانات بعد التحديث
+                await loadAllData();
+            }
+        } catch (error) {
+            console.error("خطأ في تسجيل البلاغ:", error);
+            alert("❌ فشل في تسجيل البلاغ، حاول مرة أخرى");
+        }
+    }
+
+    async function resetSector() {
+        if (!confirm(`⚠️ هل أنت متأكد من تصفير جميع البلاغات في قطاع ${sectorsData[currentSector]?.name || currentSector}؟`)) return;
+        
+        try {
+            const response = await fetch('/api/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sector: currentSector })
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadAllData();
+            }
+        } catch (error) {
+            console.error("خطأ في التصفير:", error);
+            alert("❌ فشل في تصفير البيانات");
+        }
+    }
+
+    async function exportExcel() {
+        window.open(`/api/export/${currentSector}`, '_blank');
+    }
+
+    // ============================================
+    // دوال الواجهة
+    // ============================================
+    function buildSectorButtons() {
+        const container = document.getElementById("sectorSelector");
+        container.innerHTML = "";
+        
+        const sectorNames = {
+            south: "📍 الجنوب",
+            north: "⬆️ الشمال",
+            east: "➡️ الشرق",
+            west: "⬅️ الغرب",
+            central: "🟢 الوسط"
+        };
+        
+        for (let [id, name] of Object.entries(sectorNames)) {
+            const btn = document.createElement("button");
+            btn.className = "sector-btn" + (currentSector === id ? " active" : "");
+            btn.textContent = name;
+            btn.dataset.sector = id;
+            btn.onclick = () => switchSector(id);
+            container.appendChild(btn);
+        }
+    }
+
+    function switchSector(sectorId) {
+        currentSector = sectorId;
+        // تحديث حالة الأزرار
+        document.querySelectorAll('.sector-btn').forEach(btn => {
+            if (btn.dataset.sector === sectorId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        renderCurrentSector();
+        updateTotal();
+    }
+
+    function updateTotal() {
+        const sectorReports = reports[currentSector] || {};
+        let total = 0;
+        for (let key in sectorReports) {
+            total += sectorReports[key].count;
+        }
+        document.getElementById("grandTotal").innerText = total;
+    }
+
+    function renderCurrentSector() {
+        const container = document.getElementById("pointsContainer");
+        const sector = sectorsData[currentSector];
+        
+        if (!sector) {
+            container.innerHTML = "<div class='loading'>❌ بيانات القطاع غير متوفرة</div>";
+            return;
+        }
+        
+        container.innerHTML = "";
+        const sectorReports = reports[currentSector] || {};
+        
+        for (let center in sector.centers) {
+            const pointDiv = document.createElement("div");
+            pointDiv.className = "point-card";
+            pointDiv.innerHTML = `<div class="point-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+            container.appendChild(pointDiv);
+            
+            const grid = pointDiv.querySelector(".units-grid");
+            
+            for (let unit of sector.centers[center]) {
+                const key = `${center}|${unit}`;
+                const info = sectorReports[key] || { count: 0, times: [] };
+                
+                const unitDiv = document.createElement("div");
+                unitDiv.className = "unit-card";
+                unitDiv.innerHTML = `
+                    <div class="unit-name">${unit}</div>
+                    <div class="count-number">${info.count}</div>
+                    <button class="report-btn">➕ تسجيل بلاغ</button>
+                    <button class="show-times-btn">📋 عرض التواقيت</button>
+                `;
+                
+                unitDiv.querySelector(".report-btn").onclick = (() => addReportToServer(center, unit));
+                unitDiv.querySelector(".show-times-btn").onclick = (() => showTimes(center, unit, info.times));
+                grid.appendChild(unitDiv);
+            }
+        }
+    }
+
+    function showTimes(center, unit, times) {
+        document.getElementById("modalUnitName").innerHTML = `${center} - ${unit}`;
+        const modalList = document.getElementById("modalTimesList");
+        if (!times || times.length === 0) {
+            modalList.innerHTML = "<p>— لا توجد بلاغات —</p>";
+        } else {
+            modalList.innerHTML = times.map(t => `<p>🕒 ${t}</p>`).join("");
+        }
+        document.getElementById("timeModal").style.display = "flex";
+    }
+
+    function closeModal() {
+        document.getElementById("timeModal").style.display = "none";
+    }
+
+    // ============================================
+    // التشغيل
+    // ============================================
+    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
+    document.getElementById("exportBtn").onclick = exportExcel;
+    document.getElementById("resetBtn").onclick = resetSector;
+    window.onclick = (e) => { if (e.target === document.getElementById("timeModal")) closeModal(); };
+    
+    loadAllData();
+</script>
+</body>
+</html>
