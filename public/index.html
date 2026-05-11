@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>نظام البلاغات المركزي - الفرق الإسعافية</title>
+    <title>جدول توزيع البلاغات - قطاع جنوب الرياض</title>
     <style>
         * {
             box-sizing: border-box;
-            font-family: 'Courier New', 'Segoe UI', monospace;
+            font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
         }
         body {
             background: #ffffff;
@@ -19,6 +19,7 @@
             max-width: 1400px;
             margin: auto;
         }
+        /* رأس الصفحة - مثل الورقة المطبوعة */
         .header {
             text-align: center;
             margin-bottom: 25px;
@@ -27,18 +28,25 @@
         }
         .header h1 {
             margin: 0;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
+            font-weight: bold;
         }
-        .header .sub {
+        .header .sub1 {
             margin: 8px 0 0;
             font-size: 0.9rem;
             color: #333;
         }
+        .header .sub2 {
+            margin: 5px 0 0;
+            font-size: 0.85rem;
+            color: #333;
+        }
         .header .date {
-            margin: 10px 0 0;
+            margin: 12px 0 0;
             font-size: 0.8rem;
         }
-        .sector-bar {
+        /* شريط المعلومات */
+        .info-bar {
             border: 1px solid #000;
             padding: 10px 15px;
             margin-bottom: 20px;
@@ -46,55 +54,39 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
             background: #f9f9f9;
         }
-        .sector-selector {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        .sector-btn {
-            background: white;
-            border: 1px solid #000;
-            padding: 6px 16px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-family: monospace;
-        }
-        .sector-btn.active {
-            background: #000;
-            color: white;
-        }
-        .total-badge {
+        .total-box {
             border: 1px solid #000;
             padding: 6px 18px;
             font-weight: bold;
             font-size: 1rem;
         }
-        .total-badge span {
-            font-size: 1.5rem;
-            margin-left: 5px;
+        .total-box span {
+            font-size: 1.6rem;
+            margin-left: 8px;
             font-weight: bold;
         }
         .toolbar {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             flex-wrap: wrap;
         }
         .toolbar button {
             background: white;
             border: 1px solid #000;
-            padding: 5px 12px;
+            padding: 6px 14px;
             font-weight: bold;
             cursor: pointer;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-family: monospace;
+            transition: 0.1s;
         }
         .toolbar button:active {
             background: #ddd;
         }
+        /* بطاقات المراكز */
         .point-card {
             border: 1px solid #000;
             margin-bottom: 15px;
@@ -129,11 +121,13 @@
             padding: 4px;
             border-bottom: 1px dotted #aaa;
             margin-bottom: 6px;
+            font-family: monospace;
         }
         .count-number {
             font-size: 1.8rem;
             font-weight: bold;
             margin: 6px 0;
+            font-family: monospace;
         }
         .report-btn {
             background: white;
@@ -144,6 +138,7 @@
             font-weight: bold;
             cursor: pointer;
             margin: 4px 0;
+            font-family: monospace;
         }
         .report-btn:active {
             background: #ddd;
@@ -156,7 +151,9 @@
             font-size: 0.65rem;
             cursor: pointer;
             margin: 2px 0;
+            font-family: monospace;
         }
+        /* نافذة التواقيت */
         .modal {
             display: none;
             position: fixed;
@@ -179,6 +176,7 @@
         }
         .modal-content h3 {
             margin: 0 0 8px 0;
+            font-size: 1rem;
             border-bottom: 1px solid #000;
             padding-bottom: 6px;
         }
@@ -193,7 +191,8 @@
         }
         .modal-times p {
             margin: 5px 0;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-family: monospace;
             border-bottom: 1px dotted #ccc;
             padding-bottom: 3px;
         }
@@ -203,11 +202,12 @@
             padding: 6px 20px;
             font-weight: bold;
             cursor: pointer;
+            font-family: monospace;
         }
         .loading {
             text-align: center;
             padding: 50px;
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
         footer {
             text-align: center;
@@ -227,20 +227,17 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>نظام توزيع البلاغات</h1>
-        <div class="sub">إدارة القطاعات بمنطقة الرياض - فريق الجودة والتطوير</div>
-        <div class="sub">جدول توزيع البلاغات على الوحدات الإسعافية</div>
-        <div class="date">📅 <span id="currentDate"></span></div>
+        <h1>قطاعات الرياض</h1>
+        <div class="sub1">إدارة القطاعات بمنطقة الرياض - فريق الجودة والتطوير</div>
+        <div class="sub2">جدول توزيع البلاغات على الوحدات الإسعافية</div>
+        <div class="date">📅 التاريخ: <span id="currentDate"></span></div>
     </div>
 
-    <div class="sector-bar">
-        <div class="sector-selector" id="sectorSelector">
-            <!-- الأزرار ستضاف بواسطة JavaScript -->
-        </div>
-        <div class="total-badge">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
+    <div class="info-bar">
+        <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
         <div class="toolbar">
             <button id="exportBtn">📎 تصدير Excel</button>
-            <button id="resetBtn">🗑️ تصفير القطاع</button>
+            <button id="resetBtn">🗑️ تصفير الكل</button>
         </div>
     </div>
 
@@ -262,8 +259,7 @@
     // ============================================
     // المتغيرات العامة
     // ============================================
-    let currentSector = "south";
-    let sectorsData = {};
+    let centersData = {};
     let reports = {};
 
     // ============================================
@@ -273,17 +269,12 @@
         try {
             const response = await fetch('/api/data');
             const result = await response.json();
-            sectorsData = result.sectors;
+            centersData = result.centers;
             reports = result.data;
-            
-            // بناء أزرار القطاعات
-            buildSectorButtons();
-            
-            // عرض القطاع الحالي
-            renderCurrentSector();
+            renderData();
             updateTotal();
         } catch (error) {
-            console.error("خطأ في تحميل البيانات:", error);
+            console.error("خطأ:", error);
             document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
         }
     }
@@ -293,103 +284,61 @@
             const response = await fetch('/api/report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sector: currentSector, center, unit })
+                body: JSON.stringify({ center, unit })
             });
             const result = await response.json();
             if (result.success) {
-                // إعادة تحميل البيانات بعد التحديث
                 await loadAllData();
             }
         } catch (error) {
-            console.error("خطأ في تسجيل البلاغ:", error);
-            alert("❌ فشل في تسجيل البلاغ، حاول مرة أخرى");
+            console.error("خطأ:", error);
+            alert("❌ فشل في تسجيل البلاغ");
         }
     }
 
-    async function resetSector() {
-        if (!confirm(`⚠️ هل أنت متأكد من تصفير جميع البلاغات في قطاع ${sectorsData[currentSector]?.name || currentSector}؟`)) return;
-        
+    async function resetAll() {
+        if (!confirm("⚠️ هل أنت متأكد من تصفير جميع البلاغات؟")) return;
         try {
             const response = await fetch('/api/reset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sector: currentSector })
+                body: JSON.stringify({})
             });
             const result = await response.json();
             if (result.success) {
                 await loadAllData();
             }
         } catch (error) {
-            console.error("خطأ في التصفير:", error);
+            console.error("خطأ:", error);
             alert("❌ فشل في تصفير البيانات");
         }
     }
 
-    async function exportExcel() {
-        window.open(`/api/export/${currentSector}`, '_blank');
+    function exportExcel() {
+        window.open('/api/export', '_blank');
     }
 
     // ============================================
     // دوال الواجهة
     // ============================================
-    function buildSectorButtons() {
-        const container = document.getElementById("sectorSelector");
-        container.innerHTML = "";
-        
-        const sectorNames = {
-            south: "📍 الجنوب",
-            north: "⬆️ الشمال",
-            east: "➡️ الشرق",
-            west: "⬅️ الغرب",
-            central: "🟢 الوسط"
-        };
-        
-        for (let [id, name] of Object.entries(sectorNames)) {
-            const btn = document.createElement("button");
-            btn.className = "sector-btn" + (currentSector === id ? " active" : "");
-            btn.textContent = name;
-            btn.dataset.sector = id;
-            btn.onclick = () => switchSector(id);
-            container.appendChild(btn);
-        }
-    }
-
-    function switchSector(sectorId) {
-        currentSector = sectorId;
-        // تحديث حالة الأزرار
-        document.querySelectorAll('.sector-btn').forEach(btn => {
-            if (btn.dataset.sector === sectorId) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-        renderCurrentSector();
-        updateTotal();
-    }
-
     function updateTotal() {
-        const sectorReports = reports[currentSector] || {};
         let total = 0;
-        for (let key in sectorReports) {
-            total += sectorReports[key].count;
+        for (let key in reports) {
+            total += reports[key].count;
         }
         document.getElementById("grandTotal").innerText = total;
     }
 
-    function renderCurrentSector() {
+    function renderData() {
         const container = document.getElementById("pointsContainer");
-        const sector = sectorsData[currentSector];
-        
-        if (!sector) {
-            container.innerHTML = "<div class='loading'>❌ بيانات القطاع غير متوفرة</div>";
+        if (!centersData || Object.keys(centersData).length === 0) {
+            container.innerHTML = "<div class='loading'>❌ لا توجد بيانات</div>";
             return;
         }
         
         container.innerHTML = "";
-        const sectorReports = reports[currentSector] || {};
         
-        for (let center in sector.centers) {
+        for (let center in centersData) {
             const pointDiv = document.createElement("div");
             pointDiv.className = "point-card";
             pointDiv.innerHTML = `<div class="point-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
@@ -397,9 +346,9 @@
             
             const grid = pointDiv.querySelector(".units-grid");
             
-            for (let unit of sector.centers[center]) {
+            for (let unit of centersData[center]) {
                 const key = `${center}|${unit}`;
-                const info = sectorReports[key] || { count: 0, times: [] };
+                const info = reports[key] || { count: 0, times: [] };
                 
                 const unitDiv = document.createElement("div");
                 unitDiv.className = "unit-card";
@@ -437,7 +386,7 @@
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     document.getElementById("exportBtn").onclick = exportExcel;
-    document.getElementById("resetBtn").onclick = resetSector;
+    document.getElementById("resetBtn").onclick = resetAll;
     window.onclick = (e) => { if (e.target === document.getElementById("timeModal")) closeModal(); };
     
     loadAllData();
