@@ -73,18 +73,54 @@ app.post('/api/report', async (req, res) => {
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
     
     const key = `${center}|${unit}`;
-    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // وقت السعودية (UTC+3)
+    const now = new Date();
+    const offset = 3; // السعودية UTC+3
+    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    const year = saudiTime.getUTCFullYear();
+    const month = (saudiTime.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = saudiTime.getUTCDate().toString().padStart(2, '0');
+    const hours = saudiTime.getUTCHours().toString().padStart(2, '0');
+    const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
+    const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     
     try {
         const allData = await readData();
         if (!allData[key]) allData[key] = { count: 0, times: [] };
         allData[key].count++;
         allData[key].times.unshift(timestamp);
-        if (allData[key].times.length > 8) allData[key].times.pop();
+        if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
+    }
+});
+
+// ============================================
+// API: حذف آخر بلاغ
+// ============================================
+app.post('/api/undo', async (req, res) => {
+    const { center, unit } = req.body;
+    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
+    
+    const key = `${center}|${unit}`;
+    
+    try {
+        const allData = await readData();
+        if (!allData[key] || allData[key].count === 0) {
+            return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
+        }
+        
+        allData[key].count--;
+        allData[key].times.shift(); // حذف آخر وقت (أول عنصر في المصفوفة)
+        
+        await writeData(allData);
+        res.json({ success: true, newCount: allData[key].count });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
     }
 });
 

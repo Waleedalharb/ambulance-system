@@ -86,10 +86,6 @@
         .toolbar button:active {
             background: #ddd;
         }
-        .shift-btn {
-            background: white;
-            border: 1px solid #000;
-        }
         .point-card {
             border: 1px solid #000;
             margin-bottom: 15px;
@@ -105,7 +101,7 @@
         }
         .units-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 0;
         }
         .unit-card {
@@ -130,17 +126,25 @@
             font-weight: bold;
             margin: 6px 0;
         }
-        .report-btn {
+        .buttons-row {
+            display: flex;
+            gap: 5px;
+            margin: 4px 0;
+        }
+        .report-btn, .undo-btn {
             background: white;
             border: 1px solid #000;
             padding: 5px;
-            width: 100%;
-            font-size: 0.7rem;
+            flex: 1;
+            font-size: 0.65rem;
             font-weight: bold;
             cursor: pointer;
-            margin: 4px 0;
         }
-        .report-btn:active {
+        .undo-btn {
+            border-color: #c0392b;
+            color: #c0392b;
+        }
+        .report-btn:active, .undo-btn:active {
             background: #ddd;
         }
         .show-times-btn {
@@ -148,11 +152,10 @@
             border: 1px solid #888;
             padding: 4px;
             width: 100%;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             cursor: pointer;
-            margin: 2px 0;
+            margin-top: 4px;
         }
-        /* النافذة المنبثقة للنموذج */
         .modal {
             display: none;
             position: fixed;
@@ -179,21 +182,8 @@
             text-align: center;
             margin: 5px 0;
         }
-        .modal-content h2 {
-            font-size: 1.3rem;
-        }
-        .modal-content .sector-title {
-            text-align: center;
-            font-size: 1rem;
-            margin: 5px 0;
-            color: #333;
-        }
         .form-row {
             margin: 15px 0;
-        }
-        .form-row label {
-            font-weight: bold;
-            margin-left: 10px;
         }
         .shift-type {
             display: inline-flex;
@@ -210,6 +200,7 @@
             border: 1px solid #000;
             padding: 6px;
             text-align: center;
+            vertical-align: middle;
         }
         th {
             background: #f0f0f0;
@@ -220,6 +211,27 @@
             font-family: monospace;
             border: 1px solid #aaa;
             border-radius: 3px;
+        }
+        .staff-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .staff-cell input {
+            width: 70px;
+            text-align: center;
+        }
+        .status-icon {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 30px;
+        }
+        .status-ok {
+            color: #2a7f3e;
+        }
+        .status-not {
+            color: #c0392b;
         }
         textarea {
             resize: vertical;
@@ -238,18 +250,6 @@
             border: 1px solid #000;
             background: white;
         }
-        .modal-buttons button:active {
-            background: #ddd;
-        }
-        .close-modal {
-            background: white;
-        }
-        .archive-select {
-            margin-bottom: 15px;
-            padding: 8px;
-            width: 100%;
-            max-width: 300px;
-        }
         .update-status {
             text-align: left;
             font-size: 0.65rem;
@@ -267,9 +267,8 @@
         @media (max-width: 650px) {
             body { padding: 10px; }
             .units-grid { grid-template-columns: 1fr; }
-            .unit-card { border-left: none; }
-            .modal-content { padding: 10px; width: 98%; }
-            th, td { font-size: 0.7rem; padding: 3px; }
+            .modal-content { padding: 10px; }
+            .staff-cell input { width: 55px; }
         }
     </style>
 </head>
@@ -285,7 +284,7 @@
     <div class="info-bar">
         <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
         <div class="toolbar">
-            <button id="shiftBtn" class="shift-btn">📋 نموذج المناوبة</button>
+            <button id="shiftBtn">📋 نموذج المناوبة</button>
             <button id="exportBtn">📎 تصدير Excel</button>
             <button id="resetBtn">🗑️ تصفير الكل</button>
         </div>
@@ -295,7 +294,7 @@
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
     </div>
-    <footer>⏱️ ضغطة واحدة = تسجيل بلاغ مع الوقت الفعلي | جميع الأجهزة تشترك في نفس البيانات | التحديث تلقائي</footer>
+    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | التحديث تلقائي بين الأجهزة</footer>
 </div>
 
 <!-- نافذة نموذج المناوبة -->
@@ -306,10 +305,9 @@
         <div class="sector-title">قطاع جنوب مدينة الرياض</div>
         <h3 style="text-decoration:underline;">نموذج استلام وتسليم مجريات النوبة</h3>
 
-        <!-- أرشيف المناوبات -->
         <div class="form-row">
             <label>📂 المناوبات السابقة:</label>
-            <select id="archiveSelect" class="archive-select">
+            <select id="archiveSelect" style="width:auto; min-width:200px;">
                 <option value="">-- مناوبة جديدة --</option>
             </select>
             <button id="deleteShiftBtn" style="padding:5px 10px; margin-right:10px;">🗑️ حذف المناوبة</button>
@@ -328,37 +326,31 @@
             </div>
         </div>
 
-        <!-- فرق التدخل السريع -->
         <h3>تحضير فرق التدخل السريع:</h3>
         <table id="rapidTable">
-            <thead>
-                <tr><th>النداء</th><th>التمركز</th></tr>
-            </thead>
+            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
             <tbody>
-                <tr><td>سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1" placeholder="التمركز"></td></tr>
-                <tr><td>سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2" placeholder="التمركز"></td></tr>
-                <tr><td>سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3" placeholder="التمركز"></td></tr>
-                <tr><td>سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4" placeholder="التمركز"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
             </tbody>
         </table>
 
-        <!-- المراكز (جنوب 1 إلى جنوب 19) -->
         <h3>المراكز الإسعافية:</h3>
         <table id="centersTable">
             <thead>
-                <tr><th>المركز</th><th>عدد المسعفين</th><th>ملاحظات (تأخير / غياب)</th></tr>
+                <tr><th>المركز</th><th>عدد المسعفين</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr>
             </thead>
-            <tbody id="centersTableBody">
-            </tbody>
+            <tbody id="centersTableBody"></tbody>
         </table>
 
-        <!-- الملاحظات العامة -->
         <h3>الملاحظات العامة أثناء سير المناوبة:</h3>
-        <textarea id="generalNotes" rows="3" placeholder="اكتب هنا أي ملاحظات عامة..."></textarea>
+        <textarea id="generalNotes" rows="3"></textarea>
 
         <div class="modal-buttons">
             <button id="saveShiftBtn">💾 حفظ النموذج</button>
-            <button id="closeShiftBtn" class="close-modal">❌ إغلاق</button>
+            <button id="closeShiftBtn">❌ إغلاق</button>
         </div>
     </div>
 </div>
@@ -373,12 +365,11 @@
     let currentShiftId = null;
     let allShifts = [];
 
-    // قائمة المراكز من جنوب 1 إلى جنوب 19
     const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
 
     // ============================================
-    // دوال الاتصال بالخادم (البلاغات)
+    // دوال الاتصال بالخادم
     // ============================================
     async function loadAllData() {
         try {
@@ -390,26 +381,35 @@
             updateTotal();
             document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
         } catch (error) {
-            console.error("خطأ:", error);
             document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
-            document.getElementById("updateStatus").innerHTML = "🔴 غير متصل | جاري المحاولة...";
         }
     }
 
     async function addReportToServer(center, unit) {
         try {
-            const response = await fetch('/api/report', {
+            await fetch('/api/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ center, unit })
+            });
+        } catch (error) {
+            alert("❌ فشل في تسجيل البلاغ");
+        }
+    }
+
+    async function undoLastReport(center, unit) {
+        try {
+            const response = await fetch('/api/undo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ center, unit })
             });
             const result = await response.json();
-            if (!result.success) {
-                alert("❌ فشل في تسجيل البلاغ");
+            if (!result.success && result.error) {
+                alert(result.error);
             }
         } catch (error) {
-            console.error("خطأ:", error);
-            alert("❌ فشل في الاتصال بالخادم");
+            alert("❌ فشل في التراجع");
         }
     }
 
@@ -426,9 +426,6 @@
         window.open('/api/export', '_blank');
     }
 
-    // ============================================
-    // التحديث التلقائي
-    // ============================================
     async function checkForUpdates() {
         try {
             const response = await fetch('/api/last-update');
@@ -436,22 +433,31 @@
             if (data.lastUpdate > lastKnownUpdate) {
                 lastKnownUpdate = data.lastUpdate;
                 await loadAllData();
-                console.log("🔄 تحديث تلقائي");
             }
-        } catch (error) {
-            console.error("خطأ في التحديث:", error);
-        }
+        } catch (error) {}
     }
 
-    // ============================================
-    // دوال الواجهة (البلاغات)
-    // ============================================
     function updateTotal() {
         let total = 0;
         for (let key in reports) {
-            if (reports[key] && reports[key].count) total += reports[key].count;
+            if (reports[key]?.count) total += reports[key].count;
         }
         document.getElementById("grandTotal").innerText = total;
+    }
+
+    function showTimes(center, unit, times) {
+        const modalTimes = document.createElement("div");
+        modalTimes.className = "modal";
+        modalTimes.innerHTML = `
+            <div class="modal-content" style="max-width:380px;">
+                <h3>${center} - ${unit}</h3>
+                <div class="modal-times">${times && times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p>— لا توجد بلاغات —</p>"}</div>
+                <button class="close-modal" onclick="this.closest('.modal').style.display='none'">إغلاق</button>
+            </div>
+        `;
+        document.body.appendChild(modalTimes);
+        modalTimes.style.display = "flex";
+        modalTimes.querySelector(".close-modal").onclick = () => modalTimes.remove();
     }
 
     function renderData() {
@@ -470,38 +476,30 @@
             for (let unit of centersData[center]) {
                 const key = `${center}|${unit}`;
                 const info = reports[key] || { count: 0, times: [] };
+                const hasReports = info.count > 0;
                 const unitDiv = document.createElement("div");
                 unitDiv.className = "unit-card";
                 unitDiv.innerHTML = `
                     <div class="unit-name">${unit}</div>
                     <div class="count-number">${info.count}</div>
-                    <button class="report-btn">➕ تسجيل بلاغ</button>
+                    <div class="buttons-row">
+                        <button class="report-btn">➕ تسجيل بلاغ</button>
+                        ${hasReports ? '<button class="undo-btn">↩️ تراجع</button>' : ''}
+                    </div>
                     <button class="show-times-btn">📋 عرض التواقيت</button>
                 `;
                 unitDiv.querySelector(".report-btn").onclick = () => addReportToServer(center, unit);
+                if (hasReports) {
+                    unitDiv.querySelector(".undo-btn").onclick = () => undoLastReport(center, unit);
+                }
                 unitDiv.querySelector(".show-times-btn").onclick = () => showTimes(center, unit, info.times);
                 grid.appendChild(unitDiv);
             }
         }
     }
 
-    function showTimes(center, unit, times) {
-        const modalTimes = document.createElement("div");
-        modalTimes.className = "modal";
-        modalTimes.innerHTML = `
-            <div class="modal-content" style="max-width:380px;">
-                <h3>${center} - ${unit}</h3>
-                <div class="modal-times">${times && times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p>— لا توجد بلاغات —</p>"}</div>
-                <button class="close-modal" onclick="this.closest('.modal').style.display='none'">إغلاق</button>
-            </div>
-        `;
-        document.body.appendChild(modalTimes);
-        modalTimes.style.display = "flex";
-        modalTimes.querySelector(".close-modal").onclick = () => modalTimes.remove();
-    }
-
     // ============================================
-    // دوال نموذج المناوبة (Shift Form)
+    // دوال نموذج المناوبة
     // ============================================
     async function loadShifts() {
         try {
@@ -513,35 +511,27 @@
                 const date = new Date(shift.lastUpdate).toLocaleString('ar-SA');
                 const option = document.createElement('option');
                 option.value = shift.id;
-                option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}${shift.shiftDate ? ' - ' + shift.shiftDate : ''}`;
+                option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
                 archiveSelect.appendChild(option);
             });
-        } catch (error) {
-            console.error("خطأ في تحميل المناوبات:", error);
-        }
+        } catch (error) {}
     }
 
     function loadShiftToForm(shift) {
         currentShiftId = shift.id;
         document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
         
-        // نوع المناوبة
         const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
-        shiftTypeRadios.forEach(radio => {
-            radio.checked = (radio.value === shift.shiftType);
-        });
+        shiftTypeRadios.forEach(radio => radio.checked = (radio.value === shift.shiftType));
         
-        // فرق التدخل السريع
         if (shift.rapidLocations) {
             document.querySelectorAll('.rapid-location').forEach(input => {
-                const unit = input.dataset.unit;
-                input.value = shift.rapidLocations[unit] || '';
+                input.value = shift.rapidLocations[input.dataset.unit] || '';
             });
         } else {
             document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
         }
         
-        // المراكز
         if (shift.centersData) {
             for (let i = 0; i < centerList.length; i++) {
                 const center = centerList[i];
@@ -550,6 +540,7 @@
                 const notesInput = document.getElementById(`notes_${i}`);
                 if (staffInput) staffInput.value = data.staffCount || '';
                 if (notesInput) notesInput.value = data.notes || '';
+                updateStatusIcon(i);
             }
         } else {
             for (let i = 0; i < centerList.length; i++) {
@@ -557,21 +548,18 @@
                 const notesInput = document.getElementById(`notes_${i}`);
                 if (staffInput) staffInput.value = '';
                 if (notesInput) notesInput.value = '';
+                updateStatusIcon(i);
             }
         }
-        
-        // الملاحظات العامة
         document.getElementById('generalNotes').value = shift.generalNotes || '';
     }
 
     function getShiftFromForm() {
         const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
-        
         const rapidLocations = {};
         document.querySelectorAll('.rapid-location').forEach(input => {
             rapidLocations[input.dataset.unit] = input.value;
         });
-        
         const centersDataForm = {};
         for (let i = 0; i < centerList.length; i++) {
             const center = centerList[i];
@@ -582,7 +570,6 @@
                 notes: notesInput?.value || ''
             };
         }
-        
         return {
             id: currentShiftId,
             shiftDate: document.getElementById('shiftDate').innerText,
@@ -604,15 +591,14 @@
             });
             const result = await response.json();
             if (result.success) {
-                alert("✅ تم حفظ نموذج المناوبة بنجاح");
+                alert("✅ تم حفظ نموذج المناوبة");
                 currentShiftId = result.id;
                 await loadShifts();
             } else {
-                alert("❌ فشل في حفظ النموذج");
+                alert("❌ فشل في الحفظ");
             }
         } catch (error) {
-            console.error("خطأ:", error);
-            alert("❌ خطأ في الاتصال بالخادم");
+            alert("❌ خطأ في الاتصال");
         }
     }
 
@@ -632,23 +618,38 @@
                 clearShiftForm();
                 await loadShifts();
             } else {
-                alert("❌ فشل في حذف المناوبة");
+                alert("❌ فشل في الحذف");
             }
         } catch (error) {
-            alert("❌ خطأ في الاتصال بالخادم");
+            alert("❌ خطأ في الاتصال");
+        }
+    }
+
+    function updateStatusIcon(index) {
+        const staffInput = document.getElementById(`staff_${index}`);
+        const iconSpan = document.getElementById(`status_${index}`);
+        if (staffInput && iconSpan) {
+            const staffCount = parseInt(staffInput.value);
+            if (!isNaN(staffCount) && staffCount >= 2) {
+                iconSpan.innerHTML = '✅';
+                iconSpan.className = 'status-icon status-ok';
+            } else {
+                iconSpan.innerHTML = '❌';
+                iconSpan.className = 'status-icon status-not';
+            }
         }
     }
 
     function clearShiftForm() {
         document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
-        const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
-        shiftTypeRadios.forEach(radio => radio.checked = false);
+        document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
         document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
         for (let i = 0; i < centerList.length; i++) {
             const staffInput = document.getElementById(`staff_${i}`);
             const notesInput = document.getElementById(`notes_${i}`);
             if (staffInput) staffInput.value = '';
             if (notesInput) notesInput.value = '';
+            updateStatusIcon(i);
         }
         document.getElementById('generalNotes').value = '';
     }
@@ -662,9 +663,6 @@
         });
     }
 
-    // ============================================
-    // بناء جدول المراكز في النافذة
-    // ============================================
     function buildCentersTable() {
         const tbody = document.getElementById('centersTableBody');
         tbody.innerHTML = '';
@@ -672,9 +670,12 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="font-weight:bold;">${centerList[i]}</td>
-                <td><input type="number" id="staff_${i}" placeholder="عدد المسعفين" style="width:80px; text-align:center;"></td>
-                <td><input type="text" id="notes_${i}" placeholder="أسماء المتأخرين أو الغائبين"></td>
+                <td><input type="number" id="staff_${i}" style="width:70px; text-align:center;" min="0"></td>
+                <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
+                <td><input type="text" id="notes_${i}" style="width:100%;"></td>
             `;
+            const staffInput = tr.querySelector(`#staff_${i}`);
+            staffInput.addEventListener('input', () => updateStatusIcon(i));
             tbody.appendChild(tr);
         }
     }
@@ -689,7 +690,7 @@
     document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
     document.getElementById("saveShiftBtn").onclick = saveShift;
     document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
-    
+
     document.getElementById('archiveSelect').addEventListener('change', async (e) => {
         const id = parseInt(e.target.value);
         if (id) {
