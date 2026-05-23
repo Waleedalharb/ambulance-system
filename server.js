@@ -50,38 +50,6 @@ async function writeData(data) {
 }
 
 // ============================================
-// دالة تحديد المناوبة بناءً على الوقت
-// ============================================
-function getShiftForTimestamp(timestamp, allShifts) {
-    const reportTime = new Date(timestamp);
-    
-    // البحث عن مناوبة نشطة (بداية ونهاية) تحتوي هذا الوقت
-    for (let shift of allShifts) {
-        if (!shift.startTime || !shift.endTime) continue;
-        
-        const startTime = new Date(shift.startTime);
-        let endTime = new Date(shift.endTime);
-        
-        // إذا كانت النهاية في اليوم التالي (مثل المناوبة الليلية 16:00 إلى 04:00)
-        if (endTime < startTime) {
-            endTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
-            let adjustedReportTime = new Date(reportTime);
-            if (adjustedReportTime < startTime) {
-                adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
-            }
-            if (adjustedReportTime >= startTime && adjustedReportTime <= endTime) {
-                return shift.id;
-            }
-        } else {
-            if (reportTime >= startTime && reportTime <= endTime) {
-                return shift.id;
-            }
-        }
-    }
-    return null;
-}
-
-// ============================================
 // API: جلب البيانات
 // ============================================
 app.get('/api/data', async (req, res) => {
@@ -98,7 +66,7 @@ app.get('/api/last-update', (req, res) => {
 });
 
 // ============================================
-// API: جلب جميع المناوبات (للأرشيف)
+// API: جلب جميع المناوبات
 // ============================================
 app.get('/api/shifts', async (req, res) => {
     try {
@@ -135,47 +103,28 @@ app.get('/api/shifts/:id', async (req, res) => {
         const reports = await readData();
         const shiftReports = {};
         
-        // فلترة البلاغات حسب وقت المناوبة
-        const startTime = new Date(shift.startTime);
-        let endTime = new Date(shift.endTime);
-        
-        for (let key in reports) {
-            const report = reports[key];
-            if (report.times && report.times.length) {
-                const filteredTimes = [];
-                for (let time of report.times) {
-                    const reportTime = new Date(time);
-                    let adjustedReportTime = new Date(reportTime);
-                    let adjustedEndTime = new Date(endTime);
-                    
-                    if (endTime < startTime) {
-                        adjustedEndTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
-                        if (adjustedReportTime < startTime) {
-                            adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
-                        }
-                    }
-                    
-                    if (adjustedReportTime >= startTime && adjustedReportTime <= adjustedEndTime) {
-                        filteredTimes.push(time);
-                    }
-                }
-                if (filteredTimes.length > 0) {
-                    shiftReports[key] = {
-                        count: filteredTimes.length,
-                        times: filteredTimes
-                    };
+        if (shift.savedReports) {
+            // إذا كانت المناوبة تحوي نسخة محفوظة من البلاغات
+            shiftReports.reports = shift.savedReports;
+            shiftReports.total = shift.totalReports || 0;
+        } else {
+            // فلترة البلاغات حسب وقت المناوبة (للتوافق مع الإصدارات القديمة)
+            for (let key in reports) {
+                const report = reports[key];
+                if (report.count > 0) {
+                    shiftReports[key] = report;
                 }
             }
         }
         
-        res.json({ shift, reports: shiftReports });
+        res.json({ shift, reports: shiftReports.reports || {}, total: shiftReports.total });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب المناوبة' });
     }
 });
 
 // ============================================
-// API: حفظ مناوبة جديدة
+// API: حفظ مناوبة جديدة (من نموذج المناوبة)
 // ============================================
 app.post('/api/shifts', async (req, res) => {
     try {
@@ -207,6 +156,66 @@ app.post('/api/shifts', async (req, res) => {
 });
 
 // ============================================
+// API: حفظ المناوبة الحالية (زر مناوبة جديدة)
+// ============================================
+app.post('/api/save-current-shift', async (req, res) => {
+    try {
+        // قراءة البلاغات الحالية
+        const currentReports = await readData();
+        
+        // حساب إجمالي البلاغات
+        let total = 0;
+        for (let key in currentReports) {
+            if (currentReports[key]?.count) total += currentReports[key].count;
+        }
+        
+        // إنشاء مناوبة جديدة محفوظة
+        const now = new Date();
+        const shiftDate = now.toLocaleDateString('ar-SA');
+        const shiftTime = now.toLocaleTimeString('ar-SA');
+        
+        const newShift = {
+            id: Date.now(),
+            shiftName: `مناوبة ${shiftDate} - ${shiftTime}`,
+            shiftDate: shiftDate,
+            shiftTime: shiftTime,
+            shiftType: "غير محدد",
+            startTime: now.toISOString(),
+            endTime: now.toISOString(),
+            savedReports: currentReports,
+            totalReports: total,
+            rapidLocations: {},
+            centersData: {},
+            generalNotes: "",
+            lastUpdate: now.toISOString()
+        };
+        
+        // جلب المناوبات السابقة
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        // إضافة المناوبة الجديدة في البداية
+        allShifts.unshift(newShift);
+        
+        // الاحتفاظ بآخر 50 مناوبة
+        if (allShifts.length > 50) allShifts.pop();
+        
+        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
+        
+        // تصفير البلاغات الحالية
+        await writeData({});
+        
+        res.json({ success: true, shiftId: newShift.id });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ المناوبة' });
+    }
+});
+
+// ============================================
 // API: حذف مناوبة
 // ============================================
 app.delete('/api/shifts/:id', async (req, res) => {
@@ -227,7 +236,7 @@ app.delete('/api/shifts/:id', async (req, res) => {
 });
 
 // ============================================
-// API: تسجيل بلاغ (مع ربطه بالمناوبة)
+// API: تسجيل بلاغ
 // ============================================
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
@@ -286,19 +295,7 @@ app.post('/api/undo', async (req, res) => {
 });
 
 // ============================================
-// API: تصفير البيانات
-// ============================================
-app.post('/api/reset', async (req, res) => {
-    try {
-        await writeData({});
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في إعادة الضبط' });
-    }
-});
-
-// ============================================
-// API: تصدير Excel (للمناوبة الحالية أو كل البيانات)
+// API: تصدير Excel
 // ============================================
 app.get('/api/export', async (req, res) => {
     const shiftId = req.query.shiftId ? parseInt(req.query.shiftId) : null;
@@ -315,47 +312,15 @@ app.get('/api/export', async (req, res) => {
             } catch (e) {}
             shiftInfo = allShifts.find(s => s.id === shiftId);
             
-            if (shiftInfo) {
-                const startTime = new Date(shiftInfo.startTime);
-                let endTime = new Date(shiftInfo.endTime);
-                const filteredReports = {};
-                
-                for (let key in reports) {
-                    const report = reports[key];
-                    if (report.times && report.times.length) {
-                        const filteredTimes = [];
-                        for (let time of report.times) {
-                            const reportTime = new Date(time);
-                            let adjustedReportTime = new Date(reportTime);
-                            let adjustedEndTime = new Date(endTime);
-                            
-                            if (endTime < startTime) {
-                                adjustedEndTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
-                                if (adjustedReportTime < startTime) {
-                                    adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
-                                }
-                            }
-                            
-                            if (adjustedReportTime >= startTime && adjustedReportTime <= adjustedEndTime) {
-                                filteredTimes.push(time);
-                            }
-                        }
-                        if (filteredTimes.length > 0) {
-                            filteredReports[key] = {
-                                count: filteredTimes.length,
-                                times: filteredTimes
-                            };
-                        }
-                    }
-                }
-                reports = filteredReports;
+            if (shiftInfo && shiftInfo.savedReports) {
+                reports = shiftInfo.savedReports;
             }
         }
         
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
         
         let rows = [
-            [shiftInfo ? `تقرير بلاغات - ${shiftInfo.shiftType || 'مناوبة'}` : "تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
+            [shiftInfo ? `تقرير بلاغات - ${shiftInfo.shiftName || 'مناوبة'}` : "تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
             ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
