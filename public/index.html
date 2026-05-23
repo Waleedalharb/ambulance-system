@@ -233,6 +233,26 @@
         .status-not {
             color: #c0392b;
         }
+        .shift-report-header {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #000;
+            text-align: center;
+        }
+        .shift-report-stats {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .report-badge {
+            background: white;
+            border: 1px solid #000;
+            padding: 5px 10px;
+            font-weight: bold;
+        }
         textarea {
             resize: vertical;
             min-height: 60px;
@@ -282,10 +302,10 @@
     </div>
 
     <div class="info-bar">
-        <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
+        <div class="total-box">📊 إجمالي بلاغات اليوم: <span id="grandTotal">0</span></div>
         <div class="toolbar">
             <button id="shiftBtn">📋 نموذج المناوبة</button>
-            <button id="exportBtn">📎 تصدير Excel</button>
+            <button id="exportBtn">📎 تصدير Excel (جميع البلاغات)</button>
             <button id="resetBtn">🗑️ تصفير الكل</button>
         </div>
     </div>
@@ -307,10 +327,11 @@
 
         <div class="form-row">
             <label>📂 المناوبات السابقة:</label>
-            <select id="archiveSelect" style="width:auto; min-width:200px;">
+            <select id="archiveSelect" style="width:auto; min-width:250px;">
                 <option value="">-- مناوبة جديدة --</option>
             </select>
             <button id="deleteShiftBtn" style="padding:5px 10px; margin-right:10px;">🗑️ حذف المناوبة</button>
+            <button id="exportShiftBtn" style="padding:5px 10px; margin-right:5px;">📎 تصدير بلاغات هذه المناوبة</button>
         </div>
 
         <div class="form-row">
@@ -321,9 +342,14 @@
         <div class="form-row">
             <label>⏰ توقيت المناوبة:</label>
             <div class="shift-type">
-                <label><input type="radio" name="shiftType" value="صباحية"> صباحية</label>
-                <label><input type="radio" name="shiftType" value="ليلية"> ليلية</label>
+                <label><input type="radio" name="shiftType" value="صباحية" data-start="04:00" data-end="16:00"> صباحية (4 فجراً - 4 عصراً)</label>
+                <label><input type="radio" name="shiftType" value="ليلية" data-start="16:00" data-end="04:00"> ليلية (4 عصراً - 4 فجراً)</label>
             </div>
+        </div>
+
+        <div class="form-row" id="shiftTimesRow" style="display:none;">
+            <label>⏰ وقت المناوبة:</label>
+            <span id="shiftStartTime"></span> إلى <span id="shiftEndTime"></span>
         </div>
 
         <h3>تحضير فرق التدخل السريع:</h3>
@@ -348,6 +374,13 @@
         <h3>الملاحظات العامة أثناء سير المناوبة:</h3>
         <textarea id="generalNotes" rows="3"></textarea>
 
+        <!-- عرض بلاغات المناوبة -->
+        <div id="shiftReportsSection" style="display:none;">
+            <h3>📊 بلاغات هذه المناوبة:</h3>
+            <div id="shiftReportsStats" class="shift-report-stats"></div>
+            <div id="shiftReportsTable"></div>
+        </div>
+
         <div class="modal-buttons">
             <button id="saveShiftBtn">💾 حفظ النموذج</button>
             <button id="closeShiftBtn">❌ إغلاق</button>
@@ -364,9 +397,16 @@
     let lastKnownUpdate = 0;
     let currentShiftId = null;
     let allShifts = [];
+    let currentShiftReports = {};
 
     const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
+
+    // أوقات المناوبات
+    const shiftTimes = {
+        "صباحية": { start: "04:00", end: "16:00", startHour: 4, startMinute: 0, endHour: 16, endMinute: 0 },
+        "ليلية": { start: "16:00", end: "04:00", startHour: 16, startMinute: 0, endHour: 4, endMinute: 0 }
+    };
 
     // ============================================
     // دوال الاتصال بالخادم
@@ -499,6 +539,36 @@
     }
 
     // ============================================
+    // دوال إنشاء وقت المناوبة
+    // ============================================
+    function getShiftDateTime(baseDate, timeStr, isEndTime = false, shiftType = null) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const date = new Date(baseDate);
+        date.setHours(hours, minutes, 0, 0);
+        
+        // للمناوبة الليلية، وقت النهاية 04:00 يكون في اليوم التالي
+        if (shiftType === "ليلية" && isEndTime && hours === 4) {
+            date.setDate(date.getDate() + 1);
+        }
+        return date;
+    }
+
+    function setShiftTimes(shiftType) {
+        const times = shiftTimes[shiftType];
+        if (!times) return;
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const startDateTime = getShiftDateTime(today, times.start, false, shiftType);
+        let endDateTime = getShiftDateTime(today, times.end, true, shiftType);
+        
+        document.getElementById('shiftStartTime').innerText = startDateTime.toLocaleString('ar-SA');
+        document.getElementById('shiftEndTime').innerText = endDateTime.toLocaleString('ar-SA');
+        document.getElementById('shiftTimesRow').style.display = 'flex';
+    }
+
+    // ============================================
     // دوال نموذج المناوبة
     // ============================================
     async function loadShifts() {
@@ -511,18 +581,74 @@
                 const date = new Date(shift.lastUpdate).toLocaleString('ar-SA');
                 const option = document.createElement('option');
                 option.value = shift.id;
-                option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
+                option.textContent = `${shift.shiftType || 'مناوبة'} - ${shift.shiftDate || ''} - ${date}`;
                 archiveSelect.appendChild(option);
             });
         } catch (error) {}
     }
 
-    function loadShiftToForm(shift) {
+    async function loadShiftWithReports(shiftId) {
+        try {
+            const response = await fetch(`/api/shifts/${shiftId}`);
+            const result = await response.json();
+            return { shift: result.shift, reports: result.reports };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function displayShiftReports(reportsData) {
+        const section = document.getElementById('shiftReportsSection');
+        const statsDiv = document.getElementById('shiftReportsStats');
+        const tableDiv = document.getElementById('shiftReportsTable');
+        
+        if (!reportsData || Object.keys(reportsData).length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        
+        let totalReports = 0;
+        const reportRows = [];
+        
+        for (let key in reportsData) {
+            const report = reportsData[key];
+            totalReports += report.count;
+            const [center, unit] = key.split('|');
+            reportRows.push({ center, unit, count: report.count, times: report.times });
+        }
+        
+        reportRows.sort((a, b) => {
+            const numA = parseInt(a.unit.match(/\d+/)?.[0] || 0);
+            const numB = parseInt(b.unit.match(/\d+/)?.[0] || 0);
+            return numA - numB;
+        });
+        
+        statsDiv.innerHTML = `<div class="report-badge">📊 إجمالي البلاغات: ${totalReports}</div>`;
+        
+        let tableHtml = '<table style="width:100%; margin-top:10px;"><thead><tr><th>المركز</th><th>الوحدة</th><th>عدد البلاغات</th><th>التواقيت</th></tr></thead><tbody>';
+        for (let row of reportRows) {
+            const timesStr = row.times.slice(0, 5).join('<br>') + (row.times.length > 5 ? `<br>(+${row.times.length - 5} بلاغات أخرى)` : '');
+            tableHtml += `<tr><td>${row.center}</td><td>${row.unit}</td><td style="font-weight:bold;">${row.count}</td><td style="font-size:0.7rem;">${timesStr || '—'}</td></tr>`;
+        }
+        tableHtml += '</tbody></table>';
+        tableDiv.innerHTML = tableHtml;
+        section.style.display = 'block';
+    }
+
+    async function loadShiftToForm(shift) {
         currentShiftId = shift.id;
         document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
         
         const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
-        shiftTypeRadios.forEach(radio => radio.checked = (radio.value === shift.shiftType));
+        shiftTypeRadios.forEach(radio => {
+            radio.checked = (radio.value === shift.shiftType);
+        });
+        
+        if (shift.shiftType) {
+            setShiftTimes(shift.shiftType);
+        } else {
+            document.getElementById('shiftTimesRow').style.display = 'none';
+        }
         
         if (shift.rapidLocations) {
             document.querySelectorAll('.rapid-location').forEach(input => {
@@ -552,14 +678,26 @@
             }
         }
         document.getElementById('generalNotes').value = shift.generalNotes || '';
+        
+        // تحميل بلاغات المناوبة
+        const shiftData = await loadShiftWithReports(shift.id);
+        if (shiftData && shiftData.reports) {
+            displayShiftReports(shiftData.reports);
+        } else {
+            displayShiftReports(null);
+        }
     }
 
     function getShiftFromForm() {
-        const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
+        const selectedRadio = document.querySelector('input[name="shiftType"]:checked');
+        const shiftType = selectedRadio?.value || '';
+        const times = shiftTimes[shiftType];
+        
         const rapidLocations = {};
         document.querySelectorAll('.rapid-location').forEach(input => {
             rapidLocations[input.dataset.unit] = input.value;
         });
+        
         const centersDataForm = {};
         for (let i = 0; i < centerList.length; i++) {
             const center = centerList[i];
@@ -570,10 +708,22 @@
                 notes: notesInput?.value || ''
             };
         }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let startTime = null, endTime = null;
+        
+        if (times) {
+            startTime = getShiftDateTime(today, times.start, false, shiftType);
+            endTime = getShiftDateTime(today, times.end, true, shiftType);
+        }
+        
         return {
             id: currentShiftId,
             shiftDate: document.getElementById('shiftDate').innerText,
             shiftType: shiftType,
+            startTime: startTime ? startTime.toISOString() : null,
+            endTime: endTime ? endTime.toISOString() : null,
             rapidLocations: rapidLocations,
             centersData: centersDataForm,
             generalNotes: document.getElementById('generalNotes').value,
@@ -583,6 +733,11 @@
 
     async function saveShift() {
         const shiftData = getShiftFromForm();
+        if (!shiftData.shiftType) {
+            alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)");
+            return;
+        }
+        
         try {
             const response = await fetch('/api/shifts', {
                 method: 'POST',
@@ -625,6 +780,14 @@
         }
     }
 
+    function exportShiftReports() {
+        if (currentShiftId) {
+            window.open(`/api/export?shiftId=${currentShiftId}`, '_blank');
+        } else {
+            alert("الرجاء اختيار مناوبة أولاً");
+        }
+    }
+
     function updateStatusIcon(index) {
         const staffInput = document.getElementById(`staff_${index}`);
         const iconSpan = document.getElementById(`status_${index}`);
@@ -644,6 +807,7 @@
         document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
         document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
         document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
+        document.getElementById('shiftTimesRow').style.display = 'none';
         for (let i = 0; i < centerList.length; i++) {
             const staffInput = document.getElementById(`staff_${i}`);
             const notesInput = document.getElementById(`notes_${i}`);
@@ -652,6 +816,7 @@
             updateStatusIcon(i);
         }
         document.getElementById('generalNotes').value = '';
+        displayShiftReports(null);
     }
 
     function openShiftModal() {
@@ -680,6 +845,18 @@
         }
     }
 
+    // ربط أحداث اختيار نوع المناوبة
+    function bindShiftTypeEvents() {
+        const radios = document.querySelectorAll('input[name="shiftType"]');
+        radios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    setShiftTimes(e.target.value);
+                }
+            });
+        });
+    }
+
     // ============================================
     // التشغيل
     // ============================================
@@ -690,14 +867,14 @@
     document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
     document.getElementById("saveShiftBtn").onclick = saveShift;
     document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
+    document.getElementById("exportShiftBtn").onclick = exportShiftReports;
 
     document.getElementById('archiveSelect').addEventListener('change', async (e) => {
         const id = parseInt(e.target.value);
         if (id) {
             const shift = allShifts.find(s => s.id === id);
             if (shift) {
-                currentShiftId = shift.id;
-                loadShiftToForm(shift);
+                await loadShiftToForm(shift);
             }
         } else {
             currentShiftId = null;
@@ -712,6 +889,7 @@
     };
 
     buildCentersTable();
+    bindShiftTypeEvents();
     loadAllData();
     setInterval(checkForUpdates, 1000);
     setInterval(() => {

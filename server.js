@@ -50,6 +50,38 @@ async function writeData(data) {
 }
 
 // ============================================
+// دالة تحديد المناوبة بناءً على الوقت
+// ============================================
+function getShiftForTimestamp(timestamp, allShifts) {
+    const reportTime = new Date(timestamp);
+    
+    // البحث عن مناوبة نشطة (بداية ونهاية) تحتوي هذا الوقت
+    for (let shift of allShifts) {
+        if (!shift.startTime || !shift.endTime) continue;
+        
+        const startTime = new Date(shift.startTime);
+        let endTime = new Date(shift.endTime);
+        
+        // إذا كانت النهاية في اليوم التالي (مثل المناوبة الليلية 16:00 إلى 04:00)
+        if (endTime < startTime) {
+            endTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+            let adjustedReportTime = new Date(reportTime);
+            if (adjustedReportTime < startTime) {
+                adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
+            }
+            if (adjustedReportTime >= startTime && adjustedReportTime <= endTime) {
+                return shift.id;
+            }
+        } else {
+            if (reportTime >= startTime && reportTime <= endTime) {
+                return shift.id;
+            }
+        }
+    }
+    return null;
+}
+
+// ============================================
 // API: جلب البيانات
 // ============================================
 app.get('/api/data', async (req, res) => {
@@ -66,7 +98,136 @@ app.get('/api/last-update', (req, res) => {
 });
 
 // ============================================
-// API: تسجيل بلاغ
+// API: جلب جميع المناوبات (للأرشيف)
+// ============================================
+app.get('/api/shifts', async (req, res) => {
+    try {
+        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.json([]);
+        } else {
+            res.status(500).json({ error: 'فشل في جلب المناوبات' });
+        }
+    }
+});
+
+// ============================================
+// API: جلب مناوبة محددة مع بلاغاتها
+// ============================================
+app.get('/api/shifts/:id', async (req, res) => {
+    try {
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const shiftId = parseInt(req.params.id);
+        const shift = allShifts.find(s => s.id === shiftId);
+        
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        
+        // جلب البلاغات المرتبطة بهذه المناوبة
+        const reports = await readData();
+        const shiftReports = {};
+        
+        // فلترة البلاغات حسب وقت المناوبة
+        const startTime = new Date(shift.startTime);
+        let endTime = new Date(shift.endTime);
+        
+        for (let key in reports) {
+            const report = reports[key];
+            if (report.times && report.times.length) {
+                const filteredTimes = [];
+                for (let time of report.times) {
+                    const reportTime = new Date(time);
+                    let adjustedReportTime = new Date(reportTime);
+                    let adjustedEndTime = new Date(endTime);
+                    
+                    if (endTime < startTime) {
+                        adjustedEndTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+                        if (adjustedReportTime < startTime) {
+                            adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
+                        }
+                    }
+                    
+                    if (adjustedReportTime >= startTime && adjustedReportTime <= adjustedEndTime) {
+                        filteredTimes.push(time);
+                    }
+                }
+                if (filteredTimes.length > 0) {
+                    shiftReports[key] = {
+                        count: filteredTimes.length,
+                        times: filteredTimes
+                    };
+                }
+            }
+        }
+        
+        res.json({ shift, reports: shiftReports });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المناوبة' });
+    }
+});
+
+// ============================================
+// API: حفظ مناوبة جديدة
+// ============================================
+app.post('/api/shifts', async (req, res) => {
+    try {
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const newShift = req.body;
+        newShift.id = newShift.id || Date.now();
+        newShift.lastUpdate = new Date().toISOString();
+        
+        const index = allShifts.findIndex(s => s.id === newShift.id);
+        if (index !== -1) {
+            allShifts[index] = newShift;
+        } else {
+            allShifts.unshift(newShift);
+        }
+        
+        if (allShifts.length > 50) allShifts.pop();
+        
+        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
+        res.json({ success: true, id: newShift.id });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ المناوبة' });
+    }
+});
+
+// ============================================
+// API: حذف مناوبة
+// ============================================
+app.delete('/api/shifts/:id', async (req, res) => {
+    try {
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const id = parseInt(req.params.id);
+        allShifts = allShifts.filter(s => s.id !== id);
+        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف المناوبة' });
+    }
+});
+
+// ============================================
+// API: تسجيل بلاغ (مع ربطه بالمناوبة)
 // ============================================
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
@@ -76,7 +237,7 @@ app.post('/api/report', async (req, res) => {
     
     // وقت السعودية (UTC+3)
     const now = new Date();
-    const offset = 3; // السعودية UTC+3
+    const offset = 3;
     const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
     const year = saudiTime.getUTCFullYear();
     const month = (saudiTime.getUTCMonth() + 1).toString().padStart(2, '0');
@@ -115,7 +276,7 @@ app.post('/api/undo', async (req, res) => {
         }
         
         allData[key].count--;
-        allData[key].times.shift(); // حذف آخر وقت (أول عنصر في المصفوفة)
+        allData[key].times.shift();
         
         await writeData(allData);
         res.json({ success: true, newCount: allData[key].count });
@@ -137,15 +298,64 @@ app.post('/api/reset', async (req, res) => {
 });
 
 // ============================================
-// API: تصدير Excel
+// API: تصدير Excel (للمناوبة الحالية أو كل البيانات)
 // ============================================
 app.get('/api/export', async (req, res) => {
+    const shiftId = req.query.shiftId ? parseInt(req.query.shiftId) : null;
+    
     try {
-        const reports = await readData();
+        let reports = await readData();
+        let shiftInfo = null;
+        
+        if (shiftId) {
+            let allShifts = [];
+            try {
+                const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+                allShifts = JSON.parse(data);
+            } catch (e) {}
+            shiftInfo = allShifts.find(s => s.id === shiftId);
+            
+            if (shiftInfo) {
+                const startTime = new Date(shiftInfo.startTime);
+                let endTime = new Date(shiftInfo.endTime);
+                const filteredReports = {};
+                
+                for (let key in reports) {
+                    const report = reports[key];
+                    if (report.times && report.times.length) {
+                        const filteredTimes = [];
+                        for (let time of report.times) {
+                            const reportTime = new Date(time);
+                            let adjustedReportTime = new Date(reportTime);
+                            let adjustedEndTime = new Date(endTime);
+                            
+                            if (endTime < startTime) {
+                                adjustedEndTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+                                if (adjustedReportTime < startTime) {
+                                    adjustedReportTime = new Date(adjustedReportTime.getTime() + 24 * 60 * 60 * 1000);
+                                }
+                            }
+                            
+                            if (adjustedReportTime >= startTime && adjustedReportTime <= adjustedEndTime) {
+                                filteredTimes.push(time);
+                            }
+                        }
+                        if (filteredTimes.length > 0) {
+                            filteredReports[key] = {
+                                count: filteredTimes.length,
+                                times: filteredTimes
+                            };
+                        }
+                    }
+                }
+                reports = filteredReports;
+            }
+        }
+        
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
         
         let rows = [
-            ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
+            [shiftInfo ? `تقرير بلاغات - ${shiftInfo.shiftType || 'مناوبة'}` : "تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
             ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
@@ -174,72 +384,6 @@ app.get('/api/export', async (req, res) => {
         res.status(200).send("\uFEFF" + csv);
     } catch (error) {
         res.status(500).json({ error: 'فشل في تصدير البيانات' });
-    }
-});
-
-// ============================================
-// API: نموذج المناوبة (Shift Form)
-// ============================================
-
-// جلب جميع المناوبات
-app.get('/api/shifts', async (req, res) => {
-    try {
-        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.json([]);
-        } else {
-            res.status(500).json({ error: 'فشل في جلب المناوبات' });
-        }
-    }
-});
-
-// حفظ مناوبة جديدة أو تحديثها
-app.post('/api/shifts', async (req, res) => {
-    try {
-        let allShifts = [];
-        try {
-            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-            allShifts = JSON.parse(data);
-        } catch (e) {}
-        
-        const newShift = req.body;
-        newShift.id = newShift.id || Date.now();
-        newShift.lastUpdate = new Date().toISOString();
-        
-        const index = allShifts.findIndex(s => s.id === newShift.id);
-        if (index !== -1) {
-            allShifts[index] = newShift;
-        } else {
-            allShifts.unshift(newShift);
-        }
-        
-        if (allShifts.length > 50) allShifts.pop();
-        
-        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
-        res.json({ success: true, id: newShift.id });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ المناوبة' });
-    }
-});
-
-// حذف مناوبة
-app.delete('/api/shifts/:id', async (req, res) => {
-    try {
-        let allShifts = [];
-        try {
-            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-            allShifts = JSON.parse(data);
-        } catch (e) {}
-        
-        const id = parseInt(req.params.id);
-        allShifts = allShifts.filter(s => s.id !== id);
-        await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف المناوبة' });
     }
 });
 
