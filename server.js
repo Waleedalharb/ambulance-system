@@ -99,25 +99,12 @@ app.get('/api/shifts/:id', async (req, res) => {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
         
-        // جلب البلاغات المرتبطة بهذه المناوبة
-        const reports = await readData();
-        const shiftReports = {};
-        
-        if (shift.savedReports) {
-            // إذا كانت المناوبة تحوي نسخة محفوظة من البلاغات
-            shiftReports.reports = shift.savedReports;
-            shiftReports.total = shift.totalReports || 0;
-        } else {
-            // فلترة البلاغات حسب وقت المناوبة (للتوافق مع الإصدارات القديمة)
-            for (let key in reports) {
-                const report = reports[key];
-                if (report.count > 0) {
-                    shiftReports[key] = report;
-                }
-            }
-        }
-        
-        res.json({ shift, reports: shiftReports.reports || {}, total: shiftReports.total });
+        // إرجاع المناوبة مع بلاغاتها المحفوظة
+        res.json({ 
+            shift: shift, 
+            reports: shift.savedReports || {},
+            total: shift.totalReports || 0
+        });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب المناوبة' });
     }
@@ -160,7 +147,7 @@ app.post('/api/shifts', async (req, res) => {
 // ============================================
 app.post('/api/save-current-shift', async (req, res) => {
     try {
-        // قراءة البلاغات الحالية
+        // قراءة البلاغات الحالية كاملة
         const currentReports = await readData();
         
         // حساب إجمالي البلاغات
@@ -169,10 +156,12 @@ app.post('/api/save-current-shift', async (req, res) => {
             if (currentReports[key]?.count) total += currentReports[key].count;
         }
         
-        // إنشاء مناوبة جديدة محفوظة
+        // إنشاء مناوبة جديدة محفوظة مع تفاصيل كل فرقة
         const now = new Date();
-        const shiftDate = now.toLocaleDateString('ar-SA');
-        const shiftTime = now.toLocaleTimeString('ar-SA');
+        const offset = 3;
+        const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+        const shiftDate = saudiTime.toLocaleDateString('ar-SA');
+        const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
         
         const newShift = {
             id: Date.now(),
@@ -180,14 +169,14 @@ app.post('/api/save-current-shift', async (req, res) => {
             shiftDate: shiftDate,
             shiftTime: shiftTime,
             shiftType: "غير محدد",
-            startTime: now.toISOString(),
-            endTime: now.toISOString(),
-            savedReports: currentReports,
+            startTime: saudiTime.toISOString(),
+            endTime: saudiTime.toISOString(),
+            savedReports: JSON.parse(JSON.stringify(currentReports)), // نسخة كاملة من البلاغات
             totalReports: total,
             rapidLocations: {},
             centersData: {},
             generalNotes: "",
-            lastUpdate: now.toISOString()
+            lastUpdate: saudiTime.toISOString()
         };
         
         // جلب المناوبات السابقة
@@ -210,8 +199,8 @@ app.post('/api/save-current-shift', async (req, res) => {
         
         res.json({ success: true, shiftId: newShift.id });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ المناوبة' });
+        console.error("خطأ في حفظ المناوبة:", error);
+        res.status(500).json({ error: 'فشل في حفظ المناوبة: ' + error.message });
     }
 });
 

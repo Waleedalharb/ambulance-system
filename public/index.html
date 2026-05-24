@@ -115,13 +115,20 @@
         .toolbar button:active {
             background: #ddd;
         }
-        .current-shift-badge {
-            background: #e0e7ff;
-            border: 1px solid #000;
+        .viewing-badge {
+            background: #f0f0f0;
+            border: 1px solid #aaa;
             padding: 4px 12px;
             font-size: 0.7rem;
             display: inline-block;
             margin-right: 10px;
+        }
+        .return-btn {
+            background: white;
+            border: 1px solid #000;
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            cursor: pointer;
         }
         .point-card {
             border: 1px solid #000;
@@ -193,21 +200,6 @@
             cursor: pointer;
             margin-top: 4px;
         }
-        .viewing-badge {
-            background: #f0f0f0;
-            border: 1px solid #aaa;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .return-btn {
-            background: white;
-            border: 1px solid #000;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            cursor: pointer;
-        }
         .modal {
             display: none;
             position: fixed;
@@ -263,6 +255,16 @@
             font-family: monospace;
             border: 1px solid #aaa;
             border-radius: 3px;
+        }
+        .staff-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .staff-cell input {
+            width: 70px;
+            text-align: center;
         }
         .status-icon {
             font-size: 1.2rem;
@@ -492,10 +494,10 @@
                 await loadShifts();
                 await loadAllData();
             } else {
-                alert("❌ فشل في حفظ المناوبة");
+                alert("❌ فشل في حفظ المناوبة: " + (result.error || "خطأ غير معروف"));
             }
         } catch (error) {
-            alert("❌ خطأ في الاتصال");
+            alert("❌ خطأ في الاتصال: " + error.message);
         }
     }
 
@@ -557,6 +559,7 @@
                 alert("لا توجد بلاغات في هذه المناوبة");
             }
         } catch (error) {
+            console.error(error);
             alert("❌ فشل في تحميل بلاغات المناوبة");
         }
     }
@@ -752,6 +755,7 @@
                 alert("✅ تم حفظ نموذج المناوبة");
                 currentShiftId = result.id;
                 await loadShiftFormShifts();
+                await loadShifts();
             } else {
                 alert("❌ فشل في الحفظ");
             }

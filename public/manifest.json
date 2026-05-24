@@ -1,9 +1,9 @@
 {
-  "name": "إحصاء بلاغات الفرق الإسعافية",
-  "short_name": "بلاغات الجنوب",
+  "name": "بلاغ الجنوب - الفرق الإسعافية",
+  "short_name": "بلاغ الجنوب",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#1e466e",
+  "background_color": "#ffffff",
   "theme_color": "#1e466e",
   "lang": "ar",
   "dir": "rtl",
