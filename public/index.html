@@ -256,16 +256,6 @@
             border: 1px solid #aaa;
             border-radius: 3px;
         }
-        .staff-cell {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            justify-content: center;
-        }
-        .staff-cell input {
-            width: 70px;
-            text-align: center;
-        }
         .status-icon {
             font-size: 1.2rem;
             font-weight: bold;
@@ -286,6 +276,7 @@
             justify-content: center;
             gap: 15px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
         .modal-buttons button {
             padding: 8px 25px;
@@ -308,6 +299,84 @@
             font-size: 0.65rem;
             color: #444;
         }
+        
+        /* ============================================ */
+        /* تحسينات الطباعة */
+        /* ============================================ */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .container, .modal-content {
+                max-width: 100%;
+                margin: 0;
+                padding: 5px;
+            }
+            .info-bar, .toolbar, .archive-row, .update-status, footer, 
+            .modal-buttons, #closeShiftBtn, #saveShiftBtn, #deleteShiftBtn, 
+            #shiftArchiveSelect, #printShiftBtn, button:not(.no-print),
+            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn {
+                display: none !important;
+            }
+            .modal {
+                display: block !important;
+                position: relative;
+                background: white;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: auto;
+                overflow: visible;
+                transform: none;
+            }
+            .modal-content {
+                border: 1px solid #000;
+                margin: 0;
+                padding: 5px;
+                max-width: 100%;
+                box-shadow: none;
+                overflow: visible;
+                height: auto;
+            }
+            table {
+                page-break-inside: avoid;
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 10pt;
+            }
+            th, td {
+                border: 1px solid #000;
+                padding: 4px;
+            }
+            input, textarea {
+                border: none;
+                padding: 0;
+                margin: 0;
+                font-size: 9pt;
+                background: transparent;
+            }
+            input {
+                text-align: center;
+            }
+            .status-icon {
+                font-size: 10pt;
+            }
+            h2, h3, .sector-title {
+                page-break-after: avoid;
+            }
+            .modal-content {
+                page-break-inside: avoid;
+            }
+            .form-row {
+                margin: 5px 0;
+            }
+            .shift-type label {
+                margin-left: 10px;
+            }
+        }
+        
         @media (max-width: 650px) {
             body { padding: 10px; }
             .units-grid { grid-template-columns: 1fr; }
@@ -403,6 +472,7 @@
         <textarea id="generalNotes" rows="3"></textarea>
 
         <div class="modal-buttons">
+            <button id="printShiftBtn">🖨️ طباعة النموذج</button>
             <button id="saveShiftBtn">💾 حفظ النموذج</button>
             <button id="closeShiftBtn">❌ إغلاق</button>
         </div>
@@ -826,6 +896,10 @@
         });
     }
 
+    function printShiftForm() {
+        window.print();
+    }
+
     function buildCentersTable() {
         const tbody = document.getElementById('centersTableBody');
         tbody.innerHTML = '';
@@ -852,6 +926,7 @@
     document.getElementById("shiftBtn").onclick = openShiftModal;
     document.getElementById("viewShiftBtn").onclick = viewShiftReports;
     document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
+    document.getElementById("printShiftBtn").onclick = printShiftForm;
     
     document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
     document.getElementById("saveShiftBtn").onclick = saveShift;
