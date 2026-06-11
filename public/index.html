@@ -495,7 +495,7 @@
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
 
     // ============================================
-    // دوال الاتصال بالخادم
+    // دوال الاتصال بالخادم (البلاغات)
     // ============================================
     async function loadAllData() {
         try {
@@ -601,6 +601,7 @@
         } catch (error) {}
     }
 
+    // عرض مناوبة سابقة (بلاغات + بيانات التكميل)
     async function viewShiftReports() {
         const select = document.getElementById('archiveSelect');
         const shiftId = parseInt(select.value);
@@ -613,24 +614,36 @@
             const response = await fetch(`/api/shifts/${shiftId}`);
             const result = await response.json();
             
-            if (result && result.reports) {
+            if (result && result.shift) {
                 currentViewingShift = result.shift;
                 isViewingArchiveShift = true;
-                reports = result.reports;
+                
+                // عرض البلاغات
+                if (result.reports) {
+                    reports = result.reports;
+                } else {
+                    reports = {};
+                }
                 renderData();
                 updateTotal();
                 
-                const totalReports = result.total || Object.keys(result.reports).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
+                // عرض بيانات التكميل في نموذج المناوبة
+                loadShiftToForm(result.shift);
+                
+                const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
                 document.getElementById('viewingBadge').style.display = 'inline-block';
                 document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
                 document.getElementById('viewingBadge').innerHTML = `📂 تستعرض: ${currentViewingShift.shiftName || currentViewingShift.shiftType || 'مناوبة'} (${totalReports} بلاغ)`;
                 document.getElementById('updateStatus').innerHTML = `🟡 تستعرض مناوبة سابقة | آخر تحديث: ${new Date().toLocaleTimeString()}`;
+                
+                // فتح نموذج المناوبة تلقائياً لعرض بيانات التكميل
+                document.getElementById('shiftModal').style.display = 'flex';
             } else {
-                alert("لا توجد بلاغات في هذه المناوبة");
+                alert("لا توجد بيانات في هذه المناوبة");
             }
         } catch (error) {
             console.error(error);
-            alert("❌ فشل في تحميل بلاغات المناوبة");
+            alert("❌ فشل في تحميل المناوبة");
         }
     }
 
@@ -722,7 +735,7 @@
     }
 
     // ============================================
-    // دوال نموذج المناوبة
+    // دوال نموذج المناوبة (التكميل)
     // ============================================
     async function loadShiftFormShifts() {
         try {

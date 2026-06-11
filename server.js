@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 // ============================================
 const DATA_PATH = '/data/ambulance-data.json';
 const SHIFT_DATA_PATH = '/data/shift-data.json';
+const CURRENT_SHIFT_DATA_PATH = '/data/current-shift-data.json';
 let lastUpdateTime = Date.now();
 
 // Middleware
@@ -32,7 +33,7 @@ const centersData = {
 };
 
 // ============================================
-// دوال قراءة وكتابة البيانات
+// دوال قراءة وكتابة البيانات (البلاغات)
 // ============================================
 async function readData() {
     try {
@@ -50,12 +51,34 @@ async function writeData(data) {
 }
 
 // ============================================
-// API: جلب البيانات
+// دوال بيانات التكميل الحالية
+// ============================================
+async function readCurrentShiftData() {
+    try {
+        const data = await fs.readFile(CURRENT_SHIFT_DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return {};
+        throw error;
+    }
+}
+
+async function writeCurrentShiftData(data) {
+    await fs.writeFile(CURRENT_SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// API: جلب البيانات (البلاغات + بيانات التكميل)
 // ============================================
 app.get('/api/data', async (req, res) => {
     try {
         const data = await readData();
-        res.json({ data, centers: centersData });
+        const currentShiftData = await readCurrentShiftData();
+        res.json({ 
+            data, 
+            centers: centersData,
+            currentShiftData: currentShiftData
+        });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب البيانات' });
     }
@@ -82,7 +105,7 @@ app.get('/api/shifts', async (req, res) => {
 });
 
 // ============================================
-// API: جلب مناوبة محددة مع بلاغاتها
+// API: جلب مناوبة محددة مع بلاغاتها وبيانات التكميل
 // ============================================
 app.get('/api/shifts/:id', async (req, res) => {
     try {
@@ -99,7 +122,7 @@ app.get('/api/shifts/:id', async (req, res) => {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
         
-        // إرجاع المناوبة مع بلاغاتها المحفوظة
+        // إرجاع المناوبة مع بلاغاتها وبيانات التكميل
         res.json({ 
             shift: shift, 
             reports: shift.savedReports || {},
@@ -111,7 +134,7 @@ app.get('/api/shifts/:id', async (req, res) => {
 });
 
 // ============================================
-// API: حفظ مناوبة جديدة (من نموذج المناوبة)
+// API: حفظ مناوبة جديدة (من نموذج التكميل)
 // ============================================
 app.post('/api/shifts', async (req, res) => {
     try {
@@ -143,12 +166,42 @@ app.post('/api/shifts', async (req, res) => {
 });
 
 // ============================================
+// API: حفظ بيانات التكميل الحالية (نموذج المناوبة النشط)
+// ============================================
+app.post('/api/save-current-shift-data', async (req, res) => {
+    try {
+        const data = req.body;
+        await writeCurrentShiftData(data);
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ بيانات المناوبة الحالية' });
+    }
+});
+
+// ============================================
+// API: جلب بيانات التكميل الحالية
+// ============================================
+app.get('/api/get-current-shift-data', async (req, res) => {
+    try {
+        const data = await readCurrentShiftData();
+        res.json(data);
+    } catch (error) {
+        res.json({});
+    }
+});
+
+// ============================================
 // API: حفظ المناوبة الحالية (زر مناوبة جديدة)
+// يحفظ البلاغات + بيانات التكميل الحالية معاً
 // ============================================
 app.post('/api/save-current-shift', async (req, res) => {
     try {
-        // قراءة البلاغات الحالية كاملة
+        // قراءة البلاغات الحالية
         const currentReports = await readData();
+        
+        // قراءة بيانات التكميل الحالية
+        const currentShiftData = await readCurrentShiftData();
         
         // حساب إجمالي البلاغات
         let total = 0;
@@ -156,7 +209,7 @@ app.post('/api/save-current-shift', async (req, res) => {
             if (currentReports[key]?.count) total += currentReports[key].count;
         }
         
-        // إنشاء مناوبة جديدة محفوظة مع تفاصيل كل فرقة
+        // إنشاء مناوبة جديدة محفوظة مع جميع البيانات
         const now = new Date();
         const offset = 3;
         const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
@@ -168,14 +221,15 @@ app.post('/api/save-current-shift', async (req, res) => {
             shiftName: `مناوبة ${shiftDate} - ${shiftTime}`,
             shiftDate: shiftDate,
             shiftTime: shiftTime,
-            shiftType: "غير محدد",
+            shiftType: currentShiftData.shiftType || "غير محدد",
             startTime: saudiTime.toISOString(),
             endTime: saudiTime.toISOString(),
-            savedReports: JSON.parse(JSON.stringify(currentReports)), // نسخة كاملة من البلاغات
+            savedReports: JSON.parse(JSON.stringify(currentReports)),
             totalReports: total,
-            rapidLocations: {},
-            centersData: {},
-            generalNotes: "",
+            // حفظ بيانات التكميل كاملة
+            rapidLocations: currentShiftData.rapidLocations || {},
+            centersData: currentShiftData.centersData || {},
+            generalNotes: currentShiftData.generalNotes || "",
             lastUpdate: saudiTime.toISOString()
         };
         
@@ -196,6 +250,9 @@ app.post('/api/save-current-shift', async (req, res) => {
         
         // تصفير البلاغات الحالية
         await writeData({});
+        
+        // تصفير بيانات التكميل الحالية
+        await writeCurrentShiftData({});
         
         res.json({ success: true, shiftId: newShift.id });
     } catch (error) {
@@ -348,4 +405,5 @@ app.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
     console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
+    console.log(`📁 مسار بيانات التكميل الحالية: ${CURRENT_SHIFT_DATA_PATH}`);
 });
