@@ -311,6 +311,27 @@
             color: #444;
         }
         
+        /* تحسينات تبويبات Excel */
+        .sheet-tab {
+            padding: 6px 15px;
+            border: 1px solid #000;
+            background: white;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .sheet-tab.active {
+            background: #1e466e;
+            color: white;
+        }
+        .sheet-tab:hover {
+            background: #ddd;
+        }
+        .sheet-tab.active:hover {
+            background: #1e466e;
+        }
+        
         /* ============================================ */
         /* تحسينات الطباعة */
         /* ============================================ */
@@ -393,6 +414,7 @@
             body { padding: 10px; }
             .units-grid { grid-template-columns: 1fr; }
             .modal-content { padding: 10px; }
+            .sheet-tab { padding: 4px 10px; font-size: 0.7rem; }
         }
     </style>
 </head>
@@ -494,17 +516,17 @@
 
 <!-- نافذة الجدول الشهري -->
 <div id="monthlyTableModal" class="modal">
-    <div class="modal-content" style="max-width:95%;">
+    <div class="modal-content" style="max-width:98%;">
         <h2>📊 جدول المناوبات الشهري - قطاع جنوب الرياض</h2>
         <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
                 <button type="button" id="uploadExcelBtn" style="padding:10px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">📁 اختيار ملف</button>
-                <button type="submit" id="submitUploadBtn" style="padding:10px 20px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-weight:bold;">⬆️ رفع وحفظ</button>
+                <button type="submit" id="submitUploadBtn" style="display:none;">⬆️ رفع وحفظ</button>
             </form>
             <span id="tableStatus" style="font-size:0.75rem; color:#666;">📂 جاري التحقق...</span>
         </div>
-        <div id="excelTableContainer" style="overflow-x:auto; margin-top:15px; max-height:70vh; overflow-y:auto;">
+        <div id="excelTableContainer" style="overflow:auto; margin-top:15px; max-height:75vh; position:relative;">
             <p style="text-align:center; color:#888; padding:30px 0;">⏳ جاري تحميل الجدول...</p>
         </div>
         <div class="modal-buttons">
@@ -527,6 +549,10 @@
 
     const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
+
+    // متغيرات الجدول الشهري
+    let currentSheetIndex = 0;
+    let workbookData = null;
 
     // ============================================
     // دوال الاتصال بالخادم (البلاغات)
@@ -959,7 +985,7 @@
     }
 
     // ============================================
-    // دوال الجدول الشهري (رفع وعرض)
+    // دوال الجدول الشهري (رفع وعرض Excel مع صيغ)
     // ============================================
     document.getElementById('monthlyTableBtn').onclick = function() {
         document.getElementById('monthlyTableModal').style.display = 'flex';
@@ -986,25 +1012,23 @@
                 reader.onload = function(event) {
                     try {
                         const data = new Uint8Array(event.target.result);
-                        const workbook = XLSX.read(data, { 
+                        workbookData = XLSX.read(data, { 
                             type: 'array',
-                            cellFormula: false,
+                            cellFormula: true,
                             cellHTML: false,
-                            cellNF: false,
-                            cellStyles: false,
-                            dense: true,
-                            codepage: 1256
+                            cellNF: true,
+                            cellStyles: true,
+                            dense: false,
+                            codepage: 1256,
+                            dateNF: 'yyyy-mm-dd'
                         });
-                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const html = XLSX.utils.sheet_to_html(firstSheet);
                         
-                        container.innerHTML = html;
-                        formatTable(container);
-                        status.innerHTML = '✅ جدول محفوظ';
+                        renderAllSheets(workbookData);
+                        status.innerHTML = `✅ تم تحميل ${workbookData.SheetNames.length} أوراق`;
                     } catch (error) {
                         console.error(error);
                         status.innerHTML = '❌ خطأ في عرض الجدول';
-                        container.innerHTML = '<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في عرض الجدول المحفوظ</p>';
+                        container.innerHTML = `<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في عرض الجدول: ${error.message}</p>`;
                     }
                 };
                 reader.readAsArrayBuffer(blob);
@@ -1019,61 +1043,94 @@
         }
     }
 
-    // زر اختيار الملف
+    function renderAllSheets(workbook) {
+        const container = document.getElementById('excelTableContainer');
+        let html = '';
+        
+        // إنشاء تبويبات للأوراق
+        if (workbook.SheetNames.length > 1) {
+            html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid #aaa; padding-bottom:10px;">';
+            workbook.SheetNames.forEach((name, index) => {
+                const active = index === currentSheetIndex ? 'active' : '';
+                html += `<button class="sheet-tab ${active}" data-index="${index}" style="padding:6px 15px; border:1px solid #000; background:${active ? '#1e466e' : 'white'}; color:${active ? 'white' : 'black'}; cursor:pointer; font-weight:bold; border-radius:4px;">${name}</button>`;
+            });
+            html += '</div>';
+        }
+        
+        // عرض الورقة الحالية
+        const sheetName = workbook.SheetNames[currentSheetIndex];
+        const sheet = workbook.Sheets[sheetName];
+        const htmlContent = XLSX.utils.sheet_to_html(sheet, {
+            id: 'sheet-table',
+            editable: false
+        });
+        
+        html += htmlContent;
+        container.innerHTML = html;
+        
+        // تنسيق الجدول
+        formatTable(container);
+        
+        // ربط أحداث التبويبات
+        document.querySelectorAll('.sheet-tab').forEach(btn => {
+            btn.onclick = function() {
+                currentSheetIndex = parseInt(this.dataset.index);
+                renderAllSheets(workbookData);
+            };
+        });
+    }
+
+    // رفع ملف جديد وحفظه
     document.getElementById('uploadExcelBtn').onclick = function() {
         document.getElementById('excelFileInput').click();
     };
 
-    // عرض اسم الملف عند اختياره
     document.getElementById('excelFileInput').onchange = function(e) {
         const file = e.target.files[0];
-        if (file) {
-            document.getElementById('uploadExcelBtn').innerHTML = `📁 ${file.name}`;
-        }
-    };
-
-    // رفع الملف عبر FormData
-    document.getElementById('uploadForm').onsubmit = async function(e) {
-        e.preventDefault();
-        const fileInput = document.getElementById('excelFileInput');
-        const file = fileInput.files[0];
+        if (!file) return;
         
-        if (!file) {
-            alert('الرجاء اختيار ملف أولاً');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const status = document.getElementById('tableStatus');
-        status.innerHTML = '⏳ جاري رفع الملف وحفظه...';
-
-        try {
-            const response = await fetch('/api/upload-monthly-table', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                status.innerHTML = '✅ تم حفظ الجدول بنجاح';
-                alert('✅ تم حفظ الجدول الشهري بنجاح');
-                // إعادة تحميل الجدول
-                await loadSavedTable();
-            } else {
-                status.innerHTML = '❌ فشل في حفظ الجدول';
-                alert('❌ فشل في حفظ الجدول: ' + (result.error || 'خطأ غير معروف'));
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            try {
+                const data = new Uint8Array(event.target.result);
+                workbookData = XLSX.read(data, { 
+                    type: 'array',
+                    cellFormula: true,
+                    cellHTML: false,
+                    cellNF: true,
+                    cellStyles: true,
+                    dense: false,
+                    codepage: 1256,
+                    dateNF: 'yyyy-mm-dd'
+                });
+                
+                renderAllSheets(workbookData);
+                
+                // حفظ الملف على الخادم
+                const base64 = btoa(String.fromCharCode.apply(null, data));
+                const response = await fetch('/api/upload-monthly-table', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileData: base64 })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('tableStatus').innerHTML = `✅ تم حفظ ${workbookData.SheetNames.length} أوراق بنجاح`;
+                    alert('✅ تم حفظ الجدول الشهري بنجاح');
+                } else {
+                    document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول';
+                    alert('❌ فشل في حفظ الجدول');
+                }
+            } catch (error) {
+                alert('❌ خطأ في قراءة الملف: ' + error.message);
             }
-        } catch (error) {
-            console.error(error);
-            status.innerHTML = '❌ خطأ في الرفع';
-            alert('❌ خطأ في رفع الملف: ' + error.message);
-        }
+        };
+        reader.readAsArrayBuffer(file);
     };
 
     function formatTable(container) {
-        const table = container.querySelector('table');
+        const table = container.querySelector('#sheet-table');
         if (table) {
             table.style.cssText = `
                 border-collapse: collapse;
@@ -1086,11 +1143,29 @@
                 cell.style.padding = '4px 6px';
                 cell.style.textAlign = 'center';
                 cell.style.whiteSpace = 'nowrap';
+                cell.style.verticalAlign = 'middle';
+                if (cell.dataset && cell.dataset.formula) {
+                    cell.title = `الصيغة: ${cell.dataset.formula}`;
+                    cell.style.fontStyle = 'italic';
+                    cell.style.color = '#2a7f3e';
+                }
             });
             table.querySelectorAll('th').forEach(th => {
                 th.style.background = '#f0f0f0';
                 th.style.fontWeight = 'bold';
+                th.style.position = 'sticky';
+                th.style.top = '0';
+                th.style.zIndex = '1';
             });
+            // التأكد من أن الجدول لا يتجاوز العرض
+            table.style.minWidth = '100%';
+            table.style.width = 'auto';
+            // إضافة تمرير أفقي للجداول الكبيرة
+            const containerDiv = container;
+            if (containerDiv) {
+                containerDiv.style.overflow = 'auto';
+                containerDiv.style.position = 'relative';
+            }
         }
     }
 

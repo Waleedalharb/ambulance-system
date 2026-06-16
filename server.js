@@ -15,7 +15,8 @@ const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
 let lastUpdateTime = Date.now();
 
 // Middleware
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
@@ -23,7 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ============================================
 const upload = multer({
     dest: '/data/temp/',
-    limits: { fileSize: 50 * 1024 * 1024 } // حد 50 ميجا
+    limits: { fileSize: 100 * 1024 * 1024 } // حد 100 ميجا
 });
 
 // التأكد من وجود مجلد temp
@@ -410,9 +411,8 @@ app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) =>
         if (!file) {
             return res.status(400).json({ error: 'لا يوجد ملف' });
         }
-        // نقل الملف إلى المسار النهائي
         await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
-        await fs.unlink(file.path); // حذف الملف المؤقت
+        await fs.unlink(file.path);
         res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
     } catch (error) {
         console.error(error);
