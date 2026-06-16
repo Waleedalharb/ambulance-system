@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -16,6 +17,22 @@ let lastUpdateTime = Date.now();
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================
+// إعداد Multer لرفع الملفات
+// ============================================
+const upload = multer({
+    dest: '/data/temp/',
+    limits: { fileSize: 50 * 1024 * 1024 } // حد 50 ميجا
+});
+
+// التأكد من وجود مجلد temp
+async function ensureTempDir() {
+    try {
+        await fs.mkdir('/data/temp', { recursive: true });
+    } catch (e) {}
+}
+ensureTempDir();
 
 // ============================================
 // بيانات قطاع الجنوب
@@ -75,8 +92,8 @@ app.get('/api/data', async (req, res) => {
     try {
         const data = await readData();
         const currentShiftData = await readCurrentShiftData();
-        res.json({ 
-            data, 
+        res.json({
+            data,
             centers: centersData,
             currentShiftData: currentShiftData
         });
@@ -115,16 +132,16 @@ app.get('/api/shifts/:id', async (req, res) => {
             const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
             allShifts = JSON.parse(data);
         } catch (e) {}
-        
+
         const shiftId = parseInt(req.params.id);
         const shift = allShifts.find(s => s.id === shiftId);
-        
+
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
-        
-        res.json({ 
-            shift: shift, 
+
+        res.json({
+            shift: shift,
             reports: shift.savedReports || {},
             total: shift.totalReports || 0
         });
@@ -143,20 +160,20 @@ app.post('/api/shifts', async (req, res) => {
             const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
             allShifts = JSON.parse(data);
         } catch (e) {}
-        
+
         const newShift = req.body;
         newShift.id = newShift.id || Date.now();
         newShift.lastUpdate = new Date().toISOString();
-        
+
         const index = allShifts.findIndex(s => s.id === newShift.id);
         if (index !== -1) {
             allShifts[index] = newShift;
         } else {
             allShifts.unshift(newShift);
         }
-        
+
         if (allShifts.length > 50) allShifts.pop();
-        
+
         await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
         res.json({ success: true, id: newShift.id });
     } catch (error) {
@@ -198,18 +215,18 @@ app.post('/api/save-current-shift', async (req, res) => {
     try {
         const currentReports = await readData();
         const currentShiftData = await readCurrentShiftData();
-        
+
         let total = 0;
         for (let key in currentReports) {
             if (currentReports[key]?.count) total += currentReports[key].count;
         }
-        
+
         const now = new Date();
         const offset = 3;
         const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
         const shiftDate = saudiTime.toLocaleDateString('ar-SA');
         const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
-        
+
         const newShift = {
             id: Date.now(),
             shiftName: `مناوبة ${shiftDate} - ${shiftTime}`,
@@ -225,20 +242,20 @@ app.post('/api/save-current-shift', async (req, res) => {
             generalNotes: currentShiftData.generalNotes || "",
             lastUpdate: saudiTime.toISOString()
         };
-        
+
         let allShifts = [];
         try {
             const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
             allShifts = JSON.parse(data);
         } catch (e) {}
-        
+
         allShifts.unshift(newShift);
         if (allShifts.length > 50) allShifts.pop();
-        
+
         await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
         await writeData({});
         await writeCurrentShiftData({});
-        
+
         res.json({ success: true, shiftId: newShift.id });
     } catch (error) {
         console.error("خطأ في حفظ المناوبة:", error);
@@ -256,7 +273,7 @@ app.delete('/api/shifts/:id', async (req, res) => {
             const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
             allShifts = JSON.parse(data);
         } catch (e) {}
-        
+
         const id = parseInt(req.params.id);
         allShifts = allShifts.filter(s => s.id !== id);
         await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
@@ -272,9 +289,9 @@ app.delete('/api/shifts/:id', async (req, res) => {
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
+
     const key = `${center}|${unit}`;
-    
+
     const now = new Date();
     const offset = 3;
     const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
@@ -285,7 +302,7 @@ app.post('/api/report', async (req, res) => {
     const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
     const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
     const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    
+
     try {
         const allData = await readData();
         if (!allData[key]) allData[key] = { count: 0, times: [] };
@@ -305,18 +322,18 @@ app.post('/api/report', async (req, res) => {
 app.post('/api/undo', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
+
     const key = `${center}|${unit}`;
-    
+
     try {
         const allData = await readData();
         if (!allData[key] || allData[key].count === 0) {
             return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
         }
-        
+
         allData[key].count--;
         allData[key].times.shift();
-        
+
         await writeData(allData);
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
@@ -329,11 +346,11 @@ app.post('/api/undo', async (req, res) => {
 // ============================================
 app.get('/api/export', async (req, res) => {
     const shiftId = req.query.shiftId ? parseInt(req.query.shiftId) : null;
-    
+
     try {
         let reports = await readData();
         let shiftInfo = null;
-        
+
         if (shiftId) {
             let allShifts = [];
             try {
@@ -341,21 +358,21 @@ app.get('/api/export', async (req, res) => {
                 allShifts = JSON.parse(data);
             } catch (e) {}
             shiftInfo = allShifts.find(s => s.id === shiftId);
-            
+
             if (shiftInfo && shiftInfo.savedReports) {
                 reports = shiftInfo.savedReports;
             }
         }
-        
+
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
-        
+
         let rows = [
             [shiftInfo ? `تقرير بلاغات - ${shiftInfo.shiftName || 'مناوبة'}` : "تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
             ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
         ];
-        
+
         for (let center in centersData) {
             for (let unit of centersData[center]) {
                 let key = `${center}|${unit}`;
@@ -364,16 +381,16 @@ app.get('/api/export', async (req, res) => {
                 rows.push([center, unit, record.count, timesStr]);
             }
         }
-        
+
         let total = 0;
         for (let key in safeReports) {
             if (safeReports[key]?.count) total += safeReports[key].count;
         }
         rows.push([], ["الإجمالي الكلي", "", total, ""]);
-        
+
         let csv = rows.map(row => row.map(cell => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
         const fileName = `blaghat_${Date.now()}.csv`;
-        
+
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
         res.status(200).send("\uFEFF" + csv);
@@ -386,16 +403,20 @@ app.get('/api/export', async (req, res) => {
 // API: الجدول الشهري (حفظ واسترجاع)
 // ============================================
 
-// حفظ الجدول الشهري
-app.post('/api/upload-monthly-table', async (req, res) => {
+// حفظ الجدول الشهري - رفع مباشر
+app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
     try {
-        const base64Data = req.body.fileData;
-        const buffer = Buffer.from(base64Data, 'base64');
-        await fs.writeFile(MONTHLY_TABLE_PATH, buffer);
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'لا يوجد ملف' });
+        }
+        // نقل الملف إلى المسار النهائي
+        await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
+        await fs.unlink(file.path); // حذف الملف المؤقت
         res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ الجدول' });
+        res.status(500).json({ error: 'فشل في حفظ الجدول: ' + error.message });
     }
 });
 
