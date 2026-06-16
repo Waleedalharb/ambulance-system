@@ -8,6 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>جدول توزيع البلاغات - قطاع جنوب الرياض</title>
     <link rel="manifest" href="manifest.json">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -256,6 +257,16 @@
             border: 1px solid #aaa;
             border-radius: 3px;
         }
+        .staff-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .staff-cell input {
+            width: 70px;
+            text-align: center;
+        }
         .status-icon {
             font-size: 1.2rem;
             font-weight: bold;
@@ -317,7 +328,8 @@
             .info-bar, .toolbar, .archive-row, .update-status, footer, 
             .modal-buttons, #closeShiftBtn, #saveShiftBtn, #deleteShiftBtn, 
             #shiftArchiveSelect, #printShiftBtn, button:not(.no-print),
-            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn {
+            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn,
+            #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn {
                 display: none !important;
             }
             .modal {
@@ -411,6 +423,7 @@
         <div class="toolbar">
             <button id="newShiftBtn">🔄 مناوبة جديدة</button>
             <button id="shiftBtn">📋 نموذج المناوبة</button>
+            <button id="monthlyTableBtn">📊 الجدول الشهري</button>
             <button id="exportBtn">📎 تصدير Excel</button>
         </div>
     </div>
@@ -475,6 +488,24 @@
             <button id="printShiftBtn">🖨️ طباعة النموذج</button>
             <button id="saveShiftBtn">💾 حفظ النموذج</button>
             <button id="closeShiftBtn">❌ إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الجدول الشهري -->
+<div id="monthlyTableModal" class="modal">
+    <div class="modal-content" style="max-width:95%;">
+        <h2>📊 جدول المناوبات الشهري - قطاع جنوب الرياض</h2>
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button id="uploadExcelBtn" style="padding:10px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">📁 رفع ملف Excel</button>
+            <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none;">
+            <span style="font-size:0.75rem; color:#666;">(يرجى رفع ملف Excel الخاص بالجدول الشهري)</span>
+        </div>
+        <div id="excelTableContainer" style="overflow-x:auto; margin-top:15px; max-height:70vh; overflow-y:auto;">
+            <p style="text-align:center; color:#888; padding:30px 0;">📂 يرجى رفع ملف Excel لعرض الجدول الشهري</p>
+        </div>
+        <div class="modal-buttons">
+            <button id="closeMonthlyTableBtn">❌ إغلاق</button>
         </div>
     </div>
 </div>
@@ -931,6 +962,65 @@
     }
 
     // ============================================
+    // دوال الجدول الشهري (رفع Excel)
+    // ============================================
+    document.getElementById('monthlyTableBtn').onclick = function() {
+        document.getElementById('monthlyTableModal').style.display = 'flex';
+    };
+
+    document.getElementById('closeMonthlyTableBtn').onclick = function() {
+        document.getElementById('monthlyTableModal').style.display = 'none';
+    };
+
+    document.getElementById('uploadExcelBtn').onclick = function() {
+        document.getElementById('excelFileInput').click();
+    };
+
+    document.getElementById('excelFileInput').onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // اختيار أول ورقة
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const html = XLSX.utils.sheet_to_html(firstSheet);
+                
+                const container = document.getElementById('excelTableContainer');
+                container.innerHTML = html;
+                
+                // تنسيق الجدول
+                const table = container.querySelector('table');
+                if (table) {
+                    table.style.cssText = `
+                        border-collapse: collapse;
+                        width: 100%;
+                        font-size: 0.7rem;
+                        direction: rtl;
+                    `;
+                    table.querySelectorAll('th, td').forEach(cell => {
+                        cell.style.border = '1px solid #000';
+                        cell.style.padding = '4px 6px';
+                        cell.style.textAlign = 'center';
+                        cell.style.whiteSpace = 'nowrap';
+                    });
+                    table.querySelectorAll('th').forEach(th => {
+                        th.style.background = '#f0f0f0';
+                        th.style.fontWeight = 'bold';
+                    });
+                }
+            } catch (error) {
+                alert('❌ خطأ في قراءة الملف: ' + error.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    // ============================================
     // التشغيل
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
@@ -962,6 +1052,9 @@
     window.onclick = (e) => {
         if (e.target === document.getElementById('shiftModal')) {
             document.getElementById('shiftModal').style.display = 'none';
+        }
+        if (e.target === document.getElementById('monthlyTableModal')) {
+            document.getElementById('monthlyTableModal').style.display = 'none';
         }
     };
 
