@@ -10,10 +10,11 @@ const PORT = process.env.PORT || 3000;
 const DATA_PATH = '/data/ambulance-data.json';
 const SHIFT_DATA_PATH = '/data/shift-data.json';
 const CURRENT_SHIFT_DATA_PATH = '/data/current-shift-data.json';
+const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
 let lastUpdateTime = Date.now();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
@@ -68,7 +69,7 @@ async function writeCurrentShiftData(data) {
 }
 
 // ============================================
-// API: جلب البيانات (البلاغات + بيانات التكميل)
+// API: جلب البيانات
 // ============================================
 app.get('/api/data', async (req, res) => {
     try {
@@ -105,7 +106,7 @@ app.get('/api/shifts', async (req, res) => {
 });
 
 // ============================================
-// API: جلب مناوبة محددة مع بلاغاتها وبيانات التكميل
+// API: جلب مناوبة محددة مع بلاغاتها
 // ============================================
 app.get('/api/shifts/:id', async (req, res) => {
     try {
@@ -122,7 +123,6 @@ app.get('/api/shifts/:id', async (req, res) => {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
         
-        // إرجاع المناوبة مع بلاغاتها وبيانات التكميل
         res.json({ 
             shift: shift, 
             reports: shift.savedReports || {},
@@ -166,7 +166,7 @@ app.post('/api/shifts', async (req, res) => {
 });
 
 // ============================================
-// API: حفظ بيانات التكميل الحالية (نموذج المناوبة النشط)
+// API: حفظ بيانات التكميل الحالية
 // ============================================
 app.post('/api/save-current-shift-data', async (req, res) => {
     try {
@@ -193,23 +193,17 @@ app.get('/api/get-current-shift-data', async (req, res) => {
 
 // ============================================
 // API: حفظ المناوبة الحالية (زر مناوبة جديدة)
-// يحفظ البلاغات + بيانات التكميل الحالية معاً
 // ============================================
 app.post('/api/save-current-shift', async (req, res) => {
     try {
-        // قراءة البلاغات الحالية
         const currentReports = await readData();
-        
-        // قراءة بيانات التكميل الحالية
         const currentShiftData = await readCurrentShiftData();
         
-        // حساب إجمالي البلاغات
         let total = 0;
         for (let key in currentReports) {
             if (currentReports[key]?.count) total += currentReports[key].count;
         }
         
-        // إنشاء مناوبة جديدة محفوظة مع جميع البيانات
         const now = new Date();
         const offset = 3;
         const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
@@ -226,32 +220,23 @@ app.post('/api/save-current-shift', async (req, res) => {
             endTime: saudiTime.toISOString(),
             savedReports: JSON.parse(JSON.stringify(currentReports)),
             totalReports: total,
-            // حفظ بيانات التكميل كاملة
             rapidLocations: currentShiftData.rapidLocations || {},
             centersData: currentShiftData.centersData || {},
             generalNotes: currentShiftData.generalNotes || "",
             lastUpdate: saudiTime.toISOString()
         };
         
-        // جلب المناوبات السابقة
         let allShifts = [];
         try {
             const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
             allShifts = JSON.parse(data);
         } catch (e) {}
         
-        // إضافة المناوبة الجديدة في البداية
         allShifts.unshift(newShift);
-        
-        // الاحتفاظ بآخر 50 مناوبة
         if (allShifts.length > 50) allShifts.pop();
         
         await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(allShifts, null, 2));
-        
-        // تصفير البلاغات الحالية
         await writeData({});
-        
-        // تصفير بيانات التكميل الحالية
         await writeCurrentShiftData({});
         
         res.json({ success: true, shiftId: newShift.id });
@@ -290,7 +275,6 @@ app.post('/api/report', async (req, res) => {
     
     const key = `${center}|${unit}`;
     
-    // وقت السعودية (UTC+3)
     const now = new Date();
     const offset = 3;
     const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
@@ -399,6 +383,48 @@ app.get('/api/export', async (req, res) => {
 });
 
 // ============================================
+// API: الجدول الشهري (حفظ واسترجاع)
+// ============================================
+
+// حفظ الجدول الشهري
+app.post('/api/upload-monthly-table', async (req, res) => {
+    try {
+        const base64Data = req.body.fileData;
+        const buffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(MONTHLY_TABLE_PATH, buffer);
+        res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ الجدول' });
+    }
+});
+
+// جلب الجدول الشهري
+app.get('/api/get-monthly-table', async (req, res) => {
+    try {
+        const data = await fs.readFile(MONTHLY_TABLE_PATH);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الجدول' });
+        }
+    }
+});
+
+// التحقق من وجود جدول محفوظ
+app.get('/api/check-monthly-table', async (req, res) => {
+    try {
+        await fs.access(MONTHLY_TABLE_PATH);
+        res.json({ exists: true });
+    } catch (error) {
+        res.json({ exists: false });
+    }
+});
+
+// ============================================
 // تشغيل الخادم
 // ============================================
 app.listen(PORT, () => {
@@ -406,4 +432,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
     console.log(`📁 مسار بيانات التكميل الحالية: ${CURRENT_SHIFT_DATA_PATH}`);
+    console.log(`📁 مسار الجدول الشهري: ${MONTHLY_TABLE_PATH}`);
 });
