@@ -311,7 +311,6 @@
             color: #444;
         }
         
-        /* تحسينات تبويبات Excel */
         .sheet-tab {
             padding: 6px 15px;
             border: 1px solid #000;
@@ -332,9 +331,85 @@
             background: #1e466e;
         }
         
-        /* ============================================ */
-        /* تحسينات الطباعة */
-        /* ============================================ */
+        /* مؤشرات القوى العاملة */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+        }
+        .stats-card {
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: center;
+            background: white;
+        }
+        .stats-card .label {
+            font-size: 0.7rem;
+            color: #555;
+        }
+        .stats-card .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        .value-blue { color: #1e466e; }
+        .value-red { color: #c0392b; }
+        .value-green { color: #2a7f3e; }
+        
+        .distribution-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 0.75rem;
+        }
+        .distribution-bar .name {
+            min-width: 80px;
+            font-weight: bold;
+        }
+        .distribution-bar .count {
+            min-width: 30px;
+            text-align: center;
+        }
+        .distribution-bar .bar-track {
+            flex: 1;
+            height: 12px;
+            background: #eee;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .distribution-bar .bar-fill {
+            height: 100%;
+            border-radius: 6px;
+        }
+        .distribution-bar .percent {
+            font-size: 0.6rem;
+            color: #666;
+            min-width: 40px;
+        }
+        
+        .stats-section {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #000;
+            background: #f9f9f9;
+        }
+        .stats-section h3 {
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+        .stats-scroll {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #aaa;
+            padding: 10px;
+            background: white;
+        }
+        .stats-scroll .title {
+            font-size: 0.7rem;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        
         @media print {
             body {
                 background: white;
@@ -415,6 +490,7 @@
             .units-grid { grid-template-columns: 1fr; }
             .modal-content { padding: 10px; }
             .sheet-tab { padding: 4px 10px; font-size: 0.7rem; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -503,6 +579,56 @@
             <tbody id="centersTableBody"></tbody>
         </table>
 
+        <!-- مؤشرات القوى العاملة -->
+        <div id="workforceStats" class="stats-section" style="display:none;">
+            <h3>📊 مؤشرات القوى العاملة</h3>
+            <div class="stats-grid" id="workforceStatsGrid">
+                <div class="stats-card">
+                    <div class="label">إجمالي المسعفين</div>
+                    <div class="value value-blue" id="totalStaff">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="label">المراكز الناقصة</div>
+                    <div class="value value-red" id="missingCenters">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="label">المراكز الجاهزة</div>
+                    <div class="value value-green" id="readyCenters">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="label">نسبة الجاهزية</div>
+                    <div class="value value-blue" id="readinessRate">0%</div>
+                </div>
+            </div>
+            <div class="stats-scroll" id="distributionContainer">
+                <div class="title">توزيع المسعفين على المراكز</div>
+                <div id="distributionList"></div>
+            </div>
+        </div>
+
+        <!-- إحصائيات بلاغات المناوبة -->
+        <div id="shiftReportStats" class="stats-section" style="display:none;">
+            <h3>📈 إحصائيات البلاغات</h3>
+            <div class="stats-grid" id="shiftReportStatsGrid">
+                <div class="stats-card">
+                    <div class="label">إجمالي البلاغات</div>
+                    <div class="value value-blue" id="shiftTotalReports">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="label">أكثر فرقة استخداماً</div>
+                    <div class="value value-green" id="topUnit" style="font-size:1.2rem;">-</div>
+                </div>
+                <div class="stats-card">
+                    <div class="label">عدد البلاغات للفرقة الأكثر</div>
+                    <div class="value value-red" id="topUnitCount">0</div>
+                </div>
+            </div>
+            <div class="stats-scroll" id="unitReportContainer">
+                <div class="title">توزيع البلاغات على الفرق</div>
+                <div id="unitReportList"></div>
+            </div>
+        </div>
+
         <h3>الملاحظات العامة أثناء سير المناوبة:</h3>
         <textarea id="generalNotes" rows="3"></textarea>
 
@@ -550,7 +676,6 @@
     const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
 
-    // متغيرات الجدول الشهري
     let currentSheetIndex = 0;
     let workbookData = null;
 
@@ -685,6 +810,9 @@
                 renderData();
                 updateTotal();
                 loadShiftToForm(result.shift);
+                
+                // عرض إحصائيات البلاغات
+                displayShiftReportStats(result.reports);
                 
                 const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
                 document.getElementById('viewingBadge').style.display = 'inline-block';
@@ -846,6 +974,11 @@
             }
         }
         document.getElementById('generalNotes').value = shift.generalNotes || '';
+        
+        // تحميل مؤشرات القوى العاملة
+        if (shift.id) {
+            await loadWorkforceStats(shift.id);
+        }
     }
 
     function getShiftFromForm() {
@@ -952,6 +1085,8 @@
             updateStatusIcon(i);
         }
         document.getElementById('generalNotes').value = '';
+        document.getElementById('workforceStats').style.display = 'none';
+        document.getElementById('shiftReportStats').style.display = 'none';
     }
 
     function openShiftModal() {
@@ -985,7 +1120,108 @@
     }
 
     // ============================================
-    // دوال الجدول الشهري (رفع وعرض Excel مع صيغ)
+    // دوال مؤشرات القوى العاملة
+    // ============================================
+    async function loadWorkforceStats(shiftId) {
+        try {
+            const response = await fetch(`/api/workforce-stats/${shiftId}`);
+            const stats = await response.json();
+            
+            if (stats.error) {
+                document.getElementById('workforceStats').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('workforceStats').style.display = 'block';
+            document.getElementById('totalStaff').innerText = stats.totalStaff;
+            document.getElementById('missingCenters').innerText = stats.missingCenters;
+            document.getElementById('readyCenters').innerText = stats.readyCenters;
+            document.getElementById('readinessRate').innerText = stats.readinessRate + '%';
+            
+            const distributionList = document.getElementById('distributionList');
+            distributionList.innerHTML = '';
+            const total = stats.totalStaff || 1;
+            for (let center in stats.distribution) {
+                const count = stats.distribution[center];
+                const barWidth = Math.round((count / total) * 100);
+                const isReady = count >= 2;
+                const div = document.createElement('div');
+                div.className = 'distribution-bar';
+                div.innerHTML = `
+                    <span class="name">${center}</span>
+                    <span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div>
+                    </div>
+                    <span class="percent">${barWidth}%</span>
+                `;
+                distributionList.appendChild(div);
+            }
+        } catch (error) {
+            console.error(error);
+            document.getElementById('workforceStats').style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // دوال إحصائيات البلاغات
+    // ============================================
+    function displayShiftReportStats(reports) {
+        const container = document.getElementById('shiftReportStats');
+        const listContainer = document.getElementById('unitReportList');
+        
+        if (!reports || Object.keys(reports).length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        let total = 0;
+        let unitStats = {};
+        
+        for (let key in reports) {
+            const report = reports[key];
+            if (report && report.count > 0) {
+                total += report.count;
+                const parts = key.split('|');
+                const unit = parts.length > 1 ? parts[1] : key;
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
+        }
+        
+        if (total === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        document.getElementById('shiftTotalReports').innerText = total;
+        
+        const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+        const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+        const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+        
+        document.getElementById('topUnit').innerText = topUnit;
+        document.getElementById('topUnitCount').innerText = topCount;
+        
+        listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
+        sortedUnits.forEach(([unit, count]) => {
+            const percentage = Math.round((count / total) * 100);
+            const div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = `
+                <span class="name">${unit}</span>
+                <span class="count" style="color:#1e466e;">${count}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${percentage}%; background:#1e466e;"></div>
+                </div>
+                <span class="percent">${percentage}%</span>
+            `;
+            listContainer.appendChild(div);
+        });
+    }
+
+    // ============================================
+    // دوال الجدول الشهري
     // ============================================
     document.getElementById('monthlyTableBtn').onclick = function() {
         document.getElementById('monthlyTableModal').style.display = 'flex';
@@ -1047,17 +1283,15 @@
         const container = document.getElementById('excelTableContainer');
         let html = '';
         
-        // إنشاء تبويبات للأوراق
         if (workbook.SheetNames.length > 1) {
             html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid #aaa; padding-bottom:10px;">';
             workbook.SheetNames.forEach((name, index) => {
                 const active = index === currentSheetIndex ? 'active' : '';
-                html += `<button class="sheet-tab ${active}" data-index="${index}" style="padding:6px 15px; border:1px solid #000; background:${active ? '#1e466e' : 'white'}; color:${active ? 'white' : 'black'}; cursor:pointer; font-weight:bold; border-radius:4px;">${name}</button>`;
+                html += `<button class="sheet-tab ${active}" data-index="${index}">${name}</button>`;
             });
             html += '</div>';
         }
         
-        // عرض الورقة الحالية
         const sheetName = workbook.SheetNames[currentSheetIndex];
         const sheet = workbook.Sheets[sheetName];
         const htmlContent = XLSX.utils.sheet_to_html(sheet, {
@@ -1068,10 +1302,8 @@
         html += htmlContent;
         container.innerHTML = html;
         
-        // تنسيق الجدول
         formatTable(container);
         
-        // ربط أحداث التبويبات
         document.querySelectorAll('.sheet-tab').forEach(btn => {
             btn.onclick = function() {
                 currentSheetIndex = parseInt(this.dataset.index);
@@ -1080,7 +1312,6 @@
         });
     }
 
-    // رفع ملف جديد وحفظه
     document.getElementById('uploadExcelBtn').onclick = function() {
         document.getElementById('excelFileInput').click();
     };
@@ -1106,7 +1337,6 @@
                 
                 renderAllSheets(workbookData);
                 
-                // حفظ الملف على الخادم
                 const base64 = btoa(String.fromCharCode.apply(null, data));
                 const response = await fetch('/api/upload-monthly-table', {
                     method: 'POST',
@@ -1144,11 +1374,6 @@
                 cell.style.textAlign = 'center';
                 cell.style.whiteSpace = 'nowrap';
                 cell.style.verticalAlign = 'middle';
-                if (cell.dataset && cell.dataset.formula) {
-                    cell.title = `الصيغة: ${cell.dataset.formula}`;
-                    cell.style.fontStyle = 'italic';
-                    cell.style.color = '#2a7f3e';
-                }
             });
             table.querySelectorAll('th').forEach(th => {
                 th.style.background = '#f0f0f0';
@@ -1157,15 +1382,8 @@
                 th.style.top = '0';
                 th.style.zIndex = '1';
             });
-            // التأكد من أن الجدول لا يتجاوز العرض
             table.style.minWidth = '100%';
             table.style.width = 'auto';
-            // إضافة تمرير أفقي للجداول الكبيرة
-            const containerDiv = container;
-            if (containerDiv) {
-                containerDiv.style.overflow = 'auto';
-                containerDiv.style.position = 'relative';
-            }
         }
     }
 

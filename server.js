@@ -24,10 +24,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ============================================
 const upload = multer({
     dest: '/data/temp/',
-    limits: { fileSize: 100 * 1024 * 1024 } // حد 100 ميجا
+    limits: { fileSize: 100 * 1024 * 1024 }
 });
 
-// التأكد من وجود مجلد temp
 async function ensureTempDir() {
     try {
         await fs.mkdir('/data/temp', { recursive: true });
@@ -52,7 +51,7 @@ const centersData = {
 };
 
 // ============================================
-// دوال قراءة وكتابة البيانات (البلاغات)
+// دوال قراءة وكتابة البيانات
 // ============================================
 async function readData() {
     try {
@@ -69,9 +68,6 @@ async function writeData(data) {
     lastUpdateTime = Date.now();
 }
 
-// ============================================
-// دوال بيانات التكميل الحالية
-// ============================================
 async function readCurrentShiftData() {
     try {
         const data = await fs.readFile(CURRENT_SHIFT_DATA_PATH, 'utf8');
@@ -152,7 +148,7 @@ app.get('/api/shifts/:id', async (req, res) => {
 });
 
 // ============================================
-// API: حفظ مناوبة جديدة (من نموذج التكميل)
+// API: حفظ مناوبة جديدة
 // ============================================
 app.post('/api/shifts', async (req, res) => {
     try {
@@ -285,6 +281,61 @@ app.delete('/api/shifts/:id', async (req, res) => {
 });
 
 // ============================================
+// API: إحصائيات القوى العاملة
+// ============================================
+app.get('/api/workforce-stats/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        
+        let allShifts = [];
+        try {
+            const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+            allShifts = JSON.parse(data);
+        } catch (e) {}
+        
+        const shift = allShifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        
+        const centersData = shift.centersData || {};
+        let totalStaff = 0;
+        let missingCenters = 0;
+        let readyCenters = 0;
+        let centerCount = 0;
+        const distribution = {};
+        
+        for (let center in centersData) {
+            const staffCount = parseInt(centersData[center]?.staffCount) || 0;
+            totalStaff += staffCount;
+            centerCount++;
+            
+            if (staffCount >= 2) {
+                readyCenters++;
+            } else {
+                missingCenters++;
+            }
+            
+            distribution[center] = staffCount;
+        }
+        
+        const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+        
+        res.json({
+            totalStaff,
+            missingCenters,
+            readyCenters,
+            centerCount,
+            readinessRate,
+            distribution
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' });
+    }
+});
+
+// ============================================
 // API: تسجيل بلاغ
 // ============================================
 app.post('/api/report', async (req, res) => {
@@ -401,10 +452,8 @@ app.get('/api/export', async (req, res) => {
 });
 
 // ============================================
-// API: الجدول الشهري (حفظ واسترجاع)
+// API: الجدول الشهري
 // ============================================
-
-// حفظ الجدول الشهري - رفع مباشر
 app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
     try {
         const file = req.file;
@@ -420,7 +469,6 @@ app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) =>
     }
 });
 
-// جلب الجدول الشهري
 app.get('/api/get-monthly-table', async (req, res) => {
     try {
         const data = await fs.readFile(MONTHLY_TABLE_PATH);
@@ -435,7 +483,6 @@ app.get('/api/get-monthly-table', async (req, res) => {
     }
 });
 
-// التحقق من وجود جدول محفوظ
 app.get('/api/check-monthly-table', async (req, res) => {
     try {
         await fs.access(MONTHLY_TABLE_PATH);
