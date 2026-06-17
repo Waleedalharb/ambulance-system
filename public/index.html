@@ -453,6 +453,7 @@
             #shiftArchiveSelect, #printShiftBtn, #saveShiftBtn,
             .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn,
             #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn,
+            #docsBtn, #airAmbulanceBtn,
             .no-print {
                 display: none !important;
             }
@@ -569,6 +570,8 @@
         <div class="toolbar">
             <button id="newShiftBtn">🔄 مناوبة جديدة</button>
             <button id="shiftBtn">📋 نموذج المناوبة</button>
+            <button id="docsBtn">📁 المستندات</button>
+            <button id="airAmbulanceBtn">🚁 الإسعاف الجوي</button>
             <button id="monthlyTableBtn" class="no-print">📊 الجدول الشهري</button>
             <button id="exportBtn">📎 تصدير Excel</button>
         </div>
@@ -711,6 +714,96 @@
             <button id="printShiftBtn" class="no-print">🖨️ طباعة النموذج</button>
             <button id="saveShiftBtn" class="no-print">💾 حفظ النموذج</button>
             <button id="closeShiftBtn" class="no-print">❌ إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة المستندات -->
+<div id="docsModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <h2>📁 المستندات والملفات</h2>
+        <p style="text-align:center; color:#666; margin:5px 0 15px;">رفع وعرض المستندات (السياسات، الخط الساخن، التعليمات)</p>
+        
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display:none;">
+            <button id="uploadDocBtn" style="padding:10px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">📤 رفع ملف</button>
+            <span id="docStatus" style="font-size:0.75rem; color:#666;">📂 جاري التحقق...</span>
+        </div>
+        
+        <div id="docsListContainer" style="margin-top:15px; max-height:50vh; overflow-y:auto; border:1px solid #aaa; padding:10px; background:white;">
+            <p style="text-align:center; color:#888; padding:20px 0;">📂 لا توجد مستندات محفوظة</p>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="closeDocsBtn">❌ إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الإسعاف الجوي -->
+<div id="airAmbulanceModal" class="modal">
+    <div class="modal-content" style="max-width:600px;">
+        <h2>🚁 الإسعاف الجوي</h2>
+        <p style="text-align:center; color:#666; margin:5px 0 15px;">تسجيل بلاغات الإسعاف الجوي</p>
+        
+        <div class="form-row">
+            <label>📋 رقم البلاغ:</label>
+            <input type="text" id="airReportNumber" placeholder="مثال: 2025-001" style="width:100%;">
+        </div>
+        
+        <div class="form-row">
+            <label>🚑 الفرقة المرافقة:</label>
+            <select id="airUnit" style="width:100%;">
+                <option value="">-- اختر الفرقة --</option>
+                <option value="سريع 1">سريع 1</option>
+                <option value="سريع 2">سريع 2</option>
+                <option value="سريع 3">سريع 3</option>
+                <option value="سريع 4">سريع 4</option>
+                <option value="جنوب 1">جنوب 1</option>
+                <option value="جنوب 2">جنوب 2</option>
+                <option value="جنوب 3">جنوب 3</option>
+                <option value="جنوب 4">جنوب 4</option>
+                <option value="جنوب 5">جنوب 5</option>
+                <option value="جنوب 6">جنوب 6</option>
+                <option value="جنوب 7">جنوب 7</option>
+                <option value="جنوب 8">جنوب 8</option>
+                <option value="جنوب 9">جنوب 9</option>
+                <option value="جنوب 10">جنوب 10</option>
+                <option value="جنوب 11">جنوب 11</option>
+                <option value="جنوب 12">جنوب 12</option>
+                <option value="جنوب 13">جنوب 13</option>
+                <option value="جنوب 14">جنوب 14</option>
+                <option value="جنوب 15">جنوب 15</option>
+                <option value="جنوب 16">جنوب 16</option>
+                <option value="جنوب 17">جنوب 17</option>
+                <option value="جنوب 18">جنوب 18</option>
+                <option value="جنوب 19">جنوب 19</option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <label>🏥 المستشفى المستلم:</label>
+            <input type="text" id="airHospital" placeholder="اسم المستشفى" style="width:100%;">
+        </div>
+        
+        <div class="form-row">
+            <label>📅 تاريخ ووقت النقل:</label>
+            <input type="datetime-local" id="airDateTime" style="width:100%;">
+        </div>
+        
+        <div class="form-row">
+            <label>📝 ملاحظات إضافية:</label>
+            <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="width:100%;"></textarea>
+        </div>
+        
+        <div id="airSavedRecords" style="margin-top:15px; max-height:200px; overflow-y:auto; border:1px solid #aaa; padding:10px; background:#f9f9f9; display:none;">
+            <h4 style="margin:0 0 10px 0;">📋 البلاغات المحفوظة</h4>
+            <div id="airRecordsList"></div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="saveAirRecord">💾 حفظ البلاغ</button>
+            <button id="closeAirModal">❌ إغلاق</button>
         </div>
     </div>
 </div>
@@ -1326,6 +1419,240 @@
     }
 
     // ============================================
+    // دوال المستندات
+    // ============================================
+    let uploadedDocs = [];
+
+    async function loadDocs() {
+        try {
+            const response = await fetch('/api/docs');
+            const result = await response.json();
+            if (result.success) {
+                uploadedDocs = result.docs || [];
+                renderDocsList();
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل المستندات:", error);
+        }
+    }
+
+    function renderDocsList() {
+        const container = document.getElementById('docsListContainer');
+        if (!container) return;
+        
+        if (uploadedDocs.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px 0;">📂 لا توجد مستندات محفوظة</p>';
+            return;
+        }
+        
+        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+        uploadedDocs.forEach((doc) => {
+            const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
+            const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
+                         doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
+                         doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
+                         doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : '📎';
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid #ddd; border-radius:6px; background:white;">
+                    <div>
+                        <span style="font-size:1.2rem;">${icon}</span>
+                        <span style="font-weight:bold; margin-right:8px;">${doc.filename}</span>
+                        <span style="font-size:0.7rem; color:#666; margin-right:10px;">${date}</span>
+                        ${doc.description ? `<span style="font-size:0.7rem; color:#888;">${doc.description}</span>` : ''}
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="downloadDoc('${doc.id}')" style="padding:4px 12px; border:1px solid #000; background:white; cursor:pointer; font-size:0.7rem;">📥 تحميل</button>
+                        <button onclick="deleteDoc('${doc.id}')" style="padding:4px 12px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} مستندات محفوظة`;
+    }
+
+    document.getElementById('uploadDocBtn')?.addEventListener('click', function() {
+        document.getElementById('docFileInput').click();
+    });
+
+    document.getElementById('docFileInput')?.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const description = prompt("أدخل وصفاً للمستند (اختياري):", file.name);
+        
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            try {
+                const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)));
+                const response = await fetch('/api/upload-doc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        fileData: base64,
+                        description: description || '',
+                        fileType: file.type
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ تم رفع المستند بنجاح');
+                    await loadDocs();
+                    document.getElementById('docFileInput').value = '';
+                } else {
+                    alert('❌ فشل في رفع المستند: ' + (result.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                alert('❌ خطأ في رفع الملف: ' + error.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    async function downloadDoc(docId) {
+        try {
+            window.open(`/api/download-doc/${docId}`, '_blank');
+        } catch (error) {
+            alert('❌ فشل في تحميل المستند');
+        }
+    }
+
+    async function deleteDoc(docId) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستند؟')) return;
+        try {
+            const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadDocs();
+            } else {
+                alert('❌ فشل في حذف المستند');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    }
+
+    // ============================================
+    // دوال الإسعاف الجوي
+    // ============================================
+    let airRecords = [];
+
+    async function loadAirRecords() {
+        try {
+            const response = await fetch('/api/air-ambulance');
+            const result = await response.json();
+            if (result.success) {
+                airRecords = result.records || [];
+                renderAirRecords();
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error);
+        }
+    }
+
+    function renderAirRecords() {
+        const container = document.getElementById('airRecordsList');
+        const section = document.getElementById('airSavedRecords');
+        if (!container || !section) return;
+        
+        if (airRecords.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        
+        section.style.display = 'block';
+        let html = '';
+        airRecords.forEach((record) => {
+            const date = new Date(record.createdAt).toLocaleString('ar-SA');
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #ddd; font-size:0.8rem;">
+                    <div>
+                        <strong>${record.reportNumber || 'بدون رقم'}</strong>
+                        <span style="margin:0 8px;">|</span>
+                        <span>${record.unit || '-'}</span>
+                        <span style="margin:0 8px;">|</span>
+                        <span>${record.hospital || '-'}</span>
+                        <span style="margin:0 8px;">|</span>
+                        <span style="font-size:0.65rem; color:#666;">${date}</span>
+                    </div>
+                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️</button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    document.getElementById('saveAirRecord')?.addEventListener('click', async function() {
+        const reportNumber = document.getElementById('airReportNumber').value.trim();
+        const unit = document.getElementById('airUnit').value;
+        const hospital = document.getElementById('airHospital').value.trim();
+        const dateTime = document.getElementById('airDateTime').value;
+        const notes = document.getElementById('airNotes').value.trim();
+        
+        if (!reportNumber) {
+            alert('❌ الرجاء إدخال رقم البلاغ');
+            return;
+        }
+        if (!unit) {
+            alert('❌ الرجاء اختيار الفرقة المرافقة');
+            return;
+        }
+        if (!hospital) {
+            alert('❌ الرجاء إدخال اسم المستشفى');
+            return;
+        }
+        if (!dateTime) {
+            alert('❌ الرجاء اختيار تاريخ ووقت النقل');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/save-air-ambulance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reportNumber,
+                    unit,
+                    hospital,
+                    dateTime,
+                    notes
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم حفظ بلاغ الإسعاف الجوي بنجاح');
+                document.getElementById('airReportNumber').value = '';
+                document.getElementById('airUnit').value = '';
+                document.getElementById('airHospital').value = '';
+                document.getElementById('airDateTime').value = '';
+                document.getElementById('airNotes').value = '';
+                await loadAirRecords();
+            } else {
+                alert('❌ فشل في حفظ البلاغ: ' + (result.error || 'خطأ غير معروف'));
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    async function deleteAirRecord(recordId) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا البلاغ؟')) return;
+        try {
+            const response = await fetch(`/api/delete-air-ambulance/${recordId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadAirRecords();
+            } else {
+                alert('❌ فشل في حذف البلاغ');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    }
+
+    // ============================================
     // دوال مؤشرات القوى العاملة
     // ============================================
     async function loadWorkforceStats(shiftId) {
@@ -1628,6 +1955,30 @@
     }
 
     // ============================================
+    // فتح وإغلاق النوافذ
+    // ============================================
+    document.getElementById('docsBtn')?.addEventListener('click', function() {
+        document.getElementById('docsModal').style.display = 'flex';
+        loadDocs();
+    });
+
+    document.getElementById('closeDocsBtn')?.addEventListener('click', function() {
+        document.getElementById('docsModal').style.display = 'none';
+    });
+
+    document.getElementById('airAmbulanceBtn')?.addEventListener('click', function() {
+        document.getElementById('airAmbulanceModal').style.display = 'flex';
+        loadAirRecords();
+        const now = new Date();
+        const localDateTime = now.toISOString().slice(0, 16);
+        document.getElementById('airDateTime').value = localDateTime;
+    });
+
+    document.getElementById('closeAirModal')?.addEventListener('click', function() {
+        document.getElementById('airAmbulanceModal').style.display = 'none';
+    });
+
+    // ============================================
     // التشغيل
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
@@ -1666,15 +2017,18 @@
         if (e.target === document.getElementById('shiftModal')) {
             document.getElementById('shiftModal').style.display = 'none';
         }
+        if (e.target === document.getElementById('docsModal')) {
+            document.getElementById('docsModal').style.display = 'none';
+        }
+        if (e.target === document.getElementById('airAmbulanceModal')) {
+            document.getElementById('airAmbulanceModal').style.display = 'none';
+        }
         if (e.target === document.getElementById('monthlyTableModal')) {
             document.getElementById('monthlyTableModal').style.display = 'none';
         }
     };
 
-    // بناء جدول المراكز
     buildCentersTable();
-    
-    // تحميل البيانات
     loadShifts();
     loadAllData();
     
