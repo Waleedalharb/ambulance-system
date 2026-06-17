@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* جميع الأنماط السابقة (نفسها) */
         * {
             box-sizing: border-box;
             font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
@@ -435,7 +436,6 @@
             min-width: 35px;
         }
         
-        /* تحسينات الطباعة - فقط توزيع البلاغات ونموذج المناوبة */
         @media print {
             body {
                 background: white;
@@ -447,7 +447,6 @@
                 margin: 0;
                 padding: 5px;
             }
-            /* إخفاء كل الأزرار والقوائم */
             .info-bar, .toolbar, .archive-row, .update-status, footer,
             .modal-buttons, #closeShiftBtn, #deleteShiftBtn,
             #shiftArchiveSelect, #printShiftBtn, #saveShiftBtn,
@@ -457,7 +456,6 @@
             .no-print {
                 display: none !important;
             }
-            /* إظهار النوافذ كصفحات */
             .modal {
                 display: block !important;
                 position: relative;
@@ -479,7 +477,6 @@
                 height: auto;
                 max-height: none;
             }
-            /* تنسيق الجداول */
             table {
                 page-break-inside: avoid;
                 border-collapse: collapse;
@@ -526,8 +523,7 @@
             .shift-type label {
                 margin-left: 10px;
             }
-            /* منع طباعة الجدول الشهري */
-            #monthlyTableModal {
+            #monthlyTableModal, #airAmbulanceModal, #docsModal {
                 display: none !important;
             }
         }
@@ -743,7 +739,10 @@
 <!-- نافذة الإسعاف الجوي -->
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
-        <h2>🚁 الإسعاف الجوي</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">🚁 الإسعاف الجوي</h2>
+            <button id="clearAllAirRecords" style="padding:4px 12px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️ حذف الكل</button>
+        </div>
         <p style="text-align:center; color:#666; margin:5px 0 15px;">تسجيل بلاغات الإسعاف الجوي</p>
         
         <div class="form-row">
@@ -879,7 +878,6 @@
         if (staffInput && carsInput && iconSpan) {
             const staffCount = parseInt(staffInput.value) || 0;
             const carsCount = parseInt(carsInput.value) || 0;
-            // المعيار الصحيح: 2 مسعف + 1 سيارة
             if (staffCount >= 2 && carsCount >= 1) {
                 iconSpan.innerHTML = '✅';
                 iconSpan.className = 'status-icon status-ok';
@@ -1154,7 +1152,6 @@
                 alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
                 await loadShifts();
                 await loadAllData();
-                // إغلاق نموذج المناوبة إذا كان مفتوحاً
                 document.getElementById('shiftModal').style.display = 'none';
             } else {
                 alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
@@ -1214,7 +1211,6 @@
         document.getElementById('returnToCurrentBtn').style.display = 'none';
         document.getElementById('archiveSelect').value = '';
         document.getElementById('updateStatus').innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
-        // إغلاق نموذج المناوبة
         document.getElementById('shiftModal').style.display = 'none';
     }
 
@@ -1347,7 +1343,6 @@
                 await loadShifts();
                 await loadAllData();
                 if (viewingShiftId) {
-                    // إعادة تحميل المناوبة المعروضة
                     const viewResponse = await fetch(`/api/shifts/${viewingShiftId}`);
                     const viewResult = await viewResponse.json();
                     if (viewResult && viewResult.shift) {
@@ -1398,7 +1393,6 @@
     function openShiftModal() {
         loadShiftFormShifts().then(() => {
             if (!viewingShiftId && currentShiftId) {
-                // تحميل المناوبة الحالية
                 const shift = allShifts.find(s => s.id === currentShiftId);
                 if (shift) {
                     viewingShiftId = currentShiftId;
@@ -1577,7 +1571,7 @@
                         <span style="margin:0 8px;">|</span>
                         <span style="font-size:0.65rem; color:#666;">${date}</span>
                     </div>
-                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️</button>
+                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️ حذف</button>
                 </div>
             `;
         });
@@ -1651,6 +1645,22 @@
             alert('❌ خطأ في الاتصال');
         }
     }
+
+    document.getElementById('clearAllAirRecords')?.addEventListener('click', async function() {
+        if (!confirm('⚠️ هل أنت متأكد من حذف جميع بلاغات الإسعاف الجوي؟')) return;
+        try {
+            const response = await fetch('/api/clear-air-ambulance', { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadAirRecords();
+                alert('✅ تم حذف جميع البلاغات');
+            } else {
+                alert('❌ فشل في حذف البلاغات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    });
 
     // ============================================
     // دوال مؤشرات القوى العاملة

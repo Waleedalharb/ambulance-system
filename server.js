@@ -13,6 +13,7 @@ const SHIFT_DATA_PATH = '/data/shift-data.json';
 const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
 const DOCS_PATH = '/data/docs.json';
 const AIR_PATH = '/data/air-ambulance.json';
+const IDENTITY_PATH = '/data/identity.pdf';
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
@@ -304,11 +305,11 @@ app.post('/api/undo', async (req, res) => {
 });
 
 // ============================================
-// API: إحصائيات القوى العاملة
+// API: إحصائيات القوى العاملة (تم إصلاح المسار)
 // ============================================
 app.get('/api/workforce-stats/:shiftId', async (req, res) => {
     try {
-        const shiftId = parseInt(req.params.id);
+        const shiftId = parseInt(req.params.shiftId);
         const shifts = await readShifts();
         const shift = shifts.find(s => s.id === shiftId);
         if (!shift) {
@@ -420,6 +421,44 @@ app.delete('/api/delete-doc/:id', async (req, res) => {
 });
 
 // ============================================
+// API: هوية القطاع
+// ============================================
+app.get('/api/get-identity', async (req, res) => {
+    try {
+        await fs.access(IDENTITY_PATH);
+        res.json({ exists: true });
+    } catch (error) {
+        res.json({ exists: false });
+    }
+});
+
+app.post('/api/upload-identity', async (req, res) => {
+    try {
+        const { fileData, filename } = req.body;
+        if (!fileData) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const buffer = Buffer.from(fileData, 'base64');
+        await fs.writeFile(IDENTITY_PATH, buffer);
+        res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في رفع هوية القطاع' });
+    }
+});
+
+app.get('/api/download-identity', async (req, res) => {
+    try {
+        const data = await fs.readFile(IDENTITY_PATH);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="identity.pdf"');
+        res.send(data);
+    } catch (error) {
+        res.status(404).json({ error: 'لا توجد هوية محفوظة' });
+    }
+});
+
+// ============================================
 // API: الإسعاف الجوي
 // ============================================
 app.get('/api/air-ambulance', async (req, res) => {
@@ -464,6 +503,15 @@ app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+app.delete('/api/clear-air-ambulance', async (req, res) => {
+    try {
+        await writeAirRecords([]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
     }
 });
 
@@ -550,4 +598,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
     console.log(`📁 مسار المستندات: ${DOCS_PATH}`);
     console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
+    console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
 });
