@@ -300,34 +300,41 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
         
         const centersData = shift.centersData || {};
         let totalStaff = 0;
+        let totalCars = 0;
         let missingCenters = 0;
         let readyCenters = 0;
         let centerCount = 0;
         const distribution = {};
+        const carDistribution = {};
         
         for (let center in centersData) {
             const staffCount = parseInt(centersData[center]?.staffCount) || 0;
+            const carsCount = parseInt(centersData[center]?.carsCount) || 0;
             totalStaff += staffCount;
+            totalCars += carsCount;
             centerCount++;
             
-            if (staffCount >= 2) {
+            if (staffCount >= 2 && carsCount >= 1) {
                 readyCenters++;
             } else {
                 missingCenters++;
             }
             
             distribution[center] = staffCount;
+            carDistribution[center] = carsCount;
         }
         
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
         
         res.json({
             totalStaff,
+            totalCars,
             missingCenters,
             readyCenters,
             centerCount,
             readinessRate,
-            distribution
+            distribution,
+            carDistribution
         });
     } catch (error) {
         console.error(error);
