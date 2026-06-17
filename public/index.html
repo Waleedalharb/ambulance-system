@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* جميع الأنماط السابقة ... */
         * {
             box-sizing: border-box;
             font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
@@ -257,16 +258,6 @@
             border: 1px solid #aaa;
             border-radius: 3px;
         }
-        .staff-cell {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            justify-content: center;
-        }
-        .staff-cell input {
-            width: 60px;
-            text-align: center;
-        }
         .status-icon {
             font-size: 1.2rem;
             font-weight: bold;
@@ -386,32 +377,9 @@
             text-anchor: middle;
             dominant-baseline: middle;
         }
-        .circular-chart {
-            display: inline-block;
-            width: 80px;
-            height: 80px;
-        }
-        .circular-chart .circle-bg {
-            stroke: #e6e6e6;
-            stroke-width: 6;
-            fill: none;
-        }
-        .circular-chart .circle-fg {
-            stroke-width: 6;
-            fill: none;
-            stroke-linecap: round;
-            transition: stroke-dasharray 0.5s ease;
-        }
-        .circular-chart .center-text {
-            font-size: 14px;
-            font-weight: bold;
-            fill: #1e466e;
-            text-anchor: middle;
-            dominant-baseline: middle;
-        }
-        .circular-chart .center-text.small {
-            font-size: 10px;
-        }
+        .value-blue { color: #1e466e; }
+        .value-red { color: #c0392b; }
+        .value-green { color: #2a7f3e; }
         
         .stats-section {
             margin: 15px 0;
@@ -469,98 +437,29 @@
             min-width: 35px;
         }
         
-        /* تحسينات الطباعة */
         @media print {
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-            }
-            .container, .modal-content {
-                max-width: 100%;
-                margin: 0;
-                padding: 5px;
-            }
+            body { background: white; padding: 0; margin: 0; }
+            .container, .modal-content { max-width: 100%; margin: 0; padding: 5px; }
             .info-bar, .toolbar, .archive-row, .update-status, footer, 
-            .modal-buttons, #closeShiftBtn, #saveShiftBtn, #deleteShiftBtn, 
-            #shiftArchiveSelect, #printShiftBtn, button:not(.no-print),
+            .modal-buttons, #closeShiftBtn, #deleteShiftBtn, 
+            #shiftArchiveSelect, #printShiftBtn, button,
             .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn,
             #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn {
                 display: none !important;
             }
-            .modal {
-                display: block !important;
-                position: relative;
-                background: white;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: auto;
-                overflow: visible;
-                transform: none;
-            }
-            .modal-content {
-                border: 1px solid #000;
-                margin: 0;
-                padding: 5px;
-                max-width: 100%;
-                box-shadow: none;
-                overflow: visible;
-                height: auto;
-                max-height: none;
-            }
-            table {
-                page-break-inside: avoid;
-                border-collapse: collapse;
-                width: 100%;
-                font-size: 9pt;
-            }
-            th, td {
-                border: 1px solid #000;
-                padding: 3px 5px;
-            }
-            input, textarea {
-                border: none;
-                padding: 0;
-                margin: 0;
-                font-size: 8pt;
-                background: transparent;
-            }
-            input {
-                text-align: center;
-            }
-            .status-icon {
-                font-size: 9pt;
-            }
-            h2, h3, .sector-title {
-                page-break-after: avoid;
-            }
-            .stats-section {
-                page-break-inside: avoid;
-                border: 1px solid #000;
-                background: white;
-                padding: 8px;
-            }
-            .circle-stats-container {
-                page-break-inside: avoid;
-                border: 1px solid #000;
-                background: white;
-            }
-            .svg-circle-text {
-                fill: #000 !important;
-            }
-            .circular-chart .center-text {
-                fill: #000 !important;
-            }
-            .circular-chart .circle-fg {
-                stroke: #1e466e !important;
-            }
-            .form-row {
-                margin: 5px 0;
-            }
-            .shift-type label {
-                margin-left: 10px;
-            }
+            .modal { display: block !important; position: relative; background: white; top: 0; left: 0; width: 100%; height: auto; overflow: visible; transform: none; }
+            .modal-content { border: 1px solid #000; margin: 0; padding: 5px; max-width: 100%; box-shadow: none; overflow: visible; height: auto; max-height: none; }
+            table { page-break-inside: avoid; border-collapse: collapse; width: 100%; font-size: 9pt; }
+            th, td { border: 1px solid #000; padding: 3px 5px; }
+            input, textarea { border: none; padding: 0; margin: 0; font-size: 8pt; background: transparent; }
+            input { text-align: center; }
+            .status-icon { font-size: 9pt; }
+            h2, h3, .sector-title { page-break-after: avoid; }
+            .stats-section { page-break-inside: avoid; border: 1px solid #000; background: white; padding: 8px; }
+            .circle-stats-container { page-break-inside: avoid; border: 1px solid #000; background: white; }
+            .svg-circle-text { fill: #000 !important; }
+            .form-row { margin: 5px 0; }
+            .shift-type label { margin-left: 10px; }
         }
         
         @media (max-width: 650px) {
@@ -570,8 +469,6 @@
             .sheet-tab { padding: 4px 10px; font-size: 0.7rem; }
             .circle-stats-container { grid-template-columns: 1fr 1fr; }
             .svg-circle { width: 60px; height: 60px; }
-            .circular-chart { width: 60px; height: 60px; }
-            .circular-chart .center-text { font-size: 11px; }
         }
     </style>
 </head>
@@ -668,11 +565,10 @@
             <tbody id="centersTableBody"></tbody>
         </table>
 
-        <!-- مؤشرات القوى العاملة - دوائر احترافية -->
+        <!-- مؤشرات القوى العاملة -->
         <div id="workforceStats" class="stats-section" style="display:none;">
             <h3>📊 مؤشرات القوى العاملة</h3>
-            <div class="circle-stats-container" id="workforceStatsContainer">
-                <!-- دائرة نسبة الجاهزية -->
+            <div class="circle-stats-container">
                 <div class="circle-stat">
                     <div class="svg-circle-container">
                         <svg class="svg-circle" viewBox="0 0 100 100">
@@ -687,30 +583,22 @@
                     <div class="value" style="font-size:1rem; color:#1e466e;">نسبة الجاهزية</div>
                     <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
                 </div>
-                
-                <!-- عدد المسعفين -->
                 <div class="circle-stat">
                     <div class="value value-blue" id="totalStaffDisplay">0</div>
                     <div class="label">إجمالي المسعفين</div>
                     <div class="sub-value" id="staffSubText">موزعين على 0 مركز</div>
                 </div>
-                
-                <!-- عدد السيارات -->
                 <div class="circle-stat">
                     <div class="value value-blue" id="totalCarsDisplay">0</div>
                     <div class="label">إجمالي السيارات</div>
                     <div class="sub-value" id="carsSubText">سيارة لكل مركز</div>
                 </div>
-                
-                <!-- المراكز الناقصة -->
                 <div class="circle-stat">
                     <div class="value value-red" id="missingCentersDisplay">0</div>
                     <div class="label">المراكز الناقصة</div>
                     <div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div>
                 </div>
             </div>
-            
-            <!-- توزيع المسعفين والمركبات -->
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
                 <div class="stats-scroll" id="distributionContainer">
                     <div class="title">توزيع المسعفين على المراكز</div>
@@ -723,7 +611,7 @@
             </div>
         </div>
 
-        <!-- إحصائيات بلاغات المناوبة -->
+        <!-- إحصائيات البلاغات -->
         <div id="shiftReportStats" class="stats-section" style="display:none;">
             <h3>📈 إحصائيات البلاغات</h3>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
@@ -751,6 +639,7 @@
 
         <div class="modal-buttons">
             <button id="printShiftBtn">🖨️ طباعة النموذج</button>
+            <button id="saveShiftBtn">💾 حفظ النموذج</button>
             <button id="closeShiftBtn">❌ إغلاق</button>
         </div>
     </div>
@@ -796,6 +685,131 @@
     let workbookData = null;
 
     // ============================================
+    // بناء جدول المراكز (يتم استدعاؤها عند فتح النموذج)
+    // ============================================
+    function buildCentersTable() {
+        const tbody = document.getElementById('centersTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        for (let i = 0; i < centerList.length; i++) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:bold;">${centerList[i]}</td>
+                <td><input type="number" id="staff_${i}" style="width:60px; text-align:center;" min="0" max="4" value=""></td>
+                <td><input type="number" id="cars_${i}" style="width:60px; text-align:center;" min="0" max="2" value=""></td>
+                <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
+                <td><input type="text" id="notes_${i}" style="width:100%;" value=""></td>
+            `;
+            const staffInput = tr.querySelector(`#staff_${i}`);
+            const carsInput = tr.querySelector(`#cars_${i}`);
+            staffInput.addEventListener('input', () => updateStatusIcon(i));
+            carsInput.addEventListener('input', () => updateStatusIcon(i));
+            tbody.appendChild(tr);
+        }
+    }
+
+    // تحديث حالة الجاهزية
+    function updateStatusIcon(index) {
+        const staffInput = document.getElementById(`staff_${index}`);
+        const carsInput = document.getElementById(`cars_${index}`);
+        const iconSpan = document.getElementById(`status_${index}`);
+        if (staffInput && carsInput && iconSpan) {
+            const staffCount = parseInt(staffInput.value) || 0;
+            const carsCount = parseInt(carsInput.value) || 0;
+            if (staffCount >= 2 && carsCount >= 1) {
+                iconSpan.innerHTML = '✅';
+                iconSpan.className = 'status-icon status-ok';
+            } else {
+                iconSpan.innerHTML = '❌';
+                iconSpan.className = 'status-icon status-not';
+            }
+        }
+    }
+
+    // تحميل بيانات التكميل إلى النموذج
+    function loadShiftToForm(shift) {
+        currentShiftId = shift.id;
+        document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
+        
+        const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
+        shiftTypeRadios.forEach(radio => {
+            radio.checked = (radio.value === shift.shiftType);
+        });
+        
+        document.querySelectorAll('.rapid-location').forEach(input => {
+            input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || '';
+        });
+        
+        // تعبئة بيانات المراكز
+        for (let i = 0; i < centerList.length; i++) {
+            const center = centerList[i];
+            const data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
+            const staffInput = document.getElementById(`staff_${i}`);
+            const carsInput = document.getElementById(`cars_${i}`);
+            const notesInput = document.getElementById(`notes_${i}`);
+            if (staffInput) staffInput.value = data.staffCount || '';
+            if (carsInput) carsInput.value = data.carsCount || '';
+            if (notesInput) notesInput.value = data.notes || '';
+            updateStatusIcon(i);
+        }
+        
+        document.getElementById('generalNotes').value = shift.generalNotes || '';
+        
+        if (shift.id) {
+            loadWorkforceStats(shift.id);
+        }
+    }
+
+    // جلب بيانات النموذج
+    function getShiftFromForm() {
+        const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
+        const rapidLocations = {};
+        document.querySelectorAll('.rapid-location').forEach(input => {
+            rapidLocations[input.dataset.unit] = input.value;
+        });
+        const centersDataForm = {};
+        for (let i = 0; i < centerList.length; i++) {
+            const center = centerList[i];
+            const staffInput = document.getElementById(`staff_${i}`);
+            const carsInput = document.getElementById(`cars_${i}`);
+            const notesInput = document.getElementById(`notes_${i}`);
+            centersDataForm[center] = {
+                staffCount: staffInput?.value || '',
+                carsCount: carsInput?.value || '',
+                notes: notesInput?.value || ''
+            };
+        }
+        return {
+            id: currentShiftId,
+            shiftDate: document.getElementById('shiftDate').innerText,
+            shiftType: shiftType,
+            rapidLocations: rapidLocations,
+            centersData: centersDataForm,
+            generalNotes: document.getElementById('generalNotes').value,
+            lastUpdate: new Date().toISOString()
+        };
+    }
+
+    // مسح النموذج
+    function clearShiftForm() {
+        document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
+        document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
+        document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
+        for (let i = 0; i < centerList.length; i++) {
+            const staffInput = document.getElementById(`staff_${i}`);
+            const carsInput = document.getElementById(`cars_${i}`);
+            const notesInput = document.getElementById(`notes_${i}`);
+            if (staffInput) staffInput.value = '';
+            if (carsInput) carsInput.value = '';
+            if (notesInput) notesInput.value = '';
+            updateStatusIcon(i);
+        }
+        document.getElementById('generalNotes').value = '';
+        document.getElementById('workforceStats').style.display = 'none';
+        document.getElementById('shiftReportStats').style.display = 'none';
+    }
+
+    // ============================================
     // دوال الاتصال بالخادم (البلاغات)
     // ============================================
     async function loadAllData() {
@@ -820,13 +834,19 @@
             return;
         }
         try {
-            await fetch('/api/report', {
+            const response = await fetch('/api/report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ center, unit })
             });
+            const result = await response.json();
+            if (result.success) {
+                await loadAllData(); // إعادة تحميل البيانات بعد الإضافة
+            } else {
+                alert("❌ فشل في تسجيل البلاغ");
+            }
         } catch (error) {
-            alert("❌ فشل في تسجيل البلاغ");
+            alert("❌ فشل في الاتصال بالخادم");
         }
     }
 
@@ -842,7 +862,9 @@
                 body: JSON.stringify({ center, unit })
             });
             const result = await response.json();
-            if (!result.success && result.error) {
+            if (result.success) {
+                await loadAllData();
+            } else if (result.error) {
                 alert(result.error);
             }
         } catch (error) {
@@ -850,87 +872,9 @@
         }
     }
 
-    // دالة عرض نافذة اختيار نوع المناوبة
-    function showShiftTypeDialog() {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'flex';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width:400px;">
-                    <h3 style="text-align:center;">📋 اختيار نوع المناوبة</h3>
-                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة التي تريد حفظ البلاغات الحالية فيها:</p>
-                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
-                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
-                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
-                    </div>
-                    <div style="display:flex; justify-content:center; gap:10px;">
-                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('#shiftMorningBtn').onclick = function() {
-                modal.remove();
-                resolve('صباحية');
-            };
-            modal.querySelector('#shiftNightBtn').onclick = function() {
-                modal.remove();
-                resolve('ليلية');
-            };
-            modal.querySelector('#cancelShiftBtn').onclick = function() {
-                modal.remove();
-                resolve(null);
-            };
-            modal.onclick = function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                    resolve(null);
-                }
-            };
-        });
-    }
-
-    async function saveCurrentShift() {
-        const shiftType = await showShiftTypeDialog();
-        if (!shiftType) return;
-        
-        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية كمناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'}، ثم تصفير الجدول لبدء مناوبة جديدة.`)) return;
-        
-        try {
-            let currentShiftData = {};
-            try {
-                const response = await fetch('/api/get-current-shift-data');
-                currentShiftData = await response.json();
-            } catch (e) {}
-            
-            currentShiftData.shiftType = shiftType;
-            
-            await fetch('/api/save-current-shift-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentShiftData)
-            });
-            
-            const response = await fetch('/api/save-current-shift', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}'
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(`✅ تم حفظ المناوبة ${shiftType} الحالية وبدء مناوبة جديدة`);
-                await loadShifts();
-                await loadAllData();
-            } else {
-                alert("❌ فشل في حفظ المناوبة: " + (result.error || "خطأ غير معروف"));
-            }
-        } catch (error) {
-            alert("❌ خطأ في الاتصال: " + error.message);
-        }
-    }
-
+    // ============================================
+    // دوال المناوبات
+    // ============================================
     async function loadShifts() {
         try {
             const response = await fetch('/api/shifts');
@@ -961,6 +905,7 @@
         } catch (error) {}
     }
 
+    // عرض مناوبة سابقة
     async function viewShiftReports() {
         const select = document.getElementById('archiveSelect');
         const shiftId = parseInt(select.value);
@@ -977,15 +922,10 @@
                 currentViewingShift = result.shift;
                 isViewingArchiveShift = true;
                 
-                if (result.reports) {
-                    reports = result.reports;
-                } else {
-                    reports = {};
-                }
+                reports = result.reports || {};
                 renderData();
                 updateTotal();
                 loadShiftToForm(result.shift);
-                
                 displayShiftReportStats(result.reports);
                 
                 const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
@@ -1091,7 +1031,7 @@
     }
 
     // ============================================
-    // دوال نموذج المناوبة (التكميل)
+    // دوال نموذج المناوبة
     // ============================================
     async function loadShiftFormShifts() {
         try {
@@ -1109,82 +1049,6 @@
                 });
             }
         } catch (error) {}
-    }
-
-    async function loadShiftToForm(shift) {
-        currentShiftId = shift.id;
-        document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
-        
-        const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
-        shiftTypeRadios.forEach(radio => {
-            radio.checked = (radio.value === shift.shiftType);
-        });
-        
-        if (shift.rapidLocations) {
-            document.querySelectorAll('.rapid-location').forEach(input => {
-                input.value = shift.rapidLocations[input.dataset.unit] || '';
-            });
-        } else {
-            document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
-        }
-        
-        if (shift.centersData) {
-            for (let i = 0; i < centerList.length; i++) {
-                const center = centerList[i];
-                const data = shift.centersData[center] || { staffCount: '', carsCount: '', notes: '' };
-                const staffInput = document.getElementById(`staff_${i}`);
-                const carsInput = document.getElementById(`cars_${i}`);
-                const notesInput = document.getElementById(`notes_${i}`);
-                if (staffInput) staffInput.value = data.staffCount || '';
-                if (carsInput) carsInput.value = data.carsCount || '';
-                if (notesInput) notesInput.value = data.notes || '';
-                updateStatusIcon(i);
-            }
-        } else {
-            for (let i = 0; i < centerList.length; i++) {
-                const staffInput = document.getElementById(`staff_${i}`);
-                const carsInput = document.getElementById(`cars_${i}`);
-                const notesInput = document.getElementById(`notes_${i}`);
-                if (staffInput) staffInput.value = '';
-                if (carsInput) carsInput.value = '';
-                if (notesInput) notesInput.value = '';
-                updateStatusIcon(i);
-            }
-        }
-        document.getElementById('generalNotes').value = shift.generalNotes || '';
-        
-        if (shift.id) {
-            await loadWorkforceStats(shift.id);
-        }
-    }
-
-    function getShiftFromForm() {
-        const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
-        const rapidLocations = {};
-        document.querySelectorAll('.rapid-location').forEach(input => {
-            rapidLocations[input.dataset.unit] = input.value;
-        });
-        const centersDataForm = {};
-        for (let i = 0; i < centerList.length; i++) {
-            const center = centerList[i];
-            const staffInput = document.getElementById(`staff_${i}`);
-            const carsInput = document.getElementById(`cars_${i}`);
-            const notesInput = document.getElementById(`notes_${i}`);
-            centersDataForm[center] = {
-                staffCount: staffInput?.value || '',
-                carsCount: carsInput?.value || '',
-                notes: notesInput?.value || ''
-            };
-        }
-        return {
-            id: currentShiftId,
-            shiftDate: document.getElementById('shiftDate').innerText,
-            shiftType: shiftType,
-            rapidLocations: rapidLocations,
-            centersData: centersDataForm,
-            generalNotes: document.getElementById('generalNotes').value,
-            lastUpdate: new Date().toISOString()
-        };
     }
 
     async function saveShift() {
@@ -1237,41 +1101,6 @@
         }
     }
 
-    function updateStatusIcon(index) {
-        const staffInput = document.getElementById(`staff_${index}`);
-        const carsInput = document.getElementById(`cars_${index}`);
-        const iconSpan = document.getElementById(`status_${index}`);
-        if (staffInput && carsInput && iconSpan) {
-            const staffCount = parseInt(staffInput.value) || 0;
-            const carsCount = parseInt(carsInput.value) || 0;
-            if (staffCount >= 2 && carsCount >= 1) {
-                iconSpan.innerHTML = '✅';
-                iconSpan.className = 'status-icon status-ok';
-            } else {
-                iconSpan.innerHTML = '❌';
-                iconSpan.className = 'status-icon status-not';
-            }
-        }
-    }
-
-    function clearShiftForm() {
-        document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
-        document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
-        document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
-        for (let i = 0; i < centerList.length; i++) {
-            const staffInput = document.getElementById(`staff_${i}`);
-            const carsInput = document.getElementById(`cars_${i}`);
-            const notesInput = document.getElementById(`notes_${i}`);
-            if (staffInput) staffInput.value = '';
-            if (carsInput) carsInput.value = '';
-            if (notesInput) notesInput.value = '';
-            updateStatusIcon(i);
-        }
-        document.getElementById('generalNotes').value = '';
-        document.getElementById('workforceStats').style.display = 'none';
-        document.getElementById('shiftReportStats').style.display = 'none';
-    }
-
     function openShiftModal() {
         loadShiftFormShifts().then(() => {
             currentShiftId = null;
@@ -1285,23 +1114,92 @@
         window.print();
     }
 
-    function buildCentersTable() {
-        const tbody = document.getElementById('centersTableBody');
-        tbody.innerHTML = '';
-        for (let i = 0; i < centerList.length; i++) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-weight:bold;">${centerList[i]}</td>
-                <td><input type="number" id="staff_${i}" style="width:60px; text-align:center;" min="0" max="4"></td>
-                <td><input type="number" id="cars_${i}" style="width:60px; text-align:center;" min="0" max="2"></td>
-                <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
-                <td><input type="text" id="notes_${i}" style="width:100%;"></td>
+    // ============================================
+    // نافذة اختيار نوع المناوبة (لـ مناوبة جديدة)
+    // ============================================
+    function showShiftTypeDialog() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:400px;">
+                    <h3 style="text-align:center;">📋 اختيار نوع المناوبة</h3>
+                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة التي تريد حفظ البلاغات الحالية فيها:</p>
+                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
+                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
+                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
+                    </div>
+                </div>
             `;
-            const staffInput = tr.querySelector(`#staff_${i}`);
-            const carsInput = tr.querySelector(`#cars_${i}`);
-            staffInput.addEventListener('input', () => updateStatusIcon(i));
-            carsInput.addEventListener('input', () => updateStatusIcon(i));
-            tbody.appendChild(tr);
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#shiftMorningBtn').onclick = function() {
+                modal.remove();
+                resolve('صباحية');
+            };
+            modal.querySelector('#shiftNightBtn').onclick = function() {
+                modal.remove();
+                resolve('ليلية');
+            };
+            modal.querySelector('#cancelShiftBtn').onclick = function() {
+                modal.remove();
+                resolve(null);
+            };
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            };
+        });
+    }
+
+    async function saveCurrentShift() {
+        const shiftType = await showShiftTypeDialog();
+        if (!shiftType) return;
+        
+        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية كمناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'}، ثم تصفير الجدول لبدء مناوبة جديدة.`)) return;
+        
+        try {
+            // جلب بيانات التكميل الحالية من النموذج (إذا كان مفتوحاً)
+            let currentShiftData = {};
+            try {
+                const response = await fetch('/api/get-current-shift-data');
+                currentShiftData = await response.json();
+            } catch (e) {}
+            
+            // تحديث نوع المناوبة في البيانات
+            currentShiftData.shiftType = shiftType;
+            
+            // حفظ بيانات التكميل أولاً
+            await fetch('/api/save-current-shift-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentShiftData)
+            });
+            
+            // ثم حفظ المناوبة مع البلاغات
+            const response = await fetch('/api/save-current-shift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert(`✅ تم حفظ المناوبة ${shiftType} الحالية وبدء مناوبة جديدة`);
+                await loadShifts();
+                await loadAllData();
+                // إغلاق نموذج المناوبة إذا كان مفتوحاً
+                document.getElementById('shiftModal').style.display = 'none';
+            } else {
+                alert("❌ فشل في حفظ المناوبة: " + (result.error || "خطأ غير معروف"));
+            }
+        } catch (error) {
+            alert("❌ خطأ في الاتصال: " + error.message);
         }
     }
 
@@ -1320,7 +1218,6 @@
             
             document.getElementById('workforceStats').style.display = 'block';
             
-            // تحديث الأرقام
             document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
             document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
             document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
@@ -1329,13 +1226,11 @@
             document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص' : `${stats.missingCenters} مراكز ناقصة`;
             document.getElementById('readinessSubText').innerText = `${stats.readyCenters} / ${stats.centerCount} مركز جاهز`;
             
-            // تحديث دائرة النسبة
-            const circumference = 2 * Math.PI * 42; // r=42
+            const circumference = 2 * Math.PI * 42;
             const offset = circumference - (stats.readinessRate / 100) * circumference;
             const circle = document.getElementById('readinessCircle');
             const text = document.getElementById('readinessText');
             
-            // لون الدائرة حسب النسبة
             let color = '#c0392b';
             if (stats.readinessRate >= 80) color = '#2a7f3e';
             else if (stats.readinessRate >= 50) color = '#f39c12';
@@ -1486,11 +1381,9 @@
                             codepage: 1256,
                             dateNF: 'yyyy-mm-dd'
                         });
-                        
                         renderAllSheets(workbookData);
                         status.innerHTML = `✅ تم تحميل ${workbookData.SheetNames.length} أوراق`;
                     } catch (error) {
-                        console.error(error);
                         status.innerHTML = '❌ خطأ في عرض الجدول';
                         container.innerHTML = `<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في عرض الجدول: ${error.message}</p>`;
                     }
@@ -1501,7 +1394,6 @@
                 status.innerHTML = '❌ لا يوجد جدول محفوظ';
             }
         } catch (error) {
-            console.error(error);
             container.innerHTML = '<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في تحميل الجدول المحفوظ</p>';
             status.innerHTML = '❌ خطأ في الاتصال';
         }
@@ -1529,7 +1421,6 @@
         
         html += htmlContent;
         container.innerHTML = html;
-        
         formatTable(container);
         
         document.querySelectorAll('.sheet-tab').forEach(btn => {
@@ -1562,7 +1453,6 @@
                     codepage: 1256,
                     dateNF: 'yyyy-mm-dd'
                 });
-                
                 renderAllSheets(workbookData);
                 
                 const base64 = btoa(String.fromCharCode.apply(null, data));
@@ -1625,10 +1515,11 @@
     document.getElementById("viewShiftBtn").onclick = viewShiftReports;
     document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
     document.getElementById("printShiftBtn").onclick = printShiftForm;
-    
-    document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
     document.getElementById("saveShiftBtn").onclick = saveShift;
     document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
+    
+    document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
+    document.getElementById("closeMonthlyTableBtn").onclick = () => document.getElementById('monthlyTableModal').style.display = 'none';
 
     document.getElementById('shiftArchiveSelect')?.addEventListener('change', async (e) => {
         const id = parseInt(e.target.value);
@@ -1636,7 +1527,7 @@
             const response = await fetch(`/api/shifts/${id}`);
             const result = await response.json();
             if (result && result.shift) {
-                await loadShiftToForm(result.shift);
+                loadShiftToForm(result.shift);
             }
         } else {
             currentShiftId = null;
@@ -1653,9 +1544,13 @@
         }
     };
 
+    // بناء جدول المراكز
     buildCentersTable();
+    
+    // تحميل البيانات
     loadShifts();
     loadAllData();
+    
     setInterval(checkForUpdates, 1000);
     setInterval(() => {
         if (!isViewingArchiveShift && lastKnownUpdate > 0) {
