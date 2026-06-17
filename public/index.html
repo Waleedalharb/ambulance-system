@@ -10,7 +10,6 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* جميع الأنماط السابقة ... */
         * {
             box-sizing: border-box;
             font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
@@ -301,7 +300,6 @@
             font-size: 0.65rem;
             color: #444;
         }
-        
         .sheet-tab {
             padding: 6px 15px;
             border: 1px solid #000;
@@ -318,11 +316,9 @@
         .sheet-tab:hover {
             background: #ddd;
         }
-        
-        /* دوائر المؤشرات */
         .circle-stats-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 15px;
             margin: 15px 0;
             padding: 15px;
@@ -413,12 +409,14 @@
             font-size: 0.75rem;
         }
         .distribution-bar .name {
-            min-width: 80px;
+            min-width: 70px;
             font-weight: bold;
+            font-size: 0.7rem;
         }
         .distribution-bar .count {
             min-width: 25px;
             text-align: center;
+            font-weight: bold;
         }
         .distribution-bar .bar-track {
             flex: 1;
@@ -437,29 +435,100 @@
             min-width: 35px;
         }
         
+        /* تحسينات الطباعة - فقط توزيع البلاغات ونموذج المناوبة */
         @media print {
-            body { background: white; padding: 0; margin: 0; }
-            .container, .modal-content { max-width: 100%; margin: 0; padding: 5px; }
-            .info-bar, .toolbar, .archive-row, .update-status, footer, 
-            .modal-buttons, #closeShiftBtn, #deleteShiftBtn, 
-            #shiftArchiveSelect, #printShiftBtn, button,
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .container, .modal-content {
+                max-width: 100%;
+                margin: 0;
+                padding: 5px;
+            }
+            /* إخفاء كل الأزرار والقوائم */
+            .info-bar, .toolbar, .archive-row, .update-status, footer,
+            .modal-buttons, #closeShiftBtn, #deleteShiftBtn,
+            #shiftArchiveSelect, #printShiftBtn, #saveShiftBtn,
             .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn,
-            #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn {
+            #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn,
+            .no-print {
                 display: none !important;
             }
-            .modal { display: block !important; position: relative; background: white; top: 0; left: 0; width: 100%; height: auto; overflow: visible; transform: none; }
-            .modal-content { border: 1px solid #000; margin: 0; padding: 5px; max-width: 100%; box-shadow: none; overflow: visible; height: auto; max-height: none; }
-            table { page-break-inside: avoid; border-collapse: collapse; width: 100%; font-size: 9pt; }
-            th, td { border: 1px solid #000; padding: 3px 5px; }
-            input, textarea { border: none; padding: 0; margin: 0; font-size: 8pt; background: transparent; }
-            input { text-align: center; }
-            .status-icon { font-size: 9pt; }
-            h2, h3, .sector-title { page-break-after: avoid; }
-            .stats-section { page-break-inside: avoid; border: 1px solid #000; background: white; padding: 8px; }
-            .circle-stats-container { page-break-inside: avoid; border: 1px solid #000; background: white; }
-            .svg-circle-text { fill: #000 !important; }
-            .form-row { margin: 5px 0; }
-            .shift-type label { margin-left: 10px; }
+            /* إظهار النوافذ كصفحات */
+            .modal {
+                display: block !important;
+                position: relative;
+                background: white;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: auto;
+                overflow: visible;
+                transform: none;
+            }
+            .modal-content {
+                border: 1px solid #000;
+                margin: 0;
+                padding: 5px;
+                max-width: 100%;
+                box-shadow: none;
+                overflow: visible;
+                height: auto;
+                max-height: none;
+            }
+            /* تنسيق الجداول */
+            table {
+                page-break-inside: avoid;
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 9pt;
+            }
+            th, td {
+                border: 1px solid #000;
+                padding: 3px 5px;
+            }
+            input, textarea {
+                border: none;
+                padding: 0;
+                margin: 0;
+                font-size: 8pt;
+                background: transparent;
+            }
+            input {
+                text-align: center;
+            }
+            .status-icon {
+                font-size: 9pt;
+            }
+            h2, h3, .sector-title {
+                page-break-after: avoid;
+            }
+            .stats-section {
+                page-break-inside: avoid;
+                border: 1px solid #000;
+                background: white;
+                padding: 8px;
+            }
+            .circle-stats-container {
+                page-break-inside: avoid;
+                border: 1px solid #000;
+                background: white;
+            }
+            .svg-circle-text {
+                fill: #000 !important;
+            }
+            .form-row {
+                margin: 5px 0;
+            }
+            .shift-type label {
+                margin-left: 10px;
+            }
+            /* منع طباعة الجدول الشهري */
+            #monthlyTableModal {
+                display: none !important;
+            }
         }
         
         @media (max-width: 650px) {
@@ -486,6 +555,7 @@
             <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
             <span id="viewingBadge" class="viewing-badge" style="display:none;"></span>
             <button id="returnToCurrentBtn" class="return-btn" style="display:none;">↩️ العودة للحالية</button>
+            <span id="shiftStatus" style="font-size:0.7rem; color:#666; margin-right:10px;"></span>
         </div>
         
         <div class="archive-row">
@@ -499,7 +569,7 @@
         <div class="toolbar">
             <button id="newShiftBtn">🔄 مناوبة جديدة</button>
             <button id="shiftBtn">📋 نموذج المناوبة</button>
-            <button id="monthlyTableBtn">📊 الجدول الشهري</button>
+            <button id="monthlyTableBtn" class="no-print">📊 الجدول الشهري</button>
             <button id="exportBtn">📎 تصدير Excel</button>
         </div>
     </div>
@@ -508,12 +578,12 @@
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
     </div>
-    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لحفظ البلاغات وبدء مناوبة جديدة</footer>
+    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
 <!-- نافذة نموذج المناوبة -->
 <div id="shiftModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" id="shiftModalContent">
         <h2>هيئة الهلال الأحمر السعودي</h2>
         <h3>فرع الهيئة بمنطقة الرياض</h3>
         <div class="sector-title">قطاع جنوب مدينة الرياض</div>
@@ -591,7 +661,7 @@
                 <div class="circle-stat">
                     <div class="value value-blue" id="totalCarsDisplay">0</div>
                     <div class="label">إجمالي السيارات</div>
-                    <div class="sub-value" id="carsSubText">سيارة لكل مركز</div>
+                    <div class="sub-value" id="carsSubText"></div>
                 </div>
                 <div class="circle-stat">
                     <div class="value value-red" id="missingCentersDisplay">0</div>
@@ -638,15 +708,15 @@
         <textarea id="generalNotes" rows="3"></textarea>
 
         <div class="modal-buttons">
-            <button id="printShiftBtn">🖨️ طباعة النموذج</button>
-            <button id="saveShiftBtn">💾 حفظ النموذج</button>
-            <button id="closeShiftBtn">❌ إغلاق</button>
+            <button id="printShiftBtn" class="no-print">🖨️ طباعة النموذج</button>
+            <button id="saveShiftBtn" class="no-print">💾 حفظ النموذج</button>
+            <button id="closeShiftBtn" class="no-print">❌ إغلاق</button>
         </div>
     </div>
 </div>
 
 <!-- نافذة الجدول الشهري -->
-<div id="monthlyTableModal" class="modal">
+<div id="monthlyTableModal" class="modal no-print">
     <div class="modal-content" style="max-width:98%;">
         <h2>📊 جدول المناوبات الشهري - قطاع جنوب الرياض</h2>
         <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -677,6 +747,7 @@
     let allShifts = [];
     let isViewingArchiveShift = false;
     let currentViewingShift = null;
+    let viewingShiftId = null;
 
     const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
     const centerList = centerNumbers.map(n => `جنوب ${n}`);
@@ -685,7 +756,7 @@
     let workbookData = null;
 
     // ============================================
-    // بناء جدول المراكز (يتم استدعاؤها عند فتح النموذج)
+    // بناء جدول المراكز
     // ============================================
     function buildCentersTable() {
         const tbody = document.getElementById('centersTableBody');
@@ -694,11 +765,11 @@
         for (let i = 0; i < centerList.length; i++) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="font-weight:bold;">${centerList[i]}</td>
-                <td><input type="number" id="staff_${i}" style="width:60px; text-align:center;" min="0" max="4" value=""></td>
-                <td><input type="number" id="cars_${i}" style="width:60px; text-align:center;" min="0" max="2" value=""></td>
+                <td style="font-weight:bold; font-size:0.75rem;">${centerList[i]}</td>
+                <td><input type="number" id="staff_${i}" style="width:50px; text-align:center;" min="0" max="4" value=""></td>
+                <td><input type="number" id="cars_${i}" style="width:50px; text-align:center;" min="0" max="2" value=""></td>
                 <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
-                <td><input type="text" id="notes_${i}" style="width:100%;" value=""></td>
+                <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem;" value=""></td>
             `;
             const staffInput = tr.querySelector(`#staff_${i}`);
             const carsInput = tr.querySelector(`#cars_${i}`);
@@ -708,7 +779,6 @@
         }
     }
 
-    // تحديث حالة الجاهزية
     function updateStatusIcon(index) {
         const staffInput = document.getElementById(`staff_${index}`);
         const carsInput = document.getElementById(`cars_${index}`);
@@ -716,6 +786,7 @@
         if (staffInput && carsInput && iconSpan) {
             const staffCount = parseInt(staffInput.value) || 0;
             const carsCount = parseInt(carsInput.value) || 0;
+            // المعيار الصحيح: 2 مسعف + 1 سيارة
             if (staffCount >= 2 && carsCount >= 1) {
                 iconSpan.innerHTML = '✅';
                 iconSpan.className = 'status-icon status-ok';
@@ -726,9 +797,12 @@
         }
     }
 
+    // ============================================
     // تحميل بيانات التكميل إلى النموذج
+    // ============================================
     function loadShiftToForm(shift) {
-        currentShiftId = shift.id;
+        if (!shift) return;
+        viewingShiftId = shift.id;
         document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
         
         const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
@@ -740,7 +814,6 @@
             input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || '';
         });
         
-        // تعبئة بيانات المراكز
         for (let i = 0; i < centerList.length; i++) {
             const center = centerList[i];
             const data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
@@ -760,7 +833,6 @@
         }
     }
 
-    // جلب بيانات النموذج
     function getShiftFromForm() {
         const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
         const rapidLocations = {};
@@ -780,17 +852,13 @@
             };
         }
         return {
-            id: currentShiftId,
-            shiftDate: document.getElementById('shiftDate').innerText,
             shiftType: shiftType,
             rapidLocations: rapidLocations,
             centersData: centersDataForm,
-            generalNotes: document.getElementById('generalNotes').value,
-            lastUpdate: new Date().toISOString()
+            generalNotes: document.getElementById('generalNotes').value
         };
     }
 
-    // مسح النموذج
     function clearShiftForm() {
         document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
         document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
@@ -810,7 +878,7 @@
     }
 
     // ============================================
-    // دوال الاتصال بالخادم (البلاغات)
+    // دوال الاتصال بالخادم
     // ============================================
     async function loadAllData() {
         try {
@@ -818,19 +886,39 @@
             const result = await response.json();
             centersData = result.centers;
             reports = result.data;
+            currentShiftId = result.currentShiftId || null;
             if (!isViewingArchiveShift) {
                 renderData();
                 updateTotal();
             }
+            updateShiftStatus();
             document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
         } catch (error) {
             document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
         }
     }
 
+    function updateShiftStatus() {
+        const status = document.getElementById('shiftStatus');
+        if (currentShiftId) {
+            const shift = allShifts.find(s => s.id === currentShiftId);
+            if (shift) {
+                status.innerHTML = `📌 المناوبة الحالية: ${shift.shiftType || 'غير محددة'} - ${shift.shiftDate || ''}`;
+            } else {
+                status.innerHTML = `📌 مناوبة نشطة (رقم: ${currentShiftId})`;
+            }
+        } else {
+            status.innerHTML = '📌 لا توجد مناوبة نشطة';
+        }
+    }
+
     async function addReportToServer(center, unit) {
         if (isViewingArchiveShift) {
             alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة.");
+            return;
+        }
+        if (!currentShiftId) {
+            alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
             return;
         }
         try {
@@ -841,9 +929,9 @@
             });
             const result = await response.json();
             if (result.success) {
-                await loadAllData(); // إعادة تحميل البيانات بعد الإضافة
+                await loadAllData();
             } else {
-                alert("❌ فشل في تسجيل البلاغ");
+                alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
             }
         } catch (error) {
             alert("❌ فشل في الاتصال بالخادم");
@@ -887,7 +975,11 @@
                 option.value = shift.id;
                 const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
                 const total = shift.totalReports || 0;
-                option.textContent = `${shift.shiftName || shift.shiftType || 'مناوبة'} - ${date} (${total} بلاغ)`;
+                const type = shift.shiftType || 'مناوبة';
+                option.textContent = `${type} - ${date} (${total} بلاغ)`;
+                if (shift.id === currentShiftId) {
+                    option.textContent += ' ⬅️ الحالية';
+                }
                 archiveSelect.appendChild(option);
             });
             
@@ -898,14 +990,90 @@
                     const option = document.createElement('option');
                     option.value = shift.id;
                     const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                    option.textContent = `${shift.shiftName || shift.shiftType || 'مناوبة'} - ${date}`;
+                    option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
                     shiftArchiveSelect.appendChild(option);
                 });
             }
+            
+            updateShiftStatus();
         } catch (error) {}
     }
 
+    // ============================================
+    // نافذة اختيار نوع المناوبة (لـ مناوبة جديدة)
+    // ============================================
+    function showShiftTypeDialog() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:400px;">
+                    <h3 style="text-align:center;">📋 بدء مناوبة جديدة</h3>
+                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة الجديدة:</p>
+                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
+                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
+                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#shiftMorningBtn').onclick = function() {
+                modal.remove();
+                resolve('صباحية');
+            };
+            modal.querySelector('#shiftNightBtn').onclick = function() {
+                modal.remove();
+                resolve('ليلية');
+            };
+            modal.querySelector('#cancelShiftBtn').onclick = function() {
+                modal.remove();
+                resolve(null);
+            };
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            };
+        });
+    }
+
+    async function startNewShift() {
+        const shiftType = await showShiftTypeDialog();
+        if (!shiftType) return;
+        
+        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'} جديدة.`)) return;
+        
+        try {
+            const response = await fetch('/api/start-new-shift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shiftType })
+            });
+            const result = await response.json();
+            if (result.success) {
+                currentShiftId = result.shiftId;
+                alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
+                await loadShifts();
+                await loadAllData();
+                // إغلاق نموذج المناوبة إذا كان مفتوحاً
+                document.getElementById('shiftModal').style.display = 'none';
+            } else {
+                alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
+            }
+        } catch (error) {
+            alert("❌ خطأ في الاتصال: " + error.message);
+        }
+    }
+
+    // ============================================
     // عرض مناوبة سابقة
+    // ============================================
     async function viewShiftReports() {
         const select = document.getElementById('archiveSelect');
         const shiftId = parseInt(select.value);
@@ -921,6 +1089,7 @@
             if (result && result.shift) {
                 currentViewingShift = result.shift;
                 isViewingArchiveShift = true;
+                viewingShiftId = shiftId;
                 
                 reports = result.reports || {};
                 renderData();
@@ -931,7 +1100,7 @@
                 const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
                 document.getElementById('viewingBadge').style.display = 'inline-block';
                 document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
-                document.getElementById('viewingBadge').innerHTML = `📂 تستعرض: ${currentViewingShift.shiftName || currentViewingShift.shiftType || 'مناوبة'} (${totalReports} بلاغ)`;
+                document.getElementById('viewingBadge').innerHTML = `📂 تستعرض: ${result.shift.shiftType || 'مناوبة'} - ${result.shift.shiftDate || ''} (${totalReports} بلاغ)`;
                 document.getElementById('updateStatus').innerHTML = `🟡 تستعرض مناوبة سابقة | آخر تحديث: ${new Date().toLocaleTimeString()}`;
                 document.getElementById('shiftModal').style.display = 'flex';
             } else {
@@ -946,13 +1115,19 @@
     async function returnToCurrentShift() {
         isViewingArchiveShift = false;
         currentViewingShift = null;
+        viewingShiftId = null;
         await loadAllData();
         document.getElementById('viewingBadge').style.display = 'none';
         document.getElementById('returnToCurrentBtn').style.display = 'none';
         document.getElementById('archiveSelect').value = '';
         document.getElementById('updateStatus').innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
+        // إغلاق نموذج المناوبة
+        document.getElementById('shiftModal').style.display = 'none';
     }
 
+    // ============================================
+    // دوال العرض
+    // ============================================
     async function checkForUpdates() {
         if (isViewingArchiveShift) return;
         try {
@@ -1044,55 +1219,81 @@
                     const option = document.createElement('option');
                     option.value = shift.id;
                     const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                    option.textContent = `${shift.shiftName || shift.shiftType || 'مناوبة'} - ${date}`;
+                    option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
                     shiftArchiveSelect.appendChild(option);
                 });
             }
         } catch (error) {}
     }
 
-    async function saveShift() {
+    async function saveShiftData() {
         const shiftData = getShiftFromForm();
         if (!shiftData.shiftType) {
             alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)");
             return;
         }
+        
+        const targetId = viewingShiftId || currentShiftId;
+        if (!targetId) {
+            alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً.");
+            return;
+        }
+        
         try {
-            const response = await fetch('/api/shifts', {
+            const response = await fetch('/api/update-shift-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(shiftData)
+                body: JSON.stringify({
+                    shiftId: targetId,
+                    shiftData: shiftData
+                })
             });
             const result = await response.json();
             if (result.success) {
-                alert("✅ تم حفظ نموذج المناوبة");
-                currentShiftId = result.id;
-                await loadShiftFormShifts();
+                alert("✅ تم حفظ بيانات التكميل بنجاح");
                 await loadShifts();
+                await loadAllData();
+                if (viewingShiftId) {
+                    // إعادة تحميل المناوبة المعروضة
+                    const viewResponse = await fetch(`/api/shifts/${viewingShiftId}`);
+                    const viewResult = await viewResponse.json();
+                    if (viewResult && viewResult.shift) {
+                        loadShiftToForm(viewResult.shift);
+                    }
+                }
             } else {
-                alert("❌ فشل في الحفظ");
+                alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف"));
             }
         } catch (error) {
-            alert("❌ خطأ في الاتصال");
+            alert("❌ خطأ في الاتصال: " + error.message);
         }
     }
 
     async function deleteCurrentShift() {
-        if (!currentShiftId) {
+        const targetId = viewingShiftId || currentShiftId;
+        if (!targetId) {
             alert("لا توجد مناوبة محددة للحذف");
             return;
         }
         if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
         try {
-            const response = await fetch(`/api/shifts/${currentShiftId}`, { method: 'DELETE' });
+            const response = await fetch(`/api/shifts/${targetId}`, { method: 'DELETE' });
             const result = await response.json();
             if (result.success) {
                 alert("✅ تم حذف المناوبة");
-                currentShiftId = null;
-                document.getElementById('shiftArchiveSelect').value = '';
+                if (targetId === currentShiftId) {
+                    currentShiftId = null;
+                }
+                if (targetId === viewingShiftId) {
+                    viewingShiftId = null;
+                    isViewingArchiveShift = false;
+                    document.getElementById('viewingBadge').style.display = 'none';
+                    document.getElementById('returnToCurrentBtn').style.display = 'none';
+                }
                 clearShiftForm();
-                await loadShiftFormShifts();
                 await loadShifts();
+                await loadAllData();
+                document.getElementById('shiftModal').style.display = 'none';
             } else {
                 alert("❌ فشل في الحذف");
             }
@@ -1103,104 +1304,25 @@
 
     function openShiftModal() {
         loadShiftFormShifts().then(() => {
-            currentShiftId = null;
-            clearShiftForm();
-            document.getElementById('shiftArchiveSelect').value = '';
+            if (!viewingShiftId && currentShiftId) {
+                // تحميل المناوبة الحالية
+                const shift = allShifts.find(s => s.id === currentShiftId);
+                if (shift) {
+                    viewingShiftId = currentShiftId;
+                    loadShiftToForm(shift);
+                } else {
+                    clearShiftForm();
+                }
+            } else if (!viewingShiftId) {
+                clearShiftForm();
+            }
+            document.getElementById('shiftArchiveSelect').value = viewingShiftId || '';
             document.getElementById('shiftModal').style.display = 'flex';
         });
     }
 
     function printShiftForm() {
         window.print();
-    }
-
-    // ============================================
-    // نافذة اختيار نوع المناوبة (لـ مناوبة جديدة)
-    // ============================================
-    function showShiftTypeDialog() {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'flex';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width:400px;">
-                    <h3 style="text-align:center;">📋 اختيار نوع المناوبة</h3>
-                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة التي تريد حفظ البلاغات الحالية فيها:</p>
-                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
-                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
-                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
-                    </div>
-                    <div style="display:flex; justify-content:center; gap:10px;">
-                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('#shiftMorningBtn').onclick = function() {
-                modal.remove();
-                resolve('صباحية');
-            };
-            modal.querySelector('#shiftNightBtn').onclick = function() {
-                modal.remove();
-                resolve('ليلية');
-            };
-            modal.querySelector('#cancelShiftBtn').onclick = function() {
-                modal.remove();
-                resolve(null);
-            };
-            modal.onclick = function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                    resolve(null);
-                }
-            };
-        });
-    }
-
-    async function saveCurrentShift() {
-        const shiftType = await showShiftTypeDialog();
-        if (!shiftType) return;
-        
-        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية كمناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'}، ثم تصفير الجدول لبدء مناوبة جديدة.`)) return;
-        
-        try {
-            // جلب بيانات التكميل الحالية من النموذج (إذا كان مفتوحاً)
-            let currentShiftData = {};
-            try {
-                const response = await fetch('/api/get-current-shift-data');
-                currentShiftData = await response.json();
-            } catch (e) {}
-            
-            // تحديث نوع المناوبة في البيانات
-            currentShiftData.shiftType = shiftType;
-            
-            // حفظ بيانات التكميل أولاً
-            await fetch('/api/save-current-shift-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentShiftData)
-            });
-            
-            // ثم حفظ المناوبة مع البلاغات
-            const response = await fetch('/api/save-current-shift', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}'
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(`✅ تم حفظ المناوبة ${shiftType} الحالية وبدء مناوبة جديدة`);
-                await loadShifts();
-                await loadAllData();
-                // إغلاق نموذج المناوبة إذا كان مفتوحاً
-                document.getElementById('shiftModal').style.display = 'none';
-            } else {
-                alert("❌ فشل في حفظ المناوبة: " + (result.error || "خطأ غير معروف"));
-            }
-        } catch (error) {
-            alert("❌ خطأ في الاتصال: " + error.message);
-        }
     }
 
     // ============================================
@@ -1222,8 +1344,8 @@
             document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
             document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
             document.getElementById('staffSubText').innerText = `موزعين على ${stats.centerCount} مركز`;
-            document.getElementById('carsSubText').innerText = `سيارة لكل مركز`;
-            document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص' : `${stats.missingCenters} مراكز ناقصة`;
+            document.getElementById('carsSubText').innerText = `إجمالي السيارات`;
+            document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${stats.missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
             document.getElementById('readinessSubText').innerText = `${stats.readyCenters} / ${stats.centerCount} مركز جاهز`;
             
             const circumference = 2 * Math.PI * 42;
@@ -1510,16 +1632,20 @@
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     document.getElementById("exportBtn").onclick = exportExcel;
-    document.getElementById("newShiftBtn").onclick = saveCurrentShift;
+    document.getElementById("newShiftBtn").onclick = startNewShift;
     document.getElementById("shiftBtn").onclick = openShiftModal;
     document.getElementById("viewShiftBtn").onclick = viewShiftReports;
     document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
     document.getElementById("printShiftBtn").onclick = printShiftForm;
-    document.getElementById("saveShiftBtn").onclick = saveShift;
+    document.getElementById("saveShiftBtn").onclick = saveShiftData;
     document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
     
-    document.getElementById("closeShiftBtn").onclick = () => document.getElementById('shiftModal').style.display = 'none';
-    document.getElementById("closeMonthlyTableBtn").onclick = () => document.getElementById('monthlyTableModal').style.display = 'none';
+    document.getElementById("closeShiftBtn").onclick = () => {
+        document.getElementById('shiftModal').style.display = 'none';
+    };
+    document.getElementById("closeMonthlyTableBtn").onclick = () => {
+        document.getElementById('monthlyTableModal').style.display = 'none';
+    };
 
     document.getElementById('shiftArchiveSelect')?.addEventListener('change', async (e) => {
         const id = parseInt(e.target.value);
@@ -1527,10 +1653,11 @@
             const response = await fetch(`/api/shifts/${id}`);
             const result = await response.json();
             if (result && result.shift) {
+                viewingShiftId = id;
                 loadShiftToForm(result.shift);
             }
         } else {
-            currentShiftId = null;
+            viewingShiftId = null;
             clearShiftForm();
         }
     });
