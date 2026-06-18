@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* جميع الأنماط السابقة (نفسها) */
         * {
             box-sizing: border-box;
             font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
@@ -434,6 +435,62 @@
             color: #666;
             min-width: 35px;
         }
+
+        /* إحصائيات فورية */
+        .live-stats {
+            border: 1px solid #000;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+        }
+        .live-stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .live-stats-item {
+            display: flex;
+            flex-direction: column;
+            min-width: 100px;
+        }
+        .live-stats-item .label {
+            font-size: 0.65rem;
+            color: #555;
+        }
+        .live-stats-item .value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #1e466e;
+        }
+        .live-stats-item .value.green { color: #2a7f3e; }
+        .live-stats-item .value.red { color: #c0392b; }
+        .live-distribution {
+            font-size: 0.7rem;
+            max-height: 60px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 5px;
+            background: white;
+            flex: 1;
+            min-width: 150px;
+        }
+        .live-distribution .title {
+            color: #888;
+            font-size: 0.6rem;
+        }
+        .live-distribution .item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 2px 0;
+            border-bottom: 1px dotted #eee;
+        }
+        .live-distribution .item .count {
+            font-weight: bold;
+            color: #1e466e;
+        }
         
         @media print {
             body {
@@ -525,6 +582,12 @@
             #monthlyTableModal, #airAmbulanceModal, #docsModal {
                 display: none !important;
             }
+            .live-stats {
+                display: block !important;
+                border: 1px solid #000;
+                background: white;
+                padding: 8px;
+            }
         }
         
         @media (max-width: 650px) {
@@ -534,6 +597,7 @@
             .sheet-tab { padding: 4px 10px; font-size: 0.7rem; }
             .circle-stats-container { grid-template-columns: 1fr 1fr; }
             .svg-circle { width: 60px; height: 60px; }
+            .live-stats-grid { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
@@ -572,6 +636,28 @@
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
+
+    <!-- إحصائيات البلاغات الفورية -->
+    <div id="liveReportStats" class="live-stats" style="display:none;">
+        <div class="live-stats-grid">
+            <div class="live-stats-item">
+                <span class="label">📊 إجمالي البلاغات</span>
+                <span class="value" id="liveTotalReports">0</span>
+            </div>
+            <div class="live-stats-item">
+                <span class="label">🏆 أكثر فرقة استخداماً</span>
+                <span class="value green" id="liveTopUnit">-</span>
+            </div>
+            <div class="live-stats-item">
+                <span class="label">🔢 عدد البلاغات للفرقة الأكثر</span>
+                <span class="value red" id="liveTopUnitCount">0</span>
+            </div>
+            <div class="live-distribution" id="liveUnitDistribution">
+                <div class="title">📋 توزيع البلاغات على الفرق</div>
+                <div id="liveUnitList"></div>
+            </div>
+        </div>
+    </div>
 
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
@@ -865,7 +951,6 @@
             const staffInput = tr.querySelector(`#staff_${i}`);
             const carsInput = tr.querySelector(`#cars_${i}`);
             
-            // ربط التحديث الفوري للمؤشرات
             staffInput.addEventListener('input', function() {
                 updateStatusIcon(i);
                 calculateWorkforceStatsLocally();
@@ -897,7 +982,7 @@
     }
 
     // ============================================
-    // حساب المؤشرات فوراً من النموذج (بدون خادم)
+    // حساب مؤشرات القوى العاملة فوراً
     // ============================================
     function calculateWorkforceStatsLocally() {
         const centerList = document.querySelectorAll('#centersTableBody tr');
@@ -933,7 +1018,6 @@
         
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
         
-        // تحديث الواجهة فوراً
         document.getElementById('workforceStats').style.display = 'block';
         document.getElementById('totalStaffDisplay').innerText = totalStaff;
         document.getElementById('totalCarsDisplay').innerText = totalCars;
@@ -943,7 +1027,6 @@
         document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
         document.getElementById('readinessSubText').innerText = `${readyCenters} / ${centerCount} مركز جاهز`;
         
-        // تحديث الدائرة
         const circumference = 2 * Math.PI * 42;
         const offset = circumference - (readinessRate / 100) * circumference;
         const circle = document.getElementById('readinessCircle');
@@ -957,7 +1040,6 @@
         circle.style.strokeDashoffset = offset;
         text.textContent = readinessRate + '%';
         
-        // توزيع المسعفين
         const distList = document.getElementById('distributionList');
         distList.innerHTML = '';
         const total = totalStaff || 1;
@@ -978,7 +1060,6 @@
             distList.appendChild(div);
         }
         
-        // توزيع السيارات
         const carDistList = document.getElementById('carDistributionList');
         carDistList.innerHTML = '';
         const totalCarsValue = totalCars || 1;
@@ -998,6 +1079,54 @@
             `;
             carDistList.appendChild(div);
         }
+    }
+
+    // ============================================
+    // حساب إحصائيات البلاغات فوراً
+    // ============================================
+    function calculateLiveReportStats() {
+        const container = document.getElementById('liveReportStats');
+        if (!container) return;
+        
+        let total = 0;
+        let unitStats = {};
+        
+        for (let key in reports) {
+            const report = reports[key];
+            if (report && report.count > 0) {
+                total += report.count;
+                const parts = key.split('|');
+                const unit = parts.length > 1 ? parts[1] : key;
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
+        }
+        
+        if (total === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        document.getElementById('liveTotalReports').innerText = total;
+        
+        const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+        const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+        const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+        
+        document.getElementById('liveTopUnit').innerText = topUnit;
+        document.getElementById('liveTopUnitCount').innerText = topCount;
+        
+        const listContainer = document.getElementById('liveUnitList');
+        listContainer.innerHTML = '';
+        sortedUnits.forEach(([unit, count]) => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            div.innerHTML = `
+                <span>${unit}</span>
+                <span class="count">${count}</span>
+            `;
+            listContainer.appendChild(div);
+        });
     }
 
     // ============================================
@@ -1031,7 +1160,6 @@
         
         document.getElementById('generalNotes').value = shift.generalNotes || '';
         
-        // حساب المؤشرات فوراً
         setTimeout(calculateWorkforceStatsLocally, 100);
         
         if (shift.id) {
@@ -1096,6 +1224,7 @@
             if (!isViewingArchiveShift) {
                 renderData();
                 updateTotal();
+                calculateLiveReportStats();
             }
             updateShiftStatus();
             document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
@@ -1136,6 +1265,7 @@
             const result = await response.json();
             if (result.success) {
                 await loadAllData();
+                calculateLiveReportStats();
             } else {
                 alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
             }
@@ -1158,6 +1288,7 @@
             const result = await response.json();
             if (result.success) {
                 await loadAllData();
+                calculateLiveReportStats();
             } else if (result.error) {
                 alert(result.error);
             }
@@ -1267,6 +1398,7 @@
                 alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
                 await loadShifts();
                 await loadAllData();
+                calculateLiveReportStats();
                 document.getElementById('shiftModal').style.display = 'none';
             } else {
                 alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
@@ -1301,6 +1433,7 @@
                 updateTotal();
                 loadShiftToForm(result.shift);
                 displayShiftReportStats(result.reports);
+                calculateLiveReportStats();
                 
                 const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
                 document.getElementById('viewingBadge').style.display = 'inline-block';
@@ -1322,6 +1455,7 @@
         currentViewingShift = null;
         viewingShiftId = null;
         await loadAllData();
+        calculateLiveReportStats();
         document.getElementById('viewingBadge').style.display = 'none';
         document.getElementById('returnToCurrentBtn').style.display = 'none';
         document.getElementById('archiveSelect').value = '';
@@ -1340,6 +1474,7 @@
             if (data.lastUpdate > lastKnownUpdate) {
                 lastKnownUpdate = data.lastUpdate;
                 await loadAllData();
+                calculateLiveReportStats();
             }
         } catch (error) {}
     }
@@ -1457,6 +1592,7 @@
                 alert("✅ تم حفظ بيانات التكميل بنجاح");
                 await loadShifts();
                 await loadAllData();
+                calculateLiveReportStats();
                 if (viewingShiftId) {
                     const viewResponse = await fetch(`/api/shifts/${viewingShiftId}`);
                     const viewResult = await viewResponse.json();
@@ -1496,6 +1632,7 @@
                 clearShiftForm();
                 await loadShifts();
                 await loadAllData();
+                calculateLiveReportStats();
                 document.getElementById('shiftModal').style.display = 'none';
             } else {
                 alert("❌ فشل في الحذف");
@@ -1520,7 +1657,6 @@
             }
             document.getElementById('shiftArchiveSelect').value = viewingShiftId || '';
             document.getElementById('shiftModal').style.display = 'flex';
-            // حساب المؤشرات فوراً بعد فتح النموذج
             setTimeout(calculateWorkforceStatsLocally, 200);
         });
     }
@@ -1817,7 +1953,6 @@
             circle.style.strokeDashoffset = offset;
             text.textContent = stats.readinessRate + '%';
             
-            // توزيع المسعفين
             const distList = document.getElementById('distributionList');
             distList.innerHTML = '';
             const total = stats.totalStaff || 1;
@@ -1838,7 +1973,6 @@
                 distList.appendChild(div);
             }
             
-            // توزيع السيارات
             const carDistList = document.getElementById('carDistributionList');
             carDistList.innerHTML = '';
             const totalCars = stats.totalCars || 1;
@@ -1865,7 +1999,7 @@
     }
 
     // ============================================
-    // دوال إحصائيات البلاغات
+    // دوال إحصائيات البلاغات (في نموذج المناوبة)
     // ============================================
     function displayShiftReportStats(reports) {
         const container = document.getElementById('shiftReportStats');
