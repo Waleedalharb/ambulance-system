@@ -10,7 +10,6 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* جميع الأنماط السابقة (نفسها) */
         * {
             box-sizing: border-box;
             font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
@@ -865,8 +864,17 @@
             `;
             const staffInput = tr.querySelector(`#staff_${i}`);
             const carsInput = tr.querySelector(`#cars_${i}`);
-            staffInput.addEventListener('input', () => updateStatusIcon(i));
-            carsInput.addEventListener('input', () => updateStatusIcon(i));
+            
+            // ربط التحديث الفوري للمؤشرات
+            staffInput.addEventListener('input', function() {
+                updateStatusIcon(i);
+                calculateWorkforceStatsLocally();
+            });
+            carsInput.addEventListener('input', function() {
+                updateStatusIcon(i);
+                calculateWorkforceStatsLocally();
+            });
+            
             tbody.appendChild(tr);
         }
     }
@@ -885,6 +893,110 @@
                 iconSpan.innerHTML = '❌';
                 iconSpan.className = 'status-icon status-not';
             }
+        }
+    }
+
+    // ============================================
+    // حساب المؤشرات فوراً من النموذج (بدون خادم)
+    // ============================================
+    function calculateWorkforceStatsLocally() {
+        const centerList = document.querySelectorAll('#centersTableBody tr');
+        let totalStaff = 0;
+        let totalCars = 0;
+        let readyCenters = 0;
+        let missingCenters = 0;
+        let centerCount = 0;
+        const distribution = {};
+        const carDistribution = {};
+        
+        centerList.forEach(tr => {
+            const centerName = tr.querySelector('td:first-child')?.innerText || '';
+            const staffInput = tr.querySelector('input[id^="staff_"]');
+            const carsInput = tr.querySelector('input[id^="cars_"]');
+            
+            if (staffInput && carsInput) {
+                const staffCount = parseInt(staffInput.value) || 0;
+                const carsCount = parseInt(carsInput.value) || 0;
+                totalStaff += staffCount;
+                totalCars += carsCount;
+                centerCount++;
+                distribution[centerName] = staffCount;
+                carDistribution[centerName] = carsCount;
+                
+                if (staffCount >= 2 && carsCount >= 1) {
+                    readyCenters++;
+                } else {
+                    missingCenters++;
+                }
+            }
+        });
+        
+        const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+        
+        // تحديث الواجهة فوراً
+        document.getElementById('workforceStats').style.display = 'block';
+        document.getElementById('totalStaffDisplay').innerText = totalStaff;
+        document.getElementById('totalCarsDisplay').innerText = totalCars;
+        document.getElementById('missingCentersDisplay').innerText = missingCenters;
+        document.getElementById('staffSubText').innerText = `موزعين على ${centerCount} مركز`;
+        document.getElementById('carsSubText').innerText = `إجمالي السيارات`;
+        document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
+        document.getElementById('readinessSubText').innerText = `${readyCenters} / ${centerCount} مركز جاهز`;
+        
+        // تحديث الدائرة
+        const circumference = 2 * Math.PI * 42;
+        const offset = circumference - (readinessRate / 100) * circumference;
+        const circle = document.getElementById('readinessCircle');
+        const text = document.getElementById('readinessText');
+        
+        let color = '#c0392b';
+        if (readinessRate >= 80) color = '#2a7f3e';
+        else if (readinessRate >= 50) color = '#f39c12';
+        
+        circle.setAttribute('stroke', color);
+        circle.style.strokeDashoffset = offset;
+        text.textContent = readinessRate + '%';
+        
+        // توزيع المسعفين
+        const distList = document.getElementById('distributionList');
+        distList.innerHTML = '';
+        const total = totalStaff || 1;
+        for (let center in distribution) {
+            const count = distribution[center];
+            const barWidth = Math.round((count / total) * 100);
+            const isReady = count >= 2;
+            const div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = `
+                <span class="name">${center}</span>
+                <span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div>
+                </div>
+                <span class="percent">${barWidth}%</span>
+            `;
+            distList.appendChild(div);
+        }
+        
+        // توزيع السيارات
+        const carDistList = document.getElementById('carDistributionList');
+        carDistList.innerHTML = '';
+        const totalCarsValue = totalCars || 1;
+        for (let center in carDistribution) {
+            const count = carDistribution[center];
+            const barWidth = Math.round((count / totalCarsValue) * 100);
+            const hasCar = count >= 1;
+            const div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = `
+                <span class="name">${center}</span>
+                <span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div>
+                </div>
+                <span class="percent">${barWidth}%</span>
+            `;
+            carDistList.appendChild(div);
         }
     }
 
@@ -918,6 +1030,9 @@
         }
         
         document.getElementById('generalNotes').value = shift.generalNotes || '';
+        
+        // حساب المؤشرات فوراً
+        setTimeout(calculateWorkforceStatsLocally, 100);
         
         if (shift.id) {
             loadWorkforceStats(shift.id);
@@ -1405,6 +1520,8 @@
             }
             document.getElementById('shiftArchiveSelect').value = viewingShiftId || '';
             document.getElementById('shiftModal').style.display = 'flex';
+            // حساب المؤشرات فوراً بعد فتح النموذج
+            setTimeout(calculateWorkforceStatsLocally, 200);
         });
     }
 
@@ -1560,18 +1677,20 @@
         let html = '';
         airRecords.forEach((record) => {
             const date = new Date(record.createdAt).toLocaleString('ar-SA');
+            const notes = record.notes || 'لا توجد ملاحظات';
             html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #ddd; font-size:0.8rem;">
-                    <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #ddd; font-size:0.8rem; flex-wrap:wrap; gap:5px;">
+                    <div style="flex:1; min-width:150px;">
                         <strong>${record.reportNumber || 'بدون رقم'}</strong>
-                        <span style="margin:0 8px;">|</span>
+                        <span style="margin:0 5px;">|</span>
                         <span>${record.unit || '-'}</span>
-                        <span style="margin:0 8px;">|</span>
+                        <span style="margin:0 5px;">|</span>
                         <span>${record.hospital || '-'}</span>
-                        <span style="margin:0 8px;">|</span>
-                        <span style="font-size:0.65rem; color:#666;">${date}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span style="font-size:0.6rem; color:#888; display:block;">📝 ${notes}</span>
+                        <span style="font-size:0.6rem; color:#999;">🕒 ${date}</span>
                     </div>
-                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️ حذف</button>
+                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem; border-radius:4px;">🗑️ حذف</button>
                 </div>
             `;
         });
@@ -1663,7 +1782,7 @@
     });
 
     // ============================================
-    // دوال مؤشرات القوى العاملة
+    // دوال مؤشرات القوى العاملة (من الخادم)
     // ============================================
     async function loadWorkforceStats(shiftId) {
         try {
