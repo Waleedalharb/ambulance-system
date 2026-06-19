@@ -436,7 +436,6 @@
             min-width: 35px;
         }
 
-        /* إحصائيات فورية */
         .live-stats {
             border: 1px solid #000;
             padding: 10px 15px;
@@ -492,6 +491,73 @@
             color: #1e466e;
         }
         
+        /* أنماط التحكم والتنسيق */
+        .control-person {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            flex-wrap: wrap;
+        }
+        .control-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+        .control-info {
+            flex: 2;
+            min-width: 150px;
+        }
+        .control-info .name {
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .control-info .role {
+            font-size: 0.7rem;
+            color: #666;
+        }
+        .control-vacation {
+            flex: 1;
+            min-width: 120px;
+            font-size: 0.75rem;
+        }
+        .control-vacation .display {
+            padding: 5px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .control-vacation .edit {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-vacation .edit input {
+            width: 120px;
+            padding: 3px;
+            font-size: 0.7rem;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+        }
+        .control-role-badge {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: #f9f9f9;
+        }
+        
         @media print {
             body {
                 background: white;
@@ -506,9 +572,10 @@
             .info-bar, .toolbar, .archive-row, .update-status, footer,
             .modal-buttons, #closeShiftBtn, #deleteShiftBtn,
             #shiftArchiveSelect, #printShiftBtn, #saveShiftBtn,
-            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn, #exportBtn,
+            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn,
             #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn,
-            #docsBtn, #airAmbulanceBtn,
+            #docsBtn, #airAmbulanceBtn, #controlBtn,
+            #editVacationsBtn, #saveVacationsBtn, #changePasswordBtn,
             .no-print {
                 display: none !important;
             }
@@ -579,7 +646,7 @@
             .shift-type label {
                 margin-left: 10px;
             }
-            #monthlyTableModal, #airAmbulanceModal, #docsModal {
+            #monthlyTableModal, #airAmbulanceModal, #docsModal, #controlModal {
                 display: none !important;
             }
             .live-stats {
@@ -598,6 +665,8 @@
             .circle-stats-container { grid-template-columns: 1fr 1fr; }
             .svg-circle { width: 60px; height: 60px; }
             .live-stats-grid { flex-direction: column; align-items: stretch; }
+            .control-person { flex-direction: column; align-items: stretch; }
+            .control-vacation .edit input { width: 100%; }
         }
     </style>
 </head>
@@ -631,8 +700,8 @@
             <button id="shiftBtn">📋 نموذج المناوبة</button>
             <button id="docsBtn">📁 المستندات</button>
             <button id="airAmbulanceBtn">🚁 الإسعاف الجوي</button>
+            <button id="controlBtn">📋 التحكم والتنسيق</button>
             <button id="monthlyTableBtn" class="no-print">📊 الجدول الشهري</button>
-            <button id="exportBtn">📎 تصدير Excel</button>
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
@@ -913,6 +982,80 @@
     </div>
 </div>
 
+<!-- نافذة التحكم والتنسيق -->
+<div id="controlModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">📋 التحكم والتنسيق</h2>
+            <button id="changePasswordBtn" style="padding:4px 12px; border:1px solid #000; background:#f39c12; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">🔑 تغيير الرقم السري</button>
+        </div>
+        <p style="text-align:center; color:#666; margin:5px 0 15px;">أفراد التحكم والتنسيق - إجازات الموظفين</p>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #000; padding-bottom:8px; flex-wrap:wrap; gap:5px;">
+            <span style="font-weight:bold;">عدد الأفراد: <span id="controlCount">9</span></span>
+            <span style="font-weight:bold; font-size:0.8rem;">تحكم عملياتي / تنسيق استجابة</span>
+            <div style="display:flex; gap:5px;">
+                <button id="editVacationsBtn" style="padding:4px 12px; border:1px solid #000; background:#f39c12; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">🔒 تعديل الإجازات</button>
+                <button id="saveVacationsBtn" style="display:none; padding:4px 12px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">💾 حفظ الإجازات</button>
+            </div>
+        </div>
+        
+        <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid #aaa; padding:10px; background:white;">
+            <!-- ستعرض هنا بيانات الأفراد -->
+        </div>
+        
+        <div class="form-row" style="margin-top:15px;">
+            <label>📝 ملاحظات إضافية:</label>
+            <textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..." style="width:100%;"></textarea>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="saveControlNotes" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">💾 حفظ الملاحظات</button>
+            <button id="closeControlBtn">❌ إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إدخال الرقم السري -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3>🔒 إدخال الرقم السري</h3>
+        <p style="text-align:center; color:#666; margin:5px 0 15px;">أدخل الرقم السري لتعديل الإجازات</p>
+        <div class="form-row">
+            <label>🔑 الرقم السري:</label>
+            <input type="password" id="passwordInput" placeholder="أدخل الرقم السري" style="width:100%;">
+        </div>
+        <div class="modal-buttons">
+            <button id="confirmPasswordBtn" style="padding:8px 20px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-weight:bold;">✅ تأكيد</button>
+            <button id="cancelPasswordBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer;">❌ إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تغيير الرقم السري -->
+<div id="changePasswordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3>🔑 تغيير الرقم السري</h3>
+        <p style="text-align:center; color:#666; margin:5px 0 15px;">أدخل الرقم السري القديم والجديد</p>
+        <div class="form-row">
+            <label>🔑 الرقم السري القديم:</label>
+            <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم" style="width:100%;">
+        </div>
+        <div class="form-row">
+            <label>🔑 الرقم السري الجديد:</label>
+            <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)" style="width:100%;">
+        </div>
+        <div class="form-row">
+            <label>🔑 تأكيد الرقم السري الجديد:</label>
+            <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد" style="width:100%;">
+        </div>
+        <div class="modal-buttons">
+            <button id="confirmChangePasswordBtn" style="padding:8px 20px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-weight:bold;">✅ تغيير</button>
+            <button id="cancelChangePasswordBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer;">❌ إلغاء</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // ============================================
     // المتغيرات العامة
@@ -931,6 +1074,22 @@
 
     let currentSheetIndex = 0;
     let workbookData = null;
+
+    // بيانات التحكم والتنسيق
+    const controlData = [
+        { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "11120", name: "عوض عبدالعزيز عوض الاسمري", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "102752", name: "محمد نايف صنهات العتيبي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "10717", name: "عطاالله خالد عطوي الرويلي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "101915", name: "مبارك هذال مبارك ال بريك", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "8323", name: "تركي عتيق الله خيرالله المطيري", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
+    ];
+
+    let isEditMode = false;
+    let controlNotes = "";
 
     // ============================================
     // بناء جدول المراكز
@@ -1538,10 +1697,6 @@
                 grid.appendChild(unitDiv);
             }
         }
-    }
-
-    function exportExcel() {
-        window.open('/api/export', '_blank');
     }
 
     // ============================================
@@ -2218,6 +2373,248 @@
     }
 
     // ============================================
+    // دوال التحكم والتنسيق
+    // ============================================
+    async function loadVacations() {
+        try {
+            const response = await fetch('/api/vacations');
+            const data = await response.json();
+            if (Array.isArray(data) && data.length > 0) {
+                data.forEach((item, index) => {
+                    if (controlData[index]) {
+                        controlData[index].vacationStart = item.vacationStart || '';
+                        controlData[index].vacationEnd = item.vacationEnd || '';
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل الإجازات:", error);
+        }
+    }
+
+    function renderControlList(editable = false) {
+        const container = document.getElementById('controlList');
+        if (!container) return;
+        
+        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+        const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
+        
+        controlData.forEach((person, index) => {
+            const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('');
+            const color = colors[index % colors.length];
+            
+            const startDate = person.vacationStart || '';
+            const endDate = person.vacationEnd || '';
+            const vacationDisplay = startDate && endDate ? 
+                `📅 ${formatDate(startDate)} → ${formatDate(endDate)}` : 
+                '📅 لا توجد إجازة';
+            
+            html += `
+                <div class="control-person">
+                    <div class="control-avatar" style="background:${color};">${initials}</div>
+                    <div class="control-info">
+                        <div class="name">${person.name}</div>
+                        <div class="role">📌 ${person.role} | كود: ${person.code}</div>
+                    </div>
+                    <div class="control-vacation">
+                        ${editable ? `
+                            <div class="edit">
+                                <input type="date" id="start_${index}" value="${startDate}">
+                                <span>→</span>
+                                <input type="date" id="end_${index}" value="${endDate}">
+                            </div>
+                        ` : `
+                            <div class="display">${vacationDisplay}</div>
+                        `}
+                    </div>
+                    <div class="control-role-badge">
+                        ${person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق'}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const parts = dateString.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    document.getElementById('controlBtn')?.addEventListener('click', function() {
+        document.getElementById('controlModal').style.display = 'flex';
+        loadVacations().then(() => {
+            renderControlList(false);
+            loadControlNotes();
+        });
+    });
+
+    document.getElementById('closeControlBtn')?.addEventListener('click', function() {
+        document.getElementById('controlModal').style.display = 'none';
+        isEditMode = false;
+        document.getElementById('saveVacationsBtn').style.display = 'none';
+        document.getElementById('editVacationsBtn').style.display = 'inline-block';
+    });
+
+    document.getElementById('editVacationsBtn')?.addEventListener('click', function() {
+        document.getElementById('passwordModal').style.display = 'flex';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordInput').focus();
+    });
+
+    document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
+        const password = document.getElementById('passwordInput').value;
+        try {
+            const response = await fetch('/api/get-password');
+            const result = await response.json();
+            const storedPassword = result.password || '1234';
+            
+            if (password === storedPassword) {
+                isEditMode = true;
+                document.getElementById('passwordModal').style.display = 'none';
+                document.getElementById('passwordInput').value = '';
+                renderControlList(true);
+                document.getElementById('saveVacationsBtn').style.display = 'inline-block';
+                document.getElementById('editVacationsBtn').style.display = 'none';
+                alert('✅ تم تفعيل وضع التعديل');
+            } else {
+                alert('❌ الرقم السري غير صحيح');
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+            }
+        } catch (error) {
+            alert('❌ خطأ في التحقق من الرقم السري');
+        }
+    });
+
+    document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('passwordModal').style.display = 'none';
+        document.getElementById('passwordInput').value = '';
+    });
+
+    document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
+        // جمع بيانات الإجازات من الحقول
+        controlData.forEach((person, index) => {
+            const startInput = document.getElementById(`start_${index}`);
+            const endInput = document.getElementById(`end_${index}`);
+            if (startInput && endInput) {
+                person.vacationStart = startInput.value;
+                person.vacationEnd = endInput.value;
+            }
+        });
+        
+        try {
+            const response = await fetch('/api/save-vacations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vacations: controlData })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم حفظ الإجازات بنجاح');
+                isEditMode = false;
+                renderControlList(false);
+                document.getElementById('saveVacationsBtn').style.display = 'none';
+                document.getElementById('editVacationsBtn').style.display = 'inline-block';
+            } else {
+                alert('❌ فشل في حفظ الإجازات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // ============================================
+    // دوال تغيير الرقم السري
+    // ============================================
+    document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('changePasswordModal').style.display = 'flex';
+        document.getElementById('oldPasswordInput').value = '';
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('confirmNewPasswordInput').value = '';
+    });
+
+    document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('changePasswordModal').style.display = 'none';
+    });
+
+    document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
+        const oldPassword = document.getElementById('oldPasswordInput').value;
+        const newPassword = document.getElementById('newPasswordInput').value;
+        const confirmNewPassword = document.getElementById('confirmNewPasswordInput').value;
+        
+        if (!oldPassword || !newPassword || !confirmNewPassword) {
+            alert('❌ الرجاء ملء جميع الحقول');
+            return;
+        }
+        
+        if (newPassword !== confirmNewPassword) {
+            alert('❌ الرقم السري الجديد غير متطابق');
+            return;
+        }
+        
+        if (newPassword.length < 4) {
+            alert('❌ الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldPassword, newPassword })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم تغيير الرقم السري بنجاح');
+                document.getElementById('changePasswordModal').style.display = 'none';
+            } else {
+                alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري'));
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // ============================================
+    // دوال ملاحظات التحكم والتنسيق
+    // ============================================
+    async function loadControlNotes() {
+        try {
+            const response = await fetch('/api/control-notes');
+            const result = await response.json();
+            if (result.success) {
+                controlNotes = result.notes || '';
+                document.getElementById('controlNotes').value = controlNotes;
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل ملاحظات التحكم:", error);
+        }
+    }
+
+    document.getElementById('saveControlNotes')?.addEventListener('click', async function() {
+        const notes = document.getElementById('controlNotes').value.trim();
+        try {
+            const response = await fetch('/api/save-control-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            });
+            const result = await response.json();
+            if (result.success) {
+                controlNotes = notes;
+                alert('✅ تم حفظ الملاحظات بنجاح');
+            } else {
+                alert('❌ فشل في حفظ الملاحظات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // ============================================
     // فتح وإغلاق النوافذ
     // ============================================
     document.getElementById('docsBtn')?.addEventListener('click', function() {
@@ -2245,7 +2642,6 @@
     // التشغيل
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
-    document.getElementById("exportBtn").onclick = exportExcel;
     document.getElementById("newShiftBtn").onclick = startNewShift;
     document.getElementById("shiftBtn").onclick = openShiftModal;
     document.getElementById("viewShiftBtn").onclick = viewShiftReports;
@@ -2288,6 +2684,19 @@
         }
         if (e.target === document.getElementById('monthlyTableModal')) {
             document.getElementById('monthlyTableModal').style.display = 'none';
+        }
+        if (e.target === document.getElementById('controlModal')) {
+            document.getElementById('controlModal').style.display = 'none';
+            isEditMode = false;
+            document.getElementById('saveVacationsBtn').style.display = 'none';
+            document.getElementById('editVacationsBtn').style.display = 'inline-block';
+        }
+        if (e.target === document.getElementById('passwordModal')) {
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+        if (e.target === document.getElementById('changePasswordModal')) {
+            document.getElementById('changePasswordModal').style.display = 'none';
         }
     };
 

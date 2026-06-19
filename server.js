@@ -14,6 +14,9 @@ const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
 const DOCS_PATH = '/data/docs.json';
 const AIR_PATH = '/data/air-ambulance.json';
 const IDENTITY_PATH = '/data/identity.pdf';
+const CONTROL_NOTES_PATH = '/data/control-notes.json';
+const VACATIONS_PATH = '/data/vacations.json';
+const PASSWORD_PATH = '/data/password.json';
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
@@ -111,6 +114,26 @@ async function readAirRecords() {
 
 async function writeAirRecords(data) {
     await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الرقم السري
+// ============================================
+async function readPassword() {
+    try {
+        const data = await fs.readFile(PASSWORD_PATH, 'utf8');
+        const parsed = JSON.parse(data);
+        return parsed.password || '1234';
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return '1234';
+        }
+        return '1234';
+    }
+}
+
+async function writePassword(password) {
+    await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
 }
 
 // ============================================
@@ -557,35 +580,87 @@ app.get('/api/check-monthly-table', async (req, res) => {
 });
 
 // ============================================
-// API: تصدير Excel
+// API: ملاحظات التحكم والتنسيق
 // ============================================
-app.get('/api/export', async (req, res) => {
+app.get('/api/control-notes', async (req, res) => {
     try {
-        const reports = await readData();
-        const safeReports = (reports && typeof reports === 'object') ? reports : {};
-        let rows = [
-            ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
-            ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
-            [],
-            ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
-        ];
-        for (let center in centersData) {
-            for (let unit of centersData[center]) {
-                let key = `${center}|${unit}`;
-                let record = safeReports[key] || { count: 0, times: [] };
-                let timesStr = (record.times && record.times.length) ? record.times.join(" ؛ ") : "لا يوجد بلاغات";
-                rows.push([center, unit, record.count, timesStr]);
-            }
-        }
-        let total = Object.values(safeReports).reduce((sum, r) => sum + (r.count || 0), 0);
-        rows.push([], ["الإجمالي الكلي", "", total, ""]);
-        let csv = rows.map(row => row.map(cell => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-        const fileName = `بلاغات_${new Date().toISOString().slice(0,10)}.csv`;
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-        res.status(200).send("\uFEFF" + csv);
+        const data = await fs.readFile(CONTROL_NOTES_PATH, 'utf8');
+        const parsed = JSON.parse(data);
+        res.json({ success: true, notes: parsed.notes || '' });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في تصدير البيانات' });
+        if (error.code === 'ENOENT') {
+            res.json({ success: true, notes: '' });
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الملاحظات' });
+        }
+    }
+});
+
+app.post('/api/save-control-notes', async (req, res) => {
+    try {
+        const { notes } = req.body;
+        await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
+    }
+});
+
+// ============================================
+// API: إجازات التحكم والتنسيق
+// ============================================
+app.get('/api/vacations', async (req, res) => {
+    try {
+        const data = await fs.readFile(VACATIONS_PATH, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.json([]);
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الإجازات' });
+        }
+    }
+});
+
+app.post('/api/save-vacations', async (req, res) => {
+    try {
+        const { vacations } = req.body;
+        await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الإجازات' });
+    }
+});
+
+// ============================================
+// API: الرقم السري
+// ============================================
+app.get('/api/get-password', async (req, res) => {
+    try {
+        const password = await readPassword();
+        res.json({ success: true, password });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الرقم السري' });
+    }
+});
+
+app.post('/api/change-password', async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const currentPassword = await readPassword();
+        
+        if (oldPassword !== currentPassword) {
+            return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
+        }
+        
+        if (!newPassword || newPassword.length < 4) {
+            return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
+        }
+        
+        await writePassword(newPassword);
+        res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
     }
 });
 
@@ -599,4 +674,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار المستندات: ${DOCS_PATH}`);
     console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
+    console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
 });
