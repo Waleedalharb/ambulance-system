@@ -70,20 +70,20 @@
             gap: 14px;
         }
         .header-brand .icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(255,255,255,0.10);
+            width: 52px;
+            height: 52px;
+            background: rgba(255,255,255,0.08);
             border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 4px;
-            border: 1px solid rgba(255,255,255,0.12);
+            padding: 6px;
+            border: 1px solid rgba(255,255,255,0.10);
             transition: all 0.3s;
         }
         .header-brand .icon:hover {
-            background: rgba(255,255,255,0.18);
-            transform: scale(1.05);
+            background: rgba(255,255,255,0.16);
+            transform: scale(1.04);
         }
         .header-brand .icon svg {
             width: 40px;
@@ -104,7 +104,7 @@
             gap: 6px;
         }
         .header-brand .text .sub i {
-            font-size: 0.5rem;
+            font-size: 0.4rem;
             color: var(--gold);
         }
         .header-date {
@@ -122,7 +122,7 @@
             font-size: 0.7rem;
         }
 
-        /* ===== باقي الأنماط (نفسها) ===== */
+        /* ===== باقي الأنماط ===== */
         .control-bar {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -394,28 +394,24 @@
     <header class="header">
         <div class="header-brand">
             <div class="icon">
-                <!-- أيقونة رقم 6 (محطة قصر الحكم) -->
+                <!-- أيقونة رقم 6 - محطة قصر الحكم -->
                 <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                    <!-- المظلة الفولاذية العاكسة (طبقات متعددة للإحساس بالعمق) -->
-                    <rect x="8" y="30" width="104" height="16" rx="4" fill="#FFFFFF" opacity="0.95"/>
-                    <rect x="16" y="46" width="88" height="10" rx="3" fill="#FFFFFF" opacity="0.7"/>
-                    <rect x="24" y="56" width="72" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
+                    <!-- المظلة الفولاذية العاكسة -->
+                    <rect x="10" y="32" width="100" height="16" rx="4" fill="#FFFFFF" opacity="0.95"/>
+                    <rect x="18" y="48" width="84" height="10" rx="3" fill="#FFFFFF" opacity="0.7"/>
+                    <rect x="26" y="58" width="68" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
                     
-                    <!-- الجدار المائل مع الفتحات المثلثة -->
-                    <polygon points="8,30 112,30 88,90 32,90" fill="#FFFFFF" opacity="0.12"/>
+                    <!-- الجدار المائل -->
+                    <polygon points="10,32 110,32 85,90 35,90" fill="#FFFFFF" opacity="0.12"/>
                     
-                    <!-- الفتحات المثلثة (مستوحاة من العمارة النجدية) -->
-                    <polygon points="30,40 45,40 37,60" fill="#E8C84A" opacity="0.8"/>
-                    <polygon points="50,40 65,40 57,60" fill="#E8C84A" opacity="0.8"/>
-                    <polygon points="70,40 85,40 77,60" fill="#E8C84A" opacity="0.8"/>
+                    <!-- الفتحات المثلثة (العمارة النجدية) -->
+                    <polygon points="32,42 47,42 39,62" fill="#E8C84A" opacity="0.8"/>
+                    <polygon points="52,42 67,42 59,62" fill="#E8C84A" opacity="0.8"/>
+                    <polygon points="72,42 87,42 79,62" fill="#E8C84A" opacity="0.8"/>
                     
-                    <!-- خطوط أفقية تعكس المظلة -->
-                    <line x1="12" y1="37" x2="108" y2="37" stroke="#FFFFFF" stroke-width="1.5" opacity="0.3"/>
-                    <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.2"/>
-                    
-                    <!-- عناصر معمارية إضافية -->
-                    <rect x="35" y="70" width="50" height="6" rx="2" fill="#FFFFFF" opacity="0.15"/>
-                    <rect x="40" y="78" width="40" height="4" rx="1" fill="#FFFFFF" opacity="0.10"/>
+                    <!-- خطوط أفقية -->
+                    <line x1="14" y1="39" x2="106" y2="39" stroke="#FFFFFF" stroke-width="1.5" opacity="0.3"/>
+                    <line x1="20" y1="46" x2="100" y2="46" stroke="#FFFFFF" stroke-width="1" opacity="0.2"/>
                 </svg>
             </div>
             <div class="text">
