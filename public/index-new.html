@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>بلاغ الجنوب - إدارة العمليات الإسعافية</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           الهوية البصرية الجديدة - نسخة تجريبية
+           ============================================ */
+        :root {
+            --primary-900: #0B1E33;
+            --primary-700: #1A3A5C;
+            --primary-500: #2A5A7A;
+            --primary-100: #E8EDF3;
+            --teal: #2E8B7A;
+            --teal-light: #E6F4F0;
+            --coral: #E87461;
+            --coral-light: #FDF0EC;
+            --gold: #E8C84A;
+            --white: #FFFFFF;
+            --gray-50: #F7F9FC;
+            --gray-100: #EDF1F7;
+            --gray-200: #D5DCE6;
+            --gray-400: #9AAEBD;
+            --gray-600: #6B7F94;
+            --gray-800: #2D3F52;
+            --gray-900: #1A2633;
+            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
+            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
+            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        /* ===== الشريط العلوي ===== */
+        .header {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
+            border-radius: var(--radius-lg);
+            padding: 16px 24px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            box-shadow: var(--shadow-md);
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-brand .icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+        .header-brand h1 {
+            color: var(--white);
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header-brand .sub {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.7rem;
+            font-weight: 400;
+        }
+        .header-date {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        /* ===== شريط التحكم ===== */
+        .control-bar {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .control-bar .total {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--gray-800);
+        }
+        .control-bar .total .number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            background: var(--primary-100);
+            padding: 0 12px;
+            border-radius: 30px;
+            line-height: 1.4;
+        }
+        .control-bar .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+        .btn:active {
+            transform: scale(0.97);
+        }
+        .btn-primary {
+            background: var(--primary-700);
+            color: var(--white);
+        }
+        .btn-primary:hover {
+            background: var(--primary-900);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gray-200);
+        }
+        .btn-outline:hover {
+            background: var(--gray-50);
+        }
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+        }
+        .btn-teal:hover {
+            background: #1F6B5E;
+        }
+        .btn-coral {
+            background: var(--coral);
+            color: var(--white);
+        }
+        .btn-coral:hover {
+            background: #D45A4A;
+        }
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+        }
+        .btn-xs {
+            padding: 3px 8px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        /* ===== إحصائيات البلاغات ===== */
+        .stats-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .stats-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            background: var(--gray-50);
+        }
+        .stats-item .label {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stats-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin-top: 2px;
+        }
+        .stats-item .value.green {
+            color: var(--teal);
+        }
+        .stats-item .value.red {
+            color: var(--coral);
+        }
+        .stats-distribution {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+        .stats-distribution .title {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+        .dist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 0.75rem;
+        }
+        .dist-item .name {
+            min-width: 70px;
+            font-weight: 500;
+            color: var(--gray-800);
+        }
+        .dist-item .bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--gray-100);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .dist-item .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--primary-500);
+            transition: width 0.3s;
+        }
+        .dist-item .count {
+            min-width: 30px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        /* ===== شبكة الفرق ===== */
+        .sector-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .sector-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-100);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .unit-card {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.2s;
+        }
+        .unit-card:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+        .unit-card .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+        .unit-card .count {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin: 4px 0;
+        }
+        .unit-card .count.zero {
+            color: var(--gray-400);
+        }
+        .unit-card .actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .unit-card .actions .btn {
+            padding: 3px 10px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        /* ===== الفوتر ===== */
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        /* ===== التوافق مع الجوال ===== */
+        @media (max-width: 650px) {
+            body { padding: 8px; }
+            .header { flex-direction: column; align-items: stretch; text-align: center; padding: 14px; }
+            .header-brand { justify-content: center; }
+            .header-date { text-align: center; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .control-bar .actions { justify-content: center; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== الشريط العلوي ===== -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="icon">🏥</div>
+            <div>
+                <h1>قطاع جنوب الرياض</h1>
+                <div class="sub">إدارة العمليات الإسعافية</div>
+            </div>
+        </div>
+        <div class="header-date">📅 <span id="currentDate"></span></div>
+    </header>
+
+    <!-- ===== شريط التحكم ===== -->
+    <div class="control-bar">
+        <div class="total">
+            📊 إجمالي البلاغات
+            <span class="number" id="grandTotal">0</span>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" id="newShiftBtn">🔄 مناوبة جديدة</button>
+            <button class="btn btn-outline btn-sm" id="shiftBtn">📋 نموذج</button>
+            <button class="btn btn-outline btn-sm" id="docsBtn">📁 المستندات</button>
+            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn">🚁 الإسعاف الجوي</button>
+            <button class="btn btn-outline btn-sm" id="controlBtn">📋 التحكم</button>
+            <button class="btn btn-outline btn-sm" id="monthlyTableBtn">📊 الجدول</button>
+        </div>
+    </div>
+
+    <!-- ===== إحصائيات البلاغات ===== -->
+    <div class="stats-card" id="liveReportStats" style="display:none;">
+        <div class="stats-grid">
+            <div class="stats-item">
+                <div class="label">إجمالي البلاغات</div>
+                <div class="value" id="liveTotalReports">0</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">أكثر فرقة استخداماً</div>
+                <div class="value green" id="liveTopUnit">-</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">عدد البلاغات للفرقة الأكثر</div>
+                <div class="value red" id="liveTopUnitCount">0</div>
+            </div>
+        </div>
+        <div class="stats-distribution" id="liveUnitDistribution">
+            <div class="title">📋 توزيع البلاغات على الفرق</div>
+            <div id="liveUnitList"></div>
+        </div>
+    </div>
+
+    <!-- ===== شبكة الفرق ===== -->
+    <div id="pointsContainer">
+        <div class="loading">⏳ جاري تحميل البيانات...</div>
+    </div>
+
+    <div class="footer">
+        ⏱️ ضغطة = بلاغ  |  ↩️ تراجع عن آخر بلاغ  |  🔄 تحديث تلقائي
+    </div>
+
+    <script>
+        // ============================================
+        // البيانات التجريبية (للعرض فقط)
+        // ============================================
+        const mockData = {
+            centers: {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            },
+            reports: {
+                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
+                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
+                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
+                "المنصورة|سريع 3": { count: 0, times: [] },
+                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
+                "منفوحة|جنوب 3": { count: 0, times: [] },
+                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
+                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
+                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
+                "الإسكان|جنوب 6": { count: 0, times: [] },
+                "الحائر|جنوب 7": { count: 0, times: [] },
+                "ديراب|جنوب 10": { count: 0, times: [] },
+                "عكاظ|جنوب 9": { count: 0, times: [] },
+                "الشفاء|جنوب 8": { count: 0, times: [] },
+                "الشفاء|سريع 2": { count: 0, times: [] },
+                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
+            }
+        };
+
+        // ============================================
+        // دوال العرض
+        // ============================================
+        function updateTotal() {
+            let total = 0;
+            for (let key in mockData.reports) {
+                total += mockData.reports[key].count;
+            }
+            document.getElementById('grandTotal').innerText = total;
+        }
+
+        function renderUnits() {
+            const container = document.getElementById('pointsContainer');
+            container.innerHTML = '';
+            
+            for (let center in mockData.centers) {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-card';
+                sectorDiv.innerHTML = `<div class="sector-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+                container.appendChild(sectorDiv);
+                
+                const grid = sectorDiv.querySelector('.units-grid');
+                for (let unit of mockData.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const info = mockData.reports[key] || { count: 0, times: [] };
+                    const hasReports = info.count > 0;
+                    const isZero = info.count === 0;
+                    
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit-card';
+                    unitDiv.innerHTML = `
+                        <div class="name">${unit}</div>
+                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-xs report-btn">➕ بلاغ</button>
+                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn">↩️ تراجع</button>' : ''}
+                        </div>
+                    `;
+                    
+                    unitDiv.querySelector('.report-btn').onclick = function() {
+                        info.count++;
+                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
+                        renderUnits();
+                        updateTotal();
+                        updateLiveStats();
+                    };
+                    
+                    if (hasReports) {
+                        unitDiv.querySelector('.undo-btn').onclick = function() {
+                            if (info.count > 0) {
+                                info.count--;
+                                info.times.pop();
+                                renderUnits();
+                                updateTotal();
+                                updateLiveStats();
+                            }
+                        };
+                    }
+                    
+                    grid.appendChild(unitDiv);
+                }
+            }
+        }
+
+        function updateLiveStats() {
+            const container = document.getElementById('liveReportStats');
+            let total = 0;
+            let unitStats = {};
+            
+            for (let key in mockData.reports) {
+                const report = mockData.reports[key];
+                if (report && report.count > 0) {
+                    total += report.count;
+                    const unit = key.split('|')[1];
+                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
+                }
+            }
+            
+            if (total === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            document.getElementById('liveTotalReports').innerText = total;
+            
+            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+            
+            document.getElementById('liveTopUnit').innerText = topUnit;
+            document.getElementById('liveTopUnitCount').innerText = topCount;
+            
+            const listContainer = document.getElementById('liveUnitList');
+            listContainer.innerHTML = '';
+            sortedUnits.forEach(([unit, count]) => {
+                const percentage = Math.round((count / total) * 100);
+                const div = document.createElement('div');
+                div.className = 'dist-item';
+                div.innerHTML = `
+                    <span class="name">${unit}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${percentage}%;"></div>
+                    </div>
+                    <span class="count">${count}</span>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // زر مناوبة جديدة (تجريبي)
+        // ============================================
+        document.getElementById('newShiftBtn').onclick = function() {
+            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة (تجريبي).')) {
+                for (let key in mockData.reports) {
+                    mockData.reports[key] = { count: 0, times: [] };
+                }
+                renderUnits();
+                updateTotal();
+                updateLiveStats();
+                alert('✅ تم بدء مناوبة جديدة');
+            }
+        };
+
+        // ============================================
+        // أزرار تجريبية (تنبيهات)
+        // ============================================
+        document.getElementById('shiftBtn').onclick = function() {
+            alert('📋 نموذج المناوبة - سيتم إضافته قريباً');
+        };
+        document.getElementById('docsBtn').onclick = function() {
+            alert('📁 المستندات - سيتم إضافتها قريباً');
+        };
+        document.getElementById('airAmbulanceBtn').onclick = function() {
+            alert('🚁 الإسعاف الجوي - سيتم إضافته قريباً');
+        };
+        document.getElementById('controlBtn').onclick = function() {
+            alert('📋 التحكم والتنسيق - سيتم إضافته قريباً');
+        };
+        document.getElementById('monthlyTableBtn').onclick = function() {
+            alert('📊 الجدول الشهري - سيتم إضافته قريباً');
+        };
+
+        // ============================================
+        // التشغيل
+        // ============================================
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
+        renderUnits();
+        updateTotal();
+        updateLiveStats();
+
+        console.log('✅ النسخة التجريبية - التصميم الجديد يعمل');
+        console.log('📊 يمكنك تجربة تسجيل البلاغات والتراجع');
+    </script>
+</body>
+</html>
