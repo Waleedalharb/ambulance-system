@@ -5,7 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* ============================================
+           الهوية البصرية المعتمدة - منصة الجنوب
+           ============================================ */
+        :root {
+            --primary-900: #0B1E33;
+            --primary-700: #1A3A5C;
+            --primary-500: #2A5A7A;
+            --primary-100: #E8EDF3;
+            --teal: #2E8B7A;
+            --teal-light: #E6F4F0;
+            --coral: #E87461;
+            --coral-light: #FDF0EC;
+            --gold: #E8C84A;
+            --gold-light: #F5E6A3;
+            --white: #FFFFFF;
+            --gray-50: #F7F9FC;
+            --gray-100: #EDF1F7;
+            --gray-200: #D5DCE6;
+            --gray-400: #9AAEBD;
+            --gray-600: #6B7F94;
+            --gray-800: #2D3F52;
+            --gray-900: #1A2633;
+            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
+            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
+            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,69 +46,65 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #F0F4F8;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            padding: 16px;
             min-height: 100vh;
-            padding: 20px;
         }
 
-        /* ===== البطاقة الرئيسية ===== */
-        .hero-card {
-            max-width: 800px;
-            width: 100%;
-            background: linear-gradient(145deg, #0B1E33 0%, #1A3A5C 50%, #0D2A4A 100%);
-            border-radius: 32px;
-            padding: 40px 35px 30px;
+        /* ===== الهوية البصرية (Hero Section) ===== */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 50%, #0D2A4A 100%);
+            border-radius: var(--radius-xl);
+            padding: 30px 24px 20px;
+            margin-bottom: 20px;
+            text-align: center;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(11, 30, 51, 0.3);
-        }
-
-        /* خلفية معقدة */
-        .hero-card::before {
-            content: '';
-            position: absolute;
-            top: -30%;
-            right: -20%;
-            width: 80%;
-            height: 80%;
-            background: radial-gradient(ellipse, rgba(46, 139, 122, 0.08) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .hero-card::after {
-            content: '';
-            position: absolute;
-            bottom: -20%;
-            left: -10%;
-            width: 60%;
-            height: 60%;
-            background: radial-gradient(ellipse, rgba(232, 200, 74, 0.06) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        /* ===== المحتوى ===== */
-        .hero-content {
-            position: relative;
-            z-index: 2;
+            box-shadow: var(--shadow-lg);
+            min-height: 200px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            text-align: center;
+            justify-content: center;
         }
 
-        /* ===== المنطقة البصرية (تحل محل الأيقونة) ===== */
-        .visual-area {
+        /* نقاط ضوئية في الخلفية */
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(46, 139, 122, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 80%, rgba(232, 200, 74, 0.06) 0%, transparent 50%);
+            animation: pulseGlow 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        /* المنطقة البصرية (المظلة + المثلثات) */
+        .hero-visual {
             width: 100%;
             max-width: 280px;
-            height: 140px;
-            margin: 0 auto 20px;
+            height: 120px;
+            margin: 0 auto 10px;
             background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
-            border-radius: 20px;
+            border-radius: var(--radius-md);
             border: 1px solid rgba(255,255,255,0.06);
             display: flex;
             align-items: center;
@@ -85,8 +113,18 @@
             overflow: hidden;
         }
 
-        /* خطوط المظلة - تعكس ملامح المحطة */
-        .visual-area .canopy {
+        .hero-visual .glow {
+            position: absolute;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(232, 200, 74, 0.10) 0%, transparent 70%);
+            top: 20%;
+            left: 20%;
+            border-radius: 50%;
+            filter: blur(20px);
+        }
+
+        .hero-visual .canopy {
             position: absolute;
             width: 85%;
             height: 35%;
@@ -98,7 +136,7 @@
             box-shadow: 0 4px 30px rgba(0,0,0,0.1);
         }
 
-        .visual-area .canopy-line {
+        .hero-visual .canopy-line {
             position: absolute;
             width: 70%;
             height: 1px;
@@ -108,20 +146,19 @@
             transform: translateY(-50%);
         }
 
-        .visual-area .canopy-line:nth-child(2) {
+        .hero-visual .canopy-line:nth-child(2) {
             top: 65%;
             width: 60%;
             left: 20%;
         }
 
-        .visual-area .canopy-line:nth-child(3) {
+        .hero-visual .canopy-line:nth-child(3) {
             top: 78%;
             width: 50%;
             left: 25%;
         }
 
-        /* المثلثات الذهبية - رمز الفتحات المعمارية */
-        .visual-area .triangle {
+        .hero-visual .triangle {
             position: absolute;
             width: 0;
             height: 0;
@@ -130,39 +167,26 @@
             bottom: 12%;
         }
 
-        .visual-area .triangle-1 {
+        .hero-visual .triangle-1 {
             left: 18%;
             border-width: 0 14px 30px 14px;
-            border-color: transparent transparent #E8C84A transparent;
+            border-color: transparent transparent var(--gold) transparent;
         }
 
-        .visual-area .triangle-2 {
+        .hero-visual .triangle-2 {
             left: 42%;
             border-width: 0 16px 34px 16px;
-            border-color: transparent transparent #E8C84A transparent;
+            border-color: transparent transparent var(--gold) transparent;
             opacity: 0.75;
         }
 
-        .visual-area .triangle-3 {
+        .hero-visual .triangle-3 {
             left: 66%;
             border-width: 0 14px 30px 14px;
-            border-color: transparent transparent #E8C84A transparent;
+            border-color: transparent transparent var(--gold) transparent;
         }
 
-        /* نقطة ضوئية - إضاءة خلفية */
-        .visual-area .glow {
-            position: absolute;
-            width: 60%;
-            height: 60%;
-            background: radial-gradient(circle, rgba(232, 200, 74, 0.10) 0%, transparent 70%);
-            top: 20%;
-            left: 20%;
-            border-radius: 50%;
-            filter: blur(20px);
-        }
-
-        /* خطوط عمودية رفيعة - إحساس معماري */
-        .visual-area .v-line {
+        .hero-visual .v-line {
             position: absolute;
             width: 1px;
             height: 30%;
@@ -170,90 +194,363 @@
             bottom: 12%;
         }
 
-        .visual-area .v-line-1 { left: 28%; }
-        .visual-area .v-line-2 { left: 50%; }
-        .visual-area .v-line-3 { left: 72%; }
+        .hero-visual .v-line-1 { left: 28%; }
+        .hero-visual .v-line-2 { left: 50%; }
+        .hero-visual .v-line-3 { left: 72%; }
 
-        /* ===== النصوص ===== */
         .hero-title {
-            color: #FFFFFF;
-            font-size: 2.2rem;
+            color: var(--white);
+            font-size: 1.8rem;
             font-weight: 800;
             letter-spacing: -0.5px;
-            margin: 0 0 6px;
+            margin: 0;
         }
 
         .hero-title .gold {
-            color: #E8C84A;
+            color: var(--gold);
         }
 
         .hero-sub {
-            color: rgba(255,255,255,0.6);
-            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.8rem;
             font-weight: 400;
-            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .hero-sub i {
-            color: #E8C84A;
-            margin: 0 6px;
-            font-size: 0.3rem;
-            vertical-align: middle;
+            color: var(--gold);
+            font-size: 0.4rem;
         }
 
-        .hero-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.06);
-            padding: 4px 18px;
-            border-radius: 40px;
-            color: rgba(255,255,255,0.4);
+        .hero-date {
+            color: rgba(255,255,255,0.5);
             font-size: 0.7rem;
-            margin-top: 8px;
+            background: rgba(255,255,255,0.06);
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+            margin-top: 2px;
+        }
+
+        /* ===== شريط التحكم ===== */
+        .control-bar {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .control-bar .total {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--gray-800);
+        }
+
+        .control-bar .total .number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            background: var(--primary-100);
+            padding: 0 12px;
+            border-radius: 30px;
+            line-height: 1.4;
+        }
+
+        .control-bar .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn i {
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--primary-700);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-900);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gray-200);
+        }
+
+        .btn-outline:hover {
+            background: var(--gray-50);
+        }
+
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+        }
+
+        .btn-teal:hover {
+            background: #1F6B5E;
+        }
+
+        .btn-coral {
+            background: var(--coral);
+            color: var(--white);
+        }
+
+        .btn-coral:hover {
+            background: #D45A4A;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+        }
+
+        .btn-xs {
+            padding: 3px 8px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        /* ===== إحصائيات البلاغات ===== */
+        .stats-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .stats-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            background: var(--gray-50);
+        }
+
+        .stats-item .label {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        /* ===== أزرار وهمية (للحفاظ على التصميم) ===== */
-        .mock-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 16px;
+        .stats-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin-top: 2px;
         }
 
-        .mock-btn {
-            padding: 6px 18px;
-            border-radius: 40px;
+        .stats-item .value.green {
+            color: var(--teal);
+        }
+
+        .stats-item .value.red {
+            color: var(--coral);
+        }
+
+        .stats-distribution {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .stats-distribution .title {
             font-size: 0.7rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .dist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 0.75rem;
+        }
+
+        .dist-item .name {
+            min-width: 70px;
+            font-weight: 500;
+            color: var(--gray-800);
+        }
+
+        .dist-item .bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--gray-100);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .dist-item .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--primary-500);
+            transition: width 0.3s;
+        }
+
+        .dist-item .count {
+            min-width: 30px;
+            text-align: center;
             font-weight: 600;
-            border: none;
-            cursor: default;
-            background: rgba(255,255,255,0.06);
-            color: rgba(255,255,255,0.5);
-            border: 1px solid rgba(255,255,255,0.04);
+            color: var(--gray-800);
         }
 
-        .mock-btn.primary {
-            background: #2A5A7A;
-            color: #FFFFFF;
+        /* ===== شبكة الفرق ===== */
+        .sector-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
         }
 
-        /* ===== التوافق مع الجوال ===== */
-        @media (max-width: 500px) {
-            .hero-card { padding: 25px 20px; }
-            .hero-title { font-size: 1.6rem; }
-            .visual-area { max-width: 200px; height: 110px; }
+        .sector-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-100);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sector-title i {
+            color: var(--primary-500);
+            font-size: 1rem;
+        }
+
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .unit-card {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.2s;
+        }
+
+        .unit-card:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .unit-card .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+
+        .unit-card .count {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin: 4px 0;
+        }
+
+        .unit-card .count.zero {
+            color: var(--gray-400);
+        }
+
+        .unit-card .actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .unit-card .actions .btn {
+            padding: 3px 10px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        @media (max-width: 650px) {
+            body { padding: 8px; }
+            .hero { padding: 20px 16px; min-height: 160px; }
+            .hero-title { font-size: 1.4rem; }
+            .hero-visual { max-width: 200px; height: 100px; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .control-bar .actions { justify-content: center; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
 <body>
-
-    <div class="hero-card">
+    <!-- ===== الهوية البصرية (Hero Section) ===== -->
+    <section class="hero">
         <div class="hero-content">
-
-            <!-- ===== المنطقة البصرية ===== -->
-            <div class="visual-area">
+            <!-- المنطقة البصرية -->
+            <div class="hero-visual">
                 <div class="glow"></div>
                 <div class="canopy">
                     <div class="canopy-line"></div>
@@ -268,26 +565,264 @@
                 <div class="v-line v-line-3"></div>
             </div>
 
-            <!-- ===== النصوص ===== -->
             <h1 class="hero-title">منصة <span class="gold">الجنوب</span></h1>
             <div class="hero-sub">
                 <i class="fas fa-circle"></i> إدارة العمليات الإسعافية
                 <i class="fas fa-circle"></i> قطاع جنوب الرياض
             </div>
-            <div class="hero-badge">محطة قصر الحكم</div>
+            <div class="hero-date">📅 <span id="currentDate"></span></div>
+        </div>
+    </section>
 
-            <!-- ===== أزرار وهمية ===== -->
-            <div class="mock-buttons">
-                <span class="mock-btn primary">🔄 مناوبة جديدة</span>
-                <span class="mock-btn">📋 نموذج</span>
-                <span class="mock-btn">📁 المستندات</span>
-            </div>
-
+    <!-- ===== شريط التحكم ===== -->
+    <div class="control-bar">
+        <div class="total">
+            <i class="fas fa-chart-bar"></i> إجمالي البلاغات
+            <span class="number" id="grandTotal">0</span>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
+            <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
+            <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
+            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
+            <button class="btn btn-outline btn-sm" id="controlBtn"><i class="fas fa-sliders-h"></i> التحكم</button>
+            <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
         </div>
     </div>
 
-    <!-- أيقونات Font Awesome للتوضيح -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- ===== إحصائيات البلاغات ===== -->
+    <div class="stats-card" id="liveReportStats" style="display:none;">
+        <div class="stats-grid">
+            <div class="stats-item">
+                <div class="label">إجمالي البلاغات</div>
+                <div class="value" id="liveTotalReports">0</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">أكثر فرقة استخداماً</div>
+                <div class="value green" id="liveTopUnit">-</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">عدد البلاغات للفرقة الأكثر</div>
+                <div class="value red" id="liveTopUnitCount">0</div>
+            </div>
+        </div>
+        <div class="stats-distribution" id="liveUnitDistribution">
+            <div class="title"><i class="fas fa-chart-pie"></i> توزيع البلاغات على الفرق</div>
+            <div id="liveUnitList"></div>
+        </div>
+    </div>
 
+    <!-- ===== شبكة الفرق ===== -->
+    <div id="pointsContainer">
+        <div class="loading">⏳ جاري تحميل البيانات...</div>
+    </div>
+
+    <div class="footer">
+        <i class="fas fa-clock"></i> ضغطة = بلاغ  |  <i class="fas fa-undo-alt"></i> تراجع  |  <i class="fas fa-sync-alt"></i> تحديث تلقائي
+    </div>
+
+    <script>
+        // ============================================
+        // التاريخ الحالي
+        // ============================================
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
+
+        // ============================================
+        // البيانات التجريبية (للعرض فقط)
+        // ============================================
+        const mockData = {
+            centers: {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            },
+            reports: {
+                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
+                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
+                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
+                "المنصورة|سريع 3": { count: 0, times: [] },
+                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
+                "منفوحة|جنوب 3": { count: 0, times: [] },
+                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
+                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
+                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
+                "الإسكان|جنوب 6": { count: 0, times: [] },
+                "الحائر|جنوب 7": { count: 0, times: [] },
+                "ديراب|جنوب 10": { count: 0, times: [] },
+                "عكاظ|جنوب 9": { count: 0, times: [] },
+                "الشفاء|جنوب 8": { count: 0, times: [] },
+                "الشفاء|سريع 2": { count: 0, times: [] },
+                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
+            }
+        };
+
+        // ============================================
+        // دوال العرض
+        // ============================================
+        function updateTotal() {
+            let total = 0;
+            for (let key in mockData.reports) {
+                total += mockData.reports[key].count;
+            }
+            document.getElementById('grandTotal').innerText = total;
+        }
+
+        function renderUnits() {
+            const container = document.getElementById('pointsContainer');
+            container.innerHTML = '';
+            
+            for (let center in mockData.centers) {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-card';
+                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+                container.appendChild(sectorDiv);
+                
+                const grid = sectorDiv.querySelector('.units-grid');
+                for (let unit of mockData.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const info = mockData.reports[key] || { count: 0, times: [] };
+                    const hasReports = info.count > 0;
+                    const isZero = info.count === 0;
+                    
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit-card';
+                    unitDiv.innerHTML = `
+                        <div class="name">${unit}</div>
+                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
+                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
+                        </div>
+                    `;
+                    
+                    unitDiv.querySelector('.report-btn').onclick = function() {
+                        info.count++;
+                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
+                        renderUnits();
+                        updateTotal();
+                        updateLiveStats();
+                    };
+                    
+                    if (hasReports) {
+                        unitDiv.querySelector('.undo-btn').onclick = function() {
+                            if (info.count > 0) {
+                                info.count--;
+                                info.times.pop();
+                                renderUnits();
+                                updateTotal();
+                                updateLiveStats();
+                            }
+                        };
+                    }
+                    
+                    grid.appendChild(unitDiv);
+                }
+            }
+        }
+
+        function updateLiveStats() {
+            const container = document.getElementById('liveReportStats');
+            let total = 0;
+            let unitStats = {};
+            
+            for (let key in mockData.reports) {
+                const report = mockData.reports[key];
+                if (report && report.count > 0) {
+                    total += report.count;
+                    const unit = key.split('|')[1];
+                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
+                }
+            }
+            
+            if (total === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            document.getElementById('liveTotalReports').innerText = total;
+            
+            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+            
+            document.getElementById('liveTopUnit').innerText = topUnit;
+            document.getElementById('liveTopUnitCount').innerText = topCount;
+            
+            const listContainer = document.getElementById('liveUnitList');
+            listContainer.innerHTML = '';
+            sortedUnits.forEach(([unit, count]) => {
+                const percentage = Math.round((count / total) * 100);
+                const div = document.createElement('div');
+                div.className = 'dist-item';
+                div.innerHTML = `
+                    <span class="name">${unit}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${percentage}%;"></div>
+                    </div>
+                    <span class="count">${count}</span>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // زر مناوبة جديدة (تجريبي)
+        // ============================================
+        document.getElementById('newShiftBtn').onclick = function() {
+            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة (تجريبي).')) {
+                for (let key in mockData.reports) {
+                    mockData.reports[key] = { count: 0, times: [] };
+                }
+                renderUnits();
+                updateTotal();
+                updateLiveStats();
+                alert('✅ تم بدء مناوبة جديدة');
+            }
+        };
+
+        // ============================================
+        // أزرار تجريبية (تنبيهات)
+        // ============================================
+        document.getElementById('shiftBtn').onclick = function() {
+            alert('📋 نموذج المناوبة - سيتم إضافته قريباً');
+        };
+        document.getElementById('docsBtn').onclick = function() {
+            alert('📁 المستندات - سيتم إضافتها قريباً');
+        };
+        document.getElementById('airAmbulanceBtn').onclick = function() {
+            alert('🚁 الإسعاف الجوي - سيتم إضافته قريباً');
+        };
+        document.getElementById('controlBtn').onclick = function() {
+            alert('📋 التحكم والتنسيق - سيتم إضافته قريباً');
+        };
+        document.getElementById('monthlyTableBtn').onclick = function() {
+            alert('📊 الجدول الشهري - سيتم إضافته قريباً');
+        };
+
+        // ============================================
+        // التشغيل
+        // ============================================
+        renderUnits();
+        updateTotal();
+        updateLiveStats();
+
+        console.log('✅ منصة الجنوب - الهوية البصرية المعتمدة');
+        console.log('📌 التصميم يشمل: خلفية متدرجة، منطقة بصرية، نصوص ذهبية');
+    </script>
 </body>
 </html>
