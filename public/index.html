@@ -3,2713 +3,1283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>جدول توزيع البلاغات - قطاع جنوب الرياض</title>
-    <link rel="manifest" href="manifest.json">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        /* جميع الأنماط السابقة (نفسها) */
+        /* ============================================
+           الهوية البصرية المعتمدة - منصة الجنوب
+           ============================================ */
+        :root {
+            --primary-900: #0B1E33;
+            --primary-700: #1A3A5C;
+            --primary-500: #2A5A7A;
+            --primary-100: #E8EDF3;
+            --teal: #2E8B7A;
+            --teal-light: #E6F4F0;
+            --coral: #E87461;
+            --coral-light: #FDF0EC;
+            --gold: #E8C84A;
+            --gold-light: #F5E6A3;
+            --white: #FFFFFF;
+            --gray-50: #F7F9FC;
+            --gray-100: #EDF1F7;
+            --gray-200: #D5DCE6;
+            --gray-400: #9AAEBD;
+            --gray-600: #6B7F94;
+            --gray-800: #2D3F52;
+            --gray-900: #1A2633;
+            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
+            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
+            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+        }
+
         * {
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
-            font-family: 'Courier New', 'Segoe UI', 'Arial', monospace;
         }
+
         body {
-            background: #ffffff;
-            margin: 0;
-            padding: 20px;
-            color: #000000;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            padding: 16px;
+            min-height: 100vh;
         }
-        .container {
-            max-width: 1400px;
-            margin: auto;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 25px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 15px;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        .header .sub1 {
-            margin: 8px 0 0;
-            font-size: 0.9rem;
-            color: #333;
-        }
-        .header .sub2 {
-            margin: 5px 0 0;
-            font-size: 0.85rem;
-            color: #333;
-        }
-        .header .date {
-            margin: 12px 0 0;
-            font-size: 0.8rem;
-        }
-        .info-bar {
-            border: 1px solid #000;
-            padding: 10px 15px;
+
+        /* ===== الهوية البصرية (Hero Section) ===== */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 50%, #0D2A4A 100%);
+            border-radius: var(--radius-xl);
+            padding: 30px 24px 20px;
             margin-bottom: 20px;
-            background: #f9f9f9;
-        }
-        .total-box {
-            border: 1px solid #000;
-            padding: 6px 18px;
-            font-weight: bold;
-            font-size: 1rem;
-            display: inline-block;
-            margin-bottom: 10px;
-        }
-        .total-box span {
-            font-size: 1.6rem;
-            margin-left: 8px;
-            font-weight: bold;
-        }
-        .archive-row {
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            min-height: 200px;
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(46, 139, 122, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 80%, rgba(232, 200, 74, 0.06) 0%, transparent 50%);
+            animation: pulseGlow 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 10px;
-            margin: 10px 0;
-            padding: 8px 0;
-            border-top: 1px dashed #aaa;
-            border-bottom: 1px dashed #aaa;
+            width: 100%;
         }
-        .archive-row select {
-            padding: 6px;
-            font-family: monospace;
-            border: 1px solid #000;
-            background: white;
-            flex: 2;
-            min-width: 200px;
+
+        .hero-visual {
+            width: 100%;
+            max-width: 280px;
+            height: 120px;
+            margin: 0 auto 10px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
-        .archive-row button {
-            background: white;
-            border: 1px solid #000;
-            padding: 6px 14px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-family: monospace;
+
+        .hero-visual .glow {
+            position: absolute;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(232, 200, 74, 0.10) 0%, transparent 70%);
+            top: 20%;
+            left: 20%;
+            border-radius: 50%;
+            filter: blur(20px);
         }
-        .archive-row button:active {
-            background: #ddd;
+
+        .hero-visual .canopy {
+            position: absolute;
+            width: 85%;
+            height: 35%;
+            top: 18%;
+            left: 7.5%;
+            border-radius: 4px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 4px 30px rgba(0,0,0,0.1);
         }
-        .toolbar {
+
+        .hero-visual .canopy-line {
+            position: absolute;
+            width: 70%;
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            top: 50%;
+            left: 15%;
+            transform: translateY(-50%);
+        }
+
+        .hero-visual .canopy-line:nth-child(2) {
+            top: 65%;
+            width: 60%;
+            left: 20%;
+        }
+
+        .hero-visual .canopy-line:nth-child(3) {
+            top: 78%;
+            width: 50%;
+            left: 25%;
+        }
+
+        .hero-visual .triangle {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            opacity: 0.6;
+            bottom: 12%;
+        }
+
+        .hero-visual .triangle-1 {
+            left: 18%;
+            border-width: 0 14px 30px 14px;
+            border-color: transparent transparent var(--gold) transparent;
+        }
+
+        .hero-visual .triangle-2 {
+            left: 42%;
+            border-width: 0 16px 34px 16px;
+            border-color: transparent transparent var(--gold) transparent;
+            opacity: 0.75;
+        }
+
+        .hero-visual .triangle-3 {
+            left: 66%;
+            border-width: 0 14px 30px 14px;
+            border-color: transparent transparent var(--gold) transparent;
+        }
+
+        .hero-visual .v-line {
+            position: absolute;
+            width: 1px;
+            height: 30%;
+            background: rgba(255,255,255,0.04);
+            bottom: 12%;
+        }
+
+        .hero-visual .v-line-1 { left: 28%; }
+        .hero-visual .v-line-2 { left: 50%; }
+        .hero-visual .v-line-3 { left: 72%; }
+
+        .hero-title {
+            color: var(--white);
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+
+        .hero-title .gold {
+            color: var(--gold);
+        }
+
+        .hero-sub {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.8rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .hero-sub i {
+            color: var(--gold);
+            font-size: 0.4rem;
+        }
+
+        .hero-date {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.7rem;
+            background: rgba(255,255,255,0.06);
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+            margin-top: 2px;
+        }
+
+        /* ===== شريط التحكم ===== */
+        .control-bar {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
         }
-        .toolbar button {
-            background: white;
-            border: 1px solid #000;
-            padding: 6px 14px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-family: monospace;
-        }
-        .toolbar button:active {
-            background: #ddd;
-        }
-        .viewing-badge {
-            background: #f0f0f0;
-            border: 1px solid #aaa;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .return-btn {
-            background: white;
-            border: 1px solid #000;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            cursor: pointer;
-        }
-        .point-card {
-            border: 1px solid #000;
-            margin-bottom: 15px;
-            background: white;
-        }
-        .point-title {
-            margin: 0;
-            padding: 8px 12px;
-            font-size: 1rem;
-            font-weight: bold;
-            background: #f0f0f0;
-            border-bottom: 1px solid #000;
-        }
-        .units-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 0;
-        }
-        .unit-card {
-            padding: 10px 6px;
-            text-align: center;
-            border-left: 1px solid #ddd;
-            border-bottom: 1px solid #ddd;
-            background: white;
-        }
-        .unit-card:nth-child(even) {
-            background: #fafafa;
-        }
-        .unit-name {
+
+        .control-bar .total {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
             font-size: 0.9rem;
-            font-weight: bold;
-            padding: 4px;
-            border-bottom: 1px dotted #aaa;
+            color: var(--gray-800);
+        }
+
+        .control-bar .total .number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            background: var(--primary-100);
+            padding: 0 12px;
+            border-radius: 30px;
+            line-height: 1.4;
+        }
+
+        .control-bar .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn i {
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--primary-700);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-900);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gray-200);
+        }
+
+        .btn-outline:hover {
+            background: var(--gray-50);
+        }
+
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+        }
+
+        .btn-teal:hover {
+            background: #1F6B5E;
+        }
+
+        .btn-coral {
+            background: var(--coral);
+            color: var(--white);
+        }
+
+        .btn-coral:hover {
+            background: #D45A4A;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+        }
+
+        .btn-xs {
+            padding: 3px 8px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        /* ===== إحصائيات البلاغات ===== */
+        .stats-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .stats-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            background: var(--gray-50);
+        }
+
+        .stats-item .label {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stats-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin-top: 2px;
+        }
+
+        .stats-item .value.green {
+            color: var(--teal);
+        }
+
+        .stats-item .value.red {
+            color: var(--coral);
+        }
+
+        .stats-distribution {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .stats-distribution .title {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            font-weight: 500;
             margin-bottom: 6px;
         }
-        .count-number {
-            font-size: 1.8rem;
-            font-weight: bold;
-            margin: 6px 0;
-        }
-        .buttons-row {
-            display: flex;
-            gap: 5px;
-            margin: 4px 0;
-        }
-        .report-btn, .undo-btn {
-            background: white;
-            border: 1px solid #000;
-            padding: 5px;
-            flex: 1;
-            font-size: 0.65rem;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .undo-btn {
-            border-color: #c0392b;
-            color: #c0392b;
-        }
-        .report-btn:active, .undo-btn:active {
-            background: #ddd;
-        }
-        .show-times-btn {
-            background: white;
-            border: 1px solid #888;
-            padding: 4px;
-            width: 100%;
-            font-size: 0.6rem;
-            cursor: pointer;
-            margin-top: 4px;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: white;
-            border: 2px solid #000;
-            width: 95%;
-            max-width: 1200px;
-            max-height: 90vh;
-            overflow-y: auto;
-            padding: 20px;
-            margin: 20px;
-        }
-        .modal-content h2, .modal-content h3 {
-            text-align: center;
-            margin: 5px 0;
-        }
-        .form-row {
-            margin: 15px 0;
-        }
-        .shift-type {
-            display: inline-flex;
-            gap: 15px;
-            margin-right: 15px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 0.8rem;
-        }
-        th, td {
-            border: 1px solid #000;
-            padding: 6px;
-            text-align: center;
-            vertical-align: middle;
-        }
-        th {
-            background: #f0f0f0;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 5px;
-            font-family: monospace;
-            border: 1px solid #aaa;
-            border-radius: 3px;
-        }
-        .status-icon {
-            font-size: 1.2rem;
-            font-weight: bold;
-            min-width: 30px;
-        }
-        .status-ok {
-            color: #2a7f3e;
-        }
-        .status-not {
-            color: #c0392b;
-        }
-        textarea {
-            resize: vertical;
-            min-height: 60px;
-        }
-        .modal-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .modal-buttons button {
-            padding: 8px 25px;
-            font-weight: bold;
-            cursor: pointer;
-            border: 1px solid #000;
-            background: white;
-        }
-        .update-status {
-            text-align: left;
-            font-size: 0.65rem;
-            color: #2a7f3e;
-            margin-top: 5px;
-        }
-        footer {
-            text-align: center;
-            margin-top: 25px;
-            padding-top: 12px;
-            border-top: 1px solid #aaa;
-            font-size: 0.65rem;
-            color: #444;
-        }
-        .sheet-tab {
-            padding: 6px 15px;
-            border: 1px solid #000;
-            background: white;
-            cursor: pointer;
-            font-weight: bold;
-            border-radius: 4px;
-            font-size: 0.8rem;
-        }
-        .sheet-tab.active {
-            background: #1e466e;
-            color: white;
-        }
-        .sheet-tab:hover {
-            background: #ddd;
-        }
-        .circle-stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-            padding: 15px;
-            background: #f9f9f9;
-            border: 1px solid #000;
-            border-radius: 8px;
-        }
-        .circle-stat {
-            text-align: center;
-            padding: 10px;
-        }
-        .circle-stat .value {
-            font-size: 1.4rem;
-            font-weight: bold;
-        }
-        .circle-stat .label {
-            font-size: 0.7rem;
-            color: #555;
-            margin-top: 5px;
-        }
-        .circle-stat .sub-value {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 3px;
-        }
-        .svg-circle-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .svg-circle {
-            width: 80px;
-            height: 80px;
-            transform: rotate(-90deg);
-        }
-        .svg-circle-bg {
-            fill: none;
-            stroke: #e0e0e0;
-            stroke-width: 6;
-        }
-        .svg-circle-fg {
-            fill: none;
-            stroke-width: 6;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.5s ease;
-        }
-        .svg-circle-text {
-            transform: rotate(90deg);
-            font-size: 14px;
-            font-weight: bold;
-            fill: #1e466e;
-            text-anchor: middle;
-            dominant-baseline: middle;
-        }
-        .value-blue { color: #1e466e; }
-        .value-red { color: #c0392b; }
-        .value-green { color: #2a7f3e; }
-        
-        .stats-section {
-            margin: 15px 0;
-            border: 1px solid #000;
-            background: #f9f9f9;
-            border-radius: 8px;
-            padding: 15px;
-        }
-        .stats-section h3 {
-            text-align: center;
-            margin: 0 0 10px 0;
-        }
-        .stats-scroll {
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid #aaa;
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-        }
-        .stats-scroll .title {
-            font-size: 0.7rem;
-            color: #555;
-            margin-bottom: 5px;
-        }
-        .distribution-bar {
+
+        .dist-item {
             display: flex;
             align-items: center;
             gap: 8px;
             margin: 3px 0;
             font-size: 0.75rem;
         }
-        .distribution-bar .name {
+
+        .dist-item .name {
             min-width: 70px;
-            font-weight: bold;
-            font-size: 0.7rem;
-        }
-        .distribution-bar .count {
-            min-width: 25px;
-            text-align: center;
-            font-weight: bold;
-        }
-        .distribution-bar .bar-track {
-            flex: 1;
-            height: 10px;
-            background: #eee;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-        .distribution-bar .bar-fill {
-            height: 100%;
-            border-radius: 5px;
-        }
-        .distribution-bar .percent {
-            font-size: 0.6rem;
-            color: #666;
-            min-width: 35px;
+            font-weight: 500;
+            color: var(--gray-800);
         }
 
-        .live-stats {
-            border: 1px solid #000;
-            padding: 10px 15px;
-            margin-bottom: 15px;
-            background: #f9f9f9;
-        }
-        .live-stats-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .live-stats-item {
-            display: flex;
-            flex-direction: column;
-            min-width: 100px;
-        }
-        .live-stats-item .label {
-            font-size: 0.65rem;
-            color: #555;
-        }
-        .live-stats-item .value {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #1e466e;
-        }
-        .live-stats-item .value.green { color: #2a7f3e; }
-        .live-stats-item .value.red { color: #c0392b; }
-        .live-distribution {
-            font-size: 0.7rem;
-            max-height: 60px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 5px;
-            background: white;
+        .dist-item .bar-track {
             flex: 1;
-            min-width: 150px;
+            height: 6px;
+            background: var(--gray-100);
+            border-radius: 10px;
+            overflow: hidden;
         }
-        .live-distribution .title {
-            color: #888;
-            font-size: 0.6rem;
+
+        .dist-item .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--primary-500);
+            transition: width 0.3s;
         }
-        .live-distribution .item {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 2px 0;
-            border-bottom: 1px dotted #eee;
+
+        .dist-item .count {
+            min-width: 30px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--gray-800);
         }
-        .live-distribution .item .count {
-            font-weight: bold;
-            color: #1e466e;
+
+        /* ===== شبكة الفرق ===== */
+        .sector-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
         }
-        
-        /* أنماط التحكم والتنسيق */
-        .control-person {
+
+        .sector-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-100);
             display: flex;
             align-items: center;
+            gap: 8px;
+        }
+
+        .sector-title i {
+            color: var(--primary-500);
+            font-size: 1rem;
+        }
+
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: 12px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background: white;
+        }
+
+        .unit-card {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.2s;
+        }
+
+        .unit-card:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .unit-card .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+
+        .unit-card .count {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin: 4px 0;
+        }
+
+        .unit-card .count.zero {
+            color: var(--gray-400);
+        }
+
+        .unit-card .actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
             flex-wrap: wrap;
         }
-        .control-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            color: white;
+
+        .unit-card .actions .btn {
+            padding: 3px 10px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        /* ===== نافذة تسليم المناوبة ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            max-width: 850px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px 28px;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.97);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--gray-100);
+        }
+
+        .modal-header h2 {
+            font-size: 1.3rem;
+            color: var(--primary-700);
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-            flex-shrink: 0;
+            gap: 10px;
         }
-        .control-info {
-            flex: 2;
-            min-width: 150px;
+
+        .modal-header h2 i {
+            color: var(--gold);
         }
-        .control-info .name {
-            font-weight: bold;
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray-400);
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--coral);
+        }
+
+        .modal .form-section {
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .modal .form-section .section-title {
+            background: var(--gray-50);
+            padding: 8px 14px;
+            font-weight: 600;
             font-size: 0.85rem;
+            color: var(--primary-700);
+            border-bottom: 1px solid var(--gray-100);
         }
-        .control-info .role {
-            font-size: 0.7rem;
-            color: #666;
+
+        .modal .form-section .section-body {
+            padding: 12px 14px;
         }
-        .control-vacation {
+
+        .modal .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .modal .form-row label {
+            font-weight: 500;
+            font-size: 0.8rem;
+            min-width: 100px;
+            color: var(--gray-800);
+        }
+
+        .modal .form-row input,
+        .modal .form-row select,
+        .modal .form-row textarea {
+            padding: 6px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-family: 'Inter', sans-serif;
+            background: var(--white);
             flex: 1;
-            min-width: 120px;
-            font-size: 0.75rem;
+            min-width: 80px;
         }
-        .control-vacation .display {
-            padding: 5px;
-            background: #f0f0f0;
-            border-radius: 4px;
+
+        .modal .form-row input[type="number"] {
+            max-width: 80px;
             text-align: center;
         }
-        .control-vacation .edit {
+
+        .modal .form-row .inline-group {
             display: flex;
-            gap: 5px;
             align-items: center;
+            gap: 5px;
+        }
+
+        .modal .form-row .inline-group span {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        .modal .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .modal .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .modal .total-display {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            background: var(--primary-100);
+            padding: 2px 14px;
+            border-radius: 30px;
+            display: inline-block;
+        }
+
+        .modal .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
             flex-wrap: wrap;
         }
-        .control-vacation .edit input {
-            width: 120px;
-            padding: 3px;
-            font-size: 0.7rem;
-            border: 1px solid #aaa;
-            border-radius: 3px;
+
+        .modal .modal-actions .btn {
+            padding: 10px 28px;
+            font-size: 0.9rem;
         }
-        .control-role-badge {
-            font-size: 0.7rem;
-            padding: 3px 10px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            background: #f9f9f9;
+
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
         }
-        
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-            }
-            .container, .modal-content {
-                max-width: 100%;
-                margin: 0;
-                padding: 5px;
-            }
-            .info-bar, .toolbar, .archive-row, .update-status, footer,
-            .modal-buttons, #closeShiftBtn, #deleteShiftBtn,
-            #shiftArchiveSelect, #printShiftBtn, #saveShiftBtn,
-            .return-btn, #viewShiftBtn, #newShiftBtn, #shiftBtn,
-            #monthlyTableBtn, #uploadExcelBtn, #closeMonthlyTableBtn,
-            #docsBtn, #airAmbulanceBtn, #controlBtn,
-            #editVacationsBtn, #saveVacationsBtn, #changePasswordBtn,
-            .no-print {
-                display: none !important;
-            }
-            .modal {
-                display: block !important;
-                position: relative;
-                background: white;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: auto;
-                overflow: visible;
-                transform: none;
-            }
-            .modal-content {
-                border: 1px solid #000;
-                margin: 0;
-                padding: 5px;
-                max-width: 100%;
-                box-shadow: none;
-                overflow: visible;
-                height: auto;
-                max-height: none;
-            }
-            table {
-                page-break-inside: avoid;
-                border-collapse: collapse;
-                width: 100%;
-                font-size: 9pt;
-            }
-            th, td {
-                border: 1px solid #000;
-                padding: 3px 5px;
-            }
-            input, textarea {
-                border: none;
-                padding: 0;
-                margin: 0;
-                font-size: 8pt;
-                background: transparent;
-            }
-            input {
-                text-align: center;
-            }
-            .status-icon {
-                font-size: 9pt;
-            }
-            h2, h3, .sector-title {
-                page-break-after: avoid;
-            }
-            .stats-section {
-                page-break-inside: avoid;
-                border: 1px solid #000;
-                background: white;
-                padding: 8px;
-            }
-            .circle-stats-container {
-                page-break-inside: avoid;
-                border: 1px solid #000;
-                background: white;
-            }
-            .svg-circle-text {
-                fill: #000 !important;
-            }
-            .form-row {
-                margin: 5px 0;
-            }
-            .shift-type label {
-                margin-left: 10px;
-            }
-            #monthlyTableModal, #airAmbulanceModal, #docsModal, #controlModal {
-                display: none !important;
-            }
-            .live-stats {
-                display: block !important;
-                border: 1px solid #000;
-                background: white;
-                padding: 8px;
-            }
-        }
-        
+
         @media (max-width: 650px) {
-            body { padding: 10px; }
-            .units-grid { grid-template-columns: 1fr; }
-            .modal-content { padding: 10px; }
-            .sheet-tab { padding: 4px 10px; font-size: 0.7rem; }
-            .circle-stats-container { grid-template-columns: 1fr 1fr; }
-            .svg-circle { width: 60px; height: 60px; }
-            .live-stats-grid { flex-direction: column; align-items: stretch; }
-            .control-person { flex-direction: column; align-items: stretch; }
-            .control-vacation .edit input { width: 100%; }
+            body { padding: 8px; }
+            .hero { padding: 20px 16px; min-height: 160px; }
+            .hero-title { font-size: 1.4rem; }
+            .hero-visual { max-width: 200px; height: 100px; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .control-bar .actions { justify-content: center; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
+            .modal { padding: 16px; }
+            .modal .grid-2, .modal .grid-3 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>قطاعات الرياض</h1>
-        <div class="sub1">إدارة القطاعات بمنطقة الرياض - فريق الجودة والتطوير</div>
-        <div class="sub2">جدول توزيع البلاغات على الوحدات الإسعافية</div>
-        <div class="date">📅 التاريخ: <span id="currentDate"></span></div>
-    </div>
-
-    <div class="info-bar">
-        <div>
-            <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
-            <span id="viewingBadge" class="viewing-badge" style="display:none;"></span>
-            <button id="returnToCurrentBtn" class="return-btn" style="display:none;">↩️ العودة للحالية</button>
-            <span id="shiftStatus" style="font-size:0.7rem; color:#666; margin-right:10px;"></span>
+    <!-- ===== الهوية البصرية (Hero Section) ===== -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-visual">
+                <div class="glow"></div>
+                <div class="canopy">
+                    <div class="canopy-line"></div>
+                    <div class="canopy-line"></div>
+                    <div class="canopy-line"></div>
+                </div>
+                <div class="triangle triangle-1"></div>
+                <div class="triangle triangle-2"></div>
+                <div class="triangle triangle-3"></div>
+                <div class="v-line v-line-1"></div>
+                <div class="v-line v-line-2"></div>
+                <div class="v-line v-line-3"></div>
+            </div>
+            <h1 class="hero-title">منصة <span class="gold">الجنوب</span></h1>
+            <div class="hero-sub">
+                <i class="fas fa-circle"></i> إدارة العمليات الإسعافية
+                <i class="fas fa-circle"></i> قطاع جنوب الرياض
+            </div>
+            <div class="hero-date">📅 <span id="currentDate"></span></div>
         </div>
-        
-        <div class="archive-row">
-            <label style="font-weight:bold;">📂 المناوبات السابقة:</label>
-            <select id="archiveSelect">
-                <option value="">-- مناوبة جديدة --</option>
-            </select>
-            <button id="viewShiftBtn">📋 عرض بلاغات المناوبة</button>
-        </div>
+    </section>
 
-        <div class="toolbar">
-            <button id="newShiftBtn">🔄 مناوبة جديدة</button>
-            <button id="shiftBtn">📋 نموذج المناوبة</button>
-            <button id="docsBtn">📁 المستندات</button>
-            <button id="airAmbulanceBtn">🚁 الإسعاف الجوي</button>
-            <button id="controlBtn">📋 التحكم والتنسيق</button>
-            <button id="monthlyTableBtn" class="no-print">📊 الجدول الشهري</button>
+    <!-- ===== شريط التحكم ===== -->
+    <div class="control-bar">
+        <div class="total">
+            <i class="fas fa-chart-bar"></i> إجمالي البلاغات
+            <span class="number" id="grandTotal">0</span>
         </div>
-    </div>
-    <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
-
-    <!-- إحصائيات البلاغات الفورية -->
-    <div id="liveReportStats" class="live-stats" style="display:none;">
-        <div class="live-stats-grid">
-            <div class="live-stats-item">
-                <span class="label">📊 إجمالي البلاغات</span>
-                <span class="value" id="liveTotalReports">0</span>
-            </div>
-            <div class="live-stats-item">
-                <span class="label">🏆 أكثر فرقة استخداماً</span>
-                <span class="value green" id="liveTopUnit">-</span>
-            </div>
-            <div class="live-stats-item">
-                <span class="label">🔢 عدد البلاغات للفرقة الأكثر</span>
-                <span class="value red" id="liveTopUnitCount">0</span>
-            </div>
-            <div class="live-distribution" id="liveUnitDistribution">
-                <div class="title">📋 توزيع البلاغات على الفرق</div>
-                <div id="liveUnitList"></div>
-            </div>
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
+            <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
+            <button class="btn btn-outline btn-sm" id="handoverBtn"><i class="fas fa-handshake"></i> تسليم</button>
+            <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
+            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الجوي</button>
+            <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
         </div>
     </div>
 
+    <!-- ===== إحصائيات البلاغات ===== -->
+    <div class="stats-card" id="liveReportStats" style="display:none;">
+        <div class="stats-grid">
+            <div class="stats-item">
+                <div class="label">إجمالي البلاغات</div>
+                <div class="value" id="liveTotalReports">0</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">أكثر فرقة استخداماً</div>
+                <div class="value green" id="liveTopUnit">-</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">عدد البلاغات للفرقة الأكثر</div>
+                <div class="value red" id="liveTopUnitCount">0</div>
+            </div>
+        </div>
+        <div class="stats-distribution" id="liveUnitDistribution">
+            <div class="title"><i class="fas fa-chart-pie"></i> توزيع البلاغات على الفرق</div>
+            <div id="liveUnitList"></div>
+        </div>
+    </div>
+
+    <!-- ===== شبكة الفرق ===== -->
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
     </div>
-    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
-</div>
 
-<!-- نافذة نموذج المناوبة -->
-<div id="shiftModal" class="modal">
-    <div class="modal-content" id="shiftModalContent">
-        <h2>هيئة الهلال الأحمر السعودي</h2>
-        <h3>فرع الهيئة بمنطقة الرياض</h3>
-        <div class="sector-title">قطاع جنوب مدينة الرياض</div>
-        <h3 style="text-decoration:underline;">نموذج استلام وتسليم مجريات النوبة</h3>
-
-        <div class="form-row">
-            <label>📂 المناوبات السابقة:</label>
-            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;">
-                <option value="">-- مناوبة جديدة --</option>
-            </select>
-            <button id="deleteShiftBtn" style="padding:5px 10px; margin-right:10px;">🗑️ حذف المناوبة</button>
-        </div>
-
-        <div class="form-row">
-            <label>📅 اليوم والتاريخ:</label>
-            <span id="shiftDate"></span>
-        </div>
-
-        <div class="form-row">
-            <label>⏰ توقيت المناوبة:</label>
-            <div class="shift-type">
-                <label><input type="radio" name="shiftType" value="صباحية"> صباحية (4 فجراً - 4 عصراً)</label>
-                <label><input type="radio" name="shiftType" value="ليلية"> ليلية (4 عصراً - 4 فجراً)</label>
+    <!-- ===== نافذة تسليم المناوبة ===== -->
+    <div class="modal-overlay" id="handoverModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-handshake"></i> تسليم مناوبة كبار المسعفين</h2>
+                <button class="modal-close" id="closeHandoverBtn">&times;</button>
             </div>
-        </div>
 
-        <h3>تحضير فرق التدخل السريع:</h3>
-        <table id="rapidTable">
-            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
-            <tbody>
-                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
-            </tbody>
-        </table>
-
-        <h3>المراكز الإسعافية:</h3>
-        <table id="centersTable">
-            <thead>
-                <tr>
-                    <th>المركز</th>
-                    <th>عدد المسعفين</th>
-                    <th>السيارات العاملة</th>
-                    <th>الجاهزية</th>
-                    <th>ملاحظات (تأخير / غياب)</th>
-                </tr>
-            </thead>
-            <tbody id="centersTableBody"></tbody>
-        </table>
-
-        <!-- مؤشرات القوى العاملة -->
-        <div id="workforceStats" class="stats-section" style="display:none;">
-            <h3>📊 مؤشرات القوى العاملة</h3>
-            <div class="circle-stats-container">
-                <div class="circle-stat">
-                    <div class="svg-circle-container">
-                        <svg class="svg-circle" viewBox="0 0 100 100">
-                            <circle class="svg-circle-bg" cx="50" cy="50" r="42"/>
-                            <circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42"
-                                stroke="#2a7f3e"
-                                stroke-dasharray="263.89"
-                                stroke-dashoffset="263.89"/>
-                            <text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text>
-                        </svg>
+            <!-- معلومات المناوبة -->
+            <div class="form-section">
+                <div class="section-title">📋 معلومات المناوبة</div>
+                <div class="section-body">
+                    <div class="form-row">
+                        <label>📅 التاريخ:</label>
+                        <input type="date" id="handoverDate">
+                        <label>⏰ الوقت:</label>
+                        <input type="time" id="handoverTime">
+                        <label>🌅 المناوبة:</label>
+                        <select id="handoverShiftType">
+                            <option value="صباحية">صباحية</option>
+                            <option value="ليلية">ليلية</option>
+                        </select>
                     </div>
-                    <div class="value" style="font-size:1rem; color:#1e466e;">نسبة الجاهزية</div>
-                    <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
-                </div>
-                <div class="circle-stat">
-                    <div class="value value-blue" id="totalStaffDisplay">0</div>
-                    <div class="label">إجمالي المسعفين</div>
-                    <div class="sub-value" id="staffSubText">موزعين على 0 مركز</div>
-                </div>
-                <div class="circle-stat">
-                    <div class="value value-blue" id="totalCarsDisplay">0</div>
-                    <div class="label">إجمالي السيارات</div>
-                    <div class="sub-value" id="carsSubText"></div>
-                </div>
-                <div class="circle-stat">
-                    <div class="value value-red" id="missingCentersDisplay">0</div>
-                    <div class="label">المراكز الناقصة</div>
-                    <div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div>
                 </div>
             </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                <div class="stats-scroll" id="distributionContainer">
-                    <div class="title">توزيع المسعفين على المراكز</div>
-                    <div id="distributionList"></div>
-                </div>
-                <div class="stats-scroll" id="carDistributionContainer">
-                    <div class="title">توزيع السيارات على المراكز</div>
-                    <div id="carDistributionList"></div>
-                </div>
-            </div>
-        </div>
 
-        <!-- إحصائيات البلاغات -->
-        <div id="shiftReportStats" class="stats-section" style="display:none;">
-            <h3>📈 إحصائيات البلاغات</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
-                <div style="border:1px solid #000; padding:10px; text-align:center; background:white; border-radius:4px;">
-                    <div style="font-size:0.7rem; color:#555;">إجمالي البلاغات</div>
-                    <div style="font-size:1.8rem; font-weight:bold; color:#1e466e;" id="shiftTotalReports">0</div>
-                </div>
-                <div style="border:1px solid #000; padding:10px; text-align:center; background:white; border-radius:4px;">
-                    <div style="font-size:0.7rem; color:#555;">أكثر فرقة استخداماً</div>
-                    <div style="font-size:1.2rem; font-weight:bold; color:#2a7f3e;" id="topUnit">-</div>
-                </div>
-                <div style="border:1px solid #000; padding:10px; text-align:center; background:white; border-radius:4px;">
-                    <div style="font-size:0.7rem; color:#555;">عدد البلاغات للفرقة الأكثر</div>
-                    <div style="font-size:1.8rem; font-weight:bold; color:#c0392b;" id="topUnitCount">0</div>
+            <!-- القوى البشرية -->
+            <div class="form-section">
+                <div class="section-title">👥 القوى البشرية</div>
+                <div class="section-body">
+                    <div class="grid-2">
+                        <div class="form-row"><label>إجمالي المسعفين:</label><input type="number" id="hTotalStaff" value="28"></div>
+                        <div class="form-row"><label>الحضور الآن:</label><input type="number" id="hPresentStaff" value="28"></div>
+                        <div class="form-row"><label>المتطوعين:</label><input type="number" id="hVolunteers" value="0"></div>
+                        <div class="form-row"><label>موظفين اللوكم:</label><input type="number" id="hLocumStaff" value="0"></div>
+                        <div class="form-row"><label>الزيادات:</label><input type="number" id="hExtraStaff" value="0"></div>
+                    </div>
+                    <div class="form-row" style="margin-top:8px; border-top:1px dashed var(--gray-200); padding-top:8px;">
+                        <label style="font-weight:600;">الغياب:</label>
+                        <div class="inline-group"><label>أساسي:</label><input type="number" id="hAbsentEssential" value="0" style="max-width:70px;"></div>
+                        <div class="inline-group"><label>تداخلي:</label><input type="number" id="hAbsentInterference" value="0" style="max-width:70px;"></div>
+                        <div class="inline-group"><label>الإجمالي:</label><span class="total-display" id="hAbsentTotal">0</span></div>
+                    </div>
                 </div>
             </div>
-            <div class="stats-scroll" style="margin-top:10px;" id="unitReportContainer">
-                <div class="title">توزيع البلاغات على الفرق</div>
-                <div id="unitReportList"></div>
+
+            <!-- قوة القطاع -->
+            <div class="form-section">
+                <div class="section-title">🚑 قوة القطاع</div>
+                <div class="section-body">
+                    <div style="font-weight:600; font-size:0.85rem; color:var(--primary-700); margin-bottom:4px;">أساسية:</div>
+                    <div class="grid-3">
+                        <div class="form-row"><label>وحدة إسعافية:</label><input type="number" id="hAmbulanceBase" value="13" style="max-width:60px;"><span>من</span><input type="number" id="hAmbulanceBaseTotal" value="13" style="max-width:60px;"></div>
+                        <div class="form-row"><label>وحدة سريع:</label><input type="number" id="hRapidBase" value="2" style="max-width:60px;"><span>من</span><input type="number" id="hRapidBaseTotal" value="2" style="max-width:60px;"></div>
+                        <div class="form-row"><label>سريع تخصصية:</label><input type="number" id="hRapidSpecialized" value="0" style="max-width:70px;"></div>
+                        <div class="form-row"><label>سريع مساعد:</label><input type="number" id="hRapidAssistant" value="1" style="max-width:70px;"></div>
+                    </div>
+                    <div style="font-weight:600; font-size:0.85rem; color:var(--primary-700); margin:8px 0 4px;">تداخلية:</div>
+                    <div class="grid-3">
+                        <div class="form-row"><label>وحدة إسعافية:</label><input type="number" id="hAmbulanceInter" value="0" style="max-width:60px;"><span>من</span><input type="number" id="hAmbulanceInterTotal" value="3" style="max-width:60px;"></div>
+                        <div class="form-row"><label>وحدة سريع:</label><input type="number" id="hRapidInter" value="0" style="max-width:60px;"><span>من</span><input type="number" id="hRapidInterTotal" value="1" style="max-width:60px;"></div>
+                    </div>
+                    <div style="margin-top:8px; border-top:1px dashed var(--gray-200); padding-top:8px;">
+                        <div style="font-weight:600; font-size:0.85rem; color:var(--primary-700); margin-bottom:4px;">الإجمالي:</div>
+                        <div class="grid-3">
+                            <div class="form-row"><label>فرق سريع:</label><input type="number" id="hTotalRapid" value="3" style="max-width:80px;"></div>
+                            <div class="form-row"><label>فرق إسعافية:</label><input type="number" id="hTotalAmbulance" value="13" style="max-width:80px;"></div>
+                            <div class="form-row"><label>الوحدات:</label><input type="number" id="hTotalUnits" value="16" style="max-width:80px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- المركبات -->
+            <div class="form-section">
+                <div class="section-title">🚗 المركبات</div>
+                <div class="section-body">
+                    <div class="grid-3">
+                        <div style="font-weight:600;">العاملة:</div>
+                        <div class="form-row"><label>إسعاف:</label><input type="number" id="hCarAmbulanceWorking" value="17" style="max-width:70px;"></div>
+                        <div class="form-row"><label>سريع:</label><input type="number" id="hCarRapidWorking" value="4" style="max-width:70px;"></div>
+                        <div style="font-weight:600;">المتعطلة:</div>
+                        <div class="form-row"><label>إسعاف:</label><input type="number" id="hCarAmbulanceBroken" value="3" style="max-width:70px;"></div>
+                        <div class="form-row"><label>سريع:</label><input type="number" id="hCarRapidBroken" value="0" style="max-width:70px;"></div>
+                        <div style="font-weight:600;">الاحتياط:</div>
+                        <div class="form-row"><label>إسعاف:</label><input type="number" id="hCarAmbulanceReserve" value="0" style="max-width:70px;"></div>
+                        <div class="form-row"><label>سريع:</label><input type="number" id="hCarRapidReserve" value="0" style="max-width:70px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الملاحظات -->
+            <div class="form-section">
+                <div class="section-title">📝 الملاحظات</div>
+                <div class="section-body">
+                    <div class="form-row"><label>نقاط مكشوفة:</label><input type="text" id="hNotesPoints" value="لا يوجد" style="flex:3;"></div>
+                    <div class="form-row"><label>شركاء الاستجابة:</label><input type="text" id="hNotesPartners" value="لا يوجد" style="flex:3;"></div>
+                    <div class="form-row"><label>ملاحظات عامة:</label><textarea id="hNotesGeneral" rows="2" style="flex:3;">لا يوجد</textarea></div>
+                </div>
+            </div>
+
+            <!-- الكوادر القيادية -->
+            <div class="form-section">
+                <div class="section-title">👤 الكوادر القيادية</div>
+                <div class="section-body">
+                    <div class="grid-3">
+                        <div class="form-row"><label>مساعد كبير المسعفين:</label><input type="text" id="hSeniorAssistant" value="حمود السبيعي"></div>
+                        <div class="form-row"><label>كبير المسعفين:</label><input type="text" id="hSeniorChief" value="فواز الاشجعي"></div>
+                        <div class="form-row"><label>قائد المنطقة:</label><input type="text" id="hSeniorLeader" value="علي الحربي"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-teal" id="saveHandoverBtn"><i class="fas fa-save"></i> حفظ التقرير</button>
+                <button class="btn btn-primary" id="printHandoverBtn"><i class="fas fa-print"></i> طباعة</button>
+                <button class="btn btn-outline" id="resetHandoverBtn"><i class="fas fa-undo-alt"></i> إعادة تعيين</button>
             </div>
         </div>
-
-        <h3>الملاحظات العامة أثناء سير المناوبة:</h3>
-        <textarea id="generalNotes" rows="3"></textarea>
-
-        <div class="modal-buttons">
-            <button id="printShiftBtn" class="no-print">🖨️ طباعة النموذج</button>
-            <button id="saveShiftBtn" class="no-print">💾 حفظ النموذج</button>
-            <button id="closeShiftBtn" class="no-print">❌ إغلاق</button>
-        </div>
     </div>
-</div>
 
-<!-- نافذة المستندات -->
-<div id="docsModal" class="modal">
-    <div class="modal-content" style="max-width:800px;">
-        <h2>📁 المستندات والملفات</h2>
-        <p style="text-align:center; color:#666; margin:5px 0 15px;">رفع وعرض المستندات (السياسات، الخط الساخن، التعليمات)</p>
-        
-        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display:none;">
-            <button id="uploadDocBtn" style="padding:10px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">📤 رفع ملف</button>
-            <span id="docStatus" style="font-size:0.75rem; color:#666;">📂 جاري التحقق...</span>
-        </div>
-        
-        <div id="docsListContainer" style="margin-top:15px; max-height:50vh; overflow-y:auto; border:1px solid #aaa; padding:10px; background:white;">
-            <p style="text-align:center; color:#888; padding:20px 0;">📂 لا توجد مستندات محفوظة</p>
-        </div>
-        
-        <div class="modal-buttons">
-            <button id="closeDocsBtn">❌ إغلاق</button>
-        </div>
+    <div class="footer">
+        <i class="fas fa-clock"></i> ضغطة = بلاغ  |  <i class="fas fa-undo-alt"></i> تراجع  |  <i class="fas fa-sync-alt"></i> تحديث تلقائي
     </div>
-</div>
 
-<!-- نافذة الإسعاف الجوي -->
-<div id="airAmbulanceModal" class="modal">
-    <div class="modal-content" style="max-width:600px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">🚁 الإسعاف الجوي</h2>
-            <button id="clearAllAirRecords" style="padding:4px 12px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️ حذف الكل</button>
-        </div>
-        <p style="text-align:center; color:#666; margin:5px 0 15px;">تسجيل بلاغات الإسعاف الجوي</p>
-        
-        <div class="form-row">
-            <label>📋 رقم البلاغ:</label>
-            <input type="text" id="airReportNumber" placeholder="مثال: 2025-001" style="width:100%;">
-        </div>
-        
-        <div class="form-row">
-            <label>🚑 الفرقة المرافقة:</label>
-            <select id="airUnit" style="width:100%;">
-                <option value="">-- اختر الفرقة --</option>
-                <option value="سريع 1">سريع 1</option>
-                <option value="سريع 2">سريع 2</option>
-                <option value="سريع 3">سريع 3</option>
-                <option value="سريع 4">سريع 4</option>
-                <option value="جنوب 1">جنوب 1</option>
-                <option value="جنوب 2">جنوب 2</option>
-                <option value="جنوب 3">جنوب 3</option>
-                <option value="جنوب 4">جنوب 4</option>
-                <option value="جنوب 5">جنوب 5</option>
-                <option value="جنوب 6">جنوب 6</option>
-                <option value="جنوب 7">جنوب 7</option>
-                <option value="جنوب 8">جنوب 8</option>
-                <option value="جنوب 9">جنوب 9</option>
-                <option value="جنوب 10">جنوب 10</option>
-                <option value="جنوب 11">جنوب 11</option>
-                <option value="جنوب 12">جنوب 12</option>
-                <option value="جنوب 13">جنوب 13</option>
-                <option value="جنوب 14">جنوب 14</option>
-                <option value="جنوب 15">جنوب 15</option>
-                <option value="جنوب 16">جنوب 16</option>
-                <option value="جنوب 17">جنوب 17</option>
-                <option value="جنوب 18">جنوب 18</option>
-                <option value="جنوب 19">جنوب 19</option>
-            </select>
-        </div>
-        
-        <div class="form-row">
-            <label>🏥 المستشفى المستلم:</label>
-            <input type="text" id="airHospital" placeholder="اسم المستشفى" style="width:100%;">
-        </div>
-        
-        <div class="form-row">
-            <label>📅 تاريخ ووقت النقل:</label>
-            <input type="datetime-local" id="airDateTime" style="width:100%;">
-        </div>
-        
-        <div class="form-row">
-            <label>📝 ملاحظات إضافية:</label>
-            <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="width:100%;"></textarea>
-        </div>
-        
-        <div id="airSavedRecords" style="margin-top:15px; max-height:200px; overflow-y:auto; border:1px solid #aaa; padding:10px; background:#f9f9f9; display:none;">
-            <h4 style="margin:0 0 10px 0;">📋 البلاغات المحفوظة</h4>
-            <div id="airRecordsList"></div>
-        </div>
-        
-        <div class="modal-buttons">
-            <button id="saveAirRecord">💾 حفظ البلاغ</button>
-            <button id="closeAirModal">❌ إغلاق</button>
-        </div>
-    </div>
-</div>
+    <script>
+        // ============================================
+        // التاريخ الحالي
+        // ============================================
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
 
-<!-- نافذة الجدول الشهري -->
-<div id="monthlyTableModal" class="modal no-print">
-    <div class="modal-content" style="max-width:98%;">
-        <h2>📊 جدول المناوبات الشهري - قطاع جنوب الرياض</h2>
-        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
-                <button type="button" id="uploadExcelBtn" style="padding:10px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">📁 اختيار ملف</button>
-                <button type="submit" id="submitUploadBtn" style="display:none;">⬆️ رفع وحفظ</button>
-            </form>
-            <span id="tableStatus" style="font-size:0.75rem; color:#666;">📂 جاري التحقق...</span>
-        </div>
-        <div id="excelTableContainer" style="overflow:auto; margin-top:15px; max-height:75vh; position:relative;">
-            <p style="text-align:center; color:#888; padding:30px 0;">⏳ جاري تحميل الجدول...</p>
-        </div>
-        <div class="modal-buttons">
-            <button id="closeMonthlyTableBtn">❌ إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- نافذة التحكم والتنسيق -->
-<div id="controlModal" class="modal">
-    <div class="modal-content" style="max-width:800px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">📋 التحكم والتنسيق</h2>
-            <button id="changePasswordBtn" style="padding:4px 12px; border:1px solid #000; background:#f39c12; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">🔑 تغيير الرقم السري</button>
-        </div>
-        <p style="text-align:center; color:#666; margin:5px 0 15px;">أفراد التحكم والتنسيق - إجازات الموظفين</p>
-        
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #000; padding-bottom:8px; flex-wrap:wrap; gap:5px;">
-            <span style="font-weight:bold;">عدد الأفراد: <span id="controlCount">9</span></span>
-            <span style="font-weight:bold; font-size:0.8rem;">تحكم عملياتي / تنسيق استجابة</span>
-            <div style="display:flex; gap:5px;">
-                <button id="editVacationsBtn" style="padding:4px 12px; border:1px solid #000; background:#f39c12; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">🔒 تعديل الإجازات</button>
-                <button id="saveVacationsBtn" style="display:none; padding:4px 12px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-size:0.7rem; border-radius:4px;">💾 حفظ الإجازات</button>
-            </div>
-        </div>
-        
-        <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid #aaa; padding:10px; background:white;">
-            <!-- ستعرض هنا بيانات الأفراد -->
-        </div>
-        
-        <div class="form-row" style="margin-top:15px;">
-            <label>📝 ملاحظات إضافية:</label>
-            <textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..." style="width:100%;"></textarea>
-        </div>
-        
-        <div class="modal-buttons">
-            <button id="saveControlNotes" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; font-weight:bold;">💾 حفظ الملاحظات</button>
-            <button id="closeControlBtn">❌ إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- نافذة إدخال الرقم السري -->
-<div id="passwordModal" class="modal">
-    <div class="modal-content" style="max-width:400px;">
-        <h3>🔒 إدخال الرقم السري</h3>
-        <p style="text-align:center; color:#666; margin:5px 0 15px;">أدخل الرقم السري لتعديل الإجازات</p>
-        <div class="form-row">
-            <label>🔑 الرقم السري:</label>
-            <input type="password" id="passwordInput" placeholder="أدخل الرقم السري" style="width:100%;">
-        </div>
-        <div class="modal-buttons">
-            <button id="confirmPasswordBtn" style="padding:8px 20px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-weight:bold;">✅ تأكيد</button>
-            <button id="cancelPasswordBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer;">❌ إلغاء</button>
-        </div>
-    </div>
-</div>
-
-<!-- نافذة تغيير الرقم السري -->
-<div id="changePasswordModal" class="modal">
-    <div class="modal-content" style="max-width:400px;">
-        <h3>🔑 تغيير الرقم السري</h3>
-        <p style="text-align:center; color:#666; margin:5px 0 15px;">أدخل الرقم السري القديم والجديد</p>
-        <div class="form-row">
-            <label>🔑 الرقم السري القديم:</label>
-            <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم" style="width:100%;">
-        </div>
-        <div class="form-row">
-            <label>🔑 الرقم السري الجديد:</label>
-            <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)" style="width:100%;">
-        </div>
-        <div class="form-row">
-            <label>🔑 تأكيد الرقم السري الجديد:</label>
-            <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد" style="width:100%;">
-        </div>
-        <div class="modal-buttons">
-            <button id="confirmChangePasswordBtn" style="padding:8px 20px; border:1px solid #000; background:#2a7f3e; color:white; cursor:pointer; font-weight:bold;">✅ تغيير</button>
-            <button id="cancelChangePasswordBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer;">❌ إلغاء</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // ============================================
-    // المتغيرات العامة
-    // ============================================
-    let centersData = {};
-    let reports = {};
-    let lastKnownUpdate = 0;
-    let currentShiftId = null;
-    let allShifts = [];
-    let isViewingArchiveShift = false;
-    let currentViewingShift = null;
-    let viewingShiftId = null;
-
-    const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
-    const centerList = centerNumbers.map(n => `جنوب ${n}`);
-
-    let currentSheetIndex = 0;
-    let workbookData = null;
-
-    // بيانات التحكم والتنسيق
-    const controlData = [
-        { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-        { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-        { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-        { code: "11120", name: "عوض عبدالعزيز عوض الاسمري", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-        { code: "102752", name: "محمد نايف صنهات العتيبي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-        { code: "10717", name: "عطاالله خالد عطوي الرويلي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-        { code: "101915", name: "مبارك هذال مبارك ال بريك", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-        { code: "8323", name: "تركي عتيق الله خيرالله المطيري", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-        { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
-    ];
-
-    let isEditMode = false;
-    let controlNotes = "";
-
-    // ============================================
-    // بناء جدول المراكز
-    // ============================================
-    function buildCentersTable() {
-        const tbody = document.getElementById('centersTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        for (let i = 0; i < centerList.length; i++) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-weight:bold; font-size:0.75rem;">${centerList[i]}</td>
-                <td><input type="number" id="staff_${i}" style="width:50px; text-align:center;" min="0" max="4" value=""></td>
-                <td><input type="number" id="cars_${i}" style="width:50px; text-align:center;" min="0" max="2" value=""></td>
-                <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
-                <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem;" value=""></td>
-            `;
-            const staffInput = tr.querySelector(`#staff_${i}`);
-            const carsInput = tr.querySelector(`#cars_${i}`);
-            
-            staffInput.addEventListener('input', function() {
-                updateStatusIcon(i);
-                calculateWorkforceStatsLocally();
-            });
-            carsInput.addEventListener('input', function() {
-                updateStatusIcon(i);
-                calculateWorkforceStatsLocally();
-            });
-            
-            tbody.appendChild(tr);
-        }
-    }
-
-    function updateStatusIcon(index) {
-        const staffInput = document.getElementById(`staff_${index}`);
-        const carsInput = document.getElementById(`cars_${index}`);
-        const iconSpan = document.getElementById(`status_${index}`);
-        if (staffInput && carsInput && iconSpan) {
-            const staffCount = parseInt(staffInput.value) || 0;
-            const carsCount = parseInt(carsInput.value) || 0;
-            if (staffCount >= 2 && carsCount >= 1) {
-                iconSpan.innerHTML = '✅';
-                iconSpan.className = 'status-icon status-ok';
-            } else {
-                iconSpan.innerHTML = '❌';
-                iconSpan.className = 'status-icon status-not';
-            }
-        }
-    }
-
-    // ============================================
-    // حساب مؤشرات القوى العاملة فوراً
-    // ============================================
-    function calculateWorkforceStatsLocally() {
-        const centerList = document.querySelectorAll('#centersTableBody tr');
-        let totalStaff = 0;
-        let totalCars = 0;
-        let readyCenters = 0;
-        let missingCenters = 0;
-        let centerCount = 0;
-        const distribution = {};
-        const carDistribution = {};
-        
-        centerList.forEach(tr => {
-            const centerName = tr.querySelector('td:first-child')?.innerText || '';
-            const staffInput = tr.querySelector('input[id^="staff_"]');
-            const carsInput = tr.querySelector('input[id^="cars_"]');
-            
-            if (staffInput && carsInput) {
-                const staffCount = parseInt(staffInput.value) || 0;
-                const carsCount = parseInt(carsInput.value) || 0;
-                totalStaff += staffCount;
-                totalCars += carsCount;
-                centerCount++;
-                distribution[centerName] = staffCount;
-                carDistribution[centerName] = carsCount;
-                
-                if (staffCount >= 2 && carsCount >= 1) {
-                    readyCenters++;
-                } else {
-                    missingCenters++;
-                }
-            }
-        });
-        
-        const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-        
-        document.getElementById('workforceStats').style.display = 'block';
-        document.getElementById('totalStaffDisplay').innerText = totalStaff;
-        document.getElementById('totalCarsDisplay').innerText = totalCars;
-        document.getElementById('missingCentersDisplay').innerText = missingCenters;
-        document.getElementById('staffSubText').innerText = `موزعين على ${centerCount} مركز`;
-        document.getElementById('carsSubText').innerText = `إجمالي السيارات`;
-        document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
-        document.getElementById('readinessSubText').innerText = `${readyCenters} / ${centerCount} مركز جاهز`;
-        
-        const circumference = 2 * Math.PI * 42;
-        const offset = circumference - (readinessRate / 100) * circumference;
-        const circle = document.getElementById('readinessCircle');
-        const text = document.getElementById('readinessText');
-        
-        let color = '#c0392b';
-        if (readinessRate >= 80) color = '#2a7f3e';
-        else if (readinessRate >= 50) color = '#f39c12';
-        
-        circle.setAttribute('stroke', color);
-        circle.style.strokeDashoffset = offset;
-        text.textContent = readinessRate + '%';
-        
-        const distList = document.getElementById('distributionList');
-        distList.innerHTML = '';
-        const total = totalStaff || 1;
-        for (let center in distribution) {
-            const count = distribution[center];
-            const barWidth = Math.round((count / total) * 100);
-            const isReady = count >= 2;
-            const div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = `
-                <span class="name">${center}</span>
-                <span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
-                <div class="bar-track">
-                    <div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div>
-                </div>
-                <span class="percent">${barWidth}%</span>
-            `;
-            distList.appendChild(div);
-        }
-        
-        const carDistList = document.getElementById('carDistributionList');
-        carDistList.innerHTML = '';
-        const totalCarsValue = totalCars || 1;
-        for (let center in carDistribution) {
-            const count = carDistribution[center];
-            const barWidth = Math.round((count / totalCarsValue) * 100);
-            const hasCar = count >= 1;
-            const div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = `
-                <span class="name">${center}</span>
-                <span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
-                <div class="bar-track">
-                    <div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div>
-                </div>
-                <span class="percent">${barWidth}%</span>
-            `;
-            carDistList.appendChild(div);
-        }
-    }
-
-    // ============================================
-    // حساب إحصائيات البلاغات فوراً
-    // ============================================
-    function calculateLiveReportStats() {
-        const container = document.getElementById('liveReportStats');
-        if (!container) return;
-        
-        let total = 0;
-        let unitStats = {};
-        
-        for (let key in reports) {
-            const report = reports[key];
-            if (report && report.count > 0) {
-                total += report.count;
-                const parts = key.split('|');
-                const unit = parts.length > 1 ? parts[1] : key;
-                unitStats[unit] = (unitStats[unit] || 0) + report.count;
-            }
-        }
-        
-        if (total === 0) {
-            container.style.display = 'none';
-            return;
-        }
-        
-        container.style.display = 'block';
-        document.getElementById('liveTotalReports').innerText = total;
-        
-        const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-        const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-        const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-        
-        document.getElementById('liveTopUnit').innerText = topUnit;
-        document.getElementById('liveTopUnitCount').innerText = topCount;
-        
-        const listContainer = document.getElementById('liveUnitList');
-        listContainer.innerHTML = '';
-        sortedUnits.forEach(([unit, count]) => {
-            const div = document.createElement('div');
-            div.className = 'item';
-            div.innerHTML = `
-                <span>${unit}</span>
-                <span class="count">${count}</span>
-            `;
-            listContainer.appendChild(div);
-        });
-    }
-
-    // ============================================
-    // تحميل بيانات التكميل إلى النموذج
-    // ============================================
-    function loadShiftToForm(shift) {
-        if (!shift) return;
-        viewingShiftId = shift.id;
-        document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
-        
-        const shiftTypeRadios = document.querySelectorAll('input[name="shiftType"]');
-        shiftTypeRadios.forEach(radio => {
-            radio.checked = (radio.value === shift.shiftType);
-        });
-        
-        document.querySelectorAll('.rapid-location').forEach(input => {
-            input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || '';
-        });
-        
-        for (let i = 0; i < centerList.length; i++) {
-            const center = centerList[i];
-            const data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
-            const staffInput = document.getElementById(`staff_${i}`);
-            const carsInput = document.getElementById(`cars_${i}`);
-            const notesInput = document.getElementById(`notes_${i}`);
-            if (staffInput) staffInput.value = data.staffCount || '';
-            if (carsInput) carsInput.value = data.carsCount || '';
-            if (notesInput) notesInput.value = data.notes || '';
-            updateStatusIcon(i);
-        }
-        
-        document.getElementById('generalNotes').value = shift.generalNotes || '';
-        
-        setTimeout(calculateWorkforceStatsLocally, 100);
-        
-        if (shift.id) {
-            loadWorkforceStats(shift.id);
-        }
-    }
-
-    function getShiftFromForm() {
-        const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
-        const rapidLocations = {};
-        document.querySelectorAll('.rapid-location').forEach(input => {
-            rapidLocations[input.dataset.unit] = input.value;
-        });
-        const centersDataForm = {};
-        for (let i = 0; i < centerList.length; i++) {
-            const center = centerList[i];
-            const staffInput = document.getElementById(`staff_${i}`);
-            const carsInput = document.getElementById(`cars_${i}`);
-            const notesInput = document.getElementById(`notes_${i}`);
-            centersDataForm[center] = {
-                staffCount: staffInput?.value || '',
-                carsCount: carsInput?.value || '',
-                notes: notesInput?.value || ''
-            };
-        }
-        return {
-            shiftType: shiftType,
-            rapidLocations: rapidLocations,
-            centersData: centersDataForm,
-            generalNotes: document.getElementById('generalNotes').value
+        // ============================================
+        // البيانات (محاكاة)
+        // ============================================
+        const data = {
+            centers: {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            },
+            reports: {}
         };
-    }
 
-    function clearShiftForm() {
-        document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
-        document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
-        document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
-        for (let i = 0; i < centerList.length; i++) {
-            const staffInput = document.getElementById(`staff_${i}`);
-            const carsInput = document.getElementById(`cars_${i}`);
-            const notesInput = document.getElementById(`notes_${i}`);
-            if (staffInput) staffInput.value = '';
-            if (carsInput) carsInput.value = '';
-            if (notesInput) notesInput.value = '';
-            updateStatusIcon(i);
-        }
-        document.getElementById('generalNotes').value = '';
-        document.getElementById('workforceStats').style.display = 'none';
-        document.getElementById('shiftReportStats').style.display = 'none';
-    }
-
-    // ============================================
-    // دوال الاتصال بالخادم
-    // ============================================
-    async function loadAllData() {
-        try {
-            const response = await fetch('/api/data');
-            const result = await response.json();
-            centersData = result.centers;
-            reports = result.data;
-            currentShiftId = result.currentShiftId || null;
-            if (!isViewingArchiveShift) {
-                renderData();
-                updateTotal();
-                calculateLiveReportStats();
+        // تهيئة التقارير
+        for (let center in data.centers) {
+            for (let unit of data.centers[center]) {
+                data.reports[`${center}|${unit}`] = { count: 0, times: [] };
             }
-            updateShiftStatus();
-            document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
-        } catch (error) {
-            document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
         }
-    }
 
-    function updateShiftStatus() {
-        const status = document.getElementById('shiftStatus');
-        if (currentShiftId) {
-            const shift = allShifts.find(s => s.id === currentShiftId);
-            if (shift) {
-                status.innerHTML = `📌 المناوبة الحالية: ${shift.shiftType || 'غير محددة'} - ${shift.shiftDate || ''}`;
-            } else {
-                status.innerHTML = `📌 مناوبة نشطة (رقم: ${currentShiftId})`;
+        // إضافة بعض البيانات التجريبية
+        data.reports["المنصورة|جنوب 1"] = { count: 3, times: ["10:00", "10:30", "11:00"] };
+        data.reports["المنصورة|جنوب 11"] = { count: 2, times: ["09:15", "09:45"] };
+        data.reports["الخالدية|جنوب 2"] = { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] };
+        data.reports["الدار البيضاء|جنوب 4"] = { count: 2, times: ["10:15", "11:30"] };
+
+        // ============================================
+        // دوال العرض
+        // ============================================
+        function updateTotal() {
+            let total = 0;
+            for (let key in data.reports) {
+                total += data.reports[key].count;
             }
-        } else {
-            status.innerHTML = '📌 لا توجد مناوبة نشطة';
+            document.getElementById('grandTotal').innerText = total;
         }
-    }
 
-    async function addReportToServer(center, unit) {
-        if (isViewingArchiveShift) {
-            alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة.");
-            return;
-        }
-        if (!currentShiftId) {
-            alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
-            return;
-        }
-        try {
-            const response = await fetch('/api/report', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ center, unit })
-            });
-            const result = await response.json();
-            if (result.success) {
-                await loadAllData();
-                calculateLiveReportStats();
-            } else {
-                alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
-            }
-        } catch (error) {
-            alert("❌ فشل في الاتصال بالخادم");
-        }
-    }
-
-    async function undoLastReport(center, unit) {
-        if (isViewingArchiveShift) {
-            alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة.");
-            return;
-        }
-        try {
-            const response = await fetch('/api/undo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ center, unit })
-            });
-            const result = await response.json();
-            if (result.success) {
-                await loadAllData();
-                calculateLiveReportStats();
-            } else if (result.error) {
-                alert(result.error);
-            }
-        } catch (error) {
-            alert("❌ فشل في التراجع");
-        }
-    }
-
-    // ============================================
-    // دوال المناوبات
-    // ============================================
-    async function loadShifts() {
-        try {
-            const response = await fetch('/api/shifts');
-            allShifts = await response.json();
+        function renderUnits() {
+            const container = document.getElementById('pointsContainer');
+            container.innerHTML = '';
             
-            const archiveSelect = document.getElementById('archiveSelect');
-            archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-            allShifts.forEach(shift => {
-                const option = document.createElement('option');
-                option.value = shift.id;
-                const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                const total = shift.totalReports || 0;
-                const type = shift.shiftType || 'مناوبة';
-                option.textContent = `${type} - ${date} (${total} بلاغ)`;
-                if (shift.id === currentShiftId) {
-                    option.textContent += ' ⬅️ الحالية';
-                }
-                archiveSelect.appendChild(option);
-            });
-            
-            const shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
-            if (shiftArchiveSelect) {
-                shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-                allShifts.forEach(shift => {
-                    const option = document.createElement('option');
-                    option.value = shift.id;
-                    const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                    option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
-                    shiftArchiveSelect.appendChild(option);
-                });
-            }
-            
-            updateShiftStatus();
-        } catch (error) {}
-    }
-
-    // ============================================
-    // نافذة اختيار نوع المناوبة (لـ مناوبة جديدة)
-    // ============================================
-    function showShiftTypeDialog() {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'flex';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width:400px;">
-                    <h3 style="text-align:center;">📋 بدء مناوبة جديدة</h3>
-                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة الجديدة:</p>
-                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
-                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
-                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
-                    </div>
-                    <div style="display:flex; justify-content:center; gap:10px;">
-                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('#shiftMorningBtn').onclick = function() {
-                modal.remove();
-                resolve('صباحية');
-            };
-            modal.querySelector('#shiftNightBtn').onclick = function() {
-                modal.remove();
-                resolve('ليلية');
-            };
-            modal.querySelector('#cancelShiftBtn').onclick = function() {
-                modal.remove();
-                resolve(null);
-            };
-            modal.onclick = function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                    resolve(null);
-                }
-            };
-        });
-    }
-
-    async function startNewShift() {
-        const shiftType = await showShiftTypeDialog();
-        if (!shiftType) return;
-        
-        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'} جديدة.`)) return;
-        
-        try {
-            const response = await fetch('/api/start-new-shift', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shiftType })
-            });
-            const result = await response.json();
-            if (result.success) {
-                currentShiftId = result.shiftId;
-                alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
-                await loadShifts();
-                await loadAllData();
-                calculateLiveReportStats();
-                document.getElementById('shiftModal').style.display = 'none';
-            } else {
-                alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
-            }
-        } catch (error) {
-            alert("❌ خطأ في الاتصال: " + error.message);
-        }
-    }
-
-    // ============================================
-    // عرض مناوبة سابقة
-    // ============================================
-    async function viewShiftReports() {
-        const select = document.getElementById('archiveSelect');
-        const shiftId = parseInt(select.value);
-        if (!shiftId) {
-            alert("الرجاء اختيار مناوبة من القائمة");
-            return;
-        }
-        
-        try {
-            const response = await fetch(`/api/shifts/${shiftId}`);
-            const result = await response.json();
-            
-            if (result && result.shift) {
-                currentViewingShift = result.shift;
-                isViewingArchiveShift = true;
-                viewingShiftId = shiftId;
+            for (let center in data.centers) {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-card';
+                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+                container.appendChild(sectorDiv);
                 
-                reports = result.reports || {};
-                renderData();
-                updateTotal();
-                loadShiftToForm(result.shift);
-                displayShiftReportStats(result.reports);
-                calculateLiveReportStats();
-                
-                const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
-                document.getElementById('viewingBadge').style.display = 'inline-block';
-                document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
-                document.getElementById('viewingBadge').innerHTML = `📂 تستعرض: ${result.shift.shiftType || 'مناوبة'} - ${result.shift.shiftDate || ''} (${totalReports} بلاغ)`;
-                document.getElementById('updateStatus').innerHTML = `🟡 تستعرض مناوبة سابقة | آخر تحديث: ${new Date().toLocaleTimeString()}`;
-                document.getElementById('shiftModal').style.display = 'flex';
-            } else {
-                alert("لا توجد بيانات في هذه المناوبة");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("❌ فشل في تحميل المناوبة");
-        }
-    }
-
-    async function returnToCurrentShift() {
-        isViewingArchiveShift = false;
-        currentViewingShift = null;
-        viewingShiftId = null;
-        await loadAllData();
-        calculateLiveReportStats();
-        document.getElementById('viewingBadge').style.display = 'none';
-        document.getElementById('returnToCurrentBtn').style.display = 'none';
-        document.getElementById('archiveSelect').value = '';
-        document.getElementById('updateStatus').innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
-        document.getElementById('shiftModal').style.display = 'none';
-    }
-
-    // ============================================
-    // دوال العرض
-    // ============================================
-    async function checkForUpdates() {
-        if (isViewingArchiveShift) return;
-        try {
-            const response = await fetch('/api/last-update');
-            const data = await response.json();
-            if (data.lastUpdate > lastKnownUpdate) {
-                lastKnownUpdate = data.lastUpdate;
-                await loadAllData();
-                calculateLiveReportStats();
-            }
-        } catch (error) {}
-    }
-
-    function updateTotal() {
-        let total = 0;
-        for (let key in reports) {
-            if (reports[key]?.count) total += reports[key].count;
-        }
-        document.getElementById("grandTotal").innerText = total;
-    }
-
-    function showTimes(center, unit, times) {
-        const modalTimes = document.createElement("div");
-        modalTimes.className = "modal";
-        modalTimes.innerHTML = `
-            <div class="modal-content" style="max-width:380px;">
-                <h3>${center} - ${unit}</h3>
-                <div class="modal-times">${times && times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p>— لا توجد بلاغات —</p>"}</div>
-                <button class="close-modal" onclick="this.closest('.modal').style.display='none'">إغلاق</button>
-            </div>
-        `;
-        document.body.appendChild(modalTimes);
-        modalTimes.style.display = "flex";
-        modalTimes.querySelector(".close-modal").onclick = () => modalTimes.remove();
-    }
-
-    function renderData() {
-        const container = document.getElementById("pointsContainer");
-        if (!centersData || Object.keys(centersData).length === 0) {
-            container.innerHTML = "<div class='loading'>❌ لا توجد بيانات</div>";
-            return;
-        }
-        container.innerHTML = "";
-        for (let center in centersData) {
-            const pointDiv = document.createElement("div");
-            pointDiv.className = "point-card";
-            pointDiv.innerHTML = `<div class="point-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
-            container.appendChild(pointDiv);
-            const grid = pointDiv.querySelector(".units-grid");
-            for (let unit of centersData[center]) {
-                const key = `${center}|${unit}`;
-                const info = reports[key] || { count: 0, times: [] };
-                const hasReports = info.count > 0;
-                const unitDiv = document.createElement("div");
-                unitDiv.className = "unit-card";
-                unitDiv.innerHTML = `
-                    <div class="unit-name">${unit}</div>
-                    <div class="count-number">${info.count}</div>
-                    <div class="buttons-row">
-                        <button class="report-btn">➕ تسجيل بلاغ</button>
-                        ${hasReports ? '<button class="undo-btn">↩️ تراجع</button>' : ''}
-                    </div>
-                    <button class="show-times-btn">📋 عرض التواقيت</button>
-                `;
-                unitDiv.querySelector(".report-btn").onclick = () => addReportToServer(center, unit);
-                if (hasReports) {
-                    unitDiv.querySelector(".undo-btn").onclick = () => undoLastReport(center, unit);
-                }
-                unitDiv.querySelector(".show-times-btn").onclick = () => showTimes(center, unit, info.times);
-                grid.appendChild(unitDiv);
-            }
-        }
-    }
-
-    // ============================================
-    // دوال نموذج المناوبة
-    // ============================================
-    async function loadShiftFormShifts() {
-        try {
-            const response = await fetch('/api/shifts');
-            const shifts = await response.json();
-            const shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
-            if (shiftArchiveSelect) {
-                shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-                shifts.forEach(shift => {
-                    const option = document.createElement('option');
-                    option.value = shift.id;
-                    const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                    option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
-                    shiftArchiveSelect.appendChild(option);
-                });
-            }
-        } catch (error) {}
-    }
-
-    async function saveShiftData() {
-        const shiftData = getShiftFromForm();
-        if (!shiftData.shiftType) {
-            alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)");
-            return;
-        }
-        
-        const targetId = viewingShiftId || currentShiftId;
-        if (!targetId) {
-            alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً.");
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/update-shift-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    shiftId: targetId,
-                    shiftData: shiftData
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert("✅ تم حفظ بيانات التكميل بنجاح");
-                await loadShifts();
-                await loadAllData();
-                calculateLiveReportStats();
-                if (viewingShiftId) {
-                    const viewResponse = await fetch(`/api/shifts/${viewingShiftId}`);
-                    const viewResult = await viewResponse.json();
-                    if (viewResult && viewResult.shift) {
-                        loadShiftToForm(viewResult.shift);
+                const grid = sectorDiv.querySelector('.units-grid');
+                for (let unit of data.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const info = data.reports[key] || { count: 0, times: [] };
+                    const hasReports = info.count > 0;
+                    const isZero = info.count === 0;
+                    
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit-card';
+                    unitDiv.innerHTML = `
+                        <div class="name">${unit}</div>
+                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
+                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
+                        </div>
+                    `;
+                    
+                    unitDiv.querySelector('.report-btn').onclick = function() {
+                        info.count++;
+                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
+                        renderUnits();
+                        updateTotal();
+                        updateLiveStats();
+                    };
+                    
+                    if (hasReports) {
+                        unitDiv.querySelector('.undo-btn').onclick = function() {
+                            if (info.count > 0) {
+                                info.count--;
+                                info.times.pop();
+                                renderUnits();
+                                updateTotal();
+                                updateLiveStats();
+                            }
+                        };
                     }
+                    
+                    grid.appendChild(unitDiv);
                 }
-            } else {
-                alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف"));
             }
-        } catch (error) {
-            alert("❌ خطأ في الاتصال: " + error.message);
         }
-    }
 
-    async function deleteCurrentShift() {
-        const targetId = viewingShiftId || currentShiftId;
-        if (!targetId) {
-            alert("لا توجد مناوبة محددة للحذف");
-            return;
-        }
-        if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
-        try {
-            const response = await fetch(`/api/shifts/${targetId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (result.success) {
-                alert("✅ تم حذف المناوبة");
-                if (targetId === currentShiftId) {
-                    currentShiftId = null;
-                }
-                if (targetId === viewingShiftId) {
-                    viewingShiftId = null;
-                    isViewingArchiveShift = false;
-                    document.getElementById('viewingBadge').style.display = 'none';
-                    document.getElementById('returnToCurrentBtn').style.display = 'none';
-                }
-                clearShiftForm();
-                await loadShifts();
-                await loadAllData();
-                calculateLiveReportStats();
-                document.getElementById('shiftModal').style.display = 'none';
-            } else {
-                alert("❌ فشل في الحذف");
-            }
-        } catch (error) {
-            alert("❌ خطأ في الاتصال");
-        }
-    }
-
-    function openShiftModal() {
-        loadShiftFormShifts().then(() => {
-            if (!viewingShiftId && currentShiftId) {
-                const shift = allShifts.find(s => s.id === currentShiftId);
-                if (shift) {
-                    viewingShiftId = currentShiftId;
-                    loadShiftToForm(shift);
-                } else {
-                    clearShiftForm();
-                }
-            } else if (!viewingShiftId) {
-                clearShiftForm();
-            }
-            document.getElementById('shiftArchiveSelect').value = viewingShiftId || '';
-            document.getElementById('shiftModal').style.display = 'flex';
-            setTimeout(calculateWorkforceStatsLocally, 200);
-        });
-    }
-
-    function printShiftForm() {
-        window.print();
-    }
-
-    // ============================================
-    // دوال المستندات
-    // ============================================
-    let uploadedDocs = [];
-
-    async function loadDocs() {
-        try {
-            const response = await fetch('/api/docs');
-            const result = await response.json();
-            if (result.success) {
-                uploadedDocs = result.docs || [];
-                renderDocsList();
-            }
-        } catch (error) {
-            console.error("خطأ في تحميل المستندات:", error);
-        }
-    }
-
-    function renderDocsList() {
-        const container = document.getElementById('docsListContainer');
-        if (!container) return;
-        
-        if (uploadedDocs.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px 0;">📂 لا توجد مستندات محفوظة</p>';
-            return;
-        }
-        
-        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
-        uploadedDocs.forEach((doc) => {
-            const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
-            const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
-                         doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
-                         doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
-                         doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : '📎';
-            html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid #ddd; border-radius:6px; background:white;">
-                    <div>
-                        <span style="font-size:1.2rem;">${icon}</span>
-                        <span style="font-weight:bold; margin-right:8px;">${doc.filename}</span>
-                        <span style="font-size:0.7rem; color:#666; margin-right:10px;">${date}</span>
-                        ${doc.description ? `<span style="font-size:0.7rem; color:#888;">${doc.description}</span>` : ''}
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button onclick="downloadDoc('${doc.id}')" style="padding:4px 12px; border:1px solid #000; background:white; cursor:pointer; font-size:0.7rem;">📥 تحميل</button>
-                        <button onclick="deleteDoc('${doc.id}')" style="padding:4px 12px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem;">🗑️</button>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-        document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} مستندات محفوظة`;
-    }
-
-    document.getElementById('uploadDocBtn')?.addEventListener('click', function() {
-        document.getElementById('docFileInput').click();
-    });
-
-    document.getElementById('docFileInput')?.addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const description = prompt("أدخل وصفاً للمستند (اختياري):", file.name);
-        
-        const reader = new FileReader();
-        reader.onload = async function(event) {
-            try {
-                const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)));
-                const response = await fetch('/api/upload-doc', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filename: file.name,
-                        fileData: base64,
-                        description: description || '',
-                        fileType: file.type
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    alert('✅ تم رفع المستند بنجاح');
-                    await loadDocs();
-                    document.getElementById('docFileInput').value = '';
-                } else {
-                    alert('❌ فشل في رفع المستند: ' + (result.error || 'خطأ غير معروف'));
-                }
-            } catch (error) {
-                alert('❌ خطأ في رفع الملف: ' + error.message);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    });
-
-    async function downloadDoc(docId) {
-        try {
-            window.open(`/api/download-doc/${docId}`, '_blank');
-        } catch (error) {
-            alert('❌ فشل في تحميل المستند');
-        }
-    }
-
-    async function deleteDoc(docId) {
-        if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستند؟')) return;
-        try {
-            const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (result.success) {
-                await loadDocs();
-            } else {
-                alert('❌ فشل في حذف المستند');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال');
-        }
-    }
-
-    // ============================================
-    // دوال الإسعاف الجوي
-    // ============================================
-    let airRecords = [];
-
-    async function loadAirRecords() {
-        try {
-            const response = await fetch('/api/air-ambulance');
-            const result = await response.json();
-            if (result.success) {
-                airRecords = result.records || [];
-                renderAirRecords();
-            }
-        } catch (error) {
-            console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error);
-        }
-    }
-
-    function renderAirRecords() {
-        const container = document.getElementById('airRecordsList');
-        const section = document.getElementById('airSavedRecords');
-        if (!container || !section) return;
-        
-        if (airRecords.length === 0) {
-            section.style.display = 'none';
-            return;
-        }
-        
-        section.style.display = 'block';
-        let html = '';
-        airRecords.forEach((record) => {
-            const date = new Date(record.createdAt).toLocaleString('ar-SA');
-            const notes = record.notes || 'لا توجد ملاحظات';
-            html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #ddd; font-size:0.8rem; flex-wrap:wrap; gap:5px;">
-                    <div style="flex:1; min-width:150px;">
-                        <strong>${record.reportNumber || 'بدون رقم'}</strong>
-                        <span style="margin:0 5px;">|</span>
-                        <span>${record.unit || '-'}</span>
-                        <span style="margin:0 5px;">|</span>
-                        <span>${record.hospital || '-'}</span>
-                        <span style="margin:0 5px;">|</span>
-                        <span style="font-size:0.6rem; color:#888; display:block;">📝 ${notes}</span>
-                        <span style="font-size:0.6rem; color:#999;">🕒 ${date}</span>
-                    </div>
-                    <button onclick="deleteAirRecord('${record.id}')" style="padding:2px 10px; border:1px solid #c0392b; background:white; color:#c0392b; cursor:pointer; font-size:0.7rem; border-radius:4px;">🗑️ حذف</button>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    }
-
-    document.getElementById('saveAirRecord')?.addEventListener('click', async function() {
-        const reportNumber = document.getElementById('airReportNumber').value.trim();
-        const unit = document.getElementById('airUnit').value;
-        const hospital = document.getElementById('airHospital').value.trim();
-        const dateTime = document.getElementById('airDateTime').value;
-        const notes = document.getElementById('airNotes').value.trim();
-        
-        if (!reportNumber) {
-            alert('❌ الرجاء إدخال رقم البلاغ');
-            return;
-        }
-        if (!unit) {
-            alert('❌ الرجاء اختيار الفرقة المرافقة');
-            return;
-        }
-        if (!hospital) {
-            alert('❌ الرجاء إدخال اسم المستشفى');
-            return;
-        }
-        if (!dateTime) {
-            alert('❌ الرجاء اختيار تاريخ ووقت النقل');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/save-air-ambulance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    reportNumber,
-                    unit,
-                    hospital,
-                    dateTime,
-                    notes
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert('✅ تم حفظ بلاغ الإسعاف الجوي بنجاح');
-                document.getElementById('airReportNumber').value = '';
-                document.getElementById('airUnit').value = '';
-                document.getElementById('airHospital').value = '';
-                document.getElementById('airDateTime').value = '';
-                document.getElementById('airNotes').value = '';
-                await loadAirRecords();
-            } else {
-                alert('❌ فشل في حفظ البلاغ: ' + (result.error || 'خطأ غير معروف'));
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال: ' + error.message);
-        }
-    });
-
-    async function deleteAirRecord(recordId) {
-        if (!confirm('⚠️ هل أنت متأكد من حذف هذا البلاغ؟')) return;
-        try {
-            const response = await fetch(`/api/delete-air-ambulance/${recordId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (result.success) {
-                await loadAirRecords();
-            } else {
-                alert('❌ فشل في حذف البلاغ');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال');
-        }
-    }
-
-    document.getElementById('clearAllAirRecords')?.addEventListener('click', async function() {
-        if (!confirm('⚠️ هل أنت متأكد من حذف جميع بلاغات الإسعاف الجوي؟')) return;
-        try {
-            const response = await fetch('/api/clear-air-ambulance', { method: 'DELETE' });
-            const result = await response.json();
-            if (result.success) {
-                await loadAirRecords();
-                alert('✅ تم حذف جميع البلاغات');
-            } else {
-                alert('❌ فشل في حذف البلاغات');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال');
-        }
-    });
-
-    // ============================================
-    // دوال مؤشرات القوى العاملة (من الخادم)
-    // ============================================
-    async function loadWorkforceStats(shiftId) {
-        try {
-            const response = await fetch(`/api/workforce-stats/${shiftId}`);
-            const stats = await response.json();
+        function updateLiveStats() {
+            const container = document.getElementById('liveReportStats');
+            let total = 0;
+            let unitStats = {};
             
-            if (stats.error) {
-                document.getElementById('workforceStats').style.display = 'none';
+            for (let key in data.reports) {
+                const report = data.reports[key];
+                if (report && report.count > 0) {
+                    total += report.count;
+                    const unit = key.split('|')[1];
+                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
+                }
+            }
+            
+            if (total === 0) {
+                container.style.display = 'none';
                 return;
             }
             
-            document.getElementById('workforceStats').style.display = 'block';
+            container.style.display = 'block';
+            document.getElementById('liveTotalReports').innerText = total;
             
-            document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
-            document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
-            document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
-            document.getElementById('staffSubText').innerText = `موزعين على ${stats.centerCount} مركز`;
-            document.getElementById('carsSubText').innerText = `إجمالي السيارات`;
-            document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${stats.missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
-            document.getElementById('readinessSubText').innerText = `${stats.readyCenters} / ${stats.centerCount} مركز جاهز`;
+            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
             
-            const circumference = 2 * Math.PI * 42;
-            const offset = circumference - (stats.readinessRate / 100) * circumference;
-            const circle = document.getElementById('readinessCircle');
-            const text = document.getElementById('readinessText');
+            document.getElementById('liveTopUnit').innerText = topUnit;
+            document.getElementById('liveTopUnitCount').innerText = topCount;
             
-            let color = '#c0392b';
-            if (stats.readinessRate >= 80) color = '#2a7f3e';
-            else if (stats.readinessRate >= 50) color = '#f39c12';
-            
-            circle.setAttribute('stroke', color);
-            circle.style.strokeDashoffset = offset;
-            text.textContent = stats.readinessRate + '%';
-            
-            const distList = document.getElementById('distributionList');
-            distList.innerHTML = '';
-            const total = stats.totalStaff || 1;
-            for (let center in stats.distribution) {
-                const count = stats.distribution[center];
-                const barWidth = Math.round((count / total) * 100);
-                const isReady = count >= 2;
+            const listContainer = document.getElementById('liveUnitList');
+            listContainer.innerHTML = '';
+            sortedUnits.forEach(([unit, count]) => {
+                const percentage = Math.round((count / total) * 100);
                 const div = document.createElement('div');
-                div.className = 'distribution-bar';
+                div.className = 'dist-item';
                 div.innerHTML = `
-                    <span class="name">${center}</span>
-                    <span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                    <span class="name">${unit}</span>
                     <div class="bar-track">
-                        <div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div>
+                        <div class="bar-fill" style="width:${percentage}%;"></div>
                     </div>
-                    <span class="percent">${barWidth}%</span>
+                    <span class="count">${count}</span>
                 `;
-                distList.appendChild(div);
-            }
-            
-            const carDistList = document.getElementById('carDistributionList');
-            carDistList.innerHTML = '';
-            const totalCars = stats.totalCars || 1;
-            for (let center in stats.carDistribution) {
-                const count = stats.carDistribution[center];
-                const barWidth = Math.round((count / totalCars) * 100);
-                const hasCar = count >= 1;
-                const div = document.createElement('div');
-                div.className = 'distribution-bar';
-                div.innerHTML = `
-                    <span class="name">${center}</span>
-                    <span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div>
-                    </div>
-                    <span class="percent">${barWidth}%</span>
-                `;
-                carDistList.appendChild(div);
-            }
-        } catch (error) {
-            console.error(error);
-            document.getElementById('workforceStats').style.display = 'none';
-        }
-    }
-
-    // ============================================
-    // دوال إحصائيات البلاغات (في نموذج المناوبة)
-    // ============================================
-    function displayShiftReportStats(reports) {
-        const container = document.getElementById('shiftReportStats');
-        const listContainer = document.getElementById('unitReportList');
-        
-        if (!reports || Object.keys(reports).length === 0) {
-            container.style.display = 'none';
-            return;
-        }
-        
-        let total = 0;
-        let unitStats = {};
-        
-        for (let key in reports) {
-            const report = reports[key];
-            if (report && report.count > 0) {
-                total += report.count;
-                const parts = key.split('|');
-                const unit = parts.length > 1 ? parts[1] : key;
-                unitStats[unit] = (unitStats[unit] || 0) + report.count;
-            }
-        }
-        
-        if (total === 0) {
-            container.style.display = 'none';
-            return;
-        }
-        
-        container.style.display = 'block';
-        document.getElementById('shiftTotalReports').innerText = total;
-        
-        const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-        const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-        const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-        
-        document.getElementById('topUnit').innerText = topUnit;
-        document.getElementById('topUnitCount').innerText = topCount;
-        
-        listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
-        sortedUnits.forEach(([unit, count]) => {
-            const percentage = Math.round((count / total) * 100);
-            const div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = `
-                <span class="name">${unit}</span>
-                <span class="count" style="color:#1e466e;">${count}</span>
-                <div class="bar-track">
-                    <div class="bar-fill" style="width:${percentage}%; background:#1e466e;"></div>
-                </div>
-                <span class="percent">${percentage}%</span>
-            `;
-            listContainer.appendChild(div);
-        });
-    }
-
-    // ============================================
-    // دوال الجدول الشهري
-    // ============================================
-    document.getElementById('monthlyTableBtn').onclick = function() {
-        document.getElementById('monthlyTableModal').style.display = 'flex';
-        loadSavedTable();
-    };
-
-    document.getElementById('closeMonthlyTableBtn').onclick = function() {
-        document.getElementById('monthlyTableModal').style.display = 'none';
-    };
-
-    async function loadSavedTable() {
-        const container = document.getElementById('excelTableContainer');
-        const status = document.getElementById('tableStatus');
-        
-        try {
-            const response = await fetch('/api/check-monthly-table');
-            const result = await response.json();
-            
-            if (result.exists) {
-                status.innerHTML = '⏳ جاري تحميل الجدول...';
-                const fileResponse = await fetch('/api/get-monthly-table');
-                const blob = await fileResponse.blob();
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    try {
-                        const data = new Uint8Array(event.target.result);
-                        workbookData = XLSX.read(data, { 
-                            type: 'array',
-                            cellFormula: true,
-                            cellHTML: false,
-                            cellNF: true,
-                            cellStyles: true,
-                            dense: false,
-                            codepage: 1256,
-                            dateNF: 'yyyy-mm-dd'
-                        });
-                        renderAllSheets(workbookData);
-                        status.innerHTML = `✅ تم تحميل ${workbookData.SheetNames.length} أوراق`;
-                    } catch (error) {
-                        status.innerHTML = '❌ خطأ في عرض الجدول';
-                        container.innerHTML = `<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في عرض الجدول: ${error.message}</p>`;
-                    }
-                };
-                reader.readAsArrayBuffer(blob);
-            } else {
-                container.innerHTML = '<p style="text-align:center; color:#888; padding:30px 0;">📂 لا يوجد جدول شهري محفوظ. يرجى رفع ملف Excel.</p>';
-                status.innerHTML = '❌ لا يوجد جدول محفوظ';
-            }
-        } catch (error) {
-            container.innerHTML = '<p style="text-align:center; color:#c0392b; padding:30px 0;">❌ خطأ في تحميل الجدول المحفوظ</p>';
-            status.innerHTML = '❌ خطأ في الاتصال';
-        }
-    }
-
-    function renderAllSheets(workbook) {
-        const container = document.getElementById('excelTableContainer');
-        let html = '';
-        
-        if (workbook.SheetNames.length > 1) {
-            html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid #aaa; padding-bottom:10px;">';
-            workbook.SheetNames.forEach((name, index) => {
-                const active = index === currentSheetIndex ? 'active' : '';
-                html += `<button class="sheet-tab ${active}" data-index="${index}">${name}</button>`;
+                listContainer.appendChild(div);
             });
-            html += '</div>';
         }
-        
-        const sheetName = workbook.SheetNames[currentSheetIndex];
-        const sheet = workbook.Sheets[sheetName];
-        const htmlContent = XLSX.utils.sheet_to_html(sheet, {
-            id: 'sheet-table',
-            editable: false
-        });
-        
-        html += htmlContent;
-        container.innerHTML = html;
-        formatTable(container);
-        
-        document.querySelectorAll('.sheet-tab').forEach(btn => {
-            btn.onclick = function() {
-                currentSheetIndex = parseInt(this.dataset.index);
-                renderAllSheets(workbookData);
+
+        // ============================================
+        // نافذة تسليم المناوبة
+        // ============================================
+        function setCurrentDateTime() {
+            const now = new Date();
+            document.getElementById('handoverDate').value = now.toISOString().split('T')[0];
+            document.getElementById('handoverTime').value = now.toTimeString().slice(0,5);
+        }
+
+        function calculateAbsentTotal() {
+            const essential = parseInt(document.getElementById('hAbsentEssential').value) || 0;
+            const interference = parseInt(document.getElementById('hAbsentInterference').value) || 0;
+            document.getElementById('hAbsentTotal').innerText = essential + interference;
+        }
+
+        document.getElementById('hAbsentEssential').addEventListener('input', calculateAbsentTotal);
+        document.getElementById('hAbsentInterference').addEventListener('input', calculateAbsentTotal);
+
+        function saveHandoverData() {
+            const data = {
+                date: document.getElementById('handoverDate').value,
+                time: document.getElementById('handoverTime').value,
+                shiftType: document.getElementById('handoverShiftType').value,
+                totalStaff: parseInt(document.getElementById('hTotalStaff').value) || 0,
+                presentStaff: parseInt(document.getElementById('hPresentStaff').value) || 0,
+                volunteers: parseInt(document.getElementById('hVolunteers').value) || 0,
+                locumStaff: parseInt(document.getElementById('hLocumStaff').value) || 0,
+                extraStaff: parseInt(document.getElementById('hExtraStaff').value) || 0,
+                absentEssential: parseInt(document.getElementById('hAbsentEssential').value) || 0,
+                absentInterference: parseInt(document.getElementById('hAbsentInterference').value) || 0,
+                ambulanceBase: parseInt(document.getElementById('hAmbulanceBase').value) || 0,
+                ambulanceBaseTotal: parseInt(document.getElementById('hAmbulanceBaseTotal').value) || 0,
+                rapidBase: parseInt(document.getElementById('hRapidBase').value) || 0,
+                rapidBaseTotal: parseInt(document.getElementById('hRapidBaseTotal').value) || 0,
+                rapidSpecialized: parseInt(document.getElementById('hRapidSpecialized').value) || 0,
+                rapidAssistant: parseInt(document.getElementById('hRapidAssistant').value) || 0,
+                ambulanceInter: parseInt(document.getElementById('hAmbulanceInter').value) || 0,
+                ambulanceInterTotal: parseInt(document.getElementById('hAmbulanceInterTotal').value) || 0,
+                rapidInter: parseInt(document.getElementById('hRapidInter').value) || 0,
+                rapidInterTotal: parseInt(document.getElementById('hRapidInterTotal').value) || 0,
+                totalRapid: parseInt(document.getElementById('hTotalRapid').value) || 0,
+                totalAmbulance: parseInt(document.getElementById('hTotalAmbulance').value) || 0,
+                totalUnits: parseInt(document.getElementById('hTotalUnits').value) || 0,
+                carAmbulanceWorking: parseInt(document.getElementById('hCarAmbulanceWorking').value) || 0,
+                carRapidWorking: parseInt(document.getElementById('hCarRapidWorking').value) || 0,
+                carAmbulanceBroken: parseInt(document.getElementById('hCarAmbulanceBroken').value) || 0,
+                carRapidBroken: parseInt(document.getElementById('hCarRapidBroken').value) || 0,
+                carAmbulanceReserve: parseInt(document.getElementById('hCarAmbulanceReserve').value) || 0,
+                carRapidReserve: parseInt(document.getElementById('hCarRapidReserve').value) || 0,
+                notesPoints: document.getElementById('hNotesPoints').value || '',
+                notesPartners: document.getElementById('hNotesPartners').value || '',
+                notesGeneral: document.getElementById('hNotesGeneral').value || '',
+                seniorAssistant: document.getElementById('hSeniorAssistant').value || '',
+                seniorChief: document.getElementById('hSeniorChief').value || '',
+                seniorLeader: document.getElementById('hSeniorLeader').value || ''
             };
-        });
-    }
 
-    document.getElementById('uploadExcelBtn').onclick = function() {
-        document.getElementById('excelFileInput').click();
-    };
-
-    document.getElementById('excelFileInput').onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = async function(event) {
             try {
-                const data = new Uint8Array(event.target.result);
-                workbookData = XLSX.read(data, { 
-                    type: 'array',
-                    cellFormula: true,
-                    cellHTML: false,
-                    cellNF: true,
-                    cellStyles: true,
-                    dense: false,
-                    codepage: 1256,
-                    dateNF: 'yyyy-mm-dd'
-                });
-                renderAllSheets(workbookData);
-                
-                const base64 = btoa(String.fromCharCode.apply(null, data));
-                const response = await fetch('/api/upload-monthly-table', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileData: base64 })
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    document.getElementById('tableStatus').innerHTML = `✅ تم حفظ ${workbookData.SheetNames.length} أوراق بنجاح`;
-                    alert('✅ تم حفظ الجدول الشهري بنجاح');
-                } else {
-                    document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول';
-                    alert('❌ فشل في حفظ الجدول');
+                localStorage.setItem('handoverData', JSON.stringify(data));
+                alert('✅ تم حفظ تقرير التسليم بنجاح (محلياً)');
+            } catch (error) {
+                alert('❌ فشل في حفظ التقرير: ' + error.message);
+            }
+        }
+
+        function loadHandoverData() {
+            try {
+                const saved = localStorage.getItem('handoverData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    document.getElementById('handoverDate').value = data.date || '';
+                    document.getElementById('handoverTime').value = data.time || '';
+                    document.getElementById('handoverShiftType').value = data.shiftType || 'صباحية';
+                    document.getElementById('hTotalStaff').value = data.totalStaff || 28;
+                    document.getElementById('hPresentStaff').value = data.presentStaff || 28;
+                    document.getElementById('hVolunteers').value = data.volunteers || 0;
+                    document.getElementById('hLocumStaff').value = data.locumStaff || 0;
+                    document.getElementById('hExtraStaff').value = data.extraStaff || 0;
+                    document.getElementById('hAbsentEssential').value = data.absentEssential || 0;
+                    document.getElementById('hAbsentInterference').value = data.absentInterference || 0;
+                    document.getElementById('hAmbulanceBase').value = data.ambulanceBase || 13;
+                    document.getElementById('hAmbulanceBaseTotal').value = data.ambulanceBaseTotal || 13;
+                    document.getElementById('hRapidBase').value = data.rapidBase || 2;
+                    document.getElementById('hRapidBaseTotal').value = data.rapidBaseTotal || 2;
+                    document.getElementById('hRapidSpecialized').value = data.rapidSpecialized || 0;
+                    document.getElementById('hRapidAssistant').value = data.rapidAssistant || 1;
+                    document.getElementById('hAmbulanceInter').value = data.ambulanceInter || 0;
+                    document.getElementById('hAmbulanceInterTotal').value = data.ambulanceInterTotal || 3;
+                    document.getElementById('hRapidInter').value = data.rapidInter || 0;
+                    document.getElementById('hRapidInterTotal').value = data.rapidInterTotal || 1;
+                    document.getElementById('hTotalRapid').value = data.totalRapid || 3;
+                    document.getElementById('hTotalAmbulance').value = data.totalAmbulance || 13;
+                    document.getElementById('hTotalUnits').value = data.totalUnits || 16;
+                    document.getElementById('hCarAmbulanceWorking').value = data.carAmbulanceWorking || 17;
+                    document.getElementById('hCarRapidWorking').value = data.carRapidWorking || 4;
+                    document.getElementById('hCarAmbulanceBroken').value = data.carAmbulanceBroken || 3;
+                    document.getElementById('hCarRapidBroken').value = data.carRapidBroken || 0;
+                    document.getElementById('hCarAmbulanceReserve').value = data.carAmbulanceReserve || 0;
+                    document.getElementById('hCarRapidReserve').value = data.carRapidReserve || 0;
+                    document.getElementById('hNotesPoints').value = data.notesPoints || 'لا يوجد';
+                    document.getElementById('hNotesPartners').value = data.notesPartners || 'لا يوجد';
+                    document.getElementById('hNotesGeneral').value = data.notesGeneral || 'لا يوجد';
+                    document.getElementById('hSeniorAssistant').value = data.seniorAssistant || 'حمود السبيعي';
+                    document.getElementById('hSeniorChief').value = data.seniorChief || 'فواز الاشجعي';
+                    document.getElementById('hSeniorLeader').value = data.seniorLeader || 'علي الحربي';
+                    calculateAbsentTotal();
                 }
             } catch (error) {
-                alert('❌ خطأ في قراءة الملف: ' + error.message);
+                console.error('خطأ في تحميل البيانات:', error);
+            }
+        }
+
+        function resetHandoverForm() {
+            if (confirm('⚠️ هل أنت متأكد من إعادة تعيين جميع الحقول للقيم الافتراضية؟')) {
+                document.getElementById('hTotalStaff').value = 28;
+                document.getElementById('hPresentStaff').value = 28;
+                document.getElementById('hVolunteers').value = 0;
+                document.getElementById('hLocumStaff').value = 0;
+                document.getElementById('hExtraStaff').value = 0;
+                document.getElementById('hAbsentEssential').value = 0;
+                document.getElementById('hAbsentInterference').value = 0;
+                document.getElementById('hAmbulanceBase').value = 13;
+                document.getElementById('hAmbulanceBaseTotal').value = 13;
+                document.getElementById('hRapidBase').value = 2;
+                document.getElementById('hRapidBaseTotal').value = 2;
+                document.getElementById('hRapidSpecialized').value = 0;
+                document.getElementById('hRapidAssistant').value = 1;
+                document.getElementById('hAmbulanceInter').value = 0;
+                document.getElementById('hAmbulanceInterTotal').value = 3;
+                document.getElementById('hRapidInter').value = 0;
+                document.getElementById('hRapidInterTotal').value = 1;
+                document.getElementById('hTotalRapid').value = 3;
+                document.getElementById('hTotalAmbulance').value = 13;
+                document.getElementById('hTotalUnits').value = 16;
+                document.getElementById('hCarAmbulanceWorking').value = 17;
+                document.getElementById('hCarRapidWorking').value = 4;
+                document.getElementById('hCarAmbulanceBroken').value = 3;
+                document.getElementById('hCarRapidBroken').value = 0;
+                document.getElementById('hCarAmbulanceReserve').value = 0;
+                document.getElementById('hCarRapidReserve').value = 0;
+                document.getElementById('hNotesPoints').value = 'لا يوجد';
+                document.getElementById('hNotesPartners').value = 'لا يوجد';
+                document.getElementById('hNotesGeneral').value = 'لا يوجد';
+                document.getElementById('hSeniorAssistant').value = 'حمود السبيعي';
+                document.getElementById('hSeniorChief').value = 'فواز الاشجعي';
+                document.getElementById('hSeniorLeader').value = 'علي الحربي';
+                calculateAbsentTotal();
+                setCurrentDateTime();
+                alert('✅ تم إعادة تعيين النموذج');
+            }
+        }
+
+        // ============================================
+        // ربط الأزرار
+        // ============================================
+        document.getElementById('newShiftBtn').onclick = function() {
+            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة.')) {
+                for (let key in data.reports) {
+                    data.reports[key] = { count: 0, times: [] };
+                }
+                renderUnits();
+                updateTotal();
+                updateLiveStats();
+                alert('✅ تم بدء مناوبة جديدة');
             }
         };
-        reader.readAsArrayBuffer(file);
-    };
 
-    function formatTable(container) {
-        const table = container.querySelector('#sheet-table');
-        if (table) {
-            table.style.cssText = `
-                border-collapse: collapse;
-                width: 100%;
-                font-size: 0.7rem;
-                direction: rtl;
-            `;
-            table.querySelectorAll('th, td').forEach(cell => {
-                cell.style.border = '1px solid #000';
-                cell.style.padding = '4px 6px';
-                cell.style.textAlign = 'center';
-                cell.style.whiteSpace = 'nowrap';
-                cell.style.verticalAlign = 'middle';
-            });
-            table.querySelectorAll('th').forEach(th => {
-                th.style.background = '#f0f0f0';
-                th.style.fontWeight = 'bold';
-                th.style.position = 'sticky';
-                th.style.top = '0';
-                th.style.zIndex = '1';
-            });
-            table.style.minWidth = '100%';
-            table.style.width = 'auto';
-        }
-    }
+        document.getElementById('shiftBtn').onclick = function() {
+            alert('📋 نموذج المناوبة - قيد التطوير');
+        };
 
-    // ============================================
-    // دوال التحكم والتنسيق
-    // ============================================
-    async function loadVacations() {
-        try {
-            const response = await fetch('/api/vacations');
-            const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) {
-                data.forEach((item, index) => {
-                    if (controlData[index]) {
-                        controlData[index].vacationStart = item.vacationStart || '';
-                        controlData[index].vacationEnd = item.vacationEnd || '';
-                    }
-                });
+        document.getElementById('docsBtn').onclick = function() {
+            alert('📁 المستندات - قيد التطوير');
+        };
+
+        document.getElementById('airAmbulanceBtn').onclick = function() {
+            alert('🚁 الإسعاف الجوي - قيد التطوير');
+        };
+
+        document.getElementById('monthlyTableBtn').onclick = function() {
+            alert('📊 الجدول الشهري - قيد التطوير');
+        };
+
+        // نافذة تسليم المناوبة
+        document.getElementById('handoverBtn').onclick = function() {
+            document.getElementById('handoverModal').classList.add('active');
+            setCurrentDateTime();
+            loadHandoverData();
+        };
+
+        document.getElementById('closeHandoverBtn').onclick = function() {
+            document.getElementById('handoverModal').classList.remove('active');
+        };
+
+        document.getElementById('saveHandoverBtn').onclick = saveHandoverData;
+        document.getElementById('resetHandoverBtn').onclick = resetHandoverForm;
+        document.getElementById('printHandoverBtn').onclick = function() {
+            window.print();
+        };
+
+        // إغلاق النافذة عند النقر خارجها
+        document.getElementById('handoverModal').onclick = function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
             }
-        } catch (error) {
-            console.error("خطأ في تحميل الإجازات:", error);
-        }
-    }
+        };
 
-    function renderControlList(editable = false) {
-        const container = document.getElementById('controlList');
-        if (!container) return;
-        
-        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
-        const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
-        
-        controlData.forEach((person, index) => {
-            const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('');
-            const color = colors[index % colors.length];
-            
-            const startDate = person.vacationStart || '';
-            const endDate = person.vacationEnd || '';
-            const vacationDisplay = startDate && endDate ? 
-                `📅 ${formatDate(startDate)} → ${formatDate(endDate)}` : 
-                '📅 لا توجد إجازة';
-            
-            html += `
-                <div class="control-person">
-                    <div class="control-avatar" style="background:${color};">${initials}</div>
-                    <div class="control-info">
-                        <div class="name">${person.name}</div>
-                        <div class="role">📌 ${person.role} | كود: ${person.code}</div>
-                    </div>
-                    <div class="control-vacation">
-                        ${editable ? `
-                            <div class="edit">
-                                <input type="date" id="start_${index}" value="${startDate}">
-                                <span>→</span>
-                                <input type="date" id="end_${index}" value="${endDate}">
-                            </div>
-                        ` : `
-                            <div class="display">${vacationDisplay}</div>
-                        `}
-                    </div>
-                    <div class="control-role-badge">
-                        ${person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق'}
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-    }
+        // ============================================
+        // التشغيل
+        // ============================================
+        renderUnits();
+        updateTotal();
+        updateLiveStats();
 
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        const parts = dateString.split('-');
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-
-    document.getElementById('controlBtn')?.addEventListener('click', function() {
-        document.getElementById('controlModal').style.display = 'flex';
-        loadVacations().then(() => {
-            renderControlList(false);
-            loadControlNotes();
-        });
-    });
-
-    document.getElementById('closeControlBtn')?.addEventListener('click', function() {
-        document.getElementById('controlModal').style.display = 'none';
-        isEditMode = false;
-        document.getElementById('saveVacationsBtn').style.display = 'none';
-        document.getElementById('editVacationsBtn').style.display = 'inline-block';
-    });
-
-    document.getElementById('editVacationsBtn')?.addEventListener('click', function() {
-        document.getElementById('passwordModal').style.display = 'flex';
-        document.getElementById('passwordInput').value = '';
-        document.getElementById('passwordInput').focus();
-    });
-
-    document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
-        const password = document.getElementById('passwordInput').value;
-        try {
-            const response = await fetch('/api/get-password');
-            const result = await response.json();
-            const storedPassword = result.password || '1234';
-            
-            if (password === storedPassword) {
-                isEditMode = true;
-                document.getElementById('passwordModal').style.display = 'none';
-                document.getElementById('passwordInput').value = '';
-                renderControlList(true);
-                document.getElementById('saveVacationsBtn').style.display = 'inline-block';
-                document.getElementById('editVacationsBtn').style.display = 'none';
-                alert('✅ تم تفعيل وضع التعديل');
-            } else {
-                alert('❌ الرقم السري غير صحيح');
-                document.getElementById('passwordInput').value = '';
-                document.getElementById('passwordInput').focus();
-            }
-        } catch (error) {
-            alert('❌ خطأ في التحقق من الرقم السري');
-        }
-    });
-
-    document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() {
-        document.getElementById('passwordModal').style.display = 'none';
-        document.getElementById('passwordInput').value = '';
-    });
-
-    document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
-        // جمع بيانات الإجازات من الحقول
-        controlData.forEach((person, index) => {
-            const startInput = document.getElementById(`start_${index}`);
-            const endInput = document.getElementById(`end_${index}`);
-            if (startInput && endInput) {
-                person.vacationStart = startInput.value;
-                person.vacationEnd = endInput.value;
-            }
-        });
-        
-        try {
-            const response = await fetch('/api/save-vacations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vacations: controlData })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert('✅ تم حفظ الإجازات بنجاح');
-                isEditMode = false;
-                renderControlList(false);
-                document.getElementById('saveVacationsBtn').style.display = 'none';
-                document.getElementById('editVacationsBtn').style.display = 'inline-block';
-            } else {
-                alert('❌ فشل في حفظ الإجازات');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال: ' + error.message);
-        }
-    });
-
-    // ============================================
-    // دوال تغيير الرقم السري
-    // ============================================
-    document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
-        document.getElementById('changePasswordModal').style.display = 'flex';
-        document.getElementById('oldPasswordInput').value = '';
-        document.getElementById('newPasswordInput').value = '';
-        document.getElementById('confirmNewPasswordInput').value = '';
-    });
-
-    document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() {
-        document.getElementById('changePasswordModal').style.display = 'none';
-    });
-
-    document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
-        const oldPassword = document.getElementById('oldPasswordInput').value;
-        const newPassword = document.getElementById('newPasswordInput').value;
-        const confirmNewPassword = document.getElementById('confirmNewPasswordInput').value;
-        
-        if (!oldPassword || !newPassword || !confirmNewPassword) {
-            alert('❌ الرجاء ملء جميع الحقول');
-            return;
-        }
-        
-        if (newPassword !== confirmNewPassword) {
-            alert('❌ الرقم السري الجديد غير متطابق');
-            return;
-        }
-        
-        if (newPassword.length < 4) {
-            alert('❌ الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/change-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ oldPassword, newPassword })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert('✅ تم تغيير الرقم السري بنجاح');
-                document.getElementById('changePasswordModal').style.display = 'none';
-            } else {
-                alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري'));
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال: ' + error.message);
-        }
-    });
-
-    // ============================================
-    // دوال ملاحظات التحكم والتنسيق
-    // ============================================
-    async function loadControlNotes() {
-        try {
-            const response = await fetch('/api/control-notes');
-            const result = await response.json();
-            if (result.success) {
-                controlNotes = result.notes || '';
-                document.getElementById('controlNotes').value = controlNotes;
-            }
-        } catch (error) {
-            console.error("خطأ في تحميل ملاحظات التحكم:", error);
-        }
-    }
-
-    document.getElementById('saveControlNotes')?.addEventListener('click', async function() {
-        const notes = document.getElementById('controlNotes').value.trim();
-        try {
-            const response = await fetch('/api/save-control-notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes })
-            });
-            const result = await response.json();
-            if (result.success) {
-                controlNotes = notes;
-                alert('✅ تم حفظ الملاحظات بنجاح');
-            } else {
-                alert('❌ فشل في حفظ الملاحظات');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال: ' + error.message);
-        }
-    });
-
-    // ============================================
-    // فتح وإغلاق النوافذ
-    // ============================================
-    document.getElementById('docsBtn')?.addEventListener('click', function() {
-        document.getElementById('docsModal').style.display = 'flex';
-        loadDocs();
-    });
-
-    document.getElementById('closeDocsBtn')?.addEventListener('click', function() {
-        document.getElementById('docsModal').style.display = 'none';
-    });
-
-    document.getElementById('airAmbulanceBtn')?.addEventListener('click', function() {
-        document.getElementById('airAmbulanceModal').style.display = 'flex';
-        loadAirRecords();
-        const now = new Date();
-        const localDateTime = now.toISOString().slice(0, 16);
-        document.getElementById('airDateTime').value = localDateTime;
-    });
-
-    document.getElementById('closeAirModal')?.addEventListener('click', function() {
-        document.getElementById('airAmbulanceModal').style.display = 'none';
-    });
-
-    // ============================================
-    // التشغيل
-    // ============================================
-    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
-    document.getElementById("newShiftBtn").onclick = startNewShift;
-    document.getElementById("shiftBtn").onclick = openShiftModal;
-    document.getElementById("viewShiftBtn").onclick = viewShiftReports;
-    document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
-    document.getElementById("printShiftBtn").onclick = printShiftForm;
-    document.getElementById("saveShiftBtn").onclick = saveShiftData;
-    document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
-    
-    document.getElementById("closeShiftBtn").onclick = () => {
-        document.getElementById('shiftModal').style.display = 'none';
-    };
-    document.getElementById("closeMonthlyTableBtn").onclick = () => {
-        document.getElementById('monthlyTableModal').style.display = 'none';
-    };
-
-    document.getElementById('shiftArchiveSelect')?.addEventListener('change', async (e) => {
-        const id = parseInt(e.target.value);
-        if (id) {
-            const response = await fetch(`/api/shifts/${id}`);
-            const result = await response.json();
-            if (result && result.shift) {
-                viewingShiftId = id;
-                loadShiftToForm(result.shift);
-            }
-        } else {
-            viewingShiftId = null;
-            clearShiftForm();
-        }
-    });
-
-    window.onclick = (e) => {
-        if (e.target === document.getElementById('shiftModal')) {
-            document.getElementById('shiftModal').style.display = 'none';
-        }
-        if (e.target === document.getElementById('docsModal')) {
-            document.getElementById('docsModal').style.display = 'none';
-        }
-        if (e.target === document.getElementById('airAmbulanceModal')) {
-            document.getElementById('airAmbulanceModal').style.display = 'none';
-        }
-        if (e.target === document.getElementById('monthlyTableModal')) {
-            document.getElementById('monthlyTableModal').style.display = 'none';
-        }
-        if (e.target === document.getElementById('controlModal')) {
-            document.getElementById('controlModal').style.display = 'none';
-            isEditMode = false;
-            document.getElementById('saveVacationsBtn').style.display = 'none';
-            document.getElementById('editVacationsBtn').style.display = 'inline-block';
-        }
-        if (e.target === document.getElementById('passwordModal')) {
-            document.getElementById('passwordModal').style.display = 'none';
-            document.getElementById('passwordInput').value = '';
-        }
-        if (e.target === document.getElementById('changePasswordModal')) {
-            document.getElementById('changePasswordModal').style.display = 'none';
-        }
-    };
-
-    buildCentersTable();
-    loadShifts();
-    loadAllData();
-    
-    setInterval(checkForUpdates, 1000);
-    setInterval(() => {
-        if (!isViewingArchiveShift && lastKnownUpdate > 0) {
-            document.getElementById("updateStatus").innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
-        }
-    }, 2000);
-</script>
+        console.log('✅ منصة الجنوب - الهوية البصرية المعتمدة مع نموذج التسليم');
+        console.log('📌 التصميم يشمل: خلفية متدرجة، منطقة بصرية، نصوص ذهبية');
+    </script>
 </body>
 </html>
