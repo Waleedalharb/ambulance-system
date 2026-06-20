@@ -3,826 +3,679 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>نموذج تسليم مناوبة كبار المسعفين - قطاع جنوب الرياض</title>
     <style>
-        /* ============================================
-           الهوية البصرية المعتمدة - منصة الجنوب
-           ============================================ */
-        :root {
-            --primary-900: #0B1E33;
-            --primary-700: #1A3A5C;
-            --primary-500: #2A5A7A;
-            --primary-100: #E8EDF3;
-            --teal: #2E8B7A;
-            --teal-light: #E6F4F0;
-            --coral: #E87461;
-            --coral-light: #FDF0EC;
-            --gold: #E8C84A;
-            --gold-light: #F5E6A3;
-            --white: #FFFFFF;
-            --gray-50: #F7F9FC;
-            --gray-100: #EDF1F7;
-            --gray-200: #D5DCE6;
-            --gray-400: #9AAEBD;
-            --gray-600: #6B7F94;
-            --gray-800: #2D3F52;
-            --gray-900: #1A2633;
-            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
-            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
-            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 20px;
-        }
-
         * {
-            margin: 0;
-            padding: 0;
             box-sizing: border-box;
+            font-family: 'Segoe UI', 'Arial', monospace;
         }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--gray-50);
-            color: var(--gray-900);
-            padding: 16px;
-            min-height: 100vh;
+            background: #ffffff;
+            margin: 0;
+            padding: 20px;
+            color: #000000;
         }
-
-        /* ===== الهوية البصرية (Hero Section) ===== */
-        .hero {
-            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 50%, #0D2A4A 100%);
-            border-radius: var(--radius-xl);
-            padding: 30px 24px 20px;
-            margin-bottom: 20px;
+        .container {
+            max-width: 1000px;
+            margin: auto;
+        }
+        /* الهوية البصرية الجديدة */
+        .header {
             text-align: center;
-            position: relative;
-            overflow: hidden;
-            box-shadow: var(--shadow-lg);
-            min-height: 200px;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #1e466e;
+            padding-bottom: 20px;
+        }
+        .header .logo-area {
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
         }
-
-        /* نقاط ضوئية في الخلفية */
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(ellipse at 30% 50%, rgba(46, 139, 122, 0.08) 0%, transparent 60%),
-                        radial-gradient(ellipse at 70% 80%, rgba(232, 200, 74, 0.06) 0%, transparent 50%);
-            animation: pulseGlow 8s ease-in-out infinite alternate;
+        .header .logo-icon {
+            font-size: 2.5rem;
         }
-
-        @keyframes pulseGlow {
-            0% { transform: scale(1); opacity: 0.6; }
-            100% { transform: scale(1.1); opacity: 1; }
+        .header .title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #1e466e;
+            letter-spacing: 2px;
         }
-
-        .hero-content {
-            position: relative;
-            z-index: 1;
+        .header .sub-title {
+            font-size: 1rem;
+            color: #333;
+            margin: 5px 0;
+        }
+        .header .sub-title-2 {
+            font-size: 0.9rem;
+            color: #555;
+            margin: 3px 0;
+        }
+        .header .sector-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #c0392b;
+            margin: 8px 0;
+        }
+        .header .badge-line {
             display: flex;
-            flex-direction: column;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .header .badge-line span {
+            background: #f0f0f0;
+            padding: 4px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+        }
+
+        /* النموذج */
+        .form-section {
+            border: 1px solid #000;
+            margin-bottom: 20px;
+            background: #fafafa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .form-section .section-title {
+            background: #1e466e;
+            color: white;
+            padding: 8px 15px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin: 0;
+        }
+        .form-section .section-body {
+            padding: 15px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 10px;
-            width: 100%;
+            margin-bottom: 8px;
         }
-
-        /* المنطقة البصرية (المظلة + المثلثات) */
-        .hero-visual {
-            width: 100%;
-            max-width: 280px;
-            height: 120px;
-            margin: 0 auto 10px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
-            border-radius: var(--radius-md);
-            border: 1px solid rgba(255,255,255,0.06);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .hero-visual .glow {
-            position: absolute;
-            width: 60%;
-            height: 60%;
-            background: radial-gradient(circle, rgba(232, 200, 74, 0.10) 0%, transparent 70%);
-            top: 20%;
-            left: 20%;
-            border-radius: 50%;
-            filter: blur(20px);
-        }
-
-        .hero-visual .canopy {
-            position: absolute;
-            width: 85%;
-            height: 35%;
-            top: 18%;
-            left: 7.5%;
-            border-radius: 4px;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow: 0 4px 30px rgba(0,0,0,0.1);
-        }
-
-        .hero-visual .canopy-line {
-            position: absolute;
-            width: 70%;
-            height: 1px;
-            background: rgba(255,255,255,0.08);
-            top: 50%;
-            left: 15%;
-            transform: translateY(-50%);
-        }
-
-        .hero-visual .canopy-line:nth-child(2) {
-            top: 65%;
-            width: 60%;
-            left: 20%;
-        }
-
-        .hero-visual .canopy-line:nth-child(3) {
-            top: 78%;
-            width: 50%;
-            left: 25%;
-        }
-
-        .hero-visual .triangle {
-            position: absolute;
-            width: 0;
-            height: 0;
-            border-style: solid;
-            opacity: 0.6;
-            bottom: 12%;
-        }
-
-        .hero-visual .triangle-1 {
-            left: 18%;
-            border-width: 0 14px 30px 14px;
-            border-color: transparent transparent var(--gold) transparent;
-        }
-
-        .hero-visual .triangle-2 {
-            left: 42%;
-            border-width: 0 16px 34px 16px;
-            border-color: transparent transparent var(--gold) transparent;
-            opacity: 0.75;
-        }
-
-        .hero-visual .triangle-3 {
-            left: 66%;
-            border-width: 0 14px 30px 14px;
-            border-color: transparent transparent var(--gold) transparent;
-        }
-
-        .hero-visual .v-line {
-            position: absolute;
-            width: 1px;
-            height: 30%;
-            background: rgba(255,255,255,0.04);
-            bottom: 12%;
-        }
-
-        .hero-visual .v-line-1 { left: 28%; }
-        .hero-visual .v-line-2 { left: 50%; }
-        .hero-visual .v-line-3 { left: 72%; }
-
-        .hero-title {
-            color: var(--white);
-            font-size: 1.8rem;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin: 0;
-        }
-
-        .hero-title .gold {
-            color: var(--gold);
-        }
-
-        .hero-sub {
-            color: rgba(255,255,255,0.7);
-            font-size: 0.8rem;
-            font-weight: 400;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .hero-sub i {
-            color: var(--gold);
-            font-size: 0.4rem;
-        }
-
-        .hero-date {
-            color: rgba(255,255,255,0.5);
-            font-size: 0.7rem;
-            background: rgba(255,255,255,0.06);
-            padding: 4px 14px;
-            border-radius: 30px;
-            border: 1px solid rgba(255,255,255,0.05);
-            margin-top: 2px;
-        }
-
-        /* ===== شريط التحكم ===== */
-        .control-bar {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            box-shadow: var(--shadow-sm);
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .control-bar .total {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--gray-800);
-        }
-
-        .control-bar .total .number {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--primary-700);
-            background: var(--primary-100);
-            padding: 0 12px;
-            border-radius: 30px;
-            line-height: 1.4;
-        }
-
-        .control-bar .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .btn {
-            font-family: 'Inter', sans-serif;
-            padding: 8px 16px;
-            border-radius: 30px;
-            border: none;
-            font-weight: 600;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: var(--gray-100);
-            color: var(--gray-800);
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .btn:active {
-            transform: scale(0.97);
-        }
-
-        .btn i {
-            font-size: 0.9rem;
-        }
-
-        .btn-primary {
-            background: var(--primary-700);
-            color: var(--white);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-900);
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--gray-200);
-        }
-
-        .btn-outline:hover {
-            background: var(--gray-50);
-        }
-
-        .btn-teal {
-            background: var(--teal);
-            color: var(--white);
-        }
-
-        .btn-teal:hover {
-            background: #1F6B5E;
-        }
-
-        .btn-coral {
-            background: var(--coral);
-            color: var(--white);
-        }
-
-        .btn-coral:hover {
-            background: #D45A4A;
-        }
-
-        .btn-sm {
-            padding: 4px 12px;
-            font-size: 0.7rem;
-        }
-
-        .btn-xs {
-            padding: 3px 8px;
-            font-size: 0.6rem;
-            border-radius: 20px;
-        }
-
-        /* ===== إحصائيات البلاغات ===== */
-        .stats-card {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-        }
-
-        .stats-item {
-            text-align: center;
-            padding: 8px;
-            border-radius: var(--radius-sm);
-            background: var(--gray-50);
-        }
-
-        .stats-item .label {
-            font-size: 0.65rem;
-            color: var(--gray-600);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stats-item .value {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--primary-700);
-            margin-top: 2px;
-        }
-
-        .stats-item .value.green {
-            color: var(--teal);
-        }
-
-        .stats-item .value.red {
-            color: var(--coral);
-        }
-
-        .stats-distribution {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
-        }
-
-        .stats-distribution .title {
-            font-size: 0.7rem;
-            color: var(--gray-600);
-            font-weight: 500;
-            margin-bottom: 6px;
-        }
-
-        .dist-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 3px 0;
-            font-size: 0.75rem;
-        }
-
-        .dist-item .name {
-            min-width: 70px;
-            font-weight: 500;
-            color: var(--gray-800);
-        }
-
-        .dist-item .bar-track {
-            flex: 1;
-            height: 6px;
-            background: var(--gray-100);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .dist-item .bar-fill {
-            height: 100%;
-            border-radius: 10px;
-            background: var(--primary-500);
-            transition: width 0.3s;
-        }
-
-        .dist-item .count {
-            min-width: 30px;
-            text-align: center;
-            font-weight: 600;
-            color: var(--gray-800);
-        }
-
-        /* ===== شبكة الفرق ===== */
-        .sector-card {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 14px 16px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
-        }
-
-        .sector-title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: var(--primary-700);
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid var(--primary-100);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .sector-title i {
-            color: var(--primary-500);
-            font-size: 1rem;
-        }
-
-        .units-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 12px;
-        }
-
-        .unit-card {
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-            padding: 12px 10px;
-            text-align: center;
-            border: 1px solid var(--gray-100);
-            transition: all 0.2s;
-        }
-
-        .unit-card:hover {
-            border-color: var(--primary-500);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .unit-card .name {
-            font-weight: 600;
+        .form-row label {
+            font-weight: bold;
             font-size: 0.85rem;
-            color: var(--gray-800);
+            min-width: 120px;
         }
-
-        .unit-card .count {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary-700);
-            margin: 4px 0;
+        .form-row input, .form-row select, .form-row textarea {
+            padding: 6px 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            background: white;
+            flex: 1;
+            min-width: 80px;
         }
-
-        .unit-card .count.zero {
-            color: var(--gray-400);
+        .form-row input[type="number"] {
+            max-width: 80px;
+            text-align: center;
         }
-
-        .unit-card .actions {
+        .form-row input[type="text"] {
+            flex: 2;
+        }
+        .form-row .inline-group {
             display: flex;
-            gap: 4px;
+            align-items: center;
+            gap: 5px;
+        }
+        .form-row .inline-group span {
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .total-display {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #1e466e;
+            background: #e8edf2;
+            padding: 4px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .modal-buttons {
+            display: flex;
             justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
             flex-wrap: wrap;
         }
-
-        .unit-card .actions .btn {
-            padding: 3px 10px;
-            font-size: 0.6rem;
-            border-radius: 20px;
+        .modal-buttons button {
+            padding: 10px 30px;
+            border: 1px solid #000;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .btn-save {
+            background: #2a7f3e;
+            color: white;
+        }
+        .btn-print {
+            background: #f39c12;
+            color: white;
+        }
+        .btn-close {
+            background: white;
+            color: #333;
         }
 
-        .footer {
-            text-align: center;
-            font-size: 0.65rem;
-            color: var(--gray-400);
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
+        @media print {
+            .modal-buttons, .no-print {
+                display: none !important;
+            }
+            body {
+                padding: 10px;
+                background: white;
+            }
+            .form-section {
+                border: 1px solid #000;
+                background: white;
+            }
+            .form-section .section-title {
+                background: #1e466e !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .header {
+                border-bottom: 3px solid #1e466e !important;
+            }
         }
 
-        @media (max-width: 650px) {
-            body { padding: 8px; }
-            .hero { padding: 20px 16px; min-height: 160px; }
-            .hero-title { font-size: 1.4rem; }
-            .hero-visual { max-width: 200px; height: 100px; }
-            .control-bar { flex-direction: column; align-items: stretch; }
-            .control-bar .actions { justify-content: center; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .units-grid { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 700px) {
+            .grid-2, .grid-3, .grid-4 {
+                grid-template-columns: 1fr;
+            }
+            .form-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .form-row label {
+                min-width: auto;
+            }
+            .form-row input[type="number"] {
+                max-width: 100%;
+            }
+            .header .title {
+                font-size: 1.3rem;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- ===== الهوية البصرية (Hero Section) ===== -->
-    <section class="hero">
-        <div class="hero-content">
-            <!-- المنطقة البصرية -->
-            <div class="hero-visual">
-                <div class="glow"></div>
-                <div class="canopy">
-                    <div class="canopy-line"></div>
-                    <div class="canopy-line"></div>
-                    <div class="canopy-line"></div>
+<div class="container">
+
+    <!-- ============================================ -->
+    <!-- الهوية البصرية الجديدة                        -->
+    <!-- ============================================ -->
+    <div class="header">
+        <div class="logo-area">
+            <span class="logo-icon">🏥</span>
+            <span class="title">هيئة الهلال الأحمر السعودي</span>
+            <span class="logo-icon">🏥</span>
+        </div>
+        <div class="sub-title">SAUDI RED CRESCENT AUTHORITY</div>
+        <div class="sub-title-2">فرع الهيئة بمنطقة الرياض - إدارة العمليات الإسعافية</div>
+        <div class="sector-name">📍 قطاع جنوب مدينة الرياض 📍</div>
+        <div class="badge-line">
+            <span>📋 نموذج تسليم مناوبة كبار المسعفين</span>
+            <span>📅 <span id="currentDateDisplay"></span></span>
+            <span>⏰ <span id="currentTimeDisplay"></span></span>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- معلومات المناوبة                              -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">📋 معلومات المناوبة</div>
+        <div class="section-body">
+            <div class="form-row">
+                <label>📅 التاريخ:</label>
+                <input type="date" id="handoverDate" style="max-width:200px;">
+                <label>⏰ الوقت:</label>
+                <input type="time" id="handoverTime" style="max-width:150px;">
+                <label>🌅 المناوبة:</label>
+                <select id="handoverShiftType" style="max-width:150px;">
+                    <option value="صباحية">صباحية</option>
+                    <option value="ليلية">ليلية</option>
+                </select>
+                <label>📍 القطاع:</label>
+                <span style="font-weight:bold; color:#c0392b;">الجنوب</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- القوى البشرية                                 -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">👥 القوى البشرية</div>
+        <div class="section-body">
+            <div class="grid-2">
+                <div class="form-row">
+                    <label>إجمالي المسعفين وفق الجدول:</label>
+                    <input type="number" id="hTotalStaff" value="28">
                 </div>
-                <div class="triangle triangle-1"></div>
-                <div class="triangle triangle-2"></div>
-                <div class="triangle triangle-3"></div>
-                <div class="v-line v-line-1"></div>
-                <div class="v-line v-line-2"></div>
-                <div class="v-line v-line-3"></div>
+                <div class="form-row">
+                    <label>الحضور الآن:</label>
+                    <input type="number" id="hPresentStaff" value="28">
+                </div>
+                <div class="form-row">
+                    <label>المتطوعين:</label>
+                    <input type="number" id="hVolunteers" value="0">
+                </div>
+                <div class="form-row">
+                    <label>موظفين اللوكم:</label>
+                    <input type="number" id="hLocumStaff" value="0">
+                </div>
+                <div class="form-row">
+                    <label>عدد الزيادات من المسعفين:</label>
+                    <input type="number" id="hExtraStaff" value="0">
+                </div>
             </div>
 
-            <h1 class="hero-title">منصة <span class="gold">الجنوب</span></h1>
-            <div class="hero-sub">
-                <i class="fas fa-circle"></i> إدارة العمليات الإسعافية
-                <i class="fas fa-circle"></i> قطاع جنوب الرياض
-            </div>
-            <div class="hero-date">📅 <span id="currentDate"></span></div>
-        </div>
-    </section>
-
-    <!-- ===== شريط التحكم ===== -->
-    <div class="control-bar">
-        <div class="total">
-            <i class="fas fa-chart-bar"></i> إجمالي البلاغات
-            <span class="number" id="grandTotal">0</span>
-        </div>
-        <div class="actions">
-            <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
-            <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
-            <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
-            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
-            <button class="btn btn-outline btn-sm" id="controlBtn"><i class="fas fa-sliders-h"></i> التحكم</button>
-            <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
-        </div>
-    </div>
-
-    <!-- ===== إحصائيات البلاغات ===== -->
-    <div class="stats-card" id="liveReportStats" style="display:none;">
-        <div class="stats-grid">
-            <div class="stats-item">
-                <div class="label">إجمالي البلاغات</div>
-                <div class="value" id="liveTotalReports">0</div>
-            </div>
-            <div class="stats-item">
-                <div class="label">أكثر فرقة استخداماً</div>
-                <div class="value green" id="liveTopUnit">-</div>
-            </div>
-            <div class="stats-item">
-                <div class="label">عدد البلاغات للفرقة الأكثر</div>
-                <div class="value red" id="liveTopUnitCount">0</div>
-            </div>
-        </div>
-        <div class="stats-distribution" id="liveUnitDistribution">
-            <div class="title"><i class="fas fa-chart-pie"></i> توزيع البلاغات على الفرق</div>
-            <div id="liveUnitList"></div>
-        </div>
-    </div>
-
-    <!-- ===== شبكة الفرق ===== -->
-    <div id="pointsContainer">
-        <div class="loading">⏳ جاري تحميل البيانات...</div>
-    </div>
-
-    <div class="footer">
-        <i class="fas fa-clock"></i> ضغطة = بلاغ  |  <i class="fas fa-undo-alt"></i> تراجع  |  <i class="fas fa-sync-alt"></i> تحديث تلقائي
-    </div>
-
-    <script>
-        // ============================================
-        // التاريخ الحالي
-        // ============================================
-        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
-
-        // ============================================
-        // البيانات التجريبية (للعرض فقط)
-        // ============================================
-        const mockData = {
-            centers: {
-                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-                "الخالدية": ["جنوب 2"],
-                "منفوحة": ["جنوب 3"],
-                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-                "الإسكان": ["جنوب 6"],
-                "الحائر": ["جنوب 7"],
-                "ديراب": ["جنوب 10"],
-                "عكاظ": ["جنوب 9"],
-                "الشفاء": ["جنوب 8", "سريع 2"],
-                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-            },
-            reports: {
-                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
-                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
-                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
-                "المنصورة|سريع 3": { count: 0, times: [] },
-                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
-                "منفوحة|جنوب 3": { count: 0, times: [] },
-                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
-                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
-                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
-                "الإسكان|جنوب 6": { count: 0, times: [] },
-                "الحائر|جنوب 7": { count: 0, times: [] },
-                "ديراب|جنوب 10": { count: 0, times: [] },
-                "عكاظ|جنوب 9": { count: 0, times: [] },
-                "الشفاء|جنوب 8": { count: 0, times: [] },
-                "الشفاء|سريع 2": { count: 0, times: [] },
-                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
-            }
-        };
-
-        // ============================================
-        // دوال العرض
-        // ============================================
-        function updateTotal() {
-            let total = 0;
-            for (let key in mockData.reports) {
-                total += mockData.reports[key].count;
-            }
-            document.getElementById('grandTotal').innerText = total;
-        }
-
-        function renderUnits() {
-            const container = document.getElementById('pointsContainer');
-            container.innerHTML = '';
-            
-            for (let center in mockData.centers) {
-                const sectorDiv = document.createElement('div');
-                sectorDiv.className = 'sector-card';
-                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
-                container.appendChild(sectorDiv);
-                
-                const grid = sectorDiv.querySelector('.units-grid');
-                for (let unit of mockData.centers[center]) {
-                    const key = `${center}|${unit}`;
-                    const info = mockData.reports[key] || { count: 0, times: [] };
-                    const hasReports = info.count > 0;
-                    const isZero = info.count === 0;
-                    
-                    const unitDiv = document.createElement('div');
-                    unitDiv.className = 'unit-card';
-                    unitDiv.innerHTML = `
-                        <div class="name">${unit}</div>
-                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
-                        <div class="actions">
-                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
-                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
-                        </div>
-                    `;
-                    
-                    unitDiv.querySelector('.report-btn').onclick = function() {
-                        info.count++;
-                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
-                        renderUnits();
-                        updateTotal();
-                        updateLiveStats();
-                    };
-                    
-                    if (hasReports) {
-                        unitDiv.querySelector('.undo-btn').onclick = function() {
-                            if (info.count > 0) {
-                                info.count--;
-                                info.times.pop();
-                                renderUnits();
-                                updateTotal();
-                                updateLiveStats();
-                            }
-                        };
-                    }
-                    
-                    grid.appendChild(unitDiv);
-                }
-            }
-        }
-
-        function updateLiveStats() {
-            const container = document.getElementById('liveReportStats');
-            let total = 0;
-            let unitStats = {};
-            
-            for (let key in mockData.reports) {
-                const report = mockData.reports[key];
-                if (report && report.count > 0) {
-                    total += report.count;
-                    const unit = key.split('|')[1];
-                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
-                }
-            }
-            
-            if (total === 0) {
-                container.style.display = 'none';
-                return;
-            }
-            
-            container.style.display = 'block';
-            document.getElementById('liveTotalReports').innerText = total;
-            
-            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-            
-            document.getElementById('liveTopUnit').innerText = topUnit;
-            document.getElementById('liveTopUnitCount').innerText = topCount;
-            
-            const listContainer = document.getElementById('liveUnitList');
-            listContainer.innerHTML = '';
-            sortedUnits.forEach(([unit, count]) => {
-                const percentage = Math.round((count / total) * 100);
-                const div = document.createElement('div');
-                div.className = 'dist-item';
-                div.innerHTML = `
-                    <span class="name">${unit}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill" style="width:${percentage}%;"></div>
+            <div style="margin-top:10px; border-top:1px dashed #ddd; padding-top:10px;">
+                <div class="form-row">
+                    <label style="font-weight:bold;">الغياب:</label>
+                    <div class="inline-group">
+                        <label>أساسي:</label>
+                        <input type="number" id="hAbsentEssential" value="0" style="max-width:70px;">
                     </div>
-                    <span class="count">${count}</span>
-                `;
-                listContainer.appendChild(div);
-            });
+                    <div class="inline-group">
+                        <label>تداخلي:</label>
+                        <input type="number" id="hAbsentInterference" value="0" style="max-width:70px;">
+                    </div>
+                    <div class="inline-group">
+                        <label>إجمالي الغياب:</label>
+                        <span id="hAbsentTotal" class="total-display" style="font-size:1rem;">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- قوة القطاع                                    -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">🚑 قوة القطاع</div>
+        <div class="section-body">
+            <div style="font-weight:bold; margin-bottom:5px;">أساسية:</div>
+            <div class="grid-3">
+                <div class="form-row">
+                    <label>وحدة إسعافية:</label>
+                    <input type="number" id="hAmbulanceBase" value="13" style="max-width:60px;">
+                    <span>من أصل</span>
+                    <input type="number" id="hAmbulanceBaseTotal" value="13" style="max-width:60px;">
+                </div>
+                <div class="form-row">
+                    <label>وحدة سريع:</label>
+                    <input type="number" id="hRapidBase" value="2" style="max-width:60px;">
+                    <span>من أصل</span>
+                    <input type="number" id="hRapidBaseTotal" value="2" style="max-width:60px;">
+                </div>
+                <div class="form-row">
+                    <label>سريع تخصصية:</label>
+                    <input type="number" id="hRapidSpecialized" value="0" style="max-width:70px;">
+                </div>
+                <div class="form-row">
+                    <label>سريع مساعد:</label>
+                    <input type="number" id="hRapidAssistant" value="1" style="max-width:70px;">
+                </div>
+            </div>
+
+            <div style="font-weight:bold; margin:10px 0 5px;">تداخلية:</div>
+            <div class="grid-3">
+                <div class="form-row">
+                    <label>وحدة إسعافية:</label>
+                    <input type="number" id="hAmbulanceInter" value="0" style="max-width:60px;">
+                    <span>من أصل</span>
+                    <input type="number" id="hAmbulanceInterTotal" value="3" style="max-width:60px;">
+                </div>
+                <div class="form-row">
+                    <label>وحدة سريع:</label>
+                    <input type="number" id="hRapidInter" value="0" style="max-width:60px;">
+                    <span>من أصل</span>
+                    <input type="number" id="hRapidInterTotal" value="1" style="max-width:60px;">
+                </div>
+            </div>
+
+            <div style="margin-top:10px; border-top:1px dashed #ddd; padding-top:10px;">
+                <div style="font-weight:bold; margin-bottom:5px;">الإجمالي:</div>
+                <div class="grid-3">
+                    <div class="form-row">
+                        <label>إجمالي فرق سريع المناوبة:</label>
+                        <input type="number" id="hTotalRapid" value="3" style="max-width:80px;">
+                    </div>
+                    <div class="form-row">
+                        <label>إجمالي الفرق الإسعافية المناوبة:</label>
+                        <input type="number" id="hTotalAmbulance" value="13" style="max-width:80px;">
+                    </div>
+                    <div class="form-row">
+                        <label>إجمالي الوحدات المناوبة:</label>
+                        <input type="number" id="hTotalUnits" value="16" style="max-width:80px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- المركبات                                      -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">🚗 المركبات</div>
+        <div class="section-body">
+            <div class="grid-3">
+                <div style="font-weight:bold;">العاملة:</div>
+                <div class="form-row">
+                    <label>إسعاف:</label>
+                    <input type="number" id="hCarAmbulanceWorking" value="17" style="max-width:70px;">
+                </div>
+                <div class="form-row">
+                    <label>سريع:</label>
+                    <input type="number" id="hCarRapidWorking" value="4" style="max-width:70px;">
+                </div>
+                <div style="font-weight:bold;">المتعطلة:</div>
+                <div class="form-row">
+                    <label>إسعاف:</label>
+                    <input type="number" id="hCarAmbulanceBroken" value="3" style="max-width:70px;">
+                </div>
+                <div class="form-row">
+                    <label>سريع:</label>
+                    <input type="number" id="hCarRapidBroken" value="0" style="max-width:70px;">
+                </div>
+                <div style="font-weight:bold;">الاحتياط:</div>
+                <div class="form-row">
+                    <label>إسعاف:</label>
+                    <input type="number" id="hCarAmbulanceReserve" value="0" style="max-width:70px;">
+                </div>
+                <div class="form-row">
+                    <label>سريع:</label>
+                    <input type="number" id="hCarRapidReserve" value="0" style="max-width:70px;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- الملاحظات                                     -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">📝 الملاحظات</div>
+        <div class="section-body">
+            <div class="form-row">
+                <label>نقاط إسعافية ثابتة مكشوفة:</label>
+                <input type="text" id="hNotesPoints" value="لا يوجد" style="flex:3;">
+            </div>
+            <div class="form-row">
+                <label>شركاء الاستجابة:</label>
+                <input type="text" id="hNotesPartners" value="لا يوجد" style="flex:3;">
+            </div>
+            <div class="form-row">
+                <label>ملاحظات عامة:</label>
+                <textarea id="hNotesGeneral" rows="2" style="flex:3;">لا يوجد</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- الكوادر القيادية                              -->
+    <!-- ============================================ -->
+    <div class="form-section">
+        <div class="section-title">👤 الكوادر القيادية</div>
+        <div class="section-body">
+            <div class="grid-3">
+                <div class="form-row">
+                    <label>مساعد كبير المسعفين:</label>
+                    <input type="text" id="hSeniorAssistant" value="حمود السبيعي" style="flex:1;">
+                </div>
+                <div class="form-row">
+                    <label>كبير المسعفين:</label>
+                    <input type="text" id="hSeniorChief" value="فواز الاشجعي" style="flex:1;">
+                </div>
+                <div class="form-row">
+                    <label>قائد المنطقة:</label>
+                    <input type="text" id="hSeniorLeader" value="علي الحربي" style="flex:1;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- الأزرار                                       -->
+    <!-- ============================================ -->
+    <div class="modal-buttons no-print">
+        <button class="btn-save" id="saveHandoverBtn">💾 حفظ التقرير</button>
+        <button class="btn-print" id="printHandoverBtn">🖨️ طباعة</button>
+        <button class="btn-close" id="resetHandoverBtn">🔄 إعادة تعيين</button>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- التذيير                                       -->
+    <!-- ============================================ -->
+    <div style="text-align:center; margin-top:30px; padding-top:15px; border-top:1px solid #aaa; font-size:0.7rem; color:#666;">
+        هيئة الهلال الأحمر السعودي - فرع منطقة الرياض - إدارة العمليات الإسعافية - قطاع جنوب الرياض
+    </div>
+</div>
+
+<script>
+    // ============================================
+    // تعبئة التاريخ والوقت الحالي
+    // ============================================
+    function setCurrentDateTime() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ar-SA');
+        const timeStr = now.toLocaleTimeString('ar-SA');
+        document.getElementById('currentDateDisplay').innerText = dateStr;
+        document.getElementById('currentTimeDisplay').innerText = timeStr;
+        document.getElementById('handoverDate').value = now.toISOString().split('T')[0];
+        document.getElementById('handoverTime').value = now.toTimeString().slice(0,5);
+    }
+
+    // ============================================
+    // حساب إجمالي الغياب تلقائياً
+    // ============================================
+    function calculateAbsentTotal() {
+        const essential = parseInt(document.getElementById('hAbsentEssential').value) || 0;
+        const interference = parseInt(document.getElementById('hAbsentInterference').value) || 0;
+        document.getElementById('hAbsentTotal').innerText = essential + interference;
+    }
+
+    // ربط حساب الغياب بالتغيير
+    document.getElementById('hAbsentEssential').addEventListener('input', calculateAbsentTotal);
+    document.getElementById('hAbsentInterference').addEventListener('input', calculateAbsentTotal);
+
+    // ============================================
+    // حفظ التقرير (محلياً للتجربة)
+    // ============================================
+    function saveHandoverData() {
+        const data = {
+            date: document.getElementById('handoverDate').value,
+            time: document.getElementById('handoverTime').value,
+            shiftType: document.getElementById('handoverShiftType').value,
+            totalStaff: parseInt(document.getElementById('hTotalStaff').value) || 0,
+            presentStaff: parseInt(document.getElementById('hPresentStaff').value) || 0,
+            volunteers: parseInt(document.getElementById('hVolunteers').value) || 0,
+            locumStaff: parseInt(document.getElementById('hLocumStaff').value) || 0,
+            extraStaff: parseInt(document.getElementById('hExtraStaff').value) || 0,
+            absentEssential: parseInt(document.getElementById('hAbsentEssential').value) || 0,
+            absentInterference: parseInt(document.getElementById('hAbsentInterference').value) || 0,
+            ambulanceBase: parseInt(document.getElementById('hAmbulanceBase').value) || 0,
+            ambulanceBaseTotal: parseInt(document.getElementById('hAmbulanceBaseTotal').value) || 0,
+            rapidBase: parseInt(document.getElementById('hRapidBase').value) || 0,
+            rapidBaseTotal: parseInt(document.getElementById('hRapidBaseTotal').value) || 0,
+            rapidSpecialized: parseInt(document.getElementById('hRapidSpecialized').value) || 0,
+            rapidAssistant: parseInt(document.getElementById('hRapidAssistant').value) || 0,
+            ambulanceInter: parseInt(document.getElementById('hAmbulanceInter').value) || 0,
+            ambulanceInterTotal: parseInt(document.getElementById('hAmbulanceInterTotal').value) || 0,
+            rapidInter: parseInt(document.getElementById('hRapidInter').value) || 0,
+            rapidInterTotal: parseInt(document.getElementById('hRapidInterTotal').value) || 0,
+            totalRapid: parseInt(document.getElementById('hTotalRapid').value) || 0,
+            totalAmbulance: parseInt(document.getElementById('hTotalAmbulance').value) || 0,
+            totalUnits: parseInt(document.getElementById('hTotalUnits').value) || 0,
+            carAmbulanceWorking: parseInt(document.getElementById('hCarAmbulanceWorking').value) || 0,
+            carRapidWorking: parseInt(document.getElementById('hCarRapidWorking').value) || 0,
+            carAmbulanceBroken: parseInt(document.getElementById('hCarAmbulanceBroken').value) || 0,
+            carRapidBroken: parseInt(document.getElementById('hCarRapidBroken').value) || 0,
+            carAmbulanceReserve: parseInt(document.getElementById('hCarAmbulanceReserve').value) || 0,
+            carRapidReserve: parseInt(document.getElementById('hCarRapidReserve').value) || 0,
+            notesPoints: document.getElementById('hNotesPoints').value || '',
+            notesPartners: document.getElementById('hNotesPartners').value || '',
+            notesGeneral: document.getElementById('hNotesGeneral').value || '',
+            seniorAssistant: document.getElementById('hSeniorAssistant').value || '',
+            seniorChief: document.getElementById('hSeniorChief').value || '',
+            seniorLeader: document.getElementById('hSeniorLeader').value || '',
+            savedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem('handoverData', JSON.stringify(data));
+            alert('✅ تم حفظ التقرير بنجاح (محلياً)');
+        } catch (error) {
+            alert('❌ فشل في حفظ التقرير: ' + error.message);
         }
+    }
 
-        // ============================================
-        // زر مناوبة جديدة (تجريبي)
-        // ============================================
-        document.getElementById('newShiftBtn').onclick = function() {
-            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة (تجريبي).')) {
-                for (let key in mockData.reports) {
-                    mockData.reports[key] = { count: 0, times: [] };
-                }
-                renderUnits();
-                updateTotal();
-                updateLiveStats();
-                alert('✅ تم بدء مناوبة جديدة');
+    // ============================================
+    // تحميل التقرير المحفوظ
+    // ============================================
+    function loadHandoverData() {
+        try {
+            const saved = localStorage.getItem('handoverData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('handoverDate').value = data.date || '';
+                document.getElementById('handoverTime').value = data.time || '';
+                document.getElementById('handoverShiftType').value = data.shiftType || 'صباحية';
+                document.getElementById('hTotalStaff').value = data.totalStaff || 28;
+                document.getElementById('hPresentStaff').value = data.presentStaff || 28;
+                document.getElementById('hVolunteers').value = data.volunteers || 0;
+                document.getElementById('hLocumStaff').value = data.locumStaff || 0;
+                document.getElementById('hExtraStaff').value = data.extraStaff || 0;
+                document.getElementById('hAbsentEssential').value = data.absentEssential || 0;
+                document.getElementById('hAbsentInterference').value = data.absentInterference || 0;
+                document.getElementById('hAmbulanceBase').value = data.ambulanceBase || 13;
+                document.getElementById('hAmbulanceBaseTotal').value = data.ambulanceBaseTotal || 13;
+                document.getElementById('hRapidBase').value = data.rapidBase || 2;
+                document.getElementById('hRapidBaseTotal').value = data.rapidBaseTotal || 2;
+                document.getElementById('hRapidSpecialized').value = data.rapidSpecialized || 0;
+                document.getElementById('hRapidAssistant').value = data.rapidAssistant || 1;
+                document.getElementById('hAmbulanceInter').value = data.ambulanceInter || 0;
+                document.getElementById('hAmbulanceInterTotal').value = data.ambulanceInterTotal || 3;
+                document.getElementById('hRapidInter').value = data.rapidInter || 0;
+                document.getElementById('hRapidInterTotal').value = data.rapidInterTotal || 1;
+                document.getElementById('hTotalRapid').value = data.totalRapid || 3;
+                document.getElementById('hTotalAmbulance').value = data.totalAmbulance || 13;
+                document.getElementById('hTotalUnits').value = data.totalUnits || 16;
+                document.getElementById('hCarAmbulanceWorking').value = data.carAmbulanceWorking || 17;
+                document.getElementById('hCarRapidWorking').value = data.carRapidWorking || 4;
+                document.getElementById('hCarAmbulanceBroken').value = data.carAmbulanceBroken || 3;
+                document.getElementById('hCarRapidBroken').value = data.carRapidBroken || 0;
+                document.getElementById('hCarAmbulanceReserve').value = data.carAmbulanceReserve || 0;
+                document.getElementById('hCarRapidReserve').value = data.carRapidReserve || 0;
+                document.getElementById('hNotesPoints').value = data.notesPoints || 'لا يوجد';
+                document.getElementById('hNotesPartners').value = data.notesPartners || 'لا يوجد';
+                document.getElementById('hNotesGeneral').value = data.notesGeneral || 'لا يوجد';
+                document.getElementById('hSeniorAssistant').value = data.seniorAssistant || 'حمود السبيعي';
+                document.getElementById('hSeniorChief').value = data.seniorChief || 'فواز الاشجعي';
+                document.getElementById('hSeniorLeader').value = data.seniorLeader || 'علي الحربي';
+                calculateAbsentTotal();
             }
-        };
+        } catch (error) {
+            console.error('خطأ في تحميل البيانات:', error);
+        }
+    }
 
-        // ============================================
-        // أزرار تجريبية (تنبيهات)
-        // ============================================
-        document.getElementById('shiftBtn').onclick = function() {
-            alert('📋 نموذج المناوبة - سيتم إضافته قريباً');
-        };
-        document.getElementById('docsBtn').onclick = function() {
-            alert('📁 المستندات - سيتم إضافتها قريباً');
-        };
-        document.getElementById('airAmbulanceBtn').onclick = function() {
-            alert('🚁 الإسعاف الجوي - سيتم إضافته قريباً');
-        };
-        document.getElementById('controlBtn').onclick = function() {
-            alert('📋 التحكم والتنسيق - سيتم إضافته قريباً');
-        };
-        document.getElementById('monthlyTableBtn').onclick = function() {
-            alert('📊 الجدول الشهري - سيتم إضافته قريباً');
-        };
+    // ============================================
+    // إعادة تعيين النموذج للقيم الافتراضية
+    // ============================================
+    function resetHandoverForm() {
+        if (confirm('⚠️ هل أنت متأكد من إعادة تعيين جميع الحقول للقيم الافتراضية؟')) {
+            document.getElementById('hTotalStaff').value = 28;
+            document.getElementById('hPresentStaff').value = 28;
+            document.getElementById('hVolunteers').value = 0;
+            document.getElementById('hLocumStaff').value = 0;
+            document.getElementById('hExtraStaff').value = 0;
+            document.getElementById('hAbsentEssential').value = 0;
+            document.getElementById('hAbsentInterference').value = 0;
+            document.getElementById('hAmbulanceBase').value = 13;
+            document.getElementById('hAmbulanceBaseTotal').value = 13;
+            document.getElementById('hRapidBase').value = 2;
+            document.getElementById('hRapidBaseTotal').value = 2;
+            document.getElementById('hRapidSpecialized').value = 0;
+            document.getElementById('hRapidAssistant').value = 1;
+            document.getElementById('hAmbulanceInter').value = 0;
+            document.getElementById('hAmbulanceInterTotal').value = 3;
+            document.getElementById('hRapidInter').value = 0;
+            document.getElementById('hRapidInterTotal').value = 1;
+            document.getElementById('hTotalRapid').value = 3;
+            document.getElementById('hTotalAmbulance').value = 13;
+            document.getElementById('hTotalUnits').value = 16;
+            document.getElementById('hCarAmbulanceWorking').value = 17;
+            document.getElementById('hCarRapidWorking').value = 4;
+            document.getElementById('hCarAmbulanceBroken').value = 3;
+            document.getElementById('hCarRapidBroken').value = 0;
+            document.getElementById('hCarAmbulanceReserve').value = 0;
+            document.getElementById('hCarRapidReserve').value = 0;
+            document.getElementById('hNotesPoints').value = 'لا يوجد';
+            document.getElementById('hNotesPartners').value = 'لا يوجد';
+            document.getElementById('hNotesGeneral').value = 'لا يوجد';
+            document.getElementById('hSeniorAssistant').value = 'حمود السبيعي';
+            document.getElementById('hSeniorChief').value = 'فواز الاشجعي';
+            document.getElementById('hSeniorLeader').value = 'علي الحربي';
+            calculateAbsentTotal();
+            setCurrentDateTime();
+            alert('✅ تم إعادة تعيين النموذج');
+        }
+    }
 
-        // ============================================
-        // التشغيل
-        // ============================================
-        renderUnits();
-        updateTotal();
-        updateLiveStats();
+    // ============================================
+    // ربط الأزرار
+    // ============================================
+    document.getElementById('saveHandoverBtn').addEventListener('click', saveHandoverData);
+    document.getElementById('resetHandoverBtn').addEventListener('click', resetHandoverForm);
+    document.getElementById('printHandoverBtn').addEventListener('click', function() {
+        window.print();
+    });
 
-        console.log('✅ منصة الجنوب - الهوية البصرية المعتمدة');
-        console.log('📌 التصميم يشمل: خلفية متدرجة، منطقة بصرية، نصوص ذهبية');
-    </script>
+    // ============================================
+    // التشغيل
+    // ============================================
+    setCurrentDateTime();
+    loadHandoverData();
+
+    // تحديث الوقت كل دقيقة
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('currentTimeDisplay').innerText = now.toLocaleTimeString('ar-SA');
+    }, 60000);
+</script>
 </body>
 </html>
