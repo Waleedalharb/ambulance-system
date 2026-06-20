@@ -55,7 +55,7 @@
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
             border-radius: var(--radius-lg);
-            padding: 16px 24px;
+            padding: 14px 24px;
             margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
@@ -70,14 +70,14 @@
             gap: 14px;
         }
         .header-brand .icon {
-            width: 50px;
-            height: 50px;
+            width: 48px;
+            height: 48px;
             background: rgba(255,255,255,0.10);
             border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 6px;
+            padding: 4px;
             border: 1px solid rgba(255,255,255,0.12);
             transition: all 0.3s;
         }
@@ -86,8 +86,8 @@
             transform: scale(1.05);
         }
         .header-brand .icon svg {
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
         }
         .header-brand .text h1 {
             color: var(--white);
@@ -96,15 +96,15 @@
             letter-spacing: -0.5px;
         }
         .header-brand .text .sub {
-            color: rgba(255,255,255,0.7);
+            color: rgba(255,255,255,0.75);
             font-size: 0.7rem;
             font-weight: 400;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
         .header-brand .text .sub i {
-            font-size: 0.6rem;
+            font-size: 0.5rem;
             color: var(--gold);
         }
         .header-date {
@@ -394,23 +394,34 @@
     <header class="header">
         <div class="header-brand">
             <div class="icon">
-                <!-- أيقونة محطة قصر الحكم - نسخة محسّنة -->
+                <!-- أيقونة رقم 6 (محطة قصر الحكم) -->
                 <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="10" y="35" width="100" height="18" rx="4" fill="#FFFFFF" opacity="0.95"/>
-                    <rect x="18" y="53" width="84" height="10" rx="3" fill="#FFFFFF" opacity="0.7"/>
-                    <rect x="26" y="63" width="68" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
-                    <polygon points="10,35 110,35 85,95 35,95" fill="#FFFFFF" opacity="0.12"/>
-                    <polygon points="35,45 50,45 42,65" fill="#E8C84A" opacity="0.7"/>
-                    <polygon points="55,45 70,45 62,65" fill="#E8C84A" opacity="0.7"/>
-                    <polygon points="75,45 90,45 82,65" fill="#E8C84A" opacity="0.7"/>
-                    <line x1="15" y1="42" x2="105" y2="42" stroke="#FFFFFF" stroke-width="1.5" opacity="0.3"/>
-                    <line x1="20" y1="50" x2="100" y2="50" stroke="#FFFFFF" stroke-width="1" opacity="0.2"/>
+                    <!-- المظلة الفولاذية العاكسة (طبقات متعددة للإحساس بالعمق) -->
+                    <rect x="8" y="30" width="104" height="16" rx="4" fill="#FFFFFF" opacity="0.95"/>
+                    <rect x="16" y="46" width="88" height="10" rx="3" fill="#FFFFFF" opacity="0.7"/>
+                    <rect x="24" y="56" width="72" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
+                    
+                    <!-- الجدار المائل مع الفتحات المثلثة -->
+                    <polygon points="8,30 112,30 88,90 32,90" fill="#FFFFFF" opacity="0.12"/>
+                    
+                    <!-- الفتحات المثلثة (مستوحاة من العمارة النجدية) -->
+                    <polygon points="30,40 45,40 37,60" fill="#E8C84A" opacity="0.8"/>
+                    <polygon points="50,40 65,40 57,60" fill="#E8C84A" opacity="0.8"/>
+                    <polygon points="70,40 85,40 77,60" fill="#E8C84A" opacity="0.8"/>
+                    
+                    <!-- خطوط أفقية تعكس المظلة -->
+                    <line x1="12" y1="37" x2="108" y2="37" stroke="#FFFFFF" stroke-width="1.5" opacity="0.3"/>
+                    <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.2"/>
+                    
+                    <!-- عناصر معمارية إضافية -->
+                    <rect x="35" y="70" width="50" height="6" rx="2" fill="#FFFFFF" opacity="0.15"/>
+                    <rect x="40" y="78" width="40" height="4" rx="1" fill="#FFFFFF" opacity="0.10"/>
                 </svg>
             </div>
             <div class="text">
                 <h1>منصة الجنوب</h1>
                 <div class="sub">
-                    <i class="fas fa-circle"></i> محطة قصر الحكم · إدارة العمليات الإسعافية
+                    <i class="fas fa-circle"></i> إدارة العمليات الإسعافية - قطاع جنوب الرياض
                 </div>
             </div>
         </div>
@@ -662,7 +673,7 @@
         updateTotal();
         updateLiveStats();
 
-        console.log('✅ منصة الجنوب - الهوية البصرية الجديدة تعمل');
+        console.log('✅ منصة الجنوب - أيقونة رقم 6 مع النص الجديد');
     </script>
 </body>
 </html>
