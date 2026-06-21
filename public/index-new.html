@@ -76,10 +76,17 @@
             padding: 6px;
             border: 1px solid rgba(255,255,255,0.10);
             transition: all 0.3s;
+            overflow: hidden;
         }
         .header-brand .icon:hover {
             background: rgba(255,255,255,0.16);
             transform: scale(1.04);
+        }
+        .header-brand .icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
         }
         .header-brand .icon svg {
             width: 40px;
@@ -624,40 +631,130 @@
             background: var(--gray-50);
         }
 
-        /* ===== تحسينات الطباعة ===== */
+        /* ===== تحسينات الطباعة - نموذج كبار المسعفين فقط ===== */
         @media print {
-            body { background: white; padding: 10px; }
-            .header { background: #0B1E33 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .control-bar, .stats-card, .footer, .no-print { display: none !important; }
-            .modal {
+            /* إخفاء كل شيء */
+            body * {
+                visibility: hidden !important;
+            }
+            
+            /* إظهار نافذة كبار المسعفين فقط */
+            #seniorShiftModal,
+            #seniorShiftModal * {
+                visibility: visible !important;
+            }
+            
+            #seniorShiftModal {
                 display: block !important;
-                position: relative !important;
-                background: white !important;
+                position: fixed !important;
                 top: 0 !important;
                 left: 0 !important;
                 width: 100% !important;
-                height: auto !important;
-                overflow: visible !important;
-                transform: none !important;
+                height: 100% !important;
+                background: white !important;
+                z-index: 9999 !important;
+                overflow: auto !important;
+                padding: 20px !important;
+                margin: 0 !important;
             }
+            
             .modal-content {
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 10px !important;
+                padding: 15px !important;
+                border: none !important;
                 box-shadow: none !important;
-                border: 1px solid #000 !important;
                 max-height: none !important;
                 overflow: visible !important;
+                border-radius: 0 !important;
             }
-            .modal-buttons { display: none !important; }
-            .saved-records { display: none !important; }
-            .signature-row input { border: none !important; border-bottom: 1px solid #000 !important; border-radius: 0 !important; background: transparent !important; }
-            .locations-grid label { border: none !important; background: transparent !important; }
-            .locations-grid input[type="checkbox"] { display: none !important; }
-            .locations-grid label::after { content: " ✅"; }
-            .locations-grid label:has(input:not(:checked))::after { content: " ❌"; }
-            .form-row input { border: none !important; border-bottom: 1px solid #000 !important; border-radius: 0 !important; background: transparent !important; }
-            .form-row textarea { border: 1px solid #000 !important; background: transparent !important; }
+            
+            /* إخفاء الأزرار وعناصر التحكم */
+            .modal-buttons,
+            .saved-records,
+            .no-print,
+            .btn-save,
+            .btn-print,
+            .btn-close,
+            #closeSeniorShift,
+            #saveSeniorShift,
+            #printSeniorShift {
+                display: none !important;
+            }
+            
+            /* إخفاء شريط التحكم والفوتر والشريط العلوي */
+            .control-bar,
+            .stats-card,
+            .footer,
+            .header,
+            .no-print {
+                display: none !important;
+            }
+            
+            /* إخفاء أي عناصر أخرى */
+            #pointsContainer,
+            #liveReportStats,
+            #liveUnitDistribution {
+                display: none !important;
+            }
+            
+            /* تنسيق الحقول للطباعة */
+            .form-row input,
+            .form-row textarea {
+                border: none !important;
+                border-bottom: 1px solid #000 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                padding: 4px 0 !important;
+            }
+            
+            .signature-row input {
+                border: none !important;
+                border-bottom: 1px solid #000 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                padding: 4px 0 !important;
+            }
+            
+            .locations-grid label {
+                border: none !important;
+                background: transparent !important;
+                padding: 4px !important;
+            }
+            
+            .locations-grid input[type="checkbox"] {
+                display: none !important;
+            }
+            
+            .locations-grid label::after {
+                content: " ✅";
+                font-size: 0.8rem;
+            }
+            
+            .locations-grid label:has(input:not(:checked))::after {
+                content: " ❌";
+            }
+            
+            /* إضافة عنوان الصفحة */
+            #seniorShiftModal .modal-content::before {
+                content: "منصة الجنوب - قطاع جنوب الرياض";
+                display: block;
+                text-align: center;
+                font-size: 1.2rem;
+                font-weight: 700;
+                color: #0B1E33;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #0B1E33;
+                margin-bottom: 15px;
+            }
+            
+            /* إضافة التاريخ */
+            #seniorShiftModal .modal-content .print-date {
+                text-align: center;
+                font-size: 0.8rem;
+                color: #555;
+                margin-bottom: 15px;
+            }
         }
 
         .footer {
@@ -689,8 +786,9 @@
     <!-- ===== الشريط العلوي ===== -->
     <header class="header">
         <div class="header-brand">
-            <div class="icon">
-                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+            <div class="icon" id="brandLogoContainer">
+                <!-- الشعار الافتراضي (SVG) - سيتم استبداله بالشعار المرفوع إن وجد -->
+                <svg id="defaultLogo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
                     <rect x="10" y="32" width="100" height="14" rx="2" fill="#FFFFFF" opacity="0.95"/>
                     <rect x="16" y="46" width="88" height="10" rx="2" fill="#FFFFFF" opacity="0.7"/>
                     <rect x="22" y="56" width="76" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
@@ -701,6 +799,7 @@
                     <line x1="14" y1="38" x2="106" y2="38" stroke="#FFFFFF" stroke-width="1.5" opacity="0.25"/>
                     <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.15"/>
                 </svg>
+                <img id="brandLogoImage" src="" alt="شعار منصة الجنوب" style="width:100%; height:100%; object-fit:contain; display:none;">
             </div>
             <div class="text">
                 <h1>منصة الجنوب</h1>
@@ -763,6 +862,7 @@
         <div class="modal-content">
             <h2>📋 تسليم مناوبة كبار المسعفين</h2>
             <p class="sub-title">تسجيل بيانات المناوبة لكبار المسعفين</p>
+            <p class="print-date" style="text-align:center; font-size:0.8rem; color:#666; margin-bottom:15px;">📅 <span id="printDate"></span></p>
 
             <!-- بيانات المركبات -->
             <div class="form-row">
@@ -855,6 +955,27 @@
     </div>
 
     <script>
+        // ============================================
+        // تحميل الشعار المخصص من localStorage
+        // ============================================
+        function loadBrandLogo() {
+            try {
+                const savedLogo = localStorage.getItem('brandLogo');
+                if (savedLogo) {
+                    const img = document.getElementById('brandLogoImage');
+                    const svg = document.getElementById('defaultLogo');
+                    if (img && svg) {
+                        img.src = savedLogo;
+                        img.style.display = 'block';
+                        svg.style.display = 'none';
+                        console.log('✅ تم تحميل الشعار المخصص');
+                    }
+                }
+            } catch(e) {
+                console.log('⚠️ لم يتم تحميل الشعار المخصص');
+            }
+        }
+
         // ============================================
         // البيانات التجريبية (للعرض فقط)
         // ============================================
@@ -1073,10 +1194,12 @@
         // ============================================
         document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
             // تعبئة التواريخ التلقائية
-            const now = new Date().toLocaleDateString('ar-SA');
-            document.getElementById('seniorAssistantDate').innerText = now;
-            document.getElementById('seniorChiefDate').innerText = now;
-            document.getElementById('seniorRegionLeaderDate').innerText = now;
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ar-SA');
+            document.getElementById('seniorAssistantDate').innerText = dateStr;
+            document.getElementById('seniorChiefDate').innerText = dateStr;
+            document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
+            document.getElementById('printDate').innerText = dateStr + ' - ' + now.toLocaleTimeString('ar-SA');
             
             document.getElementById('seniorShiftModal').style.display = 'flex';
             renderSeniorRecords();
@@ -1203,7 +1326,11 @@
         updateTotal();
         updateLiveStats();
 
+        // تحميل الشعار المخصص
+        loadBrandLogo();
+
         console.log('✅ منصة الجنوب - نسخة تجريبية مع نموذج كبار المسعفين');
+        console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
     </script>
 </body>
 </html>
