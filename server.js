@@ -470,15 +470,19 @@ app.get('/api/docs', async (req, res) => {
 app.post('/api/upload-doc', async (req, res) => {
     try {
         const { filename, fileData, description, fileType, category, priority, uploader } = req.body;
-        if (!filename || !fileData) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
+        
+        // ✅ فقط التأكد من وجود العنوان
+        if (!filename) {
+            return res.status(400).json({ error: 'عنوان التحديث مطلوب' });
         }
+        
+        // ✅ إذا لم يكن هناك ملف، ننشئ تحديث بدون ملف
         const docs = await readDocs();
         const newDoc = {
             id: Date.now().toString(),
             filename: filename,
-            fileData: fileData,
-            fileType: fileType || 'application/octet-stream',
+            fileData: fileData || '', // ✅ يسمح بملف فارغ
+            fileType: fileType || 'text/plain',
             description: description || '',
             category: category || 'أخرى',
             priority: priority || 'normal',
@@ -490,23 +494,7 @@ app.post('/api/upload-doc', async (req, res) => {
         res.json({ success: true, doc: newDoc });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'فشل في رفع التحديث' });
-    }
-});
-
-app.get('/api/download-doc/:id', async (req, res) => {
-    try {
-        const docs = await readDocs();
-        const doc = docs.find(d => d.id === req.params.id);
-        if (!doc) {
-            return res.status(404).json({ error: 'التحديث غير موجود' });
-        }
-        const buffer = Buffer.from(doc.fileData, 'base64');
-        res.setHeader('Content-Type', doc.fileType);
-        res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
-        res.send(buffer);
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تحميل التحديث' });
+        res.status(500).json({ error: 'فشل في رفع التحديث: ' + error.message });
     }
 });
 
