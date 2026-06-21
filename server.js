@@ -50,6 +50,43 @@ async function ensureDataFiles() {
 }
 ensureDataFiles();
 
+// ============================================
+// ترحيل البيانات من المسار القديم
+// ============================================
+async function migrateOldData() {
+    const oldPaths = [
+        '/data/ambulance-data.json',
+        '/data/shift-data.json',
+        '/data/monthly-table.xlsx',
+        '/data/docs.json',
+        '/data/air-ambulance.json',
+        '/data/identity.pdf',
+        '/data/control-notes.json',
+        '/data/vacations.json',
+        '/data/password.json'
+    ];
+    
+    const newPaths = [
+        DATA_PATH, SHIFT_DATA_PATH, MONTHLY_TABLE_PATH,
+        DOCS_PATH, AIR_PATH, IDENTITY_PATH,
+        CONTROL_NOTES_PATH, VACATIONS_PATH, PASSWORD_PATH
+    ];
+    
+    for (let i = 0; i < oldPaths.length; i++) {
+        try {
+            await fs.access(oldPaths[i]);
+            try {
+                await fs.access(newPaths[i]);
+            } catch {
+                const data = await fs.readFile(oldPaths[i]);
+                await fs.writeFile(newPaths[i], data);
+                console.log(`✅ تم ترحيل: ${path.basename(oldPaths[i])}`);
+            }
+        } catch {}
+    }
+}
+migrateOldData();
+
 // Middleware
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
@@ -419,14 +456,14 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
 });
 
 // ============================================
-// API: المستندات
+// API: المستندات / التحديثات التشغيلية
 // ============================================
 app.get('/api/docs', async (req, res) => {
     try {
         const docs = await readDocs();
         res.json({ success: true, docs });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب المستندات' });
+        res.status(500).json({ error: 'فشل في جلب التحديثات التشغيلية' });
     }
 });
 
@@ -450,7 +487,7 @@ app.post('/api/upload-doc', async (req, res) => {
         res.json({ success: true, doc: newDoc });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'فشل في رفع المستند' });
+        res.status(500).json({ error: 'فشل في رفع التحديث' });
     }
 });
 
@@ -459,14 +496,14 @@ app.get('/api/download-doc/:id', async (req, res) => {
         const docs = await readDocs();
         const doc = docs.find(d => d.id === req.params.id);
         if (!doc) {
-            return res.status(404).json({ error: 'المستند غير موجود' });
+            return res.status(404).json({ error: 'التحديث غير موجود' });
         }
         const buffer = Buffer.from(doc.fileData, 'base64');
         res.setHeader('Content-Type', doc.fileType);
         res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
         res.send(buffer);
     } catch (error) {
-        res.status(500).json({ error: 'فشل في تحميل المستند' });
+        res.status(500).json({ error: 'فشل في تحميل التحديث' });
     }
 });
 
@@ -477,7 +514,7 @@ app.delete('/api/delete-doc/:id', async (req, res) => {
         await writeDocs(filtered);
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف المستند' });
+        res.status(500).json({ error: 'فشل في حذف التحديث' });
     }
 });
 

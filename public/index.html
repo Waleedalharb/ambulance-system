@@ -1006,12 +1006,8 @@
         @media print {
             body * { visibility: hidden !important; }
             
-            #seniorShiftModal,
-            #seniorShiftModal * {
-                visibility: visible !important;
-            }
-            
-            #seniorShiftModal {
+            /* إظهار النافذة المفتوحة فقط */
+            .modal[style*="display: flex"] {
                 display: block !important;
                 position: fixed !important;
                 top: 0 !important;
@@ -1023,6 +1019,10 @@
                 overflow: auto !important;
                 padding: 20px !important;
                 margin: 0 !important;
+            }
+            
+            .modal[style*="display: flex"] * {
+                visibility: visible !important;
             }
             
             .modal-content {
@@ -1037,48 +1037,40 @@
                 background: white !important;
             }
             
+            /* إخفاء جميع الأزرار */
             .modal-buttons,
             .saved-records,
             .no-print,
             .btn,
             button,
-            #closeSeniorShift,
-            #saveSeniorShift,
-            #sendWhatsAppSeniorShift {
+            .toolbar,
+            .info-bar,
+            .archive-row,
+            .update-status,
+            #pointsContainer,
+            #liveReportStats,
+            .header,
+            footer {
                 display: none !important;
             }
             
-            .header, footer, .info-bar, .toolbar, 
-            .archive-row, .update-status, #pointsContainer,
-            #liveReportStats, #liveUnitDistribution {
-                display: none !important;
-            }
-            
-            .form-row input[type="number"] {
+            /* تنسيق الحقول للطباعة */
+            .form-row input[type="number"],
+            .form-row input[type="text"],
+            .form-row input {
                 border: none !important;
                 border-bottom: 2px solid #000 !important;
                 border-radius: 0 !important;
                 background: transparent !important;
                 text-align: center !important;
-                font-size: 1.2rem !important;
-                font-weight: 700 !important;
-                width: 80px !important;
-                color: #000 !important;
-                padding: 4px 0 !important;
-            }
-            
-            .form-row input[type="text"] {
-                border: none !important;
-                border-bottom: 2px solid #000 !important;
-                border-radius: 0 !important;
-                background: transparent !important;
-                padding: 4px 0 !important;
                 font-size: 0.9rem !important;
+                font-weight: 600 !important;
                 color: #000 !important;
-                min-width: 120px !important;
+                padding: 4px 0 !important;
+                width: 80px !important;
             }
             
-            #seniorNotes {
+            .form-row textarea {
                 border: 1px solid #000 !important;
                 background: transparent !important;
                 min-height: 50px !important;
@@ -1086,63 +1078,30 @@
                 padding: 8px !important;
             }
             
-            .locations-grid label {
-                border: none !important;
-                background: transparent !important;
-                padding: 4px 8px !important;
-                font-size: 0.85rem !important;
+            table {
+                page-break-inside: avoid;
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 9pt;
             }
-            .locations-grid input[type="checkbox"] {
+            
+            th, td {
+                border: 1px solid #000 !important;
+                padding: 4px 6px !important;
+            }
+            
+            th {
+                background: #f0f0f0 !important;
+                font-weight: bold !important;
+            }
+            
+            /* إخفاء الأيقونات في الطباعة */
+            .fas, .far, .fab, .fa, i, svg {
                 display: none !important;
             }
-            .locations-grid label::after {
-                content: " ✓" !important;
-                font-size: 0.9rem !important;
-                color: #2a7f3e !important;
-            }
-            .locations-grid label:has(input:not(:checked))::after {
-                content: " ✗" !important;
-                color: #c0392b !important;
-            }
             
-            .signature-row {
-                border: 1px solid #ddd !important;
-                padding: 12px 16px !important;
-                margin-bottom: 10px !important;
-                background: #fafafa !important;
-                border-radius: 4px !important;
-            }
-            .signature-row .sig-label {
-                font-size: 0.9rem !important;
-                font-weight: 700 !important;
-                color: #0B1E33 !important;
-                margin-bottom: 8px !important;
-            }
-            .signature-row .sig-inputs {
-                display: flex !important;
-                gap: 15px !important;
-                flex-wrap: wrap !important;
-                align-items: center !important;
-            }
-            .signature-row .sig-inputs input {
-                flex: 1 !important;
-                min-width: 150px !important;
-                border: none !important;
-                border-bottom: 2px solid #000 !important;
-                border-radius: 0 !important;
-                background: transparent !important;
-                padding: 4px 0 !important;
-                font-size: 0.9rem !important;
-                color: #000 !important;
-            }
-            .signature-row .sig-inputs .sig-placeholder {
-                font-size: 0.8rem !important;
-                color: #000 !important;
-                font-weight: 500 !important;
-                white-space: nowrap !important;
-            }
-            
-            #seniorShiftModal .modal-content::before {
+            /* عنوان التقرير */
+            .modal-content::before {
                 content: "منصة الجنوب - قطاع جنوب الرياض";
                 display: block;
                 text-align: center;
@@ -1154,35 +1113,11 @@
                 margin-bottom: 20px;
             }
             
-            .print-date {
-                font-size: 0.9rem !important;
-                color: #333 !important;
-                text-align: center !important;
-                margin-bottom: 20px !important;
-            }
-            
-            .modal-content h2 {
-                font-size: 1.2rem !important;
-                color: #0B1E33 !important;
-                margin-bottom: 5px !important;
-            }
-            .modal-content .sub-title {
-                font-size: 0.9rem !important;
-                color: #555 !important;
-            }
-            .signatures-section h3 {
-                font-size: 1rem !important;
-                color: #0B1E33 !important;
-                border-top: 2px solid #0B1E33 !important;
-                padding-top: 15px !important;
-            }
-            .form-row label {
-                font-size: 0.85rem !important;
-                font-weight: 600 !important;
-                color: #0B1E33 !important;
-            }
-            .fas, .far, .fab, .fa, i, svg {
+            /* منع ظهور نموذج كبار المسعفين عند الطباعة */
+            #seniorShiftModal,
+            #seniorShiftModal * {
                 display: none !important;
+                visibility: hidden !important;
             }
         }
 
@@ -1256,8 +1191,8 @@
 
         <div class="toolbar">
             <button id="newShiftBtn" class="btn btn-primary"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
-            <button id="shiftBtn" class="btn"><i class="fas fa-clipboard-list"></i> نموذج</button>
-            <button id="docsBtn" class="btn"><i class="fas fa-folder-open"></i> المستندات</button>
+            <button id="shiftBtn" class="btn"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+            <button id="docsBtn" class="btn"><i class="fas fa-bullhorn"></i> التحديثات التشغيلية</button>
             <button id="airAmbulanceBtn" class="btn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
             <button id="controlBtn" class="btn"><i class="fas fa-sliders-h"></i> التحكم</button>
             <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
@@ -1294,36 +1229,41 @@
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
-<!-- ===== جميع النوافذ المنبثقة تبدأ من هنا ===== -->
-
-<!-- نافذة نموذج المناوبة -->
+<!-- ===== نافذة تكميل النوبة ===== -->
 <div id="shiftModal" class="modal">
     <div class="modal-content">
-        <h2>📋 نموذج استلام وتسليم النوبة</h2>
-        <p class="sub-title">تسجيل بيانات المناوبة</p>
-
-        <div class="form-row">
-            <label>📂 المناوبات السابقة:</label>
-            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;">
-                <option value="">-- مناوبة جديدة --</option>
-            </select>
-            <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;">🗑️ حذف المناوبة</button>
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);">
+                <i class="fas fa-clipboard-list"></i>
+            </span>
+            <div>
+                <h2 style="margin:0; color:var(--primary-700);">تكميل النوبة</h2>
+                <p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات تكميل النوبة</p>
+            </div>
         </div>
 
         <div class="form-row">
-            <label>📅 اليوم والتاريخ:</label>
+            <label><i class="fas fa-archive icon-primary icon-sm"></i> المناوبات السابقة:</label>
+            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;">
+                <option value="">-- مناوبة جديدة --</option>
+            </select>
+            <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;"><i class="fas fa-trash"></i> حذف المناوبة</button>
+        </div>
+
+        <div class="form-row">
+            <label><i class="fas fa-calendar-day icon-teal icon-sm"></i> اليوم والتاريخ:</label>
             <span id="shiftDate" style="font-weight:600;"></span>
         </div>
 
         <div class="form-row">
-            <label>⏰ توقيت المناوبة:</label>
+            <label><i class="fas fa-clock icon-gold icon-sm"></i> توقيت المناوبة:</label>
             <div class="shift-type">
-                <label><input type="radio" name="shiftType" value="صباحية"> صباحية (4 فجراً - 4 عصراً)</label>
-                <label><input type="radio" name="shiftType" value="ليلية"> ليلية (4 عصراً - 4 فجراً)</label>
+                <label><input type="radio" name="shiftType" value="صباحية"> <i class="fas fa-sun icon-sm" style="color:var(--gold);"></i> صباحية (4 فجراً - 4 عصراً)</label>
+                <label><input type="radio" name="shiftType" value="ليلية"> <i class="fas fa-moon icon-sm" style="color:var(--primary-700);"></i> ليلية (4 عصراً - 4 فجراً)</label>
             </div>
         </div>
 
-        <h3>🚑 تحضير فرق التدخل السريع</h3>
+        <h3><i class="fas fa-bolt icon-teal"></i> تحضير فرق التدخل السريع</h3>
         <table id="rapidTable">
             <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
             <tbody>
@@ -1334,7 +1274,7 @@
             </tbody>
         </table>
 
-        <h3>🏥 المراكز الإسعافية</h3>
+        <h3><i class="fas fa-hospital icon-primary"></i> المراكز الإسعافية</h3>
         <table id="centersTable">
             <thead>
                 <tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr>
@@ -1411,7 +1351,7 @@
             </div>
         </div>
 
-        <h3>📝 الملاحظات العامة أثناء سير المناوبة</h3>
+        <h3><i class="fas fa-pen icon-gold"></i> الملاحظات العامة أثناء سير المناوبة</h3>
         <textarea id="generalNotes" rows="3"></textarea>
 
         <div class="modal-buttons">
@@ -1422,20 +1362,35 @@
     </div>
 </div>
 
-<!-- نافذة المستندات -->
+<!-- ===== نافذة التحديثات التشغيلية ===== -->
 <div id="docsModal" class="modal">
-    <div class="modal-content" style="max-width:800px;">
-        <h2>📁 المستندات والملفات</h2>
-        <p class="sub-title">رفع وعرض المستندات (السياسات، الخط الساخن، التعليمات)</p>
-        
-        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display:none;">
-            <button id="uploadDocBtn" class="btn btn-primary"><i class="fas fa-upload"></i> رفع ملف</button>
-            <span id="docStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+    <div class="modal-content" style="max-width:900px;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon gold" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);">
+                    <i class="fas fa-bullhorn"></i>
+                </span>
+                <div>
+                    <h2 style="margin:0; color:var(--primary-700);">التحديثات التشغيلية</h2>
+                    <p class="sub-title" style="margin:2px 0 0;">آخر التوجيهات والإشعارات التشغيلية</p>
+                </div>
+            </div>
+            <span style="font-size:0.7rem; color:var(--gray-400); background:var(--gray-100); padding:4px 12px; border-radius:20px;">
+                <i class="far fa-clock"></i> <span id="docsUpdateTime"></span>
+            </span>
         </div>
         
-        <div id="docsListContainer" style="margin-top:15px; max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);">
-            <p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--primary-100); padding:12px 16px; border-radius:var(--radius-md);">
+            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" style="display:none;">
+            <button id="uploadDocBtn" class="btn btn-primary"><i class="fas fa-upload"></i> رفع تحديث جديد</button>
+            <span id="docStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+            <span style="font-size:0.65rem; color:var(--gray-400); margin-right:auto;">
+                <i class="fas fa-info-circle"></i> يدعم: PDF, Word, Excel, صور, نصوص
+            </span>
+        </div>
+        
+        <div id="docsListContainer" style="margin-top:15px; max-height:55vh; overflow-y:auto;">
+            <!-- سيتم عرض التحديثات هنا -->
         </div>
         
         <div class="modal-buttons">
@@ -1444,22 +1399,27 @@
     </div>
 </div>
 
-<!-- نافذة الإسعاف الجوي -->
+<!-- ===== نافذة الإسعاف الجوي ===== -->
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">🚁 الإسعاف الجوي</h2>
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon teal" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);">
+                    <i class="fas fa-helicopter"></i>
+                </span>
+                <h2 style="margin:0;">الإسعاف الجوي</h2>
+            </div>
             <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
         </div>
         <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
         
         <div class="form-row">
-            <label>📋 رقم البلاغ:</label>
+            <label><i class="fas fa-hashtag icon-primary icon-sm"></i> رقم البلاغ:</label>
             <input type="text" id="airReportNumber" placeholder="مثال: 2025-001">
         </div>
         
         <div class="form-row">
-            <label>🚑 الفرقة المرافقة:</label>
+            <label><i class="fas fa-ambulance icon-teal icon-sm"></i> الفرقة المرافقة:</label>
             <select id="airUnit">
                 <option value="">-- اختر الفرقة --</option>
                 <option value="سريع 1">سريع 1</option>
@@ -1489,22 +1449,22 @@
         </div>
         
         <div class="form-row">
-            <label>🏥 المستشفى المستلم:</label>
+            <label><i class="fas fa-hospital icon-coral icon-sm"></i> المستشفى المستلم:</label>
             <input type="text" id="airHospital" placeholder="اسم المستشفى">
         </div>
         
         <div class="form-row">
-            <label>📅 تاريخ ووقت النقل:</label>
+            <label><i class="fas fa-calendar-clock icon-gold icon-sm"></i> تاريخ ووقت النقل:</label>
             <input type="datetime-local" id="airDateTime">
         </div>
         
         <div class="form-row">
-            <label>📝 ملاحظات إضافية:</label>
+            <label><i class="fas fa-pen icon-gray icon-sm"></i> ملاحظات إضافية:</label>
             <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
         </div>
         
         <div class="saved-records" id="airSavedRecords">
-            <h4>📋 البلاغات المحفوظة</h4>
+            <h4><i class="fas fa-list-ul icon-primary"></i> البلاغات المحفوظة</h4>
             <div id="airRecordsList"></div>
         </div>
         
@@ -1515,11 +1475,18 @@
     </div>
 </div>
 
-<!-- نافذة الجدول الشهري -->
+<!-- ===== نافذة الجدول الشهري ===== -->
 <div id="monthlyTableModal" class="modal no-print">
     <div class="modal-content" style="max-width:98%;">
-        <h2>📊 جدول المناوبات الشهري</h2>
-        <p class="sub-title">قطاع جنوب الرياض</p>
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);">
+                <i class="fas fa-calendar-alt"></i>
+            </span>
+            <div>
+                <h2 style="margin:0; color:var(--primary-700);">جدول المناوبات الشهري</h2>
+                <p class="sub-title" style="margin:2px 0 0;">قطاع جنوب الرياض</p>
+            </div>
+        </div>
         <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
@@ -1537,17 +1504,22 @@
     </div>
 </div>
 
-<!-- نافذة التحكم والتنسيق -->
+<!-- ===== نافذة التحكم والتنسيق ===== -->
 <div id="controlModal" class="modal">
     <div class="modal-content" style="max-width:800px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h2 style="margin:0;">📋 التحكم والتنسيق</h2>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);">
+                    <i class="fas fa-sliders-h"></i>
+                </span>
+                <h2 style="margin:0;">التحكم والتنسيق</h2>
+            </div>
             <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
         </div>
         <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
         
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:8px; flex-wrap:wrap; gap:5px;">
-            <span style="font-weight:600;">عدد الأفراد: <span id="controlCount">9</span></span>
+            <span style="font-weight:600;"><i class="fas fa-users icon-primary"></i> عدد الأفراد: <span id="controlCount">9</span></span>
             <span style="font-weight:600; font-size:0.8rem; color:var(--gray-600);">تحكم عملياتي / تنسيق استجابة</span>
             <div style="display:flex; gap:5px;">
                 <button id="editVacationsBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-lock"></i> تعديل الإجازات</button>
@@ -1560,7 +1532,7 @@
         </div>
         
         <div class="form-row" style="margin-top:15px;">
-            <label>📝 ملاحظات إضافية:</label>
+            <label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label>
             <textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea>
         </div>
         
@@ -1571,13 +1543,13 @@
     </div>
 </div>
 
-<!-- نافذة إدخال الرقم السري -->
+<!-- ===== نافذة إدخال الرقم السري ===== -->
 <div id="passwordModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
-        <h3>🔒 إدخال الرقم السري</h3>
+        <h3><i class="fas fa-lock icon-primary"></i> إدخال الرقم السري</h3>
         <p class="sub-title">أدخل الرقم السري لتعديل الإجازات</p>
         <div class="form-row">
-            <label>🔑 الرقم السري:</label>
+            <label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري:</label>
             <input type="password" id="passwordInput" placeholder="أدخل الرقم السري">
         </div>
         <div class="modal-buttons">
@@ -1587,21 +1559,21 @@
     </div>
 </div>
 
-<!-- نافذة تغيير الرقم السري -->
+<!-- ===== نافذة تغيير الرقم السري ===== -->
 <div id="changePasswordModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
-        <h3>🔑 تغيير الرقم السري</h3>
+        <h3><i class="fas fa-key icon-primary"></i> تغيير الرقم السري</h3>
         <p class="sub-title">أدخل الرقم السري القديم والجديد</p>
         <div class="form-row">
-            <label>🔑 الرقم السري القديم:</label>
+            <label><i class="fas fa-key icon-gray icon-sm"></i> الرقم السري القديم:</label>
             <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم">
         </div>
         <div class="form-row">
-            <label>🔑 الرقم السري الجديد:</label>
+            <label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري الجديد:</label>
             <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)">
         </div>
         <div class="form-row">
-            <label>🔑 تأكيد الرقم السري الجديد:</label>
+            <label><i class="fas fa-check-circle icon-teal icon-sm"></i> تأكيد الرقم السري الجديد:</label>
             <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد">
         </div>
         <div class="modal-buttons">
@@ -2002,6 +1974,142 @@
         const message = formatWhatsAppMessage(data);
         sendWhatsAppMessage(message);
     });
+
+    // ============================================
+    // دوال التحديثات التشغيلية (المستندات)
+    // ============================================
+    let uploadedDocs = [];
+
+    async function loadDocs() {
+        try {
+            const response = await fetch('/api/docs');
+            const result = await response.json();
+            if (result.success) {
+                uploadedDocs = result.docs || [];
+                renderDocsList();
+                document.getElementById('docsUpdateTime').innerText = new Date().toLocaleTimeString('ar-SA');
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل التحديثات:", error);
+        }
+    }
+
+    function renderDocsList() {
+        const container = document.getElementById('docsListContainer');
+        if (!container) return;
+        
+        if (uploadedDocs.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:40px 20px; background:var(--gray-50); border-radius:var(--radius-md); border:2px dashed var(--gray-200);">
+                    <i class="fas fa-inbox icon-gray" style="font-size:3rem; display:block; margin-bottom:10px;"></i>
+                    <p style="color:var(--gray-400);">📭 لا توجد تحديثات تشغيلية حتى الآن</p>
+                    <p style="font-size:0.8rem; color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "رفع تحديث جديد"</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div style="display:grid; gap:12px;">';
+        uploadedDocs.forEach((doc, index) => {
+            const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
+            const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
+                         doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
+                         doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
+                         doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' :
+                         doc.filename.match(/\.(txt)$/i) ? '📃' : '📎';
+            
+            const colors = ['#1A3A5C', '#2E8B7A', '#E87461', '#E8C84A', '#2A5A7A', '#6B7F94'];
+            const color = colors[index % colors.length];
+            
+            html += `
+                <div style="display:flex; align-items:center; gap:12px; padding:14px 16px; background:white; border-radius:var(--radius-md); border-right:4px solid ${color}; box-shadow:var(--shadow-sm); transition:all 0.2s;">
+                    <div style="width:44px; height:44px; border-radius:50%; background:${color}22; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">
+                        ${icon}
+                    </div>
+                    <div style="flex:1; min-width:120px;">
+                        <div style="font-weight:600; font-size:0.9rem; color:var(--gray-800);">${doc.filename}</div>
+                        ${doc.description ? `<div style="font-size:0.75rem; color:var(--gray-600);">${doc.description}</div>` : ''}
+                        <div style="font-size:0.6rem; color:var(--gray-400); margin-top:2px;">
+                            <i class="far fa-calendar-alt"></i> ${date}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-shrink:0;">
+                        <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:6px 12px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);">
+                            <i class="fas fa-download"></i> تحميل
+                        </button>
+                        <button onclick="deleteDoc('${doc.id}')" class="btn" style="padding:6px 12px; font-size:0.7rem; border-color:var(--coral); color:var(--coral);">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} تحديثات تشغيلية`;
+    }
+
+    document.getElementById('uploadDocBtn')?.addEventListener('click', function() {
+        document.getElementById('docFileInput').click();
+    });
+
+    document.getElementById('docFileInput')?.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const description = prompt("أدخل وصفاً للتحديث (اختياري):", file.name);
+        
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            try {
+                const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)));
+                const response = await fetch('/api/upload-doc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        fileData: base64,
+                        description: description || '',
+                        fileType: file.type
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ تم رفع التحديث بنجاح');
+                    await loadDocs();
+                    document.getElementById('docFileInput').value = '';
+                } else {
+                    alert('❌ فشل في رفع التحديث: ' + (result.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                alert('❌ خطأ في رفع الملف: ' + error.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    async function downloadDoc(docId) {
+        try {
+            window.open(`/api/download-doc/${docId}`, '_blank');
+        } catch (error) {
+            alert('❌ فشل في تحميل التحديث');
+        }
+    }
+
+    async function deleteDoc(docId) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
+        try {
+            const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadDocs();
+            } else {
+                alert('❌ فشل في حذف التحديث');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    }
 
     // ============================================
     // إغلاق النوافذ بالضغط خارجها
@@ -2512,120 +2620,6 @@
     document.getElementById("printShiftBtn").onclick = printShiftForm;
     document.getElementById("saveShiftBtn").onclick = saveShiftData;
     document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
-
-    // دوال المستندات
-    let uploadedDocs = [];
-
-    async function loadDocs() {
-        try {
-            const response = await fetch('/api/docs');
-            const result = await response.json();
-            if (result.success) {
-                uploadedDocs = result.docs || [];
-                renderDocsList();
-            }
-        } catch (error) {
-            console.error("خطأ في تحميل المستندات:", error);
-        }
-    }
-
-    function renderDocsList() {
-        const container = document.getElementById('docsListContainer');
-        if (!container) return;
-        
-        if (uploadedDocs.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>';
-            return;
-        }
-        
-        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
-        uploadedDocs.forEach((doc) => {
-            const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
-            const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
-                         doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
-                         doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
-                         doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : '📎';
-            html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--gray-200); border-radius:6px; background:white;">
-                    <div>
-                        <span style="font-size:1.2rem;">${icon}</span>
-                        <span style="font-weight:bold; margin-right:8px;">${doc.filename}</span>
-                        <span style="font-size:0.7rem; color:var(--gray-600); margin-right:10px;">${date}</span>
-                        ${doc.description ? `<span style="font-size:0.7rem; color:var(--gray-600);">${doc.description}</span>` : ''}
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:4px 12px; font-size:0.7rem;">📥 تحميل</button>
-                        <button onclick="deleteDoc('${doc.id}')" class="btn" style="padding:4px 12px; font-size:0.7rem; border-color:var(--coral); color:var(--coral);">🗑️</button>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-        document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} مستندات محفوظة`;
-    }
-
-    document.getElementById('uploadDocBtn')?.addEventListener('click', function() {
-        document.getElementById('docFileInput').click();
-    });
-
-    document.getElementById('docFileInput')?.addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const description = prompt("أدخل وصفاً للمستند (اختياري):", file.name);
-        
-        const reader = new FileReader();
-        reader.onload = async function(event) {
-            try {
-                const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)));
-                const response = await fetch('/api/upload-doc', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filename: file.name,
-                        fileData: base64,
-                        description: description || '',
-                        fileType: file.type
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    alert('✅ تم رفع المستند بنجاح');
-                    await loadDocs();
-                    document.getElementById('docFileInput').value = '';
-                } else {
-                    alert('❌ فشل في رفع المستند: ' + (result.error || 'خطأ غير معروف'));
-                }
-            } catch (error) {
-                alert('❌ خطأ في رفع الملف: ' + error.message);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    });
-
-    async function downloadDoc(docId) {
-        try {
-            window.open(`/api/download-doc/${docId}`, '_blank');
-        } catch (error) {
-            alert('❌ فشل في تحميل المستند');
-        }
-    }
-
-    async function deleteDoc(docId) {
-        if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستند؟')) return;
-        try {
-            const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (result.success) {
-                await loadDocs();
-            } else {
-                alert('❌ فشل في حذف المستند');
-            }
-        } catch (error) {
-            alert('❌ خطأ في الاتصال');
-        }
-    }
 
     // دوال الإسعاف الجوي
     let airRecords = [];
@@ -3485,6 +3479,7 @@
     buildCentersTable();
     loadShifts();
     loadAllData();
+    loadDocs();
     
     setInterval(() => {
         if (!isViewingArchiveShift) {
