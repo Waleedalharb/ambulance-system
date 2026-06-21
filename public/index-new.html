@@ -3,679 +3,1207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>نموذج تسليم مناوبة كبار المسعفين - قطاع جنوب الرياض</title>
+    <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Segoe UI', 'Arial', monospace;
-        }
-        body {
-            background: #ffffff;
-            margin: 0;
-            padding: 20px;
-            color: #000000;
-        }
-        .container {
-            max-width: 1000px;
-            margin: auto;
-        }
-        /* الهوية البصرية الجديدة */
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #1e466e;
-            padding-bottom: 20px;
-        }
-        .header .logo-area {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 10px;
-        }
-        .header .logo-icon {
-            font-size: 2.5rem;
-        }
-        .header .title {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #1e466e;
-            letter-spacing: 2px;
-        }
-        .header .sub-title {
-            font-size: 1rem;
-            color: #333;
-            margin: 5px 0;
-        }
-        .header .sub-title-2 {
-            font-size: 0.9rem;
-            color: #555;
-            margin: 3px 0;
-        }
-        .header .sector-name {
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: #c0392b;
-            margin: 8px 0;
-        }
-        .header .badge-line {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-            font-size: 0.8rem;
-            color: #666;
-        }
-        .header .badge-line span {
-            background: #f0f0f0;
-            padding: 4px 15px;
-            border-radius: 20px;
-            border: 1px solid #ddd;
+        :root {
+            --primary-900: #0B1E33;
+            --primary-700: #1A3A5C;
+            --primary-500: #2A5A7A;
+            --primary-100: #E8EDF3;
+            --teal: #2E8B7A;
+            --teal-light: #E6F4F0;
+            --coral: #E87461;
+            --coral-light: #FDF0EC;
+            --gold: #E8C84A;
+            --white: #FFFFFF;
+            --gray-50: #F7F9FC;
+            --gray-100: #EDF1F7;
+            --gray-200: #D5DCE6;
+            --gray-400: #9AAEBD;
+            --gray-600: #6B7F94;
+            --gray-800: #2D3F52;
+            --gray-900: #1A2633;
+            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
+            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
+            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
         }
 
-        /* النموذج */
-        .form-section {
-            border: 1px solid #000;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
+            border-radius: var(--radius-lg);
+            padding: 14px 24px;
             margin-bottom: 20px;
-            background: #fafafa;
-            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            box-shadow: var(--shadow-md);
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .header-brand .icon {
+            width: 52px;
+            height: 52px;
+            background: rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border: 1px solid rgba(255,255,255,0.10);
+            transition: all 0.3s;
+        }
+        .header-brand .icon:hover {
+            background: rgba(255,255,255,0.16);
+            transform: scale(1.04);
+        }
+        .header-brand .icon svg {
+            width: 40px;
+            height: 40px;
+        }
+        .header-brand .text h1 {
+            color: var(--white);
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header-brand .text .sub {
+            color: rgba(255,255,255,0.75);
+            font-size: 0.7rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .header-brand .text .sub i {
+            font-size: 0.4rem;
+            color: var(--gold);
+        }
+        .header-date {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.1);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-bar {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .control-bar .total {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--gray-800);
+        }
+        .control-bar .total .number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            background: var(--primary-100);
+            padding: 0 12px;
+            border-radius: 30px;
+            line-height: 1.4;
+        }
+        .control-bar .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+        .btn:active {
+            transform: scale(0.97);
+        }
+        .btn i {
+            font-size: 0.9rem;
+        }
+        .btn-primary {
+            background: var(--primary-700);
+            color: var(--white);
+        }
+        .btn-primary:hover {
+            background: var(--primary-900);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gray-200);
+        }
+        .btn-outline:hover {
+            background: var(--gray-50);
+        }
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+        }
+        .btn-teal:hover {
+            background: #1F6B5E;
+        }
+        .btn-coral {
+            background: var(--coral);
+            color: var(--white);
+        }
+        .btn-coral:hover {
+            background: #D45A4A;
+        }
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+        }
+        .btn-xs {
+            padding: 3px 8px;
+            font-size: 0.6rem;
+            border-radius: 20px;
+        }
+
+        .stats-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .stats-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            background: var(--gray-50);
+        }
+        .stats-item .label {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stats-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin-top: 2px;
+        }
+        .stats-item .value.green {
+            color: var(--teal);
+        }
+        .stats-item .value.red {
+            color: var(--coral);
+        }
+        .stats-distribution {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+        .stats-distribution .title {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+        .dist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 0.75rem;
+        }
+        .dist-item .name {
+            min-width: 70px;
+            font-weight: 500;
+            color: var(--gray-800);
+        }
+        .dist-item .bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--gray-100);
+            border-radius: 10px;
             overflow: hidden;
         }
-        .form-section .section-title {
-            background: #1e466e;
-            color: white;
-            padding: 8px 15px;
-            font-weight: bold;
-            font-size: 1rem;
-            margin: 0;
+        .dist-item .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--primary-500);
+            transition: width 0.3s;
         }
-        .form-section .section-body {
-            padding: 15px;
-        }
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-        .form-row label {
-            font-weight: bold;
-            font-size: 0.85rem;
-            min-width: 120px;
-        }
-        .form-row input, .form-row select, .form-row textarea {
-            padding: 6px 10px;
-            border: 1px solid #aaa;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            background: white;
-            flex: 1;
-            min-width: 80px;
-        }
-        .form-row input[type="number"] {
-            max-width: 80px;
+        .dist-item .count {
+            min-width: 30px;
             text-align: center;
-        }
-        .form-row input[type="text"] {
-            flex: 2;
-        }
-        .form-row .inline-group {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .form-row .inline-group span {
-            font-size: 0.8rem;
-            color: #555;
-        }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        .grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-        }
-        .grid-4 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 10px;
+            font-weight: 600;
+            color: var(--gray-800);
         }
 
-        .total-display {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #1e466e;
-            background: #e8edf2;
-            padding: 4px 15px;
+        .sector-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .sector-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-100);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sector-title i {
+            color: var(--primary-500);
+            font-size: 1rem;
+        }
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .unit-card {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.2s;
+        }
+        .unit-card:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+        .unit-card .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+        .unit-card .count {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin: 4px 0;
+        }
+        .unit-card .count.zero {
+            color: var(--gray-400);
+        }
+        .unit-card .actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .unit-card .actions .btn {
+            padding: 3px 10px;
+            font-size: 0.6rem;
             border-radius: 20px;
-            display: inline-block;
+        }
+
+        /* ===== نافذة كبار المسعفين ===== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            max-width: 650px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+            margin: 20px;
+            box-shadow: var(--shadow-lg);
+        }
+        .modal-content h2 {
+            text-align: center;
+            margin: 0 0 5px 0;
+            color: var(--primary-700);
+        }
+        .modal-content .sub-title {
+            text-align: center;
+            color: var(--gray-600);
+            margin: 0 0 20px 0;
+            font-size: 0.9rem;
+        }
+        .form-row {
+            margin-bottom: 15px;
+        }
+        .form-row label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            color: var(--gray-800);
+        }
+        .form-row input,
+        .form-row textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .form-row input:focus,
+        .form-row textarea:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+        .form-row textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        .locations-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .locations-grid label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-100);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 400;
+        }
+        .locations-grid label:hover {
+            background: var(--primary-100);
+            border-color: var(--primary-500);
+        }
+        .locations-grid input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary-700);
+            cursor: pointer;
+        }
+
+        /* ===== قسم التوقيعات ===== */
+        .signatures-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid var(--gray-100);
+        }
+        .signatures-section h3 {
+            text-align: center;
+            font-size: 0.95rem;
+            color: var(--primary-700);
+            margin-bottom: 15px;
+        }
+        .signature-row {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .signature-row .sig-label {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--primary-700);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .signature-row .sig-label i {
+            font-size: 0.8rem;
+            color: var(--gold);
+        }
+        .signature-row .sig-inputs {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .signature-row .sig-inputs input {
+            flex: 1;
+            min-width: 120px;
+            padding: 6px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: white;
+        }
+        .signature-row .sig-inputs input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+        .signature-row .sig-inputs .sig-placeholder {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            display: flex;
+            align-items: center;
+        }
+
+        /* ===== سجل المناوبات المحفوظة ===== */
+        .saved-records {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            background: var(--gray-50);
+            display: none;
+        }
+        .saved-records h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            color: var(--primary-700);
+        }
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        .record-item .record-info {
+            flex: 1;
+            min-width: 150px;
+        }
+        .record-item .record-info strong {
+            color: var(--primary-700);
+        }
+        .record-item .record-info .rec-locations {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+        }
+        .record-item .record-info .rec-date {
+            font-size: 0.6rem;
+            color: var(--gray-400);
+            display: block;
+        }
+        .record-item .record-actions button {
+            padding: 2px 10px;
+            border: 1px solid var(--coral);
+            background: white;
+            color: var(--coral);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+        .record-item .record-actions button:hover {
+            background: var(--coral);
+            color: white;
         }
 
         .modal-buttons {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 12px;
             margin-top: 20px;
             flex-wrap: wrap;
         }
-        .modal-buttons button {
-            padding: 10px 30px;
-            border: 1px solid #000;
-            font-weight: bold;
+        .modal-buttons .btn-save {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 30px;
+            background: var(--primary-700);
+            color: white;
+            font-weight: 600;
             cursor: pointer;
-            border-radius: 6px;
             font-size: 0.9rem;
+            transition: all 0.2s;
         }
-        .btn-save {
-            background: #2a7f3e;
+        .modal-buttons .btn-save:hover {
+            background: var(--primary-900);
+        }
+        .modal-buttons .btn-print {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 30px;
+            background: var(--teal);
             color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
         }
-        .btn-print {
-            background: #f39c12;
-            color: white;
+        .modal-buttons .btn-print:hover {
+            background: #1F6B5E;
         }
-        .btn-close {
+        .modal-buttons .btn-close {
+            padding: 10px 28px;
+            border: 1px solid var(--gray-200);
+            border-radius: 30px;
             background: white;
-            color: #333;
+            color: var(--gray-800);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .modal-buttons .btn-close:hover {
+            background: var(--gray-50);
         }
 
+        /* ===== تحسينات الطباعة ===== */
         @media print {
-            .modal-buttons, .no-print {
-                display: none !important;
+            body { background: white; padding: 10px; }
+            .header { background: #0B1E33 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .control-bar, .stats-card, .footer, .no-print { display: none !important; }
+            .modal {
+                display: block !important;
+                position: relative !important;
+                background: white !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                transform: none !important;
             }
-            body {
-                padding: 10px;
-                background: white;
+            .modal-content {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 10px !important;
+                box-shadow: none !important;
+                border: 1px solid #000 !important;
+                max-height: none !important;
+                overflow: visible !important;
             }
-            .form-section {
-                border: 1px solid #000;
-                background: white;
-            }
-            .form-section .section-title {
-                background: #1e466e !important;
-                color: white !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .header {
-                border-bottom: 3px solid #1e466e !important;
-            }
+            .modal-buttons { display: none !important; }
+            .saved-records { display: none !important; }
+            .signature-row input { border: none !important; border-bottom: 1px solid #000 !important; border-radius: 0 !important; background: transparent !important; }
+            .locations-grid label { border: none !important; background: transparent !important; }
+            .locations-grid input[type="checkbox"] { display: none !important; }
+            .locations-grid label::after { content: " ✅"; }
+            .locations-grid label:has(input:not(:checked))::after { content: " ❌"; }
+            .form-row input { border: none !important; border-bottom: 1px solid #000 !important; border-radius: 0 !important; background: transparent !important; }
+            .form-row textarea { border: 1px solid #000 !important; background: transparent !important; }
         }
 
-        @media (max-width: 700px) {
-            .grid-2, .grid-3, .grid-4 {
-                grid-template-columns: 1fr;
-            }
-            .form-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .form-row label {
-                min-width: auto;
-            }
-            .form-row input[type="number"] {
-                max-width: 100%;
-            }
-            .header .title {
-                font-size: 1.3rem;
-            }
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        @media (max-width: 650px) {
+            body { padding: 8px; }
+            .header { flex-direction: column; align-items: stretch; text-align: center; padding: 14px; }
+            .header-brand { justify-content: center; }
+            .header-date { text-align: center; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .control-bar .actions { justify-content: center; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
+            .locations-grid { grid-template-columns: 1fr 1fr; }
+            .signature-row .sig-inputs { flex-direction: column; }
+            .signature-row .sig-inputs input { min-width: 100%; }
+            .modal-content { padding: 16px; margin: 10px; }
         }
     </style>
 </head>
 <body>
-<div class="container">
-
-    <!-- ============================================ -->
-    <!-- الهوية البصرية الجديدة                        -->
-    <!-- ============================================ -->
-    <div class="header">
-        <div class="logo-area">
-            <span class="logo-icon">🏥</span>
-            <span class="title">هيئة الهلال الأحمر السعودي</span>
-            <span class="logo-icon">🏥</span>
+    <!-- ===== الشريط العلوي ===== -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="icon">
+                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="10" y="32" width="100" height="14" rx="2" fill="#FFFFFF" opacity="0.95"/>
+                    <rect x="16" y="46" width="88" height="10" rx="2" fill="#FFFFFF" opacity="0.7"/>
+                    <rect x="22" y="56" width="76" height="8" rx="2" fill="#FFFFFF" opacity="0.5"/>
+                    <polygon points="10,32 110,32 86,88 34,88" fill="#FFFFFF" opacity="0.10"/>
+                    <polygon points="32,42 47,42 39,60" fill="#E8C84A" opacity="0.85"/>
+                    <polygon points="52,42 67,42 59,60" fill="#E8C84A" opacity="0.85"/>
+                    <polygon points="72,42 87,42 79,60" fill="#E8C84A" opacity="0.85"/>
+                    <line x1="14" y1="38" x2="106" y2="38" stroke="#FFFFFF" stroke-width="1.5" opacity="0.25"/>
+                    <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.15"/>
+                </svg>
+            </div>
+            <div class="text">
+                <h1>منصة الجنوب</h1>
+                <div class="sub">
+                    <i class="fas fa-circle"></i> إدارة العمليات الإسعافية - قطاع جنوب الرياض
+                </div>
+            </div>
         </div>
-        <div class="sub-title">SAUDI RED CRESCENT AUTHORITY</div>
-        <div class="sub-title-2">فرع الهيئة بمنطقة الرياض - إدارة العمليات الإسعافية</div>
-        <div class="sector-name">📍 قطاع جنوب مدينة الرياض 📍</div>
-        <div class="badge-line">
-            <span>📋 نموذج تسليم مناوبة كبار المسعفين</span>
-            <span>📅 <span id="currentDateDisplay"></span></span>
-            <span>⏰ <span id="currentTimeDisplay"></span></span>
+        <div class="header-date">
+            <i class="fas fa-calendar-alt"></i> <span id="currentDate"></span>
+        </div>
+    </header>
+
+    <!-- ===== شريط التحكم ===== -->
+    <div class="control-bar">
+        <div class="total">
+            <i class="fas fa-chart-bar"></i> إجمالي البلاغات
+            <span class="number" id="grandTotal">0</span>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
+            <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
+            <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
+            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
+            <button class="btn btn-outline btn-sm" id="controlBtn"><i class="fas fa-sliders-h"></i> التحكم</button>
+            <button class="btn btn-outline btn-sm" id="seniorShiftBtn"><i class="fas fa-user-md"></i> كبار المسعفين</button>
+            <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
         </div>
     </div>
 
-    <!-- ============================================ -->
-    <!-- معلومات المناوبة                              -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">📋 معلومات المناوبة</div>
-        <div class="section-body">
+    <!-- ===== إحصائيات البلاغات ===== -->
+    <div class="stats-card" id="liveReportStats" style="display:none;">
+        <div class="stats-grid">
+            <div class="stats-item">
+                <div class="label">إجمالي البلاغات</div>
+                <div class="value" id="liveTotalReports">0</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">أكثر فرقة استخداماً</div>
+                <div class="value green" id="liveTopUnit">-</div>
+            </div>
+            <div class="stats-item">
+                <div class="label">عدد البلاغات للفرقة الأكثر</div>
+                <div class="value red" id="liveTopUnitCount">0</div>
+            </div>
+        </div>
+        <div class="stats-distribution" id="liveUnitDistribution">
+            <div class="title"><i class="fas fa-chart-pie"></i> توزيع البلاغات على الفرق</div>
+            <div id="liveUnitList"></div>
+        </div>
+    </div>
+
+    <!-- ===== شبكة الفرق ===== -->
+    <div id="pointsContainer">
+        <div class="loading">⏳ جاري تحميل البيانات...</div>
+    </div>
+
+    <!-- ===== نافذة كبار المسعفين ===== -->
+    <div id="seniorShiftModal" class="modal">
+        <div class="modal-content">
+            <h2>📋 تسليم مناوبة كبار المسعفين</h2>
+            <p class="sub-title">تسجيل بيانات المناوبة لكبار المسعفين</p>
+
+            <!-- بيانات المركبات -->
             <div class="form-row">
-                <label>📅 التاريخ:</label>
-                <input type="date" id="handoverDate" style="max-width:200px;">
-                <label>⏰ الوقت:</label>
-                <input type="time" id="handoverTime" style="max-width:150px;">
-                <label>🌅 المناوبة:</label>
-                <select id="handoverShiftType" style="max-width:150px;">
-                    <option value="صباحية">صباحية</option>
-                    <option value="ليلية">ليلية</option>
-                </select>
-                <label>📍 القطاع:</label>
-                <span style="font-weight:bold; color:#c0392b;">الجنوب</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- القوى البشرية                                 -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">👥 القوى البشرية</div>
-        <div class="section-body">
-            <div class="grid-2">
-                <div class="form-row">
-                    <label>إجمالي المسعفين وفق الجدول:</label>
-                    <input type="number" id="hTotalStaff" value="28">
-                </div>
-                <div class="form-row">
-                    <label>الحضور الآن:</label>
-                    <input type="number" id="hPresentStaff" value="28">
-                </div>
-                <div class="form-row">
-                    <label>المتطوعين:</label>
-                    <input type="number" id="hVolunteers" value="0">
-                </div>
-                <div class="form-row">
-                    <label>موظفين اللوكم:</label>
-                    <input type="number" id="hLocumStaff" value="0">
-                </div>
-                <div class="form-row">
-                    <label>عدد الزيادات من المسعفين:</label>
-                    <input type="number" id="hExtraStaff" value="0">
-                </div>
+                <label>🚑 عدد المركبات العاملة:</label>
+                <input type="number" id="seniorActiveCars" min="0" value="0">
             </div>
 
-            <div style="margin-top:10px; border-top:1px dashed #ddd; padding-top:10px;">
-                <div class="form-row">
-                    <label style="font-weight:bold;">الغياب:</label>
-                    <div class="inline-group">
-                        <label>أساسي:</label>
-                        <input type="number" id="hAbsentEssential" value="0" style="max-width:70px;">
-                    </div>
-                    <div class="inline-group">
-                        <label>تداخلي:</label>
-                        <input type="number" id="hAbsentInterference" value="0" style="max-width:70px;">
-                    </div>
-                    <div class="inline-group">
-                        <label>إجمالي الغياب:</label>
-                        <span id="hAbsentTotal" class="total-display" style="font-size:1rem;">0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- قوة القطاع                                    -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">🚑 قوة القطاع</div>
-        <div class="section-body">
-            <div style="font-weight:bold; margin-bottom:5px;">أساسية:</div>
-            <div class="grid-3">
-                <div class="form-row">
-                    <label>وحدة إسعافية:</label>
-                    <input type="number" id="hAmbulanceBase" value="13" style="max-width:60px;">
-                    <span>من أصل</span>
-                    <input type="number" id="hAmbulanceBaseTotal" value="13" style="max-width:60px;">
-                </div>
-                <div class="form-row">
-                    <label>وحدة سريع:</label>
-                    <input type="number" id="hRapidBase" value="2" style="max-width:60px;">
-                    <span>من أصل</span>
-                    <input type="number" id="hRapidBaseTotal" value="2" style="max-width:60px;">
-                </div>
-                <div class="form-row">
-                    <label>سريع تخصصية:</label>
-                    <input type="number" id="hRapidSpecialized" value="0" style="max-width:70px;">
-                </div>
-                <div class="form-row">
-                    <label>سريع مساعد:</label>
-                    <input type="number" id="hRapidAssistant" value="1" style="max-width:70px;">
-                </div>
-            </div>
-
-            <div style="font-weight:bold; margin:10px 0 5px;">تداخلية:</div>
-            <div class="grid-3">
-                <div class="form-row">
-                    <label>وحدة إسعافية:</label>
-                    <input type="number" id="hAmbulanceInter" value="0" style="max-width:60px;">
-                    <span>من أصل</span>
-                    <input type="number" id="hAmbulanceInterTotal" value="3" style="max-width:60px;">
-                </div>
-                <div class="form-row">
-                    <label>وحدة سريع:</label>
-                    <input type="number" id="hRapidInter" value="0" style="max-width:60px;">
-                    <span>من أصل</span>
-                    <input type="number" id="hRapidInterTotal" value="1" style="max-width:60px;">
-                </div>
-            </div>
-
-            <div style="margin-top:10px; border-top:1px dashed #ddd; padding-top:10px;">
-                <div style="font-weight:bold; margin-bottom:5px;">الإجمالي:</div>
-                <div class="grid-3">
-                    <div class="form-row">
-                        <label>إجمالي فرق سريع المناوبة:</label>
-                        <input type="number" id="hTotalRapid" value="3" style="max-width:80px;">
-                    </div>
-                    <div class="form-row">
-                        <label>إجمالي الفرق الإسعافية المناوبة:</label>
-                        <input type="number" id="hTotalAmbulance" value="13" style="max-width:80px;">
-                    </div>
-                    <div class="form-row">
-                        <label>إجمالي الوحدات المناوبة:</label>
-                        <input type="number" id="hTotalUnits" value="16" style="max-width:80px;">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- المركبات                                      -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">🚗 المركبات</div>
-        <div class="section-body">
-            <div class="grid-3">
-                <div style="font-weight:bold;">العاملة:</div>
-                <div class="form-row">
-                    <label>إسعاف:</label>
-                    <input type="number" id="hCarAmbulanceWorking" value="17" style="max-width:70px;">
-                </div>
-                <div class="form-row">
-                    <label>سريع:</label>
-                    <input type="number" id="hCarRapidWorking" value="4" style="max-width:70px;">
-                </div>
-                <div style="font-weight:bold;">المتعطلة:</div>
-                <div class="form-row">
-                    <label>إسعاف:</label>
-                    <input type="number" id="hCarAmbulanceBroken" value="3" style="max-width:70px;">
-                </div>
-                <div class="form-row">
-                    <label>سريع:</label>
-                    <input type="number" id="hCarRapidBroken" value="0" style="max-width:70px;">
-                </div>
-                <div style="font-weight:bold;">الاحتياط:</div>
-                <div class="form-row">
-                    <label>إسعاف:</label>
-                    <input type="number" id="hCarAmbulanceReserve" value="0" style="max-width:70px;">
-                </div>
-                <div class="form-row">
-                    <label>سريع:</label>
-                    <input type="number" id="hCarRapidReserve" value="0" style="max-width:70px;">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- الملاحظات                                     -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">📝 الملاحظات</div>
-        <div class="section-body">
             <div class="form-row">
-                <label>نقاط إسعافية ثابتة مكشوفة:</label>
-                <input type="text" id="hNotesPoints" value="لا يوجد" style="flex:3;">
+                <label>🔧 عدد المركبات المتعطلة:</label>
+                <input type="number" id="seniorBrokenCars" min="0" value="0">
             </div>
+
             <div class="form-row">
-                <label>شركاء الاستجابة:</label>
-                <input type="text" id="hNotesPartners" value="لا يوجد" style="flex:3;">
+                <label>🔄 عدد مركبات الاحتياط:</label>
+                <input type="number" id="seniorReserveCars" min="0" value="0">
             </div>
+
             <div class="form-row">
-                <label>ملاحظات عامة:</label>
-                <textarea id="hNotesGeneral" rows="2" style="flex:3;">لا يوجد</textarea>
+                <label>📊 عدد فرق الاوفر لاب:</label>
+                <input type="number" id="seniorOverlapTeams" min="0" value="0">
+            </div>
+
+            <!-- مناطق التمركز -->
+            <div class="form-row">
+                <label>📍 مناطق تمركز فرق الاوفر لاب (اختياري):</label>
+                <div class="locations-grid">
+                    <label><input type="checkbox" class="senior-location" value="الشفاء"> الشفاء</label>
+                    <label><input type="checkbox" class="senior-location" value="عكاظ"> عكاظ</label>
+                    <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> الدار البيضاء</label>
+                    <label><input type="checkbox" class="senior-location" value="الإسكان"> الإسكان</label>
+                    <label><input type="checkbox" class="senior-location" value="المنصورة"> المنصورة</label>
+                </div>
+            </div>
+
+            <!-- الملاحظات -->
+            <div class="form-row">
+                <label>📝 ملاحظات إضافية:</label>
+                <textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+            </div>
+
+            <!-- ===== التوقيعات ===== -->
+            <div class="signatures-section">
+                <h3>✍️ التسليم والاستلام</h3>
+                
+                <div class="signature-row">
+                    <div class="sig-label"><i class="fas fa-user-tie"></i> مساعد كبير المسعفين:</div>
+                    <div class="sig-inputs">
+                        <input type="text" id="seniorAssistantName" placeholder="الاسم">
+                        <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)">
+                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorAssistantDate"></span></span>
+                    </div>
+                </div>
+
+                <div class="signature-row">
+                    <div class="sig-label"><i class="fas fa-user-md"></i> كبير المسعفين:</div>
+                    <div class="sig-inputs">
+                        <input type="text" id="seniorChiefName" placeholder="الاسم">
+                        <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)">
+                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorChiefDate"></span></span>
+                    </div>
+                </div>
+
+                <div class="signature-row">
+                    <div class="sig-label"><i class="fas fa-flag"></i> قائد المنطقة:</div>
+                    <div class="sig-inputs">
+                        <input type="text" id="seniorRegionLeaderName" placeholder="الاسم">
+                        <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)">
+                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorRegionLeaderDate"></span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- السجل المحفوظ -->
+            <div class="saved-records" id="seniorSavedRecords">
+                <h4>📋 المناوبات المحفوظة</h4>
+                <div id="seniorRecordsList"></div>
+            </div>
+
+            <!-- الأزرار -->
+            <div class="modal-buttons">
+                <button class="btn-save" id="saveSeniorShift"><i class="fas fa-save"></i> حفظ المناوبة</button>
+                <button class="btn-print" id="printSeniorShift"><i class="fas fa-print"></i> طباعة التقرير</button>
+                <button class="btn-close" id="closeSeniorShift"><i class="fas fa-times"></i> إغلاق</button>
             </div>
         </div>
     </div>
 
-    <!-- ============================================ -->
-    <!-- الكوادر القيادية                              -->
-    <!-- ============================================ -->
-    <div class="form-section">
-        <div class="section-title">👤 الكوادر القيادية</div>
-        <div class="section-body">
-            <div class="grid-3">
-                <div class="form-row">
-                    <label>مساعد كبير المسعفين:</label>
-                    <input type="text" id="hSeniorAssistant" value="حمود السبيعي" style="flex:1;">
-                </div>
-                <div class="form-row">
-                    <label>كبير المسعفين:</label>
-                    <input type="text" id="hSeniorChief" value="فواز الاشجعي" style="flex:1;">
-                </div>
-                <div class="form-row">
-                    <label>قائد المنطقة:</label>
-                    <input type="text" id="hSeniorLeader" value="علي الحربي" style="flex:1;">
-                </div>
-            </div>
-        </div>
+    <div class="footer">
+        <i class="fas fa-clock"></i> ضغطة = بلاغ  |  <i class="fas fa-undo-alt"></i> تراجع  |  <i class="fas fa-sync-alt"></i> تحديث تلقائي
     </div>
 
-    <!-- ============================================ -->
-    <!-- الأزرار                                       -->
-    <!-- ============================================ -->
-    <div class="modal-buttons no-print">
-        <button class="btn-save" id="saveHandoverBtn">💾 حفظ التقرير</button>
-        <button class="btn-print" id="printHandoverBtn">🖨️ طباعة</button>
-        <button class="btn-close" id="resetHandoverBtn">🔄 إعادة تعيين</button>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- التذيير                                       -->
-    <!-- ============================================ -->
-    <div style="text-align:center; margin-top:30px; padding-top:15px; border-top:1px solid #aaa; font-size:0.7rem; color:#666;">
-        هيئة الهلال الأحمر السعودي - فرع منطقة الرياض - إدارة العمليات الإسعافية - قطاع جنوب الرياض
-    </div>
-</div>
-
-<script>
-    // ============================================
-    // تعبئة التاريخ والوقت الحالي
-    // ============================================
-    function setCurrentDateTime() {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('ar-SA');
-        const timeStr = now.toLocaleTimeString('ar-SA');
-        document.getElementById('currentDateDisplay').innerText = dateStr;
-        document.getElementById('currentTimeDisplay').innerText = timeStr;
-        document.getElementById('handoverDate').value = now.toISOString().split('T')[0];
-        document.getElementById('handoverTime').value = now.toTimeString().slice(0,5);
-    }
-
-    // ============================================
-    // حساب إجمالي الغياب تلقائياً
-    // ============================================
-    function calculateAbsentTotal() {
-        const essential = parseInt(document.getElementById('hAbsentEssential').value) || 0;
-        const interference = parseInt(document.getElementById('hAbsentInterference').value) || 0;
-        document.getElementById('hAbsentTotal').innerText = essential + interference;
-    }
-
-    // ربط حساب الغياب بالتغيير
-    document.getElementById('hAbsentEssential').addEventListener('input', calculateAbsentTotal);
-    document.getElementById('hAbsentInterference').addEventListener('input', calculateAbsentTotal);
-
-    // ============================================
-    // حفظ التقرير (محلياً للتجربة)
-    // ============================================
-    function saveHandoverData() {
-        const data = {
-            date: document.getElementById('handoverDate').value,
-            time: document.getElementById('handoverTime').value,
-            shiftType: document.getElementById('handoverShiftType').value,
-            totalStaff: parseInt(document.getElementById('hTotalStaff').value) || 0,
-            presentStaff: parseInt(document.getElementById('hPresentStaff').value) || 0,
-            volunteers: parseInt(document.getElementById('hVolunteers').value) || 0,
-            locumStaff: parseInt(document.getElementById('hLocumStaff').value) || 0,
-            extraStaff: parseInt(document.getElementById('hExtraStaff').value) || 0,
-            absentEssential: parseInt(document.getElementById('hAbsentEssential').value) || 0,
-            absentInterference: parseInt(document.getElementById('hAbsentInterference').value) || 0,
-            ambulanceBase: parseInt(document.getElementById('hAmbulanceBase').value) || 0,
-            ambulanceBaseTotal: parseInt(document.getElementById('hAmbulanceBaseTotal').value) || 0,
-            rapidBase: parseInt(document.getElementById('hRapidBase').value) || 0,
-            rapidBaseTotal: parseInt(document.getElementById('hRapidBaseTotal').value) || 0,
-            rapidSpecialized: parseInt(document.getElementById('hRapidSpecialized').value) || 0,
-            rapidAssistant: parseInt(document.getElementById('hRapidAssistant').value) || 0,
-            ambulanceInter: parseInt(document.getElementById('hAmbulanceInter').value) || 0,
-            ambulanceInterTotal: parseInt(document.getElementById('hAmbulanceInterTotal').value) || 0,
-            rapidInter: parseInt(document.getElementById('hRapidInter').value) || 0,
-            rapidInterTotal: parseInt(document.getElementById('hRapidInterTotal').value) || 0,
-            totalRapid: parseInt(document.getElementById('hTotalRapid').value) || 0,
-            totalAmbulance: parseInt(document.getElementById('hTotalAmbulance').value) || 0,
-            totalUnits: parseInt(document.getElementById('hTotalUnits').value) || 0,
-            carAmbulanceWorking: parseInt(document.getElementById('hCarAmbulanceWorking').value) || 0,
-            carRapidWorking: parseInt(document.getElementById('hCarRapidWorking').value) || 0,
-            carAmbulanceBroken: parseInt(document.getElementById('hCarAmbulanceBroken').value) || 0,
-            carRapidBroken: parseInt(document.getElementById('hCarRapidBroken').value) || 0,
-            carAmbulanceReserve: parseInt(document.getElementById('hCarAmbulanceReserve').value) || 0,
-            carRapidReserve: parseInt(document.getElementById('hCarRapidReserve').value) || 0,
-            notesPoints: document.getElementById('hNotesPoints').value || '',
-            notesPartners: document.getElementById('hNotesPartners').value || '',
-            notesGeneral: document.getElementById('hNotesGeneral').value || '',
-            seniorAssistant: document.getElementById('hSeniorAssistant').value || '',
-            seniorChief: document.getElementById('hSeniorChief').value || '',
-            seniorLeader: document.getElementById('hSeniorLeader').value || '',
-            savedAt: new Date().toISOString()
+    <script>
+        // ============================================
+        // البيانات التجريبية (للعرض فقط)
+        // ============================================
+        const mockData = {
+            centers: {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            },
+            reports: {
+                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
+                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
+                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
+                "المنصورة|سريع 3": { count: 0, times: [] },
+                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
+                "منفوحة|جنوب 3": { count: 0, times: [] },
+                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
+                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
+                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
+                "الإسكان|جنوب 6": { count: 0, times: [] },
+                "الحائر|جنوب 7": { count: 0, times: [] },
+                "ديراب|جنوب 10": { count: 0, times: [] },
+                "عكاظ|جنوب 9": { count: 0, times: [] },
+                "الشفاء|جنوب 8": { count: 0, times: [] },
+                "الشفاء|سريع 2": { count: 0, times: [] },
+                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
+                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
+            }
         };
 
-        try {
-            localStorage.setItem('handoverData', JSON.stringify(data));
-            alert('✅ تم حفظ التقرير بنجاح (محلياً)');
-        } catch (error) {
-            alert('❌ فشل في حفظ التقرير: ' + error.message);
-        }
-    }
-
-    // ============================================
-    // تحميل التقرير المحفوظ
-    // ============================================
-    function loadHandoverData() {
-        try {
-            const saved = localStorage.getItem('handoverData');
-            if (saved) {
-                const data = JSON.parse(saved);
-                document.getElementById('handoverDate').value = data.date || '';
-                document.getElementById('handoverTime').value = data.time || '';
-                document.getElementById('handoverShiftType').value = data.shiftType || 'صباحية';
-                document.getElementById('hTotalStaff').value = data.totalStaff || 28;
-                document.getElementById('hPresentStaff').value = data.presentStaff || 28;
-                document.getElementById('hVolunteers').value = data.volunteers || 0;
-                document.getElementById('hLocumStaff').value = data.locumStaff || 0;
-                document.getElementById('hExtraStaff').value = data.extraStaff || 0;
-                document.getElementById('hAbsentEssential').value = data.absentEssential || 0;
-                document.getElementById('hAbsentInterference').value = data.absentInterference || 0;
-                document.getElementById('hAmbulanceBase').value = data.ambulanceBase || 13;
-                document.getElementById('hAmbulanceBaseTotal').value = data.ambulanceBaseTotal || 13;
-                document.getElementById('hRapidBase').value = data.rapidBase || 2;
-                document.getElementById('hRapidBaseTotal').value = data.rapidBaseTotal || 2;
-                document.getElementById('hRapidSpecialized').value = data.rapidSpecialized || 0;
-                document.getElementById('hRapidAssistant').value = data.rapidAssistant || 1;
-                document.getElementById('hAmbulanceInter').value = data.ambulanceInter || 0;
-                document.getElementById('hAmbulanceInterTotal').value = data.ambulanceInterTotal || 3;
-                document.getElementById('hRapidInter').value = data.rapidInter || 0;
-                document.getElementById('hRapidInterTotal').value = data.rapidInterTotal || 1;
-                document.getElementById('hTotalRapid').value = data.totalRapid || 3;
-                document.getElementById('hTotalAmbulance').value = data.totalAmbulance || 13;
-                document.getElementById('hTotalUnits').value = data.totalUnits || 16;
-                document.getElementById('hCarAmbulanceWorking').value = data.carAmbulanceWorking || 17;
-                document.getElementById('hCarRapidWorking').value = data.carRapidWorking || 4;
-                document.getElementById('hCarAmbulanceBroken').value = data.carAmbulanceBroken || 3;
-                document.getElementById('hCarRapidBroken').value = data.carRapidBroken || 0;
-                document.getElementById('hCarAmbulanceReserve').value = data.carAmbulanceReserve || 0;
-                document.getElementById('hCarRapidReserve').value = data.carRapidReserve || 0;
-                document.getElementById('hNotesPoints').value = data.notesPoints || 'لا يوجد';
-                document.getElementById('hNotesPartners').value = data.notesPartners || 'لا يوجد';
-                document.getElementById('hNotesGeneral').value = data.notesGeneral || 'لا يوجد';
-                document.getElementById('hSeniorAssistant').value = data.seniorAssistant || 'حمود السبيعي';
-                document.getElementById('hSeniorChief').value = data.seniorChief || 'فواز الاشجعي';
-                document.getElementById('hSeniorLeader').value = data.seniorLeader || 'علي الحربي';
-                calculateAbsentTotal();
+        // ============================================
+        // دوال العرض (البلاغات)
+        // ============================================
+        function updateTotal() {
+            let total = 0;
+            for (let key in mockData.reports) {
+                total += mockData.reports[key].count;
             }
-        } catch (error) {
-            console.error('خطأ في تحميل البيانات:', error);
+            document.getElementById('grandTotal').innerText = total;
         }
-    }
 
-    // ============================================
-    // إعادة تعيين النموذج للقيم الافتراضية
-    // ============================================
-    function resetHandoverForm() {
-        if (confirm('⚠️ هل أنت متأكد من إعادة تعيين جميع الحقول للقيم الافتراضية؟')) {
-            document.getElementById('hTotalStaff').value = 28;
-            document.getElementById('hPresentStaff').value = 28;
-            document.getElementById('hVolunteers').value = 0;
-            document.getElementById('hLocumStaff').value = 0;
-            document.getElementById('hExtraStaff').value = 0;
-            document.getElementById('hAbsentEssential').value = 0;
-            document.getElementById('hAbsentInterference').value = 0;
-            document.getElementById('hAmbulanceBase').value = 13;
-            document.getElementById('hAmbulanceBaseTotal').value = 13;
-            document.getElementById('hRapidBase').value = 2;
-            document.getElementById('hRapidBaseTotal').value = 2;
-            document.getElementById('hRapidSpecialized').value = 0;
-            document.getElementById('hRapidAssistant').value = 1;
-            document.getElementById('hAmbulanceInter').value = 0;
-            document.getElementById('hAmbulanceInterTotal').value = 3;
-            document.getElementById('hRapidInter').value = 0;
-            document.getElementById('hRapidInterTotal').value = 1;
-            document.getElementById('hTotalRapid').value = 3;
-            document.getElementById('hTotalAmbulance').value = 13;
-            document.getElementById('hTotalUnits').value = 16;
-            document.getElementById('hCarAmbulanceWorking').value = 17;
-            document.getElementById('hCarRapidWorking').value = 4;
-            document.getElementById('hCarAmbulanceBroken').value = 3;
-            document.getElementById('hCarRapidBroken').value = 0;
-            document.getElementById('hCarAmbulanceReserve').value = 0;
-            document.getElementById('hCarRapidReserve').value = 0;
-            document.getElementById('hNotesPoints').value = 'لا يوجد';
-            document.getElementById('hNotesPartners').value = 'لا يوجد';
-            document.getElementById('hNotesGeneral').value = 'لا يوجد';
-            document.getElementById('hSeniorAssistant').value = 'حمود السبيعي';
-            document.getElementById('hSeniorChief').value = 'فواز الاشجعي';
-            document.getElementById('hSeniorLeader').value = 'علي الحربي';
-            calculateAbsentTotal();
-            setCurrentDateTime();
-            alert('✅ تم إعادة تعيين النموذج');
+        function renderUnits() {
+            const container = document.getElementById('pointsContainer');
+            container.innerHTML = '';
+            
+            for (let center in mockData.centers) {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-card';
+                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+                container.appendChild(sectorDiv);
+                
+                const grid = sectorDiv.querySelector('.units-grid');
+                for (let unit of mockData.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const info = mockData.reports[key] || { count: 0, times: [] };
+                    const hasReports = info.count > 0;
+                    const isZero = info.count === 0;
+                    
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit-card';
+                    unitDiv.innerHTML = `
+                        <div class="name">${unit}</div>
+                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
+                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
+                        </div>
+                    `;
+                    
+                    unitDiv.querySelector('.report-btn').onclick = function() {
+                        info.count++;
+                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
+                        renderUnits();
+                        updateTotal();
+                        updateLiveStats();
+                    };
+                    
+                    if (hasReports) {
+                        unitDiv.querySelector('.undo-btn').onclick = function() {
+                            if (info.count > 0) {
+                                info.count--;
+                                info.times.pop();
+                                renderUnits();
+                                updateTotal();
+                                updateLiveStats();
+                            }
+                        };
+                    }
+                    
+                    grid.appendChild(unitDiv);
+                }
+            }
         }
-    }
 
-    // ============================================
-    // ربط الأزرار
-    // ============================================
-    document.getElementById('saveHandoverBtn').addEventListener('click', saveHandoverData);
-    document.getElementById('resetHandoverBtn').addEventListener('click', resetHandoverForm);
-    document.getElementById('printHandoverBtn').addEventListener('click', function() {
-        window.print();
-    });
+        function updateLiveStats() {
+            const container = document.getElementById('liveReportStats');
+            let total = 0;
+            let unitStats = {};
+            
+            for (let key in mockData.reports) {
+                const report = mockData.reports[key];
+                if (report && report.count > 0) {
+                    total += report.count;
+                    const unit = key.split('|')[1];
+                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
+                }
+            }
+            
+            if (total === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            document.getElementById('liveTotalReports').innerText = total;
+            
+            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+            
+            document.getElementById('liveTopUnit').innerText = topUnit;
+            document.getElementById('liveTopUnitCount').innerText = topCount;
+            
+            const listContainer = document.getElementById('liveUnitList');
+            listContainer.innerHTML = '';
+            sortedUnits.forEach(([unit, count]) => {
+                const percentage = Math.round((count / total) * 100);
+                const div = document.createElement('div');
+                div.className = 'dist-item';
+                div.innerHTML = `
+                    <span class="name">${unit}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${percentage}%;"></div>
+                    </div>
+                    <span class="count">${count}</span>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
 
-    // ============================================
-    // التشغيل
-    // ============================================
-    setCurrentDateTime();
-    loadHandoverData();
+        // ============================================
+        // دوال كبار المسعفين (محاكاة التخزين المحلي)
+        // ============================================
+        let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
 
-    // تحديث الوقت كل دقيقة
-    setInterval(() => {
-        const now = new Date();
-        document.getElementById('currentTimeDisplay').innerText = now.toLocaleTimeString('ar-SA');
-    }, 60000);
-</script>
+        function renderSeniorRecords() {
+            const container = document.getElementById('seniorRecordsList');
+            const section = document.getElementById('seniorSavedRecords');
+            if (!container || !section) return;
+
+            if (seniorRecords.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            let html = '';
+            seniorRecords.forEach((record, index) => {
+                const date = new Date(record.createdAt).toLocaleString('ar-SA');
+                const locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
+                html += `
+                    <div class="record-item">
+                        <div class="record-info">
+                            <strong>🚑 ${record.activeCars || 0}</strong>
+                            <span style="margin:0 5px;">|</span>
+                            <span>🔧 ${record.brokenCars || 0}</span>
+                            <span style="margin:0 5px;">|</span>
+                            <span>🔄 ${record.reserveCars || 0}</span>
+                            <span style="margin:0 5px;">|</span>
+                            <span>📊 ${record.overlapTeams || 0}</span>
+                            <span style="margin:0 5px;">|</span>
+                            <span class="rec-locations">📍 ${locations}</span>
+                            <span class="rec-date">🕒 ${date}</span>
+                            ${record.assistantName ? `<span style="font-size:0.6rem; color:var(--primary-700);">👤 ${record.assistantName}</span>` : ''}
+                        </div>
+                        <div class="record-actions">
+                            <button onclick="deleteSeniorRecord(${index})">🗑️ حذف</button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function saveSeniorRecordToLocal(data) {
+            seniorRecords.unshift({
+                ...data,
+                createdAt: new Date().toISOString()
+            });
+            localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+            renderSeniorRecords();
+        }
+
+        function deleteSeniorRecord(index) {
+            if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
+            seniorRecords.splice(index, 1);
+            localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+            renderSeniorRecords();
+        }
+
+        // ============================================
+        // دوال النافذة
+        // ============================================
+        document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
+            // تعبئة التواريخ التلقائية
+            const now = new Date().toLocaleDateString('ar-SA');
+            document.getElementById('seniorAssistantDate').innerText = now;
+            document.getElementById('seniorChiefDate').innerText = now;
+            document.getElementById('seniorRegionLeaderDate').innerText = now;
+            
+            document.getElementById('seniorShiftModal').style.display = 'flex';
+            renderSeniorRecords();
+        });
+
+        document.getElementById('closeSeniorShift')?.addEventListener('click', function() {
+            document.getElementById('seniorShiftModal').style.display = 'none';
+        });
+
+        document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
+            const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+            const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+            const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+            const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+            const locations = [];
+            document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
+            const notes = document.getElementById('seniorNotes').value.trim();
+            
+            const assistantName = document.getElementById('seniorAssistantName').value.trim();
+            const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
+            const chiefName = document.getElementById('seniorChiefName').value.trim();
+            const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
+            const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
+            const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+
+            if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
+                alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)');
+                return;
+            }
+
+            saveSeniorRecordToLocal({
+                activeCars,
+                brokenCars,
+                reserveCars,
+                overlapTeams,
+                locations,
+                notes,
+                assistantName,
+                assistantSignature,
+                chiefName,
+                chiefSignature,
+                leaderName,
+                leaderSignature
+            });
+
+            alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح');
+            
+            // تصفير الحقول
+            document.getElementById('seniorActiveCars').value = 0;
+            document.getElementById('seniorBrokenCars').value = 0;
+            document.getElementById('seniorReserveCars').value = 0;
+            document.getElementById('seniorOverlapTeams').value = 0;
+            document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
+            document.getElementById('seniorNotes').value = '';
+            document.getElementById('seniorAssistantName').value = '';
+            document.getElementById('seniorAssistantSignature').value = '';
+            document.getElementById('seniorChiefName').value = '';
+            document.getElementById('seniorChiefSignature').value = '';
+            document.getElementById('seniorRegionLeaderName').value = '';
+            document.getElementById('seniorRegionLeaderSignature').value = '';
+        });
+
+        document.getElementById('printSeniorShift')?.addEventListener('click', function() {
+            // التأكد من وجود بيانات للحفظ قبل الطباعة
+            const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+            const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+            const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+            const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+            
+            if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
+                alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الطباعة');
+                return;
+            }
+            
+            window.print();
+        });
+
+        // ============================================
+        // أزرار تجريبية (تنبيهات)
+        // ============================================
+        document.getElementById('newShiftBtn').onclick = function() {
+            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة (تجريبي).')) {
+                for (let key in mockData.reports) {
+                    mockData.reports[key] = { count: 0, times: [] };
+                }
+                renderUnits();
+                updateTotal();
+                updateLiveStats();
+                alert('✅ تم بدء مناوبة جديدة');
+            }
+        };
+
+        document.getElementById('shiftBtn').onclick = function() {
+            alert('📋 نموذج المناوبة - سيتم إضافته قريباً');
+        };
+        document.getElementById('docsBtn').onclick = function() {
+            alert('📁 المستندات - سيتم إضافتها قريباً');
+        };
+        document.getElementById('airAmbulanceBtn').onclick = function() {
+            alert('🚁 الإسعاف الجوي - سيتم إضافته قريباً');
+        };
+        document.getElementById('controlBtn').onclick = function() {
+            alert('📋 التحكم والتنسيق - سيتم إضافته قريباً');
+        };
+        document.getElementById('monthlyTableBtn').onclick = function() {
+            alert('📊 الجدول الشهري - سيتم إضافته قريباً');
+        };
+
+        // ============================================
+        // إغلاق النافذة بالضغط خارجها
+        // ============================================
+        window.onclick = function(e) {
+            const modal = document.getElementById('seniorShiftModal');
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+
+        // ============================================
+        // التشغيل
+        // ============================================
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
+        renderUnits();
+        updateTotal();
+        updateLiveStats();
+
+        console.log('✅ منصة الجنوب - نسخة تجريبية مع نموذج كبار المسعفين');
+    </script>
 </body>
 </html>
