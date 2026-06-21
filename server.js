@@ -469,7 +469,7 @@ app.get('/api/docs', async (req, res) => {
 
 app.post('/api/upload-doc', async (req, res) => {
     try {
-        const { filename, fileData, description, fileType } = req.body;
+        const { filename, fileData, description, fileType, category, priority, uploader } = req.body;
         if (!filename || !fileData) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
@@ -480,6 +480,9 @@ app.post('/api/upload-doc', async (req, res) => {
             fileData: fileData,
             fileType: fileType || 'application/octet-stream',
             description: description || '',
+            category: category || 'أخرى',
+            priority: priority || 'normal',
+            uploader: uploader || 'المشرف',
             uploadDate: new Date().toISOString()
         };
         docs.push(newDoc);

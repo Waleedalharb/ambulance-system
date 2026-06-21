@@ -2,380 +2,488 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رفع شعار منصة الجنوب</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>رفع شعار قطاع الجنوب</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        :root {
+            --primary-900: #0B1E33;
+            --primary-700: #1A3A5C;
+            --primary-500: #2A5A7A;
+            --primary-100: #E8EDF3;
+            --teal: #2E8B7A;
+            --teal-light: #E6F4F0;
+            --coral: #E87461;
+            --coral-light: #FDF0EC;
+            --gold: #E8C84A;
+            --white: #FFFFFF;
+            --gray-50: #F7F9FC;
+            --gray-100: #EDF1F7;
+            --gray-200: #D5DCE6;
+            --gray-400: #9AAEBD;
+            --gray-600: #6B7F94;
+            --gray-800: #2D3F52;
+            --gray-900: #1A2633;
+            --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
+            --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
+            --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
             padding: 20px;
         }
+
         .container {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
             max-width: 500px;
             width: 100%;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header {
             text-align: center;
+            margin-bottom: 30px;
         }
-        .container h1 {
-            color: #0B1E33;
-            margin-bottom: 10px;
-        }
-        .container p {
-            color: #666;
-            margin-bottom: 25px;
-        }
-        .drop-zone {
-            border: 2px dashed #0B1E33;
-            border-radius: 16px;
-            padding: 40px 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #f9fafc;
-        }
-        .drop-zone:hover {
-            background: #e8edf3;
-            border-color: #1A3A5C;
-        }
-        .drop-zone.dragover {
-            background: #d4e6f1;
-            border-color: #2A5A7A;
-        }
-        .drop-zone img {
+
+        .header .icon {
             width: 80px;
             height: 80px;
-            opacity: 0.5;
-            margin-bottom: 15px;
+            margin: 0 auto 15px;
+            background: var(--primary-100);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: var(--primary-700);
         }
-        .drop-zone p {
-            color: #888;
-            margin: 0;
+
+        .header h1 {
+            color: var(--primary-700);
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: var(--gray-600);
+            font-size: 0.85rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--gray-200);
+            border-radius: var(--radius-md);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+            background: var(--gray-50);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-500);
+            background: var(--primary-100);
+        }
+
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--gray-400);
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .upload-area p {
+            color: var(--gray-600);
             font-size: 0.9rem;
         }
-        .drop-zone .browse-text {
-            color: #1A3A5C;
-            font-weight: 600;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        #fileInput {
-            display: none;
-        }
-        .preview-area {
-            margin-top: 20px;
-            display: none;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            background: #f9fafc;
-        }
-        .preview-area img {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 8px;
-        }
-        .preview-area .code-box {
-            margin-top: 15px;
-            background: #0B1E33;
-            color: #e8edf3;
-            padding: 15px;
-            border-radius: 8px;
+
+        .upload-area .sub {
+            color: var(--gray-400);
             font-size: 0.7rem;
-            text-align: left;
-            direction: ltr;
-            font-family: monospace;
-            word-break: break-all;
-            max-height: 200px;
-            overflow-y: auto;
-            cursor: pointer;
+            margin-top: 5px;
         }
-        .preview-area .code-box:hover {
-            background: #1A3A5C;
+
+        #previewContainer {
+            display: none;
+            margin: 15px 0;
+            padding: 15px;
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            text-align: center;
         }
+
+        #previewContainer img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--gray-200);
+        }
+
         .btn {
-            margin-top: 15px;
-            padding: 10px 30px;
-            border: none;
+            font-family: 'Inter', sans-serif;
+            padding: 10px 24px;
             border-radius: 30px;
+            border: 1px solid var(--gray-200);
             font-weight: 600;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            color: var(--gray-800);
+            width: 100%;
+            justify-content: center;
+            text-decoration: none;
         }
+
         .btn-primary {
-            background: #1A3A5C;
-            color: white;
+            background: var(--primary-700);
+            color: var(--white);
+            border-color: var(--primary-700);
         }
+
         .btn-primary:hover {
-            background: #0B1E33;
+            background: var(--primary-900);
+            border-color: var(--primary-900);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
-        .btn-success {
-            background: #2E8B7A;
-            color: white;
+
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+            border-color: var(--teal);
         }
-        .btn-success:hover {
+
+        .btn-teal:hover {
             background: #1F6B5E;
+            border-color: #1F6B5E;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
-        .btn-copy {
-            background: #E8C84A;
-            color: #0B1E33;
+
+        .btn-coral {
+            background: var(--coral);
+            color: var(--white);
+            border-color: var(--coral);
         }
-        .btn-copy:hover {
-            background: #d4b83a;
+
+        .btn-coral:hover {
+            background: #D45A4A;
+            border-color: #D45A4A;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2E8B7A;
-            color: white;
-            padding: 12px 25px;
-            border-radius: 30px;
-            font-weight: 600;
-            display: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
         }
-        .info-text {
-            font-size: 0.75rem;
-            color: #888;
+
+        .buttons-row {
+            display: flex;
+            gap: 10px;
             margin-top: 15px;
         }
-        .image-name {
-            font-weight: 600;
-            color: #1A3A5C;
-            margin-top: 10px;
+
+        .buttons-row .btn {
+            width: auto;
+            flex: 1;
         }
-        .logo-preview {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            background: #f9fafc;
+
+        .status {
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            margin-top: 15px;
+            font-size: 0.85rem;
             display: none;
         }
-        .logo-preview img {
-            max-width: 100px;
-            max-height: 100px;
-            border-radius: 8px;
+
+        .status.success {
+            display: block;
+            background: var(--teal-light);
+            color: var(--teal);
+            border: 1px solid var(--teal);
+        }
+
+        .status.error {
+            display: block;
+            background: var(--coral-light);
+            color: var(--coral);
+            border: 1px solid var(--coral);
+        }
+
+        .status.info {
+            display: block;
+            background: var(--primary-100);
+            color: var(--primary-700);
+            border: 1px solid var(--primary-500);
+        }
+
+        .current-logo {
+            margin: 15px 0;
+            padding: 15px;
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .current-logo img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: var(--radius-sm);
+        }
+
+        .current-logo .label {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            .buttons-row { flex-direction: column; }
+            .buttons-row .btn { width: 100%; }
         }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h1>🏷️ رفع شعار منصة الجنوب</h1>
-    <p>اختر صورة الشعار الخاصة بك (PNG, JPG, SVG, GIF)</p>
-
-    <!-- الشعار الحالي -->
-    <div class="logo-preview" id="currentLogoPreview">
-        <p style="color:#888; font-size:0.8rem;">الشعار الحالي:</p>
-        <img id="currentLogoImage" src="" alt="الشعار الحالي">
-        <button class="btn btn-copy" id="removeLogoBtn" style="margin-top:10px; padding:5px 15px; font-size:0.7rem;">🗑️ إزالة الشعار</button>
-    </div>
-
-    <!-- منطقة السحب والإفلات -->
-    <div class="drop-zone" id="dropZone">
-        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E" alt="رفع">
-        <p>اسحب الصورة هنا أو <span class="browse-text">اختر من الجهاز</span></p>
-        <input type="file" id="fileInput" accept="image/*,.svg">
-    </div>
-
-    <!-- منطقة المعاينة -->
-    <div class="preview-area" id="previewArea">
-        <div id="previewContent">
-            <img id="previewImage" src="" alt="معاينة الشعار">
-            <div class="image-name" id="imageName"></div>
-            <div class="code-box" id="codeBox">
-                <!-- سيكون هنا كود SVG أو Base64 -->
+    <div class="container">
+        <div class="header">
+            <div class="icon">
+                <i class="fas fa-image"></i>
             </div>
+            <h1>رفع شعار القطاع</h1>
+            <p>اختر صورة شعار قطاع جنوب الرياض</p>
         </div>
-        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px;">
-            <button class="btn btn-success" id="useImageBtn">✅ استخدام هذا الشعار</button>
-            <button class="btn btn-copy" id="copyCodeBtn">📋 نسخ الكود</button>
-            <button class="btn btn-primary" id="resetBtn">🔄 اختيار صورة أخرى</button>
+
+        <!-- عرض الشعار الحالي -->
+        <div class="current-logo" id="currentLogoContainer" style="display:none;">
+            <span class="label">الشعار الحالي</span>
+            <img id="currentLogoPreview" src="" alt="الشعار الحالي">
+            <button onclick="removeLogo()" class="btn btn-coral" style="margin-top:10px; width:auto; padding:4px 16px; font-size:0.7rem;">
+                <i class="fas fa-trash"></i> حذف الشعار
+            </button>
         </div>
-        <p class="info-text">سيتم حفظ الشعار في ذاكرة المتصفح، ويمكنك استخدامه في البرنامج الرئيسي.</p>
+
+        <!-- منطقة رفع الملف -->
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p><strong>اضغط لاختيار صورة الشعار</strong></p>
+            <p class="sub">يدعم: PNG, JPG, JPEG, SVG, GIF</p>
+            <p class="sub" style="margin-top:8px; font-size:0.6rem; color:var(--gray-400);">
+                يُفضل استخدام صورة بحجم 512×512 بكسل أو أكثر
+            </p>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;">
+        </div>
+
+        <!-- معاينة الصورة -->
+        <div id="previewContainer">
+            <img id="imagePreview" src="" alt="معاينة الشعار">
+            <p style="font-size:0.7rem; color:var(--gray-400); margin-top:5px;" id="fileNameDisplay"></p>
+        </div>
+
+        <!-- الأزرار -->
+        <div class="buttons-row">
+            <button id="saveLogoBtn" class="btn btn-primary" disabled>
+                <i class="fas fa-save"></i> حفظ الشعار
+            </button>
+            <a href="/" class="btn" style="text-decoration:none; color:var(--gray-800);">
+                <i class="fas fa-home"></i> العودة
+            </a>
+        </div>
+
+        <!-- حالة العملية -->
+        <div id="status" class="status"></div>
+
+        <div class="footer">
+            <i class="fas fa-info-circle"></i> سيتم تطبيق الشعار على جميع أجهزة المنصة
+        </div>
     </div>
 
-    <!-- رسالة منبثقة -->
-    <div class="toast" id="toast">✅ تم نسخ الكود!</div>
-</div>
+    <script>
+        // ============================================
+        // متغيرات
+        // ============================================
+        let selectedFile = null;
+        let imageDataUrl = null;
 
-<script>
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const previewArea = document.getElementById('previewArea');
-    const previewImage = document.getElementById('previewImage');
-    const imageName = document.getElementById('imageName');
-    const codeBox = document.getElementById('codeBox');
-    const useImageBtn = document.getElementById('useImageBtn');
-    const copyCodeBtn = document.getElementById('copyCodeBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const toast = document.getElementById('toast');
-    const currentLogoPreview = document.getElementById('currentLogoPreview');
-    const currentLogoImage = document.getElementById('currentLogoImage');
-    const removeLogoBtn = document.getElementById('removeLogoBtn');
-
-    let currentImageData = null;
-    let currentImageType = '';
-
-    // ============================================
-    // تحميل الشعار المحفوظ
-    // ============================================
-    function loadSavedLogo() {
-        try {
-            const saved = localStorage.getItem('brandLogo');
-            if (saved) {
-                currentLogoImage.src = saved;
-                currentLogoPreview.style.display = 'block';
-            } else {
-                currentLogoPreview.style.display = 'none';
-            }
-        } catch(e) {}
-    }
-
-    // ============================================
-    // إزالة الشعار
-    // ============================================
-    removeLogoBtn.addEventListener('click', function() {
-        if (confirm('⚠️ هل أنت متأكد من إزالة الشعار المخصص؟')) {
-            localStorage.removeItem('brandLogo');
-            localStorage.removeItem('brandLogoType');
-            localStorage.removeItem('brandLogoName');
-            currentLogoPreview.style.display = 'none';
-            showToast('✅ تم إزالة الشعار المخصص');
-        }
-    });
-
-    // ============================================
-    // رفع الملف
-    // ============================================
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) handleFile(file);
-    });
-
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file) handleFile(file);
-    });
-
-    function handleFile(file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const dataUrl = event.target.result;
-            currentImageData = dataUrl;
-            currentImageType = file.type;
-
-            previewImage.src = dataUrl;
-            imageName.textContent = `📁 ${file.name} (${Math.round(file.size / 1024)} كيلوبايت)`;
-            previewArea.style.display = 'block';
-
-            let code = '';
-            if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
-                fetch(dataUrl)
-                    .then(res => res.text())
-                    .then(svgText => {
-                        code = svgText;
-                        codeBox.textContent = code;
-                    })
-                    .catch(() => {
-                        code = dataUrl;
-                        codeBox.textContent = code;
-                    });
-            } else {
-                code = dataUrl;
-                codeBox.textContent = code;
-            }
-
-            showToast('✅ تم رفع الصورة بنجاح!');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // ============================================
-    // استخدام الشعار
-    // ============================================
-    useImageBtn.addEventListener('click', () => {
-        if (currentImageData) {
+        // ============================================
+        // تحميل الشعار الحالي
+        // ============================================
+        function loadCurrentLogo() {
             try {
-                localStorage.setItem('brandLogo', currentImageData);
-                localStorage.setItem('brandLogoType', currentImageType);
-                loadSavedLogo();
-                showToast('✅ تم حفظ الشعار! يمكنك الآن فتح الصفحة الرئيسية.');
+                const savedLogo = localStorage.getItem('brandLogo');
+                if (savedLogo) {
+                    const container = document.getElementById('currentLogoContainer');
+                    const preview = document.getElementById('currentLogoPreview');
+                    container.style.display = 'block';
+                    preview.src = savedLogo;
+                }
+            } catch(e) {}
+        }
+
+        // ============================================
+        // حذف الشعار
+        // ============================================
+        function removeLogo() {
+            if (!confirm('⚠️ هل أنت متأكد من حذف الشعار؟')) return;
+            try {
+                localStorage.removeItem('brandLogo');
+                sessionStorage.removeItem('brandLogo');
+                document.getElementById('currentLogoContainer').style.display = 'none';
+                showStatus('✅ تم حذف الشعار', 'success');
+                setTimeout(() => window.location.reload(), 1000);
             } catch(e) {
-                showToast('⚠️ الصورة كبيرة جداً، حاول استخدام SVG.');
+                showStatus('❌ فشل في حذف الشعار', 'error');
             }
         }
-    });
 
-    // ============================================
-    // نسخ الكود
-    // ============================================
-    copyCodeBtn.addEventListener('click', () => {
-        const code = codeBox.textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            showToast('✅ تم نسخ الكود!');
-        }).catch(() => {
-            const textarea = document.createElement('textarea');
-            textarea.value = code;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            showToast('✅ تم نسخ الكود!');
+        // ============================================
+        // معالجة اختيار الملف
+        // ============================================
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showStatus('❌ الرجاء اختيار ملف صورة فقط', 'error');
+                return;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                showStatus('❌ حجم الصورة كبير جداً (الحد الأقصى 5 ميجابايت)', 'error');
+                return;
+            }
+
+            selectedFile = file;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imageDataUrl = event.target.result;
+                const preview = document.getElementById('imagePreview');
+                const container = document.getElementById('previewContainer');
+                const fileName = document.getElementById('fileNameDisplay');
+                
+                preview.src = imageDataUrl;
+                fileName.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} كيلوبايت)`;
+                container.style.display = 'block';
+                document.getElementById('saveLogoBtn').disabled = false;
+                showStatus('', '');
+            };
+            reader.readAsDataURL(file);
         });
-    });
 
-    // ============================================
-    // إعادة تعيين
-    // ============================================
-    resetBtn.addEventListener('click', () => {
-        previewArea.style.display = 'none';
-        fileInput.value = '';
-        currentImageData = null;
-        showToast('🔄 تم إعادة تعيين الصورة');
-    });
+        // ============================================
+        // حفظ الشعار
+        // ============================================
+        document.getElementById('saveLogoBtn').addEventListener('click', function() {
+            if (!imageDataUrl) {
+                showStatus('❌ الرجاء اختيار صورة أولاً', 'error');
+                return;
+            }
 
-    // ============================================
-    // رسالة منبثقة
-    // ============================================
-    function showToast(message) {
-        toast.textContent = message;
-        toast.style.display = 'block';
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 3000);
-    }
+            try {
+                localStorage.setItem('brandLogo', imageDataUrl);
+                sessionStorage.setItem('brandLogo', imageDataUrl);
+                
+                showStatus('✅ تم حفظ الشعار بنجاح! سيتم تطبيقه على جميع الأجهزة.', 'success');
+                
+                loadCurrentLogo();
+                
+                document.getElementById('previewContainer').style.display = 'none';
+                document.getElementById('fileInput').value = '';
+                document.getElementById('saveLogoBtn').disabled = true;
+                selectedFile = null;
+                imageDataUrl = null;
+                
+                setTimeout(() => {
+                    if (confirm('✅ تم حفظ الشعار بنجاح!\nهل تريد الذهاب إلى الصفحة الرئيسية لمشاهدة الشعار؟')) {
+                        window.location.href = '/';
+                    }
+                }, 500);
+            } catch(e) {
+                showStatus('❌ فشل في حفظ الشعار: ' + e.message, 'error');
+            }
+        });
 
-    // ============================================
-    // التشغيل
-    // ============================================
-    loadSavedLogo();
+        // ============================================
+        // عرض الحالة
+        // ============================================
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            if (!message) {
+                status.style.display = 'none';
+                return;
+            }
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
 
-    console.log('✅ صفحة رفع الشعار جاهزة!');
-    console.log('📌 بعد رفع الصورة، استخدم زر "استخدام هذا الشعار" لحفظه.');
-</script>
+        // ============================================
+        // سحب وإفلات الملفات
+        // ============================================
+        const uploadArea = document.getElementById('uploadArea');
 
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.style.borderColor = 'var(--primary-500)';
+            this.style.background = 'var(--primary-100)';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.style.borderColor = 'var(--gray-200)';
+            this.style.background = 'var(--gray-50)';
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.borderColor = 'var(--gray-200)';
+            this.style.background = 'var(--gray-50)';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                document.getElementById('fileInput').dispatchEvent(new Event('change'));
+            }
+        });
+
+        // ============================================
+        // تحميل الشعار عند فتح الصفحة
+        // ============================================
+        loadCurrentLogo();
+
+        console.log('🖼️ شعار قطاع الجنوب - رفع الشعار');
+        console.log('📌 بعد الحفظ، سيظهر الشعار على جميع الأجهزة');
+    </script>
 </body>
 </html>
