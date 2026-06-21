@@ -1,24 +1,54 @@
 const express = require('express');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// مسارات ملفات البيانات
+// إنشاء مجلد البيانات تلقائياً
 // ============================================
-const DATA_PATH = '/data/ambulance-data.json';
-const SHIFT_DATA_PATH = '/data/shift-data.json';
-const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
-const DOCS_PATH = '/data/docs.json';
-const AIR_PATH = '/data/air-ambulance.json';
-const IDENTITY_PATH = '/data/identity.pdf';
-const CONTROL_NOTES_PATH = '/data/control-notes.json';
-const VACATIONS_PATH = '/data/vacations.json';
-const PASSWORD_PATH = '/data/password.json';
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fsSync.existsSync(DATA_DIR)) {
+    fsSync.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+const DATA_PATH = path.join(DATA_DIR, 'ambulance-data.json');
+const SHIFT_DATA_PATH = path.join(DATA_DIR, 'shift-data.json');
+const MONTHLY_TABLE_PATH = path.join(DATA_DIR, 'monthly-table.xlsx');
+const DOCS_PATH = path.join(DATA_DIR, 'docs.json');
+const AIR_PATH = path.join(DATA_DIR, 'air-ambulance.json');
+const IDENTITY_PATH = path.join(DATA_DIR, 'identity.pdf');
+const CONTROL_NOTES_PATH = path.join(DATA_DIR, 'control-notes.json');
+const VACATIONS_PATH = path.join(DATA_DIR, 'vacations.json');
+const PASSWORD_PATH = path.join(DATA_DIR, 'password.json');
+
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
+
+// ============================================
+// إنشاء ملفات البيانات إذا لم تكن موجودة
+// ============================================
+async function ensureDataFiles() {
+    const files = [
+        { path: DATA_PATH, default: {} },
+        { path: SHIFT_DATA_PATH, default: [] },
+        { path: DOCS_PATH, default: [] },
+        { path: AIR_PATH, default: [] },
+        { path: CONTROL_NOTES_PATH, default: { notes: '' } },
+        { path: VACATIONS_PATH, default: [] },
+        { path: PASSWORD_PATH, default: { password: '1234' } }
+    ];
+    for (const file of files) {
+        try {
+            await fs.access(file.path);
+        } catch {
+            await fs.writeFile(file.path, JSON.stringify(file.default, null, 2));
+        }
+    }
+}
+ensureDataFiles();
 
 // Middleware
 app.use(express.json({ limit: '100mb' }));
@@ -29,13 +59,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // إعداد Multer لرفع الملفات
 // ============================================
 const upload = multer({
-    dest: '/data/temp/',
+    dest: path.join(DATA_DIR, 'temp/'),
     limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 async function ensureTempDir() {
     try {
-        await fs.mkdir('/data/temp', { recursive: true });
+        await fs.mkdir(path.join(DATA_DIR, 'temp'), { recursive: true });
     } catch (e) {}
 }
 ensureTempDir();
@@ -126,6 +156,7 @@ async function readPassword() {
         return parsed.password || '1234';
     } catch (error) {
         if (error.code === 'ENOENT') {
+            await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password: '1234' }));
             return '1234';
         }
         return '1234';
@@ -135,6 +166,13 @@ async function readPassword() {
 async function writePassword(password) {
     await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
 }
+
+// ============================================
+// API: الصفحة الرئيسية
+// ============================================
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // ============================================
 // API: جلب البيانات
@@ -669,10 +707,6 @@ app.post('/api/change-password', async (req, res) => {
 // ============================================
 app.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
-    console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
-    console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
-    console.log(`📁 مسار المستندات: ${DOCS_PATH}`);
-    console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
-    console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
-    console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
+    console.log(`📁 مسار البيانات: ${DATA_DIR}`);
+    console.log(`📁 مسار الملفات الثابتة: ${path.join(__dirname, 'public')}`);
 });
