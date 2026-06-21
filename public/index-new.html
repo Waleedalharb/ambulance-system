@@ -58,6 +58,74 @@
             margin: auto;
         }
 
+        /* ===== أيقونات الهوية الجديدة ===== */
+        .icon-primary { color: var(--primary-700); }
+        .icon-teal { color: var(--teal); }
+        .icon-coral { color: var(--coral); }
+        .icon-gold { color: var(--gold); }
+        .icon-white { color: var(--white); }
+        .icon-gray { color: var(--gray-600); }
+        .icon-sm { font-size: 0.8rem; }
+        .icon-md { font-size: 1.1rem; }
+        .icon-lg { font-size: 1.4rem; }
+        .icon-xl { font-size: 1.8rem; }
+
+        .icon-bg-primary {
+            background: var(--primary-100);
+            padding: 8px;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-bg-teal {
+            background: var(--teal-light);
+            padding: 8px;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-bg-coral {
+            background: var(--coral-light);
+            padding: 8px;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-bg-gold {
+            background: #FFF8E7;
+            padding: 8px;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .card-icon.primary { background: var(--primary-100); color: var(--primary-700); }
+        .card-icon.teal { background: var(--teal-light); color: var(--teal); }
+        .card-icon.coral { background: var(--coral-light); color: var(--coral); }
+        .card-icon.gold { background: #FFF8E7; color: var(--gold); }
+
         /* ===== الشريط العلوي ===== */
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
@@ -252,6 +320,17 @@
         }
         .btn-coral:hover {
             background: #D45A4A;
+        }
+        .btn-whatsapp {
+            background: #25D366;
+            color: var(--white);
+            border-color: #25D366;
+            border-radius: 30px;
+            padding: 8px 24px;
+        }
+        .btn-whatsapp:hover {
+            background: #1DA851;
+            border-color: #1DA851;
         }
 
         .viewing-badge {
@@ -786,10 +865,10 @@
             border-top: 2px solid var(--gray-200);
         }
         .signatures-section h3 {
-            text-align: center;
-            font-size: 0.95rem;
-            color: var(--primary-700);
-            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
         }
         .signature-row {
             display: flex;
@@ -808,9 +887,6 @@
             display: flex;
             align-items: center;
             gap: 6px;
-        }
-        .signature-row .sig-label i {
-            color: var(--gold);
         }
         .signature-row .sig-inputs {
             display: flex;
@@ -836,6 +912,7 @@
             color: var(--gray-400);
             display: flex;
             align-items: center;
+            gap: 4px;
         }
 
         .saved-records {
@@ -852,6 +929,9 @@
             margin: 0 0 10px 0;
             font-size: 0.9rem;
             color: var(--primary-700);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .record-item {
             display: flex;
@@ -911,10 +991,8 @@
             body { background: white; padding: 0; margin: 0; }
             .container { max-width: 100%; margin: 0; padding: 5px; }
             
-            /* إخفاء كل شيء */
             body * { visibility: hidden !important; }
             
-            /* إظهار نافذة كبار المسعفين فقط */
             #seniorShiftModal,
             #seniorShiftModal * {
                 visibility: visible !important;
@@ -954,7 +1032,7 @@
             .btn-close,
             #closeSeniorShift,
             #saveSeniorShift,
-            #printSeniorShift {
+            #sendWhatsAppSeniorShift {
                 display: none !important;
             }
             
@@ -1173,7 +1251,7 @@
             <button id="docsBtn" class="btn"><i class="fas fa-folder-open"></i> المستندات</button>
             <button id="airAmbulanceBtn" class="btn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
             <button id="controlBtn" class="btn"><i class="fas fa-sliders-h"></i> التحكم</button>
-            <button id="seniorShiftBtn" class="btn"><i class="fas fa-user-md"></i> كبار المسعفين</button>
+            <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
         </div>
     </div>
@@ -1522,89 +1600,130 @@
     </div>
 </div>
 
-<!-- نافذة كبار المسعفين -->
+<!-- ============================================ -->
+<!-- نافذة كبار المسعفين - النسخة المطورة -->
+<!-- ============================================ -->
 <div id="seniorShiftModal" class="modal">
     <div class="modal-content" style="max-width:650px;">
-        <h2>📋 تسليم مناوبة كبار المسعفين</h2>
-        <p class="sub-title">تسجيل بيانات المناوبة لكبار المسعفين</p>
-        <p class="print-date" style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-bottom:15px;">📅 <span id="seniorPrintDate"></span></p>
+        <!-- رأس النافذة مع أيقونات -->
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);">
+                <i class="fas fa-user-md"></i>
+            </span>
+            <div>
+                <h2 style="margin:0; color:var(--primary-700);">تسليم مناوبة كبار المسعفين</h2>
+                <p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات المناوبة لكبار المسعفين</p>
+            </div>
+        </div>
+        <p class="print-date" style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-bottom:15px;">
+            <i class="far fa-calendar-alt icon-primary icon-sm"></i> 
+            <span id="seniorPrintDate"></span>
+        </p>
 
+        <!-- الحقول مع أيقونات -->
         <div class="form-row">
-            <label>🚑 عدد المركبات العاملة:</label>
-            <input type="number" id="seniorActiveCars" min="0" value="0">
+            <label><i class="fas fa-ambulance icon-teal icon-sm"></i> عدد المركبات العاملة:</label>
+            <input type="number" id="seniorActiveCars" min="0" value="0" style="font-size:1rem; font-weight:600;">
         </div>
 
         <div class="form-row">
-            <label>🔧 عدد المركبات المتعطلة:</label>
-            <input type="number" id="seniorBrokenCars" min="0" value="0">
+            <label><i class="fas fa-wrench icon-coral icon-sm"></i> عدد المركبات المتعطلة:</label>
+            <input type="number" id="seniorBrokenCars" min="0" value="0" style="font-size:1rem; font-weight:600;">
         </div>
 
         <div class="form-row">
-            <label>🔄 عدد مركبات الاحتياط:</label>
-            <input type="number" id="seniorReserveCars" min="0" value="0">
+            <label><i class="fas fa-rotate icon-gold icon-sm"></i> عدد مركبات الاحتياط:</label>
+            <input type="number" id="seniorReserveCars" min="0" value="0" style="font-size:1rem; font-weight:600;">
         </div>
 
         <div class="form-row">
-            <label>📊 عدد فرق الاوفر لاب:</label>
-            <input type="number" id="seniorOverlapTeams" min="0" value="0">
+            <label><i class="fas fa-people-arrows icon-primary icon-sm"></i> عدد فرق الاوفر لاب:</label>
+            <input type="number" id="seniorOverlapTeams" min="0" value="0" style="font-size:1rem; font-weight:600;">
         </div>
 
         <div class="form-row">
-            <label>📍 مناطق تمركز فرق الاوفر لاب (اختياري):</label>
+            <label><i class="fas fa-location-dot icon-teal icon-sm"></i> مناطق تمركز فرق الاوفر لاب (اختياري):</label>
             <div class="locations-grid">
-                <label><input type="checkbox" class="senior-location" value="الشفاء"> الشفاء</label>
-                <label><input type="checkbox" class="senior-location" value="عكاظ"> عكاظ</label>
-                <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> الدار البيضاء</label>
-                <label><input type="checkbox" class="senior-location" value="الإسكان"> الإسكان</label>
-                <label><input type="checkbox" class="senior-location" value="المنصورة"> المنصورة</label>
+                <label><input type="checkbox" class="senior-location" value="الشفاء"> <i class="fas fa-hospital icon-sm" style="color:var(--teal);"></i> الشفاء</label>
+                <label><input type="checkbox" class="senior-location" value="عكاظ"> <i class="fas fa-landmark icon-sm" style="color:var(--gold);"></i> عكاظ</label>
+                <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> <i class="fas fa-building icon-sm" style="color:var(--primary-500);"></i> الدار البيضاء</label>
+                <label><input type="checkbox" class="senior-location" value="الإسكان"> <i class="fas fa-home icon-sm" style="color:var(--teal);"></i> الإسكان</label>
+                <label><input type="checkbox" class="senior-location" value="المنصورة"> <i class="fas fa-city icon-sm" style="color:var(--coral);"></i> المنصورة</label>
             </div>
         </div>
 
         <div class="form-row">
-            <label>📝 ملاحظات إضافية:</label>
-            <textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+            <label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label>
+            <textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="border-color:var(--gray-200);"></textarea>
         </div>
 
+        <!-- قسم التوقيعات -->
         <div class="signatures-section">
-            <h3>✍️ التسليم والاستلام</h3>
+            <h3>
+                <span class="icon-bg-gold"><i class="fas fa-pen-to-square icon-gold"></i></span>
+                التسليم والاستلام
+            </h3>
             
             <div class="signature-row">
-                <div class="sig-label"><i class="fas fa-user-tie"></i> مساعد كبير المسعفين:</div>
+                <div class="sig-label">
+                    <span class="icon-bg-primary" style="width:28px; height:28px; font-size:0.8rem;">
+                        <i class="fas fa-user-tie icon-primary"></i>
+                    </span>
+                    مساعد كبير المسعفين:
+                </div>
                 <div class="sig-inputs">
-                    <input type="text" id="seniorAssistantName" placeholder="الاسم">
-                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)">
-                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorAssistantDate"></span></span>
+                    <input type="text" id="seniorAssistantName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorAssistantDate"></span></span>
                 </div>
             </div>
 
             <div class="signature-row">
-                <div class="sig-label"><i class="fas fa-user-md"></i> كبير المسعفين:</div>
+                <div class="sig-label">
+                    <span class="icon-bg-teal" style="width:28px; height:28px; font-size:0.8rem;">
+                        <i class="fas fa-user-md icon-teal"></i>
+                    </span>
+                    كبير المسعفين:
+                </div>
                 <div class="sig-inputs">
-                    <input type="text" id="seniorChiefName" placeholder="الاسم">
-                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)">
-                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorChiefDate"></span></span>
+                    <input type="text" id="seniorChiefName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorChiefDate"></span></span>
                 </div>
             </div>
 
             <div class="signature-row">
-                <div class="sig-label"><i class="fas fa-flag"></i> قائد المنطقة:</div>
+                <div class="sig-label">
+                    <span class="icon-bg-coral" style="width:28px; height:28px; font-size:0.8rem;">
+                        <i class="fas fa-flag icon-coral"></i>
+                    </span>
+                    قائد المنطقة:
+                </div>
                 <div class="sig-inputs">
-                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم">
-                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)">
-                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorRegionLeaderDate"></span></span>
+                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorRegionLeaderDate"></span></span>
                 </div>
             </div>
         </div>
 
+        <!-- السجلات المحفوظة -->
         <div class="saved-records" id="seniorSavedRecords">
-            <h4>📋 المناوبات المحفوظة</h4>
+            <h4><i class="fas fa-clock-rotate-left icon-primary"></i> المناوبات المحفوظة</h4>
             <div id="seniorRecordsList"></div>
         </div>
 
+        <!-- الأزرار -->
         <div class="modal-buttons">
-            <button id="saveSeniorShift" class="btn btn-primary"><i class="fas fa-save"></i> حفظ المناوبة</button>
-            <button id="printSeniorShift" class="btn btn-teal"><i class="fas fa-print"></i> طباعة التقرير</button>
-            <button id="closeSeniorShift" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button id="saveSeniorShift" class="btn btn-primary no-print">
+                <i class="fas fa-save"></i> حفظ المناوبة
+            </button>
+            <button id="sendWhatsAppSeniorShift" class="btn btn-whatsapp no-print">
+                <i class="fab fa-whatsapp"></i> إرسال واتساب
+            </button>
+            <button id="closeSeniorShift" class="btn no-print">
+                <i class="fas fa-times"></i> إغلاق
+            </button>
         </div>
     </div>
 </div>
@@ -1669,8 +1788,9 @@
     let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
 
     // ============================================
-    // دوال كبار المسعفين
+    // دوال كبار المسعفين المطورة
     // ============================================
+
     function renderSeniorRecords() {
         const container = document.getElementById('seniorRecordsList');
         const section = document.getElementById('seniorSavedRecords');
@@ -1710,13 +1830,67 @@
         container.innerHTML = html;
     }
 
+    function getSeniorShiftData() {
+        const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+        const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+        const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+        const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+        const locations = [];
+        document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
+        const notes = document.getElementById('seniorNotes').value.trim();
+        
+        const assistantName = document.getElementById('seniorAssistantName').value.trim();
+        const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
+        const chiefName = document.getElementById('seniorChiefName').value.trim();
+        const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
+        const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
+        const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+
+        return {
+            activeCars,
+            brokenCars,
+            reserveCars,
+            overlapTeams,
+            locations,
+            notes,
+            assistantName,
+            assistantSignature,
+            chiefName,
+            chiefSignature,
+            leaderName,
+            leaderSignature
+        };
+    }
+
     function saveSeniorRecordToLocal(data) {
+        if (data.activeCars === 0 && data.brokenCars === 0 && 
+            data.reserveCars === 0 && data.overlapTeams === 0) {
+            alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)');
+            return false;
+        }
+        
         seniorRecords.unshift({
             ...data,
             createdAt: new Date().toISOString()
         });
         localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
         renderSeniorRecords();
+        return true;
+    }
+
+    function clearSeniorShiftForm() {
+        document.getElementById('seniorActiveCars').value = 0;
+        document.getElementById('seniorBrokenCars').value = 0;
+        document.getElementById('seniorReserveCars').value = 0;
+        document.getElementById('seniorOverlapTeams').value = 0;
+        document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
+        document.getElementById('seniorNotes').value = '';
+        document.getElementById('seniorAssistantName').value = '';
+        document.getElementById('seniorAssistantSignature').value = '';
+        document.getElementById('seniorChiefName').value = '';
+        document.getElementById('seniorChiefSignature').value = '';
+        document.getElementById('seniorRegionLeaderName').value = '';
+        document.getElementById('seniorRegionLeaderSignature').value = '';
     }
 
     function deleteSeniorRecord(index) {
@@ -1726,9 +1900,50 @@
         renderSeniorRecords();
     }
 
+    function formatWhatsAppMessage(data) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ar-SA');
+        const timeStr = now.toLocaleTimeString('ar-SA');
+        
+        const locationsStr = data.locations && data.locations.length > 0 
+            ? data.locations.join('، ') 
+            : 'لا يوجد';
+        
+        let message = `📋 *تقرير مناوبة كبار المسعفين*\n`;
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+        message += `📅 التاريخ: ${dateStr}\n`;
+        message += `🕒 الوقت: ${timeStr}\n\n`;
+        
+        message += `🚑 *المركبات العاملة:* ${data.activeCars}\n`;
+        message += `🔧 *المركبات المتعطلة:* ${data.brokenCars}\n`;
+        message += `🔄 *مركبات الاحتياط:* ${data.reserveCars}\n`;
+        message += `📊 *فرق الاوفر لاب:* ${data.overlapTeams}\n`;
+        message += `📍 *مناطق التمركز:* ${locationsStr}\n\n`;
+        
+        if (data.notes) {
+            message += `📝 *ملاحظات:* ${data.notes}\n\n`;
+        }
+        
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+        message += `✍️ *التسليم والاستلام*\n`;
+        message += `👤 *مساعد كبير المسعفين:* ${data.assistantName || '———'}\n`;
+        message += `👤 *كبير المسعفين:* ${data.chiefName || '———'}\n`;
+        message += `👤 *قائد المنطقة:* ${data.leaderName || '———'}\n`;
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+        message += `🕒 تم الإرسال: ${dateStr} ${timeStr}`;
+        
+        return message;
+    }
+
+    function sendWhatsAppMessage(message) {
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    }
+
     // ============================================
-    // دوال نافذة كبار المسعفين
+    // ربط الأحداث لنافذة كبار المسعفين
     // ============================================
+
     document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
         const now = new Date();
         const dateStr = now.toLocaleDateString('ar-SA');
@@ -1746,69 +1961,34 @@
     });
 
     document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
-        const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-        const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-        const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-        const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
-        const locations = [];
-        document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
-        const notes = document.getElementById('seniorNotes').value.trim();
+        const data = getSeniorShiftData();
         
-        const assistantName = document.getElementById('seniorAssistantName').value.trim();
-        const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
-        const chiefName = document.getElementById('seniorChiefName').value.trim();
-        const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
-        const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
-        const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
-
-        if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
+        if (data.activeCars === 0 && data.brokenCars === 0 && 
+            data.reserveCars === 0 && data.overlapTeams === 0) {
             alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)');
             return;
         }
-
-        saveSeniorRecordToLocal({
-            activeCars,
-            brokenCars,
-            reserveCars,
-            overlapTeams,
-            locations,
-            notes,
-            assistantName,
-            assistantSignature,
-            chiefName,
-            chiefSignature,
-            leaderName,
-            leaderSignature
-        });
-
-        alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح');
         
-        document.getElementById('seniorActiveCars').value = 0;
-        document.getElementById('seniorBrokenCars').value = 0;
-        document.getElementById('seniorReserveCars').value = 0;
-        document.getElementById('seniorOverlapTeams').value = 0;
-        document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
-        document.getElementById('seniorNotes').value = '';
-        document.getElementById('seniorAssistantName').value = '';
-        document.getElementById('seniorAssistantSignature').value = '';
-        document.getElementById('seniorChiefName').value = '';
-        document.getElementById('seniorChiefSignature').value = '';
-        document.getElementById('seniorRegionLeaderName').value = '';
-        document.getElementById('seniorRegionLeaderSignature').value = '';
+        if (saveSeniorRecordToLocal(data)) {
+            alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح');
+            clearSeniorShiftForm();
+            renderSeniorRecords();
+        }
     });
 
-    document.getElementById('printSeniorShift')?.addEventListener('click', function() {
-        const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-        const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-        const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-        const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+    document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', function() {
+        const data = getSeniorShiftData();
         
-        if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
-            alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الطباعة');
+        if (data.activeCars === 0 && data.brokenCars === 0 && 
+            data.reserveCars === 0 && data.overlapTeams === 0) {
+            alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال');
             return;
         }
         
-        window.print();
+        saveSeniorRecordToLocal(data);
+        
+        const message = formatWhatsAppMessage(data);
+        sendWhatsAppMessage(message);
     });
 
     // ============================================
@@ -1825,10 +2005,1147 @@
     };
 
     // ============================================
-    // التشغيل
+    // التشغيل - باقي الكود (تم الاحتفاظ به)
+    // ============================================
+    
+    // بناء جدول المراكز
+    function buildCentersTable() {
+        const tbody = document.getElementById('centersTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        for (let i = 0; i < centerList.length; i++) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:bold; font-size:0.75rem;">${centerList[i]}</td>
+                <td><input type="number" id="staff_${i}" style="width:50px; text-align:center;" min="0" max="4" value=""></td>
+                <td><input type="number" id="cars_${i}" style="width:50px; text-align:center;" min="0" max="2" value=""></td>
+                <td><span id="status_${i}" class="status-icon status-not">❌</span></td>
+                <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem;" value=""></td>
+            `;
+            const staffInput = tr.querySelector(`#staff_${i}`);
+            const carsInput = tr.querySelector(`#cars_${i}`);
+            
+            staffInput.addEventListener('input', function() {
+                updateStatusIcon(i);
+                calculateWorkforceStatsLocally();
+            });
+            carsInput.addEventListener('input', function() {
+                updateStatusIcon(i);
+                calculateWorkforceStatsLocally();
+            });
+            
+            tbody.appendChild(tr);
+        }
+    }
+
+    function updateStatusIcon(index) {
+        const staffInput = document.getElementById(`staff_${index}`);
+        const carsInput = document.getElementById(`cars_${index}`);
+        const iconSpan = document.getElementById(`status_${index}`);
+        if (staffInput && carsInput && iconSpan) {
+            const staffCount = parseInt(staffInput.value) || 0;
+            const carsCount = parseInt(carsInput.value) || 0;
+            if (staffCount >= 2 && carsCount >= 1) {
+                iconSpan.innerHTML = '✅';
+                iconSpan.className = 'status-icon status-ok';
+            } else {
+                iconSpan.innerHTML = '❌';
+                iconSpan.className = 'status-icon status-not';
+            }
+        }
+    }
+
+    function calculateWorkforceStatsLocally() {
+        const centerList = document.querySelectorAll('#centersTableBody tr');
+        let totalStaff = 0;
+        let totalCars = 0;
+        let readyCenters = 0;
+        let missingCenters = 0;
+        let centerCount = 0;
+        const distribution = {};
+        const carDistribution = {};
+        
+        centerList.forEach(tr => {
+            const centerName = tr.querySelector('td:first-child')?.innerText || '';
+            const staffInput = tr.querySelector('input[id^="staff_"]');
+            const carsInput = tr.querySelector('input[id^="cars_"]');
+            
+            if (staffInput && carsInput) {
+                const staffCount = parseInt(staffInput.value) || 0;
+                const carsCount = parseInt(carsInput.value) || 0;
+                totalStaff += staffCount;
+                totalCars += carsCount;
+                centerCount++;
+                distribution[centerName] = staffCount;
+                carDistribution[centerName] = carsCount;
+                
+                if (staffCount >= 2 && carsCount >= 1) {
+                    readyCenters++;
+                } else {
+                    missingCenters++;
+                }
+            }
+        });
+        
+        const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+        
+        document.getElementById('workforceStats').style.display = 'block';
+        document.getElementById('totalStaffDisplay').innerText = totalStaff;
+        document.getElementById('totalCarsDisplay').innerText = totalCars;
+        document.getElementById('missingCentersDisplay').innerText = missingCenters;
+        document.getElementById('staffSubText').innerText = `موزعين على ${centerCount} مركز`;
+        document.getElementById('carsSubText').innerText = `إجمالي السيارات`;
+        document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
+        document.getElementById('readinessSubText').innerText = `${readyCenters} / ${centerCount} مركز جاهز`;
+        
+        const circumference = 2 * Math.PI * 42;
+        const offset = circumference - (readinessRate / 100) * circumference;
+        const circle = document.getElementById('readinessCircle');
+        const text = document.getElementById('readinessText');
+        
+        let color = '#c0392b';
+        if (readinessRate >= 80) color = '#2a7f3e';
+        else if (readinessRate >= 50) color = '#f39c12';
+        
+        circle.setAttribute('stroke', color);
+        circle.style.strokeDashoffset = offset;
+        text.textContent = readinessRate + '%';
+        
+        const distList = document.getElementById('distributionList');
+        distList.innerHTML = '';
+        const total = totalStaff || 1;
+        for (let center in distribution) {
+            const count = distribution[center];
+            const barWidth = Math.round((count / total) * 100);
+            const isReady = count >= 2;
+            const div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = `
+                <span class="name">${center}</span>
+                <span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div>
+                </div>
+                <span class="percent">${barWidth}%</span>
+            `;
+            distList.appendChild(div);
+        }
+        
+        const carDistList = document.getElementById('carDistributionList');
+        carDistList.innerHTML = '';
+        const totalCarsValue = totalCars || 1;
+        for (let center in carDistribution) {
+            const count = carDistribution[center];
+            const barWidth = Math.round((count / totalCarsValue) * 100);
+            const hasCar = count >= 1;
+            const div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = `
+                <span class="name">${center}</span>
+                <span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div>
+                </div>
+                <span class="percent">${barWidth}%</span>
+            `;
+            carDistList.appendChild(div);
+        }
+    }
+
+    function calculateLiveReportStats() {
+        const container = document.getElementById('liveReportStats');
+        if (!container) return;
+        
+        let total = 0;
+        let unitStats = {};
+        
+        for (let key in reports) {
+            const report = reports[key];
+            if (report && report.count > 0) {
+                total += report.count;
+                const parts = key.split('|');
+                const unit = parts.length > 1 ? parts[1] : key;
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
+        }
+        
+        if (total === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        document.getElementById('liveTotalReports').innerText = total;
+        
+        const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
+        const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+        const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+        
+        document.getElementById('liveTopUnit').innerText = topUnit;
+        document.getElementById('liveTopUnitCount').innerText = topCount;
+        
+        const listContainer = document.getElementById('liveUnitList');
+        listContainer.innerHTML = '';
+        sortedUnits.forEach(([unit, count]) => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            div.innerHTML = `
+                <span>${unit}</span>
+                <span class="count">${count}</span>
+            `;
+            listContainer.appendChild(div);
+        });
+    }
+
+    // تحميل البيانات (باقي الدوال موجودة في الكود الأصلي)
+    async function loadAllData() {
+        try {
+            const response = await fetch('/api/data');
+            const result = await response.json();
+            centersData = result.centers;
+            reports = result.data;
+            currentShiftId = result.currentShiftId || null;
+            if (!isViewingArchiveShift) {
+                renderData();
+                updateTotal();
+                calculateLiveReportStats();
+            }
+            updateShiftStatus();
+            document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
+        } catch (error) {
+            document.getElementById("pointsContainer").innerHTML = "<div class='loading'>❌ خطأ في الاتصال بالخادم</div>";
+        }
+    }
+
+    function updateShiftStatus() {
+        const status = document.getElementById('shiftStatus');
+        if (currentShiftId) {
+            const shift = allShifts.find(s => s.id === currentShiftId);
+            if (shift) {
+                status.innerHTML = `📌 المناوبة الحالية: ${shift.shiftType || 'غير محددة'} - ${shift.shiftDate || ''}`;
+            } else {
+                status.innerHTML = `📌 مناوبة نشطة (رقم: ${currentShiftId})`;
+            }
+        } else {
+            status.innerHTML = '📌 لا توجد مناوبة نشطة';
+        }
+    }
+
+    function renderData() {
+        const container = document.getElementById("pointsContainer");
+        if (!centersData || Object.keys(centersData).length === 0) {
+            container.innerHTML = "<div class='loading'>❌ لا توجد بيانات</div>";
+            return;
+        }
+        container.innerHTML = "";
+        for (let center in centersData) {
+            const pointDiv = document.createElement("div");
+            pointDiv.className = "point-card";
+            pointDiv.innerHTML = `<div class="point-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
+            container.appendChild(pointDiv);
+            const grid = pointDiv.querySelector(".units-grid");
+            for (let unit of centersData[center]) {
+                const key = `${center}|${unit}`;
+                const info = reports[key] || { count: 0, times: [] };
+                const hasReports = info.count > 0;
+                const unitDiv = document.createElement("div");
+                unitDiv.className = "unit-card";
+                unitDiv.innerHTML = `
+                    <div class="unit-name">${unit}</div>
+                    <div class="count-number">${info.count}</div>
+                    <div class="buttons-row">
+                        <button class="report-btn btn">➕ تسجيل بلاغ</button>
+                        ${hasReports ? '<button class="undo-btn btn btn-undo">↩️ تراجع</button>' : ''}
+                    </div>
+                    <button class="show-times-btn">📋 عرض التواقيت</button>
+                `;
+                unitDiv.querySelector(".report-btn").onclick = () => addReportToServer(center, unit);
+                if (hasReports) {
+                    unitDiv.querySelector(".undo-btn").onclick = () => undoLastReport(center, unit);
+                }
+                unitDiv.querySelector(".show-times-btn").onclick = () => showTimes(center, unit, info.times);
+                grid.appendChild(unitDiv);
+            }
+        }
+    }
+
+    function updateTotal() {
+        let total = 0;
+        for (let key in reports) {
+            if (reports[key]?.count) total += reports[key].count;
+        }
+        document.getElementById("grandTotal").innerText = total;
+    }
+
+    function showTimes(center, unit, times) {
+        const modalTimes = document.createElement("div");
+        modalTimes.className = "modal";
+        modalTimes.innerHTML = `
+            <div class="modal-content" style="max-width:380px;">
+                <h3>${center} - ${unit}</h3>
+                <div class="modal-times">${times && times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p>— لا توجد بلاغات —</p>"}</div>
+                <button class="btn" onclick="this.closest('.modal').style.display='none'">إغلاق</button>
+            </div>
+        `;
+        document.body.appendChild(modalTimes);
+        modalTimes.style.display = "flex";
+        modalTimes.querySelector(".btn").onclick = () => modalTimes.remove();
+    }
+
+    async function addReportToServer(center, unit) {
+        if (isViewingArchiveShift) {
+            alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة.");
+            return;
+        }
+        if (!currentShiftId) {
+            alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
+            return;
+        }
+        try {
+            const response = await fetch('/api/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ center, unit })
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadAllData();
+                calculateLiveReportStats();
+            } else {
+                alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
+            }
+        } catch (error) {
+            alert("❌ فشل في الاتصال بالخادم");
+        }
+    }
+
+    async function undoLastReport(center, unit) {
+        if (isViewingArchiveShift) {
+            alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة.");
+            return;
+        }
+        try {
+            const response = await fetch('/api/undo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ center, unit })
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadAllData();
+                calculateLiveReportStats();
+            } else if (result.error) {
+                alert(result.error);
+            }
+        } catch (error) {
+            alert("❌ فشل في التراجع");
+        }
+    }
+
+    // ============================================
+    // التشغيل النهائي
     // ============================================
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     loadBrandLogo();
+
+    // دوال المناوبات (مختصرة)
+    async function loadShifts() {
+        try {
+            const response = await fetch('/api/shifts');
+            allShifts = await response.json();
+            
+            const archiveSelect = document.getElementById('archiveSelect');
+            archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
+            allShifts.forEach(shift => {
+                const option = document.createElement('option');
+                option.value = shift.id;
+                const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
+                const total = shift.totalReports || 0;
+                const type = shift.shiftType || 'مناوبة';
+                option.textContent = `${type} - ${date} (${total} بلاغ)`;
+                if (shift.id === currentShiftId) {
+                    option.textContent += ' ⬅️ الحالية';
+                }
+                archiveSelect.appendChild(option);
+            });
+            
+            const shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
+            if (shiftArchiveSelect) {
+                shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
+                allShifts.forEach(shift => {
+                    const option = document.createElement('option');
+                    option.value = shift.id;
+                    const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
+                    option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
+                    shiftArchiveSelect.appendChild(option);
+                });
+            }
+            
+            updateShiftStatus();
+        } catch (error) {}
+    }
+
+    // بدء مناوبة جديدة
+    function showShiftTypeDialog() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:400px;">
+                    <h3 style="text-align:center;">📋 بدء مناوبة جديدة</h3>
+                    <p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة الجديدة:</p>
+                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
+                        <button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button>
+                        <button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button>
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#shiftMorningBtn').onclick = function() {
+                modal.remove();
+                resolve('صباحية');
+            };
+            modal.querySelector('#shiftNightBtn').onclick = function() {
+                modal.remove();
+                resolve('ليلية');
+            };
+            modal.querySelector('#cancelShiftBtn').onclick = function() {
+                modal.remove();
+                resolve(null);
+            };
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            };
+        });
+    }
+
+    async function startNewShift() {
+        const shiftType = await showShiftTypeDialog();
+        if (!shiftType) return;
+        
+        if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'} جديدة.`)) return;
+        
+        try {
+            const response = await fetch('/api/start-new-shift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shiftType })
+            });
+            const result = await response.json();
+            if (result.success) {
+                currentShiftId = result.shiftId;
+                alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
+                await loadShifts();
+                await loadAllData();
+                calculateLiveReportStats();
+                document.getElementById('shiftModal').style.display = 'none';
+            } else {
+                alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
+            }
+        } catch (error) {
+            alert("❌ خطأ في الاتصال: " + error.message);
+        }
+    }
+
+    // ربط الأحداث
+    document.getElementById("newShiftBtn").onclick = startNewShift;
+    document.getElementById("shiftBtn").onclick = function() {
+        document.getElementById('shiftModal').style.display = 'flex';
+        loadShifts();
+    };
+    document.getElementById("closeShiftBtn").onclick = function() {
+        document.getElementById('shiftModal').style.display = 'none';
+    };
+    document.getElementById("docsBtn").onclick = function() {
+        document.getElementById('docsModal').style.display = 'flex';
+        loadDocs();
+    };
+    document.getElementById("closeDocsBtn").onclick = function() {
+        document.getElementById('docsModal').style.display = 'none';
+    };
+    document.getElementById("airAmbulanceBtn").onclick = function() {
+        document.getElementById('airAmbulanceModal').style.display = 'flex';
+        loadAirRecords();
+        const now = new Date();
+        const localDateTime = now.toISOString().slice(0, 16);
+        document.getElementById('airDateTime').value = localDateTime;
+    };
+    document.getElementById("closeAirModal").onclick = function() {
+        document.getElementById('airAmbulanceModal').style.display = 'none';
+    };
+    document.getElementById("monthlyTableBtn").onclick = function() {
+        document.getElementById('monthlyTableModal').style.display = 'flex';
+        loadSavedTable();
+    };
+    document.getElementById("closeMonthlyTableBtn").onclick = function() {
+        document.getElementById('monthlyTableModal').style.display = 'none';
+    };
+    document.getElementById("controlBtn").onclick = function() {
+        document.getElementById('controlModal').style.display = 'flex';
+        loadVacations().then(() => {
+            renderControlList(false);
+            loadControlNotes();
+        });
+    };
+    document.getElementById("closeControlBtn").onclick = function() {
+        document.getElementById('controlModal').style.display = 'none';
+        isEditMode = false;
+        document.getElementById('saveVacationsBtn').style.display = 'none';
+        document.getElementById('editVacationsBtn').style.display = 'inline-block';
+    };
+
+    // دوال المستندات (مختصرة)
+    let uploadedDocs = [];
+
+    async function loadDocs() {
+        try {
+            const response = await fetch('/api/docs');
+            const result = await response.json();
+            if (result.success) {
+                uploadedDocs = result.docs || [];
+                renderDocsList();
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل المستندات:", error);
+        }
+    }
+
+    function renderDocsList() {
+        const container = document.getElementById('docsListContainer');
+        if (!container) return;
+        
+        if (uploadedDocs.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>';
+            return;
+        }
+        
+        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+        uploadedDocs.forEach((doc) => {
+            const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
+            const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
+                         doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
+                         doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
+                         doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : '📎';
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--gray-200); border-radius:6px; background:white;">
+                    <div>
+                        <span style="font-size:1.2rem;">${icon}</span>
+                        <span style="font-weight:bold; margin-right:8px;">${doc.filename}</span>
+                        <span style="font-size:0.7rem; color:var(--gray-600); margin-right:10px;">${date}</span>
+                        ${doc.description ? `<span style="font-size:0.7rem; color:var(--gray-600);">${doc.description}</span>` : ''}
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:4px 12px; font-size:0.7rem;">📥 تحميل</button>
+                        <button onclick="deleteDoc('${doc.id}')" class="btn" style="padding:4px 12px; font-size:0.7rem; border-color:var(--coral); color:var(--coral);">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} مستندات محفوظة`;
+    }
+
+    document.getElementById('uploadDocBtn')?.addEventListener('click', function() {
+        document.getElementById('docFileInput').click();
+    });
+
+    document.getElementById('docFileInput')?.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const description = prompt("أدخل وصفاً للمستند (اختياري):", file.name);
+        
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            try {
+                const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)));
+                const response = await fetch('/api/upload-doc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        fileData: base64,
+                        description: description || '',
+                        fileType: file.type
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ تم رفع المستند بنجاح');
+                    await loadDocs();
+                    document.getElementById('docFileInput').value = '';
+                } else {
+                    alert('❌ فشل في رفع المستند: ' + (result.error || 'خطأ غير معروف'));
+                }
+            } catch (error) {
+                alert('❌ خطأ في رفع الملف: ' + error.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    async function downloadDoc(docId) {
+        try {
+            window.open(`/api/download-doc/${docId}`, '_blank');
+        } catch (error) {
+            alert('❌ فشل في تحميل المستند');
+        }
+    }
+
+    async function deleteDoc(docId) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستند؟')) return;
+        try {
+            const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadDocs();
+            } else {
+                alert('❌ فشل في حذف المستند');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    }
+
+    // دوال الإسعاف الجوي (مختصرة)
+    let airRecords = [];
+
+    async function loadAirRecords() {
+        try {
+            const response = await fetch('/api/air-ambulance');
+            const result = await response.json();
+            if (result.success) {
+                airRecords = result.records || [];
+                renderAirRecords();
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error);
+        }
+    }
+
+    function renderAirRecords() {
+        const container = document.getElementById('airRecordsList');
+        const section = document.getElementById('airSavedRecords');
+        if (!container || !section) return;
+        
+        if (airRecords.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        
+        section.style.display = 'block';
+        let html = '';
+        airRecords.forEach((record) => {
+            const date = new Date(record.createdAt).toLocaleString('ar-SA');
+            const notes = record.notes || 'لا توجد ملاحظات';
+            html += `
+                <div class="record-item">
+                    <div class="record-info">
+                        <strong>${record.reportNumber || 'بدون رقم'}</strong>
+                        <span style="margin:0 5px;">|</span>
+                        <span>${record.unit || '-'}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span>${record.hospital || '-'}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ${notes}</span>
+                        <span class="rec-date">🕒 ${date}</span>
+                    </div>
+                    <div class="record-actions">
+                        <button onclick="deleteAirRecord('${record.id}')">🗑️ حذف</button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    document.getElementById('saveAirRecord')?.addEventListener('click', async function() {
+        const reportNumber = document.getElementById('airReportNumber').value.trim();
+        const unit = document.getElementById('airUnit').value;
+        const hospital = document.getElementById('airHospital').value.trim();
+        const dateTime = document.getElementById('airDateTime').value;
+        const notes = document.getElementById('airNotes').value.trim();
+        
+        if (!reportNumber) {
+            alert('❌ الرجاء إدخال رقم البلاغ');
+            return;
+        }
+        if (!unit) {
+            alert('❌ الرجاء اختيار الفرقة المرافقة');
+            return;
+        }
+        if (!hospital) {
+            alert('❌ الرجاء إدخال اسم المستشفى');
+            return;
+        }
+        if (!dateTime) {
+            alert('❌ الرجاء اختيار تاريخ ووقت النقل');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/save-air-ambulance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reportNumber,
+                    unit,
+                    hospital,
+                    dateTime,
+                    notes
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم حفظ بلاغ الإسعاف الجوي بنجاح');
+                document.getElementById('airReportNumber').value = '';
+                document.getElementById('airUnit').value = '';
+                document.getElementById('airHospital').value = '';
+                document.getElementById('airDateTime').value = '';
+                document.getElementById('airNotes').value = '';
+                await loadAirRecords();
+            } else {
+                alert('❌ فشل في حفظ البلاغ: ' + (result.error || 'خطأ غير معروف'));
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    async function deleteAirRecord(recordId) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا البلاغ؟')) return;
+        try {
+            const response = await fetch(`/api/delete-air-ambulance/${recordId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadAirRecords();
+            } else {
+                alert('❌ فشل في حذف البلاغ');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    }
+
+    document.getElementById('clearAllAirRecords')?.addEventListener('click', async function() {
+        if (!confirm('⚠️ هل أنت متأكد من حذف جميع بلاغات الإسعاف الجوي؟')) return;
+        try {
+            const response = await fetch('/api/clear-air-ambulance', { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                await loadAirRecords();
+                alert('✅ تم حذف جميع البلاغات');
+            } else {
+                alert('❌ فشل في حذف البلاغات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال');
+        }
+    });
+
+    // دوال الجدول الشهري (مختصرة)
+    async function loadSavedTable() {
+        const container = document.getElementById('excelTableContainer');
+        const status = document.getElementById('tableStatus');
+        
+        try {
+            const response = await fetch('/api/check-monthly-table');
+            const result = await response.json();
+            
+            if (result.exists) {
+                status.innerHTML = '⏳ جاري تحميل الجدول...';
+                const fileResponse = await fetch('/api/get-monthly-table');
+                const blob = await fileResponse.blob();
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const data = new Uint8Array(event.target.result);
+                        workbookData = XLSX.read(data, { 
+                            type: 'array',
+                            cellFormula: true,
+                            cellHTML: false,
+                            cellNF: true,
+                            cellStyles: true,
+                            dense: false,
+                            codepage: 1256,
+                            dateNF: 'yyyy-mm-dd'
+                        });
+                        renderAllSheets(workbookData);
+                        status.innerHTML = `✅ تم تحميل ${workbookData.SheetNames.length} أوراق`;
+                    } catch (error) {
+                        status.innerHTML = '❌ خطأ في عرض الجدول';
+                        container.innerHTML = `<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في عرض الجدول: ${error.message}</p>`;
+                    }
+                };
+                reader.readAsArrayBuffer(blob);
+            } else {
+                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:30px 0;">📂 لا يوجد جدول شهري محفوظ. يرجى رفع ملف Excel.</p>';
+                status.innerHTML = '❌ لا يوجد جدول محفوظ';
+            }
+        } catch (error) {
+            container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في تحميل الجدول المحفوظ</p>';
+            status.innerHTML = '❌ خطأ في الاتصال';
+        }
+    }
+
+    function renderAllSheets(workbook) {
+        const container = document.getElementById('excelTableContainer');
+        let html = '';
+        
+        if (workbook.SheetNames.length > 1) {
+            html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:10px;">';
+            workbook.SheetNames.forEach((name, index) => {
+                const active = index === currentSheetIndex ? 'active' : '';
+                html += `<button class="sheet-tab ${active}" data-index="${index}">${name}</button>`;
+            });
+            html += '</div>';
+        }
+        
+        const sheetName = workbook.SheetNames[currentSheetIndex];
+        const sheet = workbook.Sheets[sheetName];
+        const htmlContent = XLSX.utils.sheet_to_html(sheet, {
+            id: 'sheet-table',
+            editable: false
+        });
+        
+        html += htmlContent;
+        container.innerHTML = html;
+        formatTable(container);
+        
+        document.querySelectorAll('.sheet-tab').forEach(btn => {
+            btn.onclick = function() {
+                currentSheetIndex = parseInt(this.dataset.index);
+                renderAllSheets(workbookData);
+            };
+        });
+    }
+
+    function formatTable(container) {
+        const table = container.querySelector('#sheet-table');
+        if (table) {
+            table.style.cssText = `
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 0.7rem;
+                direction: rtl;
+            `;
+            table.querySelectorAll('th, td').forEach(cell => {
+                cell.style.border = '1px solid var(--gray-200)';
+                cell.style.padding = '4px 6px';
+                cell.style.textAlign = 'center';
+                cell.style.whiteSpace = 'nowrap';
+                cell.style.verticalAlign = 'middle';
+            });
+            table.querySelectorAll('th').forEach(th => {
+                th.style.background = 'var(--gray-100)';
+                th.style.fontWeight = 'bold';
+                th.style.position = 'sticky';
+                th.style.top = '0';
+                th.style.zIndex = '1';
+            });
+            table.style.minWidth = '100%';
+            table.style.width = 'auto';
+        }
+    }
+
+    document.getElementById('uploadExcelBtn')?.addEventListener('click', function() {
+        document.getElementById('excelFileInput').click();
+    });
+
+    document.getElementById('excelFileInput')?.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            try {
+                const data = new Uint8Array(event.target.result);
+                workbookData = XLSX.read(data, { 
+                    type: 'array',
+                    cellFormula: true,
+                    cellHTML: false,
+                    cellNF: true,
+                    cellStyles: true,
+                    dense: false,
+                    codepage: 1256,
+                    dateNF: 'yyyy-mm-dd'
+                });
+                renderAllSheets(workbookData);
+                
+                const base64 = btoa(String.fromCharCode.apply(null, data));
+                const response = await fetch('/api/upload-monthly-table', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileData: base64 })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('tableStatus').innerHTML = `✅ تم حفظ ${workbookData.SheetNames.length} أوراق بنجاح`;
+                    alert('✅ تم حفظ الجدول الشهري بنجاح');
+                } else {
+                    document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول';
+                    alert('❌ فشل في حفظ الجدول');
+                }
+            } catch (error) {
+                alert('❌ خطأ في قراءة الملف: ' + error.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // دوال التحكم والتنسيق
+    async function loadVacations() {
+        try {
+            const response = await fetch('/api/vacations');
+            const data = await response.json();
+            if (Array.isArray(data) && data.length > 0) {
+                data.forEach((item, index) => {
+                    if (controlData[index]) {
+                        controlData[index].vacationStart = item.vacationStart || '';
+                        controlData[index].vacationEnd = item.vacationEnd || '';
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل الإجازات:", error);
+        }
+    }
+
+    function renderControlList(editable = false) {
+        const container = document.getElementById('controlList');
+        if (!container) return;
+        
+        let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+        const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
+        
+        controlData.forEach((person, index) => {
+            const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('');
+            const color = colors[index % colors.length];
+            
+            const startDate = person.vacationStart || '';
+            const endDate = person.vacationEnd || '';
+            const vacationDisplay = startDate && endDate ? 
+                `📅 ${formatDate(startDate)} → ${formatDate(endDate)}` : 
+                '📅 لا توجد إجازة';
+            
+            html += `
+                <div class="control-person">
+                    <div class="control-avatar" style="background:${color};">${initials}</div>
+                    <div class="control-info">
+                        <div class="name">${person.name}</div>
+                        <div class="role">📌 ${person.role} | كود: ${person.code}</div>
+                    </div>
+                    <div class="control-vacation">
+                        ${editable ? `
+                            <div class="edit">
+                                <input type="date" id="start_${index}" value="${startDate}">
+                                <span>→</span>
+                                <input type="date" id="end_${index}" value="${endDate}">
+                            </div>
+                        ` : `
+                            <div class="display">${vacationDisplay}</div>
+                        `}
+                    </div>
+                    <div class="control-role-badge">
+                        ${person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق'}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const parts = dateString.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    document.getElementById('editVacationsBtn')?.addEventListener('click', function() {
+        document.getElementById('passwordModal').style.display = 'flex';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordInput').focus();
+    });
+
+    document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
+        const password = document.getElementById('passwordInput').value;
+        try {
+            const response = await fetch('/api/get-password');
+            const result = await response.json();
+            const storedPassword = result.password || '1234';
+            
+            if (password === storedPassword) {
+                isEditMode = true;
+                document.getElementById('passwordModal').style.display = 'none';
+                document.getElementById('passwordInput').value = '';
+                renderControlList(true);
+                document.getElementById('saveVacationsBtn').style.display = 'inline-block';
+                document.getElementById('editVacationsBtn').style.display = 'none';
+                alert('✅ تم تفعيل وضع التعديل');
+            } else {
+                alert('❌ الرقم السري غير صحيح');
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+            }
+        } catch (error) {
+            alert('❌ خطأ في التحقق من الرقم السري');
+        }
+    });
+
+    document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('passwordModal').style.display = 'none';
+        document.getElementById('passwordInput').value = '';
+    });
+
+    document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
+        controlData.forEach((person, index) => {
+            const startInput = document.getElementById(`start_${index}`);
+            const endInput = document.getElementById(`end_${index}`);
+            if (startInput && endInput) {
+                person.vacationStart = startInput.value;
+                person.vacationEnd = endInput.value;
+            }
+        });
+        
+        try {
+            const response = await fetch('/api/save-vacations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vacations: controlData })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم حفظ الإجازات بنجاح');
+                isEditMode = false;
+                renderControlList(false);
+                document.getElementById('saveVacationsBtn').style.display = 'none';
+                document.getElementById('editVacationsBtn').style.display = 'inline-block';
+            } else {
+                alert('❌ فشل في حفظ الإجازات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // دوال تغيير الرقم السري
+    document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('changePasswordModal').style.display = 'flex';
+        document.getElementById('oldPasswordInput').value = '';
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('confirmNewPasswordInput').value = '';
+    });
+
+    document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() {
+        document.getElementById('changePasswordModal').style.display = 'none';
+    });
+
+    document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
+        const oldPassword = document.getElementById('oldPasswordInput').value;
+        const newPassword = document.getElementById('newPasswordInput').value;
+        const confirmNewPassword = document.getElementById('confirmNewPasswordInput').value;
+        
+        if (!oldPassword || !newPassword || !confirmNewPassword) {
+            alert('❌ الرجاء ملء جميع الحقول');
+            return;
+        }
+        
+        if (newPassword !== confirmNewPassword) {
+            alert('❌ الرقم السري الجديد غير متطابق');
+            return;
+        }
+        
+        if (newPassword.length < 4) {
+            alert('❌ الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldPassword, newPassword })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ تم تغيير الرقم السري بنجاح');
+                document.getElementById('changePasswordModal').style.display = 'none';
+            } else {
+                alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري'));
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // دوال ملاحظات التحكم
+    async function loadControlNotes() {
+        try {
+            const response = await fetch('/api/control-notes');
+            const result = await response.json();
+            if (result.success) {
+                controlNotes = result.notes || '';
+                document.getElementById('controlNotes').value = controlNotes;
+            }
+        } catch (error) {
+            console.error("خطأ في تحميل ملاحظات التحكم:", error);
+        }
+    }
+
+    document.getElementById('saveControlNotes')?.addEventListener('click', async function() {
+        const notes = document.getElementById('controlNotes').value.trim();
+        try {
+            const response = await fetch('/api/save-control-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            });
+            const result = await response.json();
+            if (result.success) {
+                controlNotes = notes;
+                alert('✅ تم حفظ الملاحظات بنجاح');
+            } else {
+                alert('❌ فشل في حفظ الملاحظات');
+            }
+        } catch (error) {
+            alert('❌ خطأ في الاتصال: ' + error.message);
+        }
+    });
+
+    // التشغيل النهائي
+    buildCentersTable();
+    loadShifts();
+    loadAllData();
+    
+    setInterval(() => {
+        if (!isViewingArchiveShift) {
+            checkForUpdates();
+        }
+    }, 1000);
+
+    async function checkForUpdates() {
+        if (isViewingArchiveShift) return;
+        try {
+            const response = await fetch('/api/last-update');
+            const data = await response.json();
+            if (data.lastUpdate > lastKnownUpdate) {
+                lastKnownUpdate = data.lastUpdate;
+                await loadAllData();
+                calculateLiveReportStats();
+            }
+        } catch (error) {}
+    }
 
     console.log('✅ منصة الجنوب - الهوية البصرية الجديدة');
     console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
