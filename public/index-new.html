@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
+    <link rel="manifest" href="manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary-900: #0B1E33;
@@ -48,6 +53,12 @@
             min-height: 100vh;
         }
 
+        .container {
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        /* ===== الشريط العلوي ===== */
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
             border-radius: var(--radius-lg);
@@ -122,7 +133,8 @@
             gap: 6px;
         }
 
-        .control-bar {
+        /* ===== شريط التحكم ===== */
+        .info-bar {
             background: var(--white);
             border-radius: var(--radius-md);
             padding: 12px 20px;
@@ -134,7 +146,7 @@
             align-items: center;
             gap: 12px;
         }
-        .control-bar .total {
+        .total-box {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -142,7 +154,7 @@
             font-size: 0.9rem;
             color: var(--gray-800);
         }
-        .control-bar .total .number {
+        .total-box span {
             font-size: 1.8rem;
             font-weight: 800;
             color: var(--primary-700);
@@ -151,28 +163,62 @@
             border-radius: 30px;
             line-height: 1.4;
         }
-        .control-bar .actions {
+        .archive-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-top: 1px solid var(--gray-200);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .archive-row select {
+            padding: 6px;
+            font-family: 'Inter', sans-serif;
+            border: 1px solid var(--gray-200);
+            background: white;
+            border-radius: var(--radius-sm);
+            flex: 2;
+            min-width: 200px;
+        }
+        .archive-row button {
+            background: white;
+            border: 1px solid var(--gray-200);
+            padding: 6px 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+        .archive-row button:hover {
+            background: var(--gray-50);
+        }
+
+        .toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            align-items: center;
+            margin-top: 10px;
         }
         .btn {
             font-family: 'Inter', sans-serif;
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 30px;
-            border: none;
+            border: 1px solid var(--gray-200);
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background: var(--gray-100);
+            gap: 6px;
+            background: white;
             color: var(--gray-800);
         }
         .btn:hover {
+            background: var(--gray-50);
             transform: translateY(-1px);
             box-shadow: var(--shadow-sm);
         }
@@ -180,25 +226,21 @@
             transform: scale(0.97);
         }
         .btn i {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
         }
         .btn-primary {
             background: var(--primary-700);
             color: var(--white);
+            border-color: var(--primary-700);
         }
         .btn-primary:hover {
             background: var(--primary-900);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--gray-200);
-        }
-        .btn-outline:hover {
-            background: var(--gray-50);
+            border-color: var(--primary-900);
         }
         .btn-teal {
             background: var(--teal);
             color: var(--white);
+            border-color: var(--teal);
         }
         .btn-teal:hover {
             background: #1F6B5E;
@@ -206,102 +248,99 @@
         .btn-coral {
             background: var(--coral);
             color: var(--white);
+            border-color: var(--coral);
         }
         .btn-coral:hover {
             background: #D45A4A;
         }
-        .btn-sm {
+
+        .viewing-badge {
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
             padding: 4px 12px;
             font-size: 0.7rem;
+            border-radius: 30px;
+            display: inline-block;
+            margin-right: 10px;
         }
-        .btn-xs {
-            padding: 3px 8px;
-            font-size: 0.6rem;
-            border-radius: 20px;
+        .return-btn {
+            background: white;
+            border: 1px solid var(--gray-200);
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            border-radius: 30px;
+            cursor: pointer;
         }
 
-        .stats-card {
+        .update-status {
+            text-align: left;
+            font-size: 0.65rem;
+            color: var(--teal);
+            margin-top: 5px;
+        }
+
+        /* ===== إحصائيات البلاغات ===== */
+        .live-stats {
             background: var(--white);
             border-radius: var(--radius-md);
-            padding: 16px 20px;
+            padding: 14px 20px;
             margin-bottom: 20px;
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--gray-100);
         }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
+        .live-stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: space-between;
+            align-items: center;
         }
-        .stats-item {
-            text-align: center;
-            padding: 8px;
-            border-radius: var(--radius-sm);
-            background: var(--gray-50);
+        .live-stats-item {
+            display: flex;
+            flex-direction: column;
+            min-width: 100px;
         }
-        .stats-item .label {
+        .live-stats-item .label {
             font-size: 0.65rem;
             color: var(--gray-600);
             font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
-        .stats-item .value {
-            font-size: 1.8rem;
-            font-weight: 800;
+        .live-stats-item .value {
+            font-size: 1.6rem;
+            font-weight: 700;
             color: var(--primary-700);
-            margin-top: 2px;
         }
-        .stats-item .value.green {
-            color: var(--teal);
-        }
-        .stats-item .value.red {
-            color: var(--coral);
-        }
-        .stats-distribution {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
-        }
-        .stats-distribution .title {
+        .live-stats-item .value.green { color: var(--teal); }
+        .live-stats-item .value.red { color: var(--coral); }
+        .live-distribution {
             font-size: 0.7rem;
-            color: var(--gray-600);
-            font-weight: 500;
-            margin-bottom: 6px;
-        }
-        .dist-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 3px 0;
-            font-size: 0.75rem;
-        }
-        .dist-item .name {
-            min-width: 70px;
-            font-weight: 500;
-            color: var(--gray-800);
-        }
-        .dist-item .bar-track {
+            max-height: 60px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            padding: 5px 10px;
+            background: var(--gray-50);
             flex: 1;
-            height: 6px;
-            background: var(--gray-100);
-            border-radius: 10px;
-            overflow: hidden;
+            min-width: 150px;
         }
-        .dist-item .bar-fill {
-            height: 100%;
-            border-radius: 10px;
-            background: var(--primary-500);
-            transition: width 0.3s;
+        .live-distribution .title {
+            color: var(--gray-600);
+            font-size: 0.6rem;
         }
-        .dist-item .count {
-            min-width: 30px;
-            text-align: center;
+        .live-distribution .item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 2px 0;
+            border-bottom: 1px dotted var(--gray-200);
+        }
+        .live-distribution .item .count {
             font-weight: 600;
-            color: var(--gray-800);
+            color: var(--primary-700);
         }
 
-        .sector-card {
+        /* ===== شبكة الفرق ===== */
+        .point-card {
             background: var(--white);
             border-radius: var(--radius-md);
             padding: 14px 16px;
@@ -309,7 +348,7 @@
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--gray-100);
         }
-        .sector-title {
+        .point-title {
             font-size: 1rem;
             font-weight: 700;
             color: var(--primary-700);
@@ -320,9 +359,8 @@
             align-items: center;
             gap: 8px;
         }
-        .sector-title i {
+        .point-title i {
             color: var(--primary-500);
-            font-size: 1rem;
         }
         .units-grid {
             display: grid;
@@ -346,28 +384,51 @@
             font-size: 0.85rem;
             color: var(--gray-800);
         }
-        .unit-card .count {
+        .unit-card .count-number {
             font-size: 2rem;
-            font-weight: 800;
+            font-weight: 700;
             color: var(--primary-700);
             margin: 4px 0;
         }
-        .unit-card .count.zero {
+        .unit-card .count-number.zero {
             color: var(--gray-400);
         }
-        .unit-card .actions {
+        .buttons-row {
             display: flex;
             gap: 4px;
             justify-content: center;
             flex-wrap: wrap;
+            margin: 6px 0;
         }
-        .unit-card .actions .btn {
+        .buttons-row .btn {
             padding: 3px 10px;
             font-size: 0.6rem;
             border-radius: 20px;
         }
+        .buttons-row .btn-undo {
+            border-color: var(--coral);
+            color: var(--coral);
+        }
+        .buttons-row .btn-undo:hover {
+            background: var(--coral-light);
+        }
+        .show-times-btn {
+            background: white;
+            border: 1px solid var(--gray-200);
+            padding: 4px;
+            width: 100%;
+            font-size: 0.6rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            margin-top: 4px;
+            color: var(--gray-600);
+            transition: all 0.2s;
+        }
+        .show-times-btn:hover {
+            background: var(--gray-50);
+        }
 
-        /* ===== نافذة كبار المسعفين ===== */
+        /* ===== النوافذ المنبثقة ===== */
         .modal {
             display: none;
             position: fixed;
@@ -381,29 +442,29 @@
             align-items: center;
         }
         .modal-content {
-            background: white;
+            background: var(--white);
             border-radius: var(--radius-lg);
-            max-width: 650px;
             width: 95%;
+            max-width: 1200px;
             max-height: 90vh;
             overflow-y: auto;
             padding: 24px;
             margin: 20px;
             box-shadow: var(--shadow-lg);
         }
-        .modal-content h2 {
+        .modal-content h2, .modal-content h3 {
             text-align: center;
-            margin: 0 0 5px 0;
+            margin: 5px 0;
             color: var(--primary-700);
         }
         .modal-content .sub-title {
             text-align: center;
             color: var(--gray-600);
-            margin: 0 0 20px 0;
             font-size: 0.9rem;
+            margin-bottom: 15px;
         }
         .form-row {
-            margin-bottom: 15px;
+            margin: 15px 0;
         }
         .form-row label {
             display: block;
@@ -413,17 +474,19 @@
             color: var(--gray-800);
         }
         .form-row input,
-        .form-row textarea {
+        .form-row textarea,
+        .form-row select {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid var(--gray-200);
             border-radius: var(--radius-sm);
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-family: inherit;
             transition: border-color 0.2s;
         }
         .form-row input:focus,
-        .form-row textarea:focus {
+        .form-row textarea:focus,
+        .form-row select:focus {
             outline: none;
             border-color: var(--primary-500);
         }
@@ -431,6 +494,262 @@
             resize: vertical;
             min-height: 60px;
         }
+        .shift-type {
+            display: inline-flex;
+            gap: 15px;
+            margin-right: 15px;
+        }
+        .shift-type label {
+            font-weight: 400;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.8rem;
+        }
+        th, td {
+            border: 1px solid var(--gray-200);
+            padding: 6px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        th {
+            background: var(--gray-100);
+            font-weight: 600;
+        }
+        .status-icon {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 30px;
+        }
+        .status-ok { color: var(--teal); }
+        .status-not { color: var(--coral); }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .modal-buttons .btn {
+            padding: 8px 25px;
+            font-size: 0.85rem;
+            border-radius: 30px;
+        }
+
+        .sheet-tab {
+            padding: 6px 15px;
+            border: 1px solid var(--gray-200);
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .sheet-tab.active {
+            background: var(--primary-700);
+            color: white;
+            border-color: var(--primary-700);
+        }
+        .sheet-tab:hover {
+            background: var(--gray-100);
+        }
+
+        /* ===== مؤشرات القوى العاملة ===== */
+        .stats-section {
+            margin: 15px 0;
+            border: 1px solid var(--gray-200);
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            padding: 15px;
+        }
+        .stats-section h3 {
+            text-align: center;
+            margin: 0 0 10px 0;
+            color: var(--primary-700);
+        }
+        .circle-stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+            padding: 15px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+        }
+        .circle-stat {
+            text-align: center;
+            padding: 10px;
+        }
+        .circle-stat .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .circle-stat .label {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-top: 5px;
+        }
+        .circle-stat .sub-value {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            margin-top: 3px;
+        }
+        .svg-circle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .svg-circle {
+            width: 80px;
+            height: 80px;
+            transform: rotate(-90deg);
+        }
+        .svg-circle-bg {
+            fill: none;
+            stroke: var(--gray-200);
+            stroke-width: 6;
+        }
+        .svg-circle-fg {
+            fill: none;
+            stroke-width: 6;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        .svg-circle-text {
+            transform: rotate(90deg);
+            font-size: 14px;
+            font-weight: 700;
+            fill: var(--primary-700);
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .value-blue { color: var(--primary-700); }
+        .value-red { color: var(--coral); }
+        .value-green { color: var(--teal); }
+
+        .stats-scroll {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            background: var(--white);
+        }
+        .stats-scroll .title {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-bottom: 5px;
+        }
+        .distribution-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 0.75rem;
+        }
+        .distribution-bar .name {
+            min-width: 70px;
+            font-weight: 600;
+            font-size: 0.7rem;
+        }
+        .distribution-bar .count {
+            min-width: 25px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .distribution-bar .bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--gray-200);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .distribution-bar .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+        .distribution-bar .percent {
+            font-size: 0.6rem;
+            color: var(--gray-600);
+            min-width: 35px;
+        }
+
+        /* ===== التحكم والتنسيق ===== */
+        .control-person {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: white;
+            flex-wrap: wrap;
+        }
+        .control-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+        .control-info {
+            flex: 2;
+            min-width: 150px;
+        }
+        .control-info .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .control-info .role {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+        }
+        .control-vacation {
+            flex: 1;
+            min-width: 120px;
+            font-size: 0.75rem;
+        }
+        .control-vacation .display {
+            padding: 5px;
+            background: var(--gray-100);
+            border-radius: var(--radius-sm);
+            text-align: center;
+        }
+        .control-vacation .edit {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-vacation .edit input {
+            width: 120px;
+            padding: 3px 6px;
+            font-size: 0.7rem;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+        }
+        .control-role-badge {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: 20px;
+            background: var(--gray-50);
+        }
+
+        /* ===== نموذج كبار المسعفين ===== */
         .locations-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -445,7 +764,7 @@
             padding: 6px 10px;
             background: var(--gray-50);
             border-radius: var(--radius-sm);
-            border: 1px solid var(--gray-100);
+            border: 1px solid var(--gray-200);
             cursor: pointer;
             transition: all 0.2s;
             font-weight: 400;
@@ -461,11 +780,10 @@
             cursor: pointer;
         }
 
-        /* ===== قسم التوقيعات ===== */
         .signatures-section {
             margin-top: 20px;
             padding-top: 20px;
-            border-top: 2px solid var(--gray-100);
+            border-top: 2px solid var(--gray-200);
         }
         .signatures-section h3 {
             text-align: center;
@@ -480,7 +798,7 @@
             padding: 10px 14px;
             background: var(--gray-50);
             border-radius: var(--radius-sm);
-            border: 1px solid var(--gray-100);
+            border: 1px solid var(--gray-200);
         }
         .signature-row .sig-label {
             font-weight: 600;
@@ -492,7 +810,6 @@
             gap: 6px;
         }
         .signature-row .sig-label i {
-            font-size: 0.8rem;
             color: var(--gold);
         }
         .signature-row .sig-inputs {
@@ -521,7 +838,6 @@
             align-items: center;
         }
 
-        /* ===== سجل المناوبات المحفوظة ===== */
         .saved-records {
             margin-top: 15px;
             max-height: 200px;
@@ -581,62 +897,22 @@
             color: white;
         }
 
-        .modal-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
+        footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
             margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .modal-buttons .btn-save {
-            padding: 10px 28px;
-            border: none;
-            border-radius: 30px;
-            background: var(--primary-700);
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        .modal-buttons .btn-save:hover {
-            background: var(--primary-900);
-        }
-        .modal-buttons .btn-print {
-            padding: 10px 28px;
-            border: none;
-            border-radius: 30px;
-            background: var(--teal);
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        .modal-buttons .btn-print:hover {
-            background: #1F6B5E;
-        }
-        .modal-buttons .btn-close {
-            padding: 10px 28px;
-            border: 1px solid var(--gray-200);
-            border-radius: 30px;
-            background: white;
-            color: var(--gray-800);
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        .modal-buttons .btn-close:hover {
-            background: var(--gray-50);
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-200);
         }
 
-        /* ===== تحسينات الطباعة - نموذج كبار المسعفين فقط ===== */
+        /* ===== تحسينات الطباعة ===== */
         @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .container { max-width: 100%; margin: 0; padding: 5px; }
+            
             /* إخفاء كل شيء */
-            body * {
-                visibility: hidden !important;
-            }
+            body * { visibility: hidden !important; }
             
             /* إظهار نافذة كبار المسعفين فقط */
             #seniorShiftModal,
@@ -661,15 +937,15 @@
             .modal-content {
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 15px !important;
+                padding: 20px !important;
                 border: none !important;
                 box-shadow: none !important;
                 max-height: none !important;
                 overflow: visible !important;
                 border-radius: 0 !important;
+                background: white !important;
             }
             
-            /* إخفاء الأزرار وعناصر التحكم */
             .modal-buttons,
             .saved-records,
             .no-print,
@@ -682,88 +958,145 @@
                 display: none !important;
             }
             
-            /* إخفاء شريط التحكم والفوتر والشريط العلوي */
-            .control-bar,
-            .stats-card,
-            .footer,
-            .header,
-            .no-print {
+            .control-bar, .stats-card, .footer, .header,
+            .info-bar, .toolbar, .archive-row, .update-status,
+            #pointsContainer, #liveReportStats, #liveUnitDistribution {
                 display: none !important;
             }
             
-            /* إخفاء أي عناصر أخرى */
-            #pointsContainer,
-            #liveReportStats,
-            #liveUnitDistribution {
-                display: none !important;
-            }
-            
-            /* تنسيق الحقول للطباعة */
-            .form-row input,
-            .form-row textarea {
+            .form-row input[type="number"] {
                 border: none !important;
-                border-bottom: 1px solid #000 !important;
+                border-bottom: 2px solid #000 !important;
                 border-radius: 0 !important;
                 background: transparent !important;
+                text-align: center !important;
+                font-size: 1.2rem !important;
+                font-weight: 700 !important;
+                width: 100px !important;
+                color: #000 !important;
                 padding: 4px 0 !important;
             }
             
-            .signature-row input {
+            .form-row input[type="text"] {
                 border: none !important;
-                border-bottom: 1px solid #000 !important;
+                border-bottom: 2px solid #000 !important;
                 border-radius: 0 !important;
                 background: transparent !important;
                 padding: 4px 0 !important;
+                font-size: 0.9rem !important;
+                color: #000 !important;
+                min-width: 120px !important;
+            }
+            
+            #seniorNotes {
+                border: 1px solid #000 !important;
+                background: transparent !important;
+                min-height: 50px !important;
+                font-size: 0.85rem !important;
+                padding: 8px !important;
             }
             
             .locations-grid label {
                 border: none !important;
                 background: transparent !important;
-                padding: 4px !important;
+                padding: 4px 8px !important;
+                font-size: 0.85rem !important;
             }
-            
             .locations-grid input[type="checkbox"] {
                 display: none !important;
             }
-            
             .locations-grid label::after {
                 content: " ✅";
-                font-size: 0.8rem;
+                font-size: 0.9rem;
+                color: var(--teal);
             }
-            
             .locations-grid label:has(input:not(:checked))::after {
                 content: " ❌";
+                color: var(--coral);
             }
             
-            /* إضافة عنوان الصفحة */
+            .signature-row {
+                border: 1px solid #ddd !important;
+                padding: 12px 16px !important;
+                margin-bottom: 10px !important;
+                background: #fafafa !important;
+                border-radius: 4px !important;
+            }
+            .signature-row .sig-label {
+                font-size: 0.9rem !important;
+                font-weight: 700 !important;
+                color: #0B1E33 !important;
+                margin-bottom: 8px !important;
+            }
+            .signature-row .sig-inputs {
+                display: flex !important;
+                gap: 15px !important;
+                flex-wrap: wrap !important;
+                align-items: center !important;
+            }
+            .signature-row .sig-inputs input {
+                flex: 1 !important;
+                min-width: 150px !important;
+                border: none !important;
+                border-bottom: 2px solid #000 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                padding: 4px 0 !important;
+                font-size: 0.9rem !important;
+                color: #000 !important;
+            }
+            .signature-row .sig-inputs .sig-placeholder {
+                font-size: 0.8rem !important;
+                color: #000 !important;
+                font-weight: 500 !important;
+                white-space: nowrap !important;
+            }
+            
             #seniorShiftModal .modal-content::before {
                 content: "منصة الجنوب - قطاع جنوب الرياض";
                 display: block;
                 text-align: center;
-                font-size: 1.2rem;
+                font-size: 1.5rem;
                 font-weight: 700;
                 color: #0B1E33;
-                padding-bottom: 10px;
-                border-bottom: 2px solid #0B1E33;
-                margin-bottom: 15px;
+                padding-bottom: 12px;
+                border-bottom: 3px solid #0B1E33;
+                margin-bottom: 20px;
             }
             
-            /* إضافة التاريخ */
-            #seniorShiftModal .modal-content .print-date {
-                text-align: center;
-                font-size: 0.8rem;
-                color: #555;
-                margin-bottom: 15px;
+            .print-date {
+                font-size: 0.9rem !important;
+                color: #333 !important;
+                text-align: center !important;
+                margin-bottom: 20px !important;
             }
-        }
-
-        .footer {
-            text-align: center;
-            font-size: 0.65rem;
-            color: var(--gray-400);
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
+            
+            .modal-content h2 {
+                font-size: 1.2rem !important;
+                color: #0B1E33 !important;
+                margin-bottom: 5px !important;
+            }
+            .modal-content .sub-title {
+                font-size: 0.9rem !important;
+                color: #555 !important;
+            }
+            .signatures-section h3 {
+                font-size: 1rem !important;
+                color: #0B1E33 !important;
+                border-top: 2px solid #0B1E33 !important;
+                padding-top: 15px !important;
+            }
+            .form-row label {
+                font-size: 0.85rem !important;
+                font-weight: 600 !important;
+                color: #0B1E33 !important;
+            }
+            .fas, .far, .fab, .fa, i {
+                display: none !important;
+            }
+            .sig-label i {
+                display: none !important;
+            }
         }
 
         @media (max-width: 650px) {
@@ -771,23 +1104,27 @@
             .header { flex-direction: column; align-items: stretch; text-align: center; padding: 14px; }
             .header-brand { justify-content: center; }
             .header-date { text-align: center; }
-            .control-bar { flex-direction: column; align-items: stretch; }
-            .control-bar .actions { justify-content: center; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .units-grid { grid-template-columns: 1fr 1fr; }
+            .info-bar { flex-direction: column; align-items: stretch; }
+            .toolbar { justify-content: center; }
             .locations-grid { grid-template-columns: 1fr 1fr; }
             .signature-row .sig-inputs { flex-direction: column; }
             .signature-row .sig-inputs input { min-width: 100%; }
             .modal-content { padding: 16px; margin: 10px; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
+            .live-stats-grid { flex-direction: column; align-items: stretch; }
+            .control-person { flex-direction: column; align-items: stretch; }
+            .control-vacation .edit input { width: 100%; }
+            .circle-stats-container { grid-template-columns: 1fr 1fr; }
+            .svg-circle { width: 60px; height: 60px; }
         }
     </style>
 </head>
 <body>
+<div class="container">
     <!-- ===== الشريط العلوي ===== -->
     <header class="header">
         <div class="header-brand">
             <div class="icon" id="brandLogoContainer">
-                <!-- الشعار الافتراضي (SVG) - سيتم استبداله بالشعار المرفوع إن وجد -->
                 <svg id="defaultLogo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
                     <rect x="10" y="32" width="100" height="14" rx="2" fill="#FFFFFF" opacity="0.95"/>
                     <rect x="16" y="46" width="88" height="10" rx="2" fill="#FFFFFF" opacity="0.7"/>
@@ -814,523 +1151,687 @@
     </header>
 
     <!-- ===== شريط التحكم ===== -->
-    <div class="control-bar">
-        <div class="total">
-            <i class="fas fa-chart-bar"></i> إجمالي البلاغات
-            <span class="number" id="grandTotal">0</span>
+    <div class="info-bar">
+        <div>
+            <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
+            <span id="viewingBadge" class="viewing-badge" style="display:none;"></span>
+            <button id="returnToCurrentBtn" class="btn" style="display:none;">↩️ العودة للحالية</button>
+            <span id="shiftStatus" style="font-size:0.7rem; color:var(--gray-600); margin-right:10px;"></span>
         </div>
-        <div class="actions">
-            <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
-            <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
-            <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
-            <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
-            <button class="btn btn-outline btn-sm" id="controlBtn"><i class="fas fa-sliders-h"></i> التحكم</button>
-            <button class="btn btn-outline btn-sm" id="seniorShiftBtn"><i class="fas fa-user-md"></i> كبار المسعفين</button>
-            <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
+        
+        <div class="archive-row">
+            <label style="font-weight:600; font-size:0.85rem;">📂 المناوبات السابقة:</label>
+            <select id="archiveSelect">
+                <option value="">-- مناوبة جديدة --</option>
+            </select>
+            <button id="viewShiftBtn" class="btn">📋 عرض البلاغات</button>
+        </div>
+
+        <div class="toolbar">
+            <button id="newShiftBtn" class="btn btn-primary"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
+            <button id="shiftBtn" class="btn"><i class="fas fa-clipboard-list"></i> نموذج</button>
+            <button id="docsBtn" class="btn"><i class="fas fa-folder-open"></i> المستندات</button>
+            <button id="airAmbulanceBtn" class="btn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
+            <button id="controlBtn" class="btn"><i class="fas fa-sliders-h"></i> التحكم</button>
+            <button id="seniorShiftBtn" class="btn"><i class="fas fa-user-md"></i> كبار المسعفين</button>
+            <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
+        </div>
+    </div>
+    <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
+
+    <!-- إحصائيات البلاغات الفورية -->
+    <div id="liveReportStats" class="live-stats" style="display:none;">
+        <div class="live-stats-grid">
+            <div class="live-stats-item">
+                <span class="label">📊 إجمالي البلاغات</span>
+                <span class="value" id="liveTotalReports">0</span>
+            </div>
+            <div class="live-stats-item">
+                <span class="label">🏆 أكثر فرقة استخداماً</span>
+                <span class="value green" id="liveTopUnit">-</span>
+            </div>
+            <div class="live-stats-item">
+                <span class="label">🔢 عدد البلاغات للفرقة الأكثر</span>
+                <span class="value red" id="liveTopUnitCount">0</span>
+            </div>
+            <div class="live-distribution" id="liveUnitDistribution">
+                <div class="title">📋 توزيع البلاغات على الفرق</div>
+                <div id="liveUnitList"></div>
+            </div>
         </div>
     </div>
 
-    <!-- ===== إحصائيات البلاغات ===== -->
-    <div class="stats-card" id="liveReportStats" style="display:none;">
-        <div class="stats-grid">
-            <div class="stats-item">
-                <div class="label">إجمالي البلاغات</div>
-                <div class="value" id="liveTotalReports">0</div>
-            </div>
-            <div class="stats-item">
-                <div class="label">أكثر فرقة استخداماً</div>
-                <div class="value green" id="liveTopUnit">-</div>
-            </div>
-            <div class="stats-item">
-                <div class="label">عدد البلاغات للفرقة الأكثر</div>
-                <div class="value red" id="liveTopUnitCount">0</div>
-            </div>
-        </div>
-        <div class="stats-distribution" id="liveUnitDistribution">
-            <div class="title"><i class="fas fa-chart-pie"></i> توزيع البلاغات على الفرق</div>
-            <div id="liveUnitList"></div>
-        </div>
-    </div>
-
-    <!-- ===== شبكة الفرق ===== -->
     <div id="pointsContainer">
         <div class="loading">⏳ جاري تحميل البيانات...</div>
     </div>
+    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
+</div>
 
-    <!-- ===== نافذة كبار المسعفين ===== -->
-    <div id="seniorShiftModal" class="modal">
-        <div class="modal-content">
-            <h2>📋 تسليم مناوبة كبار المسعفين</h2>
-            <p class="sub-title">تسجيل بيانات المناوبة لكبار المسعفين</p>
-            <p class="print-date" style="text-align:center; font-size:0.8rem; color:#666; margin-bottom:15px;">📅 <span id="printDate"></span></p>
+<!-- نافذة نموذج المناوبة -->
+<div id="shiftModal" class="modal">
+    <div class="modal-content">
+        <h2>📋 نموذج استلام وتسليم النوبة</h2>
+        <p class="sub-title">تسجيل بيانات المناوبة</p>
 
-            <!-- بيانات المركبات -->
-            <div class="form-row">
-                <label>🚑 عدد المركبات العاملة:</label>
-                <input type="number" id="seniorActiveCars" min="0" value="0">
-            </div>
+        <div class="form-row">
+            <label>📂 المناوبات السابقة:</label>
+            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;">
+                <option value="">-- مناوبة جديدة --</option>
+            </select>
+            <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;">🗑️ حذف المناوبة</button>
+        </div>
 
-            <div class="form-row">
-                <label>🔧 عدد المركبات المتعطلة:</label>
-                <input type="number" id="seniorBrokenCars" min="0" value="0">
-            </div>
+        <div class="form-row">
+            <label>📅 اليوم والتاريخ:</label>
+            <span id="shiftDate" style="font-weight:600;"></span>
+        </div>
 
-            <div class="form-row">
-                <label>🔄 عدد مركبات الاحتياط:</label>
-                <input type="number" id="seniorReserveCars" min="0" value="0">
-            </div>
-
-            <div class="form-row">
-                <label>📊 عدد فرق الاوفر لاب:</label>
-                <input type="number" id="seniorOverlapTeams" min="0" value="0">
-            </div>
-
-            <!-- مناطق التمركز -->
-            <div class="form-row">
-                <label>📍 مناطق تمركز فرق الاوفر لاب (اختياري):</label>
-                <div class="locations-grid">
-                    <label><input type="checkbox" class="senior-location" value="الشفاء"> الشفاء</label>
-                    <label><input type="checkbox" class="senior-location" value="عكاظ"> عكاظ</label>
-                    <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> الدار البيضاء</label>
-                    <label><input type="checkbox" class="senior-location" value="الإسكان"> الإسكان</label>
-                    <label><input type="checkbox" class="senior-location" value="المنصورة"> المنصورة</label>
-                </div>
-            </div>
-
-            <!-- الملاحظات -->
-            <div class="form-row">
-                <label>📝 ملاحظات إضافية:</label>
-                <textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
-            </div>
-
-            <!-- ===== التوقيعات ===== -->
-            <div class="signatures-section">
-                <h3>✍️ التسليم والاستلام</h3>
-                
-                <div class="signature-row">
-                    <div class="sig-label"><i class="fas fa-user-tie"></i> مساعد كبير المسعفين:</div>
-                    <div class="sig-inputs">
-                        <input type="text" id="seniorAssistantName" placeholder="الاسم">
-                        <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)">
-                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorAssistantDate"></span></span>
-                    </div>
-                </div>
-
-                <div class="signature-row">
-                    <div class="sig-label"><i class="fas fa-user-md"></i> كبير المسعفين:</div>
-                    <div class="sig-inputs">
-                        <input type="text" id="seniorChiefName" placeholder="الاسم">
-                        <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)">
-                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorChiefDate"></span></span>
-                    </div>
-                </div>
-
-                <div class="signature-row">
-                    <div class="sig-label"><i class="fas fa-flag"></i> قائد المنطقة:</div>
-                    <div class="sig-inputs">
-                        <input type="text" id="seniorRegionLeaderName" placeholder="الاسم">
-                        <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)">
-                        <span class="sig-placeholder">📅 التاريخ: <span id="seniorRegionLeaderDate"></span></span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- السجل المحفوظ -->
-            <div class="saved-records" id="seniorSavedRecords">
-                <h4>📋 المناوبات المحفوظة</h4>
-                <div id="seniorRecordsList"></div>
-            </div>
-
-            <!-- الأزرار -->
-            <div class="modal-buttons">
-                <button class="btn-save" id="saveSeniorShift"><i class="fas fa-save"></i> حفظ المناوبة</button>
-                <button class="btn-print" id="printSeniorShift"><i class="fas fa-print"></i> طباعة التقرير</button>
-                <button class="btn-close" id="closeSeniorShift"><i class="fas fa-times"></i> إغلاق</button>
+        <div class="form-row">
+            <label>⏰ توقيت المناوبة:</label>
+            <div class="shift-type">
+                <label><input type="radio" name="shiftType" value="صباحية"> صباحية (4 فجراً - 4 عصراً)</label>
+                <label><input type="radio" name="shiftType" value="ليلية"> ليلية (4 عصراً - 4 فجراً)</label>
             </div>
         </div>
-    </div>
 
-    <div class="footer">
-        <i class="fas fa-clock"></i> ضغطة = بلاغ  |  <i class="fas fa-undo-alt"></i> تراجع  |  <i class="fas fa-sync-alt"></i> تحديث تلقائي
-    </div>
+        <h3>🚑 تحضير فرق التدخل السريع</h3>
+        <table id="rapidTable">
+            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
+            <tbody>
+                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
+            </tbody>
+        </table>
 
-    <script>
-        // ============================================
-        // تحميل الشعار المخصص من localStorage
-        // ============================================
-        function loadBrandLogo() {
-            try {
-                const savedLogo = localStorage.getItem('brandLogo');
-                if (savedLogo) {
-                    const img = document.getElementById('brandLogoImage');
-                    const svg = document.getElementById('defaultLogo');
-                    if (img && svg) {
-                        img.src = savedLogo;
-                        img.style.display = 'block';
-                        svg.style.display = 'none';
-                        console.log('✅ تم تحميل الشعار المخصص');
-                    }
-                }
-            } catch(e) {
-                console.log('⚠️ لم يتم تحميل الشعار المخصص');
-            }
-        }
+        <h3>🏥 المراكز الإسعافية</h3>
+        <table id="centersTable">
+            <thead>
+                <tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr>
+            </thead>
+            <tbody id="centersTableBody"></tbody>
+        </table>
 
-        // ============================================
-        // البيانات التجريبية (للعرض فقط)
-        // ============================================
-        const mockData = {
-            centers: {
-                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-                "الخالدية": ["جنوب 2"],
-                "منفوحة": ["جنوب 3"],
-                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-                "الإسكان": ["جنوب 6"],
-                "الحائر": ["جنوب 7"],
-                "ديراب": ["جنوب 10"],
-                "عكاظ": ["جنوب 9"],
-                "الشفاء": ["جنوب 8", "سريع 2"],
-                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-            },
-            reports: {
-                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
-                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
-                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
-                "المنصورة|سريع 3": { count: 0, times: [] },
-                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
-                "منفوحة|جنوب 3": { count: 0, times: [] },
-                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
-                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
-                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
-                "الإسكان|جنوب 6": { count: 0, times: [] },
-                "الحائر|جنوب 7": { count: 0, times: [] },
-                "ديراب|جنوب 10": { count: 0, times: [] },
-                "عكاظ|جنوب 9": { count: 0, times: [] },
-                "الشفاء|جنوب 8": { count: 0, times: [] },
-                "الشفاء|سريع 2": { count: 0, times: [] },
-                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
-            }
-        };
-
-        // ============================================
-        // دوال العرض (البلاغات)
-        // ============================================
-        function updateTotal() {
-            let total = 0;
-            for (let key in mockData.reports) {
-                total += mockData.reports[key].count;
-            }
-            document.getElementById('grandTotal').innerText = total;
-        }
-
-        function renderUnits() {
-            const container = document.getElementById('pointsContainer');
-            container.innerHTML = '';
-            
-            for (let center in mockData.centers) {
-                const sectorDiv = document.createElement('div');
-                sectorDiv.className = 'sector-card';
-                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
-                container.appendChild(sectorDiv);
-                
-                const grid = sectorDiv.querySelector('.units-grid');
-                for (let unit of mockData.centers[center]) {
-                    const key = `${center}|${unit}`;
-                    const info = mockData.reports[key] || { count: 0, times: [] };
-                    const hasReports = info.count > 0;
-                    const isZero = info.count === 0;
-                    
-                    const unitDiv = document.createElement('div');
-                    unitDiv.className = 'unit-card';
-                    unitDiv.innerHTML = `
-                        <div class="name">${unit}</div>
-                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
-                        <div class="actions">
-                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
-                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
-                        </div>
-                    `;
-                    
-                    unitDiv.querySelector('.report-btn').onclick = function() {
-                        info.count++;
-                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
-                        renderUnits();
-                        updateTotal();
-                        updateLiveStats();
-                    };
-                    
-                    if (hasReports) {
-                        unitDiv.querySelector('.undo-btn').onclick = function() {
-                            if (info.count > 0) {
-                                info.count--;
-                                info.times.pop();
-                                renderUnits();
-                                updateTotal();
-                                updateLiveStats();
-                            }
-                        };
-                    }
-                    
-                    grid.appendChild(unitDiv);
-                }
-            }
-        }
-
-        function updateLiveStats() {
-            const container = document.getElementById('liveReportStats');
-            let total = 0;
-            let unitStats = {};
-            
-            for (let key in mockData.reports) {
-                const report = mockData.reports[key];
-                if (report && report.count > 0) {
-                    total += report.count;
-                    const unit = key.split('|')[1];
-                    unitStats[unit] = (unitStats[unit] || 0) + report.count;
-                }
-            }
-            
-            if (total === 0) {
-                container.style.display = 'none';
-                return;
-            }
-            
-            container.style.display = 'block';
-            document.getElementById('liveTotalReports').innerText = total;
-            
-            const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-            const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-            const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-            
-            document.getElementById('liveTopUnit').innerText = topUnit;
-            document.getElementById('liveTopUnitCount').innerText = topCount;
-            
-            const listContainer = document.getElementById('liveUnitList');
-            listContainer.innerHTML = '';
-            sortedUnits.forEach(([unit, count]) => {
-                const percentage = Math.round((count / total) * 100);
-                const div = document.createElement('div');
-                div.className = 'dist-item';
-                div.innerHTML = `
-                    <span class="name">${unit}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill" style="width:${percentage}%;"></div>
+        <!-- مؤشرات القوى العاملة -->
+        <div id="workforceStats" class="stats-section" style="display:none;">
+            <h3>📊 مؤشرات القوى العاملة</h3>
+            <div class="circle-stats-container">
+                <div class="circle-stat">
+                    <div class="svg-circle-container">
+                        <svg class="svg-circle" viewBox="0 0 100 100">
+                            <circle class="svg-circle-bg" cx="50" cy="50" r="42"/>
+                            <circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42"
+                                stroke="#2a7f3e"
+                                stroke-dasharray="263.89"
+                                stroke-dashoffset="263.89"/>
+                            <text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text>
+                        </svg>
                     </div>
-                    <span class="count">${count}</span>
-                `;
-                listContainer.appendChild(div);
-            });
-        }
+                    <div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div>
+                    <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
+                </div>
+                <div class="circle-stat">
+                    <div class="value value-blue" id="totalStaffDisplay">0</div>
+                    <div class="label">إجمالي المسعفين</div>
+                    <div class="sub-value" id="staffSubText">موزعين على 0 مركز</div>
+                </div>
+                <div class="circle-stat">
+                    <div class="value value-blue" id="totalCarsDisplay">0</div>
+                    <div class="label">إجمالي السيارات</div>
+                    <div class="sub-value" id="carsSubText"></div>
+                </div>
+                <div class="circle-stat">
+                    <div class="value value-red" id="missingCentersDisplay">0</div>
+                    <div class="label">المراكز الناقصة</div>
+                    <div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                <div class="stats-scroll" id="distributionContainer">
+                    <div class="title">توزيع المسعفين على المراكز</div>
+                    <div id="distributionList"></div>
+                </div>
+                <div class="stats-scroll" id="carDistributionContainer">
+                    <div class="title">توزيع السيارات على المراكز</div>
+                    <div id="carDistributionList"></div>
+                </div>
+            </div>
+        </div>
 
-        // ============================================
-        // دوال كبار المسعفين (محاكاة التخزين المحلي)
-        // ============================================
-        let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+        <!-- إحصائيات البلاغات -->
+        <div id="shiftReportStats" class="stats-section" style="display:none;">
+            <h3>📈 إحصائيات البلاغات</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);">
+                    <div style="font-size:0.7rem; color:var(--gray-600);">إجمالي البلاغات</div>
+                    <div style="font-size:1.8rem; font-weight:700; color:var(--primary-700);" id="shiftTotalReports">0</div>
+                </div>
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);">
+                    <div style="font-size:0.7rem; color:var(--gray-600);">أكثر فرقة استخداماً</div>
+                    <div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="topUnit">-</div>
+                </div>
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);">
+                    <div style="font-size:0.7rem; color:var(--gray-600);">عدد البلاغات للفرقة الأكثر</div>
+                    <div style="font-size:1.8rem; font-weight:700; color:var(--coral);" id="topUnitCount">0</div>
+                </div>
+            </div>
+            <div class="stats-scroll" style="margin-top:10px;" id="unitReportContainer">
+                <div class="title">توزيع البلاغات على الفرق</div>
+                <div id="unitReportList"></div>
+            </div>
+        </div>
 
-        function renderSeniorRecords() {
-            const container = document.getElementById('seniorRecordsList');
-            const section = document.getElementById('seniorSavedRecords');
-            if (!container || !section) return;
+        <h3>📝 الملاحظات العامة أثناء سير المناوبة</h3>
+        <textarea id="generalNotes" rows="3"></textarea>
 
-            if (seniorRecords.length === 0) {
-                section.style.display = 'none';
-                return;
-            }
+        <div class="modal-buttons">
+            <button id="printShiftBtn" class="btn no-print"><i class="fas fa-print"></i> طباعة</button>
+            <button id="saveShiftBtn" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ النموذج</button>
+            <button id="closeShiftBtn" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
-            section.style.display = 'block';
-            let html = '';
-            seniorRecords.forEach((record, index) => {
-                const date = new Date(record.createdAt).toLocaleString('ar-SA');
-                const locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
-                html += `
-                    <div class="record-item">
-                        <div class="record-info">
-                            <strong>🚑 ${record.activeCars || 0}</strong>
-                            <span style="margin:0 5px;">|</span>
-                            <span>🔧 ${record.brokenCars || 0}</span>
-                            <span style="margin:0 5px;">|</span>
-                            <span>🔄 ${record.reserveCars || 0}</span>
-                            <span style="margin:0 5px;">|</span>
-                            <span>📊 ${record.overlapTeams || 0}</span>
-                            <span style="margin:0 5px;">|</span>
-                            <span class="rec-locations">📍 ${locations}</span>
-                            <span class="rec-date">🕒 ${date}</span>
-                            ${record.assistantName ? `<span style="font-size:0.6rem; color:var(--primary-700);">👤 ${record.assistantName}</span>` : ''}
-                        </div>
-                        <div class="record-actions">
-                            <button onclick="deleteSeniorRecord(${index})">🗑️ حذف</button>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        }
+<!-- نافذة المستندات -->
+<div id="docsModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <h2>📁 المستندات والملفات</h2>
+        <p class="sub-title">رفع وعرض المستندات (السياسات، الخط الساخن، التعليمات)</p>
+        
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display:none;">
+            <button id="uploadDocBtn" class="btn btn-primary"><i class="fas fa-upload"></i> رفع ملف</button>
+            <span id="docStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+        </div>
+        
+        <div id="docsListContainer" style="margin-top:15px; max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);">
+            <p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="closeDocsBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
-        function saveSeniorRecordToLocal(data) {
-            seniorRecords.unshift({
-                ...data,
-                createdAt: new Date().toISOString()
-            });
-            localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-            renderSeniorRecords();
-        }
+<!-- نافذة الإسعاف الجوي -->
+<div id="airAmbulanceModal" class="modal">
+    <div class="modal-content" style="max-width:600px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">🚁 الإسعاف الجوي</h2>
+            <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
+        </div>
+        <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
+        
+        <div class="form-row">
+            <label>📋 رقم البلاغ:</label>
+            <input type="text" id="airReportNumber" placeholder="مثال: 2025-001">
+        </div>
+        
+        <div class="form-row">
+            <label>🚑 الفرقة المرافقة:</label>
+            <select id="airUnit">
+                <option value="">-- اختر الفرقة --</option>
+                <option value="سريع 1">سريع 1</option>
+                <option value="سريع 2">سريع 2</option>
+                <option value="سريع 3">سريع 3</option>
+                <option value="سريع 4">سريع 4</option>
+                <option value="جنوب 1">جنوب 1</option>
+                <option value="جنوب 2">جنوب 2</option>
+                <option value="جنوب 3">جنوب 3</option>
+                <option value="جنوب 4">جنوب 4</option>
+                <option value="جنوب 5">جنوب 5</option>
+                <option value="جنوب 6">جنوب 6</option>
+                <option value="جنوب 7">جنوب 7</option>
+                <option value="جنوب 8">جنوب 8</option>
+                <option value="جنوب 9">جنوب 9</option>
+                <option value="جنوب 10">جنوب 10</option>
+                <option value="جنوب 11">جنوب 11</option>
+                <option value="جنوب 12">جنوب 12</option>
+                <option value="جنوب 13">جنوب 13</option>
+                <option value="جنوب 14">جنوب 14</option>
+                <option value="جنوب 15">جنوب 15</option>
+                <option value="جنوب 16">جنوب 16</option>
+                <option value="جنوب 17">جنوب 17</option>
+                <option value="جنوب 18">جنوب 18</option>
+                <option value="جنوب 19">جنوب 19</option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <label>🏥 المستشفى المستلم:</label>
+            <input type="text" id="airHospital" placeholder="اسم المستشفى">
+        </div>
+        
+        <div class="form-row">
+            <label>📅 تاريخ ووقت النقل:</label>
+            <input type="datetime-local" id="airDateTime">
+        </div>
+        
+        <div class="form-row">
+            <label>📝 ملاحظات إضافية:</label>
+            <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+        </div>
+        
+        <div class="saved-records" id="airSavedRecords">
+            <h4>📋 البلاغات المحفوظة</h4>
+            <div id="airRecordsList"></div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="saveAirRecord" class="btn btn-primary"><i class="fas fa-save"></i> حفظ البلاغ</button>
+            <button id="closeAirModal" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
-        function deleteSeniorRecord(index) {
-            if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
-            seniorRecords.splice(index, 1);
-            localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-            renderSeniorRecords();
-        }
+<!-- نافذة الجدول الشهري -->
+<div id="monthlyTableModal" class="modal no-print">
+    <div class="modal-content" style="max-width:98%;">
+        <h2>📊 جدول المناوبات الشهري</h2>
+        <p class="sub-title">قطاع جنوب الرياض</p>
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
+                <button type="button" id="uploadExcelBtn" class="btn btn-primary"><i class="fas fa-upload"></i> اختيار ملف</button>
+                <button type="submit" id="submitUploadBtn" style="display:none;">⬆️ رفع وحفظ</button>
+            </form>
+            <span id="tableStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+        </div>
+        <div id="excelTableContainer" style="overflow:auto; margin-top:15px; max-height:75vh; position:relative;">
+            <p style="text-align:center; color:var(--gray-400); padding:30px 0;">⏳ جاري تحميل الجدول...</p>
+        </div>
+        <div class="modal-buttons">
+            <button id="closeMonthlyTableBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
-        // ============================================
-        // دوال النافذة
-        // ============================================
-        document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
-            // تعبئة التواريخ التلقائية
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('ar-SA');
-            document.getElementById('seniorAssistantDate').innerText = dateStr;
-            document.getElementById('seniorChiefDate').innerText = dateStr;
-            document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
-            document.getElementById('printDate').innerText = dateStr + ' - ' + now.toLocaleTimeString('ar-SA');
+<!-- نافذة التحكم والتنسيق -->
+<div id="controlModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">📋 التحكم والتنسيق</h2>
+            <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
+        </div>
+        <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:8px; flex-wrap:wrap; gap:5px;">
+            <span style="font-weight:600;">عدد الأفراد: <span id="controlCount">9</span></span>
+            <span style="font-weight:600; font-size:0.8rem; color:var(--gray-600);">تحكم عملياتي / تنسيق استجابة</span>
+            <div style="display:flex; gap:5px;">
+                <button id="editVacationsBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-lock"></i> تعديل الإجازات</button>
+                <button id="saveVacationsBtn" class="btn btn-teal" style="display:none;"><i class="fas fa-save"></i> حفظ الإجازات</button>
+            </div>
+        </div>
+        
+        <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);">
+            <!-- ستعرض هنا بيانات الأفراد -->
+        </div>
+        
+        <div class="form-row" style="margin-top:15px;">
+            <label>📝 ملاحظات إضافية:</label>
+            <textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea>
+        </div>
+        
+        <div class="modal-buttons">
+            <button id="saveControlNotes" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الملاحظات</button>
+            <button id="closeControlBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إدخال الرقم السري -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3>🔒 إدخال الرقم السري</h3>
+        <p class="sub-title">أدخل الرقم السري لتعديل الإجازات</p>
+        <div class="form-row">
+            <label>🔑 الرقم السري:</label>
+            <input type="password" id="passwordInput" placeholder="أدخل الرقم السري">
+        </div>
+        <div class="modal-buttons">
+            <button id="confirmPasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تأكيد</button>
+            <button id="cancelPasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تغيير الرقم السري -->
+<div id="changePasswordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3>🔑 تغيير الرقم السري</h3>
+        <p class="sub-title">أدخل الرقم السري القديم والجديد</p>
+        <div class="form-row">
+            <label>🔑 الرقم السري القديم:</label>
+            <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم">
+        </div>
+        <div class="form-row">
+            <label>🔑 الرقم السري الجديد:</label>
+            <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)">
+        </div>
+        <div class="form-row">
+            <label>🔑 تأكيد الرقم السري الجديد:</label>
+            <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد">
+        </div>
+        <div class="modal-buttons">
+            <button id="confirmChangePasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تغيير</button>
+            <button id="cancelChangePasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة كبار المسعفين -->
+<div id="seniorShiftModal" class="modal">
+    <div class="modal-content" style="max-width:650px;">
+        <h2>📋 تسليم مناوبة كبار المسعفين</h2>
+        <p class="sub-title">تسجيل بيانات المناوبة لكبار المسعفين</p>
+        <p class="print-date" style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-bottom:15px;">📅 <span id="seniorPrintDate"></span></p>
+
+        <div class="form-row">
+            <label>🚑 عدد المركبات العاملة:</label>
+            <input type="number" id="seniorActiveCars" min="0" value="0">
+        </div>
+
+        <div class="form-row">
+            <label>🔧 عدد المركبات المتعطلة:</label>
+            <input type="number" id="seniorBrokenCars" min="0" value="0">
+        </div>
+
+        <div class="form-row">
+            <label>🔄 عدد مركبات الاحتياط:</label>
+            <input type="number" id="seniorReserveCars" min="0" value="0">
+        </div>
+
+        <div class="form-row">
+            <label>📊 عدد فرق الاوفر لاب:</label>
+            <input type="number" id="seniorOverlapTeams" min="0" value="0">
+        </div>
+
+        <div class="form-row">
+            <label>📍 مناطق تمركز فرق الاوفر لاب (اختياري):</label>
+            <div class="locations-grid">
+                <label><input type="checkbox" class="senior-location" value="الشفاء"> الشفاء</label>
+                <label><input type="checkbox" class="senior-location" value="عكاظ"> عكاظ</label>
+                <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> الدار البيضاء</label>
+                <label><input type="checkbox" class="senior-location" value="الإسكان"> الإسكان</label>
+                <label><input type="checkbox" class="senior-location" value="المنصورة"> المنصورة</label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label>📝 ملاحظات إضافية:</label>
+            <textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+        </div>
+
+        <div class="signatures-section">
+            <h3>✍️ التسليم والاستلام</h3>
             
-            document.getElementById('seniorShiftModal').style.display = 'flex';
-            renderSeniorRecords();
-        });
+            <div class="signature-row">
+                <div class="sig-label"><i class="fas fa-user-tie"></i> مساعد كبير المسعفين:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorAssistantName" placeholder="الاسم">
+                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)">
+                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorAssistantDate"></span></span>
+                </div>
+            </div>
 
-        document.getElementById('closeSeniorShift')?.addEventListener('click', function() {
-            document.getElementById('seniorShiftModal').style.display = 'none';
-        });
+            <div class="signature-row">
+                <div class="sig-label"><i class="fas fa-user-md"></i> كبير المسعفين:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorChiefName" placeholder="الاسم">
+                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)">
+                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorChiefDate"></span></span>
+                </div>
+            </div>
 
-        document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
-            const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-            const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-            const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-            const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
-            const locations = [];
-            document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
-            const notes = document.getElementById('seniorNotes').value.trim();
-            
-            const assistantName = document.getElementById('seniorAssistantName').value.trim();
-            const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
-            const chiefName = document.getElementById('seniorChiefName').value.trim();
-            const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
-            const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
-            const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+            <div class="signature-row">
+                <div class="sig-label"><i class="fas fa-flag"></i> قائد المنطقة:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم">
+                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)">
+                    <span class="sig-placeholder">📅 التاريخ: <span id="seniorRegionLeaderDate"></span></span>
+                </div>
+            </div>
+        </div>
 
-            if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
-                alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)');
-                return;
-            }
+        <div class="saved-records" id="seniorSavedRecords">
+            <h4>📋 المناوبات المحفوظة</h4>
+            <div id="seniorRecordsList"></div>
+        </div>
 
-            saveSeniorRecordToLocal({
-                activeCars,
-                brokenCars,
-                reserveCars,
-                overlapTeams,
-                locations,
-                notes,
-                assistantName,
-                assistantSignature,
-                chiefName,
-                chiefSignature,
-                leaderName,
-                leaderSignature
-            });
+        <div class="modal-buttons">
+            <button id="saveSeniorShift" class="btn btn-primary"><i class="fas fa-save"></i> حفظ المناوبة</button>
+            <button id="printSeniorShift" class="btn btn-teal"><i class="fas fa-print"></i> طباعة التقرير</button>
+            <button id="closeSeniorShift" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
-            alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح');
-            
-            // تصفير الحقول
-            document.getElementById('seniorActiveCars').value = 0;
-            document.getElementById('seniorBrokenCars').value = 0;
-            document.getElementById('seniorReserveCars').value = 0;
-            document.getElementById('seniorOverlapTeams').value = 0;
-            document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
-            document.getElementById('seniorNotes').value = '';
-            document.getElementById('seniorAssistantName').value = '';
-            document.getElementById('seniorAssistantSignature').value = '';
-            document.getElementById('seniorChiefName').value = '';
-            document.getElementById('seniorChiefSignature').value = '';
-            document.getElementById('seniorRegionLeaderName').value = '';
-            document.getElementById('seniorRegionLeaderSignature').value = '';
-        });
-
-        document.getElementById('printSeniorShift')?.addEventListener('click', function() {
-            // التأكد من وجود بيانات للحفظ قبل الطباعة
-            const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-            const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-            const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-            const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
-            
-            if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
-                alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الطباعة');
-                return;
-            }
-            
-            window.print();
-        });
-
-        // ============================================
-        // أزرار تجريبية (تنبيهات)
-        // ============================================
-        document.getElementById('newShiftBtn').onclick = function() {
-            if (confirm('⚠️ هل أنت متأكد؟\n\nسيتم تصفير جميع البلاغات الحالية لبدء مناوبة جديدة (تجريبي).')) {
-                for (let key in mockData.reports) {
-                    mockData.reports[key] = { count: 0, times: [] };
+<script>
+    // ============================================
+    // تحميل الشعار المخصص من localStorage
+    // ============================================
+    function loadBrandLogo() {
+        try {
+            const savedLogo = localStorage.getItem('brandLogo');
+            if (savedLogo) {
+                const img = document.getElementById('brandLogoImage');
+                const svg = document.getElementById('defaultLogo');
+                if (img && svg) {
+                    img.src = savedLogo;
+                    img.style.display = 'block';
+                    svg.style.display = 'none';
+                    console.log('✅ تم تحميل الشعار المخصص');
                 }
-                renderUnits();
-                updateTotal();
-                updateLiveStats();
-                alert('✅ تم بدء مناوبة جديدة');
             }
-        };
+        } catch(e) {
+            console.log('⚠️ لم يتم تحميل الشعار المخصص');
+        }
+    }
 
-        document.getElementById('shiftBtn').onclick = function() {
-            alert('📋 نموذج المناوبة - سيتم إضافته قريباً');
-        };
-        document.getElementById('docsBtn').onclick = function() {
-            alert('📁 المستندات - سيتم إضافتها قريباً');
-        };
-        document.getElementById('airAmbulanceBtn').onclick = function() {
-            alert('🚁 الإسعاف الجوي - سيتم إضافته قريباً');
-        };
-        document.getElementById('controlBtn').onclick = function() {
-            alert('📋 التحكم والتنسيق - سيتم إضافته قريباً');
-        };
-        document.getElementById('monthlyTableBtn').onclick = function() {
-            alert('📊 الجدول الشهري - سيتم إضافته قريباً');
-        };
+    // ============================================
+    // المتغيرات العامة
+    // ============================================
+    let centersData = {};
+    let reports = {};
+    let lastKnownUpdate = 0;
+    let currentShiftId = null;
+    let allShifts = [];
+    let isViewingArchiveShift = false;
+    let currentViewingShift = null;
+    let viewingShiftId = null;
 
-        // ============================================
-        // إغلاق النافذة بالضغط خارجها
-        // ============================================
-        window.onclick = function(e) {
-            const modal = document.getElementById('seniorShiftModal');
+    const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
+    const centerList = centerNumbers.map(n => `جنوب ${n}`);
+
+    let currentSheetIndex = 0;
+    let workbookData = null;
+
+    // بيانات التحكم والتنسيق
+    const controlData = [
+        { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "11120", name: "عوض عبدالعزيز عوض الاسمري", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "102752", name: "محمد نايف صنهات العتيبي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "10717", name: "عطاالله خالد عطوي الرويلي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+        { code: "101915", name: "مبارك هذال مبارك ال بريك", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "8323", name: "تركي عتيق الله خيرالله المطيري", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+        { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
+    ];
+
+    let isEditMode = false;
+    let controlNotes = "";
+
+    // بيانات كبار المسعفين
+    let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+
+    // ============================================
+    // دوال كبار المسعفين
+    // ============================================
+    function renderSeniorRecords() {
+        const container = document.getElementById('seniorRecordsList');
+        const section = document.getElementById('seniorSavedRecords');
+        if (!container || !section) return;
+
+        if (seniorRecords.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        let html = '';
+        seniorRecords.forEach((record, index) => {
+            const date = new Date(record.createdAt).toLocaleString('ar-SA');
+            const locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
+            html += `
+                <div class="record-item">
+                    <div class="record-info">
+                        <strong>🚑 ${record.activeCars || 0}</strong>
+                        <span style="margin:0 5px;">|</span>
+                        <span>🔧 ${record.brokenCars || 0}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span>🔄 ${record.reserveCars || 0}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span>📊 ${record.overlapTeams || 0}</span>
+                        <span style="margin:0 5px;">|</span>
+                        <span class="rec-locations">📍 ${locations}</span>
+                        <span class="rec-date">🕒 ${date}</span>
+                        ${record.assistantName ? `<span style="font-size:0.6rem; color:var(--primary-700);">👤 ${record.assistantName}</span>` : ''}
+                    </div>
+                    <div class="record-actions">
+                        <button onclick="deleteSeniorRecord(${index})">🗑️ حذف</button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function saveSeniorRecordToLocal(data) {
+        seniorRecords.unshift({
+            ...data,
+            createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+        renderSeniorRecords();
+    }
+
+    function deleteSeniorRecord(index) {
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
+        seniorRecords.splice(index, 1);
+        localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+        renderSeniorRecords();
+    }
+
+    // ============================================
+    // دوال نافذة كبار المسعفين
+    // ============================================
+    document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ar-SA');
+        document.getElementById('seniorAssistantDate').innerText = dateStr;
+        document.getElementById('seniorChiefDate').innerText = dateStr;
+        document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
+        document.getElementById('seniorPrintDate').innerText = dateStr + ' - ' + now.toLocaleTimeString('ar-SA');
+        
+        document.getElementById('seniorShiftModal').style.display = 'flex';
+        renderSeniorRecords();
+    });
+
+    document.getElementById('closeSeniorShift')?.addEventListener('click', function() {
+        document.getElementById('seniorShiftModal').style.display = 'none';
+    });
+
+    document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
+        const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+        const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+        const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+        const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+        const locations = [];
+        document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
+        const notes = document.getElementById('seniorNotes').value.trim();
+        
+        const assistantName = document.getElementById('seniorAssistantName').value.trim();
+        const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
+        const chiefName = document.getElementById('seniorChiefName').value.trim();
+        const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
+        const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
+        const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+
+        if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
+            alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)');
+            return;
+        }
+
+        saveSeniorRecordToLocal({
+            activeCars,
+            brokenCars,
+            reserveCars,
+            overlapTeams,
+            locations,
+            notes,
+            assistantName,
+            assistantSignature,
+            chiefName,
+            chiefSignature,
+            leaderName,
+            leaderSignature
+        });
+
+        alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح');
+        
+        document.getElementById('seniorActiveCars').value = 0;
+        document.getElementById('seniorBrokenCars').value = 0;
+        document.getElementById('seniorReserveCars').value = 0;
+        document.getElementById('seniorOverlapTeams').value = 0;
+        document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
+        document.getElementById('seniorNotes').value = '';
+        document.getElementById('seniorAssistantName').value = '';
+        document.getElementById('seniorAssistantSignature').value = '';
+        document.getElementById('seniorChiefName').value = '';
+        document.getElementById('seniorChiefSignature').value = '';
+        document.getElementById('seniorRegionLeaderName').value = '';
+        document.getElementById('seniorRegionLeaderSignature').value = '';
+    });
+
+    document.getElementById('printSeniorShift')?.addEventListener('click', function() {
+        const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+        const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+        const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+        const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+        
+        if (activeCars === 0 && brokenCars === 0 && reserveCars === 0 && overlapTeams === 0) {
+            alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الطباعة');
+            return;
+        }
+        
+        window.print();
+    });
+
+    // ============================================
+    // إغلاق النوافذ بالضغط خارجها
+    // ============================================
+    window.onclick = function(e) {
+        const modals = ['shiftModal', 'docsModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal'];
+        modals.forEach(id => {
+            const modal = document.getElementById(id);
             if (e.target === modal) {
                 modal.style.display = 'none';
             }
-        };
+        });
+    };
 
-        // ============================================
-        // التشغيل
-        // ============================================
-        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
-        renderUnits();
-        updateTotal();
-        updateLiveStats();
+    // ============================================
+    // التشغيل
+    // ============================================
+    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
+    loadBrandLogo();
 
-        // تحميل الشعار المخصص
-        loadBrandLogo();
-
-        console.log('✅ منصة الجنوب - نسخة تجريبية مع نموذج كبار المسعفين');
-        console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
-    </script>
+    console.log('✅ منصة الجنوب - الهوية البصرية الجديدة');
+    console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
+</script>
 </body>
 </html>
