@@ -2342,29 +2342,54 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
         return;
     }
     
-    if (selectedFiles.length === 0) {
-        alert('❌ الرجاء اختيار ملف للرفع');
-        return;
-    }
+    // ✅ تم إزالة الشرط الإجباري لرفع ملف
+    // if (selectedFiles.length === 0) {
+    //     alert('❌ الرجاء اختيار ملف للرفع');
+    //     return;
+    // }
     
     try {
-        for (let file of selectedFiles) {
-            const reader = new FileReader();
-            const base64 = await new Promise((resolve) => {
-                reader.onload = function(event) {
-                    resolve(btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result))));
-                };
-                reader.readAsArrayBuffer(file);
-            });
-            
+        // إذا كان هناك ملفات مرفوعة
+        if (selectedFiles.length > 0) {
+            for (let file of selectedFiles) {
+                const reader = new FileReader();
+                const base64 = await new Promise((resolve) => {
+                    reader.onload = function(event) {
+                        resolve(btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result))));
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+                
+                const response = await fetch('/api/upload-doc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: title + '_' + file.name,
+                        fileData: base64,
+                        description: description || '',
+                        fileType: file.type,
+                        category: category,
+                        priority: priority,
+                        uploader: 'المشرف'
+                    })
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    alert('❌ فشل في رفع الملف: ' + file.name);
+                    return;
+                }
+            }
+        } else {
+            // ✅ إذا لم يتم رفع ملف، نرسل تحديث بدون ملف
             const response = await fetch('/api/upload-doc', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    filename: title + '_' + file.name,
-                    fileData: base64,
+                    filename: title,
+                    fileData: '',
                     description: description || '',
-                    fileType: file.type,
+                    fileType: 'text/plain',
                     category: category,
                     priority: priority,
                     uploader: 'المشرف'
@@ -2373,7 +2398,7 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
             
             const result = await response.json();
             if (!result.success) {
-                alert('❌ فشل في رفع الملف: ' + file.name);
+                alert('❌ فشل في نشر التحديث: ' + (result.error || 'خطأ غير معروف'));
                 return;
             }
         }
@@ -2383,7 +2408,7 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
         await loadDocsData();
         
     } catch (error) {
-        alert('❌ خطأ في الرفع: ' + error.message);
+        alert('❌ خطأ في النشر: ' + error.message);
     }
 });
 
