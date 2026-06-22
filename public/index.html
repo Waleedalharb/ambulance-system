@@ -1153,24 +1153,45 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
     } catch (error) { alert('❌ خطأ في النشر: ' + error.message); }
 });
 
-// ===== معاينة الملف =====
+// ===== معاينة الملف - نسخة مطورة (دعم العربية) =====
 function openDocPreview(docId) {
     const doc = uploadedDocs.find(d => d.id === docId);
     if (!doc) { alert('❌ الملف غير موجود'); return; }
+    
     currentPreviewDocId = docId;
     document.getElementById('docPreviewTitle').innerText = `📄 ${doc.filename}`;
     document.getElementById('docPreviewModal').style.display = 'flex';
+    
     const content = document.getElementById('docPreviewContent');
     content.innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
+    
     try {
         if (doc.fileData) {
             const fileType = doc.fileType || '';
-            if (fileType.includes('text') || fileType.includes('plain') || doc.filename.endsWith('.txt')) {
-                const text = atob(doc.fileData);
+            const filename = doc.filename || '';
+            
+            // ===== معالجة الملفات النصية مع دعم العربية =====
+            if (fileType.includes('text') || fileType.includes('plain') || filename.endsWith('.txt')) {
+                // ✅ فك التشفير باستخدام TextDecoder لدعم العربية
+                const binaryString = atob(doc.fileData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                // ✅ استخدام TextDecoder لقراءة النص العربي بشكل صحيح
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(bytes);
+                
                 currentPreviewText = text;
-                content.innerHTML = `<pre style="white-space:pre-wrap; font-family:inherit; font-size:0.85rem; margin:0; direction:ltr; text-align:left;">${escapeHtml(text)}</pre>`;
+                content.innerHTML = `
+                    <div style="direction:rtl; text-align:right; font-family: 'Inter', sans-serif; font-size:0.9rem; line-height:1.8; padding:10px; background:white; border-radius:var(--radius-sm);">
+                        <pre style="white-space:pre-wrap; font-family:inherit; margin:0; direction:rtl; text-align:right; font-size:0.9rem;">${escapeHtml(text)}</pre>
+                    </div>
+                `;
                 document.getElementById('docPreviewCopyBtn').style.display = 'inline-flex';
-            } else if (fileType.includes('pdf') || fileType.includes('image')) {
+            } 
+            // ===== معالجة PDF والصور =====
+            else if (fileType.includes('pdf') || fileType.includes('image')) {
                 const blob = base64ToBlob(doc.fileData, fileType);
                 const url = URL.createObjectURL(blob);
                 if (fileType.includes('pdf')) {
@@ -1180,7 +1201,11 @@ function openDocPreview(docId) {
                 }
                 document.getElementById('docPreviewCopyBtn').style.display = 'none';
             } else {
-                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);"><i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.<br>يمكنك تحميله من الزر أدناه.</p>`;
+                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);">
+                    <i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>
+                    هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.
+                    <br>يمكنك تحميله من الزر أدناه.
+                </p>`;
                 document.getElementById('docPreviewCopyBtn').style.display = 'none';
             }
         } else {
