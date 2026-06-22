@@ -8,21 +8,16 @@
     <meta http-equiv="Expires" content="0">
     <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
     
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
-    
-    <!-- أيقونات التطبيق -->
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     
-    <!-- ألوان التطبيق -->
     <meta name="theme-color" content="#0B1E33">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- الخطوط والأيقونات -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -67,7 +62,6 @@
 
         .container { max-width: 1400px; margin: auto; }
 
-        /* ===== أيقونات الهوية الجديدة ===== */
         .icon-primary { color: var(--primary-700); }
         .icon-teal { color: var(--teal); }
         .icon-coral { color: var(--coral); }
@@ -90,7 +84,6 @@
         .card-icon.coral { background: var(--coral-light); color: var(--coral); }
         .card-icon.gold { background: #FFF8E7; color: var(--gold); }
 
-        /* ===== الشريط العلوي ===== */
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
             border-radius: var(--radius-lg);
@@ -124,7 +117,6 @@
         .header-brand .text .sub i { font-size: 0.4rem; color: var(--gold); }
         .header-date { color: rgba(255,255,255,0.8); font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 6px 16px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px; }
 
-        /* ===== شريط التحكم ===== */
         .info-bar {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -177,7 +169,6 @@
 
         .update-status { text-align: left; font-size: 0.65rem; color: var(--teal); margin-top: 5px; }
 
-        /* ===== إحصائيات البلاغات ===== */
         .live-stats {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -197,7 +188,6 @@
         .live-distribution .item { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px dotted var(--gray-200); }
         .live-distribution .item .count { font-weight: 600; color: var(--primary-700); }
 
-        /* ===== شبكة الفرق ===== */
         .point-card {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -221,7 +211,6 @@
         .show-times-btn { background: white; border: 1px solid var(--gray-200); padding: 4px; width: 100%; font-size: 0.6rem; border-radius: var(--radius-sm); cursor: pointer; margin-top: 4px; color: var(--gray-600); transition: all 0.2s; }
         .show-times-btn:hover { background: var(--gray-50); }
 
-        /* ===== النوافذ المنبثقة ===== */
         .modal {
             display: none;
             position: fixed;
@@ -230,7 +219,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.7);
-            z-index: 1000;
+            z-index: 10000;
             justify-content: center;
             align-items: center;
         }
@@ -277,7 +266,6 @@
         .sheet-tab.active { background: var(--primary-700); color: white; border-color: var(--primary-700); }
         .sheet-tab:hover { background: var(--gray-100); }
 
-        /* ===== مؤشرات القوى العاملة ===== */
         .stats-section { margin: 15px 0; border: 1px solid var(--gray-200); background: var(--gray-50); border-radius: var(--radius-md); padding: 15px; }
         .stats-section h3 { text-align: center; margin: 0 0 10px 0; color: var(--primary-700); }
         .circle-stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; margin: 15px 0; padding: 15px; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); }
@@ -303,7 +291,6 @@
         .distribution-bar .bar-fill { height: 100%; border-radius: 10px; transition: width 0.3s; }
         .distribution-bar .percent { font-size: 0.6rem; color: var(--gray-600); min-width: 35px; }
 
-        /* ===== التحكم والتنسيق ===== */
         .control-person { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); background: white; flex-wrap: wrap; }
         .control-avatar { width: 40px; height: 40px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
         .control-info { flex: 2; min-width: 150px; }
@@ -315,7 +302,6 @@
         .control-vacation .edit input { width: 120px; padding: 3px 6px; font-size: 0.7rem; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); }
         .control-role-badge { font-size: 0.7rem; padding: 3px 10px; border: 1px solid var(--gray-200); border-radius: 20px; background: var(--gray-50); }
 
-        /* ===== نموذج كبار المسعفين ===== */
         .locations-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
         .locations-grid label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 6px 10px; background: var(--gray-50); border-radius: var(--radius-sm); border: 1px solid var(--gray-200); cursor: pointer; transition: all 0.2s; font-weight: 400; }
         .locations-grid label:hover { background: var(--primary-100); border-color: var(--primary-500); }
@@ -343,7 +329,6 @@
 
         footer { text-align: center; font-size: 0.65rem; color: var(--gray-400); margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
 
-        /* ===== صفحة التحديثات التشغيلية ===== */
         #docsPage {
             display: none;
             position: fixed;
@@ -352,7 +337,7 @@
             width: 100%;
             height: 100%;
             background: var(--gray-50);
-            z-index: 9999;
+            z-index: 9998;
             overflow: auto;
         }
         #docsPage .docs-header {
@@ -372,7 +357,10 @@
         #docsPage .docs-header .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         #docsPage .docs-header .header-actions .count-badge { color: rgba(255,255,255,0.8); font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 4px 14px; border-radius: 20px; }
 
-        /* ===== تحسينات الطباعة ===== */
+        #docPreviewModal .modal-content { max-width: 750px; max-height: 85vh; }
+        #docPreviewContent { background: var(--gray-50); border-radius: var(--radius-md); padding: 16px; max-height: 55vh; overflow-y: auto; border: 1px solid var(--gray-200); }
+        #docPreviewContent pre { white-space: pre-wrap; font-family: inherit; font-size: 0.85rem; margin: 0; direction: ltr; text-align: left; }
+
         @media print {
             body * { visibility: hidden !important; }
             .modal[style*="display: flex"] { display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 9999 !important; overflow: auto !important; padding: 20px !important; margin: 0 !important; }
@@ -415,7 +403,6 @@
 </head>
 <body>
 <div class="container">
-    <!-- ===== الشريط العلوي ===== -->
     <header class="header">
         <div class="header-brand">
             <div class="icon" id="brandLogoContainer">
@@ -440,7 +427,6 @@
         <div class="header-date"><i class="fas fa-calendar-alt"></i> <span id="currentDate"></span></div>
     </header>
 
-    <!-- ===== شريط التحكم ===== -->
     <div class="info-bar">
         <div>
             <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
@@ -465,7 +451,6 @@
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
 
-    <!-- إحصائيات البلاغات الفورية -->
     <div id="liveReportStats" class="live-stats" style="display:none;">
         <div class="live-stats-grid">
             <div class="live-stats-item"><span class="label">📊 إجمالي البلاغات</span><span class="value" id="liveTotalReports">0</span></div>
@@ -479,9 +464,7 @@
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
-<!-- ============================================ -->
-<!-- صفحة التحديثات التشغيلية -->
-<!-- ============================================ -->
+<!-- ===== صفحة التحديثات التشغيلية ===== -->
 <div id="docsPage">
     <div class="docs-header">
         <div class="header-content">
@@ -550,9 +533,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة رفع تحديث جديد -->
-<!-- ============================================ -->
+<!-- ===== نافذة رفع تحديث جديد ===== -->
 <div id="uploadDocsModal" class="modal">
     <div class="modal-content" style="max-width:550px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -606,27 +587,40 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة تكميل النوبة -->
-<!-- ============================================ -->
+<!-- ===== نافذة معاينة الملف ===== -->
+<div id="docPreviewModal" class="modal">
+    <div class="modal-content" style="max-width:750px; max-height:85vh;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="card-icon primary" style="width:40px; height:40px; font-size:1.2rem;"><i class="fas fa-file-alt"></i></span>
+                <h3 style="margin:0; font-size:1rem;" id="docPreviewTitle">معاينة الملف</h3>
+            </div>
+            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="docPreviewContent" style="background:var(--gray-50); border-radius:var(--radius-md); padding:16px; max-height:55vh; overflow-y:auto; border:1px solid var(--gray-200);">
+            <p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <button onclick="copyDocPreview()" class="btn btn-teal" id="docPreviewCopyBtn" style="display:none;"><i class="fas fa-copy"></i> نسخ النص</button>
+            <button onclick="downloadDocFromPreview()" class="btn btn-primary"><i class="fas fa-download"></i> تحميل الملف</button>
+            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة تكميل النوبة ===== -->
 <div id="shiftModal" class="modal">
     <div class="modal-content">
         <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
             <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-clipboard-list"></i></span>
-            <div>
-                <h2 style="margin:0; color:var(--primary-700);">تكميل النوبة</h2>
-                <p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات تكميل النوبة</p>
-            </div>
+            <div><h2 style="margin:0; color:var(--primary-700);">تكميل النوبة</h2><p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات تكميل النوبة</p></div>
         </div>
         <div class="form-row">
             <label><i class="fas fa-archive icon-primary icon-sm"></i> المناوبات السابقة:</label>
             <select id="shiftArchiveSelect" style="width:auto; min-width:250px;"><option value="">-- مناوبة جديدة --</option></select>
             <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;"><i class="fas fa-trash"></i> حذف المناوبة</button>
         </div>
-        <div class="form-row">
-            <label><i class="fas fa-calendar-day icon-teal icon-sm"></i> اليوم والتاريخ:</label>
-            <span id="shiftDate" style="font-weight:600;"></span>
-        </div>
+        <div class="form-row"><label><i class="fas fa-calendar-day icon-teal icon-sm"></i> اليوم والتاريخ:</label><span id="shiftDate" style="font-weight:600;"></span></div>
         <div class="form-row">
             <label><i class="fas fa-clock icon-gold icon-sm"></i> توقيت المناوبة:</label>
             <div class="shift-type">
@@ -682,9 +676,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة الإسعاف الجوي (مع واتساب) -->
-<!-- ============================================ -->
+<!-- ===== نافذة الإسعاف الجوي ===== -->
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
@@ -695,55 +687,12 @@
             <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
         </div>
         <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
-        <div class="form-row">
-            <label><i class="fas fa-hashtag icon-primary icon-sm"></i> رقم البلاغ:</label>
-            <input type="text" id="airReportNumber" placeholder="مثال: 2025-001">
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-ambulance icon-teal icon-sm"></i> الفرقة المرافقة:</label>
-            <select id="airUnit">
-                <option value="">-- اختر الفرقة --</option>
-                <option value="سريع 1">سريع 1</option>
-                <option value="سريع 2">سريع 2</option>
-                <option value="سريع 3">سريع 3</option>
-                <option value="سريع 4">سريع 4</option>
-                <option value="جنوب 1">جنوب 1</option>
-                <option value="جنوب 2">جنوب 2</option>
-                <option value="جنوب 3">جنوب 3</option>
-                <option value="جنوب 4">جنوب 4</option>
-                <option value="جنوب 5">جنوب 5</option>
-                <option value="جنوب 6">جنوب 6</option>
-                <option value="جنوب 7">جنوب 7</option>
-                <option value="جنوب 8">جنوب 8</option>
-                <option value="جنوب 9">جنوب 9</option>
-                <option value="جنوب 10">جنوب 10</option>
-                <option value="جنوب 11">جنوب 11</option>
-                <option value="جنوب 12">جنوب 12</option>
-                <option value="جنوب 13">جنوب 13</option>
-                <option value="جنوب 14">جنوب 14</option>
-                <option value="جنوب 15">جنوب 15</option>
-                <option value="جنوب 16">جنوب 16</option>
-                <option value="جنوب 17">جنوب 17</option>
-                <option value="جنوب 18">جنوب 18</option>
-                <option value="جنوب 19">جنوب 19</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-hospital icon-coral icon-sm"></i> المستشفى المستلم:</label>
-            <input type="text" id="airHospital" placeholder="اسم المستشفى">
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-calendar-clock icon-gold icon-sm"></i> تاريخ ووقت النقل:</label>
-            <input type="datetime-local" id="airDateTime">
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-pen icon-gray icon-sm"></i> ملاحظات إضافية:</label>
-            <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
-        </div>
-        <div class="saved-records" id="airSavedRecords">
-            <h4><i class="fas fa-list-ul icon-primary"></i> البلاغات المحفوظة</h4>
-            <div id="airRecordsList"></div>
-        </div>
+        <div class="form-row"><label><i class="fas fa-hashtag icon-primary icon-sm"></i> رقم البلاغ:</label><input type="text" id="airReportNumber" placeholder="مثال: 2025-001"></div>
+        <div class="form-row"><label><i class="fas fa-ambulance icon-teal icon-sm"></i> الفرقة المرافقة:</label><select id="airUnit"><option value="">-- اختر الفرقة --</option><option value="سريع 1">سريع 1</option><option value="سريع 2">سريع 2</option><option value="سريع 3">سريع 3</option><option value="سريع 4">سريع 4</option><option value="جنوب 1">جنوب 1</option><option value="جنوب 2">جنوب 2</option><option value="جنوب 3">جنوب 3</option><option value="جنوب 4">جنوب 4</option><option value="جنوب 5">جنوب 5</option><option value="جنوب 6">جنوب 6</option><option value="جنوب 7">جنوب 7</option><option value="جنوب 8">جنوب 8</option><option value="جنوب 9">جنوب 9</option><option value="جنوب 10">جنوب 10</option><option value="جنوب 11">جنوب 11</option><option value="جنوب 12">جنوب 12</option><option value="جنوب 13">جنوب 13</option><option value="جنوب 14">جنوب 14</option><option value="جنوب 15">جنوب 15</option><option value="جنوب 16">جنوب 16</option><option value="جنوب 17">جنوب 17</option><option value="جنوب 18">جنوب 18</option><option value="جنوب 19">جنوب 19</option></select></div>
+        <div class="form-row"><label><i class="fas fa-hospital icon-coral icon-sm"></i> المستشفى المستلم:</label><input type="text" id="airHospital" placeholder="اسم المستشفى"></div>
+        <div class="form-row"><label><i class="fas fa-calendar-clock icon-gold icon-sm"></i> تاريخ ووقت النقل:</label><input type="datetime-local" id="airDateTime"></div>
+        <div class="form-row"><label><i class="fas fa-pen icon-gray icon-sm"></i> ملاحظات إضافية:</label><textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea></div>
+        <div class="saved-records" id="airSavedRecords"><h4><i class="fas fa-list-ul icon-primary"></i> البلاغات المحفوظة</h4><div id="airRecordsList"></div></div>
         <div class="modal-buttons">
             <button id="saveAirRecord" class="btn btn-primary"><i class="fas fa-save"></i> حفظ البلاغ</button>
             <button id="sendAirWhatsApp" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
@@ -752,9 +701,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة الجدول الشهري -->
-<!-- ============================================ -->
+<!-- ===== نافذة الجدول الشهري ===== -->
 <div id="monthlyTableModal" class="modal no-print">
     <div class="modal-content" style="max-width:98%;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
@@ -774,9 +721,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة التحكم والتنسيق -->
-<!-- ============================================ -->
+<!-- ===== نافذة التحكم والتنسيق ===== -->
 <div id="controlModal" class="modal">
     <div class="modal-content" style="max-width:800px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -796,10 +741,7 @@
             </div>
         </div>
         <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);"></div>
-        <div class="form-row" style="margin-top:15px;">
-            <label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label>
-            <textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea>
-        </div>
+        <div class="form-row" style="margin-top:15px;"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea></div>
         <div class="modal-buttons">
             <button id="saveControlNotes" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الملاحظات</button>
             <button id="closeControlBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
@@ -807,9 +749,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة إدخال الرقم السري -->
-<!-- ============================================ -->
+<!-- ===== نافذة إدخال الرقم السري ===== -->
 <div id="passwordModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
         <h3><i class="fas fa-lock icon-primary"></i> إدخال الرقم السري</h3>
@@ -822,9 +762,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة تغيير الرقم السري -->
-<!-- ============================================ -->
+<!-- ===== نافذة تغيير الرقم السري ===== -->
 <div id="changePasswordModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
         <h3><i class="fas fa-key icon-primary"></i> تغيير الرقم السري</h3>
@@ -839,9 +777,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة كبار المسعفين -->
-<!-- ============================================ -->
+<!-- ===== نافذة كبار المسعفين ===== -->
 <div id="seniorShiftModal" class="modal">
     <div class="modal-content" style="max-width:650px;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
@@ -900,13 +836,8 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- JavaScript -->
-<!-- ============================================ -->
 <script>
-// ============================================
-// تحميل الشعار المخصص
-// ============================================
+// ===== تحميل الشعار =====
 function loadBrandLogo() {
     try {
         const savedLogo = localStorage.getItem('brandLogo') || sessionStorage.getItem('brandLogo');
@@ -927,9 +858,7 @@ function loadBrandLogo() {
     } catch(e) { console.log('⚠️ لم يتم تحميل الشعار المخصص'); }
 }
 
-// ============================================
-// المتغيرات العامة
-// ============================================
+// ===== المتغيرات العامة =====
 let centersData = {};
 let reports = {};
 let lastKnownUpdate = 0;
@@ -944,6 +873,8 @@ let currentDocsPage = 1;
 const docsPerPage = 10;
 let selectedFiles = [];
 let docsViewMode = 'list';
+let currentPreviewDocId = null;
+let currentPreviewText = '';
 
 const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
 const centerList = centerNumbers.map(n => `جنوب ${n}`);
@@ -967,9 +898,7 @@ let isEditMode = false;
 let controlNotes = "";
 let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
 
-// ============================================
-// تحميل البيانات
-// ============================================
+// ===== تحميل البيانات =====
 async function loadAllData() {
     try {
         const response = await fetch('/api/data');
@@ -977,11 +906,7 @@ async function loadAllData() {
         centersData = result.centers;
         reports = result.data;
         currentShiftId = result.currentShiftId || null;
-        if (!isViewingArchiveShift) {
-            renderData();
-            updateTotal();
-            calculateLiveReportStats();
-        }
+        if (!isViewingArchiveShift) { renderData(); updateTotal(); calculateLiveReportStats(); }
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
     } catch (error) {
@@ -989,9 +914,7 @@ async function loadAllData() {
     }
 }
 
-// ============================================
-// دوال التحديثات التشغيلية
-// ============================================
+// ===== دوال التحديثات التشغيلية =====
 function openDocsPage() {
     document.getElementById('docsPage').style.display = 'block';
     document.body.style.overflow = 'hidden';
@@ -1016,11 +939,17 @@ async function loadDocsData() {
 }
 function renderDocsList() {
     const container = document.getElementById('docsListContainer');
+    const sortedDocs = [...filteredDocs].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
     const start = (currentDocsPage - 1) * docsPerPage;
     const end = start + docsPerPage;
-    const pageDocs = filteredDocs.slice(start, end);
+    const pageDocs = sortedDocs.slice(start, end);
     if (pageDocs.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);"><i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i><h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3><p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p><button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button></div>`;
+        container.innerHTML = `<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);">
+            <i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i>
+            <h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3>
+            <p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p>
+            <button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button>
+        </div>`;
         document.getElementById('docsPagination').innerHTML = '';
         document.getElementById('docsFilterCount').innerText = '0 تحديث';
         return;
@@ -1057,8 +986,8 @@ function renderDocsList() {
                 </div>
             </div>
             <div style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); flex-wrap:wrap;">
-                <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-download"></i> تحميل</button>
-                <button onclick="previewDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-eye"></i> معاينة</button>
+                <button onclick="openDocPreview('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-eye"></i> عرض</button>
+                <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-download"></i> تحميل</button>
                 <button onclick="deleteDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--coral); color:var(--coral); margin-right:auto;"><i class="fas fa-trash"></i></button>
             </div>
         </div>`;
@@ -1187,18 +1116,6 @@ function removeSelectedFile(index) {
     selectedFiles.splice(index, 1);
     renderSelectedFiles();
 }
-function previewDoc(docId) { window.open(`/api/download-doc/${docId}`, '_blank'); }
-async function downloadDoc(docId) {
-    try { window.open(`/api/download-doc/${docId}`, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); }
-}
-async function deleteDoc(docId) {
-    if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
-    try {
-        const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
-        const result = await response.json();
-        if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
-    } catch (error) { alert('❌ خطأ في الاتصال'); }
-}
 document.getElementById('saveDocBtn')?.addEventListener('click', async function() {
     const title = document.getElementById('docTitle').value.trim();
     const description = document.getElementById('docDescription').value.trim();
@@ -1236,9 +1153,92 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
     } catch (error) { alert('❌ خطأ في النشر: ' + error.message); }
 });
 
-// ============================================
-// بناء جدول المراكز
-// ============================================
+// ===== معاينة الملف =====
+function openDocPreview(docId) {
+    const doc = uploadedDocs.find(d => d.id === docId);
+    if (!doc) { alert('❌ الملف غير موجود'); return; }
+    currentPreviewDocId = docId;
+    document.getElementById('docPreviewTitle').innerText = `📄 ${doc.filename}`;
+    document.getElementById('docPreviewModal').style.display = 'flex';
+    const content = document.getElementById('docPreviewContent');
+    content.innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
+    try {
+        if (doc.fileData) {
+            const fileType = doc.fileType || '';
+            if (fileType.includes('text') || fileType.includes('plain') || doc.filename.endsWith('.txt')) {
+                const text = atob(doc.fileData);
+                currentPreviewText = text;
+                content.innerHTML = `<pre style="white-space:pre-wrap; font-family:inherit; font-size:0.85rem; margin:0; direction:ltr; text-align:left;">${escapeHtml(text)}</pre>`;
+                document.getElementById('docPreviewCopyBtn').style.display = 'inline-flex';
+            } else if (fileType.includes('pdf') || fileType.includes('image')) {
+                const blob = base64ToBlob(doc.fileData, fileType);
+                const url = URL.createObjectURL(blob);
+                if (fileType.includes('pdf')) {
+                    content.innerHTML = `<iframe src="${url}" style="width:100%; height:50vh; border:none; border-radius:var(--radius-sm);"></iframe>`;
+                } else if (fileType.includes('image')) {
+                    content.innerHTML = `<img src="${url}" style="max-width:100%; max-height:50vh; border-radius:var(--radius-sm);">`;
+                }
+                document.getElementById('docPreviewCopyBtn').style.display = 'none';
+            } else {
+                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);"><i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.<br>يمكنك تحميله من الزر أدناه.</p>`;
+                document.getElementById('docPreviewCopyBtn').style.display = 'none';
+            }
+        } else {
+            content.innerHTML = `<p style="text-align:center; color:var(--gray-400);">📭 لا توجد بيانات في هذا الملف</p>`;
+            document.getElementById('docPreviewCopyBtn').style.display = 'none';
+        }
+    } catch (error) {
+        content.innerHTML = `<p style="text-align:center; color:var(--coral);">❌ خطأ في عرض الملف: ${error.message}</p>`;
+        document.getElementById('docPreviewCopyBtn').style.display = 'none';
+    }
+}
+function closeDocPreview() {
+    document.getElementById('docPreviewModal').style.display = 'none';
+    document.getElementById('docPreviewContent').innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
+    currentPreviewDocId = null;
+    currentPreviewText = '';
+}
+function copyDocPreview() {
+    if (!currentPreviewText) { alert('⚠️ لا يوجد نص للنسخ'); return; }
+    navigator.clipboard.writeText(currentPreviewText).then(() => { alert('✅ تم نسخ النص بنجاح!'); }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = currentPreviewText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+        alert('✅ تم نسخ النص بنجاح!');
+    });
+}
+function downloadDocFromPreview() {
+    if (currentPreviewDocId) { downloadDoc(currentPreviewDocId); }
+}
+function base64ToBlob(base64, contentType) {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType || 'application/octet-stream' });
+}
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function downloadDoc(docId) {
+    try { window.open(`/api/download-doc/${docId}`, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); }
+}
+async function deleteDoc(docId) {
+    if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
+    try {
+        const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
+    } catch (error) { alert('❌ خطأ في الاتصال'); }
+}
+
+// ===== بناء جدول المراكز =====
 function buildCentersTable() {
     const tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
@@ -1260,13 +1260,7 @@ function updateStatusIcon(index) {
     if (staffInput && carsInput && iconSpan) {
         const staffCount = parseInt(staffInput.value) || 0;
         const carsCount = parseInt(carsInput.value) || 0;
-        if (staffCount >= 2 && carsCount >= 1) {
-            iconSpan.innerHTML = '✅';
-            iconSpan.className = 'status-icon status-ok';
-        } else {
-            iconSpan.innerHTML = '❌';
-            iconSpan.className = 'status-icon status-not';
-        }
+        if (staffCount >= 2 && carsCount >= 1) { iconSpan.innerHTML = '✅'; iconSpan.className = 'status-icon status-ok'; } else { iconSpan.innerHTML = '❌'; iconSpan.className = 'status-icon status-not'; }
     }
 }
 function calculateWorkforceStatsLocally() {
@@ -1330,9 +1324,7 @@ function calculateWorkforceStatsLocally() {
     }
 }
 
-// ============================================
-// حساب إحصائيات البلاغات
-// ============================================
+// ===== إحصائيات البلاغات =====
 function calculateLiveReportStats() {
     const container = document.getElementById('liveReportStats');
     if (!container) return;
@@ -1426,9 +1418,7 @@ function showTimes(center, unit, times) {
     modalTimes.querySelector(".btn").onclick = () => modalTimes.remove();
 }
 
-// ============================================
-// دوال المناوبات
-// ============================================
+// ===== دوال المناوبات =====
 async function loadShifts() {
     try {
         const response = await fetch('/api/shifts');
@@ -1490,9 +1480,7 @@ async function startNewShift() {
     } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
 }
 
-// ============================================
-// ربط الأحداث الرئيسية
-// ============================================
+// ===== ربط الأحداث الرئيسية =====
 document.addEventListener('DOMContentLoaded', function() {
     loadBrandLogo();
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
@@ -1527,11 +1515,8 @@ document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
 document.getElementById("viewShiftBtn").onclick = viewShiftReports;
 document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
 
-// ============================================
-// دوال الإسعاف الجوي (مع واتساب)
-// ============================================
+// ===== دوال الإسعاف الجوي =====
 let airRecords = [];
-
 async function loadAirRecords() {
     try {
         const response = await fetch('/api/air-ambulance');
@@ -1555,6 +1540,26 @@ function renderAirRecords() {
         html += `<div class="record-item"><div class="record-info"><strong>${record.reportNumber || 'بدون رقم'}</strong><span style="margin:0 5px;">|</span><span>${record.unit || '-'}</span><span style="margin:0 5px;">|</span><span>${record.hospital || '-'}</span><span style="margin:0 5px;">|</span><span style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ${notes}</span><span class="rec-date">🕒 ${date}</span></div><div class="record-actions"><button onclick="deleteAirRecord('${record.id}')">🗑️ حذف</button></div></div>`;
     });
     container.innerHTML = html;
+}
+function formatAirWhatsAppMessage(record) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ar-SA');
+    const timeStr = now.toLocaleTimeString('ar-SA');
+    let message = '';
+    message += 'تقرير الإسعاف الجوي\n';
+    message += '═══════════════════════════\n';
+    message += `رقم البلاغ: ${record.reportNumber || 'غير محدد'}\n`;
+    message += `الفرقة المرافقة: ${record.unit || 'غير محدد'}\n`;
+    message += `المستشفى المستلم: ${record.hospital || 'غير محدد'}\n`;
+    message += `تاريخ ووقت النقل: ${record.dateTime || 'غير محدد'}\n`;
+    if (record.notes) { message += `ملاحظات: ${record.notes}\n`; }
+    message += '═══════════════════════════\n';
+    message += `تم الإرسال: ${dateStr} ${timeStr}`;
+    return message;
+}
+function sendAirWhatsAppMessage(message) {
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
 }
 document.getElementById('saveAirRecord')?.addEventListener('click', async function() {
     const reportNumber = document.getElementById('airReportNumber').value.trim();
@@ -1582,6 +1587,17 @@ document.getElementById('saveAirRecord')?.addEventListener('click', async functi
         } else { alert('❌ فشل في حفظ البلاغ: ' + (result.error || 'خطأ غير معروف')); }
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
+document.getElementById('sendAirWhatsApp')?.addEventListener('click', function() {
+    const reportNumber = document.getElementById('airReportNumber').value.trim();
+    const unit = document.getElementById('airUnit').value;
+    const hospital = document.getElementById('airHospital').value.trim();
+    const dateTime = document.getElementById('airDateTime').value;
+    const notes = document.getElementById('airNotes').value.trim();
+    if (!reportNumber || !unit || !hospital || !dateTime) { alert('⚠️ الرجاء ملء جميع الحقول المطلوبة قبل الإرسال'); return; }
+    const record = { reportNumber, unit, hospital, dateTime, notes };
+    const message = formatAirWhatsAppMessage(record);
+    sendAirWhatsAppMessage(message);
+});
 async function deleteAirRecord(recordId) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا البلاغ؟')) return;
     try {
@@ -1599,44 +1615,7 @@ document.getElementById('clearAllAirRecords')?.addEventListener('click', async f
     } catch (error) { alert('❌ خطأ في الاتصال'); }
 });
 
-// ============================================
-// دوال الإسعاف الجوي - واتساب (بدون إيقونات)
-// ============================================
-function formatAirWhatsAppMessage(record) {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-SA');
-    const timeStr = now.toLocaleTimeString('ar-SA');
-    let message = '';
-    message += 'تقرير الإسعاف الجوي\n';
-    message += '═══════════════════════════\n';
-    message += `رقم البلاغ: ${record.reportNumber || 'غير محدد'}\n`;
-    message += `الفرقة المرافقة: ${record.unit || 'غير محدد'}\n`;
-    message += `المستشفى المستلم: ${record.hospital || 'غير محدد'}\n`;
-    message += `تاريخ ووقت النقل: ${record.dateTime || 'غير محدد'}\n`;
-    if (record.notes) { message += `ملاحظات: ${record.notes}\n`; }
-    message += '═══════════════════════════\n';
-    message += `تم الإرسال: ${dateStr} ${timeStr}`;
-    return message;
-}
-function sendAirWhatsAppMessage(message) {
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-}
-document.getElementById('sendAirWhatsApp')?.addEventListener('click', function() {
-    const reportNumber = document.getElementById('airReportNumber').value.trim();
-    const unit = document.getElementById('airUnit').value;
-    const hospital = document.getElementById('airHospital').value.trim();
-    const dateTime = document.getElementById('airDateTime').value;
-    const notes = document.getElementById('airNotes').value.trim();
-    if (!reportNumber || !unit || !hospital || !dateTime) { alert('⚠️ الرجاء ملء جميع الحقول المطلوبة قبل الإرسال'); return; }
-    const record = { reportNumber, unit, hospital, dateTime, notes };
-    const message = formatAirWhatsAppMessage(record);
-    sendAirWhatsAppMessage(message);
-});
-
-// ============================================
-// دوال الجدول الشهري
-// ============================================
+// ===== دوال الجدول الشهري =====
 async function loadSavedTable() {
     const container = document.getElementById('excelTableContainer');
     const status = document.getElementById('tableStatus');
@@ -1718,9 +1697,7 @@ document.getElementById('excelFileInput')?.addEventListener('change', function(e
     reader.readAsArrayBuffer(file);
 });
 
-// ============================================
-// دوال التحكم والتنسيق
-// ============================================
+// ===== دوال التحكم والتنسيق =====
 async function loadVacations() {
     try {
         const response = await fetch('/api/vacations');
@@ -1789,9 +1766,7 @@ document.getElementById('saveVacationsBtn')?.addEventListener('click', async fun
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
 
-// ============================================
-// دوال تغيير الرقم السري
-// ============================================
+// ===== دوال تغيير الرقم السري =====
 document.getElementById('changePasswordBtn')?.addEventListener('click', function() { document.getElementById('changePasswordModal').style.display = 'flex'; document.getElementById('oldPasswordInput').value = ''; document.getElementById('newPasswordInput').value = ''; document.getElementById('confirmNewPasswordInput').value = ''; });
 document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() { document.getElementById('changePasswordModal').style.display = 'none'; });
 document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
@@ -1808,9 +1783,7 @@ document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', a
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
 
-// ============================================
-// دوال ملاحظات التحكم
-// ============================================
+// ===== دوال ملاحظات التحكم =====
 async function loadControlNotes() {
     try {
         const response = await fetch('/api/control-notes');
@@ -1827,9 +1800,7 @@ document.getElementById('saveControlNotes')?.addEventListener('click', async fun
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
 
-// ============================================
-// دوال المناوبة (view, return, save, delete)
-// ============================================
+// ===== دوال المناوبة =====
 async function viewShiftReports() {
     const select = document.getElementById('archiveSelect');
     const shiftId = parseInt(select.value);
@@ -2047,9 +2018,7 @@ async function loadWorkforceStats(shiftId) {
     } catch (error) { console.error(error); document.getElementById('workforceStats').style.display = 'none'; }
 }
 
-// ============================================
-// دوال كبار المسعفين
-// ============================================
+// ===== دوال كبار المسعفين =====
 function renderSeniorRecords() {
     const container = document.getElementById('seniorRecordsList');
     const section = document.getElementById('seniorSavedRecords');
@@ -2160,20 +2129,16 @@ document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', fu
     sendWhatsAppMessage(message);
 });
 
-// ============================================
-// إغلاق النوافذ بالضغط خارجها
-// ============================================
+// ===== إغلاق النوافذ بالضغط خارجها =====
 window.onclick = function(e) {
-    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal'];
+    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal'];
     modals.forEach(id => {
         const modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
     });
 };
 
-// ============================================
-// تحديث تلقائي
-// ============================================
+// ===== تحديث تلقائي =====
 setInterval(() => {
     if (!isViewingArchiveShift) { checkForUpdates(); }
 }, 1000);
