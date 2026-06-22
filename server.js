@@ -51,6 +51,29 @@ async function ensureDataFiles() {
 ensureDataFiles();
 
 // ============================================
+// نظام الثيمات - حفظ في الخادم
+// ============================================
+const THEMES_PATH = path.join(DATA_DIR, 'themes.json');
+
+async function readThemes() {
+    try {
+        const data = await fs.readFile(THEMES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            const defaultThemes = { headerBg: null, sectorLogo: null, headerBgType: null };
+            await fs.writeFile(THEMES_PATH, JSON.stringify(defaultThemes, null, 2));
+            return defaultThemes;
+        }
+        throw error;
+    }
+}
+
+async function writeThemes(data) {
+    await fs.writeFile(THEMES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
 // ترحيل البيانات من المسار القديم
 // ============================================
 async function migrateOldData() {
@@ -470,18 +493,14 @@ app.get('/api/docs', async (req, res) => {
 app.post('/api/upload-doc', async (req, res) => {
     try {
         const { filename, fileData, description, fileType, category, priority, uploader } = req.body;
-        
-        // ✅ فقط التأكد من وجود العنوان
         if (!filename) {
             return res.status(400).json({ error: 'عنوان التحديث مطلوب' });
         }
-        
-        // ✅ إذا لم يكن هناك ملف، ننشئ تحديث بدون ملف
         const docs = await readDocs();
         const newDoc = {
             id: Date.now().toString(),
             filename: filename,
-            fileData: fileData || '', // ✅ يسمح بملف فارغ
+            fileData: fileData || '',
             fileType: fileType || 'text/plain',
             description: description || '',
             category: category || 'أخرى',
@@ -510,7 +529,35 @@ app.delete('/api/delete-doc/:id', async (req, res) => {
 });
 
 // ============================================
-// API: هوية القطاع
+// API: الثيمات (حفظ في الخادم)
+// ============================================
+app.post('/api/save-themes', async (req, res) => {
+    try {
+        const { headerBg, sectorLogo, headerBgType } = req.body;
+        const themes = await readThemes();
+        themes.headerBg = headerBg || null;
+        themes.sectorLogo = sectorLogo || null;
+        themes.headerBgType = headerBgType || null;
+        await writeThemes(themes);
+        res.json({ success: true, message: 'تم حفظ الثيمات بنجاح' });
+    } catch (error) {
+        console.error('خطأ في حفظ الثيمات:', error);
+        res.status(500).json({ error: 'فشل في حفظ الثيمات: ' + error.message });
+    }
+});
+
+app.get('/api/get-themes', async (req, res) => {
+    try {
+        const themes = await readThemes();
+        res.json({ success: true, themes });
+    } catch (error) {
+        console.error('خطأ في جلب الثيمات:', error);
+        res.status(500).json({ error: 'فشل في جلب الثيمات: ' + error.message });
+    }
+});
+
+// ============================================
+// باقي الـ APIs
 // ============================================
 app.get('/api/get-identity', async (req, res) => {
     try {
@@ -547,9 +594,6 @@ app.get('/api/download-identity', async (req, res) => {
     }
 });
 
-// ============================================
-// API: الإسعاف الجوي
-// ============================================
 app.get('/api/air-ambulance', async (req, res) => {
     try {
         const records = await readAirRecords();
@@ -672,9 +716,6 @@ app.post('/api/save-control-notes', async (req, res) => {
     }
 });
 
-// ============================================
-// API: إجازات التحكم والتنسيق
-// ============================================
 app.get('/api/vacations', async (req, res) => {
     try {
         const data = await fs.readFile(VACATIONS_PATH, 'utf8');
@@ -698,9 +739,6 @@ app.post('/api/save-vacations', async (req, res) => {
     }
 });
 
-// ============================================
-// API: الرقم السري
-// ============================================
 app.get('/api/get-password', async (req, res) => {
     try {
         const password = await readPassword();
