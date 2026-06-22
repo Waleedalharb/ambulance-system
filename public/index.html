@@ -84,6 +84,7 @@
         .card-icon.coral { background: var(--coral-light); color: var(--coral); }
         .card-icon.gold { background: #FFF8E7; color: var(--gold); }
 
+        /* ===== الشريط العلوي - مع دعم الخلفيات المرفوعة ===== */
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
             border-radius: var(--radius-lg);
@@ -95,7 +96,35 @@
             flex-wrap: wrap;
             gap: 10px;
             box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+            min-height: 80px;
         }
+
+        .header-bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.5;
+        }
+
+        /* الخلفيات المرفوعة للصور */
+        .header.has-bg-image {
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+        }
+
+        .header .header-brand,
+        .header .header-date {
+            position: relative;
+            z-index: 2;
+        }
+
         .header-brand { display: flex; align-items: center; gap: 14px; }
         .header-brand .icon {
             width: 52px; height: 52px;
@@ -108,14 +137,16 @@
             border: 1px solid rgba(255,255,255,0.10);
             transition: all 0.3s;
             overflow: hidden;
+            position: relative;
+            z-index: 2;
         }
         .header-brand .icon:hover { background: rgba(255,255,255,0.16); transform: scale(1.04); }
         .header-brand .icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; }
         .header-brand .icon svg { width: 40px; height: 40px; }
-        .header-brand .text h1 { color: var(--white); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; }
-        .header-brand .text .sub { color: rgba(255,255,255,0.75); font-size: 0.7rem; font-weight: 400; display: flex; align-items: center; gap: 6px; }
+        .header-brand .text h1 { color: var(--white); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .header-brand .text .sub { color: rgba(255,255,255,0.75); font-size: 0.7rem; font-weight: 400; display: flex; align-items: center; gap: 6px; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
         .header-brand .text .sub i { font-size: 0.4rem; color: var(--gold); }
-        .header-date { color: rgba(255,255,255,0.8); font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 6px 16px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px; }
+        .header-date { color: rgba(255,255,255,0.8); font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 6px 16px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 6px; position: relative; z-index: 2; backdrop-filter: blur(4px); }
 
         .info-bar {
             background: var(--white);
@@ -136,7 +167,7 @@
         .archive-row button { background: white; border: 1px solid var(--gray-200); padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 0.75rem; border-radius: var(--radius-sm); transition: all 0.2s; }
         .archive-row button:hover { background: var(--gray-50); }
 
-        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
         .btn {
             font-family: 'Inter', sans-serif;
             padding: 6px 14px;
@@ -169,6 +200,7 @@
 
         .update-status { text-align: left; font-size: 0.65rem; color: var(--teal); margin-top: 5px; }
 
+        /* باقي الأنماط (مختصرة للطول) */
         .live-stats {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -211,6 +243,7 @@
         .show-times-btn { background: white; border: 1px solid var(--gray-200); padding: 4px; width: 100%; font-size: 0.6rem; border-radius: var(--radius-sm); cursor: pointer; margin-top: 4px; color: var(--gray-600); transition: all 0.2s; }
         .show-times-btn:hover { background: var(--gray-50); }
 
+        /* النوافذ المنبثقة */
         .modal {
             display: none;
             position: fixed;
@@ -329,6 +362,7 @@
 
         footer { text-align: center; font-size: 0.65rem; color: var(--gray-400); margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
 
+        /* صفحة التحديثات التشغيلية */
         #docsPage {
             display: none;
             position: fixed;
@@ -357,10 +391,15 @@
         #docsPage .docs-header .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         #docsPage .docs-header .header-actions .count-badge { color: rgba(255,255,255,0.8); font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 4px 14px; border-radius: 20px; }
 
+        /* نافذة معاينة الملف */
         #docPreviewModal .modal-content { max-width: 750px; max-height: 85vh; }
         #docPreviewContent { background: var(--gray-50); border-radius: var(--radius-md); padding: 16px; max-height: 55vh; overflow-y: auto; border: 1px solid var(--gray-200); }
         #docPreviewContent pre { white-space: pre-wrap; font-family: inherit; font-size: 0.85rem; margin: 0; direction: ltr; text-align: left; }
 
+        /* ===== نافذة إدارة الثيمات ===== */
+        #themeModal .modal-content { max-width: 600px; }
+
+        /* ===== تحسينات الطباعة ===== */
         @media print {
             body * { visibility: hidden !important; }
             .modal[style*="display: flex"] { display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 9999 !important; overflow: auto !important; padding: 20px !important; margin: 0 !important; }
@@ -403,7 +442,8 @@
 </head>
 <body>
 <div class="container">
-    <header class="header">
+    <!-- ===== الشريط العلوي ===== -->
+    <header class="header" id="mainHeader">
         <div class="header-brand">
             <div class="icon" id="brandLogoContainer">
                 <svg id="defaultLogo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
@@ -418,6 +458,7 @@
                     <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.15"/>
                 </svg>
                 <img id="brandLogoImage" src="" alt="شعار قطاع جنوب الرياض" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:4px;">
+                <img id="sectorLogoImage" src="" alt="شعار القطاع" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:4px;">
             </div>
             <div class="text">
                 <h1>منصة الجنوب</h1>
@@ -427,6 +468,7 @@
         <div class="header-date"><i class="fas fa-calendar-alt"></i> <span id="currentDate"></span></div>
     </header>
 
+    <!-- ===== شريط التحكم ===== -->
     <div class="info-bar">
         <div>
             <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
@@ -447,10 +489,13 @@
             <button id="controlBtn" class="btn"><i class="fas fa-sliders-h"></i> التحكم</button>
             <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
+            <!-- زر الثيمات -->
+            <button id="themeBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-palette"></i> الثيمات</button>
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
 
+    <!-- إحصائيات البلاغات -->
     <div id="liveReportStats" class="live-stats" style="display:none;">
         <div class="live-stats-grid">
             <div class="live-stats-item"><span class="label">📊 إجمالي البلاغات</span><span class="value" id="liveTotalReports">0</span></div>
@@ -462,6 +507,365 @@
 
     <div id="pointsContainer"><div class="loading">⏳ جاري تحميل البيانات...</div></div>
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
+</div>
+
+<!-- ===== نافذة إدارة الثيمات ===== -->
+<div id="themeModal" class="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="card-icon gold"><i class="fas fa-palette"></i></span>
+                <h2 style="margin:0; font-size:1.2rem;">إدارة الثيمات</h2>
+            </div>
+            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <!-- ===== رفع خلفية الشريط العلوي ===== -->
+        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-image"></i> خلفية الشريط العلوي</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="headerBgFile" accept=".gif,.png,.jpg,.jpeg,.mp4,.webm" style="display:none;">
+                <button onclick="document.getElementById('headerBgFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار صورة/فيديو
+                </button>
+                <button onclick="removeHeaderBg()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الخلفية
+                </button>
+            </div>
+            <div id="headerBgPreview" style="margin-top:8px; display:none; border-radius:var(--radius-sm); overflow:hidden; max-height:100px;">
+                <img id="headerBgPreviewImg" src="" alt="معاينة الخلفية" style="width:100%; object-fit:cover; max-height:100px;">
+                <video id="headerBgPreviewVideo" src="" style="width:100%; object-fit:cover; max-height:100px; display:none;" autoplay loop muted></video>
+            </div>
+        </div>
+        
+        <!-- ===== رفع شعار القطاع ===== -->
+        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-building"></i> شعار القطاع</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="sectorLogoFile" accept=".png,.jpg,.jpeg,.svg" style="display:none;">
+                <button onclick="document.getElementById('sectorLogoFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار شعار
+                </button>
+                <button onclick="removeSectorLogo()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الشعار
+                </button>
+            </div>
+            <div id="sectorLogoPreview" style="margin-top:8px; display:none;">
+                <img id="sectorLogoPreviewImg" src="" alt="معاينة الشعار" style="max-width:100px; max-height:60px; border-radius:var(--radius-sm); border:1px solid var(--gray-200);">
+            </div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- باقي النوافذ (مختصرة) -->
+<!-- ============================================ -->
+
+<!-- نافذة رفع تحديث جديد -->
+<div id="uploadDocsModal" class="modal">
+    <div class="modal-content" style="max-width:550px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="card-icon primary"><i class="fas fa-upload"></i></span>
+                <h2 style="margin:0; font-size:1.2rem;">رفع تحديث جديد</h2>
+            </div>
+            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-tag icon-primary icon-sm"></i> تصنيف التحديث:</label>
+            <select id="docCategory">
+                <option value="تعليمات">📋 تعليمات</option>
+                <option value="إشعار">🔔 إشعار</option>
+                <option value="تقرير">📊 تقرير</option>
+                <option value="جدول">📅 جدول</option>
+                <option value="تنبيه">🚨 تنبيه</option>
+                <option value="أخرى">📎 أخرى</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-star icon-gold icon-sm"></i> الأولوية:</label>
+            <select id="docPriority">
+                <option value="normal">🟢 عادي</option>
+                <option value="important">🟡 مهم</option>
+                <option value="urgent">🔴 عاجل</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-heading icon-primary icon-sm"></i> عنوان التحديث:</label>
+            <input type="text" id="docTitle" placeholder="أدخل عنواناً مختصراً للتحديث">
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-align-left icon-gray icon-sm"></i> الوصف:</label>
+            <textarea id="docDescription" rows="3" placeholder="اكتب تفاصيل التحديث..."></textarea>
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-paperclip icon-teal icon-sm"></i> المرفقات:</label>
+            <div style="border:2px dashed var(--gray-200); border-radius:var(--radius-sm); padding:20px; text-align:center; cursor:pointer;" onclick="document.getElementById('docFileUpload').click()">
+                <i class="fas fa-cloud-upload-alt" style="font-size:2rem; color:var(--gray-400);"></i>
+                <p style="margin:5px 0; color:var(--gray-600); font-size:0.85rem;">اسحب الملفات هنا أو اضغط للاختيار</p>
+                <span style="font-size:0.65rem; color:var(--gray-400);">يدعم: PDF, Word, Excel, صور, نصوص</span>
+                <input type="file" id="docFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" style="display:none;" onchange="handleFileSelect(event)">
+            </div>
+            <div id="selectedFilesList" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+        <div class="modal-buttons">
+            <button id="saveDocBtn" class="btn btn-primary"><i class="fas fa-save"></i> نشر التحديث</button>
+            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة معاينة الملف -->
+<div id="docPreviewModal" class="modal">
+    <div class="modal-content" style="max-width:750px; max-height:85vh;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="card-icon primary" style="width:40px; height:40px; font-size:1.2rem;"><i class="fas fa-file-alt"></i></span>
+                <h3 style="margin:0; font-size:1rem;" id="docPreviewTitle">معاينة الملف</h3>
+            </div>
+            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="docPreviewContent" style="background:var(--gray-50); border-radius:var(--radius-md); padding:16px; max-height:55vh; overflow-y:auto; border:1px solid var(--gray-200);">
+            <p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <button onclick="copyDocPreview()" class="btn btn-teal" id="docPreviewCopyBtn" style="display:none;"><i class="fas fa-copy"></i> نسخ النص</button>
+            <button onclick="downloadDocFromPreview()" class="btn btn-primary"><i class="fas fa-download"></i> تحميل الملف</button>
+            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تكميل النوبة -->
+<div id="shiftModal" class="modal">
+    <div class="modal-content">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-clipboard-list"></i></span>
+            <div><h2 style="margin:0; color:var(--primary-700);">تكميل النوبة</h2><p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات تكميل النوبة</p></div>
+        </div>
+        <div class="form-row">
+            <label><i class="fas fa-archive icon-primary icon-sm"></i> المناوبات السابقة:</label>
+            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;"><option value="">-- مناوبة جديدة --</option></select>
+            <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;"><i class="fas fa-trash"></i> حذف المناوبة</button>
+        </div>
+        <div class="form-row"><label><i class="fas fa-calendar-day icon-teal icon-sm"></i> اليوم والتاريخ:</label><span id="shiftDate" style="font-weight:600;"></span></div>
+        <div class="form-row">
+            <label><i class="fas fa-clock icon-gold icon-sm"></i> توقيت المناوبة:</label>
+            <div class="shift-type">
+                <label><input type="radio" name="shiftType" value="صباحية"> <i class="fas fa-sun icon-sm" style="color:var(--gold);"></i> صباحية (4 فجراً - 4 عصراً)</label>
+                <label><input type="radio" name="shiftType" value="ليلية"> <i class="fas fa-moon icon-sm" style="color:var(--primary-700);"></i> ليلية (4 عصراً - 4 فجراً)</label>
+            </div>
+        </div>
+        <h3><i class="fas fa-bolt icon-teal"></i> تحضير فرق التدخل السريع</h3>
+        <table id="rapidTable">
+            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
+            <tbody>
+                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
+                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
+            </tbody>
+        </table>
+        <h3><i class="fas fa-hospital icon-primary"></i> المراكز الإسعافية</h3>
+        <table id="centersTable"><thead><tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr></thead><tbody id="centersTableBody"></tbody></table>
+        <div id="workforceStats" class="stats-section" style="display:none;">
+            <h3>📊 مؤشرات القوى العاملة</h3>
+            <div class="circle-stats-container">
+                <div class="circle-stat">
+                    <div class="svg-circle-container"><svg class="svg-circle" viewBox="0 0 100 100"><circle class="svg-circle-bg" cx="50" cy="50" r="42"/><circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42" stroke="#2a7f3e" stroke-dasharray="263.89" stroke-dashoffset="263.89"/><text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text></svg></div>
+                    <div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div>
+                    <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
+                </div>
+                <div class="circle-stat"><div class="value value-blue" id="totalStaffDisplay">0</div><div class="label">إجمالي المسعفين</div><div class="sub-value" id="staffSubText">موزعين على 0 مركز</div></div>
+                <div class="circle-stat"><div class="value value-blue" id="totalCarsDisplay">0</div><div class="label">إجمالي السيارات</div><div class="sub-value" id="carsSubText"></div></div>
+                <div class="circle-stat"><div class="value value-red" id="missingCentersDisplay">0</div><div class="label">المراكز الناقصة</div><div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div></div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                <div class="stats-scroll" id="distributionContainer"><div class="title">توزيع المسعفين على المراكز</div><div id="distributionList"></div></div>
+                <div class="stats-scroll" id="carDistributionContainer"><div class="title">توزيع السيارات على المراكز</div><div id="carDistributionList"></div></div>
+            </div>
+        </div>
+        <div id="shiftReportStats" class="stats-section" style="display:none;">
+            <h3>📈 إحصائيات البلاغات</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">إجمالي البلاغات</div><div style="font-size:1.8rem; font-weight:700; color:var(--primary-700);" id="shiftTotalReports">0</div></div>
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">أكثر فرقة استخداماً</div><div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="topUnit">-</div></div>
+                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">عدد البلاغات للفرقة الأكثر</div><div style="font-size:1.8rem; font-weight:700; color:var(--coral);" id="topUnitCount">0</div></div>
+            </div>
+            <div class="stats-scroll" style="margin-top:10px;" id="unitReportContainer"><div class="title">توزيع البلاغات على الفرق</div><div id="unitReportList"></div></div>
+        </div>
+        <h3><i class="fas fa-pen icon-gold"></i> الملاحظات العامة أثناء سير المناوبة</h3>
+        <textarea id="generalNotes" rows="3"></textarea>
+        <div class="modal-buttons">
+            <button id="printShiftBtn" class="btn no-print"><i class="fas fa-print"></i> طباعة</button>
+            <button id="saveShiftBtn" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ النموذج</button>
+            <button id="closeShiftBtn" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الإسعاف الجوي -->
+<div id="airAmbulanceModal" class="modal">
+    <div class="modal-content" style="max-width:600px;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon teal" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-helicopter"></i></span>
+                <h2 style="margin:0;">الإسعاف الجوي</h2>
+            </div>
+            <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
+        </div>
+        <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
+        <div class="form-row"><label><i class="fas fa-hashtag icon-primary icon-sm"></i> رقم البلاغ:</label><input type="text" id="airReportNumber" placeholder="مثال: 2025-001"></div>
+        <div class="form-row"><label><i class="fas fa-ambulance icon-teal icon-sm"></i> الفرقة المرافقة:</label><select id="airUnit"><option value="">-- اختر الفرقة --</option><option value="سريع 1">سريع 1</option><option value="سريع 2">سريع 2</option><option value="سريع 3">سريع 3</option><option value="سريع 4">سريع 4</option><option value="جنوب 1">جنوب 1</option><option value="جنوب 2">جنوب 2</option><option value="جنوب 3">جنوب 3</option><option value="جنوب 4">جنوب 4</option><option value="جنوب 5">جنوب 5</option><option value="جنوب 6">جنوب 6</option><option value="جنوب 7">جنوب 7</option><option value="جنوب 8">جنوب 8</option><option value="جنوب 9">جنوب 9</option><option value="جنوب 10">جنوب 10</option><option value="جنوب 11">جنوب 11</option><option value="جنوب 12">جنوب 12</option><option value="جنوب 13">جنوب 13</option><option value="جنوب 14">جنوب 14</option><option value="جنوب 15">جنوب 15</option><option value="جنوب 16">جنوب 16</option><option value="جنوب 17">جنوب 17</option><option value="جنوب 18">جنوب 18</option><option value="جنوب 19">جنوب 19</option></select></div>
+        <div class="form-row"><label><i class="fas fa-hospital icon-coral icon-sm"></i> المستشفى المستلم:</label><input type="text" id="airHospital" placeholder="اسم المستشفى"></div>
+        <div class="form-row"><label><i class="fas fa-calendar-clock icon-gold icon-sm"></i> تاريخ ووقت النقل:</label><input type="datetime-local" id="airDateTime"></div>
+        <div class="form-row"><label><i class="fas fa-pen icon-gray icon-sm"></i> ملاحظات إضافية:</label><textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea></div>
+        <div class="saved-records" id="airSavedRecords"><h4><i class="fas fa-list-ul icon-primary"></i> البلاغات المحفوظة</h4><div id="airRecordsList"></div></div>
+        <div class="modal-buttons">
+            <button id="saveAirRecord" class="btn btn-primary"><i class="fas fa-save"></i> حفظ البلاغ</button>
+            <button id="sendAirWhatsApp" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
+            <button id="closeAirModal" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة الجدول الشهري -->
+<div id="monthlyTableModal" class="modal no-print">
+    <div class="modal-content" style="max-width:98%;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-calendar-alt"></i></span>
+            <div><h2 style="margin:0; color:var(--primary-700);">جدول المناوبات الشهري</h2><p class="sub-title" style="margin:2px 0 0;">قطاع جنوب الرياض</p></div>
+        </div>
+        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
+                <button type="button" id="uploadExcelBtn" class="btn btn-primary"><i class="fas fa-upload"></i> اختيار ملف</button>
+                <button type="submit" id="submitUploadBtn" style="display:none;">⬆️ رفع وحفظ</button>
+            </form>
+            <span id="tableStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+        </div>
+        <div id="excelTableContainer" style="overflow:auto; margin-top:15px; max-height:75vh; position:relative;"><p style="text-align:center; color:var(--gray-400); padding:30px 0;">⏳ جاري تحميل الجدول...</p></div>
+        <div class="modal-buttons"><button id="closeMonthlyTableBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button></div>
+    </div>
+</div>
+
+<!-- نافذة التحكم والتنسيق -->
+<div id="controlModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span>
+                <h2 style="margin:0;">التحكم والتنسيق</h2>
+            </div>
+            <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
+        </div>
+        <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:8px; flex-wrap:wrap; gap:5px;">
+            <span style="font-weight:600;"><i class="fas fa-users icon-primary"></i> عدد الأفراد: <span id="controlCount">9</span></span>
+            <span style="font-weight:600; font-size:0.8rem; color:var(--gray-600);">تحكم عملياتي / تنسيق استجابة</span>
+            <div style="display:flex; gap:5px;">
+                <button id="editVacationsBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-lock"></i> تعديل الإجازات</button>
+                <button id="saveVacationsBtn" class="btn btn-teal" style="display:none;"><i class="fas fa-save"></i> حفظ الإجازات</button>
+            </div>
+        </div>
+        <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);"></div>
+        <div class="form-row" style="margin-top:15px;"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea></div>
+        <div class="modal-buttons">
+            <button id="saveControlNotes" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الملاحظات</button>
+            <button id="closeControlBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إدخال الرقم السري -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3><i class="fas fa-lock icon-primary"></i> إدخال الرقم السري</h3>
+        <p class="sub-title">أدخل الرقم السري لتعديل الإجازات</p>
+        <div class="form-row"><label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري:</label><input type="password" id="passwordInput" placeholder="أدخل الرقم السري"></div>
+        <div class="modal-buttons">
+            <button id="confirmPasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تأكيد</button>
+            <button id="cancelPasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تغيير الرقم السري -->
+<div id="changePasswordModal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <h3><i class="fas fa-key icon-primary"></i> تغيير الرقم السري</h3>
+        <p class="sub-title">أدخل الرقم السري القديم والجديد</p>
+        <div class="form-row"><label><i class="fas fa-key icon-gray icon-sm"></i> الرقم السري القديم:</label><input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم"></div>
+        <div class="form-row"><label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري الجديد:</label><input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)"></div>
+        <div class="form-row"><label><i class="fas fa-check-circle icon-teal icon-sm"></i> تأكيد الرقم السري الجديد:</label><input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد"></div>
+        <div class="modal-buttons">
+            <button id="confirmChangePasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تغيير</button>
+            <button id="cancelChangePasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة كبار المسعفين -->
+<div id="seniorShiftModal" class="modal">
+    <div class="modal-content" style="max-width:650px;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
+            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-user-md"></i></span>
+            <div><h2 style="margin:0; color:var(--primary-700);">تسليم مناوبة كبار المسعفين</h2><p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات المناوبة لكبار المسعفين</p></div>
+        </div>
+        <p class="print-date" style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-bottom:15px;"><i class="far fa-calendar-alt icon-primary icon-sm"></i> <span id="seniorPrintDate"></span></p>
+        <div class="form-row"><label><i class="fas fa-ambulance icon-teal icon-sm"></i> عدد المركبات العاملة:</label><input type="number" id="seniorActiveCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
+        <div class="form-row"><label><i class="fas fa-wrench icon-coral icon-sm"></i> عدد المركبات المتعطلة:</label><input type="number" id="seniorBrokenCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
+        <div class="form-row"><label><i class="fas fa-rotate icon-gold icon-sm"></i> عدد مركبات الاحتياط:</label><input type="number" id="seniorReserveCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
+        <div class="form-row"><label><i class="fas fa-people-arrows icon-primary icon-sm"></i> عدد فرق الاوفر لاب:</label><input type="number" id="seniorOverlapTeams" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
+        <div class="form-row">
+            <label><i class="fas fa-location-dot icon-teal icon-sm"></i> مناطق تمركز فرق الاوفر لاب (اختياري):</label>
+            <div class="locations-grid">
+                <label><input type="checkbox" class="senior-location" value="الشفاء"> <i class="fas fa-hospital icon-sm" style="color:var(--teal);"></i> الشفاء</label>
+                <label><input type="checkbox" class="senior-location" value="عكاظ"> <i class="fas fa-landmark icon-sm" style="color:var(--gold);"></i> عكاظ</label>
+                <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> <i class="fas fa-building icon-sm" style="color:var(--primary-500);"></i> الدار البيضاء</label>
+                <label><input type="checkbox" class="senior-location" value="الإسكان"> <i class="fas fa-home icon-sm" style="color:var(--teal);"></i> الإسكان</label>
+                <label><input type="checkbox" class="senior-location" value="المنصورة"> <i class="fas fa-city icon-sm" style="color:var(--coral);"></i> المنصورة</label>
+            </div>
+        </div>
+        <div class="form-row"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="border-color:var(--gray-200);"></textarea></div>
+        <div class="signatures-section">
+            <h3><span class="icon-bg-gold"><i class="fas fa-pen-to-square icon-gold"></i></span> التسليم والاستلام</h3>
+            <div class="signature-row">
+                <div class="sig-label"><span class="icon-bg-primary" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-tie icon-primary"></i></span> مساعد كبير المسعفين:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorAssistantName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorAssistantDate"></span></span>
+                </div>
+            </div>
+            <div class="signature-row">
+                <div class="sig-label"><span class="icon-bg-teal" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-md icon-teal"></i></span> كبير المسعفين:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorChiefName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorChiefDate"></span></span>
+                </div>
+            </div>
+            <div class="signature-row">
+                <div class="sig-label"><span class="icon-bg-coral" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-flag icon-coral"></i></span> قائد المنطقة:</div>
+                <div class="sig-inputs">
+                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم" style="border-color:var(--gray-200);">
+                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
+                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorRegionLeaderDate"></span></span>
+                </div>
+            </div>
+        </div>
+        <div class="saved-records" id="seniorSavedRecords"><h4><i class="fas fa-clock-rotate-left icon-primary"></i> المناوبات المحفوظة</h4><div id="seniorRecordsList"></div></div>
+        <div class="modal-buttons">
+            <button id="saveSeniorShift" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ المناوبة</button>
+            <button id="sendWhatsAppSeniorShift" class="btn btn-whatsapp no-print"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
+            <button id="closeSeniorShift" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
 </div>
 
 <!-- ===== صفحة التحديثات التشغيلية ===== -->
@@ -533,311 +937,10 @@
     </div>
 </div>
 
-<!-- ===== نافذة رفع تحديث جديد ===== -->
-<div id="uploadDocsModal" class="modal">
-    <div class="modal-content" style="max-width:550px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon primary"><i class="fas fa-upload"></i></span>
-                <h2 style="margin:0; font-size:1.2rem;">رفع تحديث جديد</h2>
-            </div>
-            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-tag icon-primary icon-sm"></i> تصنيف التحديث:</label>
-            <select id="docCategory">
-                <option value="تعليمات">📋 تعليمات</option>
-                <option value="إشعار">🔔 إشعار</option>
-                <option value="تقرير">📊 تقرير</option>
-                <option value="جدول">📅 جدول</option>
-                <option value="تنبيه">🚨 تنبيه</option>
-                <option value="أخرى">📎 أخرى</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-star icon-gold icon-sm"></i> الأولوية:</label>
-            <select id="docPriority">
-                <option value="normal">🟢 عادي</option>
-                <option value="important">🟡 مهم</option>
-                <option value="urgent">🔴 عاجل</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-heading icon-primary icon-sm"></i> عنوان التحديث:</label>
-            <input type="text" id="docTitle" placeholder="أدخل عنواناً مختصراً للتحديث">
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-align-left icon-gray icon-sm"></i> الوصف:</label>
-            <textarea id="docDescription" rows="3" placeholder="اكتب تفاصيل التحديث..."></textarea>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-paperclip icon-teal icon-sm"></i> المرفقات:</label>
-            <div style="border:2px dashed var(--gray-200); border-radius:var(--radius-sm); padding:20px; text-align:center; cursor:pointer;" onclick="document.getElementById('docFileUpload').click()">
-                <i class="fas fa-cloud-upload-alt" style="font-size:2rem; color:var(--gray-400);"></i>
-                <p style="margin:5px 0; color:var(--gray-600); font-size:0.85rem;">اسحب الملفات هنا أو اضغط للاختيار</p>
-                <span style="font-size:0.65rem; color:var(--gray-400);">يدعم: PDF, Word, Excel, صور, نصوص</span>
-                <input type="file" id="docFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" style="display:none;" onchange="handleFileSelect(event)">
-            </div>
-            <div id="selectedFilesList" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
-        </div>
-        <div class="modal-buttons">
-            <button id="saveDocBtn" class="btn btn-primary"><i class="fas fa-save"></i> نشر التحديث</button>
-            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إلغاء</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة معاينة الملف ===== -->
-<div id="docPreviewModal" class="modal">
-    <div class="modal-content" style="max-width:750px; max-height:85vh;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon primary" style="width:40px; height:40px; font-size:1.2rem;"><i class="fas fa-file-alt"></i></span>
-                <h3 style="margin:0; font-size:1rem;" id="docPreviewTitle">معاينة الملف</h3>
-            </div>
-            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i></button>
-        </div>
-        <div id="docPreviewContent" style="background:var(--gray-50); border-radius:var(--radius-md); padding:16px; max-height:55vh; overflow-y:auto; border:1px solid var(--gray-200);">
-            <p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>
-        </div>
-        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-            <button onclick="copyDocPreview()" class="btn btn-teal" id="docPreviewCopyBtn" style="display:none;"><i class="fas fa-copy"></i> نسخ النص</button>
-            <button onclick="downloadDocFromPreview()" class="btn btn-primary"><i class="fas fa-download"></i> تحميل الملف</button>
-            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة تكميل النوبة ===== -->
-<div id="shiftModal" class="modal">
-    <div class="modal-content">
-        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
-            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-clipboard-list"></i></span>
-            <div><h2 style="margin:0; color:var(--primary-700);">تكميل النوبة</h2><p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات تكميل النوبة</p></div>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-archive icon-primary icon-sm"></i> المناوبات السابقة:</label>
-            <select id="shiftArchiveSelect" style="width:auto; min-width:250px;"><option value="">-- مناوبة جديدة --</option></select>
-            <button id="deleteShiftBtn" class="btn btn-coral" style="margin-right:10px;"><i class="fas fa-trash"></i> حذف المناوبة</button>
-        </div>
-        <div class="form-row"><label><i class="fas fa-calendar-day icon-teal icon-sm"></i> اليوم والتاريخ:</label><span id="shiftDate" style="font-weight:600;"></span></div>
-        <div class="form-row">
-            <label><i class="fas fa-clock icon-gold icon-sm"></i> توقيت المناوبة:</label>
-            <div class="shift-type">
-                <label><input type="radio" name="shiftType" value="صباحية"> <i class="fas fa-sun icon-sm" style="color:var(--gold);"></i> صباحية (4 فجراً - 4 عصراً)</label>
-                <label><input type="radio" name="shiftType" value="ليلية"> <i class="fas fa-moon icon-sm" style="color:var(--primary-700);"></i> ليلية (4 عصراً - 4 فجراً)</label>
-            </div>
-        </div>
-        <h3><i class="fas fa-bolt icon-teal"></i> تحضير فرق التدخل السريع</h3>
-        <table id="rapidTable">
-            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
-            <tbody>
-                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
-            </tbody>
-        </table>
-        <h3><i class="fas fa-hospital icon-primary"></i> المراكز الإسعافية</h3>
-        <table id="centersTable"><thead><tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr></thead><tbody id="centersTableBody"></tbody></table>
-        <div id="workforceStats" class="stats-section" style="display:none;">
-            <h3>📊 مؤشرات القوى العاملة</h3>
-            <div class="circle-stats-container">
-                <div class="circle-stat">
-                    <div class="svg-circle-container"><svg class="svg-circle" viewBox="0 0 100 100"><circle class="svg-circle-bg" cx="50" cy="50" r="42"/><circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42" stroke="#2a7f3e" stroke-dasharray="263.89" stroke-dashoffset="263.89"/><text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text></svg></div>
-                    <div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div>
-                    <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
-                </div>
-                <div class="circle-stat"><div class="value value-blue" id="totalStaffDisplay">0</div><div class="label">إجمالي المسعفين</div><div class="sub-value" id="staffSubText">موزعين على 0 مركز</div></div>
-                <div class="circle-stat"><div class="value value-blue" id="totalCarsDisplay">0</div><div class="label">إجمالي السيارات</div><div class="sub-value" id="carsSubText"></div></div>
-                <div class="circle-stat"><div class="value value-red" id="missingCentersDisplay">0</div><div class="label">المراكز الناقصة</div><div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div></div>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                <div class="stats-scroll" id="distributionContainer"><div class="title">توزيع المسعفين على المراكز</div><div id="distributionList"></div></div>
-                <div class="stats-scroll" id="carDistributionContainer"><div class="title">توزيع السيارات على المراكز</div><div id="carDistributionList"></div></div>
-            </div>
-        </div>
-        <div id="shiftReportStats" class="stats-section" style="display:none;">
-            <h3>📈 إحصائيات البلاغات</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
-                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">إجمالي البلاغات</div><div style="font-size:1.8rem; font-weight:700; color:var(--primary-700);" id="shiftTotalReports">0</div></div>
-                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">أكثر فرقة استخداماً</div><div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="topUnit">-</div></div>
-                <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">عدد البلاغات للفرقة الأكثر</div><div style="font-size:1.8rem; font-weight:700; color:var(--coral);" id="topUnitCount">0</div></div>
-            </div>
-            <div class="stats-scroll" style="margin-top:10px;" id="unitReportContainer"><div class="title">توزيع البلاغات على الفرق</div><div id="unitReportList"></div></div>
-        </div>
-        <h3><i class="fas fa-pen icon-gold"></i> الملاحظات العامة أثناء سير المناوبة</h3>
-        <textarea id="generalNotes" rows="3"></textarea>
-        <div class="modal-buttons">
-            <button id="printShiftBtn" class="btn no-print"><i class="fas fa-print"></i> طباعة</button>
-            <button id="saveShiftBtn" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ النموذج</button>
-            <button id="closeShiftBtn" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة الإسعاف الجوي ===== -->
-<div id="airAmbulanceModal" class="modal">
-    <div class="modal-content" style="max-width:600px;">
-        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon teal" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-helicopter"></i></span>
-                <h2 style="margin:0;">الإسعاف الجوي</h2>
-            </div>
-            <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
-        </div>
-        <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
-        <div class="form-row"><label><i class="fas fa-hashtag icon-primary icon-sm"></i> رقم البلاغ:</label><input type="text" id="airReportNumber" placeholder="مثال: 2025-001"></div>
-        <div class="form-row"><label><i class="fas fa-ambulance icon-teal icon-sm"></i> الفرقة المرافقة:</label><select id="airUnit"><option value="">-- اختر الفرقة --</option><option value="سريع 1">سريع 1</option><option value="سريع 2">سريع 2</option><option value="سريع 3">سريع 3</option><option value="سريع 4">سريع 4</option><option value="جنوب 1">جنوب 1</option><option value="جنوب 2">جنوب 2</option><option value="جنوب 3">جنوب 3</option><option value="جنوب 4">جنوب 4</option><option value="جنوب 5">جنوب 5</option><option value="جنوب 6">جنوب 6</option><option value="جنوب 7">جنوب 7</option><option value="جنوب 8">جنوب 8</option><option value="جنوب 9">جنوب 9</option><option value="جنوب 10">جنوب 10</option><option value="جنوب 11">جنوب 11</option><option value="جنوب 12">جنوب 12</option><option value="جنوب 13">جنوب 13</option><option value="جنوب 14">جنوب 14</option><option value="جنوب 15">جنوب 15</option><option value="جنوب 16">جنوب 16</option><option value="جنوب 17">جنوب 17</option><option value="جنوب 18">جنوب 18</option><option value="جنوب 19">جنوب 19</option></select></div>
-        <div class="form-row"><label><i class="fas fa-hospital icon-coral icon-sm"></i> المستشفى المستلم:</label><input type="text" id="airHospital" placeholder="اسم المستشفى"></div>
-        <div class="form-row"><label><i class="fas fa-calendar-clock icon-gold icon-sm"></i> تاريخ ووقت النقل:</label><input type="datetime-local" id="airDateTime"></div>
-        <div class="form-row"><label><i class="fas fa-pen icon-gray icon-sm"></i> ملاحظات إضافية:</label><textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea></div>
-        <div class="saved-records" id="airSavedRecords"><h4><i class="fas fa-list-ul icon-primary"></i> البلاغات المحفوظة</h4><div id="airRecordsList"></div></div>
-        <div class="modal-buttons">
-            <button id="saveAirRecord" class="btn btn-primary"><i class="fas fa-save"></i> حفظ البلاغ</button>
-            <button id="sendAirWhatsApp" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
-            <button id="closeAirModal" class="btn"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة الجدول الشهري ===== -->
-<div id="monthlyTableModal" class="modal no-print">
-    <div class="modal-content" style="max-width:98%;">
-        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
-            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-calendar-alt"></i></span>
-            <div><h2 style="margin:0; color:var(--primary-700);">جدول المناوبات الشهري</h2><p class="sub-title" style="margin:2px 0 0;">قطاع جنوب الرياض</p></div>
-        </div>
-        <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <form id="uploadForm" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input type="file" id="excelFileInput" name="file" accept=".xlsx,.xls" style="display:none;">
-                <button type="button" id="uploadExcelBtn" class="btn btn-primary"><i class="fas fa-upload"></i> اختيار ملف</button>
-                <button type="submit" id="submitUploadBtn" style="display:none;">⬆️ رفع وحفظ</button>
-            </form>
-            <span id="tableStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
-        </div>
-        <div id="excelTableContainer" style="overflow:auto; margin-top:15px; max-height:75vh; position:relative;"><p style="text-align:center; color:var(--gray-400); padding:30px 0;">⏳ جاري تحميل الجدول...</p></div>
-        <div class="modal-buttons"><button id="closeMonthlyTableBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button></div>
-    </div>
-</div>
-
-<!-- ===== نافذة التحكم والتنسيق ===== -->
-<div id="controlModal" class="modal">
-    <div class="modal-content" style="max-width:800px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span>
-                <h2 style="margin:0;">التحكم والتنسيق</h2>
-            </div>
-            <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
-        </div>
-        <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:8px; flex-wrap:wrap; gap:5px;">
-            <span style="font-weight:600;"><i class="fas fa-users icon-primary"></i> عدد الأفراد: <span id="controlCount">9</span></span>
-            <span style="font-weight:600; font-size:0.8rem; color:var(--gray-600);">تحكم عملياتي / تنسيق استجابة</span>
-            <div style="display:flex; gap:5px;">
-                <button id="editVacationsBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-lock"></i> تعديل الإجازات</button>
-                <button id="saveVacationsBtn" class="btn btn-teal" style="display:none;"><i class="fas fa-save"></i> حفظ الإجازات</button>
-            </div>
-        </div>
-        <div id="controlList" style="max-height:50vh; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:10px; background:var(--gray-50);"></div>
-        <div class="form-row" style="margin-top:15px;"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="controlNotes" rows="3" placeholder="أي ملاحظات خاصة بأفراد التحكم والتنسيق..."></textarea></div>
-        <div class="modal-buttons">
-            <button id="saveControlNotes" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الملاحظات</button>
-            <button id="closeControlBtn" class="btn"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة إدخال الرقم السري ===== -->
-<div id="passwordModal" class="modal">
-    <div class="modal-content" style="max-width:400px;">
-        <h3><i class="fas fa-lock icon-primary"></i> إدخال الرقم السري</h3>
-        <p class="sub-title">أدخل الرقم السري لتعديل الإجازات</p>
-        <div class="form-row"><label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري:</label><input type="password" id="passwordInput" placeholder="أدخل الرقم السري"></div>
-        <div class="modal-buttons">
-            <button id="confirmPasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تأكيد</button>
-            <button id="cancelPasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة تغيير الرقم السري ===== -->
-<div id="changePasswordModal" class="modal">
-    <div class="modal-content" style="max-width:400px;">
-        <h3><i class="fas fa-key icon-primary"></i> تغيير الرقم السري</h3>
-        <p class="sub-title">أدخل الرقم السري القديم والجديد</p>
-        <div class="form-row"><label><i class="fas fa-key icon-gray icon-sm"></i> الرقم السري القديم:</label><input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم"></div>
-        <div class="form-row"><label><i class="fas fa-key icon-gold icon-sm"></i> الرقم السري الجديد:</label><input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)"></div>
-        <div class="form-row"><label><i class="fas fa-check-circle icon-teal icon-sm"></i> تأكيد الرقم السري الجديد:</label><input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد"></div>
-        <div class="modal-buttons">
-            <button id="confirmChangePasswordBtn" class="btn btn-teal"><i class="fas fa-check"></i> تغيير</button>
-            <button id="cancelChangePasswordBtn" class="btn"><i class="fas fa-times"></i> إلغاء</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== نافذة كبار المسعفين ===== -->
-<div id="seniorShiftModal" class="modal">
-    <div class="modal-content" style="max-width:650px;">
-        <div style="display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px;">
-            <span class="card-icon primary" style="width:52px; height:52px; font-size:1.6rem; border-radius:var(--radius-md);"><i class="fas fa-user-md"></i></span>
-            <div><h2 style="margin:0; color:var(--primary-700);">تسليم مناوبة كبار المسعفين</h2><p class="sub-title" style="margin:2px 0 0;">تسجيل بيانات المناوبة لكبار المسعفين</p></div>
-        </div>
-        <p class="print-date" style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-bottom:15px;"><i class="far fa-calendar-alt icon-primary icon-sm"></i> <span id="seniorPrintDate"></span></p>
-        <div class="form-row"><label><i class="fas fa-ambulance icon-teal icon-sm"></i> عدد المركبات العاملة:</label><input type="number" id="seniorActiveCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
-        <div class="form-row"><label><i class="fas fa-wrench icon-coral icon-sm"></i> عدد المركبات المتعطلة:</label><input type="number" id="seniorBrokenCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
-        <div class="form-row"><label><i class="fas fa-rotate icon-gold icon-sm"></i> عدد مركبات الاحتياط:</label><input type="number" id="seniorReserveCars" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
-        <div class="form-row"><label><i class="fas fa-people-arrows icon-primary icon-sm"></i> عدد فرق الاوفر لاب:</label><input type="number" id="seniorOverlapTeams" min="0" value="0" style="font-size:1rem; font-weight:600;"></div>
-        <div class="form-row">
-            <label><i class="fas fa-location-dot icon-teal icon-sm"></i> مناطق تمركز فرق الاوفر لاب (اختياري):</label>
-            <div class="locations-grid">
-                <label><input type="checkbox" class="senior-location" value="الشفاء"> <i class="fas fa-hospital icon-sm" style="color:var(--teal);"></i> الشفاء</label>
-                <label><input type="checkbox" class="senior-location" value="عكاظ"> <i class="fas fa-landmark icon-sm" style="color:var(--gold);"></i> عكاظ</label>
-                <label><input type="checkbox" class="senior-location" value="الدار البيضاء"> <i class="fas fa-building icon-sm" style="color:var(--primary-500);"></i> الدار البيضاء</label>
-                <label><input type="checkbox" class="senior-location" value="الإسكان"> <i class="fas fa-home icon-sm" style="color:var(--teal);"></i> الإسكان</label>
-                <label><input type="checkbox" class="senior-location" value="المنصورة"> <i class="fas fa-city icon-sm" style="color:var(--coral);"></i> المنصورة</label>
-            </div>
-        </div>
-        <div class="form-row"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="border-color:var(--gray-200);"></textarea></div>
-        <div class="signatures-section">
-            <h3><span class="icon-bg-gold"><i class="fas fa-pen-to-square icon-gold"></i></span> التسليم والاستلام</h3>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-primary" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-tie icon-primary"></i></span> مساعد كبير المسعفين:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorAssistantName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorAssistantDate"></span></span>
-                </div>
-            </div>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-teal" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-md icon-teal"></i></span> كبير المسعفين:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorChiefName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorChiefDate"></span></span>
-                </div>
-            </div>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-coral" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-flag icon-coral"></i></span> قائد المنطقة:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorRegionLeaderDate"></span></span>
-                </div>
-            </div>
-        </div>
-        <div class="saved-records" id="seniorSavedRecords"><h4><i class="fas fa-clock-rotate-left icon-primary"></i> المناوبات المحفوظة</h4><div id="seniorRecordsList"></div></div>
-        <div class="modal-buttons">
-            <button id="saveSeniorShift" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ المناوبة</button>
-            <button id="sendWhatsAppSeniorShift" class="btn btn-whatsapp no-print"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
-            <button id="closeSeniorShift" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
 <script>
-// ===== تحميل الشعار =====
+// ============================================
+// تحميل الشعار المخصص
+// ============================================
 function loadBrandLogo() {
     try {
         const savedLogo = localStorage.getItem('brandLogo') || sessionStorage.getItem('brandLogo');
@@ -857,6 +960,224 @@ function loadBrandLogo() {
         }
     } catch(e) { console.log('⚠️ لم يتم تحميل الشعار المخصص'); }
 }
+
+// ============================================
+// نظام رفع خلفية الشريط العلوي
+// ============================================
+
+document.getElementById('headerBgFile')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const dataUrl = event.target.result;
+        
+        // حفظ في localStorage
+        localStorage.setItem('headerBackground', dataUrl);
+        localStorage.setItem('headerBgType', file.type);
+        
+        // تطبيق فوري
+        applyHeaderBackground(dataUrl, file.type);
+        
+        // عرض المعاينة
+        const previewDiv = document.getElementById('headerBgPreview');
+        previewDiv.style.display = 'block';
+        
+        if (file.type.startsWith('video/')) {
+            const video = document.getElementById('headerBgPreviewVideo');
+            const img = document.getElementById('headerBgPreviewImg');
+            img.style.display = 'none';
+            video.style.display = 'block';
+            video.src = dataUrl;
+            video.load();
+        } else {
+            const img = document.getElementById('headerBgPreviewImg');
+            const video = document.getElementById('headerBgPreviewVideo');
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = dataUrl;
+        }
+        
+        alert('✅ تم رفع خلفية الشريط العلوي بنجاح!');
+    };
+    reader.readAsDataURL(file);
+});
+
+function applyHeaderBackground(dataUrl, fileType) {
+    const header = document.getElementById('mainHeader');
+    if (!header) return;
+    
+    // إزالة الخلفيات السابقة
+    header.style.backgroundImage = 'none';
+    header.style.backgroundColor = '#0B1E33';
+    header.classList.remove('has-bg-image');
+    
+    // حذف الفيديو السابق
+    const oldVideo = header.querySelector('.header-bg-video');
+    if (oldVideo) oldVideo.remove();
+    
+    if (fileType.startsWith('video/')) {
+        // إنشاء عنصر فيديو
+        const video = document.createElement('video');
+        video.className = 'header-bg-video';
+        video.src = dataUrl;
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.style.cssText = `
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 0; opacity: 0.5;
+        `;
+        header.prepend(video);
+        video.load();
+        video.play().catch(() => {});
+        header.style.background = 'none';
+    } else {
+        header.style.backgroundImage = `url(${dataUrl})`;
+        header.style.backgroundSize = 'cover';
+        header.style.backgroundPosition = 'center';
+        header.style.backgroundRepeat = 'no-repeat';
+        header.classList.add('has-bg-image');
+    }
+    
+    // التأكد من أن النصوص فوق الخلفية
+    const brand = header.querySelector('.header-brand');
+    const date = header.querySelector('.header-date');
+    if (brand) { brand.style.position = 'relative'; brand.style.zIndex = '2'; }
+    if (date) { date.style.position = 'relative'; date.style.zIndex = '2'; }
+}
+
+function removeHeaderBg() {
+    localStorage.removeItem('headerBackground');
+    localStorage.removeItem('headerBgType');
+    
+    const header = document.getElementById('mainHeader');
+    if (header) {
+        header.style.backgroundImage = '';
+        header.style.background = '';
+        header.style.backgroundColor = '';
+        header.classList.remove('has-bg-image');
+        
+        const video = header.querySelector('.header-bg-video');
+        if (video) video.remove();
+    }
+    
+    document.getElementById('headerBgPreview').style.display = 'none';
+    alert('✅ تم إزالة خلفية الشريط');
+}
+
+// ============================================
+// نظام رفع شعار القطاع
+// ============================================
+
+document.getElementById('sectorLogoFile')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const dataUrl = event.target.result;
+        
+        localStorage.setItem('sectorLogo', dataUrl);
+        localStorage.setItem('sectorLogoType', file.type);
+        
+        applySectorLogo(dataUrl);
+        
+        const previewDiv = document.getElementById('sectorLogoPreview');
+        previewDiv.style.display = 'block';
+        document.getElementById('sectorLogoPreviewImg').src = dataUrl;
+        
+        alert('✅ تم رفع شعار القطاع بنجاح!');
+    };
+    reader.readAsDataURL(file);
+});
+
+function applySectorLogo(dataUrl) {
+    const iconContainer = document.getElementById('brandLogoContainer');
+    if (!iconContainer) return;
+    
+    // إخفاء العناصر الأخرى
+    const svg = iconContainer.querySelector('svg');
+    if (svg) svg.style.display = 'none';
+    const defaultImg = iconContainer.querySelector('#brandLogoImage');
+    if (defaultImg) defaultImg.style.display = 'none';
+    
+    // إضافة الشعار الجديد
+    let logoImg = iconContainer.querySelector('#sectorLogoImage');
+    if (!logoImg) {
+        logoImg = document.getElementById('sectorLogoImage');
+    }
+    if (logoImg) {
+        logoImg.src = dataUrl;
+        logoImg.style.display = 'block';
+        logoImg.style.width = '100%';
+        logoImg.style.height = '100%';
+        logoImg.style.objectFit = 'contain';
+        logoImg.style.borderRadius = '4px';
+    }
+}
+
+function removeSectorLogo() {
+    localStorage.removeItem('sectorLogo');
+    localStorage.removeItem('sectorLogoType');
+    
+    const logoImg = document.getElementById('sectorLogoImage');
+    if (logoImg) {
+        logoImg.style.display = 'none';
+        logoImg.src = '';
+    }
+    
+    // إظهار الشعار الافتراضي
+    const svg = document.getElementById('defaultLogo');
+    if (svg) svg.style.display = 'block';
+    
+    document.getElementById('sectorLogoPreview').style.display = 'none';
+    alert('✅ تم إزالة شعار القطاع');
+}
+
+// ============================================
+// تحميل إعدادات الثيمات المحفوظة
+// ============================================
+function loadSavedThemeSettings() {
+    // خلفية الشريط
+    const headerBg = localStorage.getItem('headerBackground');
+    const headerBgType = localStorage.getItem('headerBgType');
+    if (headerBg && headerBgType) {
+        applyHeaderBackground(headerBg, headerBgType);
+        
+        const previewDiv = document.getElementById('headerBgPreview');
+        previewDiv.style.display = 'block';
+        if (headerBgType.startsWith('video/')) {
+            const video = document.getElementById('headerBgPreviewVideo');
+            const img = document.getElementById('headerBgPreviewImg');
+            img.style.display = 'none';
+            video.style.display = 'block';
+            video.src = headerBg;
+            video.load();
+        } else {
+            const img = document.getElementById('headerBgPreviewImg');
+            const video = document.getElementById('headerBgPreviewVideo');
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = headerBg;
+        }
+    }
+    
+    // شعار القطاع
+    const sectorLogo = localStorage.getItem('sectorLogo');
+    if (sectorLogo) {
+        applySectorLogo(sectorLogo);
+        const previewDiv = document.getElementById('sectorLogoPreview');
+        previewDiv.style.display = 'block';
+        document.getElementById('sectorLogoPreviewImg').src = sectorLogo;
+    }
+}
+
+// ============================================
+// باقي الكود (نفس الكود السابق مع جميع الدوال)
+// ============================================
 
 // ===== المتغيرات العامة =====
 let centersData = {};
@@ -897,6 +1218,11 @@ const controlData = [
 let isEditMode = false;
 let controlNotes = "";
 let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+
+// ===== ربط زر الثيمات =====
+document.getElementById('themeBtn')?.addEventListener('click', function() {
+    document.getElementById('themeModal').style.display = 'flex';
+});
 
 // ===== تحميل البيانات =====
 async function loadAllData() {
@@ -1153,59 +1479,36 @@ document.getElementById('saveDocBtn')?.addEventListener('click', async function(
     } catch (error) { alert('❌ خطأ في النشر: ' + error.message); }
 });
 
-// ===== معاينة الملف - نسخة مطورة (دعم العربية) =====
+// ===== معاينة الملف =====
 function openDocPreview(docId) {
     const doc = uploadedDocs.find(d => d.id === docId);
     if (!doc) { alert('❌ الملف غير موجود'); return; }
-    
     currentPreviewDocId = docId;
     document.getElementById('docPreviewTitle').innerText = `📄 ${doc.filename}`;
     document.getElementById('docPreviewModal').style.display = 'flex';
-    
     const content = document.getElementById('docPreviewContent');
     content.innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
-    
     try {
         if (doc.fileData) {
             const fileType = doc.fileType || '';
             const filename = doc.filename || '';
-            
-            // ===== معالجة الملفات النصية مع دعم العربية =====
             if (fileType.includes('text') || fileType.includes('plain') || filename.endsWith('.txt')) {
-                // ✅ فك التشفير باستخدام TextDecoder لدعم العربية
                 const binaryString = atob(doc.fileData);
                 const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                // ✅ استخدام TextDecoder لقراءة النص العربي بشكل صحيح
+                for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
                 const decoder = new TextDecoder('utf-8');
                 const text = decoder.decode(bytes);
-                
                 currentPreviewText = text;
-                content.innerHTML = `
-                    <div style="direction:rtl; text-align:right; font-family: 'Inter', sans-serif; font-size:0.9rem; line-height:1.8; padding:10px; background:white; border-radius:var(--radius-sm);">
-                        <pre style="white-space:pre-wrap; font-family:inherit; margin:0; direction:rtl; text-align:right; font-size:0.9rem;">${escapeHtml(text)}</pre>
-                    </div>
-                `;
+                content.innerHTML = `<div style="direction:rtl; text-align:right; font-family: 'Inter', sans-serif; font-size:0.9rem; line-height:1.8; padding:10px; background:white; border-radius:var(--radius-sm);"><pre style="white-space:pre-wrap; font-family:inherit; margin:0; direction:rtl; text-align:right; font-size:0.9rem;">${escapeHtml(text)}</pre></div>`;
                 document.getElementById('docPreviewCopyBtn').style.display = 'inline-flex';
-            } 
-            // ===== معالجة PDF والصور =====
-            else if (fileType.includes('pdf') || fileType.includes('image')) {
+            } else if (fileType.includes('pdf') || fileType.includes('image')) {
                 const blob = base64ToBlob(doc.fileData, fileType);
                 const url = URL.createObjectURL(blob);
-                if (fileType.includes('pdf')) {
-                    content.innerHTML = `<iframe src="${url}" style="width:100%; height:50vh; border:none; border-radius:var(--radius-sm);"></iframe>`;
-                } else if (fileType.includes('image')) {
-                    content.innerHTML = `<img src="${url}" style="max-width:100%; max-height:50vh; border-radius:var(--radius-sm);">`;
-                }
+                if (fileType.includes('pdf')) { content.innerHTML = `<iframe src="${url}" style="width:100%; height:50vh; border:none; border-radius:var(--radius-sm);"></iframe>`; }
+                else if (fileType.includes('image')) { content.innerHTML = `<img src="${url}" style="max-width:100%; max-height:50vh; border-radius:var(--radius-sm);">`; }
                 document.getElementById('docPreviewCopyBtn').style.display = 'none';
             } else {
-                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);">
-                    <i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>
-                    هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.
-                    <br>يمكنك تحميله من الزر أدناه.
-                </p>`;
+                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);"><i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.<br>يمكنك تحميله من الزر أدناه.</p>`;
                 document.getElementById('docPreviewCopyBtn').style.display = 'none';
             }
         } else {
@@ -1235,9 +1538,7 @@ function copyDocPreview() {
         alert('✅ تم نسخ النص بنجاح!');
     });
 }
-function downloadDocFromPreview() {
-    if (currentPreviewDocId) { downloadDoc(currentPreviewDocId); }
-}
+function downloadDocFromPreview() { if (currentPreviewDocId) { downloadDoc(currentPreviewDocId); } }
 function base64ToBlob(base64, contentType) {
     const byteCharacters = atob(base64);
     const byteNumbers = new Array(byteCharacters.length);
@@ -1250,10 +1551,7 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
-async function downloadDoc(docId) {
-    try { window.open(`/api/download-doc/${docId}`, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); }
-}
+async function downloadDoc(docId) { try { window.open(`/api/download-doc/${docId}`, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
 async function deleteDoc(docId) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
     try {
@@ -1508,6 +1806,7 @@ async function startNewShift() {
 // ===== ربط الأحداث الرئيسية =====
 document.addEventListener('DOMContentLoaded', function() {
     loadBrandLogo();
+    loadSavedThemeSettings();
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     buildCentersTable();
     loadShifts();
@@ -2156,7 +2455,7 @@ document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', fu
 
 // ===== إغلاق النوافذ بالضغط خارجها =====
 window.onclick = function(e) {
-    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal'];
+    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'themeModal'];
     modals.forEach(id => {
         const modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -2180,8 +2479,9 @@ async function checkForUpdates() {
     } catch (error) {}
 }
 
-console.log('✅ منصة الجنوب - الهوية البصرية الجديدة');
+console.log('✅ منصة الجنوب - الهوية البصرية الجديدة مع نظام الثيمات');
 console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
+console.log('🎨 لرفع خلفية أو شعار القطاع، استخدم زر "الثيمات"');
 </script>
 </body>
 </html>
