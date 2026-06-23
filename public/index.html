@@ -18,11 +18,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Leaflet.js للخريطة -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
@@ -31,16 +30,22 @@
             --primary-900: #0B1E33;
             --primary-700: #1A3A5C;
             --primary-500: #2A5A7A;
+            --primary-300: #5A8AAA;
             --primary-100: #E8EDF3;
             --teal: #2E8B7A;
             --teal-light: #E6F4F0;
+            --teal-dark: #1F6B5E;
             --coral: #E87461;
             --coral-light: #FDF0EC;
+            --coral-dark: #D45A4A;
             --gold: #E8C84A;
+            --gold-light: #FFF8E7;
+            --gold-dark: #D4B03A;
             --white: #FFFFFF;
             --gray-50: #F7F9FC;
             --gray-100: #EDF1F7;
             --gray-200: #D5DCE6;
+            --gray-300: #B8C4D0;
             --gray-400: #9AAEBD;
             --gray-600: #6B7F94;
             --gray-800: #2D3F52;
@@ -48,6 +53,7 @@
             --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
             --shadow-md: 0 4px 20px rgba(11,30,51,0.08);
             --shadow-lg: 0 8px 40px rgba(11,30,51,0.12);
+            --shadow-xl: 0 12px 60px rgba(11,30,51,0.16);
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
@@ -80,13 +86,13 @@
         .icon-bg-primary { background: var(--primary-100); padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
         .icon-bg-teal { background: var(--teal-light); padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
         .icon-bg-coral { background: var(--coral-light); padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
-        .icon-bg-gold { background: #FFF8E7; padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+        .icon-bg-gold { background: var(--gold-light); padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 
         .card-icon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
         .card-icon.primary { background: var(--primary-100); color: var(--primary-700); }
         .card-icon.teal { background: var(--teal-light); color: var(--teal); }
         .card-icon.coral { background: var(--coral-light); color: var(--coral); }
-        .card-icon.gold { background: #FFF8E7; color: var(--gold); }
+        .card-icon.gold { background: var(--gold-light); color: var(--gold); }
 
         /* ===== الشريط العلوي ===== */
         .header {
@@ -107,7 +113,6 @@
             transition: all 0.3s ease;
         }
 
-        /* ===== وضع الثيم (إخفاء النصوص والشعار) ===== */
         .header.theme-mode .header-brand .text h1,
         .header.theme-mode .header-brand .text .sub,
         .header.theme-mode .header-brand .icon {
@@ -135,7 +140,6 @@
             background-repeat: no-repeat !important;
         }
 
-        /* ===== الخلفيات ===== */
         .header-bg-video {
             position: absolute;
             top: 0;
@@ -223,15 +227,15 @@
         .btn-primary { background: var(--primary-700); color: var(--white); border-color: var(--primary-700); }
         .btn-primary:hover { background: var(--primary-900); border-color: var(--primary-900); }
         .btn-teal { background: var(--teal); color: var(--white); border-color: var(--teal); }
-        .btn-teal:hover { background: #1F6B5E; }
+        .btn-teal:hover { background: var(--teal-dark); }
         .btn-coral { background: var(--coral); color: var(--white); border-color: var(--coral); }
-        .btn-coral:hover { background: #D45A4A; }
+        .btn-coral:hover { background: var(--coral-dark); }
         .btn-whatsapp { background: #25D366; color: var(--white); border-color: #25D366; border-radius: 30px; padding: 8px 24px; }
         .btn-whatsapp:hover { background: #1DA851; border-color: #1DA851; }
         .btn-gold { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
-        .btn-gold:hover { background: #D4B03A; border-color: #D4B03A; }
+        .btn-gold:hover { background: var(--gold-dark); border-color: var(--gold-dark); }
         .btn-peak { background: var(--coral); color: white; border-color: var(--coral); }
-        .btn-peak:hover { background: #D45A4A; border-color: #D45A4A; }
+        .btn-peak:hover { background: var(--coral-dark); border-color: var(--coral-dark); }
         .btn-theme { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
         .btn-theme.active { background: var(--teal); color: white; border-color: var(--teal); }
 
@@ -257,7 +261,7 @@
         }
 
         /* ===== أنماط وقت الذروة ===== */
-        #peakTimeModal .modal-content { max-width: 800px; }
+        #peakTimeModal .modal-content { max-width: 900px; }
         #peakTimeModal .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         #peakTimeModal .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         #peakTimeModal .mt-2 { margin-top: 8px; }
@@ -506,6 +510,458 @@
             border-color: var(--teal) !important;
         }
 
+        /* ===== إحصائيات البلاغات - تصميم احترافي ===== */
+        .live-stats {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-100);
+        }
+
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--gray-100);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stats-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-header-title h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--primary-700);
+            font-weight: 700;
+        }
+
+        .stats-header-title i {
+            font-size: 1.2rem;
+            color: var(--primary-700);
+        }
+
+        .stats-badge {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            background: var(--gray-50);
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .live-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .live-stats-item {
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--gray-100);
+            transition: all 0.3s ease;
+        }
+
+        .live-stats-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .live-stats-item .stats-icon {
+            font-size: 1.4rem;
+            margin-bottom: 4px;
+            opacity: 0.6;
+        }
+
+        .live-stats-item .label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+
+        .live-stats-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            line-height: 1.2;
+        }
+
+        .live-stats-item .value.green { color: var(--teal); }
+        .live-stats-item .value.red { color: var(--coral); }
+        .live-stats-item .value.gold { color: var(--gold); }
+
+        .live-stats-item.primary { border-right: 4px solid var(--primary-700); }
+        .live-stats-item.teal { border-right: 4px solid var(--teal); }
+        .live-stats-item.coral { border-right: 4px solid var(--coral); }
+        .live-stats-item.gold { border-right: 4px solid var(--gold); }
+
+        /* ===== توزيع البلاغات ===== */
+        .live-distribution {
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            border: 1px solid var(--gray-100);
+        }
+
+        .distribution-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .distribution-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--primary-700);
+        }
+
+        .distribution-title i {
+            font-size: 1rem;
+        }
+
+        .distribution-count {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            background: var(--white);
+            padding: 2px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .distribution-list {
+            display: grid;
+            gap: 6px;
+        }
+
+        .distribution-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--white);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-100);
+            transition: all 0.3s ease;
+        }
+
+        .distribution-item:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+            transform: translateX(-4px);
+        }
+
+        .distribution-item .unit-icon {
+            font-size: 0.9rem;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .distribution-item .unit-name {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--gray-800);
+            min-width: 70px;
+            flex-shrink: 0;
+        }
+
+        .distribution-item .unit-count {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--primary-700);
+            min-width: 30px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .distribution-item .bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--gray-200);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .distribution-item .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .distribution-item .bar-fill.primary { background: linear-gradient(90deg, var(--primary-500), var(--primary-700)); }
+        .distribution-item .bar-fill.teal { background: linear-gradient(90deg, #5BA89A, var(--teal)); }
+        .distribution-item .bar-fill.coral { background: linear-gradient(90deg, #F09B8A, var(--coral)); }
+        .distribution-item .bar-fill.gold { background: linear-gradient(90deg, #F0D86A, var(--gold)); }
+        .distribution-item .bar-fill.purple { background: linear-gradient(90deg, #9B7BB8, #7B5A9B); }
+
+        .distribution-item .bar-percent {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            min-width: 40px;
+            text-align: left;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        /* ===== نظام وقت الذروة ===== */
+        .peak-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .peak-header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .peak-section {
+            background: var(--gray-50);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--gray-100);
+        }
+
+        .peak-section h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.85rem;
+            color: var(--primary-700);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peak-log {
+            max-height: 150px;
+            overflow-y: auto;
+            display: grid;
+            gap: 4px;
+        }
+
+        .peak-log-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--white);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            border-right: 3px solid var(--gray-400);
+        }
+
+        .peak-log-item .log-time {
+            font-weight: 600;
+            color: var(--gray-800);
+            font-size: 0.7rem;
+            min-width: 55px;
+        }
+
+        .peak-log-item .log-icon { font-size: 0.9rem; }
+        .peak-log-item .log-action { color: var(--gray-600); }
+        .peak-log-item .log-details { color: var(--gray-400); font-size: 0.75rem; }
+
+        .peak-missions-list {
+            display: grid;
+            gap: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .peak-mission-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--white);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .peak-mission-item .mission-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .peak-mission-item .mission-unit {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--primary-700);
+        }
+
+        .peak-mission-item .mission-location {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+        }
+
+        .peak-mission-item .mission-time {
+            font-size: 0.65rem;
+            color: var(--gray-400);
+        }
+
+        .peak-mission-item .mission-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .peak-form {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+
+        .peak-form h4 {
+            margin: 0 0 12px 0;
+            font-size: 0.85rem;
+            color: var(--primary-700);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peak-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .peak-form-grid .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .peak-form-grid .form-group label {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-bottom: 3px;
+            font-weight: 500;
+        }
+
+        .peak-form-grid .form-group input,
+        .peak-form-grid .form-group select {
+            padding: 6px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .peak-form-grid .form-group input:focus,
+        .peak-form-grid .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+
+        .location-input {
+            display: flex;
+            gap: 4px;
+        }
+
+        .location-input input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+
+        .location-input input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+
+        .location-input .btn {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+
+        .peak-form-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .peak-alerts {
+            background: var(--coral-light);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            border-right: 4px solid var(--coral);
+            margin-bottom: 12px;
+        }
+
+        .peak-alerts h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.85rem;
+            color: var(--coral);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peak-alert-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--white);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            margin-bottom: 4px;
+        }
+
+        .peak-alert-item .alert-info {
+            font-size: 0.75rem;
+        }
+
+        .peak-alert-item .alert-info .alert-title {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .peak-alert-item .alert-info .alert-details {
+            color: var(--gray-600);
+            font-size: 0.7rem;
+        }
+
         /* ===== تحسينات الجوال ===== */
         @media (max-width: 650px) {
             body { padding: 8px; }
@@ -591,7 +1047,7 @@
             .signature-row .sig-inputs input { min-width: 100%; }
             .modal-content { padding: 16px; margin: 10px; }
             .units-grid { grid-template-columns: 1fr 1fr; }
-            .live-stats-grid { flex-direction: column; align-items: stretch; }
+            .live-stats-grid { grid-template-columns: 1fr 1fr; }
             .control-person { flex-direction: column; align-items: stretch; }
             .control-vacation .edit input { width: 100%; }
             .circle-stats-container { grid-template-columns: 1fr 1fr; }
@@ -603,6 +1059,11 @@
             #peakTimeModal .modal-content { padding: 12px; }
             #peakTimeModal .grid-2 { grid-template-columns: 1fr !important; }
             #peakTimeModal .grid-3 { grid-template-columns: 1fr !important; }
+            .peak-form-grid { grid-template-columns: 1fr !important; }
+            .distribution-item { flex-wrap: wrap; gap: 4px; }
+            .distribution-item .unit-name { min-width: 50px; font-size: 0.7rem; }
+            .distribution-item .unit-count { font-size: 0.75rem; min-width: 20px; }
+            .distribution-item .bar-percent { min-width: 30px; font-size: 0.6rem; }
         }
 
         /* ===== تحسينات الطباعة ===== */
@@ -621,64 +1082,6 @@
             .modal-content::before { content: "منصة الجنوب - قطاع جنوب الرياض"; display: block; text-align: center; font-size: 1.5rem; font-weight: 700; color: #0B1E33; padding-bottom: 12px; border-bottom: 3px solid #0B1E33; margin-bottom: 20px; }
             #seniorShiftModal, #seniorShiftModal * { display: none !important; visibility: hidden !important; }
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
-        }
-
-        /* ===== إضافات تحسينية للإحصائيات الحية ===== */
-        .live-stats {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
-        }
-        .live-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-        }
-        .live-stats-item {
-            text-align: center;
-            padding: 10px;
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-        }
-        .live-stats-item .label {
-            display: block;
-            font-size: 0.7rem;
-            color: var(--gray-600);
-            margin-bottom: 4px;
-        }
-        .live-stats-item .value {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--primary-700);
-        }
-        .live-stats-item .value.green { color: var(--teal); }
-        .live-stats-item .value.red { color: var(--coral); }
-        .live-distribution {
-            grid-column: 1 / -1;
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-            padding: 12px;
-        }
-        .live-distribution .title {
-            font-size: 0.7rem;
-            color: var(--gray-600);
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        .live-distribution .item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            font-size: 0.8rem;
-            border-bottom: 1px solid var(--gray-100);
-        }
-        .live-distribution .item:last-child { border-bottom: none; }
-        .live-distribution .item .count {
-            font-weight: 600;
-            color: var(--primary-700);
         }
     </style>
 </head>
@@ -761,13 +1164,50 @@
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
 
-    <!-- إحصائيات البلاغات -->
+    <!-- إحصائيات البلاغات - تصميم احترافي -->
     <div id="liveReportStats" class="live-stats" style="display:none;">
+        <div class="stats-header">
+            <div class="stats-header-title">
+                <i class="fas fa-chart-pie"></i>
+                <h3>إحصائيات البلاغات اللحظية</h3>
+            </div>
+            <span class="stats-badge" id="statsTimestamp">
+                <i class="fas fa-sync-alt fa-spin"></i> تحديث مباشر
+            </span>
+        </div>
+        
         <div class="live-stats-grid">
-            <div class="live-stats-item"><span class="label">📊 إجمالي البلاغات</span><span class="value" id="liveTotalReports">0</span></div>
-            <div class="live-stats-item"><span class="label">🏆 أكثر فرقة استخداماً</span><span class="value green" id="liveTopUnit">-</span></div>
-            <div class="live-stats-item"><span class="label">🔢 عدد البلاغات للفرقة الأكثر</span><span class="value red" id="liveTopUnitCount">0</span></div>
-            <div class="live-distribution" id="liveUnitDistribution"><div class="title">📋 توزيع البلاغات على الفرق</div><div id="liveUnitList"></div></div>
+            <div class="live-stats-item primary">
+                <div class="stats-icon"><i class="fas fa-file-alt"></i></div>
+                <span class="label">إجمالي البلاغات</span>
+                <span class="value" id="liveTotalReports">0</span>
+            </div>
+            <div class="live-stats-item teal">
+                <div class="stats-icon"><i class="fas fa-trophy"></i></div>
+                <span class="label">أكثر فرقة استخداماً</span>
+                <span class="value green" id="liveTopUnit">-</span>
+            </div>
+            <div class="live-stats-item coral">
+                <div class="stats-icon"><i class="fas fa-hashtag"></i></div>
+                <span class="label">بلاغات الفرقة الأكثر</span>
+                <span class="value red" id="liveTopUnitCount">0</span>
+            </div>
+            <div class="live-stats-item gold">
+                <div class="stats-icon"><i class="fas fa-flag"></i></div>
+                <span class="label">عدد الفرق النشطة</span>
+                <span class="value" id="liveActiveUnits" style="color:var(--gold);">0</span>
+            </div>
+        </div>
+        
+        <div class="live-distribution">
+            <div class="distribution-header">
+                <div class="distribution-title">
+                    <i class="fas fa-list-ul"></i>
+                    <span>توزيع البلاغات على الفرق</span>
+                </div>
+                <span class="distribution-count" id="liveUnitCount">0 فرقة</span>
+            </div>
+            <div id="liveUnitList" class="distribution-list"></div>
         </div>
     </div>
 
@@ -786,7 +1226,6 @@
             <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
         </div>
         
-        <!-- رفع خلفية الشريط العلوي -->
         <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
             <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-image"></i> خلفية الشريط العلوي</h4>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -807,7 +1246,6 @@
             </div>
         </div>
         
-        <!-- رفع شعار القطاع -->
         <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
             <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-building"></i> شعار القطاع</h4>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -833,11 +1271,9 @@
 <!-- ===== نافذة وقت الذروة ===== -->
 <div id="peakTimeModal" class="modal">
     <div class="modal-content">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon coral" style="width:44px; height:44px; font-size:1.4rem;">
-                    <i class="fas fa-clock"></i>
-                </span>
+        <div class="peak-header">
+            <div class="peak-header-title">
+                <span class="card-icon coral"><i class="fas fa-clock"></i></span>
                 <div>
                     <h2 style="margin:0; font-size:1.2rem;">🚨 نظام وقت الذروة</h2>
                     <span style="font-size:0.7rem; color:var(--gray-400);">إدارة تمركز الفرق في أوقات الذروة</span>
@@ -845,24 +1281,31 @@
             </div>
             <button onclick="document.getElementById('peakTimeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
         </div>
-
+        
         <!-- سجل العمليات -->
-        <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-list-ul"></i> سجل العمليات والتنبيهات</h4>
-            <div id="peakTimeLog" style="max-height:150px; overflow-y:auto; display:grid; gap:6px;">
+        <div class="peak-section">
+            <h4><i class="fas fa-list-ul"></i> سجل العمليات</h4>
+            <div id="peakTimeLog" class="peak-log">
                 <p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>
             </div>
         </div>
-
-        <!-- نموذج تحديد التمركز -->
-        <div style="background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-plus-circle"></i> تحديد تمركز جديد</h4>
-            
-            <div class="grid-2">
-                <div>
-                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">📍 الموقع</label>
-                    <div style="display:flex; gap:6px;">
-                        <input type="text" id="peakLocation" placeholder="اختر من الخريطة" style="flex:1; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+        
+        <!-- المهام المحفوظة -->
+        <div class="peak-section">
+            <h4><i class="fas fa-tasks"></i> المهام المحفوظة</h4>
+            <div id="peakMissionsList" class="peak-missions-list">
+                <p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد مهام محفوظة</p>
+            </div>
+        </div>
+        
+        <!-- نموذج إضافة مهمة -->
+        <div class="peak-form">
+            <h4><i class="fas fa-plus-circle"></i> تحديد تمركز جديد</h4>
+            <div class="peak-form-grid">
+                <div class="form-group">
+                    <label>📍 الموقع</label>
+                    <div class="location-input">
+                        <input type="text" id="peakLocation" placeholder="اختر من الخريطة">
                         <button onclick="openPeakMap()" class="btn btn-primary" style="padding:4px 12px; font-size:0.7rem;">
                             <i class="fas fa-map-marked-alt"></i> خريطة
                         </button>
@@ -870,9 +1313,9 @@
                     <input type="hidden" id="peakLat">
                     <input type="hidden" id="peakLng">
                 </div>
-                <div>
-                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">🚑 الفرقة</label>
-                    <select id="peakUnit" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                <div class="form-group">
+                    <label>🚑 الفرقة</label>
+                    <select id="peakUnit">
                         <option value="">-- اختر الفرقة --</option>
                         <option value="سريع 1">سريع 1</option>
                         <option value="سريع 2">سريع 2</option>
@@ -899,48 +1342,43 @@
                         <option value="جنوب 19">جنوب 19</option>
                     </select>
                 </div>
-            </div>
-            
-            <div class="grid-3 mt-2">
-                <div>
-                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">⏰ بداية التمركز</label>
-                    <input type="datetime-local" id="peakStartTime" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                <div class="form-group">
+                    <label>⏰ البداية</label>
+                    <input type="datetime-local" id="peakStartTime">
                 </div>
-                <div>
-                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">⏰ نهاية التمركز</label>
-                    <input type="datetime-local" id="peakEndTime" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                <div class="form-group">
+                    <label>⏰ النهاية</label>
+                    <input type="datetime-local" id="peakEndTime">
                 </div>
-                <div>
-                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">🔴 الأولوية</label>
-                    <select id="peakPriority" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                <div class="form-group">
+                    <label>🔴 الأولوية</label>
+                    <select id="peakPriority">
                         <option value="عالية">🔴 عالية</option>
                         <option value="متوسطة">🟡 متوسطة</option>
                         <option value="منخفضة">🟢 منخفضة</option>
                     </select>
                 </div>
             </div>
-            
-            <div class="mt-2">
-                <label style="font-size:0.75rem; color:var(--gray-600); display:block;">📝 ملاحظات</label>
-                <textarea id="peakNotes" rows="2" placeholder="أي ملاحظات إضافية..." style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem; resize:vertical;"></textarea>
+            <div class="form-group" style="margin-bottom:10px;">
+                <label>📝 ملاحظات</label>
+                <textarea id="peakNotes" rows="2" placeholder="أي ملاحظات إضافية..." style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem; resize:vertical; font-family:inherit;"></textarea>
             </div>
-            
-            <div class="flex-wrap mt-2">
+            <div class="peak-form-actions">
                 <button onclick="savePeakMission()" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
-                <button onclick="openPeakMap()" class="btn btn-teal"><i class="fas fa-map-marked-alt"></i> فتح الخريطة</button>
+                <button onclick="openPeakMap()" class="btn btn-teal"><i class="fas fa-map-marked-alt"></i> خريطة</button>
                 <button onclick="sendPeakAlert()" class="btn btn-coral"><i class="fas fa-bell"></i> إرسال تنبيه</button>
                 <button onclick="clearPeakForm()" class="btn"><i class="fas fa-eraser"></i> مسح</button>
             </div>
         </div>
-
+        
         <!-- التنبيهات النشطة -->
-        <div style="background:var(--coral-light); border-radius:var(--radius-md); padding:12px; border-right:4px solid var(--coral);">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem; color:var(--coral);"><i class="fas fa-bell"></i> التنبيهات النشطة</h4>
-            <div id="peakAlerts" style="display:grid; gap:6px;">
+        <div class="peak-alerts">
+            <h4><i class="fas fa-bell"></i> التنبيهات النشطة</h4>
+            <div id="peakAlerts">
                 <p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>
             </div>
         </div>
-
+        
         <div class="modal-buttons">
             <button onclick="document.getElementById('peakTimeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
         </div>
@@ -1259,8 +1697,37 @@ function loadBrandLogo() {
 }
 
 // ============================================
-// نظام الثيمات (الكامل)
+// نظام الثيمات - متزامن مع الخادم
 // ============================================
+async function loadThemesFromServer() {
+    try {
+        const response = await fetch('/api/get-themes');
+        const result = await response.json();
+        if (result.success && result.themes) {
+            const { headerBg, sectorLogo, headerBgType } = result.themes;
+            if (headerBg) {
+                applyHeaderBackground(headerBg, headerBgType);
+            }
+            if (sectorLogo) {
+                applySectorLogo(sectorLogo);
+            }
+        }
+    } catch (error) {
+        console.error('خطأ في تحميل الثيمات:', error);
+    }
+}
+
+async function saveThemesToServer(headerBg, sectorLogo, headerBgType) {
+    try {
+        await fetch('/api/save-themes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ headerBg, sectorLogo, headerBgType })
+        });
+    } catch (error) {
+        console.error('خطأ في حفظ الثيمات:', error);
+    }
+}
 
 function applyHeaderBackground(dataUrl, fileType) {
     const header = document.getElementById('mainHeader');
@@ -1300,52 +1767,6 @@ function applyHeaderBackground(dataUrl, fileType) {
     if (date) { date.style.position = 'relative'; date.style.zIndex = '2'; }
 }
 
-document.getElementById('headerBgFile')?.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const dataUrl = event.target.result;
-        localStorage.setItem('headerBackground', dataUrl);
-        localStorage.setItem('headerBgType', file.type);
-        applyHeaderBackground(dataUrl, file.type);
-        const previewDiv = document.getElementById('headerBgPreview');
-        previewDiv.style.display = 'block';
-        if (file.type.startsWith('video/')) {
-            const video = document.getElementById('headerBgPreviewVideo');
-            const img = document.getElementById('headerBgPreviewImg');
-            img.style.display = 'none';
-            video.style.display = 'block';
-            video.src = dataUrl;
-            video.load();
-        } else {
-            const img = document.getElementById('headerBgPreviewImg');
-            const video = document.getElementById('headerBgPreviewVideo');
-            video.style.display = 'none';
-            img.style.display = 'block';
-            img.src = dataUrl;
-        }
-        alert('✅ تم رفع خلفية الشريط العلوي بنجاح!');
-    };
-    reader.readAsDataURL(file);
-});
-
-function removeHeaderBg() {
-    localStorage.removeItem('headerBackground');
-    localStorage.removeItem('headerBgType');
-    const header = document.getElementById('mainHeader');
-    if (header) {
-        header.style.backgroundImage = '';
-        header.style.background = '';
-        header.style.backgroundColor = '';
-        header.classList.remove('has-bg-image');
-        const video = header.querySelector('.header-bg-video');
-        if (video) video.remove();
-    }
-    document.getElementById('headerBgPreview').style.display = 'none';
-    alert('✅ تم إزالة خلفية الشريط');
-}
-
 function applySectorLogo(dataUrl) {
     const logoImg = document.getElementById('sectorLogoImage');
     if (!logoImg) return;
@@ -1368,13 +1789,42 @@ function applySectorLogo(dataUrl) {
     }
 }
 
+document.getElementById('headerBgFile')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(event) {
+        const dataUrl = event.target.result;
+        await saveThemesToServer(dataUrl, null, file.type);
+        applyHeaderBackground(dataUrl, file.type);
+        const previewDiv = document.getElementById('headerBgPreview');
+        previewDiv.style.display = 'block';
+        if (file.type.startsWith('video/')) {
+            const video = document.getElementById('headerBgPreviewVideo');
+            const img = document.getElementById('headerBgPreviewImg');
+            img.style.display = 'none';
+            video.style.display = 'block';
+            video.src = dataUrl;
+            video.load();
+        } else {
+            const img = document.getElementById('headerBgPreviewImg');
+            const video = document.getElementById('headerBgPreviewVideo');
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = dataUrl;
+        }
+        alert('✅ تم رفع خلفية الشريط العلوي بنجاح!');
+    };
+    reader.readAsDataURL(file);
+});
+
 document.getElementById('sectorLogoFile')?.addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(event) {
+    reader.onload = async function(event) {
         const dataUrl = event.target.result;
-        localStorage.setItem('sectorLogo', dataUrl);
+        await saveThemesToServer(null, dataUrl, null);
         applySectorLogo(dataUrl);
         const previewDiv = document.getElementById('sectorLogoPreview');
         previewDiv.style.display = 'block';
@@ -1384,6 +1834,22 @@ document.getElementById('sectorLogoFile')?.addEventListener('change', function(e
     reader.readAsDataURL(file);
 });
 
+function removeHeaderBg() {
+    localStorage.removeItem('headerBackground');
+    localStorage.removeItem('headerBgType');
+    const header = document.getElementById('mainHeader');
+    if (header) {
+        header.style.backgroundImage = '';
+        header.style.background = '';
+        header.style.backgroundColor = '';
+        header.classList.remove('has-bg-image');
+        const video = header.querySelector('.header-bg-video');
+        if (video) video.remove();
+    }
+    document.getElementById('headerBgPreview').style.display = 'none';
+    alert('✅ تم إزالة خلفية الشريط');
+}
+
 function removeSectorLogo() {
     localStorage.removeItem('sectorLogo');
     applySectorLogo(null);
@@ -1391,39 +1857,8 @@ function removeSectorLogo() {
     alert('✅ تم إزالة شعار القطاع');
 }
 
-function loadSavedThemeSettings() {
-    const headerBg = localStorage.getItem('headerBackground');
-    const headerBgType = localStorage.getItem('headerBgType');
-    if (headerBg && headerBgType) {
-        applyHeaderBackground(headerBg, headerBgType);
-        const previewDiv = document.getElementById('headerBgPreview');
-        previewDiv.style.display = 'block';
-        if (headerBgType.startsWith('video/')) {
-            const video = document.getElementById('headerBgPreviewVideo');
-            const img = document.getElementById('headerBgPreviewImg');
-            img.style.display = 'none';
-            video.style.display = 'block';
-            video.src = headerBg;
-            video.load();
-        } else {
-            const img = document.getElementById('headerBgPreviewImg');
-            const video = document.getElementById('headerBgPreviewVideo');
-            video.style.display = 'none';
-            img.style.display = 'block';
-            img.src = headerBg;
-        }
-    }
-    const sectorLogo = localStorage.getItem('sectorLogo');
-    if (sectorLogo) {
-        applySectorLogo(sectorLogo);
-        const previewDiv = document.getElementById('sectorLogoPreview');
-        previewDiv.style.display = 'block';
-        document.getElementById('sectorLogoPreviewImg').src = sectorLogo;
-    }
-}
-
 function refreshThemes() {
-    loadSavedThemeSettings();
+    loadThemesFromServer();
     alert('✅ تم تحديث الثيمات');
 }
 
@@ -1461,7 +1896,6 @@ document.getElementById('themeBtn')?.addEventListener('click', function() {
 // ============================================
 // نظام التنبيهات الرئيسية
 // ============================================
-
 function showMainAlert(title, message) {
     const alertBar = document.getElementById('alertBar');
     const alertTitle = document.getElementById('alertTitle');
@@ -1485,8 +1919,7 @@ function dismissAlert() {
 function goToPeakTime() {
     document.getElementById('alertBar').style.display = 'none';
     document.getElementById('peakTimeModal').style.display = 'flex';
-    loadPeakLog();
-    loadPeakAlerts();
+    loadPeakData();
 }
 
 function checkForAlerts() {
@@ -1502,35 +1935,147 @@ function checkForAlerts() {
 }
 
 // ============================================
-// نظام وقت الذروة
+// نظام وقت الذروة - متزامن مع الخادم
 // ============================================
-
-let peakMissions = JSON.parse(localStorage.getItem('peakMissions') || '[]');
-let peakAlertsList = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+let peakData = { missions: [], alerts: [], logs: [] };
 let selectedPeakLocation = null;
 let peakMap = null;
 
+async function loadPeakData() {
+    try {
+        const response = await fetch('/api/peak-data');
+        const result = await response.json();
+        if (result.success) {
+            peakData = { 
+                missions: result.missions || [], 
+                alerts: result.alerts || [], 
+                logs: result.logs || [] 
+            };
+            loadPeakLog();
+            loadPeakAlerts();
+            loadPeakMissionsList();
+        }
+    } catch (error) {
+        console.error('خطأ في تحميل بيانات وقت الذروة:', error);
+    }
+}
+
+async function savePeakData() {
+    try {
+        await fetch('/api/peak-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(peakData)
+        });
+    } catch (error) {
+        console.error('خطأ في حفظ بيانات وقت الذروة:', error);
+    }
+}
+
 document.getElementById('peakTimeBtn')?.addEventListener('click', function() {
     document.getElementById('peakTimeModal').style.display = 'flex';
-    loadPeakLog();
-    loadPeakAlerts();
+    loadPeakData();
     const now = new Date();
     document.getElementById('peakStartTime').value = now.toISOString().slice(0, 16);
 });
 
-function savePeakMission() {
+function loadPeakLog() {
+    const container = document.getElementById('peakTimeLog');
+    const logs = peakData.logs || [];
+    if (logs.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>';
+        return;
+    }
+    let html = '';
+    logs.forEach(log => {
+        const priorityColor = log.priority === 'عالية' ? 'var(--coral)' : log.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += '<div class="peak-log-item" style="border-right-color:' + priorityColor + ';">' +
+            '<span class="log-time">' + (log.time || '') + '</span>' +
+            '<span class="log-icon">' + (log.icon || '📌') + '</span>' +
+            '<span class="log-action">' + (log.action || '') + '</span>' +
+            '<span class="log-details">' + (log.details || '') + '</span>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function loadPeakMissionsList() {
+    const container = document.getElementById('peakMissionsList');
+    const missions = peakData.missions || [];
+    if (missions.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد مهام محفوظة</p>';
+        return;
+    }
+    let html = '';
+    missions.forEach(mission => {
+        const priorityColor = mission.priority === 'عالية' ? 'var(--coral)' : 
+                            mission.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        const hasLocation = mission.lat && mission.lng;
+        html += '<div class="peak-mission-item" style="border-right:4px solid ' + priorityColor + ';">' +
+            '<div class="mission-info">' +
+            '<span class="mission-unit">🚑 ' + mission.unit + '</span>' +
+            '<span class="mission-location">📍 ' + mission.location + '</span>' +
+            '<span class="mission-time">⏰ ' + (mission.startTime || '') + ' → ' + (mission.endTime || '') + '</span>' +
+            '</div>' +
+            '<div class="mission-actions">' +
+            (hasLocation ? '<button onclick="previewPeakLocation(' + mission.lat + ', ' + mission.lng + ', \'' + mission.location + '\')" class="btn btn-teal" style="padding:2px 10px; font-size:0.65rem;"><i class="fas fa-map-marked-alt"></i> معاينة</button>' : '') +
+            '<button onclick="deletePeakMission(\'' + mission.id + '\')" class="btn btn-coral" style="padding:2px 10px; font-size:0.65rem;"><i class="fas fa-trash"></i></button>' +
+            '</div>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function previewPeakLocation(lat, lng, locationName) {
+    document.getElementById('peakMapModal').style.display = 'flex';
+    setTimeout(() => {
+        initPeakMap();
+        if (peakMap && lat && lng) {
+            peakMap.setView([lat, lng], 16);
+            L.marker([lat, lng]).addTo(peakMap)
+                .bindPopup('📍 ' + (locationName || 'موقع التمركز'))
+                .openPopup();
+        }
+    }, 500);
+}
+
+function loadPeakAlerts() {
+    const container = document.getElementById('peakAlerts');
+    const alerts = peakData.alerts || [];
+    const activeAlerts = alerts.filter(a => a.status === 'نشط');
+    if (activeAlerts.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>';
+        return;
+    }
+    let html = '';
+    activeAlerts.forEach(alert => {
+        const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += '<div class="peak-alert-item" style="border-right:3px solid ' + priorityColor + ';">' +
+            '<div class="alert-info">' +
+            '<span class="alert-title">🔔 ' + alert.title + '</span>' +
+            '<span class="alert-details">' + alert.details + '</span>' +
+            '</div>' +
+            '<button onclick="resolvePeakAlert(\'' + alert.id + '\')" class="btn btn-teal" style="padding:2px 12px; font-size:0.6rem;"><i class="fas fa-check"></i> تم التنفيذ</button>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+}
+
+async function savePeakMission() {
     const location = document.getElementById('peakLocation').value.trim();
     const unit = document.getElementById('peakUnit').value;
     const startTime = document.getElementById('peakStartTime').value;
     const endTime = document.getElementById('peakEndTime').value;
     const priority = document.getElementById('peakPriority').value;
     const notes = document.getElementById('peakNotes').value.trim();
+    
     if (!location || !unit || !startTime || !endTime) {
         alert('⚠️ الرجاء ملء جميع الحقول المطلوبة');
         return;
     }
+    
     const mission = {
-        id: Date.now(),
+        id: Date.now().toString(),
         location: location,
         lat: document.getElementById('peakLat').value || null,
         lng: document.getElementById('peakLng').value || null,
@@ -1542,128 +2087,122 @@ function savePeakMission() {
         status: 'قيد الانتظار',
         createdAt: new Date().toISOString()
     };
-    peakMissions.unshift(mission);
-    localStorage.setItem('peakMissions', JSON.stringify(peakMissions));
-    addPeakLog('🟡', 'مهمة جديدة', unit + ' في ' + location, priority);
-    sendPeakAlertToControl(mission);
-    alert('✅ تم حفظ مهمة التمركز بنجاح');
-    clearPeakForm();
-    loadPeakLog();
-    loadPeakAlerts();
-}
-
-function addPeakLog(icon, action, details, priority) {
-    const log = {
-        id: Date.now(),
-        icon: icon,
-        action: action,
-        details: details,
-        priority: priority || 'عادي',
+    
+    peakData.missions.unshift(mission);
+    if (peakData.missions.length > 50) peakData.missions.pop();
+    
+    peakData.logs.unshift({
+        id: Date.now().toString(),
+        icon: '🟡',
+        action: 'مهمة جديدة',
+        details: unit + ' في ' + location,
+        priority: priority,
         time: new Date().toLocaleTimeString('ar-SA'),
         date: new Date().toISOString()
-    };
-    const logs = JSON.parse(localStorage.getItem('peakLogs') || '[]');
-    logs.unshift(log);
-    if (logs.length > 50) logs.pop();
-    localStorage.setItem('peakLogs', JSON.stringify(logs));
-    loadPeakLog();
-}
-
-function loadPeakLog() {
-    const container = document.getElementById('peakTimeLog');
-    const logs = JSON.parse(localStorage.getItem('peakLogs') || '[]');
-    if (logs.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>';
-        return;
-    }
-    let html = '';
-    logs.forEach(log => {
-        const priorityColor = log.priority === 'عالية' ? 'var(--coral)' : log.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
-        html += '<div style="display:flex; align-items:center; gap:8px; background:white; padding:6px 10px; border-radius:var(--radius-sm); border-right:3px solid ' + priorityColor + '; font-size:0.8rem;">' +
-            '<span>' + log.icon + '</span>' +
-            '<span style="font-weight:600; color:var(--gray-800);">' + log.time + '</span>' +
-            '<span style="color:var(--gray-600);">' + log.action + '</span>' +
-            '<span style="color:var(--gray-400);">' + log.details + '</span>' +
-            '</div>';
     });
-    container.innerHTML = html;
-}
-
-function loadPeakAlerts() {
-    const container = document.getElementById('peakAlerts');
-    const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
-    const activeAlerts = alerts.filter(a => a.status === 'نشط');
-    if (activeAlerts.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>';
-        return;
-    }
-    let html = '';
-    activeAlerts.forEach(alert => {
-        const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
-        html += '<div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:var(--radius-sm); border-right:3px solid ' + priorityColor + ';">' +
-            '<div><span style="font-weight:600; font-size:0.8rem;">🔔 ' + alert.title + '</span><span style="font-size:0.7rem; color:var(--gray-600); display:block;">' + alert.details + '</span></div>' +
-            '<button onclick="resolvePeakAlert(\'' + alert.id + '\')" class="btn btn-teal" style="padding:2px 12px; font-size:0.6rem;"><i class="fas fa-check"></i> تم التنفيذ</button>' +
-            '</div>';
-    });
-    container.innerHTML = html;
-}
-
-function sendPeakAlertToControl(mission) {
+    if (peakData.logs.length > 50) peakData.logs.pop();
+    
     const alert = {
         id: Date.now().toString(),
-        title: 'تمركز مطلوب لـ ' + mission.unit,
-        details: 'المطلوب تمركز ' + mission.unit + ' في ' + mission.location + ' (' + mission.startTime + ' - ' + mission.endTime + ')',
-        priority: mission.priority,
-        unit: mission.unit,
-        location: mission.location,
+        title: 'تمركز مطلوب لـ ' + unit,
+        details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
+        priority: priority,
+        unit: unit,
+        location: location,
         missionId: mission.id,
         status: 'نشط',
         createdAt: new Date().toISOString()
     };
-    const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
-    alerts.unshift(alert);
-    localStorage.setItem('peakAlerts', JSON.stringify(alerts));
+    peakData.alerts.unshift(alert);
+    if (peakData.alerts.length > 50) peakData.alerts.pop();
+    
+    await savePeakData();
     localStorage.removeItem('alertDismissed');
-    addPeakLog('🔔', 'تنبيه', mission.unit + ' في ' + mission.location, mission.priority);
+    showMainAlert('🔔 تمركز مطلوب لـ ' + unit, 'المطلوب تمركز ' + unit + ' في ' + location);
+    
+    alert('✅ تم حفظ مهمة التمركز بنجاح');
+    clearPeakForm();
+    loadPeakLog();
     loadPeakAlerts();
-    showMainAlert('🔔 تمركز مطلوب لـ ' + mission.unit, 'المطلوب تمركز ' + mission.unit + ' في ' + mission.location);
+    loadPeakMissionsList();
 }
 
-function sendPeakAlert() {
+async function sendPeakAlert() {
     const location = document.getElementById('peakLocation').value.trim();
     const unit = document.getElementById('peakUnit').value;
     if (!location || !unit) {
         alert('⚠️ الرجاء تحديد الموقع والفرقة');
         return;
     }
-    const mission = {
-        id: Date.now(),
-        location: location,
+    
+    const startTime = document.getElementById('peakStartTime').value || 'غير محدد';
+    const endTime = document.getElementById('peakEndTime').value || 'غير محدد';
+    const priority = document.getElementById('peakPriority').value;
+    
+    const alert = {
+        id: Date.now().toString(),
+        title: 'تمركز مطلوب لـ ' + unit,
+        details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
+        priority: priority,
         unit: unit,
-        startTime: document.getElementById('peakStartTime').value || 'غير محدد',
-        endTime: document.getElementById('peakEndTime').value || 'غير محدد',
-        priority: document.getElementById('peakPriority').value,
-        notes: document.getElementById('peakNotes').value.trim() || '',
-        status: 'قيد الانتظار',
+        location: location,
+        missionId: Date.now().toString(),
+        status: 'نشط',
         createdAt: new Date().toISOString()
     };
-    sendPeakAlertToControl(mission);
+    
+    peakData.alerts.unshift(alert);
+    if (peakData.alerts.length > 50) peakData.alerts.pop();
+    
+    peakData.logs.unshift({
+        id: Date.now().toString(),
+        icon: '🔔',
+        action: 'تنبيه',
+        details: unit + ' في ' + location,
+        priority: priority,
+        time: new Date().toLocaleTimeString('ar-SA'),
+        date: new Date().toISOString()
+    });
+    if (peakData.logs.length > 50) peakData.logs.pop();
+    
+    await savePeakData();
+    localStorage.removeItem('alertDismissed');
+    showMainAlert('🔔 تمركز مطلوب لـ ' + unit, 'المطلوب تمركز ' + unit + ' في ' + location);
+    
     alert('✅ تم إرسال التنبيه للتحكم العملياتي');
+    loadPeakLog();
+    loadPeakAlerts();
 }
 
-function resolvePeakAlert(alertId) {
+async function resolvePeakAlert(alertId) {
     if (!confirm('⚠️ هل أنت متأكد من إنهاء هذا التنبيه؟')) return;
-    let alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+    const alerts = peakData.alerts || [];
     const alert = alerts.find(a => a.id === alertId);
     if (alert) {
         alert.status = 'منتهي';
-        alerts = alerts.map(a => a.id === alertId ? alert : a);
-        localStorage.setItem('peakAlerts', JSON.stringify(alerts));
-        addPeakLog('✅', 'تم التنفيذ', alert.details, alert.priority);
-        loadPeakAlerts();
+        peakData.alerts = alerts.map(a => a.id === alertId ? alert : a);
+        peakData.logs.unshift({
+            id: Date.now().toString(),
+            icon: '✅',
+            action: 'تم التنفيذ',
+            details: alert.details || '',
+            priority: alert.priority || 'عادي',
+            time: new Date().toLocaleTimeString('ar-SA'),
+            date: new Date().toISOString()
+        });
+        if (peakData.logs.length > 50) peakData.logs.pop();
+        await savePeakData();
         loadPeakLog();
+        loadPeakAlerts();
         checkForAlerts();
     }
+}
+
+async function deletePeakMission(missionId) {
+    if (!confirm('⚠️ هل أنت متأكد من حذف هذه المهمة؟')) return;
+    peakData.missions = peakData.missions.filter(m => m.id !== missionId);
+    await savePeakData();
+    loadPeakMissionsList();
 }
 
 function openPeakMap() {
@@ -1723,7 +2262,6 @@ function clearPeakForm() {
 // ============================================
 // باقي الكود الأساسي
 // ============================================
-
 var centersData = {};
 var reports = {};
 var lastKnownUpdate = 0;
@@ -1738,8 +2276,6 @@ var currentDocsPage = 1;
 var docsPerPage = 10;
 var selectedFiles = [];
 var docsViewMode = 'list';
-var currentPreviewDocId = null;
-var currentPreviewText = '';
 
 var centerNumbers = Array.from({length: 19}, function(_, i) { return i + 1; });
 var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
@@ -1830,39 +2366,60 @@ function updateShiftStatus() {
     } else { status.innerHTML = '📌 لا توجد مناوبة نشطة'; }
 }
 
-// 🔧 تم إصلاح دالة حساب الإحصائيات الحية
+// ===== إحصائيات البلاغات - تصميم احترافي =====
 function calculateLiveReportStats() {
     var container = document.getElementById('liveReportStats');
     if (!container) return;
+    
     var total = 0;
     var unitStats = {};
+    var activeUnits = 0;
+    
     for (var key in reports) {
         var report = reports[key];
         if (report && report.count > 0) {
             total += report.count;
             var parts = key.split('|');
-            // التأكد من وجود اسم الفرقة بشكل صحيح
             var unit = parts.length > 1 ? parts[1] : key;
-            // 🔧 إصلاح: التأكد من أن اسم الفرقة ليس فارغاً
             if (unit && unit.trim() !== '') {
+                if (!unitStats[unit]) { activeUnits++; }
                 unitStats[unit] = (unitStats[unit] || 0) + report.count;
             }
         }
     }
+    
     if (total === 0) { container.style.display = 'none'; return; }
     container.style.display = 'block';
+    
     document.getElementById('liveTotalReports').innerText = total;
+    document.getElementById('liveActiveUnits').innerText = activeUnits;
+    
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
     document.getElementById('liveTopUnit').innerText = topUnit;
     document.getElementById('liveTopUnitCount').innerText = topCount;
+    document.getElementById('liveUnitCount').innerText = sortedUnits.length + ' فرقة';
+    
     var listContainer = document.getElementById('liveUnitList');
     listContainer.innerHTML = '';
-    sortedUnits.forEach(function(item) {
+    
+    var barColors = ['primary', 'teal', 'coral', 'gold', 'purple'];
+    var icons = ['🚑', '🚒', '🏥', '🚁', '💉', '🩺', '🏨', '🚨', '⭐'];
+    
+    sortedUnits.forEach(function(item, index) {
+        var percentage = Math.round((item[1] / total) * 100);
+        var colorClass = barColors[index % barColors.length];
+        var icon = icons[index % icons.length];
+        
         var div = document.createElement('div');
-        div.className = 'item';
-        div.innerHTML = '<span>' + item[0] + '</span><span class="count">' + item[1] + '</span>';
+        div.className = 'distribution-item';
+        div.innerHTML = 
+            '<span class="unit-icon">' + icon + '</span>' +
+            '<span class="unit-name">' + item[0] + '</span>' +
+            '<span class="unit-count">' + item[1] + '</span>' +
+            '<div class="bar-track"><div class="bar-fill ' + colorClass + '" style="width:' + percentage + '%;"></div></div>' +
+            '<span class="bar-percent">' + percentage + '%</span>';
         listContainer.appendChild(div);
     });
 }
@@ -1962,14 +2519,24 @@ async function startNewShift() {
 // ===== ربط الأحداث الرئيسية =====
 document.addEventListener('DOMContentLoaded', function() {
     loadBrandLogo();
-    loadSavedThemeSettings();
+    loadThemesFromServer();
     loadThemeMode();
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     buildCentersTable();
     loadShifts();
     loadAllData();
-    setTimeout(checkForAlerts, 1000);
+    setTimeout(function() {
+        checkForAlerts();
+        loadPeakData();
+    }, 1000);
 });
+
+// تحديث الإحصائيات كل 10 ثواني
+setInterval(function() {
+    if (!isViewingArchiveShift) {
+        calculateLiveReportStats();
+    }
+}, 10000);
 
 setInterval(checkForAlerts, 30000);
 
@@ -2566,7 +3133,6 @@ async function viewShiftReports() {
             renderData();
             updateTotal();
             loadShiftToForm(result.shift);
-            // 🔧 تمرير reports إلى displayShiftReportStats لعرض الإحصائيات بشكل صحيح
             displayShiftReportStats(result.reports);
             calculateLiveReportStats();
             var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
@@ -2688,13 +3254,11 @@ function clearShiftForm() {
     document.getElementById('shiftReportStats').style.display = 'none';
 }
 
-// 🔧 تم إصلاح دالة عرض إحصائيات البلاغات بشكل كامل
 function displayShiftReportStats(reportsData) {
     var container = document.getElementById('shiftReportStats');
     var listContainer = document.getElementById('unitReportList');
     if (!container || !listContainer) return;
     
-    // التأكد من وجود بيانات
     if (!reportsData || typeof reportsData !== 'object' || Object.keys(reportsData).length === 0) {
         container.style.display = 'none';
         return;
@@ -2703,14 +3267,11 @@ function displayShiftReportStats(reportsData) {
     var total = 0;
     var unitStats = {};
     
-    // معالجة البيانات بشكل صحيح
     for (var key in reportsData) {
         var report = reportsData[key];
-        // التأكد من أن التقرير يحتوي على count و أنه أكبر من 0
         if (report && typeof report === 'object' && report.count > 0) {
             total += report.count;
             var parts = key.split('|');
-            // استخراج اسم الفرقة بشكل صحيح
             var unit = parts.length > 1 ? parts[1] : key;
             if (unit && unit.trim() !== '') {
                 unitStats[unit] = (unitStats[unit] || 0) + report.count;
@@ -2718,24 +3279,20 @@ function displayShiftReportStats(reportsData) {
         }
     }
     
-    // إذا لم يكن هناك بلاغات، إخفاء القسم
     if (total === 0) {
         container.style.display = 'none';
         return;
     }
     
-    // عرض القسم
     container.style.display = 'block';
     document.getElementById('shiftTotalReports').innerText = total;
     
-    // ترتيب الفرق تنازلياً حسب عدد البلاغات
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
     document.getElementById('topUnit').innerText = topUnit;
     document.getElementById('topUnitCount').innerText = topCount;
     
-    // عرض توزيع البلاغات
     listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
     
     if (sortedUnits.length === 0) {
@@ -2942,8 +3499,13 @@ async function checkForUpdates() {
     } catch (error) {}
 }
 
-console.log('✅ منصة الجنوب - الهوية البصرية الجديدة مع نظام وقت الذروة');
-console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
+// ===== تحميل بيانات وقت الذروة عند فتح النافذة =====
+document.querySelector('#peakTimeModal .modal-content .btn[onclick*="close"]')?.addEventListener('click', function() {
+    // لا شيء
+});
+
+console.log('✅ منصة الجنوب - الهوية البصرية الجديدة مع نظام وقت الذروة المتزامن');
+console.log('📌 جميع البيانات مخزنة في MongoDB وتنعكس على جميع الأجهزة');
 console.log('🚨 لإدارة تمركز الفرق في وقت الذروة، استخدم زر "وقت الذروة"');
 </script>
 </body>
