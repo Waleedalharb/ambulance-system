@@ -3,8 +3,28 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const multer = require('multer');
+const moment = require('moment-timezone');
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ============================================
+// دوال التوقيت الموحدة
+// ============================================
+function getSaudiTime() {
+    return moment().tz('Asia/Riyadh');
+}
+
+function formatSaudiDateTime(date) {
+    return moment(date).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
+}
+
+function formatSaudiDate(date) {
+    return moment(date).tz('Asia/Riyadh').format('YYYY-MM-DD');
+}
+
+function formatSaudiTime(date) {
+    return moment(date).tz('Asia/Riyadh').format('HH:mm:ss');
+}
 
 // ============================================
 // إنشاء مجلد البيانات تلقائياً
@@ -294,15 +314,15 @@ app.post('/api/start-new-shift', async (req, res) => {
         const currentReports = await readData();
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
         
-        const now = new Date();
-        const offset = 3;
-        const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-        const shiftDate = saudiTime.toLocaleDateString('ar-SA');
-        const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
+        // استخدام التوقيت السعودي الموحد
+        const saudiTime = getSaudiTime();
+        const shiftDate = saudiTime.format('YYYY-MM-DD');
+        const shiftTime = saudiTime.format('HH:mm:ss');
+        const shiftDateArabic = saudiTime.locale('ar').format('YYYY/MM/DD');
         
         const newShift = {
             id: Date.now(),
-            shiftName: `${shiftType} - ${shiftDate} ${shiftTime}`,
+            shiftName: `${shiftType} - ${shiftDateArabic} ${shiftTime}`,
             shiftDate: shiftDate,
             shiftTime: shiftTime,
             shiftType: shiftType,
@@ -347,7 +367,7 @@ app.post('/api/update-shift-data', async (req, res) => {
         shifts[index].centersData = shiftData.centersData || {};
         shifts[index].generalNotes = shiftData.generalNotes || "";
         shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
-        shifts[index].lastUpdate = new Date().toISOString();
+        shifts[index].lastUpdate = getSaudiTime().toISOString();
         
         await writeShifts(shifts);
         currentShiftId = shiftId;
@@ -382,16 +402,8 @@ app.post('/api/report', async (req, res) => {
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
     
     const key = `${center}|${unit}`;
-    const now = new Date();
-    const offset = 3;
-    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-    const year = saudiTime.getUTCFullYear();
-    const month = (saudiTime.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = saudiTime.getUTCDate().toString().padStart(2, '0');
-    const hours = saudiTime.getUTCHours().toString().padStart(2, '0');
-    const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
-    const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
-    const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    const saudiTime = getSaudiTime();
+    const timestamp = saudiTime.format('YYYY-MM-DD HH:mm:ss');
     
     try {
         const allData = await readData();
@@ -557,7 +569,7 @@ app.get('/api/get-themes', async (req, res) => {
 });
 
 // ============================================
-// باقي الـ APIs
+// API: هوية القطاع
 // ============================================
 app.get('/api/get-identity', async (req, res) => {
     try {
@@ -594,6 +606,9 @@ app.get('/api/download-identity', async (req, res) => {
     }
 });
 
+// ============================================
+// API: الإسعاف الجوي
+// ============================================
 app.get('/api/air-ambulance', async (req, res) => {
     try {
         const records = await readAirRecords();
@@ -716,6 +731,9 @@ app.post('/api/save-control-notes', async (req, res) => {
     }
 });
 
+// ============================================
+// API: الإجازات
+// ============================================
 app.get('/api/vacations', async (req, res) => {
     try {
         const data = await fs.readFile(VACATIONS_PATH, 'utf8');
@@ -739,6 +757,9 @@ app.post('/api/save-vacations', async (req, res) => {
     }
 });
 
+// ============================================
+// API: الرقم السري
+// ============================================
 app.get('/api/get-password', async (req, res) => {
     try {
         const password = await readPassword();
@@ -775,4 +796,5 @@ app.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
     console.log(`📁 مسار البيانات: ${DATA_DIR}`);
     console.log(`📁 مسار الملفات الثابتة: ${path.join(__dirname, 'public')}`);
+    console.log(`🕐 التوقيت السعودي الحالي: ${getSaudiTime().format('YYYY-MM-DD HH:mm:ss')}`);
 });
