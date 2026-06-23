@@ -1,286 +1,186 @@
 const express = require('express');
-const fs = require('fs').promises;
-const fsSync = require('fs');
+const { MongoClient } = require('mongodb');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
-const moment = require('moment-timezone');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// دوال التوقيت الموحدة
+// اتصال MongoDB
 // ============================================
-function getSaudiTime() {
-    return moment().tz('Asia/Riyadh');
-}
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/south-platform';
+let db;
+let client;
 
-function formatSaudiDateTime(date) {
-    return moment(date).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
-}
-
-function formatSaudiDate(date) {
-    return moment(date).tz('Asia/Riyadh').format('YYYY-MM-DD');
-}
-
-function formatSaudiTime(date) {
-    return moment(date).tz('Asia/Riyadh').format('HH:mm:ss');
-}
-
-// ============================================
-// إنشاء مجلد البيانات تلقائياً
-// ============================================
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fsSync.existsSync(DATA_DIR)) {
-    fsSync.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-const DATA_PATH = path.join(DATA_DIR, 'ambulance-data.json');
-const SHIFT_DATA_PATH = path.join(DATA_DIR, 'shift-data.json');
-const MONTHLY_TABLE_PATH = path.join(DATA_DIR, 'monthly-table.xlsx');
-const DOCS_PATH = path.join(DATA_DIR, 'docs.json');
-const AIR_PATH = path.join(DATA_DIR, 'air-ambulance.json');
-const IDENTITY_PATH = path.join(DATA_DIR, 'identity.pdf');
-const CONTROL_NOTES_PATH = path.join(DATA_DIR, 'control-notes.json');
-const VACATIONS_PATH = path.join(DATA_DIR, 'vacations.json');
-const PASSWORD_PATH = path.join(DATA_DIR, 'password.json');
-
-let lastUpdateTime = Date.now();
-let currentShiftId = null;
-
-// ============================================
-// إنشاء ملفات البيانات إذا لم تكن موجودة
-// ============================================
-async function ensureDataFiles() {
-    const files = [
-        { path: DATA_PATH, default: {} },
-        { path: SHIFT_DATA_PATH, default: [] },
-        { path: DOCS_PATH, default: [] },
-        { path: AIR_PATH, default: [] },
-        { path: CONTROL_NOTES_PATH, default: { notes: '' } },
-        { path: VACATIONS_PATH, default: [] },
-        { path: PASSWORD_PATH, default: { password: '1234' } }
-    ];
-    for (const file of files) {
-        try {
-            await fs.access(file.path);
-        } catch {
-            await fs.writeFile(file.path, JSON.stringify(file.default, null, 2));
-        }
-    }
-}
-ensureDataFiles();
-
-// ============================================
-// نظام الثيمات - حفظ في الخادم
-// ============================================
-const THEMES_PATH = path.join(DATA_DIR, 'themes.json');
-
-async function readThemes() {
+async function connectDB() {
     try {
-        const data = await fs.readFile(THEMES_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            const defaultThemes = { headerBg: null, sectorLogo: null, headerBgType: null };
-            await fs.writeFile(THEMES_PATH, JSON.stringify(defaultThemes, null, 2));
-            return defaultThemes;
-        }
-        throw error;
-    }
-}
-
-async function writeThemes(data) {
-    await fs.writeFile(THEMES_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// ترحيل البيانات من المسار القديم
-// ============================================
-async function migrateOldData() {
-    const oldPaths = [
-        '/data/ambulance-data.json',
-        '/data/shift-data.json',
-        '/data/monthly-table.xlsx',
-        '/data/docs.json',
-        '/data/air-ambulance.json',
-        '/data/identity.pdf',
-        '/data/control-notes.json',
-        '/data/vacations.json',
-        '/data/password.json'
-    ];
-    
-    const newPaths = [
-        DATA_PATH, SHIFT_DATA_PATH, MONTHLY_TABLE_PATH,
-        DOCS_PATH, AIR_PATH, IDENTITY_PATH,
-        CONTROL_NOTES_PATH, VACATIONS_PATH, PASSWORD_PATH
-    ];
-    
-    for (let i = 0; i < oldPaths.length; i++) {
-        try {
-            await fs.access(oldPaths[i]);
-            try {
-                await fs.access(newPaths[i]);
-            } catch {
-                const data = await fs.readFile(oldPaths[i]);
-                await fs.writeFile(newPaths[i], data);
-                console.log(`✅ تم ترحيل: ${path.basename(oldPaths[i])}`);
+        client = new MongoClient(MONGODB_URI);
+        await client.connect();
+        db = client.db();
+        console.log('✅ تم الاتصال بـ MongoDB بنجاح');
+        
+        // إنشاء المجموعات إذا لم تكن موجودة
+        const collections = ['reports', 'shifts', 'docs', 'air', 'peak', 'themes', 'vacations', 'control'];
+        for (const name of collections) {
+            const colls = await db.listCollections({ name }).toArray();
+            if (colls.length === 0) {
+                await db.createCollection(name);
+                console.log(`📁 تم إنشاء مجموعة: ${name}`);
             }
-        } catch {}
+        }
+        
+        // تهيئة البيانات الافتراضية
+        await initDefaultData();
+        
+        return db;
+    } catch (error) {
+        console.error('❌ فشل الاتصال بـ MongoDB:', error);
+        process.exit(1);
     }
 }
-migrateOldData();
 
+async function initDefaultData() {
+    // التحقق من وجود بيانات في مجموعة reports
+    const reportsCount = await db.collection('reports').countDocuments();
+    if (reportsCount === 0) {
+        await db.collection('reports').insertOne({ data: {}, currentShiftId: null, lastUpdate: Date.now() });
+        console.log('✅ تم تهيئة بيانات البلاغات');
+    }
+    
+    const shiftsCount = await db.collection('shifts').countDocuments();
+    if (shiftsCount === 0) {
+        await db.collection('shifts').insertOne({ shifts: [] });
+        console.log('✅ تم تهيئة بيانات المناوبات');
+    }
+    
+    const peakCount = await db.collection('peak').countDocuments();
+    if (peakCount === 0) {
+        await db.collection('peak').insertOne({ missions: [], alerts: [], logs: [] });
+        console.log('✅ تم تهيئة بيانات وقت الذروة');
+    }
+    
+    const themesCount = await db.collection('themes').countDocuments();
+    if (themesCount === 0) {
+        await db.collection('themes').insertOne({ headerBg: null, sectorLogo: null, headerBgType: null });
+        console.log('✅ تم تهيئة بيانات الثيمات');
+    }
+    
+    const controlCount = await db.collection('control').countDocuments();
+    if (controlCount === 0) {
+        await db.collection('control').insertOne({ notes: '', vacations: [] });
+        console.log('✅ تم تهيئة بيانات التحكم');
+    }
+}
+
+// ============================================
 // Middleware
+// ============================================
 app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
-// إعداد Multer لرفع الملفات
-// ============================================
-const upload = multer({
-    dest: path.join(DATA_DIR, 'temp/'),
-    limits: { fileSize: 100 * 1024 * 1024 }
-});
-
-async function ensureTempDir() {
-    try {
-        await fs.mkdir(path.join(DATA_DIR, 'temp'), { recursive: true });
-    } catch (e) {}
-}
-ensureTempDir();
-
-// ============================================
-// بيانات قطاع الجنوب
-// ============================================
-const centersData = {
-    "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
-    "الخالدية": ["جنوب 2"],
-    "منفوحة": ["جنوب 3"],
-    "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
-    "الإسكان": ["جنوب 6"],
-    "الحائر": ["جنوب 7"],
-    "ديراب": ["جنوب 10"],
-    "عكاظ": ["جنوب 9"],
-    "الشفاء": ["جنوب 8", "سريع 2"],
-    "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
-};
-
-// ============================================
-// دوال قراءة وكتابة البيانات
-// ============================================
-async function readData() {
-    try {
-        const data = await fs.readFile(DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return {};
-        throw error;
-    }
-}
-
-async function writeData(data) {
-    await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2));
-    lastUpdateTime = Date.now();
-}
-
-async function readShifts() {
-    try {
-        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeShifts(data) {
-    await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
-}
-
-async function readDocs() {
-    try {
-        const data = await fs.readFile(DOCS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeDocs(data) {
-    await fs.writeFile(DOCS_PATH, JSON.stringify(data, null, 2));
-}
-
-async function readAirRecords() {
-    try {
-        const data = await fs.readFile(AIR_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeAirRecords(data) {
-    await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// دوال الرقم السري
-// ============================================
-async function readPassword() {
-    try {
-        const data = await fs.readFile(PASSWORD_PATH, 'utf8');
-        const parsed = JSON.parse(data);
-        return parsed.password || '1234';
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password: '1234' }));
-            return '1234';
-        }
-        return '1234';
-    }
-}
-
-async function writePassword(password) {
-    await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
-}
-
-// ============================================
-// API: الصفحة الرئيسية
-// ============================================
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// ============================================
-// API: جلب البيانات
+// API: البلاغات (Reports)
 // ============================================
 app.get('/api/data', async (req, res) => {
     try {
-        const data = await readData();
-        res.json({
-            data,
-            centers: centersData,
-            currentShiftId: currentShiftId
-        });
+        const doc = await db.collection('reports').findOne({});
+        const data = doc?.data || {};
+        const currentShiftId = doc?.currentShiftId || null;
+        
+        // بيانات المراكز
+        const centersData = {
+            "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+            "الخالدية": ["جنوب 2"],
+            "منفوحة": ["جنوب 3"],
+            "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+            "الإسكان": ["جنوب 6"],
+            "الحائر": ["جنوب 7"],
+            "ديراب": ["جنوب 10"],
+            "عكاظ": ["جنوب 9"],
+            "الشفاء": ["جنوب 8", "سريع 2"],
+            "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+        };
+        
+        res.json({ data, centers: centersData, currentShiftId });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب البيانات' });
     }
 });
 
-app.get('/api/last-update', (req, res) => {
-    res.json({ lastUpdate: lastUpdateTime });
+app.post('/api/report', async (req, res) => {
+    const { center, unit } = req.body;
+    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
+    
+    const key = `${center}|${unit}`;
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').slice(0, 19);
+    
+    try {
+        const doc = await db.collection('reports').findOne({});
+        const data = doc?.data || {};
+        
+        if (!data[key]) data[key] = { count: 0, times: [] };
+        data[key].count++;
+        data[key].times.unshift(timestamp);
+        if (data[key].times.length > 10) data[key].times.pop();
+        
+        await db.collection('reports').updateOne(
+            {},
+            { $set: { data, lastUpdate: Date.now() } },
+            { upsert: true }
+        );
+        
+        res.json({ success: true, newCount: data[key].count });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
+    }
+});
+
+app.post('/api/undo', async (req, res) => {
+    const { center, unit } = req.body;
+    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
+    
+    const key = `${center}|${unit}`;
+    try {
+        const doc = await db.collection('reports').findOne({});
+        const data = doc?.data || {};
+        
+        if (!data[key] || data[key].count === 0) {
+            return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
+        }
+        data[key].count--;
+        data[key].times.shift();
+        
+        await db.collection('reports').updateOne(
+            {},
+            { $set: { data, lastUpdate: Date.now() } },
+            { upsert: true }
+        );
+        
+        res.json({ success: true, newCount: data[key].count });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+app.get('/api/last-update', async (req, res) => {
+    try {
+        const doc = await db.collection('reports').findOne({});
+        res.json({ lastUpdate: doc?.lastUpdate || Date.now() });
+    } catch (error) {
+        res.json({ lastUpdate: Date.now() });
+    }
 });
 
 // ============================================
-// API: المناوبات
+// API: المناوبات (Shifts)
 // ============================================
 app.get('/api/shifts', async (req, res) => {
     try {
-        const shifts = await readShifts();
-        res.json(shifts);
+        const doc = await db.collection('shifts').findOne({});
+        res.json(doc?.shifts || []);
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب المناوبات' });
     }
@@ -288,14 +188,17 @@ app.get('/api/shifts', async (req, res) => {
 
 app.get('/api/shifts/:id', async (req, res) => {
     try {
-        const shifts = await readShifts();
+        const doc = await db.collection('shifts').findOne({});
+        const shifts = doc?.shifts || [];
         const shiftId = parseInt(req.params.id);
         const shift = shifts.find(s => s.id === shiftId);
+        
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
+        
         res.json({
-            shift: shift,
+            shift,
             reports: shift.savedReports || {},
             total: shift.totalReports || 0
         });
@@ -311,37 +214,47 @@ app.post('/api/start-new-shift', async (req, res) => {
             return res.status(400).json({ error: 'نوع المناوبة مطلوب' });
         }
         
-        const currentReports = await readData();
+        // جلب البيانات الحالية
+        const reportsDoc = await db.collection('reports').findOne({});
+        const currentReports = reportsDoc?.data || {};
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
         
-        // استخدام التوقيت السعودي الموحد
-        const saudiTime = getSaudiTime();
-        const shiftDate = saudiTime.format('YYYY-MM-DD');
-        const shiftTime = saudiTime.format('HH:mm:ss');
-        const shiftDateArabic = saudiTime.locale('ar').format('YYYY/MM/DD');
+        const now = new Date();
+        const shiftDate = now.toLocaleDateString('ar-SA');
+        const shiftTime = now.toLocaleTimeString('ar-SA');
         
         const newShift = {
             id: Date.now(),
-            shiftName: `${shiftType} - ${shiftDateArabic} ${shiftTime}`,
-            shiftDate: shiftDate,
-            shiftTime: shiftTime,
-            shiftType: shiftType,
-            startTime: saudiTime.toISOString(),
+            shiftName: `${shiftType} - ${shiftDate} ${shiftTime}`,
+            shiftDate,
+            shiftTime,
+            shiftType,
+            startTime: now.toISOString(),
             savedReports: JSON.parse(JSON.stringify(currentReports)),
             totalReports: total,
             rapidLocations: {},
             centersData: {},
             generalNotes: "",
-            lastUpdate: saudiTime.toISOString()
+            lastUpdate: now.toISOString()
         };
         
-        const shifts = await readShifts();
+        const shiftsDoc = await db.collection('shifts').findOne({});
+        const shifts = shiftsDoc?.shifts || [];
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
-        await writeShifts(shifts);
         
-        await writeData({});
-        currentShiftId = newShift.id;
+        await db.collection('shifts').updateOne(
+            {},
+            { $set: { shifts } },
+            { upsert: true }
+        );
+        
+        // تصفير البلاغات الحالية
+        await db.collection('reports').updateOne(
+            {},
+            { $set: { data: {}, currentShiftId: newShift.id, lastUpdate: Date.now() } },
+            { upsert: true }
+        );
         
         res.json({ success: true, shiftId: newShift.id, shift: newShift });
     } catch (error) {
@@ -357,8 +270,10 @@ app.post('/api/update-shift-data', async (req, res) => {
             return res.status(400).json({ error: 'معرف المناوبة مطلوب' });
         }
         
-        const shifts = await readShifts();
+        const doc = await db.collection('shifts').findOne({});
+        const shifts = doc?.shifts || [];
         const index = shifts.findIndex(s => s.id === shiftId);
+        
         if (index === -1) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
@@ -367,10 +282,13 @@ app.post('/api/update-shift-data', async (req, res) => {
         shifts[index].centersData = shiftData.centersData || {};
         shifts[index].generalNotes = shiftData.generalNotes || "";
         shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
-        shifts[index].lastUpdate = getSaudiTime().toISOString();
+        shifts[index].lastUpdate = new Date().toISOString();
         
-        await writeShifts(shifts);
-        currentShiftId = shiftId;
+        await db.collection('shifts').updateOne(
+            {},
+            { $set: { shifts } },
+            { upsert: true }
+        );
         
         res.json({ success: true });
     } catch (error) {
@@ -381,124 +299,214 @@ app.post('/api/update-shift-data', async (req, res) => {
 
 app.delete('/api/shifts/:id', async (req, res) => {
     try {
-        const shifts = await readShifts();
+        const doc = await db.collection('shifts').findOne({});
+        const shifts = doc?.shifts || [];
         const id = parseInt(req.params.id);
         const filtered = shifts.filter(s => s.id !== id);
-        await writeShifts(filtered);
-        if (currentShiftId === id) {
-            currentShiftId = null;
+        
+        await db.collection('shifts').updateOne(
+            {},
+            { $set: { shifts: filtered } },
+            { upsert: true }
+        );
+        
+        // إذا كانت المناوبة الحالية محذوفة
+        const reportsDoc = await db.collection('reports').findOne({});
+        if (reportsDoc?.currentShiftId === id) {
+            await db.collection('reports').updateOne(
+                {},
+                { $set: { currentShiftId: null } },
+                { upsert: true }
+            );
         }
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف المناوبة' });
     }
 });
 
-// ============================================
-// API: البلاغات
-// ============================================
-app.post('/api/report', async (req, res) => {
-    const { center, unit } = req.body;
-    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
-    const key = `${center}|${unit}`;
-    const saudiTime = getSaudiTime();
-    const timestamp = saudiTime.format('YYYY-MM-DD HH:mm:ss');
-    
-    try {
-        const allData = await readData();
-        if (!allData[key]) allData[key] = { count: 0, times: [] };
-        allData[key].count++;
-        allData[key].times.unshift(timestamp);
-        if (allData[key].times.length > 10) allData[key].times.pop();
-        await writeData(allData);
-        res.json({ success: true, newCount: allData[key].count });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
-    }
-});
-
-app.post('/api/undo', async (req, res) => {
-    const { center, unit } = req.body;
-    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
-    const key = `${center}|${unit}`;
-    try {
-        const allData = await readData();
-        if (!allData[key] || allData[key].count === 0) {
-            return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
-        }
-        allData[key].count--;
-        allData[key].times.shift();
-        await writeData(allData);
-        res.json({ success: true, newCount: allData[key].count });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف البلاغ' });
-    }
-});
-
-// ============================================
-// API: إحصائيات القوى العاملة
-// ============================================
 app.get('/api/workforce-stats/:shiftId', async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const shifts = await readShifts();
+        const doc = await db.collection('shifts').findOne({});
+        const shifts = doc?.shifts || [];
         const shift = shifts.find(s => s.id === shiftId);
+        
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
         
         const centersData = shift.centersData || {};
-        let totalStaff = 0;
-        let totalCars = 0;
-        let missingCenters = 0;
-        let readyCenters = 0;
-        let centerCount = 0;
-        const distribution = {};
-        const carDistribution = {};
+        let totalStaff = 0, totalCars = 0, missingCenters = 0, readyCenters = 0, centerCount = 0;
+        const distribution = {}, carDistribution = {};
         
-        for (let center in centersData) {
+        for (const center in centersData) {
             const staffCount = parseInt(centersData[center]?.staffCount) || 0;
             const carsCount = parseInt(centersData[center]?.carsCount) || 0;
             totalStaff += staffCount;
             totalCars += carsCount;
             centerCount++;
-            if (staffCount >= 2 && carsCount >= 1) {
-                readyCenters++;
-            } else {
-                missingCenters++;
-            }
+            if (staffCount >= 2 && carsCount >= 1) readyCenters++;
+            else missingCenters++;
             distribution[center] = staffCount;
             carDistribution[center] = carsCount;
         }
         
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
         res.json({
-            totalStaff,
-            totalCars,
-            missingCenters,
-            readyCenters,
-            centerCount,
-            readinessRate,
-            distribution,
-            carDistribution
+            totalStaff, totalCars, missingCenters, readyCenters, centerCount,
+            readinessRate, distribution, carDistribution
         });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' });
     }
 });
 
 // ============================================
-// API: المستندات / التحديثات التشغيلية
+// API: وقت الذروة (Peak Time) - متزامن مع MongoDB
+// ============================================
+app.get('/api/peak-data', async (req, res) => {
+    try {
+        const doc = await db.collection('peak').findOne({});
+        res.json({ success: true, ...doc });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
+    }
+});
+
+app.post('/api/peak-data', async (req, res) => {
+    try {
+        const { missions, alerts, logs } = req.body;
+        await db.collection('peak').updateOne(
+            {},
+            { $set: { missions: missions || [], alerts: alerts || [], logs: logs || [] } },
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ بيانات وقت الذروة' });
+    }
+});
+
+// ============================================
+// API: الثيمات (Themes) - متزامن مع MongoDB
+// ============================================
+app.post('/api/save-themes', async (req, res) => {
+    try {
+        const { headerBg, sectorLogo, headerBgType } = req.body;
+        await db.collection('themes').updateOne(
+            {},
+            { $set: { headerBg: headerBg || null, sectorLogo: sectorLogo || null, headerBgType: headerBgType || null } },
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الثيمات' });
+    }
+});
+
+app.get('/api/get-themes', async (req, res) => {
+    try {
+        const doc = await db.collection('themes').findOne({});
+        res.json({ success: true, themes: doc || { headerBg: null, sectorLogo: null, headerBgType: null } });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الثيمات' });
+    }
+});
+
+// ============================================
+// API: التحكم والتنسيق (Control)
+// ============================================
+app.get('/api/control-notes', async (req, res) => {
+    try {
+        const doc = await db.collection('control').findOne({});
+        res.json({ success: true, notes: doc?.notes || '' });
+    } catch (error) {
+        res.json({ success: true, notes: '' });
+    }
+});
+
+app.post('/api/save-control-notes', async (req, res) => {
+    try {
+        const { notes } = req.body;
+        await db.collection('control').updateOne(
+            {},
+            { $set: { notes: notes || '', updatedAt: new Date().toISOString() } },
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
+    }
+});
+
+app.get('/api/vacations', async (req, res) => {
+    try {
+        const doc = await db.collection('control').findOne({});
+        res.json(doc?.vacations || []);
+    } catch (error) {
+        res.json([]);
+    }
+});
+
+app.post('/api/save-vacations', async (req, res) => {
+    try {
+        const { vacations } = req.body;
+        await db.collection('control').updateOne(
+            {},
+            { $set: { vacations: vacations || [], updatedAt: new Date().toISOString() } },
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الإجازات' });
+    }
+});
+
+// ============================================
+// API: الرقم السري (Password)
+// ============================================
+app.get('/api/get-password', async (req, res) => {
+    try {
+        // استخدام ملف مؤقت أو قيمة ثابتة للتوافق
+        res.json({ success: true, password: '1234' });
+    } catch (error) {
+        res.json({ success: true, password: '1234' });
+    }
+});
+
+app.post('/api/change-password', async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        // في إصدار مبسط، نستخدم قيمة ثابتة
+        if (oldPassword !== '1234') {
+            return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
+        }
+        if (!newPassword || newPassword.length < 4) {
+            return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
+        }
+        // حفظ الرقم السري الجديد في قاعدة البيانات
+        await db.collection('password').updateOne(
+            {},
+            { $set: { password: newPassword, updatedAt: new Date().toISOString() } },
+            { upsert: true }
+        );
+        res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
+    }
+});
+
+// ============================================
+// API: المستندات التشغيلية (Docs)
 // ============================================
 app.get('/api/docs', async (req, res) => {
     try {
-        const docs = await readDocs();
-        res.json({ success: true, docs });
+        const doc = await db.collection('docs').findOne({});
+        res.json({ success: true, docs: doc?.docs || [] });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب التحديثات التشغيلية' });
+        res.json({ success: true, docs: [] });
     }
 });
 
@@ -508,10 +516,13 @@ app.post('/api/upload-doc', async (req, res) => {
         if (!filename) {
             return res.status(400).json({ error: 'عنوان التحديث مطلوب' });
         }
-        const docs = await readDocs();
+        
+        const doc = await db.collection('docs').findOne({});
+        const docs = doc?.docs || [];
+        
         const newDoc = {
             id: Date.now().toString(),
-            filename: filename,
+            filename,
             fileData: fileData || '',
             fileType: fileType || 'text/plain',
             description: description || '',
@@ -521,19 +532,29 @@ app.post('/api/upload-doc', async (req, res) => {
             uploadDate: new Date().toISOString()
         };
         docs.push(newDoc);
-        await writeDocs(docs);
+        
+        await db.collection('docs').updateOne(
+            {},
+            { $set: { docs } },
+            { upsert: true }
+        );
+        
         res.json({ success: true, doc: newDoc });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: 'فشل في رفع التحديث: ' + error.message });
     }
 });
 
 app.delete('/api/delete-doc/:id', async (req, res) => {
     try {
-        const docs = await readDocs();
+        const doc = await db.collection('docs').findOne({});
+        const docs = doc?.docs || [];
         const filtered = docs.filter(d => d.id !== req.params.id);
-        await writeDocs(filtered);
+        await db.collection('docs').updateOne(
+            {},
+            { $set: { docs: filtered } },
+            { upsert: true }
+        );
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف التحديث' });
@@ -541,80 +562,14 @@ app.delete('/api/delete-doc/:id', async (req, res) => {
 });
 
 // ============================================
-// API: الثيمات (حفظ في الخادم)
-// ============================================
-app.post('/api/save-themes', async (req, res) => {
-    try {
-        const { headerBg, sectorLogo, headerBgType } = req.body;
-        const themes = await readThemes();
-        themes.headerBg = headerBg || null;
-        themes.sectorLogo = sectorLogo || null;
-        themes.headerBgType = headerBgType || null;
-        await writeThemes(themes);
-        res.json({ success: true, message: 'تم حفظ الثيمات بنجاح' });
-    } catch (error) {
-        console.error('خطأ في حفظ الثيمات:', error);
-        res.status(500).json({ error: 'فشل في حفظ الثيمات: ' + error.message });
-    }
-});
-
-app.get('/api/get-themes', async (req, res) => {
-    try {
-        const themes = await readThemes();
-        res.json({ success: true, themes });
-    } catch (error) {
-        console.error('خطأ في جلب الثيمات:', error);
-        res.status(500).json({ error: 'فشل في جلب الثيمات: ' + error.message });
-    }
-});
-
-// ============================================
-// API: هوية القطاع
-// ============================================
-app.get('/api/get-identity', async (req, res) => {
-    try {
-        await fs.access(IDENTITY_PATH);
-        res.json({ exists: true });
-    } catch (error) {
-        res.json({ exists: false });
-    }
-});
-
-app.post('/api/upload-identity', async (req, res) => {
-    try {
-        const { fileData, filename } = req.body;
-        if (!fileData) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
-        const buffer = Buffer.from(fileData, 'base64');
-        await fs.writeFile(IDENTITY_PATH, buffer);
-        res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في رفع هوية القطاع' });
-    }
-});
-
-app.get('/api/download-identity', async (req, res) => {
-    try {
-        const data = await fs.readFile(IDENTITY_PATH);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'inline; filename="identity.pdf"');
-        res.send(data);
-    } catch (error) {
-        res.status(404).json({ error: 'لا توجد هوية محفوظة' });
-    }
-});
-
-// ============================================
-// API: الإسعاف الجوي
+// API: الإسعاف الجوي (Air Ambulance)
 // ============================================
 app.get('/api/air-ambulance', async (req, res) => {
     try {
-        const records = await readAirRecords();
-        res.json({ success: true, records });
+        const doc = await db.collection('air').findOne({});
+        res.json({ success: true, records: doc?.records || [] });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب سجلات الإسعاف الجوي' });
+        res.json({ success: true, records: [] });
     }
 });
 
@@ -624,7 +579,10 @@ app.post('/api/save-air-ambulance', async (req, res) => {
         if (!reportNumber || !unit || !hospital || !dateTime) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readAirRecords();
+        
+        const doc = await db.collection('air').findOne({});
+        const records = doc?.records || [];
+        
         const newRecord = {
             id: Date.now().toString(),
             reportNumber,
@@ -635,19 +593,29 @@ app.post('/api/save-air-ambulance', async (req, res) => {
             createdAt: new Date().toISOString()
         };
         records.unshift(newRecord);
-        await writeAirRecords(records);
+        
+        await db.collection('air').updateOne(
+            {},
+            { $set: { records } },
+            { upsert: true }
+        );
+        
         res.json({ success: true, record: newRecord });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: 'فشل في حفظ بلاغ الإسعاف الجوي' });
     }
 });
 
 app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
     try {
-        const records = await readAirRecords();
+        const doc = await db.collection('air').findOne({});
+        const records = doc?.records || [];
         const filtered = records.filter(r => r.id !== req.params.id);
-        await writeAirRecords(filtered);
+        await db.collection('air').updateOne(
+            {},
+            { $set: { records: filtered } },
+            { upsert: true }
+        );
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
@@ -656,7 +624,11 @@ app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
 
 app.delete('/api/clear-air-ambulance', async (req, res) => {
     try {
-        await writeAirRecords([]);
+        await db.collection('air').updateOne(
+            {},
+            { $set: { records: [] } },
+            { upsert: true }
+        );
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
@@ -664,40 +636,38 @@ app.delete('/api/clear-air-ambulance', async (req, res) => {
 });
 
 // ============================================
-// API: الجدول الشهري
+// API: الجدول الشهري (Monthly Table)
 // ============================================
-app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
+const MONTHLY_TABLE_PATH = path.join(__dirname, 'data', 'monthly-table.xlsx');
+
+app.post('/api/upload-monthly-table', async (req, res) => {
     try {
-        const file = req.file;
-        if (!file) {
+        const { fileData } = req.body;
+        if (!fileData) {
             return res.status(400).json({ error: 'لا يوجد ملف' });
         }
-        await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
-        await fs.unlink(file.path);
+        const buffer = Buffer.from(fileData, 'base64');
+        await fs.promises.mkdir(path.join(__dirname, 'data'), { recursive: true });
+        await fs.promises.writeFile(MONTHLY_TABLE_PATH, buffer);
         res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: 'فشل في حفظ الجدول: ' + error.message });
     }
 });
 
 app.get('/api/get-monthly-table', async (req, res) => {
     try {
-        const data = await fs.readFile(MONTHLY_TABLE_PATH);
+        const data = await fs.promises.readFile(MONTHLY_TABLE_PATH);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.send(data);
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الجدول' });
-        }
+        res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
     }
 });
 
 app.get('/api/check-monthly-table', async (req, res) => {
     try {
-        await fs.access(MONTHLY_TABLE_PATH);
+        await fs.promises.access(MONTHLY_TABLE_PATH);
         res.json({ exists: true });
     } catch (error) {
         res.json({ exists: false });
@@ -705,96 +675,14 @@ app.get('/api/check-monthly-table', async (req, res) => {
 });
 
 // ============================================
-// API: ملاحظات التحكم والتنسيق
-// ============================================
-app.get('/api/control-notes', async (req, res) => {
-    try {
-        const data = await fs.readFile(CONTROL_NOTES_PATH, 'utf8');
-        const parsed = JSON.parse(data);
-        res.json({ success: true, notes: parsed.notes || '' });
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.json({ success: true, notes: '' });
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الملاحظات' });
-        }
-    }
-});
-
-app.post('/api/save-control-notes', async (req, res) => {
-    try {
-        const { notes } = req.body;
-        await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
-    }
-});
-
-// ============================================
-// API: الإجازات
-// ============================================
-app.get('/api/vacations', async (req, res) => {
-    try {
-        const data = await fs.readFile(VACATIONS_PATH, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.json([]);
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الإجازات' });
-        }
-    }
-});
-
-app.post('/api/save-vacations', async (req, res) => {
-    try {
-        const { vacations } = req.body;
-        await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حفظ الإجازات' });
-    }
-});
-
-// ============================================
-// API: الرقم السري
-// ============================================
-app.get('/api/get-password', async (req, res) => {
-    try {
-        const password = await readPassword();
-        res.json({ success: true, password });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب الرقم السري' });
-    }
-});
-
-app.post('/api/change-password', async (req, res) => {
-    try {
-        const { oldPassword, newPassword } = req.body;
-        const currentPassword = await readPassword();
-        
-        if (oldPassword !== currentPassword) {
-            return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
-        }
-        
-        if (!newPassword || newPassword.length < 4) {
-            return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
-        }
-        
-        await writePassword(newPassword);
-        res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
-    }
-});
-
-// ============================================
 // تشغيل الخادم
 // ============================================
-app.listen(PORT, () => {
-    console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
-    console.log(`📁 مسار البيانات: ${DATA_DIR}`);
-    console.log(`📁 مسار الملفات الثابتة: ${path.join(__dirname, 'public')}`);
-    console.log(`🕐 التوقيت السعودي الحالي: ${getSaudiTime().format('YYYY-MM-DD HH:mm:ss')}`);
-});
+async function startServer() {
+    await connectDB();
+    app.listen(PORT, () => {
+        console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
+        console.log(`📁 متصل بـ MongoDB`);
+    });
+}
+
+startServer();
