@@ -622,6 +622,64 @@
             #seniorShiftModal, #seniorShiftModal * { display: none !important; visibility: hidden !important; }
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
         }
+
+        /* ===== إضافات تحسينية للإحصائيات الحية ===== */
+        .live-stats {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .live-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .live-stats-item {
+            text-align: center;
+            padding: 10px;
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+        }
+        .live-stats-item .label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-bottom: 4px;
+        }
+        .live-stats-item .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-700);
+        }
+        .live-stats-item .value.green { color: var(--teal); }
+        .live-stats-item .value.red { color: var(--coral); }
+        .live-distribution {
+            grid-column: 1 / -1;
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+        }
+        .live-distribution .title {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .live-distribution .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .live-distribution .item:last-child { border-bottom: none; }
+        .live-distribution .item .count {
+            font-weight: 600;
+            color: var(--primary-700);
+        }
     </style>
 </head>
 <body>
@@ -1772,6 +1830,7 @@ function updateShiftStatus() {
     } else { status.innerHTML = '📌 لا توجد مناوبة نشطة'; }
 }
 
+// 🔧 تم إصلاح دالة حساب الإحصائيات الحية
 function calculateLiveReportStats() {
     var container = document.getElementById('liveReportStats');
     if (!container) return;
@@ -1782,8 +1841,12 @@ function calculateLiveReportStats() {
         if (report && report.count > 0) {
             total += report.count;
             var parts = key.split('|');
+            // التأكد من وجود اسم الفرقة بشكل صحيح
             var unit = parts.length > 1 ? parts[1] : key;
-            unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            // 🔧 إصلاح: التأكد من أن اسم الفرقة ليس فارغاً
+            if (unit && unit.trim() !== '') {
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
         }
     }
     if (total === 0) { container.style.display = 'none'; return; }
@@ -2503,6 +2566,7 @@ async function viewShiftReports() {
             renderData();
             updateTotal();
             loadShiftToForm(result.shift);
+            // 🔧 تمرير reports إلى displayShiftReportStats لعرض الإحصائيات بشكل صحيح
             displayShiftReportStats(result.reports);
             calculateLiveReportStats();
             var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
@@ -2623,30 +2687,62 @@ function clearShiftForm() {
     document.getElementById('workforceStats').style.display = 'none';
     document.getElementById('shiftReportStats').style.display = 'none';
 }
+
+// 🔧 تم إصلاح دالة عرض إحصائيات البلاغات بشكل كامل
 function displayShiftReportStats(reportsData) {
     var container = document.getElementById('shiftReportStats');
     var listContainer = document.getElementById('unitReportList');
-    if (!reportsData || Object.keys(reportsData).length === 0) { container.style.display = 'none'; return; }
+    if (!container || !listContainer) return;
+    
+    // التأكد من وجود بيانات
+    if (!reportsData || typeof reportsData !== 'object' || Object.keys(reportsData).length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
     var total = 0;
     var unitStats = {};
+    
+    // معالجة البيانات بشكل صحيح
     for (var key in reportsData) {
         var report = reportsData[key];
-        if (report && report.count > 0) {
+        // التأكد من أن التقرير يحتوي على count و أنه أكبر من 0
+        if (report && typeof report === 'object' && report.count > 0) {
             total += report.count;
             var parts = key.split('|');
+            // استخراج اسم الفرقة بشكل صحيح
             var unit = parts.length > 1 ? parts[1] : key;
-            unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            if (unit && unit.trim() !== '') {
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
         }
     }
-    if (total === 0) { container.style.display = 'none'; return; }
+    
+    // إذا لم يكن هناك بلاغات، إخفاء القسم
+    if (total === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    // عرض القسم
     container.style.display = 'block';
     document.getElementById('shiftTotalReports').innerText = total;
+    
+    // ترتيب الفرق تنازلياً حسب عدد البلاغات
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
     document.getElementById('topUnit').innerText = topUnit;
     document.getElementById('topUnitCount').innerText = topCount;
+    
+    // عرض توزيع البلاغات
     listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
+    
+    if (sortedUnits.length === 0) {
+        listContainer.innerHTML += '<p style="text-align:center; color:var(--gray-400); font-size:0.7rem;">لا توجد بيانات كافية</p>';
+        return;
+    }
+    
     sortedUnits.forEach(function(item) {
         var percentage = Math.round((item[1] / total) * 100);
         var div = document.createElement('div');
@@ -2655,6 +2751,7 @@ function displayShiftReportStats(reportsData) {
         listContainer.appendChild(div);
     });
 }
+
 async function loadWorkforceStats(shiftId) {
     try {
         var response = await fetch('/api/workforce-stats/' + shiftId);
