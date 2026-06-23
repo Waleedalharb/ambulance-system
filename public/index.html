@@ -22,6 +22,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- Leaflet.js للخريطة -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
         :root {
             --primary-900: #0B1E33;
@@ -62,6 +66,32 @@
 
         .container { max-width: 1400px; margin: auto; }
 
+        /* ===== أنماط الخريطة ===== */
+        #peakMap {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            border-radius: var(--radius-md);
+            z-index: 1;
+        }
+        #peakMapContainer {
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            min-height: 400px;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+            background: #e5e5e5;
+        }
+        .leaflet-control-attribution {
+            font-size: 8px !important;
+        }
+        .leaflet-control-zoom {
+            z-index: 10 !important;
+        }
+
+        /* باقي الأنماط (نفس الكود السابق) */
         .icon-primary { color: var(--primary-700); }
         .icon-teal { color: var(--teal); }
         .icon-coral { color: var(--coral); }
@@ -103,35 +133,25 @@
             transition: all 0.3s ease;
         }
 
-        /* ===== وضع الثيم (إخفاء النصوص والشعار) ===== */
         .header.theme-mode .header-brand .text h1,
         .header.theme-mode .header-brand .text .sub,
         .header.theme-mode .header-brand .icon {
             display: none !important;
         }
-
-        .header.theme-mode .header-date {
-            display: none !important;
-        }
-
+        .header.theme-mode .header-date { display: none !important; }
         .header.theme-mode {
             min-height: 120px !important;
             padding: 10px !important;
             justify-content: center !important;
             align-items: center !important;
         }
-
-        .header.theme-mode .header-bg-video {
-            opacity: 1 !important;
-        }
-
+        .header.theme-mode .header-bg-video { opacity: 1 !important; }
         .header.theme-mode.has-bg-image {
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
         }
 
-        /* ===== الخلفيات ===== */
         .header-bg-video {
             position: absolute;
             top: 0;
@@ -142,19 +162,16 @@
             z-index: 0;
             opacity: 0.4;
         }
-
         .header.has-bg-image {
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
         }
-
         .header .header-brand,
         .header .header-date {
             position: relative;
             z-index: 2;
         }
-
         .header-brand { display: flex; align-items: center; gap: 14px; }
         .header-brand .icon {
             width: 52px; height: 52px;
@@ -226,57 +243,15 @@
         .btn-whatsapp:hover { background: #1DA851; border-color: #1DA851; }
         .btn-gold { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
         .btn-gold:hover { background: #D4B03A; border-color: #D4B03A; }
-        .btn-theme { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
-        .btn-theme.active { background: var(--teal); color: white; border-color: var(--teal); }
+        .btn-peak { background: var(--coral); color: white; border-color: var(--coral); }
+        .btn-peak:hover { background: #D45A4A; border-color: #D45A4A; }
 
         .viewing-badge { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 4px 12px; font-size: 0.7rem; border-radius: 30px; display: inline-block; margin-right: 10px; }
         .return-btn { background: white; border: 1px solid var(--gray-200); padding: 4px 12px; font-size: 0.7rem; border-radius: 30px; cursor: pointer; }
 
         .update-status { text-align: left; font-size: 0.65rem; color: var(--teal); margin-top: 5px; }
 
-        /* باقي الأنماط */
-        .live-stats {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 14px 20px;
-            margin-bottom: 20px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
-        }
-        .live-stats-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center; }
-        .live-stats-item { display: flex; flex-direction: column; min-width: 100px; }
-        .live-stats-item .label { font-size: 0.65rem; color: var(--gray-600); font-weight: 500; }
-        .live-stats-item .value { font-size: 1.6rem; font-weight: 700; color: var(--primary-700); }
-        .live-stats-item .value.green { color: var(--teal); }
-        .live-stats-item .value.red { color: var(--coral); }
-        .live-distribution { font-size: 0.7rem; max-height: 60px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 5px 10px; background: var(--gray-50); flex: 1; min-width: 150px; }
-        .live-distribution .title { color: var(--gray-600); font-size: 0.6rem; }
-        .live-distribution .item { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px dotted var(--gray-200); }
-        .live-distribution .item .count { font-weight: 600; color: var(--primary-700); }
-
-        .point-card {
-            background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 14px 16px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--gray-100);
-        }
-        .point-title { font-size: 1rem; font-weight: 700; color: var(--primary-700); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--primary-100); display: flex; align-items: center; gap: 8px; }
-        .point-title i { color: var(--primary-500); }
-        .units-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-        .unit-card { background: var(--gray-50); border-radius: var(--radius-sm); padding: 12px 10px; text-align: center; border: 1px solid var(--gray-100); transition: all 0.2s; }
-        .unit-card:hover { border-color: var(--primary-500); box-shadow: var(--shadow-sm); }
-        .unit-card .name { font-weight: 600; font-size: 0.85rem; color: var(--gray-800); }
-        .unit-card .count-number { font-size: 2rem; font-weight: 700; color: var(--primary-700); margin: 4px 0; }
-        .unit-card .count-number.zero { color: var(--gray-400); }
-        .buttons-row { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin: 6px 0; }
-        .buttons-row .btn { padding: 3px 10px; font-size: 0.6rem; border-radius: 20px; }
-        .buttons-row .btn-undo { border-color: var(--coral); color: var(--coral); }
-        .buttons-row .btn-undo:hover { background: var(--coral-light); }
-        .show-times-btn { background: white; border: 1px solid var(--gray-200); padding: 4px; width: 100%; font-size: 0.6rem; border-radius: var(--radius-sm); cursor: pointer; margin-top: 4px; color: var(--gray-600); transition: all 0.2s; }
-        .show-times-btn:hover { background: var(--gray-50); }
-
+        /* ===== أنماط النوافذ المنبثقة ===== */
         .modal {
             display: none;
             position: fixed;
@@ -432,17 +407,14 @@
         /* ===== نافذة إدارة الثيمات ===== */
         #themeModal .modal-content { max-width: 600px; }
 
-        /* ===== زر وضع الثيم ===== */
-        #themeModeToggle.btn-theme.active {
-            background: var(--teal) !important;
-            color: white !important;
-            border-color: var(--teal) !important;
-        }
+        /* ===== نافذة وقت الذروة ===== */
+        #peakTimeModal .modal-content { max-width: 800px; }
+        #peakTimeLog { max-height: 150px; overflow-y: auto; display: grid; gap: 6px; }
+        #peakAlerts { display: grid; gap: 6px; }
 
         /* ===== تحسينات الجوال ===== */
         @media (max-width: 650px) {
             body { padding: 8px; }
-            
             .header {
                 min-height: 100px !important;
                 padding: 12px 16px !important;
@@ -451,71 +423,17 @@
                 text-align: center !important;
                 display: flex !important;
             }
-
-            .header-bg-video {
-                opacity: 0.3 !important;
-                display: block !important;
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: cover !important;
-            }
-            
-            .header.has-bg-image {
-                background-size: cover !important;
-                background-position: center !important;
-                background-repeat: no-repeat !important;
-                display: block !important;
-            }
-
-            .header .header-brand,
-            .header .header-date {
-                position: relative !important;
-                z-index: 2 !important;
-            }
-
+            .header-bg-video { opacity: 0.3 !important; display: block !important; width: 100% !important; height: 100% !important; object-fit: cover !important; }
+            .header.has-bg-image { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; display: block !important; }
+            .header .header-brand, .header .header-date { position: relative !important; z-index: 2 !important; }
             .header-brand { justify-content: center !important; flex-wrap: wrap !important; }
-            .header-brand .icon {
-                width: 40px !important;
-                height: 40px !important;
-                background: rgba(255,255,255,0.1) !important;
-                border-radius: 8px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
+            .header-brand .icon { width: 40px !important; height: 40px !important; background: rgba(255,255,255,0.1) !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
             .header-brand .icon svg { width: 32px !important; height: 32px !important; }
             .header-brand .icon img { width: 32px !important; height: 32px !important; object-fit: contain !important; display: block !important; }
-
-            .header-brand .text h1 {
-                font-size: 1rem !important;
-                color: white !important;
-                text-shadow: 0 2px 10px rgba(0,0,0,0.8) !important;
-            }
-            .header-brand .text .sub {
-                font-size: 0.55rem !important;
-                color: rgba(255,255,255,0.8) !important;
-                text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important;
-                flex-wrap: wrap !important;
-                justify-content: center !important;
-            }
-
-            .header-date {
-                background: rgba(0,0,0,0.3) !important;
-                backdrop-filter: blur(4px) !important;
-                font-size: 0.65rem !important;
-                padding: 4px 12px !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                gap: 4px !important;
-                color: white !important;
-                border: 1px solid rgba(255,255,255,0.1) !important;
-                border-radius: 30px !important;
-            }
-
-            .header.theme-mode {
-                min-height: 80px !important;
-                padding: 5px !important;
-            }
+            .header-brand .text h1 { font-size: 1rem !important; color: white !important; text-shadow: 0 2px 10px rgba(0,0,0,0.8) !important; }
+            .header-brand .text .sub { font-size: 0.55rem !important; color: rgba(255,255,255,0.8) !important; text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important; flex-wrap: wrap !important; justify-content: center !important; }
+            .header-date { background: rgba(0,0,0,0.3) !important; backdrop-filter: blur(4px) !important; font-size: 0.65rem !important; padding: 4px 12px !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 30px !important; }
+            .header.theme-mode { min-height: 80px !important; padding: 5px !important; }
 
             .info-bar { flex-direction: column; align-items: stretch; }
             .toolbar { justify-content: center; }
@@ -532,6 +450,10 @@
             #docsPage .docs-header .header-content { flex-direction: column; align-items: stretch; text-align: center; }
             #docsPage .docs-header .brand { justify-content: center; }
             #docsPage .docs-header .header-actions { justify-content: center; }
+            #peakMapContainer { height: 40vh !important; min-height: 250px !important; }
+            #peakTimeModal .modal-content { padding: 12px; }
+            #peakTimeModal .modal-content .grid-2 { grid-template-columns: 1fr !important; }
+            #peakTimeModal .modal-content .grid-3 { grid-template-columns: 1fr !important; }
         }
 
         /* ===== تحسينات الطباعة ===== */
@@ -551,6 +473,14 @@
             #seniorShiftModal, #seniorShiftModal * { display: none !important; visibility: hidden !important; }
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
         }
+
+        /* ===== كلاسات مساعدة للشبكات ===== */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .mt-2 { margin-top: 8px; }
+        .mb-2 { margin-bottom: 8px; }
+        .gap-2 { gap: 8px; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     </style>
 </head>
 <body>
@@ -603,9 +533,7 @@
             <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
             <button id="themeBtn" class="btn btn-gold"><i class="fas fa-palette"></i> الثيمات</button>
-            <button id="themeModeToggle" class="btn btn-theme" onclick="toggleThemeMode()">
-                <i class="fas fa-expand"></i> وضع الثيم
-            </button>
+            <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> وقت الذروة</button>
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
@@ -624,139 +552,162 @@
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
-<!-- ===== نافذة إدارة الثيمات ===== -->
-<div id="themeModal" class="modal">
+<!-- ============================================ -->
+<!-- نافذة وقت الذروة -->
+<!-- ============================================ -->
+<div id="peakTimeModal" class="modal">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon gold"><i class="fas fa-palette"></i></span>
-                <h2 style="margin:0; font-size:1.2rem;">إدارة الثيمات</h2>
+                <span class="card-icon coral" style="width:44px; height:44px; font-size:1.4rem;">
+                    <i class="fas fa-clock"></i>
+                </span>
+                <div>
+                    <h2 style="margin:0; font-size:1.2rem;">🚨 نظام وقت الذروة</h2>
+                    <span style="font-size:0.7rem; color:var(--gray-400);">إدارة تمركز الفرق في أوقات الذروة</span>
+                </div>
             </div>
-            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+            <button onclick="document.getElementById('peakTimeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
         </div>
-        
-        <!-- رفع خلفية الشريط العلوي -->
-        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-image"></i> خلفية الشريط العلوي</h4>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <input type="file" id="headerBgFile" accept=".gif,.png,.jpg,.jpeg,.mp4,.webm" style="display:none;">
-                <button onclick="document.getElementById('headerBgFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
-                    <i class="fas fa-upload"></i> اختيار صورة/فيديو
-                </button>
-                <button onclick="removeHeaderBg()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
-                    <i class="fas fa-times"></i> إزالة الخلفية
-                </button>
-                <button onclick="refreshThemes()" class="btn btn-teal" style="padding:6px 16px; font-size:0.8rem;">
-                    <i class="fas fa-sync"></i> تحديث
-                </button>
-            </div>
-            <div id="headerBgPreview" style="margin-top:8px; display:none; border-radius:var(--radius-sm); overflow:hidden; max-height:100px;">
-                <img id="headerBgPreviewImg" src="" alt="معاينة الخلفية" style="width:100%; object-fit:cover; max-height:100px;">
-                <video id="headerBgPreviewVideo" src="" style="width:100%; object-fit:cover; max-height:100px; display:none;" autoplay loop muted></video>
+
+        <!-- ===== سجل العمليات والتنبيهات ===== -->
+        <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-list-ul"></i> سجل العمليات والتنبيهات</h4>
+            <div id="peakTimeLog" style="max-height:150px; overflow-y:auto; display:grid; gap:6px;">
+                <p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>
             </div>
         </div>
-        
-        <!-- رفع شعار القطاع -->
-        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-building"></i> شعار القطاع</h4>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <input type="file" id="sectorLogoFile" accept=".png,.jpg,.jpeg,.svg" style="display:none;">
-                <button onclick="document.getElementById('sectorLogoFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
-                    <i class="fas fa-upload"></i> اختيار شعار
-                </button>
-                <button onclick="removeSectorLogo()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
-                    <i class="fas fa-times"></i> إزالة الشعار
-                </button>
+
+        <!-- ===== نموذج تحديد التمركز ===== -->
+        <div style="background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-plus-circle"></i> تحديد تمركز جديد</h4>
+            
+            <div class="grid-2">
+                <div>
+                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">📍 الموقع</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="peakLocation" placeholder="اختر من الخريطة" style="flex:1; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                        <button onclick="openPeakMap()" class="btn btn-primary" style="padding:4px 12px; font-size:0.7rem;">
+                            <i class="fas fa-map-marked-alt"></i> خريطة
+                        </button>
+                    </div>
+                    <input type="hidden" id="peakLat">
+                    <input type="hidden" id="peakLng">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">🚑 الفرقة</label>
+                    <select id="peakUnit" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                        <option value="">-- اختر الفرقة --</option>
+                        <option value="سريع 1">سريع 1</option>
+                        <option value="سريع 2">سريع 2</option>
+                        <option value="سريع 3">سريع 3</option>
+                        <option value="سريع 4">سريع 4</option>
+                        <option value="جنوب 1">جنوب 1</option>
+                        <option value="جنوب 2">جنوب 2</option>
+                        <option value="جنوب 3">جنوب 3</option>
+                        <option value="جنوب 4">جنوب 4</option>
+                        <option value="جنوب 5">جنوب 5</option>
+                        <option value="جنوب 6">جنوب 6</option>
+                        <option value="جنوب 7">جنوب 7</option>
+                        <option value="جنوب 8">جنوب 8</option>
+                        <option value="جنوب 9">جنوب 9</option>
+                        <option value="جنوب 10">جنوب 10</option>
+                        <option value="جنوب 11">جنوب 11</option>
+                        <option value="جنوب 12">جنوب 12</option>
+                        <option value="جنوب 13">جنوب 13</option>
+                        <option value="جنوب 14">جنوب 14</option>
+                        <option value="جنوب 15">جنوب 15</option>
+                        <option value="جنوب 16">جنوب 16</option>
+                        <option value="جنوب 17">جنوب 17</option>
+                        <option value="جنوب 18">جنوب 18</option>
+                        <option value="جنوب 19">جنوب 19</option>
+                    </select>
+                </div>
             </div>
-            <div id="sectorLogoPreview" style="margin-top:8px; display:none;">
-                <img id="sectorLogoPreviewImg" src="" alt="معاينة الشعار" style="max-width:100px; max-height:60px; border-radius:var(--radius-sm); border:1px solid var(--gray-200);">
+            
+            <div class="grid-3 mt-2">
+                <div>
+                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">⏰ بداية التمركز</label>
+                    <input type="datetime-local" id="peakStartTime" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">⏰ نهاية التمركز</label>
+                    <input type="datetime-local" id="peakEndTime" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; color:var(--gray-600); display:block;">🔴 الأولوية</label>
+                    <select id="peakPriority" style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem;">
+                        <option value="عالية">🔴 عالية</option>
+                        <option value="متوسطة">🟡 متوسطة</option>
+                        <option value="منخفضة">🟢 منخفضة</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mt-2">
+                <label style="font-size:0.75rem; color:var(--gray-600); display:block;">📝 ملاحظات</label>
+                <textarea id="peakNotes" rows="2" placeholder="أي ملاحظات إضافية..." style="width:100%; padding:6px 10px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.85rem; resize:vertical;"></textarea>
+            </div>
+            
+            <div class="flex-wrap mt-2">
+                <button onclick="savePeakMission()" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
+                <button onclick="openPeakMap()" class="btn btn-teal"><i class="fas fa-map-marked-alt"></i> فتح الخريطة</button>
+                <button onclick="sendPeakAlert()" class="btn btn-coral"><i class="fas fa-bell"></i> إرسال تنبيه</button>
+                <button onclick="clearPeakForm()" class="btn"><i class="fas fa-eraser"></i> مسح</button>
             </div>
         </div>
-        
+
+        <!-- ===== التنبيهات النشطة ===== -->
+        <div style="background:var(--coral-light); border-radius:var(--radius-md); padding:12px; border-right:4px solid var(--coral);">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem; color:var(--coral);"><i class="fas fa-bell"></i> التنبيهات النشطة</h4>
+            <div id="peakAlerts" style="display:grid; gap:6px;">
+                <p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>
+            </div>
+        </div>
+
         <div class="modal-buttons">
-            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button onclick="document.getElementById('peakTimeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
 </div>
 
 <!-- ============================================ -->
-<!-- باقي النوافذ -->
+<!-- نافذة الخريطة -->
 <!-- ============================================ -->
-
-<!-- نافذة رفع تحديث جديد -->
-<div id="uploadDocsModal" class="modal">
-    <div class="modal-content" style="max-width:550px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+<div id="peakMapModal" class="modal">
+    <div class="modal-content" style="max-width:95%; max-height:95vh; padding:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon primary"><i class="fas fa-upload"></i></span>
-                <h2 style="margin:0; font-size:1.2rem;">رفع تحديث جديد</h2>
+                <span class="card-icon teal" style="width:36px; height:36px; font-size:1.2rem;">
+                    <i class="fas fa-map-marked-alt"></i>
+                </span>
+                <h3 style="margin:0; font-size:1rem;">🗺️ تحديد موقع التمركز</h3>
             </div>
-            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+            <button onclick="closePeakMap()" class="btn"><i class="fas fa-times"></i></button>
         </div>
-        <div class="form-row">
-            <label><i class="fas fa-tag icon-primary icon-sm"></i> تصنيف التحديث:</label>
-            <select id="docCategory">
-                <option value="تعليمات">📋 تعليمات</option>
-                <option value="إشعار">🔔 إشعار</option>
-                <option value="تقرير">📊 تقرير</option>
-                <option value="جدول">📅 جدول</option>
-                <option value="تنبيه">🚨 تنبيه</option>
-                <option value="أخرى">📎 أخرى</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-star icon-gold icon-sm"></i> الأولوية:</label>
-            <select id="docPriority">
-                <option value="normal">🟢 عادي</option>
-                <option value="important">🟡 مهم</option>
-                <option value="urgent">🔴 عاجل</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-heading icon-primary icon-sm"></i> عنوان التحديث:</label>
-            <input type="text" id="docTitle" placeholder="أدخل عنواناً مختصراً للتحديث">
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-align-left icon-gray icon-sm"></i> الوصف:</label>
-            <textarea id="docDescription" rows="3" placeholder="اكتب تفاصيل التحديث..."></textarea>
-        </div>
-        <div class="form-row">
-            <label><i class="fas fa-paperclip icon-teal icon-sm"></i> المرفقات:</label>
-            <div style="border:2px dashed var(--gray-200); border-radius:var(--radius-sm); padding:20px; text-align:center; cursor:pointer;" onclick="document.getElementById('docFileUpload').click()">
-                <i class="fas fa-cloud-upload-alt" style="font-size:2rem; color:var(--gray-400);"></i>
-                <p style="margin:5px 0; color:var(--gray-600); font-size:0.85rem;">اسحب الملفات هنا أو اضغط للاختيار</p>
-                <span style="font-size:0.65rem; color:var(--gray-400);">يدعم: PDF, Word, Excel, صور, نصوص</span>
-                <input type="file" id="docFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" style="display:none;" onchange="handleFileSelect(event)">
+        
+        <!-- الخريطة -->
+        <div id="peakMapContainer">
+            <div id="peakMap" style="width:100%; height:100%; min-height:400px;"></div>
+            <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:white; padding:6px 16px; border-radius:30px; font-size:0.7rem; z-index:1000;">
+                <i class="fas fa-hand-pointer"></i> اضغط على الخريطة لتحديد الموقع
             </div>
-            <div id="selectedFilesList" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
         </div>
-        <div class="modal-buttons">
-            <button id="saveDocBtn" class="btn btn-primary"><i class="fas fa-save"></i> نشر التحديث</button>
-            <button onclick="document.getElementById('uploadDocsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إلغاء</button>
+        
+        <!-- الموقع المحدد -->
+        <div style="display:flex; gap:10px; margin-top:8px; align-items:center; flex-wrap:wrap; background:var(--gray-50); padding:8px 12px; border-radius:var(--radius-sm);">
+            <span style="font-weight:600; font-size:0.8rem;">📍 الموقع المحدد:</span>
+            <span id="peakSelectedLocation" style="font-size:0.8rem; color:var(--gray-600);">لم يتم تحديد موقع</span>
+            <button onclick="confirmPeakLocation()" class="btn btn-primary" style="padding:4px 16px; font-size:0.75rem;">
+                <i class="fas fa-check"></i> تأكيد الموقع
+            </button>
         </div>
     </div>
 </div>
 
-<!-- نافذة معاينة الملف -->
-<div id="docPreviewModal" class="modal">
-    <div class="modal-content" style="max-width:750px; max-height:85vh;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span class="card-icon primary" style="width:40px; height:40px; font-size:1.2rem;"><i class="fas fa-file-alt"></i></span>
-                <h3 style="margin:0; font-size:1rem;" id="docPreviewTitle">معاينة الملف</h3>
-            </div>
-            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i></button>
-        </div>
-        <div id="docPreviewContent" style="background:var(--gray-50); border-radius:var(--radius-md); padding:16px; max-height:55vh; overflow-y:auto; border:1px solid var(--gray-200);">
-            <p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>
-        </div>
-        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-            <button onclick="copyDocPreview()" class="btn btn-teal" id="docPreviewCopyBtn" style="display:none;"><i class="fas fa-copy"></i> نسخ النص</button>
-            <button onclick="downloadDocFromPreview()" class="btn btn-primary"><i class="fas fa-download"></i> تحميل الملف</button>
-            <button onclick="closeDocPreview()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
+<!-- ============================================ -->
+<!-- باقي النوافذ (تكميل النوبة، الإسعاف الجوي، الخ) -->
+<!-- ============================================ -->
 
 <!-- نافذة تكميل النوبة -->
 <div id="shiftModal" class="modal">
@@ -1080,289 +1031,301 @@ function loadBrandLogo() {
 }
 
 // ============================================
-// نظام الثيمات
+// نظام وقت الذروة
 // ============================================
 
-// ===== تطبيق خلفية الشريط =====
-function applyHeaderBackground(dataUrl, fileType) {
-    const header = document.getElementById('mainHeader');
-    if (!header) return;
+// ===== المتغيرات =====
+let peakMissions = JSON.parse(localStorage.getItem('peakMissions') || '[]');
+let peakAlertsList = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+let selectedPeakLocation = null;
+let peakMap = null;
+let peakMapInitialized = false;
+
+// ===== فتح نافذة وقت الذروة =====
+document.getElementById('peakTimeBtn')?.addEventListener('click', function() {
+    document.getElementById('peakTimeModal').style.display = 'flex';
+    loadPeakLog();
+    loadPeakAlerts();
+    const now = new Date();
+    const localDateTime = now.toISOString().slice(0, 16);
+    document.getElementById('peakStartTime').value = localDateTime;
+});
+
+// ===== حفظ مهمة تمركز =====
+function savePeakMission() {
+    const location = document.getElementById('peakLocation').value.trim();
+    const lat = document.getElementById('peakLat').value;
+    const lng = document.getElementById('peakLng').value;
+    const unit = document.getElementById('peakUnit').value;
+    const startTime = document.getElementById('peakStartTime').value;
+    const endTime = document.getElementById('peakEndTime').value;
+    const priority = document.getElementById('peakPriority').value;
+    const notes = document.getElementById('peakNotes').value.trim();
     
-    header.style.backgroundImage = 'none';
-    header.style.backgroundColor = '#0B1E33';
-    header.classList.remove('has-bg-image');
+    if (!location || !unit || !startTime || !endTime) {
+        alert('⚠️ الرجاء ملء جميع الحقول المطلوبة');
+        return;
+    }
     
-    const oldVideo = header.querySelector('.header-bg-video');
-    if (oldVideo) oldVideo.remove();
+    const mission = {
+        id: Date.now(),
+        location: location,
+        lat: lat || null,
+        lng: lng || null,
+        unit: unit,
+        startTime: startTime,
+        endTime: endTime,
+        priority: priority,
+        notes: notes || '',
+        status: 'قيد الانتظار',
+        createdAt: new Date().toISOString()
+    };
     
-    if (fileType && fileType.startsWith('video/')) {
-        const video = document.createElement('video');
-        video.className = 'header-bg-video';
-        video.src = dataUrl;
-        video.autoplay = true;
-        video.loop = true;
-        video.muted = true;
-        video.playsInline = true;
-        video.style.cssText = `
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover; z-index: 0;
-            opacity: 0.4;
+    peakMissions.unshift(mission);
+    localStorage.setItem('peakMissions', JSON.stringify(peakMissions));
+    
+    addPeakLog('🟡', 'مهمة جديدة', `${unit} في ${location}`, priority);
+    sendPeakAlertToControl(mission);
+    
+    alert('✅ تم حفظ مهمة التمركز بنجاح');
+    clearPeakForm();
+    loadPeakLog();
+    loadPeakAlerts();
+}
+
+// ===== إضافة سجل =====
+function addPeakLog(icon, action, details, priority) {
+    const log = {
+        id: Date.now(),
+        icon: icon,
+        action: action,
+        details: details,
+        priority: priority || 'عادي',
+        time: new Date().toLocaleTimeString('ar-SA'),
+        date: new Date().toISOString()
+    };
+    const logs = JSON.parse(localStorage.getItem('peakLogs') || '[]');
+    logs.unshift(log);
+    if (logs.length > 50) logs.pop();
+    localStorage.setItem('peakLogs', JSON.stringify(logs));
+    loadPeakLog();
+}
+
+// ===== تحميل سجل العمليات =====
+function loadPeakLog() {
+    const container = document.getElementById('peakTimeLog');
+    const logs = JSON.parse(localStorage.getItem('peakLogs') || '[]');
+    
+    if (logs.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>';
+        return;
+    }
+    
+    let html = '';
+    logs.forEach(log => {
+        const priorityColor = log.priority === 'عالية' ? 'var(--coral)' : 
+                             log.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += `
+            <div style="display:flex; align-items:center; gap:8px; background:white; padding:6px 10px; border-radius:var(--radius-sm); border-right:3px solid ${priorityColor}; font-size:0.8rem;">
+                <span>${log.icon}</span>
+                <span style="font-weight:600; color:var(--gray-800);">${log.time}</span>
+                <span style="color:var(--gray-600);">${log.action}</span>
+                <span style="color:var(--gray-400);">${log.details}</span>
+            </div>
         `;
-        header.prepend(video);
-        video.load();
-        video.play().catch(() => {});
-        header.style.background = 'none';
-    } else if (dataUrl) {
-        header.style.backgroundImage = `url(${dataUrl})`;
-        header.style.backgroundSize = 'cover';
-        header.style.backgroundPosition = 'center';
-        header.style.backgroundRepeat = 'no-repeat';
-        header.classList.add('has-bg-image');
+    });
+    container.innerHTML = html;
+}
+
+// ===== تحميل التنبيهات النشطة =====
+function loadPeakAlerts() {
+    const container = document.getElementById('peakAlerts');
+    const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+    const activeAlerts = alerts.filter(a => a.status === 'نشط');
+    
+    if (activeAlerts.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>';
+        return;
     }
     
-    const brand = header.querySelector('.header-brand');
-    const date = header.querySelector('.header-date');
-    if (brand) { brand.style.position = 'relative'; brand.style.zIndex = '2'; }
-    if (date) { date.style.position = 'relative'; date.style.zIndex = '2'; }
+    let html = '';
+    activeAlerts.forEach(alert => {
+        const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : 
+                             alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:var(--radius-sm); border-right:3px solid ${priorityColor};">
+                <div>
+                    <span style="font-weight:600; font-size:0.8rem;">🔔 ${alert.title}</span>
+                    <span style="font-size:0.7rem; color:var(--gray-600); display:block;">${alert.details}</span>
+                </div>
+                <button onclick="resolvePeakAlert('${alert.id}')" class="btn btn-teal" style="padding:2px 12px; font-size:0.6rem;">
+                    <i class="fas fa-check"></i> تم التنفيذ
+                </button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
 }
 
-// ===== رفع خلفية الشريط =====
-document.getElementById('headerBgFile')?.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+// ===== إرسال تنبيه للتحكم العملياتي =====
+function sendPeakAlertToControl(mission) {
+    const alert = {
+        id: Date.now().toString(),
+        title: `تمركز مطلوب لـ ${mission.unit}`,
+        details: `المطلوب تمركز ${mission.unit} في ${mission.location} (${mission.startTime} - ${mission.endTime})`,
+        priority: mission.priority,
+        unit: mission.unit,
+        location: mission.location,
+        missionId: mission.id,
+        status: 'نشط',
+        createdAt: new Date().toISOString()
+    };
     
-    const reader = new FileReader();
-    reader.onload = async function(event) {
-        const dataUrl = event.target.result;
-        const fileType = file.type;
-        
-        applyHeaderBackground(dataUrl, fileType);
-        
-        // حفظ في localStorage مؤقتاً
-        localStorage.setItem('headerBackground', dataUrl);
-        localStorage.setItem('headerBgType', fileType);
-        
-        // حفظ في الخادم
-        await saveThemesToServer(dataUrl, null, fileType);
-        
-        const previewDiv = document.getElementById('headerBgPreview');
-        previewDiv.style.display = 'block';
-        if (fileType.startsWith('video/')) {
-            const video = document.getElementById('headerBgPreviewVideo');
-            const img = document.getElementById('headerBgPreviewImg');
-            img.style.display = 'none';
-            video.style.display = 'block';
-            video.src = dataUrl;
-            video.load();
-        } else {
-            const img = document.getElementById('headerBgPreviewImg');
-            const video = document.getElementById('headerBgPreviewVideo');
-            video.style.display = 'none';
-            img.style.display = 'block';
-            img.src = dataUrl;
-        }
-        alert('✅ تم رفع خلفية الشريط العلوي بنجاح!');
-    };
-    reader.readAsDataURL(file);
-});
-
-// ===== إزالة خلفية الشريط =====
-function removeHeaderBg() {
-    localStorage.removeItem('headerBackground');
-    localStorage.removeItem('headerBgType');
-    const header = document.getElementById('mainHeader');
-    if (header) {
-        header.style.backgroundImage = '';
-        header.style.background = '';
-        header.style.backgroundColor = '';
-        header.classList.remove('has-bg-image');
-        const video = header.querySelector('.header-bg-video');
-        if (video) video.remove();
-    }
-    document.getElementById('headerBgPreview').style.display = 'none';
-    saveThemesToServer(null, null, null);
-    alert('✅ تم إزالة خلفية الشريط');
+    const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+    alerts.unshift(alert);
+    localStorage.setItem('peakAlerts', JSON.stringify(alerts));
+    
+    addPeakLog('🔔', 'تنبيه', `${mission.unit} في ${mission.location}`, mission.priority);
+    loadPeakAlerts();
 }
 
-// ===== تطبيق شعار القطاع =====
-function applySectorLogo(dataUrl) {
-    const logoImg = document.getElementById('sectorLogoImage');
-    if (!logoImg) return;
-    if (dataUrl) {
-        logoImg.src = dataUrl;
-        logoImg.style.display = 'block';
-        logoImg.style.width = '100%';
-        logoImg.style.height = '100%';
-        logoImg.style.objectFit = 'contain';
-        logoImg.style.borderRadius = '4px';
-        const svg = document.getElementById('defaultLogo');
-        if (svg) svg.style.display = 'none';
-        const defaultImg = document.getElementById('brandLogoImage');
-        if (defaultImg) defaultImg.style.display = 'none';
-    } else {
-        logoImg.style.display = 'none';
-        logoImg.src = '';
-        const svg = document.getElementById('defaultLogo');
-        if (svg) svg.style.display = 'block';
+// ===== إرسال تنبيه يدوي =====
+function sendPeakAlert() {
+    const location = document.getElementById('peakLocation').value.trim();
+    const unit = document.getElementById('peakUnit').value;
+    const priority = document.getElementById('peakPriority').value;
+    
+    if (!location || !unit) {
+        alert('⚠️ الرجاء تحديد الموقع والفرقة');
+        return;
+    }
+    
+    const mission = {
+        id: Date.now(),
+        location: location,
+        unit: unit,
+        startTime: document.getElementById('peakStartTime').value || 'غير محدد',
+        endTime: document.getElementById('peakEndTime').value || 'غير محدد',
+        priority: priority,
+        notes: document.getElementById('peakNotes').value.trim() || '',
+        status: 'قيد الانتظار',
+        createdAt: new Date().toISOString()
+    };
+    
+    sendPeakAlertToControl(mission);
+    alert('✅ تم إرسال التنبيه للتحكم العملياتي');
+}
+
+// ===== إنهاء تنبيه =====
+function resolvePeakAlert(alertId) {
+    if (!confirm('⚠️ هل أنت متأكد من إنهاء هذا التنبيه؟')) return;
+    
+    let alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+    const alert = alerts.find(a => a.id === alertId);
+    if (alert) {
+        alert.status = 'منتهي';
+        alerts = alerts.map(a => a.id === alertId ? alert : a);
+        localStorage.setItem('peakAlerts', JSON.stringify(alerts));
+        
+        addPeakLog('✅', 'تم التنفيذ', alert.details, alert.priority);
+        loadPeakAlerts();
+        loadPeakLog();
     }
 }
 
-// ===== رفع شعار القطاع =====
-document.getElementById('sectorLogoFile')?.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(event) {
-        const dataUrl = event.target.result;
-        applySectorLogo(dataUrl);
-        
-        localStorage.setItem('sectorLogo', dataUrl);
-        
-        // حفظ في الخادم
-        const themes = await loadThemesFromServer() || {};
-        await saveThemesToServer(themes.headerBg || null, dataUrl, themes.headerBgType || null);
-        
-        const previewDiv = document.getElementById('sectorLogoPreview');
-        previewDiv.style.display = 'block';
-        document.getElementById('sectorLogoPreviewImg').src = dataUrl;
-        alert('✅ تم رفع شعار القطاع بنجاح!');
-    };
-    reader.readAsDataURL(file);
-});
-
-// ===== إزالة شعار القطاع =====
-function removeSectorLogo() {
-    localStorage.removeItem('sectorLogo');
-    applySectorLogo(null);
-    document.getElementById('sectorLogoPreview').style.display = 'none';
-    saveThemesToServer(null, null, null);
-    alert('✅ تم إزالة شعار القطاع');
+// ===== فتح الخريطة =====
+function openPeakMap() {
+    document.getElementById('peakMapModal').style.display = 'flex';
+    setTimeout(initPeakMap, 500);
 }
 
-// ===== حفظ الثيمات في الخادم =====
-async function saveThemesToServer(headerBg, sectorLogo, headerBgType) {
+// ===== إغلاق الخريطة =====
+function closePeakMap() {
+    document.getElementById('peakMapModal').style.display = 'none';
+    if (peakMap) {
+        peakMap.invalidateSize();
+    }
+}
+
+// ===== تهيئة الخريطة =====
+function initPeakMap() {
+    const container = document.getElementById('peakMap');
+    if (!container) return;
+    
+    // التحقق من وجود Leaflet
+    if (typeof L === 'undefined') {
+        setTimeout(initPeakMap, 500);
+        return;
+    }
+    
+    if (peakMap) {
+        setTimeout(() => peakMap.invalidateSize(), 300);
+        return;
+    }
+    
     try {
-        const response = await fetch('/api/save-themes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ headerBg, sectorLogo, headerBgType })
+        peakMap = L.map('peakMap').setView([24.7136, 46.6753], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(peakMap);
+        
+        let marker = null;
+        peakMap.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            if (marker) {
+                peakMap.removeLayer(marker);
+            }
+            
+            marker = L.marker([lat, lng]).addTo(peakMap);
+            
+            document.getElementById('peakSelectedLocation').innerHTML = 
+                `<strong>${lat.toFixed(6)}, ${lng.toFixed(6)}</strong>`;
+            selectedPeakLocation = { lat, lng };
         });
-        return await response.json();
+        
+        setTimeout(() => peakMap.invalidateSize(), 300);
+        peakMapInitialized = true;
     } catch (error) {
-        console.error('خطأ في حفظ الثيمات:', error);
-        return { success: false };
+        console.error('خطأ في تهيئة الخريطة:', error);
     }
 }
 
-// ===== تحميل الثيمات من الخادم =====
-async function loadThemesFromServer() {
-    try {
-        const response = await fetch('/api/get-themes');
-        const result = await response.json();
-        if (result.success && result.themes) {
-            return result.themes;
-        }
-        return null;
-    } catch (error) {
-        console.error('خطأ في تحميل الثيمات:', error);
-        return null;
+// ===== تأكيد الموقع من الخريطة =====
+function confirmPeakLocation() {
+    if (!selectedPeakLocation) {
+        alert('⚠️ الرجاء تحديد موقع على الخريطة');
+        return;
     }
-}
-
-// ===== تطبيق الثيمات من الخادم =====
-async function applyThemesFromServer() {
-    const themes = await loadThemesFromServer();
-    if (themes) {
-        if (themes.headerBg && themes.headerBgType) {
-            applyHeaderBackground(themes.headerBg, themes.headerBgType);
-        }
-        if (themes.sectorLogo) {
-            applySectorLogo(themes.sectorLogo);
-        }
-    }
-}
-
-// ===== تحميل الثيمات المحفوظة (localStorage) =====
-function loadSavedThemeSettings() {
-    const headerBg = localStorage.getItem('headerBackground');
-    const headerBgType = localStorage.getItem('headerBgType');
-    if (headerBg && headerBgType) {
-        applyHeaderBackground(headerBg, headerBgType);
-        const previewDiv = document.getElementById('headerBgPreview');
-        previewDiv.style.display = 'block';
-        if (headerBgType.startsWith('video/')) {
-            const video = document.getElementById('headerBgPreviewVideo');
-            const img = document.getElementById('headerBgPreviewImg');
-            img.style.display = 'none';
-            video.style.display = 'block';
-            video.src = headerBg;
-            video.load();
-        } else {
-            const img = document.getElementById('headerBgPreviewImg');
-            const video = document.getElementById('headerBgPreviewVideo');
-            video.style.display = 'none';
-            img.style.display = 'block';
-            img.src = headerBg;
-        }
-    }
-    const sectorLogo = localStorage.getItem('sectorLogo');
-    if (sectorLogo) {
-        applySectorLogo(sectorLogo);
-        const previewDiv = document.getElementById('sectorLogoPreview');
-        previewDiv.style.display = 'block';
-        document.getElementById('sectorLogoPreviewImg').src = sectorLogo;
-    }
-}
-
-// ===== تحديث الثيمات =====
-function refreshThemes() {
-    loadSavedThemeSettings();
-    applyThemesFromServer();
-    alert('✅ تم تحديث الثيمات');
-}
-
-// ===== تفعيل/إلغاء وضع الثيم =====
-function toggleThemeMode() {
-    const header = document.getElementById('mainHeader');
-    const btn = document.getElementById('themeModeToggle');
     
-    if (header.classList.contains('theme-mode')) {
-        header.classList.remove('theme-mode');
-        btn.classList.remove('active');
-        btn.innerHTML = '<i class="fas fa-expand"></i> وضع الثيم';
-        localStorage.setItem('themeMode', 'off');
-    } else {
-        header.classList.add('theme-mode');
-        btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
-        localStorage.setItem('themeMode', 'on');
-    }
-}
-
-// ===== تحميل حالة وضع الثيم =====
-function loadThemeMode() {
-    const mode = localStorage.getItem('themeMode');
-    const header = document.getElementById('mainHeader');
-    const btn = document.getElementById('themeModeToggle');
+    const { lat, lng } = selectedPeakLocation;
+    document.getElementById('peakLocation').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    document.getElementById('peakLat').value = lat;
+    document.getElementById('peakLng').value = lng;
     
-    if (mode === 'on' && header && btn) {
-        header.classList.add('theme-mode');
-        btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
-    }
+    closePeakMap();
+    alert('✅ تم تحديد الموقع بنجاح');
 }
 
-// ===== ربط زر الثيمات =====
-document.getElementById('themeBtn')?.addEventListener('click', function() {
-    document.getElementById('themeModal').style.display = 'flex';
-});
+// ===== مسح النموذج =====
+function clearPeakForm() {
+    document.getElementById('peakLocation').value = '';
+    document.getElementById('peakLat').value = '';
+    document.getElementById('peakLng').value = '';
+    document.getElementById('peakUnit').value = '';
+    document.getElementById('peakStartTime').value = '';
+    document.getElementById('peakEndTime').value = '';
+    document.getElementById('peakPriority').value = 'عالية';
+    document.getElementById('peakNotes').value = '';
+    selectedPeakLocation = null;
+}
 
 // ============================================
-// باقي الكود
+// باقي الكود (المتغيرات والدوال الأساسية)
 // ============================================
 
-// ===== المتغيرات العامة =====
 let centersData = {};
 let reports = {};
 let lastKnownUpdate = 0;
@@ -1981,9 +1944,6 @@ async function startNewShift() {
 // ===== ربط الأحداث الرئيسية =====
 document.addEventListener('DOMContentLoaded', function() {
     loadBrandLogo();
-    loadSavedThemeSettings();
-    applyThemesFromServer();
-    loadThemeMode();
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     buildCentersTable();
     loadShifts();
@@ -2632,7 +2592,7 @@ document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', fu
 
 // ===== إغلاق النوافذ بالضغط خارجها =====
 window.onclick = function(e) {
-    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'themeModal'];
+    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal'];
     modals.forEach(id => {
         const modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -2656,9 +2616,9 @@ async function checkForUpdates() {
     } catch (error) {}
 }
 
-console.log('✅ منصة الجنوب - الهوية البصرية الجديدة مع نظام الثيمات');
+console.log('✅ منصة الجنوب - الهوية البصرية الجديدة مع نظام وقت الذروة');
 console.log('📌 لرفع شعار مخصص، استخدم صفحة: upload-logo.html');
-console.log('🎨 لرفع خلفية أو شعار القطاع، استخدم زر "الثيمات"');
+console.log('🚨 لإدارة تمركز الفرق في وقت الذروة، استخدم زر "وقت الذروة"');
 </script>
 </body>
 </html>
