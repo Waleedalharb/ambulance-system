@@ -66,32 +66,6 @@
 
         .container { max-width: 1400px; margin: auto; }
 
-        /* ===== أنماط الخريطة ===== */
-        #peakMap {
-            width: 100%;
-            height: 100%;
-            min-height: 400px;
-            border-radius: var(--radius-md);
-            z-index: 1;
-        }
-        #peakMapContainer {
-            position: relative;
-            width: 100%;
-            height: 60vh;
-            min-height: 400px;
-            border-radius: var(--radius-md);
-            overflow: hidden;
-            border: 1px solid var(--gray-200);
-            background: #e5e5e5;
-        }
-        .leaflet-control-attribution {
-            font-size: 8px !important;
-        }
-        .leaflet-control-zoom {
-            z-index: 10 !important;
-        }
-
-        /* باقي الأنماط (نفس الكود السابق) */
         .icon-primary { color: var(--primary-700); }
         .icon-teal { color: var(--teal); }
         .icon-coral { color: var(--coral); }
@@ -133,25 +107,35 @@
             transition: all 0.3s ease;
         }
 
+        /* ===== وضع الثيم (إخفاء النصوص والشعار) ===== */
         .header.theme-mode .header-brand .text h1,
         .header.theme-mode .header-brand .text .sub,
         .header.theme-mode .header-brand .icon {
             display: none !important;
         }
-        .header.theme-mode .header-date { display: none !important; }
+
+        .header.theme-mode .header-date {
+            display: none !important;
+        }
+
         .header.theme-mode {
             min-height: 120px !important;
             padding: 10px !important;
             justify-content: center !important;
             align-items: center !important;
         }
-        .header.theme-mode .header-bg-video { opacity: 1 !important; }
+
+        .header.theme-mode .header-bg-video {
+            opacity: 1 !important;
+        }
+
         .header.theme-mode.has-bg-image {
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
         }
 
+        /* ===== الخلفيات ===== */
         .header-bg-video {
             position: absolute;
             top: 0;
@@ -162,16 +146,19 @@
             z-index: 0;
             opacity: 0.4;
         }
+
         .header.has-bg-image {
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
         }
+
         .header .header-brand,
         .header .header-date {
             position: relative;
             z-index: 2;
         }
+
         .header-brand { display: flex; align-items: center; gap: 14px; }
         .header-brand .icon {
             width: 52px; height: 52px;
@@ -245,13 +232,118 @@
         .btn-gold:hover { background: #D4B03A; border-color: #D4B03A; }
         .btn-peak { background: var(--coral); color: white; border-color: var(--coral); }
         .btn-peak:hover { background: #D45A4A; border-color: #D45A4A; }
+        .btn-theme { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
+        .btn-theme.active { background: var(--teal); color: white; border-color: var(--teal); }
 
         .viewing-badge { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 4px 12px; font-size: 0.7rem; border-radius: 30px; display: inline-block; margin-right: 10px; }
         .return-btn { background: white; border: 1px solid var(--gray-200); padding: 4px 12px; font-size: 0.7rem; border-radius: 30px; cursor: pointer; }
 
         .update-status { text-align: left; font-size: 0.65rem; color: var(--teal); margin-top: 5px; }
 
-        /* ===== أنماط النوافذ المنبثقة ===== */
+        /* ===== شريط التنبيهات ===== */
+        #alertBar {
+            display: none;
+            background: var(--coral-light);
+            border-right: 4px solid var(--coral);
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 15px;
+            position: relative;
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== أنماط وقت الذروة ===== */
+        #peakTimeModal .modal-content { max-width: 800px; }
+        #peakTimeModal .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        #peakTimeModal .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        #peakTimeModal .mt-2 { margin-top: 8px; }
+        #peakTimeModal .mb-2 { margin-bottom: 8px; }
+        #peakTimeModal .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+        /* ===== أنماط الخريطة ===== */
+        #peakMap { width: 100%; height: 100%; min-height: 400px; border-radius: var(--radius-md); z-index: 1; }
+        #peakMapContainer {
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            min-height: 400px;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+            background: #e5e5e5;
+        }
+        .leaflet-control-attribution { font-size: 8px !important; }
+        .leaflet-control-zoom { z-index: 10 !important; }
+
+        /* ===== أنماط البلاغات ===== */
+        .point-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+        .point-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-100);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .point-title i { color: var(--primary-500); }
+        .units-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .unit-card {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.2s;
+        }
+        .unit-card:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+        .unit-card .name { font-weight: 600; font-size: 0.85rem; color: var(--gray-800); }
+        .unit-card .count-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin: 4px 0;
+        }
+        .unit-card .count-number.zero { color: var(--gray-400); }
+        .buttons-row { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin: 6px 0; }
+        .buttons-row .btn { padding: 3px 10px; font-size: 0.6rem; border-radius: 20px; }
+        .buttons-row .btn-undo { border-color: var(--coral); color: var(--coral); }
+        .buttons-row .btn-undo:hover { background: var(--coral-light); }
+        .show-times-btn {
+            background: white;
+            border: 1px solid var(--gray-200);
+            padding: 4px;
+            width: 100%;
+            font-size: 0.6rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            margin-top: 4px;
+            color: var(--gray-600);
+            transition: all 0.2s;
+        }
+        .show-times-btn:hover { background: var(--gray-50); }
+
+        /* ===== النوافذ المنبثقة ===== */
         .modal {
             display: none;
             position: fixed;
@@ -407,14 +499,17 @@
         /* ===== نافذة إدارة الثيمات ===== */
         #themeModal .modal-content { max-width: 600px; }
 
-        /* ===== نافذة وقت الذروة ===== */
-        #peakTimeModal .modal-content { max-width: 800px; }
-        #peakTimeLog { max-height: 150px; overflow-y: auto; display: grid; gap: 6px; }
-        #peakAlerts { display: grid; gap: 6px; }
+        /* ===== زر وضع الثيم ===== */
+        #themeModeToggle.btn-theme.active {
+            background: var(--teal) !important;
+            color: white !important;
+            border-color: var(--teal) !important;
+        }
 
         /* ===== تحسينات الجوال ===== */
         @media (max-width: 650px) {
             body { padding: 8px; }
+            
             .header {
                 min-height: 100px !important;
                 padding: 12px 16px !important;
@@ -423,17 +518,71 @@
                 text-align: center !important;
                 display: flex !important;
             }
-            .header-bg-video { opacity: 0.3 !important; display: block !important; width: 100% !important; height: 100% !important; object-fit: cover !important; }
-            .header.has-bg-image { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; display: block !important; }
-            .header .header-brand, .header .header-date { position: relative !important; z-index: 2 !important; }
+
+            .header-bg-video {
+                opacity: 0.3 !important;
+                display: block !important;
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+            }
+            
+            .header.has-bg-image {
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                display: block !important;
+            }
+
+            .header .header-brand,
+            .header .header-date {
+                position: relative !important;
+                z-index: 2 !important;
+            }
+
             .header-brand { justify-content: center !important; flex-wrap: wrap !important; }
-            .header-brand .icon { width: 40px !important; height: 40px !important; background: rgba(255,255,255,0.1) !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+            .header-brand .icon {
+                width: 40px !important;
+                height: 40px !important;
+                background: rgba(255,255,255,0.1) !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
             .header-brand .icon svg { width: 32px !important; height: 32px !important; }
             .header-brand .icon img { width: 32px !important; height: 32px !important; object-fit: contain !important; display: block !important; }
-            .header-brand .text h1 { font-size: 1rem !important; color: white !important; text-shadow: 0 2px 10px rgba(0,0,0,0.8) !important; }
-            .header-brand .text .sub { font-size: 0.55rem !important; color: rgba(255,255,255,0.8) !important; text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important; flex-wrap: wrap !important; justify-content: center !important; }
-            .header-date { background: rgba(0,0,0,0.3) !important; backdrop-filter: blur(4px) !important; font-size: 0.65rem !important; padding: 4px 12px !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 30px !important; }
-            .header.theme-mode { min-height: 80px !important; padding: 5px !important; }
+
+            .header-brand .text h1 {
+                font-size: 1rem !important;
+                color: white !important;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.8) !important;
+            }
+            .header-brand .text .sub {
+                font-size: 0.55rem !important;
+                color: rgba(255,255,255,0.8) !important;
+                text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important;
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+            }
+
+            .header-date {
+                background: rgba(0,0,0,0.3) !important;
+                backdrop-filter: blur(4px) !important;
+                font-size: 0.65rem !important;
+                padding: 4px 12px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                color: white !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
+                border-radius: 30px !important;
+            }
+
+            .header.theme-mode {
+                min-height: 80px !important;
+                padding: 5px !important;
+            }
 
             .info-bar { flex-direction: column; align-items: stretch; }
             .toolbar { justify-content: center; }
@@ -452,8 +601,8 @@
             #docsPage .docs-header .header-actions { justify-content: center; }
             #peakMapContainer { height: 40vh !important; min-height: 250px !important; }
             #peakTimeModal .modal-content { padding: 12px; }
-            #peakTimeModal .modal-content .grid-2 { grid-template-columns: 1fr !important; }
-            #peakTimeModal .modal-content .grid-3 { grid-template-columns: 1fr !important; }
+            #peakTimeModal .grid-2 { grid-template-columns: 1fr !important; }
+            #peakTimeModal .grid-3 { grid-template-columns: 1fr !important; }
         }
 
         /* ===== تحسينات الطباعة ===== */
@@ -462,7 +611,7 @@
             .modal[style*="display: flex"] { display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 9999 !important; overflow: auto !important; padding: 20px !important; margin: 0 !important; }
             .modal[style*="display: flex"] * { visibility: visible !important; }
             .modal-content { max-width: 100% !important; margin: 0 !important; padding: 20px !important; border: none !important; box-shadow: none !important; max-height: none !important; overflow: visible !important; border-radius: 0 !important; background: white !important; }
-            .modal-buttons, .saved-records, .no-print, .btn, button, .toolbar, .info-bar, .archive-row, .update-status, #pointsContainer, #liveReportStats, .header, footer { display: none !important; }
+            .modal-buttons, .saved-records, .no-print, .btn, button, .toolbar, .info-bar, .archive-row, .update-status, #pointsContainer, #liveReportStats, .header, footer, #alertBar { display: none !important; }
             .form-row input[type="number"], .form-row input[type="text"], .form-row input { border: none !important; border-bottom: 2px solid #000 !important; border-radius: 0 !important; background: transparent !important; text-align: center !important; font-size: 0.9rem !important; font-weight: 600 !important; color: #000 !important; padding: 4px 0 !important; width: 80px !important; }
             .form-row textarea { border: 1px solid #000 !important; background: transparent !important; min-height: 50px !important; font-size: 0.85rem !important; padding: 8px !important; }
             table { page-break-inside: avoid; border-collapse: collapse; width: 100%; font-size: 9pt; }
@@ -473,14 +622,6 @@
             #seniorShiftModal, #seniorShiftModal * { display: none !important; visibility: hidden !important; }
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
         }
-
-        /* ===== كلاسات مساعدة للشبكات ===== */
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-        .mt-2 { margin-top: 8px; }
-        .mb-2 { margin-bottom: 8px; }
-        .gap-2 { gap: 8px; }
-        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     </style>
 </head>
 <body>
@@ -511,6 +652,27 @@
         <div class="header-date"><i class="fas fa-calendar-alt"></i> <span id="currentDate"></span></div>
     </header>
 
+    <!-- ===== شريط التنبيهات ===== -->
+    <div id="alertBar">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:1.4rem;">🔔</span>
+                <div>
+                    <span style="font-weight:700; color:var(--coral);" id="alertTitle">تنبيه جديد</span>
+                    <span style="font-size:0.8rem; color:var(--gray-600); display:block;" id="alertMessage"></span>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button onclick="goToPeakTime()" class="btn btn-primary" style="padding:4px 16px; font-size:0.75rem;">
+                    <i class="fas fa-eye"></i> عرض
+                </button>
+                <button onclick="dismissAlert()" class="btn" style="padding:4px 12px; font-size:0.75rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== شريط التحكم ===== -->
     <div class="info-bar">
         <div>
@@ -533,6 +695,9 @@
             <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
             <button id="themeBtn" class="btn btn-gold"><i class="fas fa-palette"></i> الثيمات</button>
+            <button id="themeModeToggle" class="btn btn-theme" onclick="toggleThemeMode()">
+                <i class="fas fa-expand"></i> وضع الثيم
+            </button>
             <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> وقت الذروة</button>
         </div>
     </div>
@@ -552,9 +717,62 @@
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة وقت الذروة -->
-<!-- ============================================ -->
+<!-- ===== نافذة إدارة الثيمات ===== -->
+<div id="themeModal" class="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="card-icon gold"><i class="fas fa-palette"></i></span>
+                <h2 style="margin:0; font-size:1.2rem;">إدارة الثيمات</h2>
+            </div>
+            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <!-- رفع خلفية الشريط العلوي -->
+        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-image"></i> خلفية الشريط العلوي</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="headerBgFile" accept=".gif,.png,.jpg,.jpeg,.mp4,.webm" style="display:none;">
+                <button onclick="document.getElementById('headerBgFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار صورة/فيديو
+                </button>
+                <button onclick="removeHeaderBg()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الخلفية
+                </button>
+                <button onclick="refreshThemes()" class="btn btn-teal" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+            <div id="headerBgPreview" style="margin-top:8px; display:none; border-radius:var(--radius-sm); overflow:hidden; max-height:100px;">
+                <img id="headerBgPreviewImg" src="" alt="معاينة الخلفية" style="width:100%; object-fit:cover; max-height:100px;">
+                <video id="headerBgPreviewVideo" src="" style="width:100%; object-fit:cover; max-height:100px; display:none;" autoplay loop muted></video>
+            </div>
+        </div>
+        
+        <!-- رفع شعار القطاع -->
+        <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-building"></i> شعار القطاع</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="sectorLogoFile" accept=".png,.jpg,.jpeg,.svg" style="display:none;">
+                <button onclick="document.getElementById('sectorLogoFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار شعار
+                </button>
+                <button onclick="removeSectorLogo()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الشعار
+                </button>
+            </div>
+            <div id="sectorLogoPreview" style="margin-top:8px; display:none;">
+                <img id="sectorLogoPreviewImg" src="" alt="معاينة الشعار" style="max-width:100px; max-height:60px; border-radius:var(--radius-sm); border:1px solid var(--gray-200);">
+            </div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة وقت الذروة ===== -->
 <div id="peakTimeModal" class="modal">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -570,7 +788,7 @@
             <button onclick="document.getElementById('peakTimeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
         </div>
 
-        <!-- ===== سجل العمليات والتنبيهات ===== -->
+        <!-- سجل العمليات -->
         <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
             <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-list-ul"></i> سجل العمليات والتنبيهات</h4>
             <div id="peakTimeLog" style="max-height:150px; overflow-y:auto; display:grid; gap:6px;">
@@ -578,7 +796,7 @@
             </div>
         </div>
 
-        <!-- ===== نموذج تحديد التمركز ===== -->
+        <!-- نموذج تحديد التمركز -->
         <div style="background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
             <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-plus-circle"></i> تحديد تمركز جديد</h4>
             
@@ -657,7 +875,7 @@
             </div>
         </div>
 
-        <!-- ===== التنبيهات النشطة ===== -->
+        <!-- التنبيهات النشطة -->
         <div style="background:var(--coral-light); border-radius:var(--radius-md); padding:12px; border-right:4px solid var(--coral);">
             <h4 style="margin:0 0 8px 0; font-size:0.85rem; color:var(--coral);"><i class="fas fa-bell"></i> التنبيهات النشطة</h4>
             <div id="peakAlerts" style="display:grid; gap:6px;">
@@ -671,9 +889,7 @@
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- نافذة الخريطة -->
-<!-- ============================================ -->
+<!-- ===== نافذة الخريطة ===== -->
 <div id="peakMapModal" class="modal">
     <div class="modal-content" style="max-width:95%; max-height:95vh; padding:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -686,7 +902,6 @@
             <button onclick="closePeakMap()" class="btn"><i class="fas fa-times"></i></button>
         </div>
         
-        <!-- الخريطة -->
         <div id="peakMapContainer">
             <div id="peakMap" style="width:100%; height:100%; min-height:400px;"></div>
             <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:white; padding:6px 16px; border-radius:30px; font-size:0.7rem; z-index:1000;">
@@ -694,7 +909,6 @@
             </div>
         </div>
         
-        <!-- الموقع المحدد -->
         <div style="display:flex; gap:10px; margin-top:8px; align-items:center; flex-wrap:wrap; background:var(--gray-50); padding:8px 12px; border-radius:var(--radius-sm);">
             <span style="font-weight:600; font-size:0.8rem;">📍 الموقع المحدد:</span>
             <span id="peakSelectedLocation" style="font-size:0.8rem; color:var(--gray-600);">لم يتم تحديد موقع</span>
@@ -730,36 +944,25 @@
             </div>
         </div>
         <h3><i class="fas fa-bolt icon-teal"></i> تحضير فرق التدخل السريع</h3>
-        <table id="rapidTable">
-            <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
-            <tbody>
-                <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
-                <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
-            </tbody>
-        </table>
+        <table id="rapidTable"><thead><tr><th>النداء</th><th>التمركز</th></tr></thead><tbody>
+            <tr><td style="font-weight:bold;">سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
+            <tr><td style="font-weight:bold;">سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
+            <tr><td style="font-weight:bold;">سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
+            <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
+        </tbody></table>
         <h3><i class="fas fa-hospital icon-primary"></i> المراكز الإسعافية</h3>
         <table id="centersTable"><thead><tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr></thead><tbody id="centersTableBody"></tbody></table>
-        <div id="workforceStats" class="stats-section" style="display:none;">
-            <h3>📊 مؤشرات القوى العاملة</h3>
-            <div class="circle-stats-container">
-                <div class="circle-stat">
-                    <div class="svg-circle-container"><svg class="svg-circle" viewBox="0 0 100 100"><circle class="svg-circle-bg" cx="50" cy="50" r="42"/><circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42" stroke="#2a7f3e" stroke-dasharray="263.89" stroke-dashoffset="263.89"/><text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text></svg></div>
-                    <div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div>
-                    <div class="sub-value" id="readinessSubText">0 / 0 مركز</div>
-                </div>
-                <div class="circle-stat"><div class="value value-blue" id="totalStaffDisplay">0</div><div class="label">إجمالي المسعفين</div><div class="sub-value" id="staffSubText">موزعين على 0 مركز</div></div>
-                <div class="circle-stat"><div class="value value-blue" id="totalCarsDisplay">0</div><div class="label">إجمالي السيارات</div><div class="sub-value" id="carsSubText"></div></div>
-                <div class="circle-stat"><div class="value value-red" id="missingCentersDisplay">0</div><div class="label">المراكز الناقصة</div><div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div></div>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                <div class="stats-scroll" id="distributionContainer"><div class="title">توزيع المسعفين على المراكز</div><div id="distributionList"></div></div>
-                <div class="stats-scroll" id="carDistributionContainer"><div class="title">توزيع السيارات على المراكز</div><div id="carDistributionList"></div></div>
-            </div>
+        <div id="workforceStats" class="stats-section" style="display:none;"><h3>📊 مؤشرات القوى العاملة</h3><div class="circle-stats-container">
+            <div class="circle-stat"><div class="svg-circle-container"><svg class="svg-circle" viewBox="0 0 100 100"><circle class="svg-circle-bg" cx="50" cy="50" r="42"/><circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42" stroke="#2a7f3e" stroke-dasharray="263.89" stroke-dashoffset="263.89"/><text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text></svg></div><div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div><div class="sub-value" id="readinessSubText">0 / 0 مركز</div></div>
+            <div class="circle-stat"><div class="value value-blue" id="totalStaffDisplay">0</div><div class="label">إجمالي المسعفين</div><div class="sub-value" id="staffSubText">موزعين على 0 مركز</div></div>
+            <div class="circle-stat"><div class="value value-blue" id="totalCarsDisplay">0</div><div class="label">إجمالي السيارات</div><div class="sub-value" id="carsSubText"></div></div>
+            <div class="circle-stat"><div class="value value-red" id="missingCentersDisplay">0</div><div class="label">المراكز الناقصة</div><div class="sub-value" id="missingSubText">بحاجة إلى مسعفين</div></div>
         </div>
-        <div id="shiftReportStats" class="stats-section" style="display:none;">
-            <h3>📈 إحصائيات البلاغات</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+            <div class="stats-scroll" id="distributionContainer"><div class="title">توزيع المسعفين على المراكز</div><div id="distributionList"></div></div>
+            <div class="stats-scroll" id="carDistributionContainer"><div class="title">توزيع السيارات على المراكز</div><div id="carDistributionList"></div></div>
+        </div></div>
+        <div id="shiftReportStats" class="stats-section" style="display:none;"><h3>📈 إحصائيات البلاغات</h3>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
                 <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">إجمالي البلاغات</div><div style="font-size:1.8rem; font-weight:700; color:var(--primary-700);" id="shiftTotalReports">0</div></div>
                 <div style="border:1px solid var(--gray-200); padding:10px; text-align:center; background:white; border-radius:var(--radius-sm);"><div style="font-size:0.7rem; color:var(--gray-600);">أكثر فرقة استخداماً</div><div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="topUnit">-</div></div>
@@ -781,10 +984,7 @@
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon teal" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-helicopter"></i></span>
-                <h2 style="margin:0;">الإسعاف الجوي</h2>
-            </div>
+            <div style="display:flex; align-items:center; gap:12px;"><span class="card-icon teal" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-helicopter"></i></span><h2 style="margin:0;">الإسعاف الجوي</h2></div>
             <button id="clearAllAirRecords" class="btn btn-coral" style="padding:4px 12px; font-size:0.7rem;"><i class="fas fa-trash"></i> حذف الكل</button>
         </div>
         <p class="sub-title">تسجيل بلاغات الإسعاف الجوي</p>
@@ -826,10 +1026,7 @@
 <div id="controlModal" class="modal">
     <div class="modal-content" style="max-width:800px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span>
-                <h2 style="margin:0;">التحكم والتنسيق</h2>
-            </div>
+            <div style="display:flex; align-items:center; gap:12px;"><span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span><h2 style="margin:0;">التحكم والتنسيق</h2></div>
             <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
         </div>
         <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
@@ -903,29 +1100,14 @@
         <div class="form-row"><label><i class="fas fa-pen icon-gold icon-sm"></i> ملاحظات إضافية:</label><textarea id="seniorNotes" rows="3" placeholder="أي ملاحظات إضافية..." style="border-color:var(--gray-200);"></textarea></div>
         <div class="signatures-section">
             <h3><span class="icon-bg-gold"><i class="fas fa-pen-to-square icon-gold"></i></span> التسليم والاستلام</h3>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-primary" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-tie icon-primary"></i></span> مساعد كبير المسعفين:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorAssistantName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorAssistantDate"></span></span>
-                </div>
+            <div class="signature-row"><div class="sig-label"><span class="icon-bg-primary" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-tie icon-primary"></i></span> مساعد كبير المسعفين:</div>
+                <div class="sig-inputs"><input type="text" id="seniorAssistantName" placeholder="الاسم" style="border-color:var(--gray-200);"><input type="text" id="seniorAssistantSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);"><span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorAssistantDate"></span></span></div>
             </div>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-teal" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-md icon-teal"></i></span> كبير المسعفين:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorChiefName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorChiefDate"></span></span>
-                </div>
+            <div class="signature-row"><div class="sig-label"><span class="icon-bg-teal" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-user-md icon-teal"></i></span> كبير المسعفين:</div>
+                <div class="sig-inputs"><input type="text" id="seniorChiefName" placeholder="الاسم" style="border-color:var(--gray-200);"><input type="text" id="seniorChiefSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);"><span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorChiefDate"></span></span></div>
             </div>
-            <div class="signature-row">
-                <div class="sig-label"><span class="icon-bg-coral" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-flag icon-coral"></i></span> قائد المنطقة:</div>
-                <div class="sig-inputs">
-                    <input type="text" id="seniorRegionLeaderName" placeholder="الاسم" style="border-color:var(--gray-200);">
-                    <input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);">
-                    <span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorRegionLeaderDate"></span></span>
-                </div>
+            <div class="signature-row"><div class="sig-label"><span class="icon-bg-coral" style="width:28px; height:28px; font-size:0.8rem;"><i class="fas fa-flag icon-coral"></i></span> قائد المنطقة:</div>
+                <div class="sig-inputs"><input type="text" id="seniorRegionLeaderName" placeholder="الاسم" style="border-color:var(--gray-200);"><input type="text" id="seniorRegionLeaderSignature" placeholder="التوقيع (اختياري)" style="border-color:var(--gray-200);"><span class="sig-placeholder"><i class="far fa-calendar-alt icon-gray icon-sm"></i> التاريخ: <span id="seniorRegionLeaderDate"></span></span></div>
             </div>
         </div>
         <div class="saved-records" id="seniorSavedRecords"><h4><i class="fas fa-clock-rotate-left icon-primary"></i> المناوبات المحفوظة</h4><div id="seniorRecordsList"></div></div>
@@ -982,22 +1164,10 @@
             <span style="font-size:0.75rem; color:var(--gray-600);" id="docsFilterCount"></span>
         </div>
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px; margin-top:12px;">
-            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--primary-700);">
-                <div style="font-size:0.6rem; color:var(--gray-600);">📄 المجموع</div>
-                <div style="font-size:1.2rem; font-weight:700; color:var(--primary-700);" id="statTotal">0</div>
-            </div>
-            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--teal);">
-                <div style="font-size:0.6rem; color:var(--gray-600);">📋 تعليمات</div>
-                <div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="statInstructions">0</div>
-            </div>
-            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--coral);">
-                <div style="font-size:0.6rem; color:var(--gray-600);">🚨 تنبيهات</div>
-                <div style="font-size:1.2rem; font-weight:700; color:var(--coral);" id="statAlerts">0</div>
-            </div>
-            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--gold);">
-                <div style="font-size:0.6rem; color:var(--gray-600);">🔔 إشعارات</div>
-                <div style="font-size:1.2rem; font-weight:700; color:var(--gold);" id="statNotifications">0</div>
-            </div>
+            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--primary-700);"><div style="font-size:0.6rem; color:var(--gray-600);">📄 المجموع</div><div style="font-size:1.2rem; font-weight:700; color:var(--primary-700);" id="statTotal">0</div></div>
+            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--teal);"><div style="font-size:0.6rem; color:var(--gray-600);">📋 تعليمات</div><div style="font-size:1.2rem; font-weight:700; color:var(--teal);" id="statInstructions">0</div></div>
+            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--coral);"><div style="font-size:0.6rem; color:var(--gray-600);">🚨 تنبيهات</div><div style="font-size:1.2rem; font-weight:700; color:var(--coral);" id="statAlerts">0</div></div>
+            <div style="background:white; padding:10px 14px; border-radius:var(--radius-sm); box-shadow:var(--shadow-sm); text-align:center; border-right:3px solid var(--gold);"><div style="font-size:0.6rem; color:var(--gray-600);">🔔 إشعارات</div><div style="font-size:1.2rem; font-weight:700; color:var(--gold);" id="statNotifications">0</div></div>
         </div>
     </div>
     <div style="max-width:1400px; margin:auto; padding:0 20px 20px;">
@@ -1031,47 +1201,281 @@ function loadBrandLogo() {
 }
 
 // ============================================
+// نظام الثيمات (الكامل)
+// ============================================
+
+function applyHeaderBackground(dataUrl, fileType) {
+    const header = document.getElementById('mainHeader');
+    if (!header) return;
+    
+    header.style.backgroundImage = 'none';
+    header.style.backgroundColor = '#0B1E33';
+    header.classList.remove('has-bg-image');
+    
+    const oldVideo = header.querySelector('.header-bg-video');
+    if (oldVideo) oldVideo.remove();
+    
+    if (fileType && fileType.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.className = 'header-bg-video';
+        video.src = dataUrl;
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0.4;';
+        header.prepend(video);
+        video.load();
+        video.play().catch(() => {});
+        header.style.background = 'none';
+    } else if (dataUrl) {
+        header.style.backgroundImage = 'url(' + dataUrl + ')';
+        header.style.backgroundSize = 'cover';
+        header.style.backgroundPosition = 'center';
+        header.style.backgroundRepeat = 'no-repeat';
+        header.classList.add('has-bg-image');
+    }
+    
+    const brand = header.querySelector('.header-brand');
+    const date = header.querySelector('.header-date');
+    if (brand) { brand.style.position = 'relative'; brand.style.zIndex = '2'; }
+    if (date) { date.style.position = 'relative'; date.style.zIndex = '2'; }
+}
+
+document.getElementById('headerBgFile')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const dataUrl = event.target.result;
+        localStorage.setItem('headerBackground', dataUrl);
+        localStorage.setItem('headerBgType', file.type);
+        applyHeaderBackground(dataUrl, file.type);
+        const previewDiv = document.getElementById('headerBgPreview');
+        previewDiv.style.display = 'block';
+        if (file.type.startsWith('video/')) {
+            const video = document.getElementById('headerBgPreviewVideo');
+            const img = document.getElementById('headerBgPreviewImg');
+            img.style.display = 'none';
+            video.style.display = 'block';
+            video.src = dataUrl;
+            video.load();
+        } else {
+            const img = document.getElementById('headerBgPreviewImg');
+            const video = document.getElementById('headerBgPreviewVideo');
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = dataUrl;
+        }
+        alert('✅ تم رفع خلفية الشريط العلوي بنجاح!');
+    };
+    reader.readAsDataURL(file);
+});
+
+function removeHeaderBg() {
+    localStorage.removeItem('headerBackground');
+    localStorage.removeItem('headerBgType');
+    const header = document.getElementById('mainHeader');
+    if (header) {
+        header.style.backgroundImage = '';
+        header.style.background = '';
+        header.style.backgroundColor = '';
+        header.classList.remove('has-bg-image');
+        const video = header.querySelector('.header-bg-video');
+        if (video) video.remove();
+    }
+    document.getElementById('headerBgPreview').style.display = 'none';
+    alert('✅ تم إزالة خلفية الشريط');
+}
+
+function applySectorLogo(dataUrl) {
+    const logoImg = document.getElementById('sectorLogoImage');
+    if (!logoImg) return;
+    if (dataUrl) {
+        logoImg.src = dataUrl;
+        logoImg.style.display = 'block';
+        logoImg.style.width = '100%';
+        logoImg.style.height = '100%';
+        logoImg.style.objectFit = 'contain';
+        logoImg.style.borderRadius = '4px';
+        const svg = document.getElementById('defaultLogo');
+        if (svg) svg.style.display = 'none';
+        const defaultImg = document.getElementById('brandLogoImage');
+        if (defaultImg) defaultImg.style.display = 'none';
+    } else {
+        logoImg.style.display = 'none';
+        logoImg.src = '';
+        const svg = document.getElementById('defaultLogo');
+        if (svg) svg.style.display = 'block';
+    }
+}
+
+document.getElementById('sectorLogoFile')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const dataUrl = event.target.result;
+        localStorage.setItem('sectorLogo', dataUrl);
+        applySectorLogo(dataUrl);
+        const previewDiv = document.getElementById('sectorLogoPreview');
+        previewDiv.style.display = 'block';
+        document.getElementById('sectorLogoPreviewImg').src = dataUrl;
+        alert('✅ تم رفع شعار القطاع بنجاح!');
+    };
+    reader.readAsDataURL(file);
+});
+
+function removeSectorLogo() {
+    localStorage.removeItem('sectorLogo');
+    applySectorLogo(null);
+    document.getElementById('sectorLogoPreview').style.display = 'none';
+    alert('✅ تم إزالة شعار القطاع');
+}
+
+function loadSavedThemeSettings() {
+    const headerBg = localStorage.getItem('headerBackground');
+    const headerBgType = localStorage.getItem('headerBgType');
+    if (headerBg && headerBgType) {
+        applyHeaderBackground(headerBg, headerBgType);
+        const previewDiv = document.getElementById('headerBgPreview');
+        previewDiv.style.display = 'block';
+        if (headerBgType.startsWith('video/')) {
+            const video = document.getElementById('headerBgPreviewVideo');
+            const img = document.getElementById('headerBgPreviewImg');
+            img.style.display = 'none';
+            video.style.display = 'block';
+            video.src = headerBg;
+            video.load();
+        } else {
+            const img = document.getElementById('headerBgPreviewImg');
+            const video = document.getElementById('headerBgPreviewVideo');
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = headerBg;
+        }
+    }
+    const sectorLogo = localStorage.getItem('sectorLogo');
+    if (sectorLogo) {
+        applySectorLogo(sectorLogo);
+        const previewDiv = document.getElementById('sectorLogoPreview');
+        previewDiv.style.display = 'block';
+        document.getElementById('sectorLogoPreviewImg').src = sectorLogo;
+    }
+}
+
+function refreshThemes() {
+    loadSavedThemeSettings();
+    alert('✅ تم تحديث الثيمات');
+}
+
+function toggleThemeMode() {
+    const header = document.getElementById('mainHeader');
+    const btn = document.getElementById('themeModeToggle');
+    if (header.classList.contains('theme-mode')) {
+        header.classList.remove('theme-mode');
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-expand"></i> وضع الثيم';
+        localStorage.setItem('themeMode', 'off');
+    } else {
+        header.classList.add('theme-mode');
+        btn.classList.add('active');
+        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
+        localStorage.setItem('themeMode', 'on');
+    }
+}
+
+function loadThemeMode() {
+    const mode = localStorage.getItem('themeMode');
+    const header = document.getElementById('mainHeader');
+    const btn = document.getElementById('themeModeToggle');
+    if (mode === 'on' && header && btn) {
+        header.classList.add('theme-mode');
+        btn.classList.add('active');
+        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
+    }
+}
+
+document.getElementById('themeBtn')?.addEventListener('click', function() {
+    document.getElementById('themeModal').style.display = 'flex';
+});
+
+// ============================================
+// نظام التنبيهات الرئيسية
+// ============================================
+
+function showMainAlert(title, message) {
+    const alertBar = document.getElementById('alertBar');
+    const alertTitle = document.getElementById('alertTitle');
+    const alertMessage = document.getElementById('alertMessage');
+    if (alertBar && alertTitle && alertMessage) {
+        alertTitle.textContent = title || 'تنبيه جديد';
+        alertMessage.textContent = message || 'يوجد تنبيه جديد في نظام وقت الذروة';
+        alertBar.style.display = 'block';
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoAAACBhYqNlZuZn52hoaOko6SjpKGfnZiWkJGMi4mGg4B9ent5d3V0dHJwcXBwcnN0dXZ3eHp7fH5/gIGChIWHiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8=');
+            audio.play().catch(() => {});
+        } catch(e) {}
+    }
+}
+
+function dismissAlert() {
+    document.getElementById('alertBar').style.display = 'none';
+    localStorage.setItem('alertDismissed', 'true');
+}
+
+function goToPeakTime() {
+    document.getElementById('alertBar').style.display = 'none';
+    document.getElementById('peakTimeModal').style.display = 'flex';
+    loadPeakLog();
+    loadPeakAlerts();
+}
+
+function checkForAlerts() {
+    const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
+    const activeAlerts = alerts.filter(a => a.status === 'نشط');
+    const dismissed = localStorage.getItem('alertDismissed') === 'true';
+    if (activeAlerts.length > 0 && !dismissed) {
+        const latestAlert = activeAlerts[0];
+        showMainAlert('🔔 ' + latestAlert.title, latestAlert.details);
+    } else if (activeAlerts.length === 0) {
+        document.getElementById('alertBar').style.display = 'none';
+    }
+}
+
+// ============================================
 // نظام وقت الذروة
 // ============================================
 
-// ===== المتغيرات =====
 let peakMissions = JSON.parse(localStorage.getItem('peakMissions') || '[]');
 let peakAlertsList = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
 let selectedPeakLocation = null;
 let peakMap = null;
-let peakMapInitialized = false;
 
-// ===== فتح نافذة وقت الذروة =====
 document.getElementById('peakTimeBtn')?.addEventListener('click', function() {
     document.getElementById('peakTimeModal').style.display = 'flex';
     loadPeakLog();
     loadPeakAlerts();
     const now = new Date();
-    const localDateTime = now.toISOString().slice(0, 16);
-    document.getElementById('peakStartTime').value = localDateTime;
+    document.getElementById('peakStartTime').value = now.toISOString().slice(0, 16);
 });
 
-// ===== حفظ مهمة تمركز =====
 function savePeakMission() {
     const location = document.getElementById('peakLocation').value.trim();
-    const lat = document.getElementById('peakLat').value;
-    const lng = document.getElementById('peakLng').value;
     const unit = document.getElementById('peakUnit').value;
     const startTime = document.getElementById('peakStartTime').value;
     const endTime = document.getElementById('peakEndTime').value;
     const priority = document.getElementById('peakPriority').value;
     const notes = document.getElementById('peakNotes').value.trim();
-    
     if (!location || !unit || !startTime || !endTime) {
         alert('⚠️ الرجاء ملء جميع الحقول المطلوبة');
         return;
     }
-    
     const mission = {
         id: Date.now(),
         location: location,
-        lat: lat || null,
-        lng: lng || null,
+        lat: document.getElementById('peakLat').value || null,
+        lng: document.getElementById('peakLng').value || null,
         unit: unit,
         startTime: startTime,
         endTime: endTime,
@@ -1080,20 +1484,16 @@ function savePeakMission() {
         status: 'قيد الانتظار',
         createdAt: new Date().toISOString()
     };
-    
     peakMissions.unshift(mission);
     localStorage.setItem('peakMissions', JSON.stringify(peakMissions));
-    
-    addPeakLog('🟡', 'مهمة جديدة', `${unit} في ${location}`, priority);
+    addPeakLog('🟡', 'مهمة جديدة', unit + ' في ' + location, priority);
     sendPeakAlertToControl(mission);
-    
     alert('✅ تم حفظ مهمة التمركز بنجاح');
     clearPeakForm();
     loadPeakLog();
     loadPeakAlerts();
 }
 
-// ===== إضافة سجل =====
 function addPeakLog(icon, action, details, priority) {
     const log = {
         id: Date.now(),
@@ -1111,68 +1511,50 @@ function addPeakLog(icon, action, details, priority) {
     loadPeakLog();
 }
 
-// ===== تحميل سجل العمليات =====
 function loadPeakLog() {
     const container = document.getElementById('peakTimeLog');
     const logs = JSON.parse(localStorage.getItem('peakLogs') || '[]');
-    
     if (logs.length === 0) {
         container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد سجلات</p>';
         return;
     }
-    
     let html = '';
     logs.forEach(log => {
-        const priorityColor = log.priority === 'عالية' ? 'var(--coral)' : 
-                             log.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
-        html += `
-            <div style="display:flex; align-items:center; gap:8px; background:white; padding:6px 10px; border-radius:var(--radius-sm); border-right:3px solid ${priorityColor}; font-size:0.8rem;">
-                <span>${log.icon}</span>
-                <span style="font-weight:600; color:var(--gray-800);">${log.time}</span>
-                <span style="color:var(--gray-600);">${log.action}</span>
-                <span style="color:var(--gray-400);">${log.details}</span>
-            </div>
-        `;
+        const priorityColor = log.priority === 'عالية' ? 'var(--coral)' : log.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += '<div style="display:flex; align-items:center; gap:8px; background:white; padding:6px 10px; border-radius:var(--radius-sm); border-right:3px solid ' + priorityColor + '; font-size:0.8rem;">' +
+            '<span>' + log.icon + '</span>' +
+            '<span style="font-weight:600; color:var(--gray-800);">' + log.time + '</span>' +
+            '<span style="color:var(--gray-600);">' + log.action + '</span>' +
+            '<span style="color:var(--gray-400);">' + log.details + '</span>' +
+            '</div>';
     });
     container.innerHTML = html;
 }
 
-// ===== تحميل التنبيهات النشطة =====
 function loadPeakAlerts() {
     const container = document.getElementById('peakAlerts');
     const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
     const activeAlerts = alerts.filter(a => a.status === 'نشط');
-    
     if (activeAlerts.length === 0) {
         container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.8rem;">📭 لا توجد تنبيهات نشطة</p>';
         return;
     }
-    
     let html = '';
     activeAlerts.forEach(alert => {
-        const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : 
-                             alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
-        html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:var(--radius-sm); border-right:3px solid ${priorityColor};">
-                <div>
-                    <span style="font-weight:600; font-size:0.8rem;">🔔 ${alert.title}</span>
-                    <span style="font-size:0.7rem; color:var(--gray-600); display:block;">${alert.details}</span>
-                </div>
-                <button onclick="resolvePeakAlert('${alert.id}')" class="btn btn-teal" style="padding:2px 12px; font-size:0.6rem;">
-                    <i class="fas fa-check"></i> تم التنفيذ
-                </button>
-            </div>
-        `;
+        const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:var(--radius-sm); border-right:3px solid ' + priorityColor + ';">' +
+            '<div><span style="font-weight:600; font-size:0.8rem;">🔔 ' + alert.title + '</span><span style="font-size:0.7rem; color:var(--gray-600); display:block;">' + alert.details + '</span></div>' +
+            '<button onclick="resolvePeakAlert(\'' + alert.id + '\')" class="btn btn-teal" style="padding:2px 12px; font-size:0.6rem;"><i class="fas fa-check"></i> تم التنفيذ</button>' +
+            '</div>';
     });
     container.innerHTML = html;
 }
 
-// ===== إرسال تنبيه للتحكم العملياتي =====
 function sendPeakAlertToControl(mission) {
     const alert = {
         id: Date.now().toString(),
-        title: `تمركز مطلوب لـ ${mission.unit}`,
-        details: `المطلوب تمركز ${mission.unit} في ${mission.location} (${mission.startTime} - ${mission.endTime})`,
+        title: 'تمركز مطلوب لـ ' + mission.unit,
+        details: 'المطلوب تمركز ' + mission.unit + ' في ' + mission.location + ' (' + mission.startTime + ' - ' + mission.endTime + ')',
         priority: mission.priority,
         unit: mission.unit,
         location: mission.location,
@@ -1180,136 +1562,94 @@ function sendPeakAlertToControl(mission) {
         status: 'نشط',
         createdAt: new Date().toISOString()
     };
-    
     const alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
     alerts.unshift(alert);
     localStorage.setItem('peakAlerts', JSON.stringify(alerts));
-    
-    addPeakLog('🔔', 'تنبيه', `${mission.unit} في ${mission.location}`, mission.priority);
+    localStorage.removeItem('alertDismissed');
+    addPeakLog('🔔', 'تنبيه', mission.unit + ' في ' + mission.location, mission.priority);
     loadPeakAlerts();
+    showMainAlert('🔔 تمركز مطلوب لـ ' + mission.unit, 'المطلوب تمركز ' + mission.unit + ' في ' + mission.location);
 }
 
-// ===== إرسال تنبيه يدوي =====
 function sendPeakAlert() {
     const location = document.getElementById('peakLocation').value.trim();
     const unit = document.getElementById('peakUnit').value;
-    const priority = document.getElementById('peakPriority').value;
-    
     if (!location || !unit) {
         alert('⚠️ الرجاء تحديد الموقع والفرقة');
         return;
     }
-    
     const mission = {
         id: Date.now(),
         location: location,
         unit: unit,
         startTime: document.getElementById('peakStartTime').value || 'غير محدد',
         endTime: document.getElementById('peakEndTime').value || 'غير محدد',
-        priority: priority,
+        priority: document.getElementById('peakPriority').value,
         notes: document.getElementById('peakNotes').value.trim() || '',
         status: 'قيد الانتظار',
         createdAt: new Date().toISOString()
     };
-    
     sendPeakAlertToControl(mission);
     alert('✅ تم إرسال التنبيه للتحكم العملياتي');
 }
 
-// ===== إنهاء تنبيه =====
 function resolvePeakAlert(alertId) {
     if (!confirm('⚠️ هل أنت متأكد من إنهاء هذا التنبيه؟')) return;
-    
     let alerts = JSON.parse(localStorage.getItem('peakAlerts') || '[]');
     const alert = alerts.find(a => a.id === alertId);
     if (alert) {
         alert.status = 'منتهي';
         alerts = alerts.map(a => a.id === alertId ? alert : a);
         localStorage.setItem('peakAlerts', JSON.stringify(alerts));
-        
         addPeakLog('✅', 'تم التنفيذ', alert.details, alert.priority);
         loadPeakAlerts();
         loadPeakLog();
+        checkForAlerts();
     }
 }
 
-// ===== فتح الخريطة =====
 function openPeakMap() {
     document.getElementById('peakMapModal').style.display = 'flex';
     setTimeout(initPeakMap, 500);
 }
 
-// ===== إغلاق الخريطة =====
 function closePeakMap() {
     document.getElementById('peakMapModal').style.display = 'none';
-    if (peakMap) {
-        peakMap.invalidateSize();
-    }
+    if (peakMap) peakMap.invalidateSize();
 }
 
-// ===== تهيئة الخريطة =====
 function initPeakMap() {
     const container = document.getElementById('peakMap');
     if (!container) return;
-    
-    // التحقق من وجود Leaflet
-    if (typeof L === 'undefined') {
-        setTimeout(initPeakMap, 500);
-        return;
-    }
-    
-    if (peakMap) {
-        setTimeout(() => peakMap.invalidateSize(), 300);
-        return;
-    }
-    
+    if (typeof L === 'undefined') { setTimeout(initPeakMap, 500); return; }
+    if (peakMap) { setTimeout(function() { peakMap.invalidateSize(); }, 300); return; }
     try {
         peakMap = L.map('peakMap').setView([24.7136, 46.6753], 13);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(peakMap);
-        
-        let marker = null;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(peakMap);
+        var marker = null;
         peakMap.on('click', function(e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            
-            if (marker) {
-                peakMap.removeLayer(marker);
-            }
-            
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            if (marker) peakMap.removeLayer(marker);
             marker = L.marker([lat, lng]).addTo(peakMap);
-            
-            document.getElementById('peakSelectedLocation').innerHTML = 
-                `<strong>${lat.toFixed(6)}, ${lng.toFixed(6)}</strong>`;
-            selectedPeakLocation = { lat, lng };
+            document.getElementById('peakSelectedLocation').innerHTML = '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
+            selectedPeakLocation = { lat: lat, lng: lng };
         });
-        
-        setTimeout(() => peakMap.invalidateSize(), 300);
-        peakMapInitialized = true;
-    } catch (error) {
-        console.error('خطأ في تهيئة الخريطة:', error);
-    }
+        setTimeout(function() { peakMap.invalidateSize(); }, 300);
+    } catch (error) { console.error('خطأ في تهيئة الخريطة:', error); }
 }
 
-// ===== تأكيد الموقع من الخريطة =====
 function confirmPeakLocation() {
-    if (!selectedPeakLocation) {
-        alert('⚠️ الرجاء تحديد موقع على الخريطة');
-        return;
-    }
-    
-    const { lat, lng } = selectedPeakLocation;
-    document.getElementById('peakLocation').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    if (!selectedPeakLocation) { alert('⚠️ الرجاء تحديد موقع على الخريطة'); return; }
+    var lat = selectedPeakLocation.lat;
+    var lng = selectedPeakLocation.lng;
+    document.getElementById('peakLocation').value = lat.toFixed(6) + ', ' + lng.toFixed(6);
     document.getElementById('peakLat').value = lat;
     document.getElementById('peakLng').value = lng;
-    
     closePeakMap();
     alert('✅ تم تحديد الموقع بنجاح');
 }
 
-// ===== مسح النموذج =====
 function clearPeakForm() {
     document.getElementById('peakLocation').value = '';
     document.getElementById('peakLat').value = '';
@@ -1323,33 +1663,33 @@ function clearPeakForm() {
 }
 
 // ============================================
-// باقي الكود (المتغيرات والدوال الأساسية)
+// باقي الكود الأساسي
 // ============================================
 
-let centersData = {};
-let reports = {};
-let lastKnownUpdate = 0;
-let currentShiftId = null;
-let allShifts = [];
-let isViewingArchiveShift = false;
-let currentViewingShift = null;
-let viewingShiftId = null;
-let uploadedDocs = [];
-let filteredDocs = [];
-let currentDocsPage = 1;
-const docsPerPage = 10;
-let selectedFiles = [];
-let docsViewMode = 'list';
-let currentPreviewDocId = null;
-let currentPreviewText = '';
+var centersData = {};
+var reports = {};
+var lastKnownUpdate = 0;
+var currentShiftId = null;
+var allShifts = [];
+var isViewingArchiveShift = false;
+var currentViewingShift = null;
+var viewingShiftId = null;
+var uploadedDocs = [];
+var filteredDocs = [];
+var currentDocsPage = 1;
+var docsPerPage = 10;
+var selectedFiles = [];
+var docsViewMode = 'list';
+var currentPreviewDocId = null;
+var currentPreviewText = '';
 
-const centerNumbers = Array.from({length: 19}, (_, i) => i + 1);
-const centerList = centerNumbers.map(n => `جنوب ${n}`);
+var centerNumbers = Array.from({length: 19}, function(_, i) { return i + 1; });
+var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
 
-let currentSheetIndex = 0;
-let workbookData = null;
+var currentSheetIndex = 0;
+var workbookData = null;
 
-const controlData = [
+var controlData = [
     { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
     { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
     { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
@@ -1361,15 +1701,15 @@ const controlData = [
     { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
 ];
 
-let isEditMode = false;
-let controlNotes = "";
-let seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+var isEditMode = false;
+var controlNotes = "";
+var seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
 
 // ===== تحميل البيانات =====
 async function loadAllData() {
     try {
-        const response = await fetch('/api/data');
-        const result = await response.json();
+        var response = await fetch('/api/data');
+        var result = await response.json();
         centersData = result.centers;
         reports = result.data;
         currentShiftId = result.currentShiftId || null;
@@ -1381,7 +1721,312 @@ async function loadAllData() {
     }
 }
 
-// ===== دوال التحديثات التشغيلية =====
+// ===== عرض البيانات =====
+function renderData() {
+    var container = document.getElementById("pointsContainer");
+    if (!centersData || Object.keys(centersData).length === 0) {
+        container.innerHTML = "<div class='loading'>❌ لا توجد بيانات</div>";
+        return;
+    }
+    container.innerHTML = "";
+    for (var center in centersData) {
+        var pointDiv = document.createElement("div");
+        pointDiv.className = "point-card";
+        var titleDiv = document.createElement("div");
+        titleDiv.className = "point-title";
+        titleDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + center;
+        pointDiv.appendChild(titleDiv);
+        var gridDiv = document.createElement("div");
+        gridDiv.className = "units-grid";
+        for (var i = 0; i < centersData[center].length; i++) {
+            var unit = centersData[center][i];
+            var key = center + '|' + unit;
+            var info = reports[key] || { count: 0, times: [] };
+            var hasReports = info.count > 0;
+            var unitDiv = document.createElement("div");
+            unitDiv.className = "unit-card";
+            unitDiv.innerHTML = '<div class="name">' + unit + '</div><div class="count-number ' + (info.count === 0 ? 'zero' : '') + '">' + info.count + '</div><div class="buttons-row"><button class="report-btn btn">➕ تسجيل بلاغ</button>' + (hasReports ? '<button class="undo-btn btn btn-undo">↩️ تراجع</button>' : '') + '</div><button class="show-times-btn">📋 عرض التواقيت</button>';
+            unitDiv.querySelector(".report-btn").onclick = (function(c, u) { return function() { addReportToServer(c, u); }; })(center, unit);
+            if (hasReports) {
+                unitDiv.querySelector(".undo-btn").onclick = (function(c, u) { return function() { undoLastReport(c, u); }; })(center, unit);
+            }
+            unitDiv.querySelector(".show-times-btn").onclick = (function(c, u, t) { return function() { showTimes(c, u, t); }; })(center, unit, info.times);
+            gridDiv.appendChild(unitDiv);
+        }
+        pointDiv.appendChild(gridDiv);
+        container.appendChild(pointDiv);
+    }
+}
+
+function updateTotal() {
+    var total = 0;
+    for (var key in reports) { if (reports[key] && reports[key].count) total += reports[key].count; }
+    document.getElementById("grandTotal").innerText = total;
+}
+
+function updateShiftStatus() {
+    var status = document.getElementById('shiftStatus');
+    if (currentShiftId) {
+        var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
+        if (shift) { status.innerHTML = '📌 المناوبة الحالية: ' + (shift.shiftType || 'غير محددة') + ' - ' + (shift.shiftDate || ''); } else { status.innerHTML = '📌 مناوبة نشطة (رقم: ' + currentShiftId + ')'; }
+    } else { status.innerHTML = '📌 لا توجد مناوبة نشطة'; }
+}
+
+function calculateLiveReportStats() {
+    var container = document.getElementById('liveReportStats');
+    if (!container) return;
+    var total = 0;
+    var unitStats = {};
+    for (var key in reports) {
+        var report = reports[key];
+        if (report && report.count > 0) {
+            total += report.count;
+            var parts = key.split('|');
+            var unit = parts.length > 1 ? parts[1] : key;
+            unitStats[unit] = (unitStats[unit] || 0) + report.count;
+        }
+    }
+    if (total === 0) { container.style.display = 'none'; return; }
+    container.style.display = 'block';
+    document.getElementById('liveTotalReports').innerText = total;
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    document.getElementById('liveTopUnit').innerText = topUnit;
+    document.getElementById('liveTopUnitCount').innerText = topCount;
+    var listContainer = document.getElementById('liveUnitList');
+    listContainer.innerHTML = '';
+    sortedUnits.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = '<span>' + item[0] + '</span><span class="count">' + item[1] + '</span>';
+        listContainer.appendChild(div);
+    });
+}
+
+async function addReportToServer(center, unit) {
+    if (isViewingArchiveShift) { alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة."); return; }
+    if (!currentShiftId) { alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً."); return; }
+    try {
+        var response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
+        var result = await response.json();
+        if (result.success) { await loadAllData(); calculateLiveReportStats(); } else { alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف")); }
+    } catch (error) { alert("❌ فشل في الاتصال بالخادم"); }
+}
+
+async function undoLastReport(center, unit) {
+    if (isViewingArchiveShift) { alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة."); return; }
+    try {
+        var response = await fetch('/api/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
+        var result = await response.json();
+        if (result.success) { await loadAllData(); calculateLiveReportStats(); } else if (result.error) { alert(result.error); }
+    } catch (error) { alert("❌ فشل في التراجع"); }
+}
+
+function showTimes(center, unit, times) {
+    var modalTimes = document.createElement("div");
+    modalTimes.className = "modal";
+    modalTimes.innerHTML = '<div class="modal-content" style="max-width:380px;"><h3>' + center + ' - ' + unit + '</h3><div class="modal-times">' + (times && times.length ? times.map(function(t) { return '<p>🕒 ' + t + '</p>'; }).join("") : "<p>— لا توجد بلاغات —</p>") + '</div><button class="btn" onclick="this.closest(\'.modal\').style.display=\'none\'">إغلاق</button></div>';
+    document.body.appendChild(modalTimes);
+    modalTimes.style.display = "flex";
+    modalTimes.querySelector(".btn").onclick = function() { modalTimes.remove(); };
+}
+
+// ===== دوال المناوبات =====
+async function loadShifts() {
+    try {
+        var response = await fetch('/api/shifts');
+        allShifts = await response.json();
+        var archiveSelect = document.getElementById('archiveSelect');
+        archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
+        allShifts.forEach(function(shift) {
+            var option = document.createElement('option');
+            option.value = shift.id;
+            var date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
+            var total = shift.totalReports || 0;
+            var type = shift.shiftType || 'مناوبة';
+            option.textContent = type + ' - ' + date + ' (' + total + ' بلاغ)';
+            if (shift.id === currentShiftId) { option.textContent += ' ⬅️ الحالية'; }
+            archiveSelect.appendChild(option);
+        });
+        var shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
+        if (shiftArchiveSelect) {
+            shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
+            allShifts.forEach(function(shift) {
+                var option = document.createElement('option');
+                option.value = shift.id;
+                var date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
+                option.textContent = (shift.shiftType || 'مناوبة') + ' - ' + date;
+                shiftArchiveSelect.appendChild(option);
+            });
+        }
+        updateShiftStatus();
+    } catch (error) {}
+}
+
+function showShiftTypeDialog() {
+    return new Promise(function(resolve) {
+        var modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = '<div class="modal-content" style="max-width:400px;"><h3 style="text-align:center;">📋 بدء مناوبة جديدة</h3><p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة الجديدة:</p><div style="display:flex; gap:15px; justify-content:center; margin:20px 0;"><button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button><button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button></div><div style="display:flex; justify-content:center; gap:10px;"><button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button></div></div>';
+        document.body.appendChild(modal);
+        modal.querySelector('#shiftMorningBtn').onclick = function() { modal.remove(); resolve('صباحية'); };
+        modal.querySelector('#shiftNightBtn').onclick = function() { modal.remove(); resolve('ليلية'); };
+        modal.querySelector('#cancelShiftBtn').onclick = function() { modal.remove(); resolve(null); };
+        modal.onclick = function(e) { if (e.target === modal) { modal.remove(); resolve(null); } };
+    });
+}
+
+async function startNewShift() {
+    var shiftType = await showShiftTypeDialog();
+    if (!shiftType) return;
+    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)') + ' جديدة.')) return;
+    try {
+        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: shiftType }) });
+        var result = await response.json();
+        if (result.success) {
+            currentShiftId = result.shiftId;
+            alert('✅ تم بدء المناوبة ' + shiftType + ' بنجاح');
+            await loadShifts();
+            await loadAllData();
+            calculateLiveReportStats();
+            document.getElementById('shiftModal').style.display = 'none';
+        } else { alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); }
+    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+}
+
+// ===== ربط الأحداث الرئيسية =====
+document.addEventListener('DOMContentLoaded', function() {
+    loadBrandLogo();
+    loadSavedThemeSettings();
+    loadThemeMode();
+    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
+    buildCentersTable();
+    loadShifts();
+    loadAllData();
+    setTimeout(checkForAlerts, 1000);
+});
+
+setInterval(checkForAlerts, 30000);
+
+document.getElementById("newShiftBtn").onclick = startNewShift;
+document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
+document.getElementById("closeShiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
+document.getElementById("docsBtn").onclick = function() { openDocsPage(); };
+document.getElementById("airAmbulanceBtn").onclick = function() {
+    document.getElementById('airAmbulanceModal').style.display = 'flex';
+    loadAirRecords();
+    var now = new Date();
+    document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
+};
+document.getElementById("closeAirModal").onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
+document.getElementById("monthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
+document.getElementById("closeMonthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
+document.getElementById("controlBtn").onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); loadControlNotes(); }); };
+document.getElementById("closeControlBtn").onclick = function() {
+    document.getElementById('controlModal').style.display = 'none';
+    isEditMode = false;
+    document.getElementById('saveVacationsBtn').style.display = 'none';
+    document.getElementById('editVacationsBtn').style.display = 'inline-block';
+};
+document.getElementById("printShiftBtn").onclick = function() { window.print(); };
+document.getElementById("saveShiftBtn").onclick = saveShiftData;
+document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
+document.getElementById("viewShiftBtn").onclick = viewShiftReports;
+document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
+
+// ===== بناء جدول المراكز =====
+function buildCentersTable() {
+    var tbody = document.getElementById('centersTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    for (var i = 0; i < centerList.length; i++) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td style="font-weight:bold; font-size:0.75rem;">' + centerList[i] + '</td><td><input type="number" id="staff_' + i + '" style="width:50px; text-align:center;" min="0" max="4" value=""></td><td><input type="number" id="cars_' + i + '" style="width:50px; text-align:center;" min="0" max="2" value=""></td><td><span id="status_' + i + '" class="status-icon status-not">❌</span></td><td><input type="text" id="notes_' + i + '" style="width:100%; font-size:0.7rem;" value=""></td>';
+        var staffInput = tr.querySelector('#staff_' + i);
+        var carsInput = tr.querySelector('#cars_' + i);
+        staffInput.addEventListener('input', function(idx) { return function() { updateStatusIcon(idx); calculateWorkforceStatsLocally(); }; }(i));
+        carsInput.addEventListener('input', function(idx) { return function() { updateStatusIcon(idx); calculateWorkforceStatsLocally(); }; }(i));
+        tbody.appendChild(tr);
+    }
+}
+
+function updateStatusIcon(index) {
+    var staffInput = document.getElementById('staff_' + index);
+    var carsInput = document.getElementById('cars_' + index);
+    var iconSpan = document.getElementById('status_' + index);
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if (staffCount >= 2 && carsCount >= 1) { iconSpan.innerHTML = '✅'; iconSpan.className = 'status-icon status-ok'; } else { iconSpan.innerHTML = '❌'; iconSpan.className = 'status-icon status-not'; }
+    }
+}
+
+function calculateWorkforceStatsLocally() {
+    var centerList = document.querySelectorAll('#centersTableBody tr');
+    var totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
+    var distribution = {}, carDistribution = {};
+    centerList.forEach(function(tr) {
+        var centerName = tr.querySelector('td:first-child')?.innerText || '';
+        var staffInput = tr.querySelector('input[id^="staff_"]');
+        var carsInput = tr.querySelector('input[id^="cars_"]');
+        if (staffInput && carsInput) {
+            var staffCount = parseInt(staffInput.value) || 0;
+            var carsCount = parseInt(carsInput.value) || 0;
+            totalStaff += staffCount; totalCars += carsCount; centerCount++;
+            distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
+            if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+        }
+    });
+    var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+    document.getElementById('workforceStats').style.display = 'block';
+    document.getElementById('totalStaffDisplay').innerText = totalStaff;
+    document.getElementById('totalCarsDisplay').innerText = totalCars;
+    document.getElementById('missingCentersDisplay').innerText = missingCenters;
+    document.getElementById('staffSubText').innerText = 'موزعين على ' + centerCount + ' مركز';
+    document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
+    document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
+    document.getElementById('readinessSubText').innerText = readyCenters + ' / ' + centerCount + ' مركز جاهز';
+    var circumference = 2 * Math.PI * 42;
+    var offset = circumference - (readinessRate / 100) * circumference;
+    var circle = document.getElementById('readinessCircle');
+    var text = document.getElementById('readinessText');
+    var color = '#c0392b';
+    if (readinessRate >= 80) color = '#2a7f3e';
+    else if (readinessRate >= 50) color = '#f39c12';
+    circle.setAttribute('stroke', color);
+    circle.style.strokeDashoffset = offset;
+    text.textContent = readinessRate + '%';
+    var distList = document.getElementById('distributionList');
+    distList.innerHTML = '';
+    var total = totalStaff || 1;
+    for (var center in distribution) {
+        var count = distribution[center];
+        var barWidth = Math.round((count / total) * 100);
+        var isReady = count >= 2;
+        var div = document.createElement('div');
+        div.className = 'distribution-bar';
+        div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
+        distList.appendChild(div);
+    }
+    var carDistList = document.getElementById('carDistributionList');
+    carDistList.innerHTML = '';
+    var totalCarsValue = totalCars || 1;
+    for (var center2 in carDistribution) {
+        var count2 = carDistribution[center2];
+        var barWidth2 = Math.round((count2 / totalCarsValue) * 100);
+        var hasCar = count2 >= 1;
+        var div2 = document.createElement('div');
+        div2.className = 'distribution-bar';
+        div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
+        carDistList.appendChild(div2);
+    }
+}
+
+// ============================================
+// دوال التحديثات التشغيلية
+// ============================================
 function openDocsPage() {
     document.getElementById('docsPage').style.display = 'block';
     document.body.style.overflow = 'hidden';
@@ -1393,11 +2038,11 @@ function closeDocsPage() {
 }
 async function loadDocsData() {
     try {
-        const response = await fetch('/api/docs');
-        const result = await response.json();
+        var response = await fetch('/api/docs');
+        var result = await response.json();
         if (result.success) {
             uploadedDocs = result.docs || [];
-            filteredDocs = [...uploadedDocs];
+            filteredDocs = [].concat(uploadedDocs);
             renderDocsList();
             updateStats();
             document.getElementById('docsTotalCount').innerText = uploadedDocs.length;
@@ -1405,97 +2050,92 @@ async function loadDocsData() {
     } catch (error) { console.error('خطأ في تحميل التحديثات:', error); }
 }
 function renderDocsList() {
-    const container = document.getElementById('docsListContainer');
-    const sortedDocs = [...filteredDocs].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-    const start = (currentDocsPage - 1) * docsPerPage;
-    const end = start + docsPerPage;
-    const pageDocs = sortedDocs.slice(start, end);
+    var container = document.getElementById('docsListContainer');
+    var sortedDocs = filteredDocs.slice().sort(function(a, b) { return new Date(b.uploadDate) - new Date(a.uploadDate); });
+    var start = (currentDocsPage - 1) * docsPerPage;
+    var end = start + docsPerPage;
+    var pageDocs = sortedDocs.slice(start, end);
     if (pageDocs.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);">
-            <i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i>
-            <h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3>
-            <p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p>
-            <button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button>
-        </div>`;
+        container.innerHTML = '<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);"><i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i><h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3><p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p><button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button></div>';
         document.getElementById('docsPagination').innerHTML = '';
         document.getElementById('docsFilterCount').innerText = '0 تحديث';
         return;
     }
-    const isGrid = docsViewMode === 'grid';
+    var isGrid = docsViewMode === 'grid';
     container.style.display = 'grid';
     container.style.gridTemplateColumns = isGrid ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
     container.style.gap = '14px';
-    let html = '';
-    pageDocs.forEach((doc) => {
-        const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
-        const timeAgo = getTimeAgo(doc.uploadDate);
-        const icon = getFileIcon(doc.filename);
-        const category = doc.category || 'أخرى';
-        const priority = doc.priority || 'normal';
-        const color = getCategoryColor(category);
-        const priorityColor = getPriorityColor(priority);
-        html += `<div style="background:white; border-radius:var(--radius-md); padding:16px 20px; border-right:4px solid ${color}; box-shadow:var(--shadow-sm); transition:all 0.2s; position:relative; ${isGrid ? 'height:100%;' : ''}">
-            ${priority === 'urgent' ? `<div style="position:absolute; top:-6px; left:16px; background:${priorityColor}; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> عاجل</div>` : ''}
-            ${priority === 'important' ? `<div style="position:absolute; top:-6px; left:16px; background:${priorityColor}; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-star"></i> مهم</div>` : ''}
-            <div style="display:flex; gap:14px; align-items:flex-start; margin-top:${priority !== 'normal' ? '12px' : '0'};">
-                <div style="width:48px; height:48px; border-radius:50%; background:${color}22; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0;">${icon}</div>
-                <div style="flex:1; min-width:0;">
-                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:4px;">
-                        <span style="font-size:0.6rem; background:${color}22; color:${color}; padding:2px 10px; border-radius:20px; font-weight:600;">${category}</span>
-                        <span style="font-size:0.6rem; color:var(--gray-400);"><i class="far fa-clock"></i> ${timeAgo}</span>
-                    </div>
-                    <h3 style="margin:0; font-size:0.95rem; color:var(--gray-800);">${doc.filename}</h3>
-                    ${doc.description ? `<p style="margin:4px 0 0; color:var(--gray-600); font-size:0.8rem; line-height:1.5;">${doc.description}</p>` : ''}
-                    <div style="display:flex; gap:12px; margin-top:8px; font-size:0.65rem; color:var(--gray-400); flex-wrap:wrap;">
-                        <span><i class="far fa-calendar-alt"></i> ${date}</span>
-                        <span><i class="fas fa-user"></i> ${doc.uploader || 'المشرف'}</span>
-                    </div>
-                </div>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); flex-wrap:wrap;">
-                <button onclick="openDocPreview('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-eye"></i> عرض</button>
-                <button onclick="downloadDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-download"></i> تحميل</button>
-                <button onclick="deleteDoc('${doc.id}')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--coral); color:var(--coral); margin-right:auto;"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>`;
+    var html = '';
+    pageDocs.forEach(function(doc) {
+        var date = new Date(doc.uploadDate).toLocaleString('ar-SA');
+        var timeAgo = getTimeAgo(doc.uploadDate);
+        var icon = getFileIcon(doc.filename);
+        var category = doc.category || 'أخرى';
+        var priority = doc.priority || 'normal';
+        var color = getCategoryColor(category);
+        var priorityColor = getPriorityColor(priority);
+        html += '<div style="background:white; border-radius:var(--radius-md); padding:16px 20px; border-right:4px solid ' + color + '; box-shadow:var(--shadow-sm); transition:all 0.2s; position:relative; ' + (isGrid ? 'height:100%;' : '') + '">' +
+            (priority === 'urgent' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> عاجل</div>' : '') +
+            (priority === 'important' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-star"></i> مهم</div>' : '') +
+            '<div style="display:flex; gap:14px; align-items:flex-start; margin-top:' + (priority !== 'normal' ? '12px' : '0') + ';">' +
+            '<div style="width:48px; height:48px; border-radius:50%; background:' + color + '22; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0;">' + icon + '</div>' +
+            '<div style="flex:1; min-width:0;">' +
+            '<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:4px;">' +
+            '<span style="font-size:0.6rem; background:' + color + '22; color:' + color + '; padding:2px 10px; border-radius:20px; font-weight:600;">' + category + '</span>' +
+            '<span style="font-size:0.6rem; color:var(--gray-400);"><i class="far fa-clock"></i> ' + timeAgo + '</span>' +
+            '</div>' +
+            '<h3 style="margin:0; font-size:0.95rem; color:var(--gray-800);">' + doc.filename + '</h3>' +
+            (doc.description ? '<p style="margin:4px 0 0; color:var(--gray-600); font-size:0.8rem; line-height:1.5;">' + doc.description + '</p>' : '') +
+            '<div style="display:flex; gap:12px; margin-top:8px; font-size:0.65rem; color:var(--gray-400); flex-wrap:wrap;">' +
+            '<span><i class="far fa-calendar-alt"></i> ' + date + '</span>' +
+            '<span><i class="fas fa-user"></i> ' + (doc.uploader || 'المشرف') + '</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); flex-wrap:wrap;">' +
+            '<button onclick="openDocPreview(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-eye"></i> عرض</button>' +
+            '<button onclick="downloadDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-download"></i> تحميل</button>' +
+            '<button onclick="deleteDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--coral); color:var(--coral); margin-right:auto;"><i class="fas fa-trash"></i></button>' +
+            '</div>' +
+            '</div>';
     });
     container.innerHTML = html;
     updatePagination(filteredDocs.length);
-    document.getElementById('docsFilterCount').innerText = `${filteredDocs.length} تحديث (من ${uploadedDocs.length})`;
+    document.getElementById('docsFilterCount').innerText = filteredDocs.length + ' تحديث (من ' + uploadedDocs.length + ')';
 }
 function updatePagination(total) {
-    const totalPages = Math.ceil(total / docsPerPage);
-    const container = document.getElementById('docsPagination');
+    var totalPages = Math.ceil(total / docsPerPage);
+    var container = document.getElementById('docsPagination');
     if (totalPages <= 1) { container.innerHTML = ''; return; }
-    let html = `<button onclick="goToDocsPage(${currentDocsPage - 1})" class="btn" ${currentDocsPage === 1 ? 'disabled style="opacity:0.5;"' : ''}><i class="fas fa-chevron-right"></i></button>`;
-    for (let i = 1; i <= totalPages; i++) {
-        html += `<button onclick="goToDocsPage(${i})" class="btn ${i === currentDocsPage ? 'btn-primary' : ''}" style="padding:4px 12px; min-width:32px;">${i}</button>`;
+    var html = '<button onclick="goToDocsPage(' + (currentDocsPage - 1) + ')" class="btn" ' + (currentDocsPage === 1 ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-right"></i></button>';
+    for (var i = 1; i <= totalPages; i++) {
+        html += '<button onclick="goToDocsPage(' + i + ')" class="btn ' + (i === currentDocsPage ? 'btn-primary' : '') + '" style="padding:4px 12px; min-width:32px;">' + i + '</button>';
     }
-    html += `<button onclick="goToDocsPage(${currentDocsPage + 1})" class="btn" ${currentDocsPage === totalPages ? 'disabled style="opacity:0.5;"' : ''}><i class="fas fa-chevron-left"></i></button>`;
+    html += '<button onclick="goToDocsPage(' + (currentDocsPage + 1) + ')" class="btn" ' + (currentDocsPage === totalPages ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-left"></i></button>';
     container.innerHTML = html;
 }
 function goToDocsPage(page) {
-    const totalPages = Math.ceil(filteredDocs.length / docsPerPage);
+    var totalPages = Math.ceil(filteredDocs.length / docsPerPage);
     if (page < 1 || page > totalPages) return;
     currentDocsPage = page;
     renderDocsList();
     document.getElementById('docsListContainer').scrollIntoView({ behavior: 'smooth' });
 }
 function filterDocs() {
-    const searchTerm = document.getElementById('searchDocsInput').value.toLowerCase();
-    const category = document.getElementById('filterDocsCategory').value;
-    const timeFilter = document.getElementById('filterDocsTime').value;
-    filteredDocs = uploadedDocs.filter(doc => {
-        const matchesSearch = doc.filename.toLowerCase().includes(searchTerm) || (doc.description || '').toLowerCase().includes(searchTerm);
-        const matchesCategory = category === 'all' || doc.category === category;
-        const now = new Date();
-        const docDate = new Date(doc.uploadDate);
-        let matchesTime = true;
+    var searchTerm = document.getElementById('searchDocsInput').value.toLowerCase();
+    var category = document.getElementById('filterDocsCategory').value;
+    var timeFilter = document.getElementById('filterDocsTime').value;
+    filteredDocs = uploadedDocs.filter(function(doc) {
+        var matchesSearch = doc.filename.toLowerCase().includes(searchTerm) || (doc.description || '').toLowerCase().includes(searchTerm);
+        var matchesCategory = category === 'all' || doc.category === category;
+        var now = new Date();
+        var docDate = new Date(doc.uploadDate);
+        var matchesTime = true;
         switch(timeFilter) {
             case 'today': matchesTime = docDate.toDateString() === now.toDateString(); break;
-            case 'week': const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); matchesTime = docDate >= weekAgo; break;
-            case 'month': const monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth() - 1); matchesTime = docDate >= monthAgo; break;
-            case 'year': const yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear() - 1); matchesTime = docDate >= yearAgo; break;
+            case 'week': var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); matchesTime = docDate >= weekAgo; break;
+            case 'month': var monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth() - 1); matchesTime = docDate >= monthAgo; break;
+            case 'year': var yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear() - 1); matchesTime = docDate >= yearAgo; break;
             default: matchesTime = true;
         }
         return matchesSearch && matchesCategory && matchesTime;
@@ -1504,25 +2144,25 @@ function filterDocs() {
     renderDocsList();
 }
 function updateStats() {
-    const total = uploadedDocs.length;
-    const instructions = uploadedDocs.filter(d => d.category === 'تعليمات').length;
-    const alerts = uploadedDocs.filter(d => d.category === 'تنبيه').length;
-    const notifications = uploadedDocs.filter(d => d.category === 'إشعار').length;
+    var total = uploadedDocs.length;
+    var instructions = uploadedDocs.filter(function(d) { return d.category === 'تعليمات'; }).length;
+    var alerts = uploadedDocs.filter(function(d) { return d.category === 'تنبيه'; }).length;
+    var notifications = uploadedDocs.filter(function(d) { return d.category === 'إشعار'; }).length;
     document.getElementById('statTotal').innerText = total;
     document.getElementById('statInstructions').innerText = instructions;
     document.getElementById('statAlerts').innerText = alerts;
     document.getElementById('statNotifications').innerText = notifications;
 }
 function getTimeAgo(dateString) {
-    const now = new Date();
-    const past = new Date(dateString);
-    const diff = Math.floor((now - past) / 1000);
+    var now = new Date();
+    var past = new Date(dateString);
+    var diff = Math.floor((now - past) / 1000);
     if (diff < 60) return 'الآن';
-    if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`;
-    if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`;
-    if (diff < 604800) return `منذ ${Math.floor(diff / 86400)} يوم`;
-    if (diff < 2592000) return `منذ ${Math.floor(diff / 604800)} أسبوع`;
-    return `منذ ${Math.floor(diff / 2592000)} شهر`;
+    if (diff < 3600) return 'منذ ' + Math.floor(diff / 60) + ' دقيقة';
+    if (diff < 86400) return 'منذ ' + Math.floor(diff / 3600) + ' ساعة';
+    if (diff < 604800) return 'منذ ' + Math.floor(diff / 86400) + ' يوم';
+    if (diff < 2592000) return 'منذ ' + Math.floor(diff / 604800) + ' أسبوع';
+    return 'منذ ' + Math.floor(diff / 2592000) + ' شهر';
 }
 function getFileIcon(filename) {
     if (filename.match(/\.(pdf)$/i)) return '📄';
@@ -1534,11 +2174,11 @@ function getFileIcon(filename) {
     return '📎';
 }
 function getCategoryColor(category) {
-    const colors = { 'تعليمات': '#1A3A5C', 'إشعار': '#E8C84A', 'تقرير': '#2E8B7A', 'جدول': '#2A5A7A', 'تنبيه': '#E87461', 'أخرى': '#6B7F94' };
+    var colors = { 'تعليمات': '#1A3A5C', 'إشعار': '#E8C84A', 'تقرير': '#2E8B7A', 'جدول': '#2A5A7A', 'تنبيه': '#E87461', 'أخرى': '#6B7F94' };
     return colors[category] || '#6B7F94';
 }
 function getPriorityColor(priority) {
-    const colors = { 'normal': '#6B7F94', 'important': '#E8C84A', 'urgent': '#E87461' };
+    var colors = { 'normal': '#6B7F94', 'important': '#E8C84A', 'urgent': '#E87461' };
     return colors[priority] || '#6B7F94';
 }
 function changeViewMode() {
@@ -1561,482 +2201,95 @@ function openUrgentUploadModal() {
     document.getElementById('docCategory').value = 'تنبيه';
 }
 function handleFileSelect(event) {
-    const files = event.target.files;
-    for (let file of files) { selectedFiles.push(file); }
+    var files = event.target.files;
+    for (var i = 0; i < files.length; i++) { selectedFiles.push(files[i]); }
     renderSelectedFiles();
 }
 function renderSelectedFiles() {
-    const container = document.getElementById('selectedFilesList');
+    var container = document.getElementById('selectedFilesList');
     if (selectedFiles.length === 0) { container.innerHTML = ''; return; }
-    let html = '';
-    selectedFiles.forEach((file, index) => {
-        const icon = file.type.includes('pdf') ? '📄' : file.type.includes('word') ? '📝' : file.type.includes('excel') ? '📊' : file.type.includes('image') ? '🖼️' : '📎';
-        const size = (file.size / 1024).toFixed(1) + ' كيلوبايت';
-        html += `<div style="display:flex; align-items:center; gap:8px; background:var(--gray-50); padding:4px 12px 4px 8px; border-radius:20px; border:1px solid var(--gray-200); font-size:0.75rem;">
-            <span>${icon}</span><span>${file.name}</span><span style="color:var(--gray-400); font-size:0.6rem;">(${size})</span>
-            <button onclick="removeSelectedFile(${index})" style="border:none; background:transparent; color:var(--coral); cursor:pointer; font-size:0.8rem;">✕</button>
-        </div>`;
+    var html = '';
+    selectedFiles.forEach(function(file, index) {
+        var icon = file.type.includes('pdf') ? '📄' : file.type.includes('word') ? '📝' : file.type.includes('excel') ? '📊' : file.type.includes('image') ? '🖼️' : '📎';
+        var size = (file.size / 1024).toFixed(1) + ' كيلوبايت';
+        html += '<div style="display:flex; align-items:center; gap:8px; background:var(--gray-50); padding:4px 12px 4px 8px; border-radius:20px; border:1px solid var(--gray-200); font-size:0.75rem;">' +
+            '<span>' + icon + '</span><span>' + file.name + '</span><span style="color:var(--gray-400); font-size:0.6rem;">(' + size + ')</span>' +
+            '<button onclick="removeSelectedFile(' + index + ')" style="border:none; background:transparent; color:var(--coral); cursor:pointer; font-size:0.8rem;">✕</button>' +
+            '</div>';
     });
     container.innerHTML = html;
 }
 function removeSelectedFile(index) { selectedFiles.splice(index, 1); renderSelectedFiles(); }
-document.getElementById('saveDocBtn')?.addEventListener('click', async function() {
-    const title = document.getElementById('docTitle').value.trim();
-    const description = document.getElementById('docDescription').value.trim();
-    const category = document.getElementById('docCategory').value;
-    const priority = document.getElementById('docPriority').value;
-    if (!title) { alert('❌ الرجاء إدخال عنوان للتحديث'); return; }
-    try {
-        if (selectedFiles.length > 0) {
-            for (let file of selectedFiles) {
-                const reader = new FileReader();
-                const base64 = await new Promise((resolve) => {
-                    reader.onload = function(event) { resolve(btoa(String.fromCharCode.apply(null, new Uint8Array(event.target.result)))); };
-                    reader.readAsArrayBuffer(file);
-                });
-                const response = await fetch('/api/upload-doc', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename: title + '_' + file.name, fileData: base64, description: description || '', fileType: file.type, category: category, priority: priority, uploader: 'المشرف' })
-                });
-                const result = await response.json();
-                if (!result.success) { alert('❌ فشل في رفع الملف: ' + file.name); return; }
-            }
-        } else {
-            const response = await fetch('/api/upload-doc', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: title, fileData: '', description: description || '', fileType: 'text/plain', category: category, priority: priority, uploader: 'المشرف' })
-            });
-            const result = await response.json();
-            if (!result.success) { alert('❌ فشل في نشر التحديث: ' + (result.error || 'خطأ غير معروف')); return; }
-        }
-        alert('✅ تم نشر التحديث بنجاح');
-        document.getElementById('uploadDocsModal').style.display = 'none';
-        await loadDocsData();
-    } catch (error) { alert('❌ خطأ في النشر: ' + error.message); }
-});
 
-// ===== معاينة الملف =====
-function openDocPreview(docId) {
-    const doc = uploadedDocs.find(d => d.id === docId);
-    if (!doc) { alert('❌ الملف غير موجود'); return; }
-    currentPreviewDocId = docId;
-    document.getElementById('docPreviewTitle').innerText = `📄 ${doc.filename}`;
-    document.getElementById('docPreviewModal').style.display = 'flex';
-    const content = document.getElementById('docPreviewContent');
-    content.innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
-    try {
-        if (doc.fileData) {
-            const fileType = doc.fileType || '';
-            const filename = doc.filename || '';
-            if (fileType.includes('text') || fileType.includes('plain') || filename.endsWith('.txt')) {
-                const binaryString = atob(doc.fileData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
-                const decoder = new TextDecoder('utf-8');
-                const text = decoder.decode(bytes);
-                currentPreviewText = text;
-                content.innerHTML = `<div style="direction:rtl; text-align:right; font-family: 'Inter', sans-serif; font-size:0.9rem; line-height:1.8; padding:10px; background:white; border-radius:var(--radius-sm);"><pre style="white-space:pre-wrap; font-family:inherit; margin:0; direction:rtl; text-align:right; font-size:0.9rem;">${escapeHtml(text)}</pre></div>`;
-                document.getElementById('docPreviewCopyBtn').style.display = 'inline-flex';
-            } else if (fileType.includes('pdf') || fileType.includes('image')) {
-                const blob = base64ToBlob(doc.fileData, fileType);
-                const url = URL.createObjectURL(blob);
-                if (fileType.includes('pdf')) { content.innerHTML = `<iframe src="${url}" style="width:100%; height:50vh; border:none; border-radius:var(--radius-sm);"></iframe>`; }
-                else if (fileType.includes('image')) { content.innerHTML = `<img src="${url}" style="max-width:100%; max-height:50vh; border-radius:var(--radius-sm);">`; }
-                document.getElementById('docPreviewCopyBtn').style.display = 'none';
-            } else {
-                content.innerHTML = `<p style="text-align:center; color:var(--gray-500);"><i class="fas fa-file" style="font-size:2rem; display:block; margin-bottom:10px;"></i>هذا الملف من نوع ${fileType || 'غير معروف'} لا يمكن عرضه مباشرة.<br>يمكنك تحميله من الزر أدناه.</p>`;
-                document.getElementById('docPreviewCopyBtn').style.display = 'none';
-            }
-        } else {
-            content.innerHTML = `<p style="text-align:center; color:var(--gray-400);">📭 لا توجد بيانات في هذا الملف</p>`;
-            document.getElementById('docPreviewCopyBtn').style.display = 'none';
-        }
-    } catch (error) {
-        content.innerHTML = `<p style="text-align:center; color:var(--coral);">❌ خطأ في عرض الملف: ${error.message}</p>`;
-        document.getElementById('docPreviewCopyBtn').style.display = 'none';
-    }
-}
-function closeDocPreview() {
-    document.getElementById('docPreviewModal').style.display = 'none';
-    document.getElementById('docPreviewContent').innerHTML = '<p style="text-align:center; color:var(--gray-400);">⏳ جاري تحميل الملف...</p>';
-    currentPreviewDocId = null;
-    currentPreviewText = '';
-}
-function copyDocPreview() {
-    if (!currentPreviewText) { alert('⚠️ لا يوجد نص للنسخ'); return; }
-    navigator.clipboard.writeText(currentPreviewText).then(() => { alert('✅ تم نسخ النص بنجاح!'); }).catch(() => {
-        const textarea = document.createElement('textarea');
-        textarea.value = currentPreviewText;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        textarea.remove();
-        alert('✅ تم نسخ النص بنجاح!');
-    });
-}
-function downloadDocFromPreview() { if (currentPreviewDocId) { downloadDoc(currentPreviewDocId); } }
-function base64ToBlob(base64, contentType) {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: contentType || 'application/octet-stream' });
-}
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-async function downloadDoc(docId) { try { window.open(`/api/download-doc/${docId}`, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
+// ===== دوال التحميل والحذف =====
+async function downloadDoc(docId) { try { window.open('/api/download-doc/' + docId, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
 async function deleteDoc(docId) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
     try {
-        const response = await fetch(`/api/delete-doc/${docId}`, { method: 'DELETE' });
-        const result = await response.json();
+        var response = await fetch('/api/delete-doc/' + docId, { method: 'DELETE' });
+        var result = await response.json();
         if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
     } catch (error) { alert('❌ خطأ في الاتصال'); }
 }
 
-// ===== بناء جدول المراكز =====
-function buildCentersTable() {
-    const tbody = document.getElementById('centersTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    for (let i = 0; i < centerList.length; i++) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td style="font-weight:bold; font-size:0.75rem;">${centerList[i]}</td><td><input type="number" id="staff_${i}" style="width:50px; text-align:center;" min="0" max="4" value=""></td><td><input type="number" id="cars_${i}" style="width:50px; text-align:center;" min="0" max="2" value=""></td><td><span id="status_${i}" class="status-icon status-not">❌</span></td><td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem;" value=""></td>`;
-        const staffInput = tr.querySelector(`#staff_${i}`);
-        const carsInput = tr.querySelector(`#cars_${i}`);
-        staffInput.addEventListener('input', function() { updateStatusIcon(i); calculateWorkforceStatsLocally(); });
-        carsInput.addEventListener('input', function() { updateStatusIcon(i); calculateWorkforceStatsLocally(); });
-        tbody.appendChild(tr);
-    }
-}
-function updateStatusIcon(index) {
-    const staffInput = document.getElementById(`staff_${index}`);
-    const carsInput = document.getElementById(`cars_${index}`);
-    const iconSpan = document.getElementById(`status_${index}`);
-    if (staffInput && carsInput && iconSpan) {
-        const staffCount = parseInt(staffInput.value) || 0;
-        const carsCount = parseInt(carsInput.value) || 0;
-        if (staffCount >= 2 && carsCount >= 1) { iconSpan.innerHTML = '✅'; iconSpan.className = 'status-icon status-ok'; } else { iconSpan.innerHTML = '❌'; iconSpan.className = 'status-icon status-not'; }
-    }
-}
-function calculateWorkforceStatsLocally() {
-    const centerList = document.querySelectorAll('#centersTableBody tr');
-    let totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
-    const distribution = {}, carDistribution = {};
-    centerList.forEach(tr => {
-        const centerName = tr.querySelector('td:first-child')?.innerText || '';
-        const staffInput = tr.querySelector('input[id^="staff_"]');
-        const carsInput = tr.querySelector('input[id^="cars_"]');
-        if (staffInput && carsInput) {
-            const staffCount = parseInt(staffInput.value) || 0;
-            const carsCount = parseInt(carsInput.value) || 0;
-            totalStaff += staffCount; totalCars += carsCount; centerCount++;
-            distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
-            if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
-        }
-    });
-    const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-    document.getElementById('workforceStats').style.display = 'block';
-    document.getElementById('totalStaffDisplay').innerText = totalStaff;
-    document.getElementById('totalCarsDisplay').innerText = totalCars;
-    document.getElementById('missingCentersDisplay').innerText = missingCenters;
-    document.getElementById('staffSubText').innerText = `موزعين على ${centerCount} مركز`;
-    document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-    document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
-    document.getElementById('readinessSubText').innerText = `${readyCenters} / ${centerCount} مركز جاهز`;
-    const circumference = 2 * Math.PI * 42;
-    const offset = circumference - (readinessRate / 100) * circumference;
-    const circle = document.getElementById('readinessCircle');
-    const text = document.getElementById('readinessText');
-    let color = '#c0392b';
-    if (readinessRate >= 80) color = '#2a7f3e';
-    else if (readinessRate >= 50) color = '#f39c12';
-    circle.setAttribute('stroke', color);
-    circle.style.strokeDashoffset = offset;
-    text.textContent = readinessRate + '%';
-    const distList = document.getElementById('distributionList');
-    distList.innerHTML = '';
-    const total = totalStaff || 1;
-    for (let center in distribution) {
-        const count = distribution[center];
-        const barWidth = Math.round((count / total) * 100);
-        const isReady = count >= 2;
-        const div = document.createElement('div');
-        div.className = 'distribution-bar';
-        div.innerHTML = `<span class="name">${center}</span><span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span><div class="bar-track"><div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div></div><span class="percent">${barWidth}%</span>`;
-        distList.appendChild(div);
-    }
-    const carDistList = document.getElementById('carDistributionList');
-    carDistList.innerHTML = '';
-    const totalCarsValue = totalCars || 1;
-    for (let center in carDistribution) {
-        const count = carDistribution[center];
-        const barWidth = Math.round((count / totalCarsValue) * 100);
-        const hasCar = count >= 1;
-        const div = document.createElement('div');
-        div.className = 'distribution-bar';
-        div.innerHTML = `<span class="name">${center}</span><span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span><div class="bar-track"><div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div></div><span class="percent">${barWidth}%</span>`;
-        carDistList.appendChild(div);
-    }
-}
-
-// ===== إحصائيات البلاغات =====
-function calculateLiveReportStats() {
-    const container = document.getElementById('liveReportStats');
-    if (!container) return;
-    let total = 0;
-    let unitStats = {};
-    for (let key in reports) {
-        const report = reports[key];
-        if (report && report.count > 0) {
-            total += report.count;
-            const parts = key.split('|');
-            const unit = parts.length > 1 ? parts[1] : key;
-            unitStats[unit] = (unitStats[unit] || 0) + report.count;
-        }
-    }
-    if (total === 0) { container.style.display = 'none'; return; }
-    container.style.display = 'block';
-    document.getElementById('liveTotalReports').innerText = total;
-    const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-    const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-    const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-    document.getElementById('liveTopUnit').innerText = topUnit;
-    document.getElementById('liveTopUnitCount').innerText = topCount;
-    const listContainer = document.getElementById('liveUnitList');
-    listContainer.innerHTML = '';
-    sortedUnits.forEach(([unit, count]) => {
-        const div = document.createElement('div');
-        div.className = 'item';
-        div.innerHTML = `<span>${unit}</span><span class="count">${count}</span>`;
-        listContainer.appendChild(div);
-    });
-}
-function updateTotal() {
-    let total = 0;
-    for (let key in reports) { if (reports[key]?.count) total += reports[key].count; }
-    document.getElementById("grandTotal").innerText = total;
-}
-function updateShiftStatus() {
-    const status = document.getElementById('shiftStatus');
-    if (currentShiftId) {
-        const shift = allShifts.find(s => s.id === currentShiftId);
-        if (shift) { status.innerHTML = `📌 المناوبة الحالية: ${shift.shiftType || 'غير محددة'} - ${shift.shiftDate || ''}`; } else { status.innerHTML = `📌 مناوبة نشطة (رقم: ${currentShiftId})`; }
-    } else { status.innerHTML = '📌 لا توجد مناوبة نشطة'; }
-}
-function renderData() {
-    const container = document.getElementById("pointsContainer");
-    if (!centersData || Object.keys(centersData).length === 0) { container.innerHTML = "<div class='loading'>❌ لا توجد بيانات</div>"; return; }
-    container.innerHTML = "";
-    for (let center in centersData) {
-        const pointDiv = document.createElement("div");
-        pointDiv.className = "point-card";
-        pointDiv.innerHTML = `<div class="point-title">📋 ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
-        container.appendChild(pointDiv);
-        const grid = pointDiv.querySelector(".units-grid");
-        for (let unit of centersData[center]) {
-            const key = `${center}|${unit}`;
-            const info = reports[key] || { count: 0, times: [] };
-            const hasReports = info.count > 0;
-            const unitDiv = document.createElement("div");
-            unitDiv.className = "unit-card";
-            unitDiv.innerHTML = `<div class="unit-name">${unit}</div><div class="count-number">${info.count}</div><div class="buttons-row"><button class="report-btn btn">➕ تسجيل بلاغ</button>${hasReports ? '<button class="undo-btn btn btn-undo">↩️ تراجع</button>' : ''}</div><button class="show-times-btn">📋 عرض التواقيت</button>`;
-            unitDiv.querySelector(".report-btn").onclick = () => addReportToServer(center, unit);
-            if (hasReports) { unitDiv.querySelector(".undo-btn").onclick = () => undoLastReport(center, unit); }
-            unitDiv.querySelector(".show-times-btn").onclick = () => showTimes(center, unit, info.times);
-            grid.appendChild(unitDiv);
-        }
-    }
-}
-async function addReportToServer(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة."); return; }
-    if (!currentShiftId) { alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً."); return; }
-    try {
-        const response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center, unit }) });
-        const result = await response.json();
-        if (result.success) { await loadAllData(); calculateLiveReportStats(); } else { alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ فشل في الاتصال بالخادم"); }
-}
-async function undoLastReport(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة."); return; }
-    try {
-        const response = await fetch('/api/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center, unit }) });
-        const result = await response.json();
-        if (result.success) { await loadAllData(); calculateLiveReportStats(); } else if (result.error) { alert(result.error); }
-    } catch (error) { alert("❌ فشل في التراجع"); }
-}
-function showTimes(center, unit, times) {
-    const modalTimes = document.createElement("div");
-    modalTimes.className = "modal";
-    modalTimes.innerHTML = `<div class="modal-content" style="max-width:380px;"><h3>${center} - ${unit}</h3><div class="modal-times">${times && times.length ? times.map(t => `<p>🕒 ${t}</p>`).join("") : "<p>— لا توجد بلاغات —</p>"}</div><button class="btn" onclick="this.closest('.modal').style.display='none'">إغلاق</button></div>`;
-    document.body.appendChild(modalTimes);
-    modalTimes.style.display = "flex";
-    modalTimes.querySelector(".btn").onclick = () => modalTimes.remove();
-}
-
-// ===== دوال المناوبات =====
-async function loadShifts() {
-    try {
-        const response = await fetch('/api/shifts');
-        allShifts = await response.json();
-        const archiveSelect = document.getElementById('archiveSelect');
-        archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-        allShifts.forEach(shift => {
-            const option = document.createElement('option');
-            option.value = shift.id;
-            const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-            const total = shift.totalReports || 0;
-            const type = shift.shiftType || 'مناوبة';
-            option.textContent = `${type} - ${date} (${total} بلاغ)`;
-            if (shift.id === currentShiftId) { option.textContent += ' ⬅️ الحالية'; }
-            archiveSelect.appendChild(option);
-        });
-        const shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
-        if (shiftArchiveSelect) {
-            shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-            allShifts.forEach(shift => {
-                const option = document.createElement('option');
-                option.value = shift.id;
-                const date = shift.shiftDate || new Date(shift.lastUpdate).toLocaleDateString('ar-SA');
-                option.textContent = `${shift.shiftType || 'مناوبة'} - ${date}`;
-                shiftArchiveSelect.appendChild(option);
-            });
-        }
-        updateShiftStatus();
-    } catch (error) {}
-}
-function showShiftTypeDialog() {
-    return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.style.display = 'flex';
-        modal.innerHTML = `<div class="modal-content" style="max-width:400px;"><h3 style="text-align:center;">📋 بدء مناوبة جديدة</h3><p style="text-align:center; color:#666; margin:10px 0;">اختر نوع المناوبة الجديدة:</p><div style="display:flex; gap:15px; justify-content:center; margin:20px 0;"><button id="shiftMorningBtn" style="padding:12px 25px; border:1px solid #000; background:#e8f5e9; cursor:pointer; font-weight:bold; border-radius:8px;">🌅 صباحية<br><span style="font-size:0.7rem; font-weight:normal;">4 فجراً - 4 عصراً</span></button><button id="shiftNightBtn" style="padding:12px 25px; border:1px solid #000; background:#e3f2fd; cursor:pointer; font-weight:bold; border-radius:8px;">🌙 ليلية<br><span style="font-size:0.7rem; font-weight:normal;">4 عصراً - 4 فجراً</span></button></div><div style="display:flex; justify-content:center; gap:10px;"><button id="cancelShiftBtn" style="padding:8px 20px; border:1px solid #000; background:white; cursor:pointer; border-radius:6px;">إلغاء</button></div></div>`;
-        document.body.appendChild(modal);
-        modal.querySelector('#shiftMorningBtn').onclick = function() { modal.remove(); resolve('صباحية'); };
-        modal.querySelector('#shiftNightBtn').onclick = function() { modal.remove(); resolve('ليلية'); };
-        modal.querySelector('#cancelShiftBtn').onclick = function() { modal.remove(); resolve(null); };
-        modal.onclick = function(e) { if (e.target === modal) { modal.remove(); resolve(null); } };
-    });
-}
-async function startNewShift() {
-    const shiftType = await showShiftTypeDialog();
-    if (!shiftType) return;
-    if (!confirm(`⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ${shiftType === 'صباحية' ? 'صباحية (4 فجراً - 4 عصراً)' : 'ليلية (4 عصراً - 4 فجراً)'} جديدة.`)) return;
-    try {
-        const response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType }) });
-        const result = await response.json();
-        if (result.success) {
-            currentShiftId = result.shiftId;
-            alert(`✅ تم بدء المناوبة ${shiftType} بنجاح`);
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            document.getElementById('shiftModal').style.display = 'none';
-        } else { alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
-}
-
-// ===== ربط الأحداث الرئيسية =====
-document.addEventListener('DOMContentLoaded', function() {
-    loadBrandLogo();
-    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
-    buildCentersTable();
-    loadShifts();
-    loadAllData();
-});
-document.getElementById("newShiftBtn").onclick = startNewShift;
-document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
-document.getElementById("closeShiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
-document.getElementById("docsBtn").onclick = function() { openDocsPage(); };
-document.getElementById("airAmbulanceBtn").onclick = function() {
-    document.getElementById('airAmbulanceModal').style.display = 'flex';
-    loadAirRecords();
-    const now = new Date();
-    const localDateTime = now.toISOString().slice(0, 16);
-    document.getElementById('airDateTime').value = localDateTime;
-};
-document.getElementById("closeAirModal").onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
-document.getElementById("monthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
-document.getElementById("closeMonthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
-document.getElementById("controlBtn").onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(() => { renderControlList(false); loadControlNotes(); }); };
-document.getElementById("closeControlBtn").onclick = function() {
-    document.getElementById('controlModal').style.display = 'none';
-    isEditMode = false;
-    document.getElementById('saveVacationsBtn').style.display = 'none';
-    document.getElementById('editVacationsBtn').style.display = 'inline-block';
-};
-document.getElementById("printShiftBtn").onclick = function() { window.print(); };
-document.getElementById("saveShiftBtn").onclick = saveShiftData;
-document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
-document.getElementById("viewShiftBtn").onclick = viewShiftReports;
-document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
-
 // ===== دوال الإسعاف الجوي =====
-let airRecords = [];
+var airRecords = [];
 async function loadAirRecords() {
     try {
-        const response = await fetch('/api/air-ambulance');
-        const result = await response.json();
-        if (result.success) {
-            airRecords = result.records || [];
-            renderAirRecords();
-        }
+        var response = await fetch('/api/air-ambulance');
+        var result = await response.json();
+        if (result.success) { airRecords = result.records || []; renderAirRecords(); }
     } catch (error) { console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error); }
 }
 function renderAirRecords() {
-    const container = document.getElementById('airRecordsList');
-    const section = document.getElementById('airSavedRecords');
+    var container = document.getElementById('airRecordsList');
+    var section = document.getElementById('airSavedRecords');
     if (!container || !section) return;
     if (airRecords.length === 0) { section.style.display = 'none'; return; }
     section.style.display = 'block';
-    let html = '';
-    airRecords.forEach((record) => {
-        const date = new Date(record.createdAt).toLocaleString('ar-SA');
-        const notes = record.notes || 'لا توجد ملاحظات';
-        html += `<div class="record-item"><div class="record-info"><strong>${record.reportNumber || 'بدون رقم'}</strong><span style="margin:0 5px;">|</span><span>${record.unit || '-'}</span><span style="margin:0 5px;">|</span><span>${record.hospital || '-'}</span><span style="margin:0 5px;">|</span><span style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ${notes}</span><span class="rec-date">🕒 ${date}</span></div><div class="record-actions"><button onclick="deleteAirRecord('${record.id}')">🗑️ حذف</button></div></div>`;
+    var html = '';
+    airRecords.forEach(function(record) {
+        var date = new Date(record.createdAt).toLocaleString('ar-SA');
+        var notes = record.notes || 'لا توجد ملاحظات';
+        html += '<div class="record-item"><div class="record-info"><strong>' + (record.reportNumber || 'بدون رقم') + '</strong><span style="margin:0 5px;">|</span><span>' + (record.unit || '-') + '</span><span style="margin:0 5px;">|</span><span>' + (record.hospital || '-') + '</span><span style="margin:0 5px;">|</span><span style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ' + notes + '</span><span class="rec-date">🕒 ' + date + '</span></div><div class="record-actions"><button onclick="deleteAirRecord(\'' + record.id + '\')">🗑️ حذف</button></div></div>';
     });
     container.innerHTML = html;
 }
 function formatAirWhatsAppMessage(record) {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-SA');
-    const timeStr = now.toLocaleTimeString('ar-SA');
-    let message = '';
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('ar-SA');
+    var timeStr = now.toLocaleTimeString('ar-SA');
+    var message = '';
     message += 'تقرير الإسعاف الجوي\n';
     message += '═══════════════════════════\n';
-    message += `رقم البلاغ: ${record.reportNumber || 'غير محدد'}\n`;
-    message += `الفرقة المرافقة: ${record.unit || 'غير محدد'}\n`;
-    message += `المستشفى المستلم: ${record.hospital || 'غير محدد'}\n`;
-    message += `تاريخ ووقت النقل: ${record.dateTime || 'غير محدد'}\n`;
-    if (record.notes) { message += `ملاحظات: ${record.notes}\n`; }
+    message += 'رقم البلاغ: ' + (record.reportNumber || 'غير محدد') + '\n';
+    message += 'الفرقة المرافقة: ' + (record.unit || 'غير محدد') + '\n';
+    message += 'المستشفى المستلم: ' + (record.hospital || 'غير محدد') + '\n';
+    message += 'تاريخ ووقت النقل: ' + (record.dateTime || 'غير محدد') + '\n';
+    if (record.notes) { message += 'ملاحظات: ' + record.notes + '\n'; }
     message += '═══════════════════════════\n';
-    message += `تم الإرسال: ${dateStr} ${timeStr}`;
+    message += 'تم الإرسال: ' + dateStr + ' ' + timeStr;
     return message;
 }
 function sendAirWhatsAppMessage(message) {
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    var encodedMessage = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encodedMessage, '_blank');
 }
 document.getElementById('saveAirRecord')?.addEventListener('click', async function() {
-    const reportNumber = document.getElementById('airReportNumber').value.trim();
-    const unit = document.getElementById('airUnit').value;
-    const hospital = document.getElementById('airHospital').value.trim();
-    const dateTime = document.getElementById('airDateTime').value;
-    const notes = document.getElementById('airNotes').value.trim();
+    var reportNumber = document.getElementById('airReportNumber').value.trim();
+    var unit = document.getElementById('airUnit').value;
+    var hospital = document.getElementById('airHospital').value.trim();
+    var dateTime = document.getElementById('airDateTime').value;
+    var notes = document.getElementById('airNotes').value.trim();
     if (!reportNumber || !unit || !hospital || !dateTime) { alert('❌ الرجاء ملء جميع الحقول المطلوبة'); return; }
     try {
-        const response = await fetch('/api/save-air-ambulance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportNumber, unit, hospital, dateTime, notes }) });
-        const result = await response.json();
+        var response = await fetch('/api/save-air-ambulance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportNumber: reportNumber, unit: unit, hospital: hospital, dateTime: dateTime, notes: notes }) });
+        var result = await response.json();
         if (result.success) {
             alert('✅ تم حفظ بلاغ الإسعاف الجوي بنجاح');
             if (confirm('✅ تم الحفظ بنجاح!\nهل تريد إرسال التقرير عبر واتساب الآن؟')) {
-                const record = { reportNumber, unit, hospital, dateTime, notes };
-                const message = formatAirWhatsAppMessage(record);
+                var record = { reportNumber: reportNumber, unit: unit, hospital: hospital, dateTime: dateTime, notes: notes };
+                var message = formatAirWhatsAppMessage(record);
                 sendAirWhatsAppMessage(message);
             }
             document.getElementById('airReportNumber').value = '';
@@ -2049,54 +2302,56 @@ document.getElementById('saveAirRecord')?.addEventListener('click', async functi
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
 document.getElementById('sendAirWhatsApp')?.addEventListener('click', function() {
-    const reportNumber = document.getElementById('airReportNumber').value.trim();
-    const unit = document.getElementById('airUnit').value;
-    const hospital = document.getElementById('airHospital').value.trim();
-    const dateTime = document.getElementById('airDateTime').value;
-    const notes = document.getElementById('airNotes').value.trim();
+    var reportNumber = document.getElementById('airReportNumber').value.trim();
+    var unit = document.getElementById('airUnit').value;
+    var hospital = document.getElementById('airHospital').value.trim();
+    var dateTime = document.getElementById('airDateTime').value;
+    var notes = document.getElementById('airNotes').value.trim();
     if (!reportNumber || !unit || !hospital || !dateTime) { alert('⚠️ الرجاء ملء جميع الحقول المطلوبة قبل الإرسال'); return; }
-    const record = { reportNumber, unit, hospital, dateTime, notes };
-    const message = formatAirWhatsAppMessage(record);
+    var record = { reportNumber: reportNumber, unit: unit, hospital: hospital, dateTime: dateTime, notes: notes };
+    var message = formatAirWhatsAppMessage(record);
     sendAirWhatsAppMessage(message);
 });
 async function deleteAirRecord(recordId) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا البلاغ؟')) return;
     try {
-        const response = await fetch(`/api/delete-air-ambulance/${recordId}`, { method: 'DELETE' });
-        const result = await response.json();
+        var response = await fetch('/api/delete-air-ambulance/' + recordId, { method: 'DELETE' });
+        var result = await response.json();
         if (result.success) { await loadAirRecords(); } else { alert('❌ فشل في حذف البلاغ'); }
     } catch (error) { alert('❌ خطأ في الاتصال'); }
 }
 document.getElementById('clearAllAirRecords')?.addEventListener('click', async function() {
     if (!confirm('⚠️ هل أنت متأكد من حذف جميع بلاغات الإسعاف الجوي؟')) return;
     try {
-        const response = await fetch('/api/clear-air-ambulance', { method: 'DELETE' });
-        const result = await response.json();
+        var response = await fetch('/api/clear-air-ambulance', { method: 'DELETE' });
+        var result = await response.json();
         if (result.success) { await loadAirRecords(); alert('✅ تم حذف جميع البلاغات'); } else { alert('❌ فشل في حذف البلاغات'); }
     } catch (error) { alert('❌ خطأ في الاتصال'); }
 });
 
-// ===== دوال الجدول الشهري =====
+// ============================================
+// دوال الجدول الشهري
+// ============================================
 async function loadSavedTable() {
-    const container = document.getElementById('excelTableContainer');
-    const status = document.getElementById('tableStatus');
+    var container = document.getElementById('excelTableContainer');
+    var status = document.getElementById('tableStatus');
     try {
-        const response = await fetch('/api/check-monthly-table');
-        const result = await response.json();
+        var response = await fetch('/api/check-monthly-table');
+        var result = await response.json();
         if (result.exists) {
             status.innerHTML = '⏳ جاري تحميل الجدول...';
-            const fileResponse = await fetch('/api/get-monthly-table');
-            const blob = await fileResponse.blob();
-            const reader = new FileReader();
+            var fileResponse = await fetch('/api/get-monthly-table');
+            var blob = await fileResponse.blob();
+            var reader = new FileReader();
             reader.onload = function(event) {
                 try {
-                    const data = new Uint8Array(event.target.result);
+                    var data = new Uint8Array(event.target.result);
                     workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
                     renderAllSheets(workbookData);
-                    status.innerHTML = `✅ تم تحميل ${workbookData.SheetNames.length} أوراق`;
+                    status.innerHTML = '✅ تم تحميل ' + workbookData.SheetNames.length + ' أوراق';
                 } catch (error) {
                     status.innerHTML = '❌ خطأ في عرض الجدول';
-                    container.innerHTML = `<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في عرض الجدول: ${error.message}</p>`;
+                    container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في عرض الجدول: ' + error.message + '</p>';
                 }
             };
             reader.readAsArrayBuffer(blob);
@@ -2110,92 +2365,95 @@ async function loadSavedTable() {
     }
 }
 function renderAllSheets(workbook) {
-    const container = document.getElementById('excelTableContainer');
-    let html = '';
+    var container = document.getElementById('excelTableContainer');
+    var html = '';
     if (workbook.SheetNames.length > 1) {
         html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:10px;">';
-        workbook.SheetNames.forEach((name, index) => {
-            const active = index === currentSheetIndex ? 'active' : '';
-            html += `<button class="sheet-tab ${active}" data-index="${index}">${name}</button>`;
+        workbook.SheetNames.forEach(function(name, index) {
+            var active = index === currentSheetIndex ? 'active' : '';
+            html += '<button class="sheet-tab ' + active + '" data-index="' + index + '">' + name + '</button>';
         });
         html += '</div>';
     }
-    const sheetName = workbook.SheetNames[currentSheetIndex];
-    const sheet = workbook.Sheets[sheetName];
-    const htmlContent = XLSX.utils.sheet_to_html(sheet, { id: 'sheet-table', editable: false });
+    var sheetName = workbook.SheetNames[currentSheetIndex];
+    var sheet = workbook.Sheets[sheetName];
+    var htmlContent = XLSX.utils.sheet_to_html(sheet, { id: 'sheet-table', editable: false });
     html += htmlContent;
     container.innerHTML = html;
     formatTable(container);
-    document.querySelectorAll('.sheet-tab').forEach(btn => {
+    document.querySelectorAll('.sheet-tab').forEach(function(btn) {
         btn.onclick = function() { currentSheetIndex = parseInt(this.dataset.index); renderAllSheets(workbookData); };
     });
 }
 function formatTable(container) {
-    const table = container.querySelector('#sheet-table');
+    var table = container.querySelector('#sheet-table');
     if (table) {
-        table.style.cssText = `border-collapse: collapse; width: 100%; font-size: 0.7rem; direction: rtl;`;
-        table.querySelectorAll('th, td').forEach(cell => { cell.style.border = '1px solid var(--gray-200)'; cell.style.padding = '4px 6px'; cell.style.textAlign = 'center'; cell.style.whiteSpace = 'nowrap'; cell.style.verticalAlign = 'middle'; });
-        table.querySelectorAll('th').forEach(th => { th.style.background = 'var(--gray-100)'; th.style.fontWeight = 'bold'; th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = '1'; });
+        table.style.cssText = 'border-collapse: collapse; width: 100%; font-size: 0.7rem; direction: rtl;';
+        table.querySelectorAll('th, td').forEach(function(cell) { cell.style.border = '1px solid var(--gray-200)'; cell.style.padding = '4px 6px'; cell.style.textAlign = 'center'; cell.style.whiteSpace = 'nowrap'; cell.style.verticalAlign = 'middle'; });
+        table.querySelectorAll('th').forEach(function(th) { th.style.background = 'var(--gray-100)'; th.style.fontWeight = 'bold'; th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = '1'; });
         table.style.minWidth = '100%'; table.style.width = 'auto';
     }
 }
 document.getElementById('uploadExcelBtn')?.addEventListener('click', function() { document.getElementById('excelFileInput').click(); });
 document.getElementById('excelFileInput')?.addEventListener('change', function(e) {
-    const file = e.target.files[0];
+    var file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
+    var reader = new FileReader();
     reader.onload = async function(event) {
         try {
-            const data = new Uint8Array(event.target.result);
+            var data = new Uint8Array(event.target.result);
             workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
             renderAllSheets(workbookData);
-            const base64 = btoa(String.fromCharCode.apply(null, data));
-            const response = await fetch('/api/upload-monthly-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileData: base64 }) });
-            const result = await response.json();
-            if (result.success) { document.getElementById('tableStatus').innerHTML = `✅ تم حفظ ${workbookData.SheetNames.length} أوراق بنجاح`; alert('✅ تم حفظ الجدول الشهري بنجاح'); } else { document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول'; alert('❌ فشل في حفظ الجدول'); }
+            var base64 = btoa(String.fromCharCode.apply(null, data));
+            var response = await fetch('/api/upload-monthly-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileData: base64 }) });
+            var result = await response.json();
+            if (result.success) { document.getElementById('tableStatus').innerHTML = '✅ تم حفظ ' + workbookData.SheetNames.length + ' أوراق بنجاح'; alert('✅ تم حفظ الجدول الشهري بنجاح'); } else { document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول'; alert('❌ فشل في حفظ الجدول'); }
         } catch (error) { alert('❌ خطأ في قراءة الملف: ' + error.message); }
     };
     reader.readAsArrayBuffer(file);
 });
 
-// ===== دوال التحكم والتنسيق =====
+// ============================================
+// دوال التحكم والتنسيق
+// ============================================
 async function loadVacations() {
     try {
-        const response = await fetch('/api/vacations');
-        const data = await response.json();
+        var response = await fetch('/api/vacations');
+        var data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
-            data.forEach((item, index) => { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
+            data.forEach(function(item, index) { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
         }
     } catch (error) { console.error("خطأ في تحميل الإجازات:", error); }
 }
-function renderControlList(editable = false) {
-    const container = document.getElementById('controlList');
+function renderControlList(editable) {
+    editable = editable || false;
+    var container = document.getElementById('controlList');
     if (!container) return;
-    let html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
-    const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
-    controlData.forEach((person, index) => {
-        const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('');
-        const color = colors[index % colors.length];
-        const startDate = person.vacationStart || '';
-        const endDate = person.vacationEnd || '';
-        const vacationDisplay = startDate && endDate ? `📅 ${formatDate(startDate)} → ${formatDate(endDate)}` : '📅 لا توجد إجازة';
-        html += `<div class="control-person"><div class="control-avatar" style="background:${color};">${initials}</div><div class="control-info"><div class="name">${person.name}</div><div class="role">📌 ${person.role} | كود: ${person.code}</div></div><div class="control-vacation">${editable ? `<div class="edit"><input type="date" id="start_${index}" value="${startDate}"><span>→</span><input type="date" id="end_${index}" value="${endDate}"></div>` : `<div class="display">${vacationDisplay}</div>`}</div><div class="control-role-badge">${person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق'}</div></div>`;
+    var html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+    var colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
+    controlData.forEach(function(person, index) {
+        var initials = person.name.split(' ').slice(0, 2).map(function(n) { return n[0]; }).join('');
+        var color = colors[index % colors.length];
+        var startDate = person.vacationStart || '';
+        var endDate = person.vacationEnd || '';
+        var vacationDisplay = startDate && endDate ? '📅 ' + formatDate(startDate) + ' → ' + formatDate(endDate) : '📅 لا توجد إجازة';
+        html += '<div class="control-person"><div class="control-avatar" style="background:' + color + ';">' + initials + '</div><div class="control-info"><div class="name">' + person.name + '</div><div class="role">📌 ' + person.role + ' | كود: ' + person.code + '</div></div><div class="control-vacation">' + (editable ? '<div class="edit"><input type="date" id="start_' + index + '" value="' + startDate + '"><span>→</span><input type="date" id="end_' + index + '" value="' + endDate + '"></div>' : '<div class="display">' + vacationDisplay + '</div>') + '</div><div class="control-role-badge">' + (person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق') + '</div></div>';
     });
     html += '</div>';
     container.innerHTML = html;
 }
 function formatDate(dateString) {
     if (!dateString) return '';
-    const parts = dateString.split('-');
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    var parts = dateString.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
 }
 document.getElementById('editVacationsBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'flex'; document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); });
 document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
-    const password = document.getElementById('passwordInput').value;
+    var password = document.getElementById('passwordInput').value;
     try {
-        const response = await fetch('/api/get-password');
-        const result = await response.json();
-        const storedPassword = result.password || '1234';
+        var response = await fetch('/api/get-password');
+        var result = await response.json();
+        var storedPassword = result.password || '1234';
         if (password === storedPassword) {
             isEditMode = true;
             document.getElementById('passwordModal').style.display = 'none';
@@ -2209,14 +2467,14 @@ document.getElementById('confirmPasswordBtn')?.addEventListener('click', async f
 });
 document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'none'; document.getElementById('passwordInput').value = ''; });
 document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
-    controlData.forEach((person, index) => {
-        const startInput = document.getElementById(`start_${index}`);
-        const endInput = document.getElementById(`end_${index}`);
+    controlData.forEach(function(person, index) {
+        var startInput = document.getElementById('start_' + index);
+        var endInput = document.getElementById('end_' + index);
         if (startInput && endInput) { person.vacationStart = startInput.value; person.vacationEnd = endInput.value; }
     });
     try {
-        const response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacations: controlData }) });
-        const result = await response.json();
+        var response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacations: controlData }) });
+        var result = await response.json();
         if (result.success) {
             alert('✅ تم حفظ الإجازات بنجاح');
             isEditMode = false;
@@ -2227,48 +2485,16 @@ document.getElementById('saveVacationsBtn')?.addEventListener('click', async fun
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
 
-// ===== دوال تغيير الرقم السري =====
-document.getElementById('changePasswordBtn')?.addEventListener('click', function() { document.getElementById('changePasswordModal').style.display = 'flex'; document.getElementById('oldPasswordInput').value = ''; document.getElementById('newPasswordInput').value = ''; document.getElementById('confirmNewPasswordInput').value = ''; });
-document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() { document.getElementById('changePasswordModal').style.display = 'none'; });
-document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
-    const oldPassword = document.getElementById('oldPasswordInput').value;
-    const newPassword = document.getElementById('newPasswordInput').value;
-    const confirmNewPassword = document.getElementById('confirmNewPasswordInput').value;
-    if (!oldPassword || !newPassword || !confirmNewPassword) { alert('❌ الرجاء ملء جميع الحقول'); return; }
-    if (newPassword !== confirmNewPassword) { alert('❌ الرقم السري الجديد غير متطابق'); return; }
-    if (newPassword.length < 4) { alert('❌ الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل'); return; }
-    try {
-        const response = await fetch('/api/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldPassword, newPassword }) });
-        const result = await response.json();
-        if (result.success) { alert('✅ تم تغيير الرقم السري بنجاح'); document.getElementById('changePasswordModal').style.display = 'none'; } else { alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري')); }
-    } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
-});
-
-// ===== دوال ملاحظات التحكم =====
-async function loadControlNotes() {
-    try {
-        const response = await fetch('/api/control-notes');
-        const result = await response.json();
-        if (result.success) { controlNotes = result.notes || ''; document.getElementById('controlNotes').value = controlNotes; }
-    } catch (error) { console.error("خطأ في تحميل ملاحظات التحكم:", error); }
-}
-document.getElementById('saveControlNotes')?.addEventListener('click', async function() {
-    const notes = document.getElementById('controlNotes').value.trim();
-    try {
-        const response = await fetch('/api/save-control-notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }) });
-        const result = await response.json();
-        if (result.success) { controlNotes = notes; alert('✅ تم حفظ الملاحظات بنجاح'); } else { alert('❌ فشل في حفظ الملاحظات'); }
-    } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
-});
-
-// ===== دوال المناوبة =====
+// ============================================
+// دوال المناوبة (view, return, save, delete)
+// ============================================
 async function viewShiftReports() {
-    const select = document.getElementById('archiveSelect');
-    const shiftId = parseInt(select.value);
+    var select = document.getElementById('archiveSelect');
+    var shiftId = parseInt(select.value);
     if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
     try {
-        const response = await fetch(`/api/shifts/${shiftId}`);
-        const result = await response.json();
+        var response = await fetch('/api/shifts/' + shiftId);
+        var result = await response.json();
         if (result && result.shift) {
             currentViewingShift = result.shift;
             isViewingArchiveShift = true;
@@ -2279,11 +2505,11 @@ async function viewShiftReports() {
             loadShiftToForm(result.shift);
             displayShiftReportStats(result.reports);
             calculateLiveReportStats();
-            const totalReports = result.total || Object.keys(result.reports || {}).reduce((sum, key) => sum + (result.reports[key]?.count || 0), 0);
+            var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
             document.getElementById('viewingBadge').style.display = 'inline-block';
             document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
-            document.getElementById('viewingBadge').innerHTML = `📂 تستعرض: ${result.shift.shiftType || 'مناوبة'} - ${result.shift.shiftDate || ''} (${totalReports} بلاغ)`;
-            document.getElementById('updateStatus').innerHTML = `🟡 تستعرض مناوبة سابقة | آخر تحديث: ${new Date().toLocaleTimeString()}`;
+            document.getElementById('viewingBadge').innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
+            document.getElementById('updateStatus').innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + new Date().toLocaleTimeString();
             document.getElementById('shiftModal').style.display = 'flex';
         } else { alert("لا توجد بيانات في هذه المناوبة"); }
     } catch (error) { console.error(error); alert("❌ فشل في تحميل المناوبة"); }
@@ -2297,37 +2523,37 @@ async function returnToCurrentShift() {
     document.getElementById('viewingBadge').style.display = 'none';
     document.getElementById('returnToCurrentBtn').style.display = 'none';
     document.getElementById('archiveSelect').value = '';
-    document.getElementById('updateStatus').innerHTML = "🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: " + new Date().toLocaleTimeString();
+    document.getElementById('updateStatus').innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + new Date().toLocaleTimeString();
     document.getElementById('shiftModal').style.display = 'none';
 }
 async function saveShiftData() {
-    const shiftData = getShiftFromForm();
+    var shiftData = getShiftFromForm();
     if (!shiftData.shiftType) { alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return; }
-    const targetId = viewingShiftId || currentShiftId;
+    var targetId = viewingShiftId || currentShiftId;
     if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
     try {
-        const response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
-        const result = await response.json();
+        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
+        var result = await response.json();
         if (result.success) {
             alert("✅ تم حفظ بيانات التكميل بنجاح");
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
             if (viewingShiftId) {
-                const viewResponse = await fetch(`/api/shifts/${viewingShiftId}`);
-                const viewResult = await viewResponse.json();
+                var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
+                var viewResult = await viewResponse.json();
                 if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
             }
         } else { alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); }
     } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
 }
 async function deleteCurrentShift() {
-    const targetId = viewingShiftId || currentShiftId;
+    var targetId = viewingShiftId || currentShiftId;
     if (!targetId) { alert("لا توجد مناوبة محددة للحذف"); return; }
     if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
     try {
-        const response = await fetch(`/api/shifts/${targetId}`, { method: 'DELETE' });
-        const result = await response.json();
+        var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE' });
+        var result = await response.json();
         if (result.success) {
             alert("✅ تم حذف المناوبة");
             if (targetId === currentShiftId) { currentShiftId = null; }
@@ -2349,14 +2575,14 @@ function loadShiftToForm(shift) {
     if (!shift) return;
     viewingShiftId = shift.id;
     document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
-    document.querySelectorAll('input[name="shiftType"]').forEach(radio => { radio.checked = (radio.value === shift.shiftType); });
-    document.querySelectorAll('.rapid-location').forEach(input => { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
-    for (let i = 0; i < centerList.length; i++) {
-        const center = centerList[i];
-        const data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
-        const staffInput = document.getElementById(`staff_${i}`);
-        const carsInput = document.getElementById(`cars_${i}`);
-        const notesInput = document.getElementById(`notes_${i}`);
+    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
+    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
         if (staffInput) staffInput.value = data.staffCount || '';
         if (carsInput) carsInput.value = data.carsCount || '';
         if (notesInput) notesInput.value = data.notes || '';
@@ -2367,27 +2593,27 @@ function loadShiftToForm(shift) {
     if (shift.id) { loadWorkforceStats(shift.id); }
 }
 function getShiftFromForm() {
-    const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
-    const rapidLocations = {};
-    document.querySelectorAll('.rapid-location').forEach(input => { rapidLocations[input.dataset.unit] = input.value; });
-    const centersDataForm = {};
-    for (let i = 0; i < centerList.length; i++) {
-        const center = centerList[i];
-        const staffInput = document.getElementById(`staff_${i}`);
-        const carsInput = document.getElementById(`cars_${i}`);
-        const notesInput = document.getElementById(`notes_${i}`);
+    var shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
+    var rapidLocations = {};
+    document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
+    var centersDataForm = {};
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
         centersDataForm[center] = { staffCount: staffInput?.value || '', carsCount: carsInput?.value || '', notes: notesInput?.value || '' };
     }
     return { shiftType: shiftType, rapidLocations: rapidLocations, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
 }
 function clearShiftForm() {
     document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
-    document.querySelectorAll('input[name="shiftType"]').forEach(radio => radio.checked = false);
-    document.querySelectorAll('.rapid-location').forEach(input => input.value = '');
-    for (let i = 0; i < centerList.length; i++) {
-        const staffInput = document.getElementById(`staff_${i}`);
-        const carsInput = document.getElementById(`cars_${i}`);
-        const notesInput = document.getElementById(`notes_${i}`);
+    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
+    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
+    for (var i = 0; i < centerList.length; i++) {
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
         if (staffInput) staffInput.value = '';
         if (carsInput) carsInput.value = '';
         if (notesInput) notesInput.value = '';
@@ -2398,121 +2624,123 @@ function clearShiftForm() {
     document.getElementById('shiftReportStats').style.display = 'none';
 }
 function displayShiftReportStats(reportsData) {
-    const container = document.getElementById('shiftReportStats');
-    const listContainer = document.getElementById('unitReportList');
+    var container = document.getElementById('shiftReportStats');
+    var listContainer = document.getElementById('unitReportList');
     if (!reportsData || Object.keys(reportsData).length === 0) { container.style.display = 'none'; return; }
-    let total = 0;
-    let unitStats = {};
-    for (let key in reportsData) {
-        const report = reportsData[key];
+    var total = 0;
+    var unitStats = {};
+    for (var key in reportsData) {
+        var report = reportsData[key];
         if (report && report.count > 0) {
             total += report.count;
-            const parts = key.split('|');
-            const unit = parts.length > 1 ? parts[1] : key;
+            var parts = key.split('|');
+            var unit = parts.length > 1 ? parts[1] : key;
             unitStats[unit] = (unitStats[unit] || 0) + report.count;
         }
     }
     if (total === 0) { container.style.display = 'none'; return; }
     container.style.display = 'block';
     document.getElementById('shiftTotalReports').innerText = total;
-    const sortedUnits = Object.entries(unitStats).sort((a, b) => b[1] - a[1]);
-    const topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-    const topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
     document.getElementById('topUnit').innerText = topUnit;
     document.getElementById('topUnitCount').innerText = topCount;
     listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
-    sortedUnits.forEach(([unit, count]) => {
-        const percentage = Math.round((count / total) * 100);
-        const div = document.createElement('div');
+    sortedUnits.forEach(function(item) {
+        var percentage = Math.round((item[1] / total) * 100);
+        var div = document.createElement('div');
         div.className = 'distribution-bar';
-        div.innerHTML = `<span class="name">${unit}</span><span class="count" style="color:#1e466e;">${count}</span><div class="bar-track"><div class="bar-fill" style="width:${percentage}%; background:#1e466e;"></div></div><span class="percent">${percentage}%</span>`;
+        div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#1e466e;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#1e466e;"></div></div><span class="percent">' + percentage + '%</span>';
         listContainer.appendChild(div);
     });
 }
 async function loadWorkforceStats(shiftId) {
     try {
-        const response = await fetch(`/api/workforce-stats/${shiftId}`);
-        const stats = await response.json();
+        var response = await fetch('/api/workforce-stats/' + shiftId);
+        var stats = await response.json();
         if (stats.error) { document.getElementById('workforceStats').style.display = 'none'; return; }
         document.getElementById('workforceStats').style.display = 'block';
         document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
         document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
         document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
-        document.getElementById('staffSubText').innerText = `موزعين على ${stats.centerCount} مركز`;
+        document.getElementById('staffSubText').innerText = 'موزعين على ' + stats.centerCount + ' مركز';
         document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-        document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : `${stats.missingCenters} مراكز ناقصة (بحاجة 2 مسعف + سيارة)`;
-        document.getElementById('readinessSubText').innerText = `${stats.readyCenters} / ${stats.centerCount} مركز جاهز`;
-        const circumference = 2 * Math.PI * 42;
-        const offset = circumference - (stats.readinessRate / 100) * circumference;
-        const circle = document.getElementById('readinessCircle');
-        const text = document.getElementById('readinessText');
-        let color = '#c0392b';
+        document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
+        document.getElementById('readinessSubText').innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
+        var circumference = 2 * Math.PI * 42;
+        var offset = circumference - (stats.readinessRate / 100) * circumference;
+        var circle = document.getElementById('readinessCircle');
+        var text = document.getElementById('readinessText');
+        var color = '#c0392b';
         if (stats.readinessRate >= 80) color = '#2a7f3e';
         else if (stats.readinessRate >= 50) color = '#f39c12';
         circle.setAttribute('stroke', color);
         circle.style.strokeDashoffset = offset;
         text.textContent = stats.readinessRate + '%';
-        const distList = document.getElementById('distributionList');
+        var distList = document.getElementById('distributionList');
         distList.innerHTML = '';
-        const total = stats.totalStaff || 1;
-        for (let center in stats.distribution) {
-            const count = stats.distribution[center];
-            const barWidth = Math.round((count / total) * 100);
-            const isReady = count >= 2;
-            const div = document.createElement('div');
+        var total = stats.totalStaff || 1;
+        for (var center in stats.distribution) {
+            var count = stats.distribution[center];
+            var barWidth = Math.round((count / total) * 100);
+            var isReady = count >= 2;
+            var div = document.createElement('div');
             div.className = 'distribution-bar';
-            div.innerHTML = `<span class="name">${center}</span><span class="count" style="${isReady ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span><div class="bar-track"><div class="bar-fill" style="width:${barWidth}%; background:${isReady ? '#2a7f3e' : '#c0392b'};"></div></div><span class="percent">${barWidth}%</span>`;
+            div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
             distList.appendChild(div);
         }
-        const carDistList = document.getElementById('carDistributionList');
+        var carDistList = document.getElementById('carDistributionList');
         carDistList.innerHTML = '';
-        const totalCars = stats.totalCars || 1;
-        for (let center in stats.carDistribution) {
-            const count = stats.carDistribution[center];
-            const barWidth = Math.round((count / totalCars) * 100);
-            const hasCar = count >= 1;
-            const div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = `<span class="name">${center}</span><span class="count" style="${hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;'}">${count}</span><div class="bar-track"><div class="bar-fill" style="width:${barWidth}%; background:${hasCar ? '#2980b9' : '#c0392b'};"></div></div><span class="percent">${barWidth}%</span>`;
-            carDistList.appendChild(div);
+        var totalCars = stats.totalCars || 1;
+        for (var center2 in stats.carDistribution) {
+            var count2 = stats.carDistribution[center2];
+            var barWidth2 = Math.round((count2 / totalCars) * 100);
+            var hasCar = count2 >= 1;
+            var div2 = document.createElement('div');
+            div2.className = 'distribution-bar';
+            div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
+            carDistList.appendChild(div2);
         }
     } catch (error) { console.error(error); document.getElementById('workforceStats').style.display = 'none'; }
 }
 
-// ===== دوال كبار المسعفين =====
+// ============================================
+// دوال كبار المسعفين
+// ============================================
 function renderSeniorRecords() {
-    const container = document.getElementById('seniorRecordsList');
-    const section = document.getElementById('seniorSavedRecords');
+    var container = document.getElementById('seniorRecordsList');
+    var section = document.getElementById('seniorSavedRecords');
     if (!container || !section) return;
     if (seniorRecords.length === 0) { section.style.display = 'none'; return; }
     section.style.display = 'block';
-    let html = '';
-    seniorRecords.forEach((record, index) => {
-        const date = new Date(record.createdAt).toLocaleString('ar-SA');
-        const locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
-        html += `<div class="record-item"><div class="record-info"><strong>🚑 ${record.activeCars || 0}</strong><span style="margin:0 5px;">|</span><span>🔧 ${record.brokenCars || 0}</span><span style="margin:0 5px;">|</span><span>🔄 ${record.reserveCars || 0}</span><span style="margin:0 5px;">|</span><span>📊 ${record.overlapTeams || 0}</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ${locations}</span><span class="rec-date">🕒 ${date}</span>${record.assistantName ? `<span style="font-size:0.6rem; color:var(--primary-700);">👤 ${record.assistantName}</span>` : ''}</div><div class="record-actions"><button onclick="deleteSeniorRecord(${index})">🗑️ حذف</button></div></div>`;
+    var html = '';
+    seniorRecords.forEach(function(record, index) {
+        var date = new Date(record.createdAt).toLocaleString('ar-SA');
+        var locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
+        html += '<div class="record-item"><div class="record-info"><strong>🚑 ' + (record.activeCars || 0) + '</strong><span style="margin:0 5px;">|</span><span>🔧 ' + (record.brokenCars || 0) + '</span><span style="margin:0 5px;">|</span><span>🔄 ' + (record.reserveCars || 0) + '</span><span style="margin:0 5px;">|</span><span>📊 ' + (record.overlapTeams || 0) + '</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ' + locations + '</span><span class="rec-date">🕒 ' + date + '</span>' + (record.assistantName ? '<span style="font-size:0.6rem; color:var(--primary-700);">👤 ' + record.assistantName + '</span>' : '') + '</div><div class="record-actions"><button onclick="deleteSeniorRecord(' + index + ')">🗑️ حذف</button></div></div>';
     });
     container.innerHTML = html;
 }
 function getSeniorShiftData() {
-    const activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-    const brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-    const reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-    const overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
-    const locations = [];
-    document.querySelectorAll('.senior-location:checked').forEach(cb => locations.push(cb.value));
-    const notes = document.getElementById('seniorNotes').value.trim();
-    const assistantName = document.getElementById('seniorAssistantName').value.trim();
-    const assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
-    const chiefName = document.getElementById('seniorChiefName').value.trim();
-    const chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
-    const leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
-    const leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
-    return { activeCars, brokenCars, reserveCars, overlapTeams, locations, notes, assistantName, assistantSignature, chiefName, chiefSignature, leaderName, leaderSignature };
+    var activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+    var brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+    var reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+    var overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+    var locations = [];
+    document.querySelectorAll('.senior-location:checked').forEach(function(cb) { locations.push(cb.value); });
+    var notes = document.getElementById('seniorNotes').value.trim();
+    var assistantName = document.getElementById('seniorAssistantName').value.trim();
+    var assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
+    var chiefName = document.getElementById('seniorChiefName').value.trim();
+    var chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
+    var leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
+    var leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+    return { activeCars: activeCars, brokenCars: brokenCars, reserveCars: reserveCars, overlapTeams: overlapTeams, locations: locations, notes: notes, assistantName: assistantName, assistantSignature: assistantSignature, chiefName: chiefName, chiefSignature: chiefSignature, leaderName: leaderName, leaderSignature: leaderSignature };
 }
 function saveSeniorRecordToLocal(data) {
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return false; }
-    seniorRecords.unshift({ ...data, createdAt: new Date().toISOString() });
+    seniorRecords.unshift({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() });
     localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
     renderSeniorRecords();
     return true;
@@ -2522,7 +2750,7 @@ function clearSeniorShiftForm() {
     document.getElementById('seniorBrokenCars').value = 0;
     document.getElementById('seniorReserveCars').value = 0;
     document.getElementById('seniorOverlapTeams').value = 0;
-    document.querySelectorAll('.senior-location').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.senior-location').forEach(function(cb) { cb.checked = false; });
     document.getElementById('seniorNotes').value = '';
     document.getElementById('seniorAssistantName').value = '';
     document.getElementById('seniorAssistantSignature').value = '';
@@ -2538,37 +2766,37 @@ function deleteSeniorRecord(index) {
     renderSeniorRecords();
 }
 function formatWhatsAppMessage(data) {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-SA');
-    const timeStr = now.toLocaleTimeString('ar-SA');
-    const locationsStr = data.locations && data.locations.length > 0 ? data.locations.join('، ') : 'لا يوجد';
-    let message = '';
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('ar-SA');
+    var timeStr = now.toLocaleTimeString('ar-SA');
+    var locationsStr = data.locations && data.locations.length > 0 ? data.locations.join('، ') : 'لا يوجد';
+    var message = '';
     message += 'تقرير مناوبة كبار المسعفين\n';
     message += '═══════════════════════════\n';
-    message += `التاريخ: ${dateStr}\n`;
-    message += `الوقت: ${timeStr}\n\n`;
-    message += `المركبات العاملة: ${data.activeCars}\n`;
-    message += `المركبات المتعطلة: ${data.brokenCars}\n`;
-    message += `مركبات الاحتياط: ${data.reserveCars}\n`;
-    message += `فرق الاوفر لاب: ${data.overlapTeams}\n`;
-    message += `مناطق التمركز: ${locationsStr}\n\n`;
-    if (data.notes) { message += `الملاحظات: ${data.notes}\n\n`; }
+    message += 'التاريخ: ' + dateStr + '\n';
+    message += 'الوقت: ' + timeStr + '\n\n';
+    message += 'المركبات العاملة: ' + data.activeCars + '\n';
+    message += 'المركبات المتعطلة: ' + data.brokenCars + '\n';
+    message += 'مركبات الاحتياط: ' + data.reserveCars + '\n';
+    message += 'فرق الاوفر لاب: ' + data.overlapTeams + '\n';
+    message += 'مناطق التمركز: ' + locationsStr + '\n\n';
+    if (data.notes) { message += 'الملاحظات: ' + data.notes + '\n\n'; }
     message += '═══════════════════════════\n';
     message += 'التسليم والاستلام\n';
-    message += `مساعد كبير المسعفين: ${data.assistantName || '———'}\n`;
-    message += `كبير المسعفين: ${data.chiefName || '———'}\n`;
-    message += `قائد المنطقة: ${data.leaderName || '———'}\n`;
+    message += 'مساعد كبير المسعفين: ' + (data.assistantName || '———') + '\n';
+    message += 'كبير المسعفين: ' + (data.chiefName || '———') + '\n';
+    message += 'قائد المنطقة: ' + (data.leaderName || '———') + '\n';
     message += '═══════════════════════════\n';
-    message += `تم الإرسال: ${dateStr} ${timeStr}`;
+    message += 'تم الإرسال: ' + dateStr + ' ' + timeStr;
     return message;
 }
 function sendWhatsAppMessage(message) {
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    var encodedMessage = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encodedMessage, '_blank');
 }
 document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-SA');
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('ar-SA');
     document.getElementById('seniorAssistantDate').innerText = dateStr;
     document.getElementById('seniorChiefDate').innerText = dateStr;
     document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
@@ -2578,36 +2806,37 @@ document.getElementById('seniorShiftBtn')?.addEventListener('click', function() 
 });
 document.getElementById('closeSeniorShift')?.addEventListener('click', function() { document.getElementById('seniorShiftModal').style.display = 'none'; });
 document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
-    const data = getSeniorShiftData();
+    var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
     if (saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
 });
 document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', function() {
-    const data = getSeniorShiftData();
+    var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال'); return; }
     saveSeniorRecordToLocal(data);
-    const message = formatWhatsAppMessage(data);
+    var message = formatWhatsAppMessage(data);
     sendWhatsAppMessage(message);
 });
 
 // ===== إغلاق النوافذ بالضغط خارجها =====
 window.onclick = function(e) {
-    const modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal'];
-    modals.forEach(id => {
-        const modal = document.getElementById(id);
+    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal'];
+    modals.forEach(function(id) {
+        var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
     });
 };
 
 // ===== تحديث تلقائي =====
-setInterval(() => {
+setInterval(function() {
     if (!isViewingArchiveShift) { checkForUpdates(); }
 }, 1000);
+
 async function checkForUpdates() {
     if (isViewingArchiveShift) return;
     try {
-        const response = await fetch('/api/last-update');
-        const data = await response.json();
+        var response = await fetch('/api/last-update');
+        var data = await response.json();
         if (data.lastUpdate > lastKnownUpdate) {
             lastKnownUpdate = data.lastUpdate;
             await loadAllData();
