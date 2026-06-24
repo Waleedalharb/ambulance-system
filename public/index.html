@@ -1016,6 +1016,8 @@
             </button>
             <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> وقت الذروة</button>
             <button id="distributionBtn" class="btn"><i class="fas fa-ambulance"></i> التوزيع</button>
+            <button id="manageCentersBtn" class="btn btn-gold"><i class="fas fa-map-marked-alt"></i> إدارة المراكز</button>
+            <button id="peakStatsBtn" class="btn btn-gold"><i class="fas fa-chart-line"></i> الإحصاءات</button>
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
@@ -1123,6 +1125,69 @@
 <!-- ============================================================ -->
 <!-- ===== النوافذ المنبثقة ===== -->
 <!-- ============================================================ -->
+
+<!-- ===== نافذة إدارة المراكز ===== -->
+<div id="manageCentersModal" class="modal">
+    <div class="modal-content" style="max-width:900px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0; color:var(--primary-700);">
+                <i class="fas fa-map-marked-alt" style="color:var(--teal);"></i> إدارة مواقع المراكز
+            </h2>
+            <button onclick="document.getElementById('manageCentersModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="sub-title">تحديد الإحداثيات ونصف القطر لكل مركز لتحديد النطاق الجغرافي</p>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; max-height:50vh; overflow-y:auto; padding:5px;">
+            <div id="centersListContainer">
+                <!-- سيتم تعبئتها بواسطة JavaScript -->
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-top:15px; justify-content:center; flex-wrap:wrap;">
+            <button onclick="saveCentersGeo()" class="btn btn-primary"><i class="fas fa-save"></i> حفظ التغييرات</button>
+            <button onclick="resetCentersGeo()" class="btn btn-coral"><i class="fas fa-undo"></i> إعادة تعيين</button>
+            <button onclick="document.getElementById('manageCentersModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة إحصاءات وقت الذروة ===== -->
+<div id="peakStatsModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0; color:var(--primary-700);">
+                <i class="fas fa-chart-line" style="color:var(--gold);"></i> إحصاءات وقت الذروة
+            </h2>
+            <button onclick="document.getElementById('peakStatsModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:15px;">
+            <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-sm); text-align:center;">
+                <div style="font-size:0.6rem; color:var(--gray-600);">إجمالي البلاغات</div>
+                <div style="font-size:1.6rem; font-weight:800; color:var(--primary-700);" id="statsTotalReports">0</div>
+            </div>
+            <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-sm); text-align:center;">
+                <div style="font-size:0.6rem; color:var(--gray-600);">أكثر وقت ذروة</div>
+                <div style="font-size:1.2rem; font-weight:800; color:var(--coral);" id="statsPeakHour">-</div>
+            </div>
+            <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-sm); text-align:center;">
+                <div style="font-size:0.6rem; color:var(--gray-600);">التوقع</div>
+                <div style="font-size:1.2rem; font-weight:800; color:var(--teal);" id="statsPrediction">-</div>
+            </div>
+        </div>
+        
+        <div style="background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md); padding:15px;">
+            <h4 style="margin:0 0 10px 0; font-size:0.9rem;">📊 توزيع البلاغات حسب الساعة</h4>
+            <div id="statsHourlyChart" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:2px; height:150px; align-items:end;">
+                <!-- سيتم تعبئتها بواسطة JavaScript -->
+            </div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button onclick="document.getElementById('peakStatsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
 <!-- ===== تنبيه وقت الذروة ===== -->
 <div id="peakAlertModal" class="modal">
@@ -1381,7 +1446,7 @@
     </div>
 </div>
 
-<!-- ===== باقي النوافذ (مختصرة للحفاظ على الطول) ===== -->
+<!-- ===== باقي النوافذ (تكميل النوبة، الإسعاف الجوي، الجدول، التحكم، الرقم السري، كبار المسعفين) ===== -->
 <!-- نافذة تكميل النوبة -->
 <div id="shiftModal" class="modal">
     <div class="modal-content">
@@ -2117,7 +2182,7 @@ async function resolvePeakAlertFromModal() {
 }
 
 // ============================================
-// نظام وقت الذروة (Server-based)
+// نظام وقت الذروة (Server-based مع توقيت محلي صحيح)
 // ============================================
 let peakMissions = [];
 let peakAlertsList = [];
@@ -2180,8 +2245,8 @@ function loadPeakAlerts() {
     let html = '';
     activeAlerts.forEach(alert => {
         const priorityColor = alert.priority === 'عالية' ? 'var(--coral)' : alert.priority === 'متوسطة' ? 'var(--gold)' : 'var(--teal)';
-        const startDisplay = alert.startTimeDisplay || new Date(alert.startTime).toLocaleString('ar-SA');
-        const endDisplay = alert.endTimeDisplay || new Date(alert.endTime).toLocaleString('ar-SA');
+        const startDisplay = alert.startTimeDisplay || formatLocalTime(alert.startTime);
+        const endDisplay = alert.endTimeDisplay || formatLocalTime(alert.endTime);
         html += '<div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:var(--radius-sm); border-right:3px solid ' + priorityColor + ';">' +
             '<div><span style="font-weight:600; font-size:0.8rem;">🔔 ' + alert.title + '</span>' +
             '<span style="font-size:0.7rem; color:var(--gray-600); display:block;">' + alert.details + '</span>' +
@@ -2193,6 +2258,21 @@ function loadPeakAlerts() {
     container.innerHTML = html;
 }
 
+// دالة مساعدة لعرض التوقيت المحلي
+function formatLocalTime(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr);
+        d.setHours(d.getHours() + 3);
+        return d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+    } catch(e) {
+        return dateStr;
+    }
+}
+
+// ============================================
+// حفظ مهمة وقت الذروة - التصحيح النهائي
+// ============================================
 async function savePeakMission() {
     const location = document.getElementById('peakLocation').value.trim();
     const unit = document.getElementById('peakUnit').value;
@@ -2215,8 +2295,8 @@ async function savePeakMission() {
             body: JSON.stringify({ 
                 location, 
                 unit, 
-                startTime, 
-                endTime, 
+                startTime: startTime,
+                endTime: endTime,
                 priority, 
                 notes, 
                 lat, 
@@ -2320,6 +2400,294 @@ function clearPeakForm() {
 }
 
 // ============================================
+// إدارة مواقع المراكز
+// ============================================
+
+let centerGeoData = {};
+let tempCenterGeoData = {};
+
+// تحميل البيانات الجغرافية
+async function loadCenterGeo() {
+    try {
+        const response = await fetch('/api/center-geo');
+        const result = await response.json();
+        if (result.success) {
+            centerGeoData = result.data;
+            tempCenterGeoData = JSON.parse(JSON.stringify(centerGeoData));
+        }
+    } catch (error) {
+        console.error('خطأ في تحميل بيانات المراكز:', error);
+        // بيانات افتراضية
+        centerGeoData = {
+            "جنوب 1": { center: [24.7136, 46.6753], radius: 5000, address: "طريق الملك فهد، الرياض" },
+            "جنوب 2": { center: [24.7000, 46.6600], radius: 4000, address: "حي المنصورة، الرياض" },
+            "جنوب 3": { center: [24.6850, 46.6450], radius: 3500, address: "الخالدية، الرياض" },
+            "جنوب 4": { center: [24.7200, 46.6900], radius: 4500, address: "الدار البيضاء، الرياض" },
+            "جنوب 5": { center: [24.7300, 46.7000], radius: 4000, address: "الدار البيضاء، الرياض" },
+            "جنوب 6": { center: [24.6700, 46.6400], radius: 3500, address: "الإسكان، الرياض" },
+            "جنوب 7": { center: [24.6500, 46.6200], radius: 4000, address: "الحائر، الرياض" },
+            "جنوب 8": { center: [24.6900, 46.6700], radius: 3500, address: "الشفاء، الرياض" },
+            "جنوب 9": { center: [24.7050, 46.6800], radius: 3000, address: "عكاظ، الرياض" },
+            "جنوب 10": { center: [24.6600, 46.6100], radius: 4500, address: "ديراب، الرياض" },
+            "سريع 1": { center: [24.7100, 46.6850], radius: 8000, address: "مستشفى الملك خالد، الرياض" },
+            "سريع 2": { center: [24.6900, 46.6600], radius: 7000, address: "الشفاء، الرياض" },
+            "سريع 3": { center: [24.7000, 46.6700], radius: 6000, address: "المنصورة، الرياض" },
+            "سريع 4": { center: [24.7200, 46.6800], radius: 7000, address: "الفرق الإضافية، الرياض" }
+        };
+        tempCenterGeoData = JSON.parse(JSON.stringify(centerGeoData));
+    }
+}
+
+// عرض إدارة المراكز
+function renderCentersManagement() {
+    const container = document.getElementById('centersListContainer');
+    if (!container) return;
+    
+    let html = '';
+    const sortedCenters = Object.keys(tempCenterGeoData).sort();
+    
+    sortedCenters.forEach(center => {
+        const data = tempCenterGeoData[center];
+        const lat = data.center ? data.center[0].toFixed(6) : '';
+        const lng = data.center ? data.center[1].toFixed(6) : '';
+        const radius = data.radius || 5000;
+        
+        html += `
+            <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:12px; margin-bottom:8px; border:1px solid var(--gray-200);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:700; color:var(--primary-700);">${center}</span>
+                    <button onclick="showCenterOnMap('${center}')" class="btn btn-sm btn-primary" style="padding:2px 10px; font-size:0.6rem;">
+                        <i class="fas fa-map"></i> عرض
+                    </button>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px;">
+                    <div>
+                        <label style="font-size:0.6rem; color:var(--gray-600);">خط العرض</label>
+                        <input type="number" id="lat_${center.replace(/\s/g, '_')}" value="${lat}" step="0.000001" style="width:100%; padding:4px 6px; border:1px solid var(--gray-200); border-radius:4px; font-size:0.75rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.6rem; color:var(--gray-600);">خط الطول</label>
+                        <input type="number" id="lng_${center.replace(/\s/g, '_')}" value="${lng}" step="0.000001" style="width:100%; padding:4px 6px; border:1px solid var(--gray-200); border-radius:4px; font-size:0.75rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.6rem; color:var(--gray-600);">نصف القطر (م)</label>
+                        <input type="number" id="radius_${center.replace(/\s/g, '_')}" value="${radius}" step="500" min="1000" max="15000" style="width:100%; padding:4px 6px; border:1px solid var(--gray-200); border-radius:4px; font-size:0.75rem;">
+                    </div>
+                </div>
+                <div style="margin-top:6px;">
+                    <label style="font-size:0.6rem; color:var(--gray-600);">العنوان</label>
+                    <input type="text" id="address_${center.replace(/\s/g, '_')}" value="${data.address || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--gray-200); border-radius:4px; font-size:0.75rem;">
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// حفظ التغييرات
+async function saveCentersGeo() {
+    const updatedData = {};
+    const sortedCenters = Object.keys(tempCenterGeoData).sort();
+    
+    sortedCenters.forEach(center => {
+        const key = center.replace(/\s/g, '_');
+        const lat = parseFloat(document.getElementById(`lat_${key}`).value);
+        const lng = parseFloat(document.getElementById(`lng_${key}`).value);
+        const radius = parseFloat(document.getElementById(`radius_${key}`).value);
+        const address = document.getElementById(`address_${key}`).value;
+        
+        if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+            updatedData[center] = {
+                center: [lat, lng],
+                radius: radius,
+                address: address || ''
+            };
+        }
+    });
+    
+    try {
+        const response = await fetch('/api/save-center-geo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: updatedData })
+        });
+        const result = await response.json();
+        if (result.success) {
+            centerGeoData = updatedData;
+            tempCenterGeoData = JSON.parse(JSON.stringify(updatedData));
+            updateUnitLocations();
+            alert('✅ تم حفظ مواقع المراكز بنجاح');
+            document.getElementById('manageCentersModal').style.display = 'none';
+        } else {
+            alert('❌ فشل في حفظ البيانات');
+        }
+    } catch (error) {
+        alert('❌ خطأ في الاتصال: ' + error.message);
+    }
+}
+
+// إعادة تعيين
+function resetCentersGeo() {
+    if (!confirm('⚠️ هل أنت متأكد من إعادة تعيين مواقع المراكز للقيم الافتراضية؟')) return;
+    tempCenterGeoData = JSON.parse(JSON.stringify(centerGeoData));
+    renderCentersManagement();
+    alert('✅ تم إعادة التعيين');
+}
+
+// عرض المركز على الخريطة
+function showCenterOnMap(center) {
+    const data = tempCenterGeoData[center];
+    if (!data || !data.center) return;
+    const lat = data.center[0];
+    const lng = data.center[1];
+    const radius = data.radius || 5000;
+    
+    document.getElementById('peakMapModal').style.display = 'flex';
+    setTimeout(() => {
+        initPeakMapWithCenter(lat, lng, radius, center);
+    }, 500);
+}
+
+function initPeakMapWithCenter(lat, lng, radius, center) {
+    const container = document.getElementById('peakMap');
+    if (!container) return;
+    if (typeof L === 'undefined') { setTimeout(() => initPeakMapWithCenter(lat, lng, radius, center), 500); return; }
+    
+    if (peakMap) {
+        peakMap.remove();
+        peakMap = null;
+    }
+    
+    try {
+        peakMap = L.map('peakMap').setView([lat, lng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(peakMap);
+        
+        L.marker([lat, lng]).addTo(peakMap)
+            .bindPopup('<b>' + center + '</b><br>الموقع: ' + lat.toFixed(6) + ', ' + lng.toFixed(6))
+            .openPopup();
+        
+        L.circle([lat, lng], {
+            radius: radius,
+            color: '#E87461',
+            fillColor: '#E87461',
+            fillOpacity: 0.15,
+            weight: 2
+        }).addTo(peakMap);
+        
+        setTimeout(() => peakMap.invalidateSize(), 500);
+    } catch (error) {
+        console.error('خطأ في تهيئة الخريطة:', error);
+    }
+}
+
+// تحديث unitLocations من centerGeoData
+function updateUnitLocations() {
+    for (let center in centerGeoData) {
+        if (unitLocations[center]) {
+            unitLocations[center] = centerGeoData[center].address || unitLocations[center];
+        }
+    }
+}
+
+// ============================================
+// إحصاءات وقت الذروة
+// ============================================
+
+function showPeakStats() {
+    document.getElementById('peakStatsModal').style.display = 'flex';
+    
+    let total = 0;
+    const hourlyStats = {};
+    const unitStats = {};
+    
+    for (var key in reports) {
+        var report = reports[key];
+        if (report && report.count > 0) {
+            total += report.count;
+            if (report.times) {
+                report.times.forEach(time => {
+                    const hour = parseInt(time.split(':')[0]);
+                    if (!isNaN(hour)) {
+                        hourlyStats[hour] = (hourlyStats[hour] || 0) + 1;
+                    }
+                });
+            }
+            var parts = key.split('|');
+            var unit = parts.length > 1 ? parts[1] : key;
+            if (unit) {
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
+        }
+    }
+    
+    document.getElementById('statsTotalReports').innerText = total;
+    
+    let maxHour = null;
+    let maxCount = 0;
+    for (let hour in hourlyStats) {
+        if (hourlyStats[hour] > maxCount) {
+            maxCount = hourlyStats[hour];
+            maxHour = hour;
+        }
+    }
+    if (maxHour !== null) {
+        document.getElementById('statsPeakHour').innerText = maxHour + ':00 (' + maxCount + ' بلاغ)';
+    }
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    let predictedHour = currentHour;
+    let maxPrediction = 0;
+    for (let hour = 0; hour < 24; hour++) {
+        const count = hourlyStats[hour] || 0;
+        if (count > maxPrediction) {
+            maxPrediction = count;
+            predictedHour = hour;
+        }
+    }
+    if (maxPrediction > 0) {
+        const isToday = predictedHour >= currentHour;
+        document.getElementById('statsPrediction').innerText = 
+            (isToday ? 'اليوم ' : 'غداً ') + predictedHour + ':00 (' + maxPrediction + ' بلاغ متوقع)';
+    }
+    
+    const chart = document.getElementById('statsHourlyChart');
+    chart.innerHTML = '';
+    const maxVal = Math.max(...Object.values(hourlyStats), 1);
+    for (let hour = 0; hour < 24; hour++) {
+        const count = hourlyStats[hour] || 0;
+        const height = Math.max((count / maxVal) * 100, 2);
+        const div = document.createElement('div');
+        div.style.cssText = `
+            height: ${height}%;
+            min-height: 4px;
+            background: ${count > 0 ? 'var(--primary-500)' : 'var(--gray-200)'};
+            border-radius: 2px 2px 0 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        `;
+        div.title = hour + ':00 - ' + count + ' بلاغ';
+        div.onmouseover = function() { this.style.opacity = '0.7'; };
+        div.onmouseout = function() { this.style.opacity = '1'; };
+        chart.appendChild(div);
+    }
+}
+
+// ============================================
+// ربط الأزرار الجديدة
+// ============================================
+document.getElementById('manageCentersBtn')?.addEventListener('click', function() {
+    document.getElementById('manageCentersModal').style.display = 'flex';
+    renderCentersManagement();
+});
+
+document.getElementById('peakStatsBtn')?.addEventListener('click', showPeakStats);
+
+// ============================================
 // نافذة توزيع البلاغات المتطورة
 // ============================================
 function renderAdvancedDistribution() {
@@ -2355,7 +2723,7 @@ function renderAdvancedDistribution() {
             gridHtml += '<div class="distribution-unit-item">' +
                 (info.count > 0 ? '<span class="unit-badge">' + info.count + '</span>' : '') +
                 '<div class="unit-name">' + unit2 + '</div>' +
-                '<div class="unit-count ' + (isZero ? 'zero' : '') + '">' + info.count + '</div>' +
+                '<div class="unit-count ' + (isZero ? 'zero' : '') + '" id="count_' + center.replace(/\s/g, '_') + '_' + unit2.replace(/\s/g, '_') + '">' + info.count + '</div>' +
                 '<div class="unit-actions">' +
                 '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;"><i class="fas fa-plus-circle"></i></button>' +
                 (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;"><i class="fas fa-undo-alt"></i></button>' : '') +
@@ -2368,32 +2736,40 @@ function renderAdvancedDistribution() {
         sectorDiv.innerHTML = headerHtml + gridHtml;
         container.appendChild(sectorDiv);
         
-        // ربط الأحداث
         sectorDiv.querySelectorAll('.report-btn').forEach(function(btn, idx) {
             var unit = centersData[center][idx];
+            var key = center + '|' + unit;
             btn.onclick = function() {
+                if (!reports[key]) reports[key] = { count: 0, times: [] };
+                reports[key].count++;
+                reports[key].times.push(new Date().toLocaleTimeString('ar-SA'));
+                
+                updateDistributionCount(center, unit);
+                updateTotal();
+                calculateLiveReportStats();
+                updateDistributionIndicator();
+                
                 addReportToServer(center, unit);
-                setTimeout(function() {
-                    renderAdvancedDistribution();
-                    updateTotal();
-                    calculateLiveReportStats();
-                    updateWorkforceStats();
-                    updateDistributionIndicator();
-                }, 300);
+                showToast('✅ تم تسجيل بلاغ لـ ' + unit, 'success');
             };
         });
         
         sectorDiv.querySelectorAll('.undo-btn').forEach(function(btn, idx) {
             var unit = centersData[center][idx];
+            var key = center + '|' + unit;
             btn.onclick = function() {
-                undoLastReport(center, unit);
-                setTimeout(function() {
-                    renderAdvancedDistribution();
+                if (reports[key] && reports[key].count > 0) {
+                    reports[key].count--;
+                    reports[key].times.pop();
+                    
+                    updateDistributionCount(center, unit);
                     updateTotal();
                     calculateLiveReportStats();
-                    updateWorkforceStats();
                     updateDistributionIndicator();
-                }, 300);
+                    
+                    undoLastReport(center, unit);
+                    showToast('↩️ تم التراجع عن بلاغ لـ ' + unit, 'info');
+                }
             };
         });
         
@@ -2404,6 +2780,31 @@ function renderAdvancedDistribution() {
                 openMapPreview(unit, location);
             };
         });
+    }
+}
+
+function updateDistributionCount(center, unit) {
+    var key = center + '|' + unit;
+    var info = reports[key] || { count: 0, times: [] };
+    var id = 'count_' + center.replace(/\s/g, '_') + '_' + unit.replace(/\s/g, '_');
+    var el = document.getElementById(id);
+    if (el) {
+        el.innerText = info.count;
+        el.className = 'unit-count ' + (info.count === 0 ? 'zero' : '');
+        var parent = el.closest('.distribution-unit-item');
+        if (parent) {
+            var badge = parent.querySelector('.unit-badge');
+            if (info.count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'unit-badge';
+                    parent.prepend(badge);
+                }
+                badge.innerText = info.count;
+            } else if (badge) {
+                badge.remove();
+            }
+        }
     }
 }
 
@@ -2442,7 +2843,7 @@ document.getElementById('distributionBtn')?.addEventListener('click', function()
 });
 
 // ============================================
-// المؤشرات الأساسية
+// المؤشرات الأساسية (مختصرة للطول)
 // ============================================
 var centersData = {};
 var reports = {};
@@ -2478,7 +2879,7 @@ var seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]
 var airRecords = [];
 
 // ============================================
-// دوال العرض الرئيسية
+// دوال العرض الرئيسية (مختصرة)
 // ============================================
 function showToast(message, type) {
     type = type || 'info';
@@ -2719,7 +3120,7 @@ function updateDistributionIndicator() {
 }
 
 // ============================================
-// دوال الإسعاف الجوي
+// دوال الإسعاف الجوي (مختصرة)
 // ============================================
 async function loadAirRecords() {
     try {
@@ -2754,7 +3155,7 @@ async function deleteAirRecord(recordId) {
 }
 
 // ============================================
-// دوال المناوبات
+// دوال المناوبات (مختصرة)
 // ============================================
 async function loadShifts() {
     try {
@@ -2822,6 +3223,38 @@ async function startNewShift() {
 }
 
 // ============================================
+// دوال إضافة البلاغات (من التوزيع)
+// ============================================
+async function addReportToServer(center, unit) {
+    if (isViewingArchiveShift) { alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة."); return; }
+    if (!currentShiftId) { alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً."); return; }
+    try {
+        var response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
+        var result = await response.json();
+        if (result.success) { 
+            await loadAllData(); 
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+        } else { alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف")); }
+    } catch (error) { alert("❌ فشل في الاتصال بالخادم"); }
+}
+
+async function undoLastReport(center, unit) {
+    if (isViewingArchiveShift) { alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة."); return; }
+    try {
+        var response = await fetch('/api/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
+        var result = await response.json();
+        if (result.success) { 
+            await loadAllData(); 
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+        } else if (result.error) { alert(result.error); }
+    } catch (error) { alert("❌ فشل في التراجع"); }
+}
+
+// ============================================
 // تهيئة الصفحة والإشعارات
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -2832,14 +3265,13 @@ document.addEventListener('DOMContentLoaded', function() {
     buildCentersTable();
     loadShifts();
     loadAllData();
+    loadCenterGeo();
     setTimeout(checkForAlerts, 1000);
     
-    // تهيئة الإشعارات الصوتية والاتصال بخادم الإشعارات
     initNotificationSound();
     setTimeout(connectPeakEvents, 2000);
 });
 
-// فحص التنبيهات كل 10 ثواني (كحل احتياطي)
 setInterval(checkForAlerts, 10000);
 
 // ============================================
@@ -3530,7 +3962,7 @@ async function loadWorkforceStats(shiftId) {
 }
 
 // ============================================
-// دوال كبار المسعفين
+// دوال كبار المسعفين (مختصرة)
 // ============================================
 function renderSeniorRecords() {
     var container = document.getElementById('seniorRecordsList');
@@ -3643,42 +4075,10 @@ document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', fu
 });
 
 // ============================================
-// دوال إضافة البلاغات (من التوزيع)
-// ============================================
-async function addReportToServer(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة."); return; }
-    if (!currentShiftId) { alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً."); return; }
-    try {
-        var response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
-        var result = await response.json();
-        if (result.success) { 
-            await loadAllData(); 
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-        } else { alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ فشل في الاتصال بالخادم"); }
-}
-
-async function undoLastReport(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة."); return; }
-    try {
-        var response = await fetch('/api/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
-        var result = await response.json();
-        if (result.success) { 
-            await loadAllData(); 
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-        } else if (result.error) { alert(result.error); }
-    } catch (error) { alert("❌ فشل في التراجع"); }
-}
-
-// ============================================
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal'];
+    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'manageCentersModal', 'peakStatsModal'];
     modals.forEach(function(id) {
         var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -3713,6 +4113,8 @@ console.log('🌐 نظام وقت الذروة يعمل على الخادم (Ser
 console.log('📍 تنبيهات وقت الذروة تظهر مع خريطة الموقع');
 console.log('🗺️ معاينة الخريطة للفرق متاحة من نافذة التوزيع');
 console.log('🔔 الإشعارات اللحظية (SSE) مفعلة');
+console.log('📍 إدارة مواقع المراكز متاحة');
+console.log('📊 إحصاءات وقت الذروة متاحة');
 </script>
 </body>
 </html>

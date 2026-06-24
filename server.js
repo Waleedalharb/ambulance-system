@@ -44,29 +44,48 @@ async function ensureTempDir() {
 ensureTempDir();
 
 // ============================================
-// دوال مساعدة للتوقيت (الرياض GMT+3)
+// دوال مساعدة للتوقيت - الإصدار الصحيح
 // ============================================
 
 // الحصول على التوقيت المحلي (الرياض GMT+3)
 function getLocalTime(date = new Date()) {
-    const offset = 3; // الرياض GMT+3
-    const localDate = new Date(date.getTime() + (offset * 60 * 60 * 1000));
-    return localDate;
+    const d = new Date(date);
+    d.setHours(d.getHours() + 3);
+    return d;
 }
 
+// تحويل من UTC إلى Local (عند العرض)
 function formatLocalDateTime(date) {
-    const local = getLocalTime(date);
-    return local.toISOString().slice(0, 16).replace('T', ' ');
+    if (!date) return '-';
+    try {
+        const d = new Date(date);
+        d.setHours(d.getHours() + 3);
+        return d.toISOString().slice(0, 16).replace('T', ' ');
+    } catch(e) {
+        return date;
+    }
 }
 
 function formatLocalDate(date) {
-    const local = getLocalTime(date);
-    return local.toLocaleDateString('ar-SA');
+    if (!date) return '-';
+    try {
+        const d = new Date(date);
+        d.setHours(d.getHours() + 3);
+        return d.toLocaleDateString('ar-SA');
+    } catch(e) {
+        return date;
+    }
 }
 
 function formatLocalTime(date) {
-    const local = getLocalTime(date);
-    return local.toLocaleTimeString('ar-SA');
+    if (!date) return '-';
+    try {
+        const d = new Date(date);
+        d.setHours(d.getHours() + 3);
+        return d.toLocaleTimeString('ar-SA');
+    } catch(e) {
+        return date;
+    }
 }
 
 // ============================================
@@ -878,7 +897,7 @@ app.post('/api/change-password', async (req, res) => {
 });
 
 // ============================================
-// API: وقت الذروة (Server-based مع توقيت محلي)
+// API: وقت الذروة (Server-based مع توقيت محلي صحيح)
 // ============================================
 
 app.get('/api/peak-data', async (req, res) => {
@@ -900,9 +919,17 @@ app.post('/api/peak-mission', async (req, res) => {
         const data = await readPeakData();
         const now = new Date();
         
-        // تحويل التوقيتات إلى التوقيت المحلي
+        // ===== التصحيح: تحويل التوقيت بشكل صحيح =====
+        // المتصفح يرسل التوقيت المحلي (الرياض)
+        // نحتاج إلى تحويله إلى UTC للتخزين، ثم إضافة 3 ساعات عند العرض
+        
+        // 1. إنشاء كائنات التاريخ من التوقيت المستلم (المحلي)
         const startLocal = new Date(startTime);
         const endLocal = new Date(endTime);
+        
+        // 2. تحويل إلى UTC للتخزين (نطرح 3 ساعات)
+        const startUTC = new Date(startLocal.getTime() - (3 * 60 * 60 * 1000));
+        const endUTC = new Date(endLocal.getTime() - (3 * 60 * 60 * 1000));
         
         const mission = {
             id: Date.now().toString(),
@@ -910,10 +937,12 @@ app.post('/api/peak-mission', async (req, res) => {
             lat: lat || null,
             lng: lng || null,
             unit,
-            startTime: startLocal.toISOString(),
-            endTime: endLocal.toISOString(),
-            startTimeDisplay: formatLocalDateTime(startLocal),
-            endTimeDisplay: formatLocalDateTime(endLocal),
+            // تخزين بصيغة UTC
+            startTime: startUTC.toISOString(),
+            endTime: endUTC.toISOString(),
+            // للعرض فقط (توقيت محلي)
+            startTimeDisplay: formatLocalDateTime(startUTC),
+            endTimeDisplay: formatLocalDateTime(endUTC),
             priority: priority || 'عالية',
             notes: notes || '',
             status: 'نشط',
@@ -924,6 +953,7 @@ app.post('/api/peak-mission', async (req, res) => {
         data.missions.unshift(mission);
         if (data.missions.length > 100) data.missions.pop();
         
+        // سجل العمليات
         data.logs.unshift({
             id: Date.now().toString(),
             icon: '🟡',
@@ -936,18 +966,18 @@ app.post('/api/peak-mission', async (req, res) => {
         });
         if (data.logs.length > 50) data.logs.pop();
         
-        // إضافة تنبيه مع توقيت محلي
+        // التنبيه مع التوقيت الصحيح
         const alertData = {
             id: Date.now().toString(),
             title: 'تمركز مطلوب لـ ' + unit,
-            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + formatLocalDateTime(startLocal) + ' - ' + formatLocalDateTime(endLocal) + ')',
+            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + formatLocalDateTime(startUTC) + ' - ' + formatLocalDateTime(endUTC) + ')',
             priority: priority || 'عالية',
             unit: unit,
             location: location,
-            startTime: startLocal.toISOString(),
-            endTime: endLocal.toISOString(),
-            startTimeDisplay: formatLocalDateTime(startLocal),
-            endTimeDisplay: formatLocalDateTime(endLocal),
+            startTime: startUTC.toISOString(),
+            endTime: endUTC.toISOString(),
+            startTimeDisplay: formatLocalDateTime(startUTC),
+            endTimeDisplay: formatLocalDateTime(endUTC),
             notes: notes || '',
             lat: lat || null,
             lng: lng || null,
