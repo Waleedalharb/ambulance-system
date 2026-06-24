@@ -17,6 +17,7 @@ const IDENTITY_PATH = '/data/identity.pdf';
 const CONTROL_NOTES_PATH = '/data/control-notes.json';
 const VACATIONS_PATH = '/data/vacations.json';
 const PASSWORD_PATH = '/data/password.json';
+const PEAK_DATA_PATH = '/data/peak-data.json';
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
@@ -134,6 +135,25 @@ async function readPassword() {
 
 async function writePassword(password) {
     await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
+}
+
+// ============================================
+// دوال وقت الذروة
+// ============================================
+async function readPeakData() {
+    try {
+        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return { missions: [], alerts: [], logs: [] };
+        }
+        return { missions: [], alerts: [], logs: [] };
+    }
+}
+
+async function writePeakData(data) {
+    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
 }
 
 // ============================================
@@ -628,6 +648,104 @@ app.post('/api/change-password', async (req, res) => {
 });
 
 // ============================================
+// API: وقت الذروة (Server-based)
+// ============================================
+app.get('/api/peak-data', async (req, res) => {
+    try {
+        const data = await readPeakData();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
+    }
+});
+
+app.post('/api/peak-mission', async (req, res) => {
+    try {
+        const { location, unit, startTime, endTime, priority, notes, lat, lng } = req.body;
+        if (!location || !unit || !startTime || !endTime) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        
+        const data = await readPeakData();
+        const mission = {
+            id: Date.now().toString(),
+            location,
+            lat: lat || null,
+            lng: lng || null,
+            unit,
+            startTime,
+            endTime,
+            priority: priority || 'عالية',
+            notes: notes || '',
+            status: 'نشط',
+            createdAt: new Date().toISOString()
+        };
+        
+        data.missions.unshift(mission);
+        if (data.missions.length > 100) data.missions.pop();
+        
+        data.logs.unshift({
+            id: Date.now().toString(),
+            icon: '🟡',
+            action: 'مهمة جديدة',
+            details: unit + ' في ' + location,
+            priority: priority || 'عادي',
+            time: new Date().toLocaleTimeString('ar-SA'),
+            date: new Date().toISOString()
+        });
+        if (data.logs.length > 50) data.logs.pop();
+        
+        data.alerts.unshift({
+            id: Date.now().toString(),
+            title: 'تمركز مطلوب لـ ' + unit,
+            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
+            priority: priority || 'عالية',
+            unit: unit,
+            location: location,
+            missionId: mission.id,
+            status: 'نشط',
+            createdAt: new Date().toISOString()
+        });
+        if (data.alerts.length > 50) data.alerts.pop();
+        
+        await writePeakData(data);
+        res.json({ success: true, mission });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ المهمة' });
+    }
+});
+
+app.post('/api/peak-resolve', async (req, res) => {
+    try {
+        const { alertId } = req.body;
+        if (!alertId) {
+            return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
+        }
+        
+        const data = await readPeakData();
+        const alert = data.alerts.find(a => a.id === alertId);
+        if (alert) {
+            alert.status = 'منتهي';
+            data.logs.unshift({
+                id: Date.now().toString(),
+                icon: '✅',
+                action: 'تم التنفيذ',
+                details: alert.details,
+                priority: alert.priority || 'عادي',
+                time: new Date().toLocaleTimeString('ar-SA'),
+                date: new Date().toISOString()
+            });
+            if (data.logs.length > 50) data.logs.pop();
+            await writePeakData(data);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إنهاء التنبيه' });
+    }
+});
+
+// ============================================
 // API: الجدول الشهري
 // ============================================
 app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
@@ -712,4 +830,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
+    console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
 });
