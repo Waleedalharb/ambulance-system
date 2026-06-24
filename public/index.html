@@ -2190,7 +2190,7 @@ let selectedPeakLocation = null;
 let isMapInitialized = false;
 let mapClickHandler = null;
 
-// فتح نافذة الخريطة
+// ===== فتح نافذة الخريطة (لوقت الذروة) =====
 function openPeakMap() {
     console.log('🗺️ فتح الخريطة من وقت الذروة');
     
@@ -2200,20 +2200,16 @@ function openPeakMap() {
         return;
     }
     
-    // عرض النافذة
     modal.style.display = 'flex';
-    
-    // إعادة تعيين الموقع المحدد
     selectedPeakLocation = null;
     document.getElementById('peakSelectedLocation').innerHTML = 'لم يتم تحديد موقع';
     
-    // تأخير تهيئة الخريطة
     setTimeout(function() {
         initPeakMapForSelection();
     }, 500);
 }
 
-// تهيئة الخريطة للتحديد (تفاعلية)
+// ===== تهيئة الخريطة للتفاعل (وقت الذروة) =====
 function initPeakMapForSelection() {
     console.log('🗺️ تهيئة الخريطة التفاعلية...');
     
@@ -2223,85 +2219,67 @@ function initPeakMapForSelection() {
         return;
     }
     
-    // التحقق من تحميل Leaflet
     if (typeof L === 'undefined') {
         console.log('⏳ تحميل Leaflet...');
         loadLeafletAndRetry();
         return;
     }
     
-    // إزالة الخريطة القديمة إذا وجدت
     if (peakMap) {
         peakMap.remove();
         peakMap = null;
     }
     
     try {
-        // إنشاء خريطة جديدة
         peakMap = L.map('peakMap', {
             center: [24.7136, 46.6753],
             zoom: 13,
             zoomControl: true
         });
         
-        // إضافة طبقة الخريطة
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(peakMap);
         
-        console.log('✅ تم إنشاء الخريطة التفاعلية');
-        
-        // متغير للعلامة
         let marker = null;
         
-        // إزالة أي حدث سابق
         if (mapClickHandler) {
             peakMap.off('click', mapClickHandler);
         }
         
-        // إضافة حدث النقر
         mapClickHandler = function(e) {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
             console.log('📍 تم النقر على الخريطة:', lat, lng);
             
-            // إزالة العلامة السابقة
             if (marker) {
                 peakMap.removeLayer(marker);
             }
             
-            // إضافة علامة جديدة
             marker = L.marker([lat, lng], {
                 draggable: true
             }).addTo(peakMap);
             
             marker.bindPopup('📍 الموقع المحدد: ' + lat.toFixed(6) + ', ' + lng.toFixed(6)).openPopup();
             
-            // السماح بسحب العلامة
             marker.on('dragend', function() {
                 const pos = marker.getLatLng();
                 selectedPeakLocation = { lat: pos.lat, lng: pos.lng };
                 document.getElementById('peakSelectedLocation').innerHTML = 
                     '<strong>' + pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6) + '</strong>';
-                console.log('📍 تم سحب العلامة إلى:', pos.lat, pos.lng);
             });
             
-            // تحديث الموقع المحدد
             selectedPeakLocation = { lat: lat, lng: lng };
             document.getElementById('peakSelectedLocation').innerHTML = 
                 '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
-            
-            console.log('✅ تم تحديد الموقع:', lat, lng);
         };
         
         peakMap.on('click', mapClickHandler);
         
-        // تحديث حجم الخريطة بعد التهيئة
         setTimeout(function() {
             if (peakMap) {
                 peakMap.invalidateSize();
-                console.log('✅ تم تحديث حجم الخريطة');
             }
         }, 500);
         
@@ -2313,94 +2291,9 @@ function initPeakMapForSelection() {
     }
 }
 
-// تحميل Leaflet وإعادة المحاولة
-function loadLeafletAndRetry() {
-    console.log('⏳ جاري تحميل Leaflet...');
-    
-    if (!document.querySelector('link[href*="leaflet.css"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
-        console.log('✅ تم تحميل CSS');
-    }
-    
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = function() {
-        console.log('✅ تم تحميل Leaflet JS');
-        setTimeout(function() {
-            initPeakMapForSelection();
-        }, 300);
-    };
-    script.onerror = function() {
-        console.error('❌ فشل تحميل Leaflet');
-        alert('❌ فشل تحميل مكتبة الخريطة. الرجاء التحقق من الاتصال بالإنترنت.');
-    };
-    document.head.appendChild(script);
-}
-
-// تأكيد الموقع المحدد
-function confirmPeakLocation() {
-    console.log('📍 تأكيد الموقع...');
-    
-    if (!selectedPeakLocation) {
-        alert('⚠️ الرجاء تحديد موقع على الخريطة (اضغط على الخريطة أو اسحب العلامة)');
-        return;
-    }
-    
-    const lat = selectedPeakLocation.lat;
-    const lng = selectedPeakLocation.lng;
-    
-    document.getElementById('peakLocation').value = lat.toFixed(6) + ', ' + lng.toFixed(6);
-    document.getElementById('peakLat').value = lat;
-    document.getElementById('peakLng').value = lng;
-    
-    closePeakMap();
-    alert('✅ تم تحديد الموقع بنجاح');
-    console.log('✅ الموقع المحدد:', lat, lng);
-}
-
-// إغلاق نافذة الخريطة
-function closePeakMap() {
-    const modal = document.getElementById('peakMapModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-    // لا نحذف الخريطة، فقط نخفيها
-}
-
-// ============================================
-// دوال إدارة المراكز (للعرض فقط)
-// ============================================
-
-// عرض المركز على الخريطة (للإدارة)
-function showCenterOnMap(center) {
-    console.log('🗺️ عرض المركز على الخريطة:', center);
-    
-    const data = tempCenterGeoData[center];
-    if (!data || !data.center) {
-        alert('⚠️ لا توجد بيانات للمركز');
-        return;
-    }
-    
-    const lat = data.center[0];
-    const lng = data.center[1];
-    const radius = data.radius || 5000;
-    
-    const modal = document.getElementById('peakMapModal');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-    
-    setTimeout(function() {
-        initPeakMapForView(lat, lng, radius, center);
-    }, 500);
-}
-
-// تهيئة الخريطة للعرض فقط (غير تفاعلية)
+// ===== تهيئة الخريطة للعرض مع إمكانية السحب (إدارة المراكز) =====
 function initPeakMapForView(lat, lng, radius, centerName) {
-    console.log('🗺️ عرض المركز:', centerName, lat, lng);
+    console.log('🗺️ عرض المركز مع إمكانية التعديل:', centerName, lat, lng);
     
     const container = document.getElementById('peakMap');
     if (!container) return;
@@ -2427,9 +2320,62 @@ function initPeakMapForView(lat, lng, radius, centerName) {
             maxZoom: 19
         }).addTo(peakMap);
         
-        const marker = L.marker([lat, lng]).addTo(peakMap);
+        // ===== علامة قابلة للسحب =====
+        const marker = L.marker([lat, lng], {
+            draggable: true  // <-- تفعيل السحب
+        }).addTo(peakMap);
+        
         marker.bindPopup('<b>' + centerName + '</b><br>📍 ' + lat.toFixed(6) + ', ' + lng.toFixed(6)).openPopup();
         
+        // ===== عند سحب العلامة =====
+        marker.on('dragend', function() {
+            const pos = marker.getLatLng();
+            console.log('📍 تم سحب العلامة إلى:', pos.lat, pos.lng);
+            
+            // تحديث الحقول في نموذج إدارة المراكز
+            const key = centerName.replace(/\s/g, '_');
+            const latInput = document.getElementById('lat_' + key);
+            const lngInput = document.getElementById('lng_' + key);
+            
+            if (latInput) latInput.value = pos.lat.toFixed(6);
+            if (lngInput) lngInput.value = pos.lng.toFixed(6);
+            
+            // تحديث الموقع المحدد (لوقت الذروة)
+            selectedPeakLocation = { lat: pos.lat, lng: pos.lng };
+            document.getElementById('peakSelectedLocation').innerHTML = 
+                '<strong>' + pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6) + '</strong>';
+            
+            // تحديث popup
+            marker.bindPopup('<b>' + centerName + '</b><br>📍 ' + pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6)).openPopup();
+            
+            showToast('📍 تم تحديث موقع ' + centerName, 'success');
+        });
+        
+        // ===== عند النقر على الخريطة (تحديد موقع جديد) =====
+        peakMap.on('click', function(e) {
+            const newLat = e.latlng.lat;
+            const newLng = e.latlng.lng;
+            
+            // تحريك العلامة إلى الموقع الجديد
+            marker.setLatLng([newLat, newLng]);
+            marker.bindPopup('<b>' + centerName + '</b><br>📍 ' + newLat.toFixed(6) + ', ' + newLng.toFixed(6)).openPopup();
+            
+            // تحديث الحقول
+            const key = centerName.replace(/\s/g, '_');
+            const latInput = document.getElementById('lat_' + key);
+            const lngInput = document.getElementById('lng_' + key);
+            
+            if (latInput) latInput.value = newLat.toFixed(6);
+            if (lngInput) lngInput.value = newLng.toFixed(6);
+            
+            selectedPeakLocation = { lat: newLat, lng: newLng };
+            document.getElementById('peakSelectedLocation').innerHTML = 
+                '<strong>' + newLat.toFixed(6) + ', ' + newLng.toFixed(6) + '</strong>';
+            
+            console.log('📍 تم تحديد موقع جديد:', newLat, newLng);
+        });
+        
+        // ===== دائرة نصف القطر =====
         if (radius && radius > 0) {
             L.circle([lat, lng], {
                 radius: radius,
@@ -2440,11 +2386,16 @@ function initPeakMapForView(lat, lng, radius, centerName) {
             }).addTo(peakMap);
         }
         
-        // تعطيل التفاعل (عرض فقط)
-        peakMap.dragging.disable();
-        peakMap.touchZoom.disable();
-        peakMap.doubleClickZoom.disable();
-        peakMap.scrollWheelZoom.disable();
+        // ===== تفعيل التفاعل (بدلاً من تعطيله) =====
+        peakMap.dragging.enable();
+        peakMap.touchZoom.enable();
+        peakMap.doubleClickZoom.enable();
+        peakMap.scrollWheelZoom.enable();
+        
+        // حفظ الموقع الحالي
+        selectedPeakLocation = { lat: lat, lng: lng };
+        document.getElementById('peakSelectedLocation').innerHTML = 
+            '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
         
         setTimeout(function() {
             if (peakMap) {
@@ -2452,14 +2403,97 @@ function initPeakMapForView(lat, lng, radius, centerName) {
             }
         }, 500);
         
-        console.log('✅ تم عرض المركز بنجاح');
+        console.log('✅ تم تهيئة الخريطة مع إمكانية السحب والتحديد');
         
     } catch (error) {
-        console.error('❌ خطأ في عرض المركز:', error);
+        console.error('❌ خطأ في تهيئة الخريطة:', error);
+        alert('❌ حدث خطأ في تهيئة الخريطة: ' + error.message);
     }
 }
 
-// دالة initPeakMap القديمة (للتوافق)
+// ===== عرض المركز على الخريطة (من إدارة المراكز) =====
+function showCenterOnMap(center) {
+    console.log('🗺️ عرض المركز على الخريطة:', center);
+    
+    const data = tempCenterGeoData[center];
+    if (!data || !data.center) {
+        alert('⚠️ لا توجد بيانات للمركز');
+        return;
+    }
+    
+    const lat = data.center[0];
+    const lng = data.center[1];
+    const radius = data.radius || 5000;
+    
+    const modal = document.getElementById('peakMapModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+    
+    setTimeout(function() {
+        initPeakMapForView(lat, lng, radius, center);
+    }, 500);
+}
+
+// ===== تأكيد الموقع المحدد =====
+function confirmPeakLocation() {
+    console.log('📍 تأكيد الموقع...');
+    
+    if (!selectedPeakLocation) {
+        alert('⚠️ الرجاء تحديد موقع على الخريطة (اضغط على الخريطة أو اسحب العلامة)');
+        return;
+    }
+    
+    const lat = selectedPeakLocation.lat;
+    const lng = selectedPeakLocation.lng;
+    
+    document.getElementById('peakLocation').value = lat.toFixed(6) + ', ' + lng.toFixed(6);
+    document.getElementById('peakLat').value = lat;
+    document.getElementById('peakLng').value = lng;
+    
+    closePeakMap();
+    alert('✅ تم تحديد الموقع بنجاح');
+}
+
+// ===== إغلاق نافذة الخريطة =====
+function closePeakMap() {
+    const modal = document.getElementById('peakMapModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// ===== تحميل Leaflet وإعادة المحاولة =====
+function loadLeafletAndRetry() {
+    console.log('⏳ جاري تحميل Leaflet...');
+    
+    if (!document.querySelector('link[href*="leaflet.css"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+        console.log('✅ تم تحميل CSS');
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = function() {
+        console.log('✅ تم تحميل Leaflet JS');
+        setTimeout(function() {
+            // تحديد الوضع المناسب
+            if (document.getElementById('peakMapModal').style.display === 'flex') {
+                initPeakMapForSelection();
+            }
+        }, 300);
+    };
+    script.onerror = function() {
+        console.error('❌ فشل تحميل Leaflet');
+        alert('❌ فشل تحميل مكتبة الخريطة. الرجاء التحقق من الاتصال بالإنترنت.');
+    };
+    document.head.appendChild(script);
+}
+
+// ===== دالة initPeakMap القديمة (للتوافق) =====
 function initPeakMap() {
     initPeakMapForSelection();
 }

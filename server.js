@@ -6,18 +6,31 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// مسارات ملفات البيانات
+// مسارات ملفات البيانات - محلية
 // ============================================
-const DATA_PATH = '/data/ambulance-data.json';
-const SHIFT_DATA_PATH = '/data/shift-data.json';
-const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
-const DOCS_PATH = '/data/docs.json';
-const AIR_PATH = '/data/air-ambulance.json';
-const IDENTITY_PATH = '/data/identity.pdf';
-const CONTROL_NOTES_PATH = '/data/control-notes.json';
-const VACATIONS_PATH = '/data/vacations.json';
-const PASSWORD_PATH = '/data/password.json';
-const PEAK_DATA_PATH = '/data/peak-data.json';
+const DATA_DIR = path.join(__dirname, 'data');
+
+// دالة للتأكد من وجود مجلد data
+async function ensureDataDir() {
+    try {
+        await fs.mkdir(DATA_DIR, { recursive: true });
+        await fs.mkdir(path.join(DATA_DIR, 'temp'), { recursive: true });
+    } catch (e) {
+        // المجلد موجود مسبقاً
+    }
+}
+ensureDataDir();
+
+const DATA_PATH = path.join(DATA_DIR, 'ambulance-data.json');
+const SHIFT_DATA_PATH = path.join(DATA_DIR, 'shift-data.json');
+const MONTHLY_TABLE_PATH = path.join(DATA_DIR, 'monthly-table.xlsx');
+const DOCS_PATH = path.join(DATA_DIR, 'docs.json');
+const AIR_PATH = path.join(DATA_DIR, 'air-ambulance.json');
+const IDENTITY_PATH = path.join(DATA_DIR, 'identity.pdf');
+const CONTROL_NOTES_PATH = path.join(DATA_DIR, 'control-notes.json');
+const VACATIONS_PATH = path.join(DATA_DIR, 'vacations.json');
+const PASSWORD_PATH = path.join(DATA_DIR, 'password.json');
+const PEAK_DATA_PATH = path.join(DATA_DIR, 'peak-data.json');
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
@@ -32,16 +45,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // إعداد Multer لرفع الملفات
 // ============================================
 const upload = multer({
-    dest: '/data/temp/',
+    dest: path.join(DATA_DIR, 'temp'),
     limits: { fileSize: 100 * 1024 * 1024 }
 });
-
-async function ensureTempDir() {
-    try {
-        await fs.mkdir('/data/temp', { recursive: true });
-    } catch (e) {}
-}
-ensureTempDir();
 
 // ============================================
 // دوال مساعدة للتوقيت - الإصدار الصحيح
@@ -1152,7 +1158,50 @@ app.get('/api/export', async (req, res) => {
         res.status(500).json({ error: 'فشل في تصدير البيانات' });
     }
 });
+// ============================================
+// API: البيانات الجغرافية للمراكز (GET)
+// ============================================
+app.get('/api/center-geo', (req, res) => {
+    res.json({ success: true, data: centerGeoData });
+});
 
+// ============================================
+// API: حفظ البيانات الجغرافية للمراكز (POST)
+// ============================================
+app.post('/api/save-center-geo', async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        
+        // تحديث البيانات الجغرافية
+        for (let center in data) {
+            if (centerGeoData[center]) {
+                centerGeoData[center].center = data[center].center;
+                centerGeoData[center].radius = data[center].radius;
+                centerGeoData[center].address = data[center].address || centerGeoData[center].address;
+            }
+        }
+        
+        res.json({ success: true, message: 'تم حفظ مواقع المراكز بنجاح' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ مواقع المراكز' });
+    }
+});
+
+// ============================================
+// API: بيانات وقت الذروة (GET) - تأكد من وجودها
+// ============================================
+app.get('/api/peak-data', async (req, res) => {
+    try {
+        const data = await readPeakData();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
+    }
+});
 // ============================================
 // تشغيل الخادم
 // ============================================
