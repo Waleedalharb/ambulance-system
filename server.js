@@ -303,9 +303,6 @@ app.post('/api/report', async (req, res) => {
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
         
-        // إضافة إشعار بتسجيل بلاغ جديد
-        addNotification(`📢 بلاغ جديد: ${unit} في ${center}`, 'report', { center, unit, count: allData[key].count });
-        
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
@@ -385,20 +382,20 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
 });
 
 // ============================================
-// API: المستندات
+// API: المستندات (التحديثات التشغيلية)
 // ============================================
 app.get('/api/docs', async (req, res) => {
     try {
         const docs = await readDocs();
         res.json({ success: true, docs });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب المستندات' });
+        res.status(500).json({ error: 'فشل في جلب التحديثات' });
     }
 });
 
 app.post('/api/upload-doc', async (req, res) => {
     try {
-        const { filename, fileData, description, fileType } = req.body;
+        const { filename, fileData, description, fileType, category, priority } = req.body;
         if (!filename || !fileData) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
@@ -409,6 +406,9 @@ app.post('/api/upload-doc', async (req, res) => {
             fileData: fileData,
             fileType: fileType || 'application/octet-stream',
             description: description || '',
+            category: category || 'أخرى',
+            priority: priority || 'normal',
+            uploader: req.body.uploader || 'المشرف',
             uploadDate: new Date().toISOString()
         };
         docs.push(newDoc);
@@ -416,7 +416,7 @@ app.post('/api/upload-doc', async (req, res) => {
         res.json({ success: true, doc: newDoc });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'فشل في رفع المستند' });
+        res.status(500).json({ error: 'فشل في رفع التحديث' });
     }
 });
 
@@ -425,14 +425,14 @@ app.get('/api/download-doc/:id', async (req, res) => {
         const docs = await readDocs();
         const doc = docs.find(d => d.id === req.params.id);
         if (!doc) {
-            return res.status(404).json({ error: 'المستند غير موجود' });
+            return res.status(404).json({ error: 'التحديث غير موجود' });
         }
         const buffer = Buffer.from(doc.fileData, 'base64');
         res.setHeader('Content-Type', doc.fileType);
         res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
         res.send(buffer);
     } catch (error) {
-        res.status(500).json({ error: 'فشل في تحميل المستند' });
+        res.status(500).json({ error: 'فشل في تحميل التحديث' });
     }
 });
 
@@ -443,7 +443,7 @@ app.delete('/api/delete-doc/:id', async (req, res) => {
         await writeDocs(filtered);
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف المستند' });
+        res.status(500).json({ error: 'فشل في حذف التحديث' });
     }
 });
 
@@ -702,157 +702,13 @@ app.get('/api/export', async (req, res) => {
 });
 
 // ============================================
-// نظام توقيتات الذروة والإشعارات
-// ============================================
-
-// تعريف أوقات الذروة
-const PEAK_HOURS = [
-    { start: "08:00", end: "10:00", label: "ذروة صباحية", level: "high" },
-    { start: "14:00", end: "16:00", label: "ذروة عصرية", level: "high" },
-    { start: "20:00", end: "22:00", label: "ذروة مسائية", level: "medium" }
-];
-
-// تخزين الإشعارات
-let notifications = [];
-let peakStatus = { isPeak: false, currentPeak: null };
-let lastKnownLocations = {};
-
-// دالة إضافة إشعار
-function addNotification(message, type = 'info', data = null) {
-    const notif = {
-        id: Date.now(),
-        message: message,
-        type: type,
-        data: data,
-        timestamp: new Date().toISOString(),
-        read: false
-    };
-    notifications.unshift(notif);
-    if (notifications.length > 100) notifications.pop();
-}
-
-// دالة التحقق من وقت الذروة
-function checkPeakTime() {
-    const now = new Date();
-    const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
-                        now.getMinutes().toString().padStart(2, '0');
-    
-    let foundPeak = null;
-    for (let peak of PEAK_HOURS) {
-        if (currentTime >= peak.start && currentTime <= peak.end) {
-            foundPeak = peak;
-            break;
-        }
-    }
-    
-    const wasPeak = peakStatus.isPeak;
-    peakStatus.isPeak = !!foundPeak;
-    peakStatus.currentPeak = foundPeak;
-    
-    if (wasPeak !== peakStatus.isPeak) {
-        const message = peakStatus.isPeak 
-            ? `🔴 بداية وقت الذروة: ${foundPeak.label} (${foundPeak.start} - ${foundPeak.end})`
-            : `🟢 انتهاء وقت الذروة`;
-        addNotification(message, 'system');
-    }
-    return peakStatus;
-}
-
-// دالة تحديث تمركز فرقة
-function updateUnitLocation(unit, location) {
-    const oldLocation = lastKnownLocations[unit] || null;
-    lastKnownLocations[unit] = location;
-    
-    if (oldLocation && oldLocation !== location) {
-        addNotification(
-            `📍 تنبيه تمركز: ${unit} انتقل من "${oldLocation}" إلى "${location}"`,
-            'alert',
-            { unit, oldLocation, newLocation: location }
-        );
-    } else if (!oldLocation && location) {
-        addNotification(
-            `📍 تم تسجيل تمركز ${unit}: "${location}"`,
-            'info',
-            { unit, location }
-        );
-    }
-}
-
-// تشغيل فحص الذروة كل دقيقة
-setInterval(checkPeakTime, 60000);
-checkPeakTime();
-
-// ============================================
-// API: الإشعارات
-// ============================================
-
-app.get('/api/notifications', (req, res) => {
-    const limit = parseInt(req.query.limit) || 50;
-    res.json({
-        success: true,
-        notifications: notifications.slice(0, limit),
-        peakStatus: peakStatus,
-        total: notifications.length
-    });
-});
-
-app.get('/api/notifications/new/:lastId', (req, res) => {
-    const lastId = parseInt(req.params.lastId) || 0;
-    const newNotifs = notifications.filter(n => n.id > lastId);
-    res.json({
-        success: true,
-        notifications: newNotifs,
-        peakStatus: peakStatus
-    });
-});
-
-app.get('/api/peak-status', (req, res) => {
-    res.json({
-        success: true,
-        peakStatus: peakStatus,
-        peakHours: PEAK_HOURS
-    });
-});
-
-// ============================================
-// API: تمركز الفرق
-// ============================================
-
-app.post('/api/update-location', (req, res) => {
-    const { unit, location } = req.body;
-    if (!unit || !location) {
-        return res.status(400).json({ error: 'بيانات ناقصة' });
-    }
-    updateUnitLocation(unit, location);
-    res.json({ success: true });
-});
-
-app.get('/api/locations', (req, res) => {
-    res.json({
-        success: true,
-        locations: lastKnownLocations
-    });
-});
-
-app.get('/api/location/:unit', (req, res) => {
-    const unit = req.params.unit;
-    const location = lastKnownLocations[unit] || null;
-    res.json({
-        success: true,
-        unit: unit,
-        location: location,
-        mapUrl: location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}` : null
-    });
-});
-
-// ============================================
 // تشغيل الخادم
 // ============================================
 app.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
     console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
-    console.log(`📁 مسار المستندات: ${DOCS_PATH}`);
+    console.log(`📁 مسار التحديثات التشغيلية: ${DOCS_PATH}`);
     console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
