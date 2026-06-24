@@ -56,6 +56,7 @@
             margin: auto;
         }
 
+        /* ===== الهيدر ===== */
         .header {
             background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
             border-radius: var(--radius-lg);
@@ -67,12 +68,27 @@
             flex-wrap: wrap;
             gap: 10px;
             box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 50%;
+            pointer-events: none;
         }
 
         .header-brand {
             display: flex;
             align-items: center;
             gap: 14px;
+            z-index: 1;
         }
 
         .header-brand .icon {
@@ -129,8 +145,10 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            z-index: 1;
         }
 
+        /* ===== شريط التحكم ===== */
         .control-bar {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -235,6 +253,15 @@
             background: #D45A4A;
         }
 
+        .btn-gold {
+            background: var(--gold);
+            color: var(--gray-900);
+        }
+
+        .btn-gold:hover {
+            background: #D4B83A;
+        }
+
         .btn-sm {
             padding: 4px 12px;
             font-size: 0.7rem;
@@ -246,131 +273,257 @@
             border-radius: 20px;
         }
 
-        .dashboard-stats {
+        /* ===== تنبيه وقت الذروة ===== */
+        .peak-alert {
+            background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+            border: 2px solid #FF9800;
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            animation: pulseAlert 2s infinite;
+        }
+
+        .peak-alert.active {
+            display: flex;
+        }
+
+        @keyframes pulseAlert {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+        }
+
+        .peak-alert .icon {
+            font-size: 2rem;
+            animation: bounceIcon 1s infinite;
+        }
+
+        @keyframes bounceIcon {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .peak-alert .message {
+            flex: 1;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #E65100;
+        }
+
+        .peak-alert .time {
+            font-size: 0.8rem;
+            color: #BF360C;
+            background: rgba(255, 152, 0, 0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        .peak-alert .dismiss {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #BF360C;
+        }
+
+        /* ===== المؤشرات الرئيسية ===== */
+        .main-stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
             margin-bottom: 20px;
         }
 
-        .stat-card {
+        .main-stat-card {
             background: var(--white);
             border-radius: var(--radius-md);
-            padding: 15px;
+            padding: 18px 15px;
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--gray-100);
             text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
         }
 
-        .stat-card .value {
-            font-size: 2rem;
+        .main-stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .main-stat-card .icon-bg {
+            position: absolute;
+            top: -30px;
+            left: -30px;
+            font-size: 5rem;
+            opacity: 0.05;
+        }
+
+        .main-stat-card .value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-stat-card .value.primary { color: var(--primary-700); }
+        .main-stat-card .value.teal { color: var(--teal); }
+        .main-stat-card .value.coral { color: var(--coral); }
+        .main-stat-card .value.gold { color: var(--gold); }
+
+        .main-stat-card .label {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            margin-top: 4px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-stat-card .sub-label {
+            font-size: 0.6rem;
+            color: var(--gray-400);
+            margin-top: 2px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== مؤشرات القوى العاملة ===== */
+        .workforce-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+
+        .workforce-section .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-100);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .workforce-section .section-title i {
+            color: var(--gold);
+        }
+
+        .workforce-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .workforce-stat {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 15px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.3s;
+        }
+
+        .workforce-stat:hover {
+            border-color: var(--primary-500);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .workforce-stat .value {
+            font-size: 1.8rem;
             font-weight: 800;
         }
 
-        .stat-card .value.primary {
-            color: var(--primary-700);
-        }
+        .workforce-stat .value.primary { color: var(--primary-700); }
+        .workforce-stat .value.teal { color: var(--teal); }
+        .workforce-stat .value.coral { color: var(--coral); }
+        .workforce-stat .value.gold { color: var(--gold); }
 
-        .stat-card .value.teal {
-            color: var(--teal);
-        }
-
-        .stat-card .value.coral {
-            color: var(--coral);
-        }
-
-        .stat-card .label {
+        .workforce-stat .label {
             font-size: 0.7rem;
             color: var(--gray-600);
             margin-top: 4px;
         }
 
-        .notification-bar {
+        /* ===== توزيع الفرق ===== */
+        .units-distribution-section {
             background: var(--white);
-            border-radius: var(--radius-md);
-            padding: 10px 16px;
-            margin-bottom: 15px;
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 20px;
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--gray-100);
-            display: none;
         }
 
-        .notification-bar .content {
+        .units-distribution-section .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-700);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-100);
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        .peak-badge {
-            padding: 4px 14px;
-            border-radius: 30px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--gray-100);
-            color: var(--gray-600);
-        }
-
-        .peak-badge.active {
-            background: var(--coral-light);
-            color: var(--coral);
-        }
-
-        .peak-badge.inactive {
-            background: var(--teal-light);
+        .units-distribution-section .section-title i {
             color: var(--teal);
         }
 
-        .notification-list {
-            flex: 1;
-            min-width: 150px;
-            max-height: 60px;
-            overflow-y: auto;
+        .units-distribution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        .unit-dist-item {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .unit-dist-item:hover {
+            border-color: var(--primary-500);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .unit-dist-item .name {
             font-size: 0.75rem;
-            color: var(--gray-700);
+            font-weight: 600;
+            color: var(--gray-800);
         }
 
-        .notification-list .item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 2px 0;
-            border-bottom: 1px solid var(--gray-100);
+        .unit-dist-item .count {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-700);
+            margin: 4px 0;
         }
 
-        .notification-list .item .icon {
-            font-size: 0.8rem;
+        .unit-dist-item .count.zero {
+            color: var(--gray-400);
         }
 
-        .notification-list .item .msg {
-            flex: 1;
-            font-size: 0.7rem;
-        }
-
-        .notification-list .item .time {
+        .unit-dist-item .sector {
             font-size: 0.55rem;
             color: var(--gray-400);
         }
 
-        .location-alert {
-            display: none;
-            background: #FFF8E1;
-            border: 1px solid var(--gold);
-            border-radius: var(--radius-sm);
-            padding: 8px 14px;
-            margin-top: 8px;
-            font-size: 0.75rem;
-        }
-
-        .location-alert .dismiss {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            margin-right: 10px;
-            color: var(--gray-400);
-        }
-
+        /* ===== النوافذ المنبثقة ===== */
         .modal {
             display: none;
             position: fixed;
@@ -386,7 +539,6 @@
 
         .modal-content {
             background: var(--white);
-            border: 2px solid var(--gray-200);
             border-radius: var(--radius-lg);
             width: 95%;
             max-width: 95%;
@@ -397,17 +549,9 @@
             position: relative;
         }
 
-        .modal-content.max-w-800 {
-            max-width: 800px;
-        }
-
-        .modal-content.max-w-600 {
-            max-width: 600px;
-        }
-
-        .modal-content.max-w-1000 {
-            max-width: 1000px;
-        }
+        .modal-content.max-w-800 { max-width: 800px; }
+        .modal-content.max-w-600 { max-width: 600px; }
+        .modal-content.max-w-1000 { max-width: 1000px; }
 
         .modal-header {
             display: flex;
@@ -416,12 +560,7 @@
             margin-bottom: 15px;
         }
 
-        .modal-header h2 {
-            margin: 0;
-            color: var(--primary-700);
-        }
-
-        .modal-header h3 {
+        .modal-header h2, .modal-header h3 {
             margin: 0;
             color: var(--primary-700);
         }
@@ -438,6 +577,15 @@
             color: var(--gray-800);
         }
 
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== مكونات النماذج ===== */
         .form-row {
             margin: 15px 0;
         }
@@ -529,116 +677,7 @@
             border-color: var(--primary-500);
         }
 
-        .status-icon {
-            font-size: 1.2rem;
-            font-weight: bold;
-        }
-
-        .status-icon.ok {
-            color: var(--teal);
-        }
-
-        .status-icon.not {
-            color: var(--coral);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-        }
-
-        .stats-grid .stat-item {
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-            padding: 12px;
-            text-align: center;
-            border: 1px solid var(--gray-100);
-        }
-
-        .stats-grid .stat-item .label {
-            font-size: 0.65rem;
-            color: var(--gray-600);
-            font-weight: 500;
-        }
-
-        .stats-grid .stat-item .value {
-            font-size: 1.6rem;
-            font-weight: 800;
-        }
-
-        .stats-grid .stat-item .value.primary {
-            color: var(--primary-700);
-        }
-
-        .stats-grid .stat-item .value.teal {
-            color: var(--teal);
-        }
-
-        .stats-grid .stat-item .value.coral {
-            color: var(--coral);
-        }
-
-        .stats-scroll {
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid var(--gray-200);
-            padding: 10px;
-            background: var(--white);
-            border-radius: var(--radius-sm);
-        }
-
-        .distribution-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 3px 0;
-            font-size: 0.75rem;
-        }
-
-        .distribution-bar .name {
-            min-width: 70px;
-            font-weight: 500;
-        }
-
-        .distribution-bar .count {
-            min-width: 25px;
-            text-align: center;
-            font-weight: 600;
-        }
-
-        .distribution-bar .bar-track {
-            flex: 1;
-            height: 8px;
-            background: var(--gray-100);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .distribution-bar .bar-fill {
-            height: 100%;
-            border-radius: 10px;
-        }
-
-        .distribution-bar .bar-fill.green {
-            background: var(--teal);
-        }
-
-        .distribution-bar .bar-fill.red {
-            background: var(--coral);
-        }
-
-        .distribution-bar .bar-fill.blue {
-            background: var(--primary-500);
-        }
-
-        .distribution-bar .percent {
-            font-size: 0.6rem;
-            color: var(--gray-600);
-            min-width: 35px;
-        }
-
+        /* ===== مكونات التوزيع ===== */
         .sector-card {
             background: var(--white);
             border-radius: var(--radius-md);
@@ -666,7 +705,7 @@
 
         .units-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 12px;
         }
 
@@ -714,6 +753,139 @@
             border-radius: 20px;
         }
 
+        /* ===== مكونات التحكم ===== */
+        .control-person {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .control-person .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .control-person .info {
+            flex: 2;
+            min-width: 150px;
+        }
+
+        .control-person .info .name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .control-person .info .role {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+        }
+
+        .control-person .badge {
+            font-size: 0.65rem;
+            padding: 3px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: 20px;
+            background: var(--gray-50);
+        }
+
+        /* ===== مكونات التحديثات التشغيلية ===== */
+        #updatesPage {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--gray-50);
+            z-index: 9998;
+            overflow: auto;
+            direction: rtl;
+        }
+
+        #updatesPage .updates-header {
+            background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%);
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+
+        #updatesPage .updates-header .header-content {
+            max-width: 1400px;
+            margin: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        #updatesPage .updates-header .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #updatesPage .updates-header .brand .icon-box {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.1);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #updatesPage .updates-header .brand h1 {
+            margin: 0;
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        #updatesPage .updates-header .brand span {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.7rem;
+        }
+
+        #updatesPage .updates-header .brand span i {
+            font-size: 0.3rem;
+            color: var(--gold);
+        }
+
+        #updatesPage .updates-header .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #updatesPage .updates-header .header-actions .count-badge {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 14px;
+            border-radius: 20px;
+        }
+
+        /* ===== مكونات الخريطة ===== */
         .map-frame {
             border: 1px solid var(--gray-200);
             border-radius: var(--radius-sm);
@@ -735,18 +907,52 @@
             text-align: center;
         }
 
-        .modal-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
+        /* ===== تنسيقات عامة ===== */
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--gray-400);
             margin-top: 20px;
-            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
         }
 
-        .modal-buttons .btn {
-            padding: 8px 25px;
-            font-size: 0.85rem;
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1rem;
+            color: var(--gray-600);
         }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stats-grid .stat-item {
+            background: var(--gray-50);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+            border: 1px solid var(--gray-100);
+        }
+
+        .stats-grid .stat-item .label {
+            font-size: 0.65rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .stats-grid .stat-item .value {
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        .stats-grid .stat-item .value.primary { color: var(--primary-700); }
+        .stats-grid .stat-item .value.teal { color: var(--teal); }
+        .stats-grid .stat-item .value.coral { color: var(--coral); }
 
         .circle-stats-container {
             display: grid;
@@ -815,8 +1021,8 @@
             dominant-baseline: middle;
         }
 
-        .docs-list {
-            max-height: 50vh;
+        .stats-scroll {
+            max-height: 150px;
             overflow-y: auto;
             border: 1px solid var(--gray-200);
             padding: 10px;
@@ -824,356 +1030,52 @@
             border-radius: var(--radius-sm);
         }
 
-        .docs-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border: 1px solid var(--gray-100);
-            border-radius: var(--radius-sm);
-            background: var(--white);
-            margin-bottom: 6px;
-        }
-
-        .docs-item .info {
+        .distribution-bar {
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-
-        .docs-item .info .icon {
-            font-size: 1.2rem;
-        }
-
-        .docs-item .info .filename {
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .docs-item .info .date {
-            font-size: 0.65rem;
-            color: var(--gray-600);
-        }
-
-        .docs-item .info .desc {
-            font-size: 0.7rem;
-            color: var(--gray-600);
-        }
-
-        .docs-item .actions {
-            display: flex;
-            gap: 6px;
-        }
-
-        .docs-item .actions .btn {
-            padding: 3px 10px;
-            font-size: 0.65rem;
-        }
-
-        .air-records-list {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid var(--gray-200);
-            padding: 10px;
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-            display: none;
-        }
-
-        .air-record-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            border-bottom: 1px solid var(--gray-100);
-            font-size: 0.8rem;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-
-        .air-record-item .info {
-            flex: 1;
-            min-width: 150px;
-        }
-
-        .air-record-item .info .notes {
-            font-size: 0.6rem;
-            color: var(--gray-600);
-            display: block;
-        }
-
-        .air-record-item .info .time {
-            font-size: 0.6rem;
-            color: var(--gray-400);
-        }
-
-        .air-record-item .btn {
-            padding: 2px 10px;
-            font-size: 0.65rem;
-            border-radius: 4px;
-        }
-
-        .footer {
-            text-align: center;
-            font-size: 0.65rem;
-            color: var(--gray-400);
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            font-size: 1rem;
-            color: var(--gray-600);
-        }
-
-        .control-person {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px;
-            border: 1px solid var(--gray-100);
-            border-radius: var(--radius-sm);
-            background: var(--white);
-            flex-wrap: wrap;
-        }
-
-        .control-person .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-            flex-shrink: 0;
-        }
-
-        .control-person .info {
-            flex: 2;
-            min-width: 150px;
-        }
-
-        .control-person .info .name {
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .control-person .info .role {
-            font-size: 0.7rem;
-            color: var(--gray-600);
-        }
-
-        .control-person .vacation {
-            flex: 1;
-            min-width: 120px;
+            gap: 8px;
+            margin: 3px 0;
             font-size: 0.75rem;
         }
 
-        .control-person .vacation .display {
-            padding: 5px;
-            background: var(--gray-50);
-            border-radius: 4px;
+        .distribution-bar .name {
+            min-width: 70px;
+            font-weight: 500;
+        }
+
+        .distribution-bar .count {
+            min-width: 25px;
             text-align: center;
+            font-weight: 600;
         }
 
-        .control-person .vacation .edit {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            flex-wrap: wrap;
+        .distribution-bar .bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--gray-100);
+            border-radius: 10px;
+            overflow: hidden;
         }
 
-        .control-person .vacation .edit input {
-            width: 120px;
-            padding: 3px;
-            font-size: 0.7rem;
-            border: 1px solid var(--gray-200);
-            border-radius: 4px;
+        .distribution-bar .bar-fill {
+            height: 100%;
+            border-radius: 10px;
         }
 
-        .control-person .badge {
-            font-size: 0.65rem;
-            padding: 3px 10px;
-            border: 1px solid var(--gray-200);
-            border-radius: 20px;
-            background: var(--gray-50);
+        .distribution-bar .bar-fill.green { background: var(--teal); }
+        .distribution-bar .bar-fill.red { background: var(--coral); }
+        .distribution-bar .bar-fill.blue { background: var(--primary-500); }
+
+        .distribution-bar .percent {
+            font-size: 0.6rem;
+            color: var(--gray-600);
+            min-width: 35px;
         }
 
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-            }
-            .container,
-            .modal-content {
-                max-width: 100%;
-                margin: 0;
-                padding: 5px;
-            }
-            .control-bar,
-            .toolbar,
-            .archive-row,
-            .update-status,
-            footer,
-            .modal-buttons,
-            .no-print {
-                display: none !important;
-            }
-            .modal {
-                display: block !important;
-                position: relative;
-                background: white;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: auto;
-                overflow: visible;
-                transform: none;
-            }
-            .modal-content {
-                border: 1px solid #000;
-                margin: 0;
-                padding: 5px;
-                max-width: 100%;
-                box-shadow: none;
-                overflow: visible;
-                height: auto;
-                max-height: none;
-            }
-            table {
-                page-break-inside: avoid;
-                border-collapse: collapse;
-                width: 100%;
-                font-size: 9pt;
-            }
-            th,
-            td {
-                border: 1px solid #000;
-                padding: 3px 5px;
-            }
-            input,
-            textarea {
-                border: none;
-                padding: 0;
-                margin: 0;
-                font-size: 8pt;
-                background: transparent;
-            }
-            input {
-                text-align: center;
-            }
-            .status-icon {
-                font-size: 9pt;
-            }
-            .stats-grid {
-                page-break-inside: avoid;
-            }
-            .circle-stats-container {
-                page-break-inside: avoid;
-                border: 1px solid #000;
-                background: white;
-            }
-            .svg-circle-text {
-                fill: #000 !important;
-            }
-            #monthlyTableModal,
-            #airAmbulanceModal,
-            #docsModal,
-            #controlModal {
-                display: none !important;
-            }
-            .dashboard-stats {
-                display: none !important;
-            }
-            .notification-bar {
-                display: none !important;
-            }
-        }
-
-        @media (max-width: 650px) {
-            body {
-                padding: 8px;
-            }
-            .header {
-                flex-direction: column;
-                align-items: stretch;
-                text-align: center;
-                padding: 14px;
-            }
-            .header-brand {
-                justify-content: center;
-            }
-            .header-date {
-                text-align: center;
-            }
-            .control-bar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .control-bar .actions {
-                justify-content: center;
-            }
-            .dashboard-stats {
-                grid-template-columns: 1fr 1fr;
-            }
-            .units-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-            .modal-content {
-                padding: 12px;
-                margin: 10px;
-                width: 98%;
-                max-width: 98%;
-            }
-            .notification-bar .content {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .control-person {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .control-person .vacation .edit input {
-                width: 100%;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-            .circle-stats-container {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        @media (max-width: 400px) {
-            .dashboard-stats {
-                grid-template-columns: 1fr;
-            }
-            .units-grid {
-                grid-template-columns: 1fr;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            .circle-stats-container {
-                grid-template-columns: 1fr;
-            }
-        }
-
+        /* ===== توست ===== */
         @keyframes slideIn {
-            from {
-                transform: translateX(100px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
         .toast {
@@ -1206,34 +1108,49 @@
             color: var(--gray-800);
         }
 
-        .sheet-tab {
-            padding: 6px 15px;
-            border: 1px solid var(--gray-200);
-            background: var(--white);
-            cursor: pointer;
-            font-weight: 600;
-            border-radius: 4px;
-            font-size: 0.8rem;
+        /* ===== استجابة ===== */
+        @media (max-width: 992px) {
+            .main-stats-grid { grid-template-columns: 1fr 1fr; }
+            .workforce-stats-grid { grid-template-columns: 1fr 1fr; }
         }
 
-        .sheet-tab.active {
-            background: var(--primary-700);
-            color: var(--white);
-            border-color: var(--primary-700);
+        @media (max-width: 650px) {
+            body { padding: 8px; }
+            .header { flex-direction: column; align-items: stretch; text-align: center; padding: 14px; }
+            .header-brand { justify-content: center; }
+            .header-date { text-align: center; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .control-bar .actions { justify-content: center; }
+            .main-stats-grid { grid-template-columns: 1fr 1fr; }
+            .workforce-stats-grid { grid-template-columns: 1fr 1fr; }
+            .units-distribution-grid { grid-template-columns: 1fr 1fr; }
+            .modal-content { padding: 12px; margin: 10px; width: 98%; max-width: 98%; }
+            .units-grid { grid-template-columns: 1fr 1fr; }
+            #updatesPage .updates-header .header-content { flex-direction: column; align-items: stretch; text-align: center; }
+            #updatesPage .updates-header .brand { justify-content: center; }
+            #updatesPage .updates-header .header-actions { justify-content: center; }
         }
 
-        .sheet-tab:hover {
-            background: var(--gray-100);
+        @media (max-width: 400px) {
+            .main-stats-grid { grid-template-columns: 1fr; }
+            .workforce-stats-grid { grid-template-columns: 1fr; }
+            .units-distribution-grid { grid-template-columns: 1fr; }
+            .units-grid { grid-template-columns: 1fr; }
         }
 
-        .sheet-tab.active:hover {
-            background: var(--primary-900);
+        @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .container, .modal-content { max-width: 100%; margin: 0; padding: 5px; }
+            .control-bar, .toolbar, .modal-buttons, .no-print { display: none !important; }
+            .modal { display: block !important; position: relative; background: white; top: 0; left: 0; width: 100%; height: auto; overflow: visible; transform: none; }
+            .modal-content { border: 1px solid #000; margin: 0; padding: 5px; max-width: 100%; box-shadow: none; overflow: visible; height: auto; max-height: none; }
+            .dashboard-stats { display: none !important; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- ===== الشريط العلوي ===== -->
+        <!-- ===== الهيدر ===== -->
         <header class="header">
             <div class="header-brand">
                 <div class="icon">
@@ -1261,6 +1178,14 @@
             </div>
         </header>
 
+        <!-- ===== تنبيه وقت الذروة ===== -->
+        <div id="peakAlert" class="peak-alert">
+            <span class="icon">🔴</span>
+            <span class="message" id="peakAlertMessage">⏰ وقت الذروة: الفترة الصباحية (08:00 - 10:00)</span>
+            <span class="time" id="peakAlertTime">🕒 ينتهي في 10:00</span>
+            <button class="dismiss" id="dismissPeakAlert">×</button>
+        </div>
+
         <!-- ===== شريط التحكم ===== -->
         <div class="control-bar">
             <div class="total">
@@ -1270,59 +1195,92 @@
             <div class="actions">
                 <button class="btn btn-primary btn-sm" id="newShiftBtn"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
                 <button class="btn btn-outline btn-sm" id="shiftBtn"><i class="fas fa-clipboard-list"></i> نموذج</button>
-                <button class="btn btn-outline btn-sm" id="docsBtn"><i class="fas fa-folder-open"></i> المستندات</button>
+                <button class="btn btn-outline btn-sm" id="updatesBtn"><i class="fas fa-bullhorn"></i> التحديثات التشغيلية</button>
                 <button class="btn btn-outline btn-sm" id="airAmbulanceBtn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
                 <button class="btn btn-outline btn-sm" id="controlBtn"><i class="fas fa-sliders-h"></i> التحكم</button>
                 <button class="btn btn-outline btn-sm" id="monthlyTableBtn"><i class="fas fa-calendar-alt"></i> الجدول</button>
+                <button class="btn btn-outline btn-sm" id="distributionBtn"><i class="fas fa-ambulance"></i> التوزيع</button>
             </div>
         </div>
 
-        <!-- ===== شريط الإشعارات ===== -->
-        <div id="notificationBar" class="notification-bar">
-            <div class="content">
-                <div id="peakStatusBadge" class="peak-badge">⏱️ جاري التحقق...</div>
-                <div class="notification-list" id="notificationList">
-                    <span style="color:var(--gray-400);">📭 لا توجد إشعارات جديدة</span>
-                </div>
-                <button id="clearNotificationsBtn" class="btn btn-sm" style="font-size:0.6rem; padding:2px 10px; border:1px solid var(--gray-200); background:transparent; color:var(--gray-600);">مسح الكل</button>
-            </div>
-            <div id="locationAlert" class="location-alert">
-                <span id="locationAlertMessage"></span>
-                <button id="dismissLocationAlert" class="dismiss">×</button>
-            </div>
-        </div>
-
-        <!-- ===== مؤشرات الصفحة الرئيسية ===== -->
-        <div class="dashboard-stats">
-            <div class="stat-card">
+        <!-- ===== المؤشرات الرئيسية ===== -->
+        <div class="main-stats-grid">
+            <div class="main-stat-card">
+                <div class="icon-bg">📊</div>
                 <div class="value primary" id="dashTotalReports">0</div>
                 <div class="label">📊 إجمالي البلاغات</div>
+                <div class="sub-label">آخر تحديث: <span id="dashLastUpdate">الآن</span></div>
             </div>
-            <div class="stat-card">
+            <div class="main-stat-card">
+                <div class="icon-bg">🚑</div>
                 <div class="value teal" id="dashActiveUnits">0</div>
-                <div class="label">🚑 فرقة نشطة</div>
+                <div class="label">🚑 فرق نشطة</div>
+                <div class="sub-label">من أصل <span id="dashTotalUnits">0</span> فرقة</div>
             </div>
-            <div class="stat-card">
+            <div class="main-stat-card">
+                <div class="icon-bg">⏱️</div>
                 <div class="value coral" id="dashAvgResponse">0</div>
                 <div class="label">⏱️ متوسط وقت الاستجابة</div>
+                <div class="sub-label">دقيقة</div>
             </div>
-            <div class="stat-card">
-                <div class="value primary" id="dashReadiness">0%</div>
+            <div class="main-stat-card">
+                <div class="icon-bg">✅</div>
+                <div class="value gold" id="dashReadiness">0%</div>
                 <div class="label">✅ جاهزية القطاع</div>
+                <div class="sub-label" id="dashReadinessSub">0 / 0 مركز جاهز</div>
             </div>
         </div>
 
-        <!-- ===== زر فتح توزيع البلاغات ===== -->
-        <div style="text-align:center; margin-bottom:20px;">
-            <button id="openDistributionBtn" class="btn btn-primary" style="padding:12px 30px; font-size:1rem;">
-                <i class="fas fa-ambulance"></i> 📋 توزيع البلاغات
-            </button>
+        <!-- ===== مؤشرات القوى العاملة ===== -->
+        <div class="workforce-section">
+            <div class="section-title">
+                <i class="fas fa-users"></i> مؤشرات القوى العاملة
+                <span style="font-size:0.7rem; color:var(--gray-400); font-weight:400; margin-right:auto;">
+                    آخر تحديث: <span id="workforceUpdateTime">الآن</span>
+                </span>
+            </div>
+            <div class="workforce-stats-grid">
+                <div class="workforce-stat">
+                    <div class="value primary" id="wfTotalStaff">0</div>
+                    <div class="label">👨‍⚕️ إجمالي المسعفين</div>
+                </div>
+                <div class="workforce-stat">
+                    <div class="value teal" id="wfTotalCars">0</div>
+                    <div class="label">🚗 إجمالي السيارات</div>
+                </div>
+                <div class="workforce-stat">
+                    <div class="value gold" id="wfReadiness">0%</div>
+                    <div class="label">✅ نسبة الجاهزية</div>
+                </div>
+                <div class="workforce-stat">
+                    <div class="value coral" id="wfMissingCenters">0</div>
+                    <div class="label">⚠️ مراكز ناقصة</div>
+                </div>
+            </div>
         </div>
 
+        <!-- ===== توزيع الفرق ===== -->
+        <div class="units-distribution-section">
+            <div class="section-title">
+                <i class="fas fa-ambulance"></i> توزيع البلاغات على الفرق
+                <span style="font-size:0.7rem; color:var(--gray-400); font-weight:400; margin-right:auto;">
+                    <span id="unitsCount">0</span> فرقة
+                </span>
+            </div>
+            <div class="units-distribution-grid" id="unitsDistributionGrid">
+                <!-- يتم تعبئتها بواسطة JavaScript -->
+            </div>
+        </div>
+
+        <!-- ===== الفوتر ===== -->
         <div class="footer">
             <i class="fas fa-clock"></i> ضغطة = بلاغ | <i class="fas fa-undo-alt"></i> تراجع | <i class="fas fa-sync-alt"></i> تحديث تلقائي
         </div>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- ===== النوافذ المنبثقة ===== -->
+    <!-- ============================================================ -->
 
     <!-- ===== نافذة توزيع البلاغات ===== -->
     <div id="distributionModal" class="modal">
@@ -1333,23 +1291,6 @@
             </div>
             <div id="distributionContainer">
                 <div class="loading">⏳ جاري تحميل البيانات...</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== نافذة معاينة الخريطة ===== -->
-    <div id="mapModal" class="modal">
-        <div class="modal-content" style="max-width:600px;">
-            <div class="modal-header">
-                <h3 id="mapModalTitle">📍 معاينة الموقع</h3>
-                <button id="closeMapModal" class="modal-close">×</button>
-            </div>
-            <div class="map-frame">
-                <iframe id="mapFrame" loading="lazy"></iframe>
-            </div>
-            <div class="map-location-text" id="mapLocationText"></div>
-            <div class="modal-buttons">
-                <button id="closeMapBtn" class="btn btn-outline">❌ إغلاق</button>
             </div>
         </div>
     </div>
@@ -1489,27 +1430,84 @@
         </div>
     </div>
 
-    <!-- ===== نافذة المستندات ===== -->
-    <div id="docsModal" class="modal">
-        <div class="modal-content max-w-800">
-            <div class="modal-header">
-                <h2><i class="fas fa-folder-open"></i> المستندات والملفات</h2>
-                <button id="closeDocsModal" class="modal-close">×</button>
+    <!-- ===== صفحة التحديثات التشغيلية ===== -->
+    <div id="updatesPage">
+        <div class="updates-header">
+            <div class="header-content">
+                <div class="brand">
+                    <div class="icon-box"><i class="fas fa-bullhorn" style="color:var(--gold);"></i></div>
+                    <div>
+                        <h1>التحديثات التشغيلية</h1>
+                        <span><i class="fas fa-circle"></i> منصة الجنوب - قطاع جنوب الرياض</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <span class="count-badge">📌 <span id="updatesCount">0</span> تحديث</span>
+                    <button id="closeUpdatesPage" class="btn" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:8px 16px; border-radius:30px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
+                        ✕ العودة
+                    </button>
+                </div>
             </div>
-            <p style="text-align:center; color:var(--gray-600); margin:5px 0 15px;">رفع وعرض المستندات (السياسات، الخط الساخن، التعليمات)</p>
+        </div>
 
-            <div class="form-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input type="file" id="docFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display:none;">
-                <button id="uploadDocBtn" class="btn btn-primary">📤 رفع ملف</button>
-                <span id="docStatus" style="font-size:0.75rem; color:var(--gray-600);">📂 جاري التحقق...</span>
+        <div style="max-width:1000px; margin:20px auto; padding:0 16px;">
+            
+            <!-- ===== شريط الإجراءات ===== -->
+            <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; justify-content:space-between; align-items:center; background:var(--white); padding:12px 20px; border-radius:var(--radius-md); box-shadow:var(--shadow-sm); border:1px solid var(--gray-100);">
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="newUpdateBtn" class="btn btn-primary"><i class="fas fa-plus-circle"></i> تحديث جديد</button>
+                    <button id="refreshUpdatesBtn" class="btn btn-outline"><i class="fas fa-sync-alt"></i> تحديث</button>
+                    <select id="filterUpdatesType" style="padding:6px 12px; border:1px solid var(--gray-200); border-radius:30px; font-size:0.75rem; background:var(--white);">
+                        <option value="all">📋 الكل</option>
+                        <option value="important">⚠️ مهم</option>
+                        <option value="operational">⚙️ تشغيلي</option>
+                        <option value="announcement">📢 إعلان</option>
+                        <option value="general">📌 عام</option>
+                    </select>
+                </div>
+                <span style="font-size:0.7rem; color:var(--gray-400);">
+                    <i class="fas fa-clock"></i> <span id="updatesLastRefresh">الآن</span>
+                </span>
             </div>
 
-            <div id="docsListContainer" class="docs-list">
-                <p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>
+            <!-- ===== نموذج إضافة تحديث جديد ===== -->
+            <div id="newUpdateForm" style="display:none; background:var(--white); padding:20px; border-radius:var(--radius-lg); margin-bottom:20px; border:2px solid var(--primary-500); box-shadow:var(--shadow-md);">
+                <h3 style="margin:0 0 15px 0; color:var(--primary-700); display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-edit" style="color:var(--gold);"></i> إضافة تحديث تشغيلي جديد
+                </h3>
+                <div class="form-row">
+                    <label>📌 عنوان التحديث:</label>
+                    <input type="text" id="updateTitle" placeholder="مثال: تغيير في بروتوكول الاستجابة للحوادث الكبرى">
+                </div>
+                <div class="form-row">
+                    <label>📝 محتوى التحديث:</label>
+                    <textarea id="updateContent" rows="5" placeholder="اكتب تفاصيل التحديث التشغيلي هنا..."></textarea>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="form-row">
+                        <label>🏷️ نوع التحديث:</label>
+                        <select id="updateType">
+                            <option value="important">⚠️ مهم</option>
+                            <option value="operational" selected>⚙️ تشغيلي</option>
+                            <option value="announcement">📢 إعلان</option>
+                            <option value="general">📌 عام</option>
+                        </select>
+                    </div>
+                    <div class="form-row" style="display:flex; align-items:center; gap:10px; margin-top:25px;">
+                        <label style="display:flex; align-items:center; gap:5px; font-weight:400; cursor:pointer;">
+                            <input type="checkbox" id="updatePin"> 📌 تثبيت التحديث
+                        </label>
+                    </div>
+                </div>
+                <div style="display:flex; gap:12px; margin-top:15px; flex-wrap:wrap;">
+                    <button id="submitUpdateBtn" class="btn btn-primary" style="padding:10px 30px;">📤 نشر التحديث</button>
+                    <button id="cancelUpdateBtn" class="btn btn-outline">❌ إلغاء</button>
+                </div>
             </div>
 
-            <div class="modal-buttons">
-                <button id="closeDocsModalBtn" class="btn btn-outline">❌ إغلاق</button>
+            <!-- ===== قائمة التحديثات ===== -->
+            <div id="updatesList" style="display:flex; flex-direction:column; gap:16px;">
+                <p style="text-align:center; color:var(--gray-400); padding:40px 0; font-size:1rem;">📭 لا توجد تحديثات حالياً</p>
             </div>
         </div>
     </div>
@@ -1535,29 +1533,6 @@
                 <label>🚑 الفرقة المرافقة:</label>
                 <select id="airUnit">
                     <option value="">-- اختر الفرقة --</option>
-                    <option value="سريع 1">سريع 1</option>
-                    <option value="سريع 2">سريع 2</option>
-                    <option value="سريع 3">سريع 3</option>
-                    <option value="سريع 4">سريع 4</option>
-                    <option value="جنوب 1">جنوب 1</option>
-                    <option value="جنوب 2">جنوب 2</option>
-                    <option value="جنوب 3">جنوب 3</option>
-                    <option value="جنوب 4">جنوب 4</option>
-                    <option value="جنوب 5">جنوب 5</option>
-                    <option value="جنوب 6">جنوب 6</option>
-                    <option value="جنوب 7">جنوب 7</option>
-                    <option value="جنوب 8">جنوب 8</option>
-                    <option value="جنوب 9">جنوب 9</option>
-                    <option value="جنوب 10">جنوب 10</option>
-                    <option value="جنوب 11">جنوب 11</option>
-                    <option value="جنوب 12">جنوب 12</option>
-                    <option value="جنوب 13">جنوب 13</option>
-                    <option value="جنوب 14">جنوب 14</option>
-                    <option value="جنوب 15">جنوب 15</option>
-                    <option value="جنوب 16">جنوب 16</option>
-                    <option value="جنوب 17">جنوب 17</option>
-                    <option value="جنوب 18">جنوب 18</option>
-                    <option value="جنوب 19">جنوب 19</option>
                 </select>
             </div>
 
@@ -1576,7 +1551,7 @@
                 <textarea id="airNotes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
             </div>
 
-            <div id="airSavedRecords" class="air-records-list">
+            <div id="airSavedRecords" class="air-records-list" style="display:none; max-height:200px; overflow-y:auto; border:1px solid var(--gray-200); padding:10px; background:var(--gray-50); border-radius:var(--radius-sm);">
                 <h4 style="margin:0 0 10px 0;">📋 البلاغات المحفوظة</h4>
                 <div id="airRecordsList"></div>
             </div>
@@ -1621,33 +1596,6 @@
             <div class="modal-buttons">
                 <button id="saveControlNotes" class="btn btn-primary">💾 حفظ الملاحظات</button>
                 <button id="closeControlModalBtn" class="btn btn-outline">❌ إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== نافذة تغيير الرقم السري ===== -->
-    <div id="changePasswordModal" class="modal">
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>🔑 تغيير الرقم السري</h3>
-                <button id="cancelChangePasswordBtn" class="modal-close">×</button>
-            </div>
-            <p style="text-align:center; color:var(--gray-600); margin:5px 0 15px;">أدخل الرقم السري القديم والجديد</p>
-            <div class="form-row">
-                <label>🔑 الرقم السري القديم:</label>
-                <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم">
-            </div>
-            <div class="form-row">
-                <label>🔑 الرقم السري الجديد:</label>
-                <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)">
-            </div>
-            <div class="form-row">
-                <label>🔑 تأكيد الرقم السري الجديد:</label>
-                <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد">
-            </div>
-            <div class="modal-buttons">
-                <button id="confirmChangePasswordBtn" class="btn btn-primary">✅ تغيير</button>
-                <button id="cancelChangePasswordModalBtn" class="btn btn-outline">❌ إلغاء</button>
             </div>
         </div>
     </div>
@@ -1698,6 +1646,50 @@
         </div>
     </div>
 
+    <!-- ===== نافذة تغيير الرقم السري ===== -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3>🔑 تغيير الرقم السري</h3>
+                <button id="cancelChangePasswordBtn" class="modal-close">×</button>
+            </div>
+            <p style="text-align:center; color:var(--gray-600); margin:5px 0 15px;">أدخل الرقم السري القديم والجديد</p>
+            <div class="form-row">
+                <label>🔑 الرقم السري القديم:</label>
+                <input type="password" id="oldPasswordInput" placeholder="أدخل الرقم السري القديم">
+            </div>
+            <div class="form-row">
+                <label>🔑 الرقم السري الجديد:</label>
+                <input type="password" id="newPasswordInput" placeholder="أدخل الرقم السري الجديد (4 أحرف على الأقل)">
+            </div>
+            <div class="form-row">
+                <label>🔑 تأكيد الرقم السري الجديد:</label>
+                <input type="password" id="confirmNewPasswordInput" placeholder="أعد إدخال الرقم السري الجديد">
+            </div>
+            <div class="modal-buttons">
+                <button id="confirmChangePasswordBtn" class="btn btn-primary">✅ تغيير</button>
+                <button id="cancelChangePasswordModalBtn" class="btn btn-outline">❌ إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== نافذة معاينة الخريطة ===== -->
+    <div id="mapModal" class="modal">
+        <div class="modal-content" style="max-width:600px;">
+            <div class="modal-header">
+                <h3 id="mapModalTitle">📍 معاينة الموقع</h3>
+                <button id="closeMapModal" class="modal-close">×</button>
+            </div>
+            <div class="map-frame">
+                <iframe id="mapFrame" loading="lazy" style="width:100%; height:350px; border:0; border-radius:var(--radius-sm);"></iframe>
+            </div>
+            <div class="map-location-text" id="mapLocationText" style="margin-top:10px; font-size:0.8rem; color:var(--gray-600); text-align:center;"></div>
+            <div class="modal-buttons">
+                <button id="closeMapBtn" class="btn btn-outline">❌ إغلاق</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ============================================
         // التاريخ الحالي
@@ -1705,23 +1697,10 @@
         document.getElementById('currentDate').innerText = new Date().toLocaleDateString('ar-SA');
 
         // ============================================
-        // البيانات التجريبية
+        // البيانات
         // ============================================
         const centerNumbers = Array.from({ length: 19 }, (_, i) => i + 1);
         const centerList = centerNumbers.map(n => `جنوب ${n}`);
-
-        const controlData = [
-            { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "",
-            vacationEnd: "" },
-            { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-            { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-            { code: "11120", name: "عوض عبدالعزيز عوض الاسمري", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-            { code: "102752", name: "محمد نايف صنهات العتيبي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-            { code: "10717", name: "عطاالله خالد عطوي الرويلي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
-            { code: "101915", name: "مبارك هذال مبارك ال بريك", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-            { code: "8323", name: "تركي عتيق الله خيرالله المطيري", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
-            { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
-        ];
 
         const mockData = {
             centers: {
@@ -1734,38 +1713,45 @@
                 "ديراب": ["جنوب 10"],
                 "عكاظ": ["جنوب 9"],
                 "الشفاء": ["جنوب 8", "سريع 2"],
-                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18",
-                    "جنوب 19"
-                ]
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
             },
-            reports: {
-                "المنصورة|جنوب 1": { count: 3, times: ["10:00", "10:30", "11:00"] },
-                "المنصورة|جنوب 11": { count: 2, times: ["09:15", "09:45"] },
-                "المنصورة|جنوب 12": { count: 1, times: ["08:30"] },
-                "المنصورة|سريع 3": { count: 0, times: [] },
-                "الخالدية|جنوب 2": { count: 5, times: ["07:00", "07:30", "08:00", "08:30", "09:00"] },
-                "منفوحة|جنوب 3": { count: 0, times: [] },
-                "الدار البيضاء|جنوب 4": { count: 2, times: ["10:15", "11:30"] },
-                "الدار البيضاء|جنوب 5": { count: 1, times: ["09:00"] },
-                "الدار البيضاء|سريع 1": { count: 1, times: ["08:45"] },
-                "الإسكان|جنوب 6": { count: 0, times: [] },
-                "الحائر|جنوب 7": { count: 0, times: [] },
-                "ديراب|جنوب 10": { count: 0, times: [] },
-                "عكاظ|جنوب 9": { count: 0, times: [] },
-                "الشفاء|جنوب 8": { count: 0, times: [] },
-                "الشفاء|سريع 2": { count: 0, times: [] },
-                "الفرق الإضافية|سريع 4": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 13": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 14": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 15": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 16": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 17": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 18": { count: 0, times: [] },
-                "الفرق الإضافية|جنوب 19": { count: 0, times: [] }
-            }
+            reports: {}
         };
 
-        let unitLocations = {
+        // توليد بيانات تجريبية للتقارير
+        for (let center in mockData.centers) {
+            for (let unit of mockData.centers[center]) {
+                const key = `${center}|${unit}`;
+                const count = Math.floor(Math.random() * 8);
+                mockData.reports[key] = { 
+                    count: count, 
+                    times: Array.from({ length: count }, () => 
+                        `${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`
+                    ) 
+                };
+            }
+        }
+
+        // بيانات التحكم
+        const controlData = [
+            { code: "4252", name: "سلطان ابراهيم يوسف اليوسف التميمي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+            { code: "101353", name: "هيثم حويكم هليل العنزي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+            { code: "102462", name: "وليد معلا الحربي", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+            { code: "11120", name: "عوض عبدالعزيز عوض الاسمري", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+            { code: "102752", name: "محمد نايف صنهات العتيبي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+            { code: "10717", name: "عطاالله خالد عطوي الرويلي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" },
+            { code: "101915", name: "مبارك هذال مبارك ال بريك", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+            { code: "8323", name: "تركي عتيق الله خيرالله المطيري", role: "تحكم عملياتي", vacationStart: "", vacationEnd: "" },
+            { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
+        ];
+
+        let uploadedDocs = [];
+        let airRecords = [];
+        let currentShiftId = null;
+        let isEditMode = false;
+
+        // مواقع الفرق للخريطة
+        const unitLocations = {
             "جنوب 1": "طريق الملك فهد، الرياض",
             "جنوب 2": "حي المنصورة، الرياض",
             "جنوب 3": "الخالدية، الرياض",
@@ -1774,85 +1760,122 @@
             "سريع 2": "الشفاء، الرياض"
         };
 
-        let airRecords = [];
-        let uploadedDocs = [];
+        // ============================================
+        // بيانات التحديثات التشغيلية
+        // ============================================
+        let operationalUpdates = [
+            {
+                id: 1,
+                title: "تحديث بروتوكول الاستجابة للحوادث الكبرى",
+                content: "تم اعتماد البروتوكول الجديد للاستجابة للحوادث الكبرى والذي يشمل:\n• تفعيل نظام النداء الجماعي للفرق\n• توزيع الفرق حسب الأولوية الجغرافية\n• رفع الجاهزية إلى 100% في جميع المراكز\n• تفعيل غرفة العمليات الموحدة",
+                type: "important",
+                author: "فريق العمليات",
+                date: new Date(Date.now() - 3600000 * 2).toISOString(),
+                pinned: true,
+                likes: 12,
+                comments: [
+                    { author: "سامي العنزي", text: "تم التطبيق بنجاح في جميع المراكز ✅", date: new Date(Date.now() - 3600000 * 1.5).toISOString() },
+                    { author: "تركي المطيري", text: "قيد التنفيذ في المراكز الطرفية", date: new Date(Date.now() - 3600000 * 1).toISOString() }
+                ]
+            },
+            {
+                id: 2,
+                title: "استلام سيارات إسعاف جديدة ومجهزة",
+                content: "تم استلام 5 سيارات إسعاف جديدة مجهزة بأحدث التقنيات الطبية. سيتم توزيعها على المراكز التالية:\n• المنصورة (سيارتان)\n• الخالدية (سيارة)\n• الدار البيضاء (سيارة)\n• الشفاء (سيارة)",
+                type: "announcement",
+                author: "إدارة الأسطول",
+                date: new Date(Date.now() - 3600000 * 5).toISOString(),
+                pinned: false,
+                likes: 8,
+                comments: [
+                    { author: "وليد الحربي", text: "متى موعد التوزيع الرسمي؟", date: new Date(Date.now() - 3600000 * 4.5).toISOString() }
+                ]
+            },
+            {
+                id: 3,
+                title: "تحديث نظام توزيع البلاغات",
+                content: "تم تحديث نظام توزيع البلاغات ليشمل:\n• توزيع ذكي حسب القرب الجغرافي\n• إشارات تحذيرية للحالات الحرجة\n• تكامل مع نظام الإسعاف الجوي",
+                type: "operational",
+                author: "فريق التقنية",
+                date: new Date(Date.now() - 3600000 * 8).toISOString(),
+                pinned: false,
+                likes: 5,
+                comments: []
+            }
+        ];
+
+        let updateIdCounter = 4;
 
         // ============================================
-        // دوال العرض الأساسية
+        // دوال عرض الصفحة الرئيسية
         // ============================================
-        function updateTotal() {
+        function updateMainStats() {
             let total = 0;
-            for (let key in mockData.reports) {
-                total += mockData.reports[key].count;
-            }
-            document.getElementById('grandTotal').innerText = total;
-            document.getElementById('dashTotalReports').innerText = total;
-
             let activeUnits = 0;
-            for (let key in mockData.reports) {
-                if (mockData.reports[key].count > 0) activeUnits++;
-            }
-            document.getElementById('dashActiveUnits').innerText = activeUnits;
-            document.getElementById('dashAvgResponse').innerText = Math.floor(Math.random() * 5 + 2);
-            document.getElementById('dashReadiness').innerText = Math.floor(Math.random() * 30 + 70) + '%';
-        }
+            let totalUnits = 0;
 
-        function renderUnitsInModal(container) {
-            container.innerHTML = '';
             for (let center in mockData.centers) {
-                const sectorDiv = document.createElement('div');
-                sectorDiv.className = 'sector-card';
-                sectorDiv.innerHTML =
-                    `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid" id="grid-${center.replace(/\s/g, '')}"></div>`;
-                container.appendChild(sectorDiv);
-
-                const grid = sectorDiv.querySelector('.units-grid');
                 for (let unit of mockData.centers[center]) {
                     const key = `${center}|${unit}`;
-                    const info = mockData.reports[key] || { count: 0, times: [] };
-                    const hasReports = info.count > 0;
-                    const isZero = info.count === 0;
-                    const location = unitLocations[unit] || 'لم يتم تحديد موقع';
-
-                    const unitDiv = document.createElement('div');
-                    unitDiv.className = 'unit-card';
-                    unitDiv.innerHTML = `
-                        <div class="name">${unit}</div>
-                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
-                        <div class="actions">
-                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
-                            ${hasReports ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
-                            <button class="btn btn-outline btn-xs preview-btn"><i class="fas fa-map-marker-alt"></i> معاينة</button>
-                        </div>
-                    `;
-
-                    unitDiv.querySelector('.report-btn').onclick = function() {
-                        info.count++;
-                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
-                        renderUnitsInModal(container);
-                        updateTotal();
-                        showToast(`✅ تم تسجيل بلاغ لـ ${unit}`, 'success');
-                    };
-
-                    if (hasReports) {
-                        unitDiv.querySelector('.undo-btn').onclick = function() {
-                            if (info.count > 0) {
-                                info.count--;
-                                info.times.pop();
-                                renderUnitsInModal(container);
-                                updateTotal();
-                                showToast(`↩️ تم التراجع عن بلاغ لـ ${unit}`, 'info');
-                            }
-                        };
-                    }
-
-                    unitDiv.querySelector('.preview-btn').onclick = function() {
-                        openMapPreview(unit, location);
-                    };
-
-                    grid.appendChild(unitDiv);
+                    const count = mockData.reports[key]?.count || 0;
+                    total += count;
+                    totalUnits++;
+                    if (count > 0) activeUnits++;
                 }
             }
+
+            document.getElementById('grandTotal').innerText = total;
+            document.getElementById('dashTotalReports').innerText = total;
+            document.getElementById('dashActiveUnits').innerText = activeUnits;
+            document.getElementById('dashTotalUnits').innerText = totalUnits;
+            document.getElementById('dashAvgResponse').innerText = Math.floor(Math.random() * 5 + 2);
+            
+            const readiness = Math.floor(Math.random() * 30 + 70);
+            document.getElementById('dashReadiness').innerText = readiness + '%';
+            document.getElementById('dashReadinessSub').innerText = `${Math.floor(readiness / 10)} / ${Math.floor(totalUnits / 3)} مركز جاهز`;
+            document.getElementById('unitsCount').innerText = totalUnits;
+
+            // مؤشرات القوى العاملة
+            const totalStaff = totalUnits * 2 + Math.floor(Math.random() * 10);
+            const totalCars = totalUnits + Math.floor(Math.random() * 5);
+            document.getElementById('wfTotalStaff').innerText = totalStaff;
+            document.getElementById('wfTotalCars').innerText = totalCars;
+            document.getElementById('wfReadiness').innerText = readiness + '%';
+            document.getElementById('wfMissingCenters').innerText = Math.floor(Math.random() * 5);
+
+            // تحديث توزيع الفرق
+            renderUnitsDistribution();
+        }
+
+        function renderUnitsDistribution() {
+            const grid = document.getElementById('unitsDistributionGrid');
+            grid.innerHTML = '';
+
+            const allUnits = [];
+            for (let center in mockData.centers) {
+                for (let unit of mockData.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const count = mockData.reports[key]?.count || 0;
+                    allUnits.push({ unit, center, count });
+                }
+            }
+
+            allUnits.sort((a, b) => b.count - a.count);
+
+            allUnits.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'unit-dist-item';
+                div.innerHTML = `
+                    <div class="name">${item.unit}</div>
+                    <div class="count ${item.count === 0 ? 'zero' : ''}">${item.count}</div>
+                    <div class="sector">${item.center}</div>
+                `;
+                div.onclick = function() {
+                    const location = unitLocations[item.unit] || 'لم يتم تحديد موقع';
+                    openMapPreview(item.unit, location);
+                };
+                grid.appendChild(div);
+            });
         }
 
         // ============================================
@@ -1862,7 +1885,7 @@
             const modal = document.getElementById('mapModal');
             document.getElementById('mapModalTitle').innerText = `📍 معاينة موقع ${unit}`;
             const query = encodeURIComponent(location);
-            document.getElementById('mapFrame').src =
+            document.getElementById('mapFrame').src = 
                 `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${query}&language=ar`;
             document.getElementById('mapLocationText').innerText = `📍 الموقع: ${location}`;
             modal.style.display = 'flex';
@@ -1872,6 +1895,45 @@
             document.getElementById('mapModal').style.display = 'none';
             document.getElementById('mapFrame').src = '';
         }
+
+        // ============================================
+        // دوال تنبيه وقت الذروة
+        // ============================================
+        const PEAK_HOURS = [
+            { start: "08:00", end: "10:00", label: "ذروة صباحية", icon: "🌅" },
+            { start: "14:00", end: "16:00", label: "ذروة عصرية", icon: "☀️" },
+            { start: "20:00", end: "22:00", label: "ذروة مسائية", icon: "🌙" }
+        ];
+
+        function checkPeakTime() {
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
+                                now.getMinutes().toString().padStart(2, '0');
+
+            let foundPeak = null;
+            for (let peak of PEAK_HOURS) {
+                if (currentTime >= peak.start && currentTime <= peak.end) {
+                    foundPeak = peak;
+                    break;
+                }
+            }
+
+            const alert = document.getElementById('peakAlert');
+            const message = document.getElementById('peakAlertMessage');
+            const time = document.getElementById('peakAlertTime');
+
+            if (foundPeak) {
+                alert.className = 'peak-alert active';
+                message.innerHTML = `${foundPeak.icon} ⏰ وقت الذروة: ${foundPeak.label} (${foundPeak.start} - ${foundPeak.end})`;
+                time.innerHTML = `🕒 ينتهي في ${foundPeak.end}`;
+            } else {
+                alert.className = 'peak-alert';
+            }
+        }
+
+        document.getElementById('dismissPeakAlert').onclick = function() {
+            document.getElementById('peakAlert').className = 'peak-alert';
+        };
 
         // ============================================
         // دوال الإشعارات
@@ -1897,38 +1959,63 @@
             }, 5000);
         }
 
-        function showNotificationBar(show) {
-            const bar = document.getElementById('notificationBar');
-            if (bar) bar.style.display = show ? 'block' : 'none';
-        }
-
-        function updatePeakStatus(status) {
-            const badge = document.getElementById('peakStatusBadge');
-            if (!badge) return;
-            if (status && status.isPeak && status.currentPeak) {
-                badge.innerHTML = `🔴 وقت الذروة: ${status.currentPeak.label}`;
-                badge.className = 'peak-badge active';
-            } else {
-                badge.innerHTML = '🟢 وقت عادي';
-                badge.className = 'peak-badge inactive';
-            }
-        }
-
-        function loadNotifications() {
-            showNotificationBar(true);
-            updatePeakStatus({ isPeak: false });
-        }
-
         // ============================================
         // دوال توزيع البلاغات
         // ============================================
-        function openDistributionModal() {
-            document.getElementById('distributionModal').style.display = 'flex';
-            renderUnitsInModal(document.getElementById('distributionContainer'));
-        }
+        function renderUnitsInModal(container) {
+            container.innerHTML = '';
+            for (let center in mockData.centers) {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-card';
+                sectorDiv.innerHTML = `<div class="sector-title"><i class="fas fa-map-pin"></i> ${center}</div><div class="units-grid"></div>`;
+                container.appendChild(sectorDiv);
 
-        function closeDistributionModal() {
-            document.getElementById('distributionModal').style.display = 'none';
+                const grid = sectorDiv.querySelector('.units-grid');
+                for (let unit of mockData.centers[center]) {
+                    const key = `${center}|${unit}`;
+                    const info = mockData.reports[key] || { count: 0, times: [] };
+                    const isZero = info.count === 0;
+                    const location = unitLocations[unit] || 'لم يتم تحديد موقع';
+
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit-card';
+                    unitDiv.innerHTML = `
+                        <div class="name">${unit}</div>
+                        <div class="count ${isZero ? 'zero' : ''}">${info.count}</div>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-xs report-btn"><i class="fas fa-plus-circle"></i> بلاغ</button>
+                            ${info.count > 0 ? '<button class="btn btn-coral btn-xs undo-btn"><i class="fas fa-undo-alt"></i></button>' : ''}
+                            <button class="btn btn-outline btn-xs preview-btn"><i class="fas fa-map-marker-alt"></i> معاينة</button>
+                        </div>
+                    `;
+
+                    unitDiv.querySelector('.report-btn').onclick = function() {
+                        info.count++;
+                        info.times.push(new Date().toLocaleTimeString('ar-SA'));
+                        renderUnitsInModal(container);
+                        updateMainStats();
+                        showToast(`✅ تم تسجيل بلاغ لـ ${unit}`, 'success');
+                    };
+
+                    if (info.count > 0) {
+                        unitDiv.querySelector('.undo-btn').onclick = function() {
+                            if (info.count > 0) {
+                                info.count--;
+                                info.times.pop();
+                                renderUnitsInModal(container);
+                                updateMainStats();
+                                showToast(`↩️ تم التراجع عن بلاغ لـ ${unit}`, 'info');
+                            }
+                        };
+                    }
+
+                    unitDiv.querySelector('.preview-btn').onclick = function() {
+                        openMapPreview(unit, location);
+                    };
+
+                    grid.appendChild(unitDiv);
+                }
+            }
         }
 
         // ============================================
@@ -2067,52 +2154,153 @@
         }
 
         // ============================================
-        // دوال المستندات
+        // دوال التحديثات التشغيلية
         // ============================================
-        function renderDocsList() {
-            const container = document.getElementById('docsListContainer');
+        function renderUpdates(filterType = 'all') {
+            const container = document.getElementById('updatesList');
             if (!container) return;
-            if (uploadedDocs.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:20px 0;">📂 لا توجد مستندات محفوظة</p>';
+
+            let filtered = operationalUpdates;
+            if (filterType !== 'all') {
+                filtered = filtered.filter(u => u.type === filterType);
+            }
+
+            const sorted = [...filtered].sort((a, b) => {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                return new Date(b.date) - new Date(a.date);
+            });
+
+            document.getElementById('updatesCount').innerText = operationalUpdates.length;
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:40px 0; font-size:1rem;">📭 لا توجد تحديثات حالياً</p>';
                 return;
             }
+
             let html = '';
-            uploadedDocs.forEach(doc => {
-                const date = new Date(doc.uploadDate).toLocaleString('ar-SA');
-                const icon = doc.filename.match(/\.(pdf)$/i) ? '📄' :
-                    doc.filename.match(/\.(doc|docx)$/i) ? '📝' :
-                    doc.filename.match(/\.(xls|xlsx)$/i) ? '📊' :
-                    doc.filename.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : '📎';
+            sorted.forEach(update => {
+                const date = new Date(update.date).toLocaleString('ar-SA');
+                const typeConfig = {
+                    'important': { bg: '#FDF0EC', color: '#E87461', icon: '⚠️', label: 'مهم' },
+                    'operational': { bg: '#E6F4F0', color: '#2E8B7A', icon: '⚙️', label: 'تشغيلي' },
+                    'announcement': { bg: '#FFF8E1', color: '#F39C12', icon: '📢', label: 'إعلان' },
+                    'general': { bg: '#E8EDF3', color: '#2A5A7A', icon: '📌', label: 'عام' }
+                };
+                const typeStyle = typeConfig[update.type] || typeConfig.general;
+
                 html += `
-                    <div class="docs-item">
-                        <div class="info">
-                            <span class="icon">${icon}</span>
-                            <div>
-                                <div class="filename">${doc.filename}</div>
-                                <div class="date">${date}</div>
-                                ${doc.description ? `<div class="desc">${doc.description}</div>` : ''}
+                    <div style="border:1px solid var(--gray-200); border-radius:var(--radius-lg); padding:20px; background:${update.pinned ? 'var(--gray-50)' : 'var(--white)'}; ${update.pinned ? 'border-right:5px solid var(--gold);' : ''} box-shadow:var(--shadow-sm); transition:all 0.3s;">
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                            <div style="flex:1;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                                    <span style="background:${typeStyle.bg}; color:${typeStyle.color}; padding:3px 12px; border-radius:20px; font-size:0.65rem; font-weight:600;">
+                                        ${typeStyle.icon} ${typeStyle.label}
+                                    </span>
+                                    ${update.pinned ? '<span style="background:var(--gold); color:var(--gray-900); padding:3px 12px; border-radius:20px; font-size:0.65rem; font-weight:600;">📌 مثبت</span>' : ''}
+                                    <span style="font-size:0.6rem; color:var(--gray-400);">🕒 ${date}</span>
+                                </div>
+                                <h4 style="margin:6px 0 8px 0; font-size:1.05rem; color:var(--primary-700);">${update.title}</h4>
+                                <p style="font-size:0.85rem; color:var(--gray-700); white-space:pre-wrap; margin:5px 0; line-height:1.7;">${update.content}</p>
+                                <div style="font-size:0.7rem; color:var(--gray-500); margin-top:4px;">
+                                    <i class="fas fa-user"></i> ${update.author}
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap; flex-shrink:0;">
+                                <button onclick="togglePinUpdate(${update.id})" class="btn btn-xs ${update.pinned ? 'btn-gold' : 'btn-outline'}" style="font-size:0.6rem; padding:3px 10px;">
+                                    📌 ${update.pinned ? 'إلغاء التثبيت' : 'تثبيت'}
+                                </button>
+                                <button onclick="deleteUpdate(${update.id})" class="btn btn-coral btn-xs" style="font-size:0.6rem; padding:3px 10px;">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
-                        <div class="actions">
-                            <button onclick="downloadDoc('${doc.id}')" class="btn btn-outline btn-sm">📥 تحميل</button>
-                            <button onclick="deleteDoc('${doc.id}')" class="btn btn-coral btn-sm">🗑️</button>
+
+                        <div style="display:flex; gap:15px; margin:12px 0 10px 0; padding:10px 0; border-top:1px solid var(--gray-100); border-bottom:1px solid var(--gray-100); flex-wrap:wrap;">
+                            <button onclick="likeUpdate(${update.id})" class="btn btn-xs" style="background:transparent; border:1px solid var(--gray-200); padding:4px 14px; border-radius:20px; display:flex; align-items:center; gap:6px; font-size:0.75rem;">
+                                👍 <span>${update.likes || 0}</span>
+                            </button>
+                            <button onclick="toggleComments(${update.id})" class="btn btn-xs" style="background:transparent; border:1px solid var(--gray-200); padding:4px 14px; border-radius:20px; display:flex; align-items:center; gap:6px; font-size:0.75rem;">
+                                💬 <span>${(update.comments || []).length}</span>
+                            </button>
+                        </div>
+
+                        <div id="comments_${update.id}" style="display:none; margin-top:12px; padding:15px; background:var(--gray-50); border-radius:var(--radius-md);">
+                            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                                <input type="text" id="commentInput_${update.id}" placeholder="اكتب تعليقاً..." style="flex:1; padding:8px 16px; border:1px solid var(--gray-200); border-radius:25px; font-size:0.8rem; background:var(--white);">
+                                <button onclick="addComment(${update.id})" class="btn btn-primary btn-sm" style="padding:6px 18px;">إرسال</button>
+                            </div>
+                            <div id="commentsList_${update.id}">
+                                ${(update.comments || []).map(c => `
+                                    <div style="padding:8px 0; border-bottom:1px solid var(--gray-200); font-size:0.75rem;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <strong style="color:var(--primary-700);">${c.author}</strong>
+                                            <span style="color:var(--gray-400); font-size:0.55rem;">${new Date(c.date).toLocaleString('ar-SA')}</span>
+                                        </div>
+                                        <p style="margin:4px 0 0 0; color:var(--gray-700);">${c.text}</p>
+                                    </div>
+                                `).join('')}
+                                ${(!update.comments || update.comments.length === 0) ? '<p style="color:var(--gray-400); font-size:0.7rem; text-align:center;">💬 لا توجد تعليقات، كن أول من يعلق!</p>' : ''}
+                            </div>
                         </div>
                     </div>
                 `;
             });
             container.innerHTML = html;
-            document.getElementById('docStatus').innerHTML = `📂 ${uploadedDocs.length} مستندات محفوظة`;
         }
 
-        function downloadDoc(docId) {
-            showToast(`📥 جاري تحميل المستند...`, 'info');
+        function addComment(updateId) {
+            const input = document.getElementById(`commentInput_${updateId}`);
+            if (!input || !input.value.trim()) return;
+            
+            const update = operationalUpdates.find(u => u.id === updateId);
+            if (!update) return;
+            
+            if (!update.comments) update.comments = [];
+            update.comments.push({
+                author: "مشرف العمليات",
+                text: input.value.trim(),
+                date: new Date().toISOString()
+            });
+            
+            input.value = '';
+            renderUpdates(document.getElementById('filterUpdatesType').value);
+            const commentsDiv = document.getElementById(`comments_${updateId}`);
+            if (commentsDiv) commentsDiv.style.display = 'block';
+            showToast('✅ تم إضافة التعليق', 'success');
         }
 
-        function deleteDoc(docId) {
-            if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستند؟')) return;
-            uploadedDocs = uploadedDocs.filter(d => d.id !== docId);
-            renderDocsList();
-            showToast('🗑️ تم حذف المستند', 'info');
+        function toggleComments(updateId) {
+            const container = document.getElementById(`comments_${updateId}`);
+            if (container) {
+                container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function likeUpdate(updateId) {
+            const update = operationalUpdates.find(u => u.id === updateId);
+            if (update) {
+                update.likes = (update.likes || 0) + 1;
+                renderUpdates(document.getElementById('filterUpdatesType').value);
+                showToast('👍 تم الإعجاب', 'info');
+            }
+        }
+
+        function togglePinUpdate(updateId) {
+            const update = operationalUpdates.find(u => u.id === updateId);
+            if (update) {
+                update.pinned = !update.pinned;
+                renderUpdates(document.getElementById('filterUpdatesType').value);
+                showToast(update.pinned ? '📌 تم تثبيت التحديث' : '📌 تم إلغاء التثبيت', 'info');
+            }
+        }
+
+        function deleteUpdate(updateId) {
+            if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
+            operationalUpdates = operationalUpdates.filter(u => u.id !== updateId);
+            renderUpdates(document.getElementById('filterUpdatesType').value);
+            showToast('🗑️ تم حذف التحديث', 'info');
         }
 
         // ============================================
@@ -2130,19 +2318,18 @@
             let html = '';
             airRecords.forEach(record => {
                 const date = new Date(record.createdAt).toLocaleString('ar-SA');
-                const notes = record.notes || 'لا توجد ملاحظات';
                 html += `
-                    <div class="air-record-item">
-                        <div class="info">
+                    <div class="air-record-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid var(--gray-100); font-size:0.8rem; flex-wrap:wrap; gap:5px;">
+                        <div class="info" style="flex:1; min-width:150px;">
                             <strong>${record.reportNumber || 'بدون رقم'}</strong>
                             <span style="margin:0 5px;">|</span>
                             <span>${record.unit || '-'}</span>
                             <span style="margin:0 5px;">|</span>
                             <span>${record.hospital || '-'}</span>
-                            <span class="notes">📝 ${notes}</span>
-                            <span class="time">🕒 ${date}</span>
+                            <span class="notes" style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ${record.notes || 'لا توجد ملاحظات'}</span>
+                            <span class="time" style="font-size:0.6rem; color:var(--gray-400);">🕒 ${date}</span>
                         </div>
-                        <button onclick="deleteAirRecord('${record.id}')" class="btn btn-coral btn-sm">🗑️ حذف</button>
+                        <button onclick="deleteAirRecord('${record.id}')" class="btn btn-coral btn-sm" style="padding:2px 10px; font-size:0.65rem; border-radius:4px;">🗑️ حذف</button>
                     </div>
                 `;
             });
@@ -2162,9 +2349,7 @@
         function renderControlList(editable = false) {
             const container = document.getElementById('controlList');
             if (!container) return;
-            const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400',
-                '#16a085'
-            ];
+            const colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
             let html = '';
             controlData.forEach((person, index) => {
                 const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('');
@@ -2184,13 +2369,13 @@
                         </div>
                         <div class="vacation">
                             ${editable ? `
-                                <div class="edit">
-                                    <input type="date" id="start_${index}" value="${startDate}">
+                                <div class="edit" style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+                                    <input type="date" id="start_${index}" value="${startDate}" style="width:120px; padding:3px; font-size:0.7rem; border:1px solid var(--gray-200); border-radius:4px;">
                                     <span>→</span>
-                                    <input type="date" id="end_${index}" value="${endDate}">
+                                    <input type="date" id="end_${index}" value="${endDate}" style="width:120px; padding:3px; font-size:0.7rem; border:1px solid var(--gray-200); border-radius:4px;">
                                 </div>
                             ` : `
-                                <div class="display">${vacationDisplay}</div>
+                                <div class="display" style="padding:5px; background:var(--gray-50); border-radius:4px; text-align:center; font-size:0.75rem;">${vacationDisplay}</div>
                             `}
                         </div>
                         <div class="badge">
@@ -2209,70 +2394,31 @@
         }
 
         // ============================================
-        // ربط الأزرار الرئيسية
+        // ربط الأزرار
         // ============================================
-        document.getElementById('openDistributionBtn').onclick = openDistributionModal;
-        document.getElementById('closeDistributionBtn').onclick = closeDistributionModal;
+
+        // توزيع البلاغات
+        document.getElementById('distributionBtn').onclick = function() {
+            document.getElementById('distributionModal').style.display = 'flex';
+            renderUnitsInModal(document.getElementById('distributionContainer'));
+        };
+        document.getElementById('closeDistributionBtn').onclick = function() {
+            document.getElementById('distributionModal').style.display = 'none';
+        };
+
+        // الخريطة
         document.getElementById('closeMapModal').onclick = closeMapModal;
         document.getElementById('closeMapBtn').onclick = closeMapModal;
 
         // نموذج المناوبة
-        document.getElementById('closeShiftModal').onclick = () => document.getElementById('shiftModal').style.display =
-        'none';
-        document.getElementById('closeShiftModalBtn').onclick = () => document.getElementById('shiftModal').style.display =
-            'none';
-        document.getElementById('shiftBtn').onclick = () => {
+        document.getElementById('shiftBtn').onclick = function() {
             document.getElementById('shiftModal').style.display = 'flex';
+            document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
             buildCentersTable();
             setTimeout(calculateWorkforceStatsLocally, 100);
         };
-
-        // المستندات
-        document.getElementById('closeDocsModal').onclick = () => document.getElementById('docsModal').style.display = 'none';
-        document.getElementById('closeDocsModalBtn').onclick = () => document.getElementById('docsModal').style.display =
-            'none';
-        document.getElementById('docsBtn').onclick = () => {
-            document.getElementById('docsModal').style.display = 'flex';
-            renderDocsList();
-        };
-
-        // الإسعاف الجوي
-        document.getElementById('closeAirModal').onclick = () => document.getElementById('airAmbulanceModal').style.display =
-            'none';
-        document.getElementById('closeAirModalBtn').onclick = () => document.getElementById('airAmbulanceModal').style
-            .display = 'none';
-        document.getElementById('airAmbulanceBtn').onclick = () => {
-            document.getElementById('airAmbulanceModal').style.display = 'flex';
-            const now = new Date();
-            document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
-            renderAirRecords();
-        };
-
-        // التحكم والتنسيق
-        document.getElementById('closeControlModal').onclick = () => document.getElementById('controlModal').style.display =
-            'none';
-        document.getElementById('closeControlModalBtn').onclick = () => document.getElementById('controlModal').style
-            .display = 'none';
-        document.getElementById('controlBtn').onclick = () => {
-            document.getElementById('controlModal').style.display = 'flex';
-            renderControlList(false);
-            document.getElementById('controlNotes').value = '';
-        };
-
-        // الجدول الشهري
-        document.getElementById('closeMonthlyTableModal').onclick = () => document.getElementById('monthlyTableModal').style
-            .display = 'none';
-        document.getElementById('closeMonthlyTableModalBtn').onclick = () => document.getElementById('monthlyTableModal')
-            .style.display = 'none';
-        document.getElementById('monthlyTableBtn').onclick = () => {
-            document.getElementById('monthlyTableModal').style.display = 'flex';
-        };
-
-        // ============================================
-        // دوال نموذج المناوبة (حفظ وطباعة)
-        // ============================================
-        document.getElementById('printShiftBtn').onclick = () => window.print();
-
+        document.getElementById('closeShiftModal').onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
+        document.getElementById('closeShiftModalBtn').onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
         document.getElementById('saveShiftBtn').onclick = function() {
             const shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
             if (!shiftType) {
@@ -2281,33 +2427,103 @@
             }
             showToast('✅ تم حفظ نموذج المناوبة', 'success');
         };
-
-        // ============================================
-        // دوال المستندات (رفع)
-        // ============================================
-        document.getElementById('uploadDocBtn').onclick = () => document.getElementById('docFileInput').click();
-
-        document.getElementById('docFileInput').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const description = prompt('أدخل وصفاً للمستند (اختياري):', file.name);
-            const newDoc = {
-                id: Date.now().toString(),
-                filename: file.name,
-                fileData: 'base64placeholder',
-                fileType: file.type,
-                description: description || '',
-                uploadDate: new Date().toISOString()
-            };
-            uploadedDocs.unshift(newDoc);
-            renderDocsList();
-            document.getElementById('docFileInput').value = '';
-            showToast('✅ تم رفع المستند بنجاح', 'success');
+        document.getElementById('printShiftBtn').onclick = function() { window.print(); };
+        document.getElementById('newShiftBtn').onclick = function() {
+            showToast('✅ تم بدء مناوبة جديدة', 'success');
         };
 
-        // ============================================
-        // دوال الإسعاف الجوي (حفظ)
-        // ============================================
+        // التحديثات التشغيلية
+        document.getElementById('updatesBtn').onclick = function() {
+            document.getElementById('updatesPage').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            renderUpdates(document.getElementById('filterUpdatesType').value);
+            document.getElementById('updatesLastRefresh').innerText = new Date().toLocaleTimeString('ar-SA');
+        };
+
+        document.getElementById('closeUpdatesPage').onclick = function() {
+            document.getElementById('updatesPage').style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        document.getElementById('refreshUpdatesBtn').onclick = function() {
+            renderUpdates(document.getElementById('filterUpdatesType').value);
+            document.getElementById('updatesLastRefresh').innerText = new Date().toLocaleTimeString('ar-SA');
+            showToast('🔄 تم تحديث قائمة التحديثات', 'info');
+        };
+
+        document.getElementById('newUpdateBtn').onclick = function() {
+            const form = document.getElementById('newUpdateForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'block') {
+                document.getElementById('updateTitle').focus();
+            }
+        };
+
+        document.getElementById('cancelUpdateBtn').onclick = function() {
+            document.getElementById('newUpdateForm').style.display = 'none';
+            document.getElementById('updateTitle').value = '';
+            document.getElementById('updateContent').value = '';
+            document.getElementById('updateType').value = 'operational';
+            document.getElementById('updatePin').checked = false;
+        };
+
+        document.getElementById('submitUpdateBtn').onclick = function() {
+            const title = document.getElementById('updateTitle').value.trim();
+            const content = document.getElementById('updateContent').value.trim();
+            const type = document.getElementById('updateType').value;
+            const pinned = document.getElementById('updatePin').checked;
+
+            if (!title || !content) {
+                alert('❌ الرجاء إدخال عنوان ومحتوى التحديث');
+                return;
+            }
+
+            const newUpdate = {
+                id: updateIdCounter++,
+                title: title,
+                content: content,
+                type: type,
+                author: "مشرف العمليات",
+                date: new Date().toISOString(),
+                pinned: pinned,
+                likes: 0,
+                comments: []
+            };
+
+            operationalUpdates.unshift(newUpdate);
+            document.getElementById('newUpdateForm').style.display = 'none';
+            document.getElementById('updateTitle').value = '';
+            document.getElementById('updateContent').value = '';
+            document.getElementById('updateType').value = 'operational';
+            document.getElementById('updatePin').checked = false;
+            
+            renderUpdates(document.getElementById('filterUpdatesType').value);
+            showToast('✅ تم نشر التحديث التشغيلي', 'success');
+        };
+
+        document.getElementById('filterUpdatesType').onchange = function() {
+            renderUpdates(this.value);
+        };
+
+        // الإسعاف الجوي
+        document.getElementById('airAmbulanceBtn').onclick = function() {
+            document.getElementById('airAmbulanceModal').style.display = 'flex';
+            const now = new Date();
+            document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
+            const select = document.getElementById('airUnit');
+            select.innerHTML = '<option value="">-- اختر الفرقة --</option>';
+            for (let center in mockData.centers) {
+                for (let unit of mockData.centers[center]) {
+                    const opt = document.createElement('option');
+                    opt.value = unit;
+                    opt.textContent = unit;
+                    select.appendChild(opt);
+                }
+            }
+            renderAirRecords();
+        };
+        document.getElementById('closeAirModal').onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
+        document.getElementById('closeAirModalBtn').onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
         document.getElementById('saveAirRecord').onclick = function() {
             const reportNumber = document.getElementById('airReportNumber').value.trim();
             const unit = document.getElementById('airUnit').value;
@@ -2320,7 +2536,7 @@
                 return;
             }
 
-            const newRecord = {
+            airRecords.unshift({
                 id: Date.now().toString(),
                 reportNumber,
                 unit,
@@ -2328,17 +2544,16 @@
                 dateTime,
                 notes: notes || '',
                 createdAt: new Date().toISOString()
-            };
-            airRecords.unshift(newRecord);
-            renderAirRecords();
+            });
+
             document.getElementById('airReportNumber').value = '';
             document.getElementById('airUnit').value = '';
             document.getElementById('airHospital').value = '';
             document.getElementById('airDateTime').value = '';
             document.getElementById('airNotes').value = '';
+            renderAirRecords();
             showToast('✅ تم حفظ بلاغ الإسعاف الجوي', 'success');
         };
-
         document.getElementById('clearAllAirRecords').onclick = function() {
             if (!confirm('⚠️ هل أنت متأكد من حذف جميع بلاغات الإسعاف الجوي؟')) return;
             airRecords = [];
@@ -2346,29 +2561,46 @@
             showToast('🗑️ تم حذف جميع البلاغات', 'info');
         };
 
-        // ============================================
-        // دوال التحكم والتنسيق (حفظ الملاحظات)
-        // ============================================
+        // التحكم والتنسيق
+        document.getElementById('controlBtn').onclick = function() {
+            document.getElementById('controlModal').style.display = 'flex';
+            renderControlList(false);
+            document.getElementById('controlNotes').value = '';
+        };
+        document.getElementById('closeControlModal').onclick = function() { document.getElementById('controlModal').style.display = 'none'; };
+        document.getElementById('closeControlModalBtn').onclick = function() { document.getElementById('controlModal').style.display = 'none'; };
         document.getElementById('saveControlNotes').onclick = function() {
-            const notes = document.getElementById('controlNotes').value.trim();
             showToast('✅ تم حفظ الملاحظات', 'success');
         };
 
-        // ============================================
-        // دوال الرقم السري
-        // ============================================
-        document.getElementById('changePasswordBtn').onclick = () => {
-            document.getElementById('changePasswordModal').style.display = 'flex';
-            document.getElementById('oldPasswordInput').value = '';
-            document.getElementById('newPasswordInput').value = '';
-            document.getElementById('confirmNewPasswordInput').value = '';
+        // الجدول الشهري
+        document.getElementById('monthlyTableBtn').onclick = function() {
+            document.getElementById('monthlyTableModal').style.display = 'flex';
+        };
+        document.getElementById('closeMonthlyTableModal').onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
+        document.getElementById('closeMonthlyTableModalBtn').onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
+        document.getElementById('uploadExcelBtn').onclick = function() { document.getElementById('excelFileInput').click(); };
+        document.getElementById('excelFileInput').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('excelTableContainer').innerHTML = `
+                <div style="padding:20px; text-align:center; color:var(--gray-600);">
+                    ✅ تم رفع الملف: ${file.name}<br>
+                    <span style="font-size:0.7rem;">(سيتم عرض الجدول في التحديث القادم)</span>
+                </div>
+            `;
+            document.getElementById('tableStatus').innerHTML = `✅ تم رفع ${file.name}`;
+            showToast('✅ تم رفع الجدول الشهري', 'success');
         };
 
-        document.getElementById('cancelChangePasswordBtn').onclick = () => document.getElementById('changePasswordModal')
-            .style.display = 'none';
-        document.getElementById('cancelChangePasswordModalBtn').onclick = () => document.getElementById(
-            'changePasswordModal').style.display = 'none';
-
+        // ============================================
+        // دوال الرقم السري والإجازات
+        // ============================================
+        document.getElementById('changePasswordBtn').onclick = function() {
+            document.getElementById('changePasswordModal').style.display = 'flex';
+        };
+        document.getElementById('cancelChangePasswordBtn').onclick = function() { document.getElementById('changePasswordModal').style.display = 'none'; };
+        document.getElementById('cancelChangePasswordModalBtn').onclick = function() { document.getElementById('changePasswordModal').style.display = 'none'; };
         document.getElementById('confirmChangePasswordBtn').onclick = function() {
             const oldPassword = document.getElementById('oldPasswordInput').value;
             const newPassword = document.getElementById('newPasswordInput').value;
@@ -2390,21 +2622,12 @@
             document.getElementById('changePasswordModal').style.display = 'none';
         };
 
-        // ============================================
-        // دوال الإجازات
-        // ============================================
-        let isEditMode = false;
-
         document.getElementById('editVacationsBtn').onclick = function() {
             document.getElementById('passwordModal').style.display = 'flex';
             document.getElementById('passwordInput').value = '';
         };
-
-        document.getElementById('cancelPasswordBtn').onclick = () => document.getElementById('passwordModal').style
-            .display = 'none';
-        document.getElementById('cancelPasswordModalBtn').onclick = () => document.getElementById('passwordModal').style
-            .display = 'none';
-
+        document.getElementById('cancelPasswordBtn').onclick = function() { document.getElementById('passwordModal').style.display = 'none'; };
+        document.getElementById('cancelPasswordModalBtn').onclick = function() { document.getElementById('passwordModal').style.display = 'none'; };
         document.getElementById('confirmPasswordBtn').onclick = function() {
             const password = document.getElementById('passwordInput').value;
             if (password === '1234') {
@@ -2419,7 +2642,6 @@
                 document.getElementById('passwordInput').value = '';
             }
         };
-
         document.getElementById('saveVacationsBtn').onclick = function() {
             controlData.forEach((person, index) => {
                 const startInput = document.getElementById(`start_${index}`);
@@ -2437,45 +2659,31 @@
         };
 
         // ============================================
-        // دوال الجدول الشهري (رفع Excel)
-        // ============================================
-        document.getElementById('uploadExcelBtn').onclick = () => document.getElementById('excelFileInput').click();
-
-        document.getElementById('excelFileInput').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const container = document.getElementById('excelTableContainer');
-            container.innerHTML = `
-                <div style="padding:20px; text-align:center; color:var(--gray-600);">
-                    ✅ تم رفع الملف: ${file.name}<br>
-                    <span style="font-size:0.7rem;">(سيتم عرض الجدول في التحديث القادم)</span>
-                </div>
-            `;
-            document.getElementById('tableStatus').innerHTML = `✅ تم رفع ${file.name}`;
-            showToast('✅ تم رفع الجدول الشهري', 'success');
-        };
-
-        // ============================================
         // إغلاق النوافذ عند الضغط خارجها
         // ============================================
         window.onclick = function(e) {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(modal => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
+            document.querySelectorAll('.modal:not(#updatesPage)').forEach(modal => {
+                if (e.target === modal) modal.style.display = 'none';
             });
         };
 
         // ============================================
-        // التشغيل
+        // تشغيل التطبيق
         // ============================================
-        loadNotifications();
-        updateTotal();
+        checkPeakTime();
+        setInterval(checkPeakTime, 60000);
+
+        updateMainStats();
+        setInterval(updateMainStats, 10000);
+
         renderControlList(false);
         buildCentersTable();
+        renderUpdates('all');
 
-        console.log('✅ منصة الجنوب - جميع النوافذ مكتملة');
+        console.log('✅ منصة الجنوب - الصفحة الرئيسية المتكاملة');
+        console.log('📊 عدد الفرق:', Object.values(mockData.centers).flat().length);
+        console.log('📋 عدد المراكز:', Object.keys(mockData.centers).length);
+        console.log('📌 عدد التحديثات التشغيلية:', operationalUpdates.length);
     </script>
 </body>
 </html>
