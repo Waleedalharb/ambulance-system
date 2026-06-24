@@ -21,7 +21,9 @@ const PEAK_DATA_PATH = '/data/peak-data.json';
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
+// ============================================
 // Middleware
+// ============================================
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -42,6 +44,32 @@ async function ensureTempDir() {
 ensureTempDir();
 
 // ============================================
+// دوال مساعدة للتوقيت (الرياض GMT+3)
+// ============================================
+
+// الحصول على التوقيت المحلي (الرياض GMT+3)
+function getLocalTime(date = new Date()) {
+    const offset = 3; // الرياض GMT+3
+    const localDate = new Date(date.getTime() + (offset * 60 * 60 * 1000));
+    return localDate;
+}
+
+function formatLocalDateTime(date) {
+    const local = getLocalTime(date);
+    return local.toISOString().slice(0, 16).replace('T', ' ');
+}
+
+function formatLocalDate(date) {
+    const local = getLocalTime(date);
+    return local.toLocaleDateString('ar-SA');
+}
+
+function formatLocalTime(date) {
+    const local = getLocalTime(date);
+    return local.toLocaleTimeString('ar-SA');
+}
+
+// ============================================
 // بيانات قطاع الجنوب
 // ============================================
 const centersData = {
@@ -55,6 +83,150 @@ const centersData = {
     "عكاظ": ["جنوب 9"],
     "الشفاء": ["جنوب 8", "سريع 2"],
     "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+};
+
+// ============================================
+// البيانات الجغرافية للمراكز
+// ============================================
+const centerGeoData = {
+    "جنوب 1": {
+        center: [24.7136, 46.6753],
+        radius: 5000,
+        boundaries: { north: 24.7500, south: 24.6800, east: 46.7200, west: 46.6300 },
+        address: "طريق الملك فهد، الرياض"
+    },
+    "جنوب 2": {
+        center: [24.7000, 46.6600],
+        radius: 4000,
+        boundaries: { north: 24.7300, south: 24.6700, east: 46.6900, west: 46.6300 },
+        address: "حي المنصورة، الرياض"
+    },
+    "جنوب 3": {
+        center: [24.6850, 46.6450],
+        radius: 3500,
+        boundaries: { north: 24.7100, south: 24.6600, east: 46.6700, west: 46.6200 },
+        address: "الخالدية، الرياض"
+    },
+    "جنوب 4": {
+        center: [24.7200, 46.6900],
+        radius: 4500,
+        boundaries: { north: 24.7550, south: 24.6900, east: 46.7300, west: 46.6500 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 5": {
+        center: [24.7300, 46.7000],
+        radius: 4000,
+        boundaries: { north: 24.7600, south: 24.7000, east: 46.7350, west: 46.6700 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 6": {
+        center: [24.6700, 46.6400],
+        radius: 3500,
+        boundaries: { north: 24.7000, south: 24.6400, east: 46.6700, west: 46.6100 },
+        address: "الإسكان، الرياض"
+    },
+    "جنوب 7": {
+        center: [24.6500, 46.6200],
+        radius: 4000,
+        boundaries: { north: 24.6800, south: 24.6200, east: 46.6500, west: 46.5900 },
+        address: "الحائر، الرياض"
+    },
+    "جنوب 8": {
+        center: [24.6900, 46.6700],
+        radius: 3500,
+        boundaries: { north: 24.7200, south: 24.6600, east: 46.7000, west: 46.6400 },
+        address: "الشفاء، الرياض"
+    },
+    "جنوب 9": {
+        center: [24.7050, 46.6800],
+        radius: 3000,
+        boundaries: { north: 24.7300, south: 24.6800, east: 46.7100, west: 46.6500 },
+        address: "عكاظ، الرياض"
+    },
+    "جنوب 10": {
+        center: [24.6600, 46.6100],
+        radius: 4500,
+        boundaries: { north: 24.6900, south: 24.6300, east: 46.6400, west: 46.5800 },
+        address: "ديراب، الرياض"
+    },
+    "سريع 1": {
+        center: [24.7100, 46.6850],
+        radius: 8000,
+        boundaries: { north: 24.7700, south: 24.6600, east: 46.7500, west: 46.6200 },
+        address: "مستشفى الملك خالد، الرياض"
+    },
+    "سريع 2": {
+        center: [24.6900, 46.6600],
+        radius: 7000,
+        boundaries: { north: 24.7400, south: 24.6400, east: 46.7100, west: 46.6100 },
+        address: "الشفاء، الرياض"
+    },
+    "سريع 3": {
+        center: [24.7000, 46.6700],
+        radius: 6000,
+        boundaries: { north: 24.7400, south: 24.6600, east: 46.7100, west: 46.6300 },
+        address: "المنصورة، الرياض"
+    },
+    "سريع 4": {
+        center: [24.7200, 46.6800],
+        radius: 7000,
+        boundaries: { north: 24.7600, south: 24.6800, east: 46.7300, west: 46.6300 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 11": {
+        center: [24.7100, 46.6700],
+        radius: 3500,
+        boundaries: { north: 24.7400, south: 24.6800, east: 46.7000, west: 46.6400 },
+        address: "المنصورة، الرياض"
+    },
+    "جنوب 12": {
+        center: [24.7200, 46.6750],
+        radius: 3000,
+        boundaries: { north: 24.7450, south: 24.6950, east: 46.7050, west: 46.6450 },
+        address: "المنصورة، الرياض"
+    },
+    "جنوب 13": {
+        center: [24.7300, 46.6900],
+        radius: 4000,
+        boundaries: { north: 24.7600, south: 24.7000, east: 46.7200, west: 46.6600 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 14": {
+        center: [24.7400, 46.6950],
+        radius: 3500,
+        boundaries: { north: 24.7700, south: 24.7100, east: 46.7250, west: 46.6650 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 15": {
+        center: [24.7500, 46.7000],
+        radius: 3000,
+        boundaries: { north: 24.7750, south: 24.7250, east: 46.7300, west: 46.6700 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 16": {
+        center: [24.7100, 46.6600],
+        radius: 3500,
+        boundaries: { north: 24.7400, south: 24.6800, east: 46.6900, west: 46.6300 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 17": {
+        center: [24.7000, 46.6550],
+        radius: 3000,
+        boundaries: { north: 24.7250, south: 24.6750, east: 46.6850, west: 46.6250 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 18": {
+        center: [24.6900, 46.6500],
+        radius: 3500,
+        boundaries: { north: 24.7200, south: 24.6600, east: 46.6800, west: 46.6200 },
+        address: "الفرق الإضافية، الرياض"
+    },
+    "جنوب 19": {
+        center: [24.6800, 46.6450],
+        radius: 3000,
+        boundaries: { north: 24.7050, south: 24.6550, east: 46.6750, west: 46.6150 },
+        address: "الفرق الإضافية، الرياض"
+    }
 };
 
 // ============================================
@@ -117,9 +289,22 @@ async function writeAirRecords(data) {
     await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2));
 }
 
-// ============================================
-// دوال الرقم السري
-// ============================================
+async function readPeakData() {
+    try {
+        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return { missions: [], alerts: [], logs: [] };
+        }
+        return { missions: [], alerts: [], logs: [] };
+    }
+}
+
+async function writePeakData(data) {
+    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
 async function readPassword() {
     try {
         const data = await fs.readFile(PASSWORD_PATH, 'utf8');
@@ -138,22 +323,64 @@ async function writePassword(password) {
 }
 
 // ============================================
-// دوال وقت الذروة
+// Server-Sent Events للإشعارات اللحظية
 // ============================================
-async function readPeakData() {
-    try {
-        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return { missions: [], alerts: [], logs: [] };
+
+let peakEventClients = [];
+
+app.get('/api/peak-events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    const clientId = Date.now();
+    const newClient = {
+        id: clientId,
+        res: res
+    };
+    
+    peakEventClients.push(newClient);
+    
+    // إرسال رسالة ترحيب
+    res.write(`data: ${JSON.stringify({ type: 'connected', message: 'متصل بنظام الإشعارات', timestamp: new Date().toISOString() })}\n\n`);
+    
+    // إزالة العميل عند انقطاع الاتصال
+    req.on('close', () => {
+        peakEventClients = peakEventClients.filter(client => client.id !== clientId);
+    });
+});
+
+// دالة إرسال إشعار لجميع العملاء
+function sendPeakNotification(alertData, type = 'new_peak_alert') {
+    const eventData = {
+        type: type,
+        alert: alertData,
+        timestamp: new Date().toISOString(),
+        timestampDisplay: formatLocalDateTime(new Date())
+    };
+    
+    peakEventClients.forEach(client => {
+        try {
+            client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
+        } catch (error) {
+            console.error('خطأ في إرسال الإشعار:', error);
         }
-        return { missions: [], alerts: [], logs: [] };
-    }
+    });
 }
 
-async function writePeakData(data) {
-    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
+// ============================================
+// دوال المساعدة
+// ============================================
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c * 1000;
 }
 
 // ============================================
@@ -217,10 +444,9 @@ app.post('/api/start-new-shift', async (req, res) => {
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
         
         const now = new Date();
-        const offset = 3;
-        const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-        const shiftDate = saudiTime.toLocaleDateString('ar-SA');
-        const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
+        const localNow = getLocalTime(now);
+        const shiftDate = formatLocalDate(now);
+        const shiftTime = formatLocalTime(now);
         
         const newShift = {
             id: Date.now(),
@@ -228,13 +454,14 @@ app.post('/api/start-new-shift', async (req, res) => {
             shiftDate: shiftDate,
             shiftTime: shiftTime,
             shiftType: shiftType,
-            startTime: saudiTime.toISOString(),
+            startTime: now.toISOString(),
+            startTimeDisplay: formatLocalDateTime(now),
             savedReports: JSON.parse(JSON.stringify(currentReports)),
             totalReports: total,
             rapidLocations: {},
             centersData: {},
             generalNotes: "",
-            lastUpdate: saudiTime.toISOString()
+            lastUpdate: now.toISOString()
         };
         
         const shifts = await readShifts();
@@ -305,14 +532,13 @@ app.post('/api/report', async (req, res) => {
     
     const key = `${center}|${unit}`;
     const now = new Date();
-    const offset = 3;
-    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-    const year = saudiTime.getUTCFullYear();
-    const month = (saudiTime.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = saudiTime.getUTCDate().toString().padStart(2, '0');
-    const hours = saudiTime.getUTCHours().toString().padStart(2, '0');
-    const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
-    const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
+    const localNow = getLocalTime(now);
+    const year = localNow.getUTCFullYear();
+    const month = (localNow.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = localNow.getUTCDate().toString().padStart(2, '0');
+    const hours = localNow.getUTCHours().toString().padStart(2, '0');
+    const minutes = localNow.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = localNow.getUTCSeconds().toString().padStart(2, '0');
     const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     
     try {
@@ -429,7 +655,8 @@ app.post('/api/upload-doc', async (req, res) => {
             category: category || 'أخرى',
             priority: priority || 'normal',
             uploader: req.body.uploader || 'المشرف',
-            uploadDate: new Date().toISOString()
+            uploadDate: new Date().toISOString(),
+            uploadDateDisplay: formatLocalDateTime(new Date())
         };
         docs.push(newDoc);
         await writeDocs(docs);
@@ -524,14 +751,17 @@ app.post('/api/save-air-ambulance', async (req, res) => {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         const records = await readAirRecords();
+        const now = new Date();
         const newRecord = {
             id: Date.now().toString(),
             reportNumber,
             unit,
             hospital,
             dateTime,
+            dateTimeDisplay: formatLocalDateTime(new Date(dateTime)),
             notes: notes || '',
-            createdAt: new Date().toISOString()
+            createdAt: now.toISOString(),
+            createdAtDisplay: formatLocalDateTime(now)
         };
         records.unshift(newRecord);
         await writeAirRecords(records);
@@ -648,8 +878,9 @@ app.post('/api/change-password', async (req, res) => {
 });
 
 // ============================================
-// API: وقت الذروة (Server-based)
+// API: وقت الذروة (Server-based مع توقيت محلي)
 // ============================================
+
 app.get('/api/peak-data', async (req, res) => {
     try {
         const data = await readPeakData();
@@ -667,18 +898,27 @@ app.post('/api/peak-mission', async (req, res) => {
         }
         
         const data = await readPeakData();
+        const now = new Date();
+        
+        // تحويل التوقيتات إلى التوقيت المحلي
+        const startLocal = new Date(startTime);
+        const endLocal = new Date(endTime);
+        
         const mission = {
             id: Date.now().toString(),
             location,
             lat: lat || null,
             lng: lng || null,
             unit,
-            startTime,
-            endTime,
+            startTime: startLocal.toISOString(),
+            endTime: endLocal.toISOString(),
+            startTimeDisplay: formatLocalDateTime(startLocal),
+            endTimeDisplay: formatLocalDateTime(endLocal),
             priority: priority || 'عالية',
             notes: notes || '',
             status: 'نشط',
-            createdAt: new Date().toISOString()
+            createdAt: now.toISOString(),
+            createdAtDisplay: formatLocalDateTime(now)
         };
         
         data.missions.unshift(mission);
@@ -690,31 +930,42 @@ app.post('/api/peak-mission', async (req, res) => {
             action: 'مهمة جديدة',
             details: unit + ' في ' + location,
             priority: priority || 'عادي',
-            time: new Date().toLocaleTimeString('ar-SA'),
-            date: new Date().toISOString()
+            time: formatLocalTime(now),
+            date: formatLocalDate(now),
+            fullDate: now.toISOString()
         });
         if (data.logs.length > 50) data.logs.pop();
         
-        data.alerts.unshift({
+        // إضافة تنبيه مع توقيت محلي
+        const alertData = {
             id: Date.now().toString(),
             title: 'تمركز مطلوب لـ ' + unit,
-            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
+            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + formatLocalDateTime(startLocal) + ' - ' + formatLocalDateTime(endLocal) + ')',
             priority: priority || 'عالية',
             unit: unit,
             location: location,
-            startTime: startTime,
-            endTime: endTime,
+            startTime: startLocal.toISOString(),
+            endTime: endLocal.toISOString(),
+            startTimeDisplay: formatLocalDateTime(startLocal),
+            endTimeDisplay: formatLocalDateTime(endLocal),
             notes: notes || '',
             lat: lat || null,
             lng: lng || null,
             radius: 5000,
             missionId: mission.id,
             status: 'نشط',
-            createdAt: new Date().toISOString()
-        });
+            createdAt: now.toISOString(),
+            createdAtDisplay: formatLocalDateTime(now),
+            read: false
+        };
+        data.alerts.unshift(alertData);
         if (data.alerts.length > 50) data.alerts.pop();
         
         await writePeakData(data);
+        
+        // إرسال إشعار فوري عبر SSE
+        sendPeakNotification(alertData, 'new_peak_alert');
+        
         res.json({ success: true, mission });
     } catch (error) {
         console.error(error);
@@ -733,17 +984,27 @@ app.post('/api/peak-resolve', async (req, res) => {
         const alert = data.alerts.find(a => a.id === alertId);
         if (alert) {
             alert.status = 'منتهي';
+            alert.resolvedAt = new Date().toISOString();
+            alert.resolvedAtDisplay = formatLocalDateTime(new Date());
+            
             data.logs.unshift({
                 id: Date.now().toString(),
                 icon: '✅',
                 action: 'تم التنفيذ',
                 details: alert.details,
                 priority: alert.priority || 'عادي',
-                time: new Date().toLocaleTimeString('ar-SA'),
-                date: new Date().toISOString()
+                time: formatLocalTime(new Date()),
+                date: formatLocalDate(new Date()),
+                fullDate: new Date().toISOString()
             });
             if (data.logs.length > 50) data.logs.pop();
             await writePeakData(data);
+            
+            // إرسال إشعار بحل التنبيه
+            sendPeakNotification({
+                ...alert,
+                status: 'منتهي'
+            }, 'resolved_peak_alert');
         }
         res.json({ success: true });
     } catch (error) {
@@ -754,81 +1015,6 @@ app.post('/api/peak-resolve', async (req, res) => {
 // ============================================
 // API: البيانات الجغرافية للمراكز
 // ============================================
-const centerGeoData = {
-    "جنوب 1": {
-        center: [24.7136, 46.6753],
-        radius: 5000,
-        boundaries: { north: 24.7500, south: 24.6800, east: 46.7200, west: 46.6300 },
-        address: "طريق الملك فهد، الرياض"
-    },
-    "جنوب 2": {
-        center: [24.7000, 46.6600],
-        radius: 4000,
-        boundaries: { north: 24.7300, south: 24.6700, east: 46.6900, west: 46.6300 },
-        address: "حي المنصورة، الرياض"
-    },
-    "جنوب 3": {
-        center: [24.6850, 46.6450],
-        radius: 3500,
-        boundaries: { north: 24.7100, south: 24.6600, east: 46.6700, west: 46.6200 },
-        address: "الخالدية، الرياض"
-    },
-    "جنوب 4": {
-        center: [24.7200, 46.6900],
-        radius: 4500,
-        boundaries: { north: 24.7550, south: 24.6900, east: 46.7300, west: 46.6500 },
-        address: "الدار البيضاء، الرياض"
-    },
-    "جنوب 5": {
-        center: [24.7300, 46.7000],
-        radius: 4000,
-        boundaries: { north: 24.7600, south: 24.7000, east: 46.7350, west: 46.6700 },
-        address: "الدار البيضاء، الرياض"
-    },
-    "جنوب 6": {
-        center: [24.6700, 46.6400],
-        radius: 3500,
-        boundaries: { north: 24.7000, south: 24.6400, east: 46.6700, west: 46.6100 },
-        address: "الإسكان، الرياض"
-    },
-    "جنوب 7": {
-        center: [24.6500, 46.6200],
-        radius: 4000,
-        boundaries: { north: 24.6800, south: 24.6200, east: 46.6500, west: 46.5900 },
-        address: "الحائر، الرياض"
-    },
-    "جنوب 8": {
-        center: [24.6900, 46.6700],
-        radius: 3500,
-        boundaries: { north: 24.7200, south: 24.6600, east: 46.7000, west: 46.6400 },
-        address: "الشفاء، الرياض"
-    },
-    "جنوب 9": {
-        center: [24.7050, 46.6800],
-        radius: 3000,
-        boundaries: { north: 24.7300, south: 24.6800, east: 46.7100, west: 46.6500 },
-        address: "عكاظ، الرياض"
-    },
-    "جنوب 10": {
-        center: [24.6600, 46.6100],
-        radius: 4500,
-        boundaries: { north: 24.6900, south: 24.6300, east: 46.6400, west: 46.5800 },
-        address: "ديراب، الرياض"
-    },
-    "سريع 1": {
-        center: [24.7100, 46.6850],
-        radius: 8000,
-        boundaries: { north: 24.7700, south: 24.6600, east: 46.7500, west: 46.6200 },
-        address: "مستشفى الملك خالد، الرياض"
-    },
-    "سريع 2": {
-        center: [24.6900, 46.6600],
-        radius: 7000,
-        boundaries: { north: 24.7400, south: 24.6400, east: 46.7100, west: 46.6100 },
-        address: "الشفاء، الرياض"
-    }
-};
-
 app.get('/api/center-geo', (req, res) => {
     res.json({ success: true, data: centerGeoData });
 });
@@ -862,17 +1048,6 @@ app.post('/api/locate-report', (req, res) => {
         location: foundCenter ? centerGeoData[foundCenter].address : 'غير معروف'
     });
 });
-
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c * 1000;
-}
 
 // ============================================
 // API: الجدول الشهري
@@ -916,7 +1091,7 @@ app.get('/api/check-monthly-table', async (req, res) => {
 });
 
 // ============================================
-// API: تصدير Excel
+// API: تصدير البيانات
 // ============================================
 app.get('/api/export', async (req, res) => {
     try {
@@ -924,7 +1099,7 @@ app.get('/api/export', async (req, res) => {
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
         let rows = [
             ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
-            ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
+            ["تاريخ التصدير:", formatLocalDateTime(new Date())],
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
         ];
@@ -961,4 +1136,6 @@ app.listen(PORT, () => {
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
     console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
     console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
+    console.log(`🕒 التوقيت المحلي: ${formatLocalDateTime(new Date())}`);
+    console.log(`📡 نظام الإشعارات اللحظية (SSE) مفعل`);
 });
