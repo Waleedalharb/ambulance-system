@@ -1,0 +1,49 @@
+# Node.js
+node_modules/
+npm-debug.log
+package-lock.json
+yarn.lock
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ملفات البيئة
+.env
+.env.local
+.env.*.local
+*.env
+
+# ملفات مؤقتة
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# مجلدات البيانات (محلية)
+/data/
+/temp/
+/uploads/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# ملفات التشغيل
+dist/
+build/
+out/
+
+# ملفات السجل
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# ملفات الاختبار
+coverage/
+*.test.js
+*.spec.js
