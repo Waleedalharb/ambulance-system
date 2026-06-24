@@ -702,6 +702,12 @@ app.post('/api/peak-mission', async (req, res) => {
             priority: priority || 'عالية',
             unit: unit,
             location: location,
+            startTime: startTime,
+            endTime: endTime,
+            notes: notes || '',
+            lat: lat || null,
+            lng: lng || null,
+            radius: 5000,
             missionId: mission.id,
             status: 'نشط',
             createdAt: new Date().toISOString()
@@ -744,6 +750,129 @@ app.post('/api/peak-resolve', async (req, res) => {
         res.status(500).json({ error: 'فشل في إنهاء التنبيه' });
     }
 });
+
+// ============================================
+// API: البيانات الجغرافية للمراكز
+// ============================================
+const centerGeoData = {
+    "جنوب 1": {
+        center: [24.7136, 46.6753],
+        radius: 5000,
+        boundaries: { north: 24.7500, south: 24.6800, east: 46.7200, west: 46.6300 },
+        address: "طريق الملك فهد، الرياض"
+    },
+    "جنوب 2": {
+        center: [24.7000, 46.6600],
+        radius: 4000,
+        boundaries: { north: 24.7300, south: 24.6700, east: 46.6900, west: 46.6300 },
+        address: "حي المنصورة، الرياض"
+    },
+    "جنوب 3": {
+        center: [24.6850, 46.6450],
+        radius: 3500,
+        boundaries: { north: 24.7100, south: 24.6600, east: 46.6700, west: 46.6200 },
+        address: "الخالدية، الرياض"
+    },
+    "جنوب 4": {
+        center: [24.7200, 46.6900],
+        radius: 4500,
+        boundaries: { north: 24.7550, south: 24.6900, east: 46.7300, west: 46.6500 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 5": {
+        center: [24.7300, 46.7000],
+        radius: 4000,
+        boundaries: { north: 24.7600, south: 24.7000, east: 46.7350, west: 46.6700 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 6": {
+        center: [24.6700, 46.6400],
+        radius: 3500,
+        boundaries: { north: 24.7000, south: 24.6400, east: 46.6700, west: 46.6100 },
+        address: "الإسكان، الرياض"
+    },
+    "جنوب 7": {
+        center: [24.6500, 46.6200],
+        radius: 4000,
+        boundaries: { north: 24.6800, south: 24.6200, east: 46.6500, west: 46.5900 },
+        address: "الحائر، الرياض"
+    },
+    "جنوب 8": {
+        center: [24.6900, 46.6700],
+        radius: 3500,
+        boundaries: { north: 24.7200, south: 24.6600, east: 46.7000, west: 46.6400 },
+        address: "الشفاء، الرياض"
+    },
+    "جنوب 9": {
+        center: [24.7050, 46.6800],
+        radius: 3000,
+        boundaries: { north: 24.7300, south: 24.6800, east: 46.7100, west: 46.6500 },
+        address: "عكاظ، الرياض"
+    },
+    "جنوب 10": {
+        center: [24.6600, 46.6100],
+        radius: 4500,
+        boundaries: { north: 24.6900, south: 24.6300, east: 46.6400, west: 46.5800 },
+        address: "ديراب، الرياض"
+    },
+    "سريع 1": {
+        center: [24.7100, 46.6850],
+        radius: 8000,
+        boundaries: { north: 24.7700, south: 24.6600, east: 46.7500, west: 46.6200 },
+        address: "مستشفى الملك خالد، الرياض"
+    },
+    "سريع 2": {
+        center: [24.6900, 46.6600],
+        radius: 7000,
+        boundaries: { north: 24.7400, south: 24.6400, east: 46.7100, west: 46.6100 },
+        address: "الشفاء، الرياض"
+    }
+};
+
+app.get('/api/center-geo', (req, res) => {
+    res.json({ success: true, data: centerGeoData });
+});
+
+app.post('/api/locate-report', (req, res) => {
+    const { lat, lng } = req.body;
+    if (!lat || !lng) {
+        return res.status(400).json({ error: 'إحداثيات غير صالحة' });
+    }
+    
+    let foundCenter = null;
+    let minDistance = Infinity;
+    
+    for (let center in centerGeoData) {
+        const data = centerGeoData[center];
+        const centerLat = data.center[0];
+        const centerLng = data.center[1];
+        
+        const distance = getDistance(lat, lng, centerLat, centerLng);
+        
+        if (distance < data.radius && distance < minDistance) {
+            minDistance = distance;
+            foundCenter = center;
+        }
+    }
+    
+    res.json({
+        success: true,
+        center: foundCenter,
+        distance: minDistance,
+        location: foundCenter ? centerGeoData[foundCenter].address : 'غير معروف'
+    });
+});
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c * 1000;
+}
 
 // ============================================
 // API: الجدول الشهري
@@ -831,4 +960,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
     console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
+    console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
 });

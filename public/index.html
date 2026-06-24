@@ -103,9 +103,7 @@
 
         .header.theme-mode .header-brand .text h1,
         .header.theme-mode .header-brand .text .sub,
-        .header.theme-mode .header-brand .icon {
-            display: none !important;
-        }
+        .header.theme-mode .header-brand .icon { display: none !important; }
         .header.theme-mode .header-date { display: none !important; }
         .header.theme-mode {
             min-height: 120px !important;
@@ -287,6 +285,7 @@
             overflow: hidden;
             transition: all 0.3s ease;
             border: 1px solid var(--gray-100);
+            cursor: default;
         }
         .wf-card:hover {
             transform: translateY(-4px);
@@ -712,6 +711,14 @@
             font-weight: 700;
         }
 
+        /* ===== تنبيه وقت الذروة ===== */
+        #peakAlertModal .modal-content { max-width: 700px; }
+        #peakAlertMap { width: 100%; height: 300px; border-radius: var(--radius-sm); }
+        @keyframes bounceIcon {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
         /* ===== استجابة ===== */
         @media (max-width: 992px) {
             .workforce-grid { grid-template-columns: repeat(2, 1fr); }
@@ -729,7 +736,6 @@
             .distribution-advanced { grid-template-columns: 1fr; }
             .distribution-unit-grid { grid-template-columns: repeat(2, 1fr); }
             .modal-content { padding: 16px; margin: 10px; }
-            .units-grid { grid-template-columns: 1fr 1fr; }
             #docsPage .docs-header .header-content { flex-direction: column; align-items: stretch; text-align: center; }
             #docsPage .docs-header .brand { justify-content: center; }
             #docsPage .docs-header .header-actions { justify-content: center; }
@@ -744,6 +750,8 @@
             .control-vacation .edit input { width: 100%; }
             .circle-stats-container { grid-template-columns: 1fr 1fr; }
             .svg-circle { width: 60px; height: 60px; }
+            #peakAlertModal .modal-content { padding: 16px; }
+            #peakAlertMap { height: 200px; }
         }
 
         @media (max-width: 400px) {
@@ -756,7 +764,7 @@
             .modal[style*="display: flex"] { display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: white !important; z-index: 9999 !important; overflow: auto !important; padding: 20px !important; margin: 0 !important; }
             .modal[style*="display: flex"] * { visibility: visible !important; }
             .modal-content { max-width: 100% !important; margin: 0 !important; padding: 20px !important; border: none !important; box-shadow: none !important; max-height: none !important; overflow: visible !important; border-radius: 0 !important; background: white !important; }
-            .modal-buttons, .saved-records, .no-print, .btn, button, .toolbar, .info-bar, .archive-row, .update-status, #pointsContainer, #liveReportStats, .header, footer, #alertBar { display: none !important; }
+            .modal-buttons, .saved-records, .no-print, .btn, button, .toolbar, .info-bar, .archive-row, .update-status, #liveReportStats, .header, footer, #alertBar { display: none !important; }
             .form-row input[type="number"], .form-row input[type="text"], .form-row input { border: none !important; border-bottom: 2px solid #000 !important; border-radius: 0 !important; background: transparent !important; text-align: center !important; font-size: 0.9rem !important; font-weight: 600 !important; color: #000 !important; padding: 4px 0 !important; width: 80px !important; }
             .form-row textarea { border: 1px solid #000 !important; background: transparent !important; min-height: 50px !important; font-size: 0.85rem !important; padding: 8px !important; }
             table { page-break-inside: avoid; border-collapse: collapse; width: 100%; font-size: 9pt; }
@@ -766,6 +774,7 @@
             .modal-content::before { content: "منصة الجنوب - قطاع جنوب الرياض"; display: block; text-align: center; font-size: 1.5rem; font-weight: 700; color: #0B1E33; padding-bottom: 12px; border-bottom: 3px solid #0B1E33; margin-bottom: 20px; }
             #seniorShiftModal, #seniorShiftModal * { display: none !important; visibility: hidden !important; }
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
+            .workforce-dashboard, .distribution-indicator { display: none !important; }
         }
     </style>
 </head>
@@ -964,6 +973,57 @@
 <!-- ============================================================ -->
 <!-- ===== النوافذ المنبثقة ===== -->
 <!-- ============================================================ -->
+
+<!-- ===== تنبيه وقت الذروة ===== -->
+<div id="peakAlertModal" class="modal">
+    <div class="modal-content" style="max-width:700px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:2rem; animation: bounceIcon 1s infinite;">🚨</span>
+                <div>
+                    <h2 style="margin:0; color:var(--coral);">تنبيه وقت الذروة</h2>
+                    <span style="font-size:0.8rem; color:var(--gray-600);" id="peakAlertTime"></span>
+                </div>
+            </div>
+            <button onclick="closePeakAlert()" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:15px; margin-bottom:15px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                    <label style="font-size:0.7rem; color:var(--gray-600);">🚑 الفرقة</label>
+                    <div style="font-weight:700; font-size:1.1rem; color:var(--primary-700);" id="peakAlertUnit">-</div>
+                </div>
+                <div>
+                    <label style="font-size:0.7rem; color:var(--gray-600);">📍 الموقع</label>
+                    <div style="font-weight:700; font-size:1.1rem; color:var(--primary-700);" id="peakAlertLocation">-</div>
+                </div>
+                <div>
+                    <label style="font-size:0.7rem; color:var(--gray-600);">⏰ البداية</label>
+                    <div style="font-weight:700; font-size:1.1rem; color:var(--teal);" id="peakAlertStart">-</div>
+                </div>
+                <div>
+                    <label style="font-size:0.7rem; color:var(--gray-600);">⏰ النهاية</label>
+                    <div style="font-weight:700; font-size:1.1rem; color:var(--coral);" id="peakAlertEnd">-</div>
+                </div>
+            </div>
+            <div style="margin-top:10px; padding:10px; background:var(--white); border-radius:var(--radius-sm);">
+                <label style="font-size:0.7rem; color:var(--gray-600);">📝 ملاحظات</label>
+                <div id="peakAlertNotes" style="font-size:0.85rem; color:var(--gray-800);">-</div>
+            </div>
+        </div>
+        
+        <!-- الخريطة -->
+        <div style="border:1px solid var(--gray-200); border-radius:var(--radius-md); overflow:hidden; min-height:250px;">
+            <div id="peakAlertMap" style="width:100%; height:300px;"></div>
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-top:15px; justify-content:center; flex-wrap:wrap;">
+            <button onclick="resolvePeakAlertFromModal()" class="btn btn-primary">✅ تم التنفيذ</button>
+            <button onclick="closePeakAlert()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
 
 <!-- ===== نافذة توزيع البلاغات المتطورة ===== -->
 <div id="distributionModal" class="modal">
@@ -1680,15 +1740,123 @@ function checkForAlerts() {
                 const alerts = result.data.alerts || [];
                 const activeAlerts = alerts.filter(a => a.status === 'نشط');
                 const dismissed = localStorage.getItem('alertDismissed') === 'true';
+                const shownAlert = localStorage.getItem('lastShownPeakAlert');
+                
                 if (activeAlerts.length > 0 && !dismissed) {
                     const latestAlert = activeAlerts[0];
-                    showMainAlert('🔔 ' + latestAlert.title, latestAlert.details);
-                } else if (activeAlerts.length === 0) {
-                    document.getElementById('alertBar').style.display = 'none';
+                    if (latestAlert.id !== shownAlert) {
+                        showPeakAlert({
+                            unit: latestAlert.unit || latestAlert.title?.replace('تمركز مطلوب لـ ', '') || '-',
+                            location: latestAlert.location || '-',
+                            startTime: latestAlert.startTime || '-',
+                            endTime: latestAlert.endTime || '-',
+                            notes: latestAlert.notes || 'لا توجد ملاحظات',
+                            lat: latestAlert.lat || 24.7136,
+                            lng: latestAlert.lng || 46.6753,
+                            radius: latestAlert.radius || 5000,
+                            id: latestAlert.id,
+                            details: latestAlert.details
+                        });
+                        localStorage.setItem('lastShownPeakAlert', latestAlert.id);
+                    }
                 }
             }
         })
         .catch(() => {});
+}
+
+// ============================================
+// تنبيه وقت الذروة - منبثق مع خريطة
+// ============================================
+let peakAlertMap = null;
+let currentPeakAlert = null;
+let currentPeakAlertId = null;
+
+function showPeakAlert(alertData) {
+    currentPeakAlert = alertData;
+    currentPeakAlertId = alertData.id;
+    
+    document.getElementById('peakAlertUnit').innerText = alertData.unit || '-';
+    document.getElementById('peakAlertLocation').innerText = alertData.location || '-';
+    document.getElementById('peakAlertStart').innerText = alertData.startTime || '-';
+    document.getElementById('peakAlertEnd').innerText = alertData.endTime || '-';
+    document.getElementById('peakAlertNotes').innerText = alertData.notes || 'لا توجد ملاحظات';
+    document.getElementById('peakAlertTime').innerText = '🕒 ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
+    
+    document.getElementById('peakAlertModal').style.display = 'flex';
+    
+    setTimeout(function() {
+        initPeakAlertMap(alertData);
+    }, 300);
+}
+
+function initPeakAlertMap(alertData) {
+    const container = document.getElementById('peakAlertMap');
+    if (!container) return;
+    if (typeof L === 'undefined') { setTimeout(function() { initPeakAlertMap(alertData); }, 500); return; }
+    
+    if (peakAlertMap) {
+        peakAlertMap.invalidateSize();
+        return;
+    }
+    
+    try {
+        const centerLat = parseFloat(alertData.lat) || 24.7136;
+        const centerLng = parseFloat(alertData.lng) || 46.6753;
+        
+        peakAlertMap = L.map('peakAlertMap').setView([centerLat, centerLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(peakAlertMap);
+        
+        const marker = L.marker([centerLat, centerLng]).addTo(peakAlertMap);
+        marker.bindPopup('<b>' + alertData.unit + '</b><br>' + alertData.location).openPopup();
+        
+        if (alertData.radius) {
+            L.circle([centerLat, centerLng], {
+                radius: alertData.radius,
+                color: '#E87461',
+                fillColor: '#E87461',
+                fillOpacity: 0.15,
+                weight: 2
+            }).addTo(peakAlertMap);
+        }
+        
+        setTimeout(function() { peakAlertMap.invalidateSize(); }, 500);
+    } catch (error) {
+        console.error('خطأ في تهيئة خريطة التنبيه:', error);
+    }
+}
+
+function closePeakAlert() {
+    document.getElementById('peakAlertModal').style.display = 'none';
+    if (peakAlertMap) {
+        peakAlertMap.remove();
+        peakAlertMap = null;
+    }
+}
+
+async function resolvePeakAlertFromModal() {
+    if (!currentPeakAlertId) {
+        closePeakAlert();
+        return;
+    }
+    if (!confirm('⚠️ هل أنت متأكد من إنهاء هذا التنبيه؟')) return;
+    try {
+        const response = await fetch('/api/peak-resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alertId: currentPeakAlertId })
+        });
+        const result = await response.json();
+        if (result.success) {
+            await loadPeakData();
+            closePeakAlert();
+            showToast('✅ تم إنهاء التنبيه', 'success');
+        }
+    } catch (error) {
+        alert('❌ خطأ في الاتصال');
+    }
 }
 
 // ============================================
@@ -2133,9 +2301,25 @@ function calculateLiveReportStats() {
 }
 
 // ============================================
-// مؤشرات القوى العاملة المتطورة
+// مؤشرات القوى العاملة المتطورة (تعكس بيانات التكميل)
 // ============================================
 function updateWorkforceStats() {
+    // محاولة جلب بيانات التكميل من المناوبة الحالية
+    var shiftData = null;
+    if (currentShiftId) {
+        var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
+        if (shift && shift.centersData) {
+            shiftData = shift.centersData;
+        }
+    }
+    
+    // إذا كان هناك بيانات تكميل، استخدمها
+    if (shiftData && Object.keys(shiftData).length > 0) {
+        updateWorkforceFromShiftData(shiftData);
+        return;
+    }
+    
+    // وإلا استخدم البيانات التقديرية
     var totalUnits = 0;
     for (var center in centersData) {
         totalUnits += centersData[center].length;
@@ -2145,6 +2329,35 @@ function updateWorkforceStats() {
     var readiness = Math.floor(Math.random() * 30 + 70);
     var missingCenters = Math.floor(Math.random() * 5);
     
+    updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters);
+}
+
+function updateWorkforceFromShiftData(shiftData) {
+    var totalStaff = 0;
+    var totalCars = 0;
+    var readyCenters = 0;
+    var missingCenters = 0;
+    var centerCount = 0;
+    
+    for (var center in shiftData) {
+        var data = shiftData[center];
+        var staff = parseInt(data.staffCount) || 0;
+        var cars = parseInt(data.carsCount) || 0;
+        totalStaff += staff;
+        totalCars += cars;
+        centerCount++;
+        if (staff >= 2 && cars >= 1) {
+            readyCenters++;
+        } else {
+            missingCenters++;
+        }
+    }
+    
+    var readiness = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+    updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters);
+}
+
+function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
     animateValue('wfTotalStaff', totalStaff);
     animateValue('wfTotalCars', totalCars);
     document.getElementById('wfReadiness').innerText = readiness + '%';
@@ -2333,6 +2546,8 @@ async function startNewShift() {
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
             document.getElementById('shiftModal').style.display = 'none';
         } else { alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); }
     } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
@@ -2352,7 +2567,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(checkForAlerts, 1000);
 });
 
-setInterval(checkForAlerts, 30000);
+// فحص التنبيهات كل 10 ثواني
+setInterval(checkForAlerts, 10000);
 
 document.getElementById("newShiftBtn").onclick = startNewShift;
 document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
@@ -2465,6 +2681,11 @@ function calculateWorkforceStatsLocally() {
         div2.className = 'distribution-bar';
         div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
         carDistList.appendChild(div2);
+    }
+    
+    // تحديث مؤشرات القوى العاملة في الصفحة الرئيسية من بيانات التكميل
+    if (totalStaff > 0 || totalCars > 0) {
+        updateWorkforceDisplay(totalStaff, totalCars, readinessRate, missingCenters);
     }
 }
 
@@ -2858,6 +3079,8 @@ async function saveShiftData() {
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
             if (viewingShiftId) {
                 var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
                 var viewResult = await viewResponse.json();
@@ -2886,6 +3109,8 @@ async function deleteCurrentShift() {
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
             document.getElementById('shiftModal').style.display = 'none';
         } else { alert("❌ فشل في الحذف"); }
     } catch (error) { alert("❌ خطأ في الاتصال"); }
@@ -3179,7 +3404,7 @@ async function undoLastReport(center, unit) {
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal'];
+    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal'];
     modals.forEach(function(id) {
         var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -3209,9 +3434,10 @@ async function checkForUpdates() {
 }
 
 console.log('✅ منصة الجنوب - الصفحة الرئيسية المتطورة');
-console.log('📊 مؤشرات القوى العاملة وتوزيع البلاغات في الصفحة الرئيسية');
+console.log('📊 مؤشرات القوى العاملة تعكس بيانات التكميل');
 console.log('🌐 نظام وقت الذروة يعمل على الخادم (Server-based)');
-console.log('📍 معاينة الخريطة للفرق متاحة من نافذة التوزيع');
+console.log('📍 تنبيهات وقت الذروة تظهر مع خريطة الموقع');
+console.log('🗺️ معاينة الخريطة للفرق متاحة من نافذة التوزيع');
 </script>
 </body>
 </html>
