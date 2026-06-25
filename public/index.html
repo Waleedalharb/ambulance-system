@@ -1151,7 +1151,6 @@
     <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
 </div>
 
-<!-- ===== النوافذ المنبثقة - الجزء المهم (نافذة التصعيد) ===== -->
 <!-- ===== نافذة التصعيد الجديدة (معدلة نهائياً) ===== -->
 <div id="escalationModal" class="modal">
     <div class="modal-content" style="max-width:750px;">
@@ -1170,10 +1169,10 @@
             <span style="font-size:0.75rem; color:var(--gray-600);">التصعيد مخصص للحالات التالية: حرائق، حوادث مرورية متعددة، كوارث طبيعية، مدارس، انهيارات، تسربات كيميائية، إطلاق نار</span>
         </div>
 
-        <!-- رقم البلاغ - اختياري -->
+        <!-- رقم البلاغ - حقل إدخال فقط -->
         <div class="form-row">
-            <label>رقم البلاغ <span style="color:var(--gray-400); font-size:0.7rem;">(اختياري - اتركه فارغاً للتوليد التلقائي)</span></label>
-            <input type="text" id="escReportNumber" placeholder="مثال: B-2026-001 أو اتركه للتوليد التلقائي">
+            <label>رقم البلاغ</label>
+            <input type="text" id="escReportNumber" placeholder="أدخل رقم البلاغ">
         </div>
 
         <div class="grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -1192,7 +1191,7 @@
             </div>
             <div class="form-row" style="margin:5px 0;">
                 <label>مستوى التصعيد</label>
-                <select id="escLevel" onchange="updateEscalationLevelBadge()">
+                <select id="escLevel">
                     <option value="عاجل جداً" style="color:#C0392B;">عاجل جداً</option>
                     <option value="عالي" style="color:#E67E22;">عالي</option>
                     <option value="متوسط" style="color:#F1C40F;">متوسط</option>
@@ -1203,7 +1202,7 @@
         <div class="grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div class="form-row" style="margin:5px 0;">
                 <label>عدد المصابين</label>
-                <input type="number" id="escCasualties" min="0" value="1" onchange="updateEscalationLevel()">
+                <input type="number" id="escCasualties" min="0" value="1">
             </div>
             <div class="form-row" style="margin:5px 0;">
                 <label>وقت التصعيد</label>
@@ -1211,15 +1210,25 @@
             </div>
         </div>
 
-        <!-- الفرق المشاركة -->
+        <!-- الفرق المشاركة (مقسمة حسب الفرق) -->
         <div class="form-row">
-            <label>الفرق المشاركة</label>
+            <label>الجهات المشاركة</label>
             <div class="locations-grid" style="grid-template-columns:1fr 1fr 1fr;">
+                <!-- الفرق الصحية -->
+                <label style="font-weight:600; color:var(--teal); grid-column: span 3; border: none; background: transparent; padding:5px 0;">🟢 الجهات الصحية</label>
                 <label><input type="checkbox" class="esc-agency" value="الإسعاف الجوي"> الإسعاف الجوي</label>
                 <label><input type="checkbox" class="esc-agency" value="الهلال الأحمر"> الهلال الأحمر</label>
-                <label><input type="checkbox" class="esc-agency" value="الدفاع المدني"> الدفاع المدني</label>
-                <label><input type="checkbox" class="esc-agency" value="أمن الطرق والمرور والدوريات"> أمن الطرق والمرور والدوريات</label>
                 <label><input type="checkbox" class="esc-agency" value="الصحة العامة"> الصحة العامة</label>
+                
+                <!-- الجهات الأمنية -->
+                <label style="font-weight:600; color:var(--primary-700); grid-column: span 3; border: none; background: transparent; padding:5px 0;">🔵 الجهات الأمنية</label>
+                <label><input type="checkbox" class="esc-agency" value="أمن طرق"> أمن طرق</label>
+                <label><input type="checkbox" class="esc-agency" value="المرور"> المرور</label>
+                <label><input type="checkbox" class="esc-agency" value="الدوريات"> الدوريات</label>
+                
+                <!-- جهات الدفاع -->
+                <label style="font-weight:600; color:var(--coral); grid-column: span 3; border: none; background: transparent; padding:5px 0;">🔴 جهات الدفاع</label>
+                <label><input type="checkbox" class="esc-agency" value="الدفاع المدني"> الدفاع المدني</label>
             </div>
         </div>
 
