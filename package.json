@@ -1,7 +1,7 @@
 {
   "name": "ambulance-system",
   "version": "2.1.0",
-  "description": "منصة الجنوب - نظام إدارة العمليات الإسعافية لقطاع جنوب الرياض مع نظام التصعيد",
+  "description": "منصة الجنوب - نظام إدارة العمليات الإسعافية لقطاع جنوب الرياض",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

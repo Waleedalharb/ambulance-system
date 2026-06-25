@@ -2820,58 +2820,7 @@ if (typeof unitLocations === 'undefined' || !unitLocations || Object.keys(unitLo
 }
 
 // ============================================
-// بيانات المراكز الافتراضية - تعمل فوراً
-// ============================================
-
-// التأكد من عدم تكرار التعريف
-if (typeof defaultCentersData === 'undefined') {
-    var defaultCentersData = {
-        "قطاع جنوب 1": ["جنوب 1", "جنوب 2", "جنوب 3", "جنوب 4", "جنوب 5"],
-        "قطاع جنوب 2": ["جنوب 6", "جنوب 7", "جنوب 8", "جنوب 9", "جنوب 10"],
-        "قطاع جنوب 3": ["جنوب 11", "جنوب 12", "جنوب 13", "جنوب 14", "جنوب 15"],
-        "قطاع جنوب 4": ["جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"],
-        "قطاع سريع": ["سريع 1", "سريع 2", "سريع 3", "سريع 4"]
-    };
-}
-
-if (typeof defaultUnitLocations === 'undefined') {
-    var defaultUnitLocations = {
-        "جنوب 1": "طريق الملك فهد، الرياض",
-        "جنوب 2": "حي المنصورة، الرياض",
-        "جنوب 3": "الخالدية، الرياض",
-        "جنوب 4": "الدار البيضاء، الرياض",
-        "جنوب 5": "الدار البيضاء، الرياض",
-        "جنوب 6": "الإسكان، الرياض",
-        "جنوب 7": "الحائر، الرياض",
-        "جنوب 8": "الشفاء، الرياض",
-        "جنوب 9": "عكاظ، الرياض",
-        "جنوب 10": "ديراب، الرياض",
-        "جنوب 11": "المنصورة، الرياض",
-        "جنوب 12": "الخالدية، الرياض",
-        "جنوب 13": "الشفاء، الرياض",
-        "جنوب 14": "عكاظ، الرياض",
-        "جنوب 15": "الإسكان، الرياض",
-        "جنوب 16": "المنصورة، الرياض",
-        "جنوب 17": "الخالدية، الرياض",
-        "جنوب 18": "الشفاء، الرياض",
-        "جنوب 19": "عكاظ، الرياض",
-        "سريع 1": "مستشفى الملك خالد، الرياض",
-        "سريع 2": "الشفاء، الرياض",
-        "سريع 3": "المنصورة، الرياض",
-        "سريع 4": "الفرق الإضافية، الرياض"
-    };
-}
-
-// تهيئة البيانات الفعلية من الافتراضية
-if (typeof centersData === 'undefined' || !centersData || Object.keys(centersData).length === 0) {
-    var centersData = JSON.parse(JSON.stringify(defaultCentersData));
-}
-if (typeof unitLocations === 'undefined' || !unitLocations || Object.keys(unitLocations).length === 0) {
-    var unitLocations = JSON.parse(JSON.stringify(defaultUnitLocations));
-}
-
-// ============================================
-// نافذة توزيع البلاغات - تعمل فوراً بدون انتظار
+// نافذة توزيع البلاغات - تم إزالة زر الخريطة
 // ============================================
 
 function renderAdvancedDistribution() {
@@ -2881,7 +2830,7 @@ function renderAdvancedDistribution() {
         return;
     }
     
-    // استخدام البيانات المحلية فوراً
+    // استخدام البيانات المحلية إذا كانت موجودة، وإلا استخدام الافتراضية
     var dataToUse = (typeof centersData !== 'undefined' && centersData && Object.keys(centersData).length > 0) ? centersData : defaultCentersData;
     var locToUse = (typeof unitLocations !== 'undefined' && unitLocations && Object.keys(unitLocations).length > 0) ? unitLocations : defaultUnitLocations;
     
@@ -2922,7 +2871,10 @@ function renderAdvancedDistribution() {
         <span style="margin-right:15px; font-size:0.7rem; color:var(--gray-600);">
             🏥 ${Object.keys(dataToUse).length} قطاع | 🚑 ${countTotalUnits(dataToUse)} فرقة
         </span>
-        <button onclick="openManageCenters()" class="btn btn-sm" style="padding:2px 10px; font-size:0.6rem; background:var(--gold); color:var(--primary-900); border-color:var(--gold);">
+        <button onclick="refreshDistributionData()" class="btn btn-sm" style="margin-right:10px; padding:2px 10px; font-size:0.6rem;">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+        <button onclick="document.getElementById('manageCentersModal').style.display='flex'; renderCentersManagement();" class="btn btn-sm" style="padding:2px 10px; font-size:0.6rem; background:var(--gold); color:var(--primary-900); border-color:var(--gold);">
             <i class="fas fa-map-marked-alt"></i> إدارة المراكز
         </button>
     `;
@@ -3028,19 +2980,33 @@ function resetToDefaultCenters() {
     showToast('تم استعادة البيانات الافتراضية', 'success');
 }
 
-// دالة فتح إدارة المراكز
-function openManageCenters() {
-    var modal = document.getElementById('manageCentersModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        if (typeof renderCentersManagement === 'function') {
-            renderCentersManagement();
-        }
-    }
+// دالة تحديث البيانات من الخادم
+function refreshDistributionData() {
+    showToast('جاري تحديث البيانات...', 'info');
+    fetch('/api/data')
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result.centers && Object.keys(result.centers).length > 0) {
+                centersData = result.centers;
+            }
+            if (result.data) {
+                reports = result.data;
+            }
+            if (result.currentShiftId) {
+                currentShiftId = result.currentShiftId;
+            }
+            renderAdvancedDistribution();
+            showToast('تم تحديث البيانات', 'success');
+        })
+        .catch(function(error) {
+            console.error('❌ فشل تحديث البيانات:', error);
+            showToast('فشل التحديث، استخدم البيانات المحلية', 'error');
+            renderAdvancedDistribution();
+        });
 }
 
 // ============================================
-// ربط زر التوزيع - يعمل فوراً بدون تعليق
+// ربط زر التوزيع - يعمل فوراً
 // ============================================
 
 // إزالة الربط السابق إذا كان موجوداً
@@ -3056,36 +3022,11 @@ if (oldDistributionBtn) {
             modal.style.display = 'flex';
         }
         
-        // عرض البيانات فوراً
         renderAdvancedDistribution();
         
-        // محاولة تحديث البيانات من الخادم في الخلفية (بدون انتظار)
         setTimeout(function() {
-            try {
-                fetch('/api/data')
-                    .then(function(response) { return response.json(); })
-                    .then(function(result) {
-                        if (result.centers && Object.keys(result.centers).length > 0) {
-                            centersData = result.centers;
-                        }
-                        if (result.data) {
-                            reports = result.data;
-                        }
-                        if (result.currentShiftId) {
-                            currentShiftId = result.currentShiftId;
-                        }
-                        // تحديث العرض إذا كانت النافذة لا تزال مفتوحة
-                        if (document.getElementById('distributionModal').style.display === 'flex') {
-                            renderAdvancedDistribution();
-                        }
-                    })
-                    .catch(function(error) {
-                        console.log('⚠️ فشل تحديث البيانات من الخادم، استخدم المحلية');
-                    });
-            } catch(e) {
-                console.log('⚠️ خطأ في الاتصال بالخادم');
-            }
-        }, 1000);
+            refreshDistributionData();
+        }, 500);
     });
 }
 
@@ -3139,13 +3080,8 @@ function addReportWithAnimation(center, unit, btnElement) {
     updateSectorTotal(center);
     updateTotalReportsDisplay();
     
-    // إرسال إلى الخادم (غير متزامن بدون انتظار)
     if (typeof addReportToServer === 'function') {
-        try {
-            addReportToServer(center, unit);
-        } catch(e) {
-            console.log('⚠️ فشل إرسال البلاغ للخادم');
-        }
+        addReportToServer(center, unit);
     }
     
     showToast('✅ تم تسجيل بلاغ لـ ' + unit, 'success');
@@ -3608,65 +3544,295 @@ async function sendEscalationAlert(record) {
     }
 }
 
-<!-- ===== نافذة توزيع البلاغات - التصميم الجديد ===== -->
-<div id="distributionModal" class="modal">
-    <div class="modal-content" style="max-width:95%; padding:0; overflow:hidden; border-radius:var(--radius-xl);">
-        <!-- رأس النافذة - تصميم عصري -->
-        <div style="background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%); padding:20px 28px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-            <div style="display:flex; align-items:center; gap:16px;">
-                <div style="width:48px; height:48px; background:rgba(255,255,255,0.12); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.08);">
-                    <i class="fas fa-ambulance" style="color:var(--gold); font-size:1.4rem;"></i>
-                </div>
-                <div>
-                    <h2 style="margin:0; color:white; font-size:1.3rem; font-weight:700;">توزيع البلاغات</h2>
-                    <span style="color:rgba(255,255,255,0.6); font-size:0.75rem; display:flex; align-items:center; gap:6px;">
-                        <i class="fas fa-circle" style="color:var(--teal); font-size:0.4rem;"></i>
-                        إدارة عملياتية لحظية
-                    </span>
-                </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <div style="background:rgba(255,255,255,0.08); padding:6px 16px; border-radius:30px; border:1px solid rgba(255,255,255,0.06);">
-                    <span style="color:rgba(255,255,255,0.7); font-size:0.7rem;">📊 إجمالي البلاغات</span>
-                    <span style="color:white; font-size:1.2rem; font-weight:700; margin-right:6px;" id="distTotalReportsHeader">0</span>
-                </div>
-                <button onclick="document.getElementById('distributionModal').style.display='none'" class="btn" style="background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.06); padding:8px 14px; border-radius:30px; font-size:0.8rem;">
-                    <i class="fas fa-times"></i>
+// ============================================
+// نافذة توزيع البلاغات المتطورة - مُصححة
+// ============================================
+
+function renderAdvancedDistribution() {
+    var container = document.getElementById('distributionContainer');
+    if (!container) {
+        console.error('❌ container غير موجود');
+        return;
+    }
+    
+    // التأكد من وجود بيانات
+    if (!centersData || Object.keys(centersData).length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; background:var(--gray-50); border-radius:var(--radius-md); border:2px dashed var(--gray-200);">
+                <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary-500);"></i>
+                <p style="color:var(--gray-600); margin-top:10px;">جاري تحميل بيانات المراكز...</p>
+                <button onclick="loadCentersDataAndRender()" class="btn btn-primary" style="margin-top:10px;">
+                    <i class="fas fa-sync-alt"></i> إعادة تحميل
                 </button>
             </div>
-        </div>
+        `;
+        // محاولة تحميل البيانات
+        loadCentersDataAndRender();
+        return;
+    }
+    
+    // التحقق من وجود مراكز
+    var totalCenters = 0;
+    for (var c in centersData) {
+        if (centersData[c] && centersData[c].length > 0) {
+            totalCenters += centersData[c].length;
+        }
+    }
+    
+    if (totalCenters === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; background:var(--gray-50); border-radius:var(--radius-md); border:2px dashed var(--gray-200);">
+                <i class="fas fa-ambulance" style="font-size:2.5rem; color:var(--gray-400);"></i>
+                <p style="color:var(--gray-600); margin-top:10px;">لا توجد مراكز مسجلة حالياً</p>
+                <p style="color:var(--gray-400); font-size:0.8rem;">الرجاء بدء مناوبة جديدة أو تحديث البيانات</p>
+                <button onclick="loadAllData(); setTimeout(renderAdvancedDistribution, 500);" class="btn btn-primary" style="margin-top:10px;">
+                    <i class="fas fa-sync-alt"></i> تحديث البيانات
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    container.className = 'distribution-advanced';
+    
+    var totalReports = 0;
+    for (var key in reports) {
+        if (reports[key] && reports[key].count) {
+            totalReports += reports[key].count;
+        }
+    }
+    
+    // عرض إجمالي البلاغات في الأعلى
+    var headerDiv = document.createElement('div');
+    headerDiv.style.cssText = 'grid-column: 1 / -1; background:var(--primary-100); padding:10px 16px; border-radius:var(--radius-md); text-align:center; margin-bottom:5px;';
+    headerDiv.innerHTML = `
+        <span style="font-weight:700; color:var(--primary-700);">
+            📊 إجمالي البلاغات: <span style="font-size:1.4rem;">${totalReports}</span>
+        </span>
+        <span style="margin-right:15px; font-size:0.7rem; color:var(--gray-600);">
+            🏥 ${Object.keys(centersData).length} قطاع | 🚑 ${totalCenters} فرقة
+        </span>
+    `;
+    container.appendChild(headerDiv);
+    
+    var sortedCenters = Object.keys(centersData).sort();
+    
+    sortedCenters.forEach(function(center) {
+        var sectorDiv = document.createElement('div');
+        sectorDiv.className = 'distribution-sector-card';
         
-        <!-- محتوى النافذة -->
-        <div style="padding:20px 24px; background:var(--gray-50);">
-            <!-- شريط التحكم السريع -->
-            <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px; background:white; padding:12px 20px; border-radius:var(--radius-md); box-shadow:var(--shadow-sm);">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <span style="font-size:0.75rem; color:var(--gray-600); font-weight:600;">⚡ إجراء سريع:</span>
-                    <button onclick="addQuickReport()" class="btn btn-primary" style="padding:4px 16px; font-size:0.7rem;">
-                        <i class="fas fa-plus-circle"></i> بلاغ سريع
-                    </button>
-                    <button onclick="document.getElementById('manageCentersModal').style.display='flex'; renderCentersManagement();" class="btn" style="padding:4px 16px; font-size:0.7rem; background:var(--gold); color:var(--primary-900); border-color:var(--gold);">
-                        <i class="fas fa-map-marked-alt"></i> إدارة المراكز
-                    </button>
-                </div>
-                <div style="flex:1; min-width:150px; display:flex; gap:8px; align-items:center; justify-content:flex-end;">
-                    <span style="font-size:0.65rem; color:var(--gray-400);">
-                        <i class="fas fa-circle" style="color:var(--teal); font-size:0.4rem;"></i>
-                        <span id="distLastUpdate">محدث الآن</span>
-                    </span>
-                    <button onclick="renderAdvancedDistribution()" class="btn" style="padding:2px 10px; font-size:0.6rem; border-color:var(--gray-300);">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
+        var totalSectorReports = 0;
+        var units = centersData[center] || [];
+        for (var i = 0; i < units.length; i++) {
+            var unit = units[i];
+            var key = center + '|' + unit;
+            totalSectorReports += (reports[key]?.count || 0);
+        }
+        
+        var headerHtml = '<div class="distribution-sector-header">' +
+            '<span class="sector-name"><i class="fas fa-map-pin" style="color:var(--primary-500);"></i> ' + center + '</span>' +
+            '<span class="sector-total">📊 ' + totalSectorReports + '</span>' +
+            '</div>';
+        
+        var gridHtml = '<div class="distribution-unit-grid">';
+        for (var j = 0; j < units.length; j++) {
+            var unit2 = units[j];
+            var key2 = center + '|' + unit2;
+            var info = reports[key2] || { count: 0, times: [] };
+            var isZero = info.count === 0;
+            var location = unitLocations[unit2] || 'لم يتم تحديد موقع';
             
-            <!-- حاوية التوزيع -->
-            <div id="distributionContainer" class="distribution-advanced" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:16px;">
-                <p style="text-align:center; color:var(--gray-400); padding:30px 0; font-size:0.9rem; grid-column:1/-1;">📭 جاري تحميل البيانات...</p>
-            </div>
-        </div>
-    </div>
-</div>
+            gridHtml += '<div class="distribution-unit-item" id="item_' + center.replace(/\s/g, '_') + '_' + unit2.replace(/\s/g, '_') + '">' +
+                (info.count > 0 ? '<span class="unit-badge">' + info.count + '</span>' : '') +
+                '<div class="unit-name">' + unit2 + '</div>' +
+                '<div class="unit-count ' + (isZero ? 'zero' : '') + '" id="count_' + center.replace(/\s/g, '_') + '_' + unit2.replace(/\s/g, '_') + '">' + info.count + '</div>' +
+                '<div class="unit-actions">' +
+                '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
+                (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '') +
+                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
+                '</div>' +
+                '</div>';
+        }
+        gridHtml += '</div>';
+        
+        sectorDiv.innerHTML = headerHtml + gridHtml;
+        container.appendChild(sectorDiv);
+    });
+    
+    // ربط الأحداث بعد إنشاء العناصر
+    container.querySelectorAll('.report-btn').forEach(function(btn) {
+        var center = btn.dataset.center;
+        var unit = btn.dataset.unit;
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            addReportWithAnimation(center, unit, btn);
+        };
+    });
+    
+    container.querySelectorAll('.undo-btn').forEach(function(btn) {
+        var center = btn.dataset.center;
+        var unit = btn.dataset.unit;
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            var key = center + '|' + unit;
+            if (reports[key] && reports[key].count > 0) {
+                reports[key].count--;
+                reports[key].times.pop();
+                
+                updateDistributionCount(center, unit);
+                updateTotal();
+                calculateLiveReportStats();
+                updateDistributionIndicator();
+                
+                undoLastReport(center, unit);
+                showToast('تم التراجع عن بلاغ لـ ' + unit, 'info');
+            }
+        };
+    });
+    
+    container.querySelectorAll('.preview-btn').forEach(function(btn) {
+        var unit = btn.dataset.unit;
+        var location = btn.dataset.location;
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            openMapPreview(unit, location);
+        };
+    });
+    
+    console.log('✅ تم عرض التوزيع بنجاح - ' + sortedCenters.length + ' قطاع');
+}
+
+// دالة مساعدة لتحميل البيانات ثم عرض التوزيع
+function loadCentersDataAndRender() {
+    console.log('🔄 جاري تحميل بيانات المراكز...');
+    fetch('/api/data')
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result.centers) {
+                centersData = result.centers;
+                console.log('✅ تم تحميل بيانات المراكز:', Object.keys(centersData));
+            }
+            if (result.data) {
+                reports = result.data;
+                console.log('✅ تم تحميل البلاغات:', Object.keys(reports).length);
+            }
+            if (result.currentShiftId) {
+                currentShiftId = result.currentShiftId;
+            }
+            renderAdvancedDistribution();
+        })
+        .catch(function(error) {
+            console.error('❌ فشل تحميل البيانات:', error);
+            var container = document.getElementById('distributionContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px 20px; background:var(--coral-light); border-radius:var(--radius-md); border:2px solid var(--coral);">
+                        <i class="fas fa-exclamation-triangle" style="font-size:2rem; color:var(--coral);"></i>
+                        <p style="color:var(--gray-800); margin-top:10px;">فشل تحميل البيانات من الخادم</p>
+                        <p style="color:var(--gray-600); font-size:0.8rem;">${error.message}</p>
+                        <button onclick="loadCentersDataAndRender()" class="btn btn-primary" style="margin-top:10px;">
+                            <i class="fas fa-sync-alt"></i> إعادة المحاولة
+                        </button>
+                    </div>
+                `;
+            }
+        });
+}
+
+// ربط زر التوزيع
+document.getElementById('distributionBtn')?.addEventListener('click', function() {
+    console.log('🔘 فتح نافذة التوزيع');
+    document.getElementById('distributionModal').style.display = 'flex';
+    
+    // التأكد من وجود بيانات قبل العرض
+    if (!centersData || Object.keys(centersData).length === 0) {
+        loadCentersDataAndRender();
+    } else {
+        renderAdvancedDistribution();
+    }
+});
+
+// تحديث دالة addReportWithAnimation لتعمل بشكل صحيح
+function addReportWithAnimation(center, unit, btnElement) {
+    const key = center + '|' + unit;
+    if (!reports[key]) reports[key] = { count: 0, times: [] };
+    reports[key].count++;
+    reports[key].times.push(new Date().toLocaleTimeString('ar-SA'));
+    
+    // تحديث العرض
+    updateDistributionCount(center, unit);
+    updateTotal();
+    calculateLiveReportStats();
+    updateDistributionIndicator();
+    
+    // أنيميشن للزر
+    if (btnElement) {
+        btnElement.classList.add('unit-card-pop');
+        setTimeout(() => btnElement.classList.remove('unit-card-pop'), 600);
+    }
+    
+    // أنيميشن للعدد
+    const id = 'count_' + center.replace(/\s/g, '_') + '_' + unit.replace(/\s/g, '_');
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add('report-pop');
+        setTimeout(() => el.classList.remove('report-pop'), 500);
+    }
+    
+    // تحديث الشارة (badge)
+    const itemId = 'item_' + center.replace(/\s/g, '_') + '_' + unit.replace(/\s/g, '_');
+    const item = document.getElementById(itemId);
+    if (item) {
+        var badge = item.querySelector('.unit-badge');
+        if (reports[key].count > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'unit-badge';
+                item.prepend(badge);
+            }
+            badge.innerText = reports[key].count;
+        } else if (badge) {
+            badge.remove();
+        }
+    }
+    
+    // تحديث إجمالي القطاع
+    updateSectorTotal(center);
+    
+    addReportToServer(center, unit);
+    showToast('✅ تم تسجيل بلاغ لـ ' + unit, 'success');
+}
+
+// تحديث إجمالي القطاع
+function updateSectorTotal(center) {
+    var container = document.getElementById('distributionContainer');
+    if (!container) return;
+    
+    var sectors = container.querySelectorAll('.distribution-sector-card');
+    sectors.forEach(function(sector) {
+        var header = sector.querySelector('.distribution-sector-header');
+        if (!header) return;
+        var nameSpan = header.querySelector('.sector-name');
+        if (!nameSpan) return;
+        var sectorName = nameSpan.textContent.trim();
+        if (sectorName !== center) return;
+        
+        var total = 0;
+        var units = sector.querySelectorAll('.distribution-unit-item');
+        units.forEach(function(item) {
+            var countEl = item.querySelector('.unit-count');
+            if (countEl) {
+                total += parseInt(countEl.textContent) || 0;
+            }
+        });
+        
+        var totalSpan = header.querySelector('.sector-total');
+        if (totalSpan) {
+            totalSpan.textContent = '📊 ' + total;
+        }
+    });
+}
 
 // تحديث دالة updateDistributionCount لتحديث إجمالي القطاع أيضاً
 function updateDistributionCount(center, unit) {
