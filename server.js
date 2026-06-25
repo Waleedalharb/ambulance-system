@@ -10,14 +10,11 @@ const PORT = process.env.PORT || 3000;
 // ============================================
 const DATA_DIR = path.join(__dirname, 'data');
 
-// دالة للتأكد من وجود مجلد data
 async function ensureDataDir() {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true });
         await fs.mkdir(path.join(DATA_DIR, 'temp'), { recursive: true });
-    } catch (e) {
-        // المجلد موجود مسبقاً
-    }
+    } catch (e) {}
 }
 ensureDataDir();
 
@@ -31,45 +28,35 @@ const CONTROL_NOTES_PATH = path.join(DATA_DIR, 'control-notes.json');
 const VACATIONS_PATH = path.join(DATA_DIR, 'vacations.json');
 const PASSWORD_PATH = path.join(DATA_DIR, 'password.json');
 const PEAK_DATA_PATH = path.join(DATA_DIR, 'peak-data.json');
+const ESCALATION_PATH = path.join(DATA_DIR, 'escalation-data.json');
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
-// ============================================
-// Middleware
-// ============================================
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ============================================
-// إعداد Multer لرفع الملفات
-// ============================================
 const upload = multer({
     dest: path.join(DATA_DIR, 'temp'),
     limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 // ============================================
-// دوال مساعدة للتوقيت - الإصدار الصحيح
+// دوال مساعدة للتوقيت
 // ============================================
-
-// الحصول على التوقيت المحلي (الرياض GMT+3)
 function getLocalTime(date = new Date()) {
     const d = new Date(date);
     d.setHours(d.getHours() + 3);
     return d;
 }
 
-// تحويل من UTC إلى Local (عند العرض)
 function formatLocalDateTime(date) {
     if (!date) return '-';
     try {
         const d = new Date(date);
         d.setHours(d.getHours() + 3);
         return d.toISOString().slice(0, 16).replace('T', ' ');
-    } catch(e) {
-        return date;
-    }
+    } catch(e) { return date; }
 }
 
 function formatLocalDate(date) {
@@ -78,9 +65,7 @@ function formatLocalDate(date) {
         const d = new Date(date);
         d.setHours(d.getHours() + 3);
         return d.toLocaleDateString('ar-SA');
-    } catch(e) {
-        return date;
-    }
+    } catch(e) { return date; }
 }
 
 function formatLocalTime(date) {
@@ -89,9 +74,7 @@ function formatLocalTime(date) {
         const d = new Date(date);
         d.setHours(d.getHours() + 3);
         return d.toLocaleTimeString('ar-SA');
-    } catch(e) {
-        return date;
-    }
+    } catch(e) { return date; }
 }
 
 // ============================================
@@ -114,243 +97,73 @@ const centersData = {
 // البيانات الجغرافية للمراكز
 // ============================================
 const centerGeoData = {
-    "جنوب 1": {
-        center: [24.7136, 46.6753],
-        radius: 5000,
-        boundaries: { north: 24.7500, south: 24.6800, east: 46.7200, west: 46.6300 },
-        address: "طريق الملك فهد، الرياض"
-    },
-    "جنوب 2": {
-        center: [24.7000, 46.6600],
-        radius: 4000,
-        boundaries: { north: 24.7300, south: 24.6700, east: 46.6900, west: 46.6300 },
-        address: "حي المنصورة، الرياض"
-    },
-    "جنوب 3": {
-        center: [24.6850, 46.6450],
-        radius: 3500,
-        boundaries: { north: 24.7100, south: 24.6600, east: 46.6700, west: 46.6200 },
-        address: "الخالدية، الرياض"
-    },
-    "جنوب 4": {
-        center: [24.7200, 46.6900],
-        radius: 4500,
-        boundaries: { north: 24.7550, south: 24.6900, east: 46.7300, west: 46.6500 },
-        address: "الدار البيضاء، الرياض"
-    },
-    "جنوب 5": {
-        center: [24.7300, 46.7000],
-        radius: 4000,
-        boundaries: { north: 24.7600, south: 24.7000, east: 46.7350, west: 46.6700 },
-        address: "الدار البيضاء، الرياض"
-    },
-    "جنوب 6": {
-        center: [24.6700, 46.6400],
-        radius: 3500,
-        boundaries: { north: 24.7000, south: 24.6400, east: 46.6700, west: 46.6100 },
-        address: "الإسكان، الرياض"
-    },
-    "جنوب 7": {
-        center: [24.6500, 46.6200],
-        radius: 4000,
-        boundaries: { north: 24.6800, south: 24.6200, east: 46.6500, west: 46.5900 },
-        address: "الحائر، الرياض"
-    },
-    "جنوب 8": {
-        center: [24.6900, 46.6700],
-        radius: 3500,
-        boundaries: { north: 24.7200, south: 24.6600, east: 46.7000, west: 46.6400 },
-        address: "الشفاء، الرياض"
-    },
-    "جنوب 9": {
-        center: [24.7050, 46.6800],
-        radius: 3000,
-        boundaries: { north: 24.7300, south: 24.6800, east: 46.7100, west: 46.6500 },
-        address: "عكاظ، الرياض"
-    },
-    "جنوب 10": {
-        center: [24.6600, 46.6100],
-        radius: 4500,
-        boundaries: { north: 24.6900, south: 24.6300, east: 46.6400, west: 46.5800 },
-        address: "ديراب، الرياض"
-    },
-    "سريع 1": {
-        center: [24.7100, 46.6850],
-        radius: 8000,
-        boundaries: { north: 24.7700, south: 24.6600, east: 46.7500, west: 46.6200 },
-        address: "مستشفى الملك خالد، الرياض"
-    },
-    "سريع 2": {
-        center: [24.6900, 46.6600],
-        radius: 7000,
-        boundaries: { north: 24.7400, south: 24.6400, east: 46.7100, west: 46.6100 },
-        address: "الشفاء، الرياض"
-    },
-    "سريع 3": {
-        center: [24.7000, 46.6700],
-        radius: 6000,
-        boundaries: { north: 24.7400, south: 24.6600, east: 46.7100, west: 46.6300 },
-        address: "المنصورة، الرياض"
-    },
-    "سريع 4": {
-        center: [24.7200, 46.6800],
-        radius: 7000,
-        boundaries: { north: 24.7600, south: 24.6800, east: 46.7300, west: 46.6300 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 11": {
-        center: [24.7100, 46.6700],
-        radius: 3500,
-        boundaries: { north: 24.7400, south: 24.6800, east: 46.7000, west: 46.6400 },
-        address: "المنصورة، الرياض"
-    },
-    "جنوب 12": {
-        center: [24.7200, 46.6750],
-        radius: 3000,
-        boundaries: { north: 24.7450, south: 24.6950, east: 46.7050, west: 46.6450 },
-        address: "المنصورة، الرياض"
-    },
-    "جنوب 13": {
-        center: [24.7300, 46.6900],
-        radius: 4000,
-        boundaries: { north: 24.7600, south: 24.7000, east: 46.7200, west: 46.6600 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 14": {
-        center: [24.7400, 46.6950],
-        radius: 3500,
-        boundaries: { north: 24.7700, south: 24.7100, east: 46.7250, west: 46.6650 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 15": {
-        center: [24.7500, 46.7000],
-        radius: 3000,
-        boundaries: { north: 24.7750, south: 24.7250, east: 46.7300, west: 46.6700 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 16": {
-        center: [24.7100, 46.6600],
-        radius: 3500,
-        boundaries: { north: 24.7400, south: 24.6800, east: 46.6900, west: 46.6300 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 17": {
-        center: [24.7000, 46.6550],
-        radius: 3000,
-        boundaries: { north: 24.7250, south: 24.6750, east: 46.6850, west: 46.6250 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 18": {
-        center: [24.6900, 46.6500],
-        radius: 3500,
-        boundaries: { north: 24.7200, south: 24.6600, east: 46.6800, west: 46.6200 },
-        address: "الفرق الإضافية، الرياض"
-    },
-    "جنوب 19": {
-        center: [24.6800, 46.6450],
-        radius: 3000,
-        boundaries: { north: 24.7050, south: 24.6550, east: 46.6750, west: 46.6150 },
-        address: "الفرق الإضافية، الرياض"
-    }
+    "جنوب 1": { center: [24.7136, 46.6753], radius: 5000, address: "طريق الملك فهد، الرياض" },
+    "جنوب 2": { center: [24.7000, 46.6600], radius: 4000, address: "حي المنصورة، الرياض" },
+    "جنوب 3": { center: [24.6850, 46.6450], radius: 3500, address: "الخالدية، الرياض" },
+    "جنوب 4": { center: [24.7200, 46.6900], radius: 4500, address: "الدار البيضاء، الرياض" },
+    "جنوب 5": { center: [24.7300, 46.7000], radius: 4000, address: "الدار البيضاء، الرياض" },
+    "جنوب 6": { center: [24.6700, 46.6400], radius: 3500, address: "الإسكان، الرياض" },
+    "جنوب 7": { center: [24.6500, 46.6200], radius: 4000, address: "الحائر، الرياض" },
+    "جنوب 8": { center: [24.6900, 46.6700], radius: 3500, address: "الشفاء، الرياض" },
+    "جنوب 9": { center: [24.7050, 46.6800], radius: 3000, address: "عكاظ، الرياض" },
+    "جنوب 10": { center: [24.6600, 46.6100], radius: 4500, address: "ديراب، الرياض" },
+    "سريع 1": { center: [24.7100, 46.6850], radius: 8000, address: "مستشفى الملك خالد، الرياض" },
+    "سريع 2": { center: [24.6900, 46.6600], radius: 7000, address: "الشفاء، الرياض" },
+    "سريع 3": { center: [24.7000, 46.6700], radius: 6000, address: "المنصورة، الرياض" },
+    "سريع 4": { center: [24.7200, 46.6800], radius: 7000, address: "الفرق الإضافية، الرياض" }
 };
 
 // ============================================
 // دوال قراءة وكتابة البيانات
 // ============================================
 async function readData() {
-    try {
-        const data = await fs.readFile(DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return {};
-        throw error;
-    }
+    try { const data = await fs.readFile(DATA_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
 }
-
-async function writeData(data) {
-    await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2));
-    lastUpdateTime = Date.now();
-}
+async function writeData(data) { await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2)); lastUpdateTime = Date.now(); }
 
 async function readShifts() {
-    try {
-        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
+    try { const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return []; throw error; }
 }
-
-async function writeShifts(data) {
-    await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
-}
+async function writeShifts(data) { await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2)); }
 
 async function readDocs() {
-    try {
-        const data = await fs.readFile(DOCS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
+    try { const data = await fs.readFile(DOCS_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return []; throw error; }
 }
-
-async function writeDocs(data) {
-    await fs.writeFile(DOCS_PATH, JSON.stringify(data, null, 2));
-}
+async function writeDocs(data) { await fs.writeFile(DOCS_PATH, JSON.stringify(data, null, 2)); }
 
 async function readAirRecords() {
-    try {
-        const data = await fs.readFile(AIR_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
+    try { const data = await fs.readFile(AIR_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return []; throw error; }
 }
-
-async function writeAirRecords(data) {
-    await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2));
-}
+async function writeAirRecords(data) { await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2)); }
 
 async function readPeakData() {
-    try {
-        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return { missions: [], alerts: [], logs: [] };
-        }
-        return { missions: [], alerts: [], logs: [] };
-    }
+    try { const data = await fs.readFile(PEAK_DATA_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return { missions: [], alerts: [], logs: [] }; return { missions: [], alerts: [], logs: [] }; }
 }
-
-async function writePeakData(data) {
-    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
-}
+async function writePeakData(data) { await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2)); }
 
 async function readPassword() {
-    try {
-        const data = await fs.readFile(PASSWORD_PATH, 'utf8');
-        const parsed = JSON.parse(data);
-        return parsed.password || '1234';
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return '1234';
-        }
-        return '1234';
-    }
+    try { const data = await fs.readFile(PASSWORD_PATH, 'utf8'); const parsed = JSON.parse(data); return parsed.password || '1234'; } 
+    catch (error) { if (error.code === 'ENOENT') { return '1234'; } return '1234'; }
 }
+async function writePassword(password) { await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() })); }
 
-async function writePassword(password) {
-    await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
+// ============================================
+// دوال التصعيد
+// ============================================
+async function readEscalations() {
+    try { const data = await fs.readFile(ESCALATION_PATH, 'utf8'); return JSON.parse(data); } 
+    catch (error) { if (error.code === 'ENOENT') return []; throw error; }
 }
+async function writeEscalations(data) { await fs.writeFile(ESCALATION_PATH, JSON.stringify(data, null, 2)); }
 
 // ============================================
 // Server-Sent Events للإشعارات اللحظية
 // ============================================
-
 let peakEventClients = [];
 
 app.get('/api/peak-events', (req, res) => {
@@ -360,50 +173,22 @@ app.get('/api/peak-events', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     
     const clientId = Date.now();
-    const newClient = {
-        id: clientId,
-        res: res
-    };
-    
+    const newClient = { id: clientId, res: res };
     peakEventClients.push(newClient);
-    
-    // إرسال رسالة ترحيب
     res.write(`data: ${JSON.stringify({ type: 'connected', message: 'متصل بنظام الإشعارات', timestamp: new Date().toISOString() })}\n\n`);
-    
-    // إزالة العميل عند انقطاع الاتصال
-    req.on('close', () => {
-        peakEventClients = peakEventClients.filter(client => client.id !== clientId);
-    });
+    req.on('close', () => { peakEventClients = peakEventClients.filter(client => client.id !== clientId); });
 });
 
-// دالة إرسال إشعار لجميع العملاء
 function sendPeakNotification(alertData, type = 'new_peak_alert') {
-    const eventData = {
-        type: type,
-        alert: alertData,
-        timestamp: new Date().toISOString(),
-        timestampDisplay: formatLocalDateTime(new Date())
-    };
-    
-    peakEventClients.forEach(client => {
-        try {
-            client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
-        } catch (error) {
-            console.error('خطأ في إرسال الإشعار:', error);
-        }
-    });
+    const eventData = { type, alert: alertData, timestamp: new Date().toISOString(), timestampDisplay: formatLocalDateTime(new Date()) };
+    peakEventClients.forEach(client => { try { client.res.write(`data: ${JSON.stringify(eventData)}\n\n`); } catch (error) {} });
 }
 
-// ============================================
-// دوال المساعدة
-// ============================================
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c * 1000;
 }
@@ -412,140 +197,81 @@ function getDistance(lat1, lon1, lat2, lon2) {
 // API: جلب البيانات
 // ============================================
 app.get('/api/data', async (req, res) => {
-    try {
-        const data = await readData();
-        res.json({
-            data,
-            centers: centersData,
-            currentShiftId: currentShiftId
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب البيانات' });
-    }
+    try { const data = await readData(); res.json({ data, centers: centersData, currentShiftId }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب البيانات' }); }
 });
-
-app.get('/api/last-update', (req, res) => {
-    res.json({ lastUpdate: lastUpdateTime });
-});
+app.get('/api/last-update', (req, res) => { res.json({ lastUpdate: lastUpdateTime }); });
 
 // ============================================
 // API: المناوبات
 // ============================================
 app.get('/api/shifts', async (req, res) => {
-    try {
-        const shifts = await readShifts();
-        res.json(shifts);
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب المناوبات' });
-    }
+    try { const shifts = await readShifts(); res.json(shifts); } catch (error) { res.status(500).json({ error: 'فشل في جلب المناوبات' }); }
 });
-
 app.get('/api/shifts/:id', async (req, res) => {
     try {
         const shifts = await readShifts();
         const shiftId = parseInt(req.params.id);
         const shift = shifts.find(s => s.id === shiftId);
-        if (!shift) {
-            return res.status(404).json({ error: 'المناوبة غير موجودة' });
-        }
-        res.json({
-            shift: shift,
-            reports: shift.savedReports || {},
-            total: shift.totalReports || 0
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب المناوبة' });
-    }
+        if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        res.json({ shift, reports: shift.savedReports || {}, total: shift.totalReports || 0 });
+    } catch (error) { res.status(500).json({ error: 'فشل في جلب المناوبة' }); }
 });
-
 app.post('/api/start-new-shift', async (req, res) => {
     try {
         const { shiftType } = req.body;
-        if (!shiftType) {
-            return res.status(400).json({ error: 'نوع المناوبة مطلوب' });
-        }
-        
+        if (!shiftType) return res.status(400).json({ error: 'نوع المناوبة مطلوب' });
         const currentReports = await readData();
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-        
         const now = new Date();
-        const localNow = getLocalTime(now);
         const shiftDate = formatLocalDate(now);
         const shiftTime = formatLocalTime(now);
-        
         const newShift = {
             id: Date.now(),
             shiftName: `${shiftType} - ${shiftDate} ${shiftTime}`,
-            shiftDate: shiftDate,
-            shiftTime: shiftTime,
-            shiftType: shiftType,
+            shiftDate, shiftTime, shiftType,
             startTime: now.toISOString(),
             startTimeDisplay: formatLocalDateTime(now),
             savedReports: JSON.parse(JSON.stringify(currentReports)),
             totalReports: total,
-            rapidLocations: {},
-            centersData: {},
-            generalNotes: "",
+            rapidLocations: {}, centersData: {}, generalNotes: "",
             lastUpdate: now.toISOString()
         };
-        
         const shifts = await readShifts();
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
-        
         await writeData({});
         currentShiftId = newShift.id;
-        
         res.json({ success: true, shiftId: newShift.id, shift: newShift });
-    } catch (error) {
-        console.error("خطأ في بدء المناوبة:", error);
-        res.status(500).json({ error: 'فشل في بدء المناوبة: ' + error.message });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في بدء المناوبة: ' + error.message }); }
 });
-
 app.post('/api/update-shift-data', async (req, res) => {
     try {
         const { shiftId, shiftData } = req.body;
-        if (!shiftId) {
-            return res.status(400).json({ error: 'معرف المناوبة مطلوب' });
-        }
-        
+        if (!shiftId) return res.status(400).json({ error: 'معرف المناوبة مطلوب' });
         const shifts = await readShifts();
         const index = shifts.findIndex(s => s.id === shiftId);
-        if (index === -1) {
-            return res.status(404).json({ error: 'المناوبة غير موجودة' });
-        }
-        
+        if (index === -1) return res.status(404).json({ error: 'المناوبة غير موجودة' });
         shifts[index].rapidLocations = shiftData.rapidLocations || {};
         shifts[index].centersData = shiftData.centersData || {};
         shifts[index].generalNotes = shiftData.generalNotes || "";
         shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
         shifts[index].lastUpdate = new Date().toISOString();
-        
         await writeShifts(shifts);
         currentShiftId = shiftId;
-        
         res.json({ success: true });
-    } catch (error) {
-        console.error("خطأ في تحديث بيانات المناوبة:", error);
-        res.status(500).json({ error: 'فشل في تحديث بيانات المناوبة' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في تحديث بيانات المناوبة' }); }
 });
-
 app.delete('/api/shifts/:id', async (req, res) => {
     try {
         const shifts = await readShifts();
         const id = parseInt(req.params.id);
         const filtered = shifts.filter(s => s.id !== id);
         await writeShifts(filtered);
-        if (currentShiftId === id) {
-            currentShiftId = null;
-        }
+        if (currentShiftId === id) currentShiftId = null;
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف المناوبة' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حذف المناوبة' }); }
 });
 
 // ============================================
@@ -554,18 +280,10 @@ app.delete('/api/shifts/:id', async (req, res) => {
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
     const key = `${center}|${unit}`;
     const now = new Date();
     const localNow = getLocalTime(now);
-    const year = localNow.getUTCFullYear();
-    const month = (localNow.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = localNow.getUTCDate().toString().padStart(2, '0');
-    const hours = localNow.getUTCHours().toString().padStart(2, '0');
-    const minutes = localNow.getUTCMinutes().toString().padStart(2, '0');
-    const seconds = localNow.getUTCSeconds().toString().padStart(2, '0');
-    const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    
+    const timestamp = `${localNow.getUTCFullYear()}-${(localNow.getUTCMonth()+1).toString().padStart(2,'0')}-${localNow.getUTCDate().toString().padStart(2,'0')} ${localNow.getUTCHours().toString().padStart(2,'0')}:${localNow.getUTCMinutes().toString().padStart(2,'0')}:${localNow.getUTCSeconds().toString().padStart(2,'0')}`;
     try {
         const allData = await readData();
         if (!allData[key]) allData[key] = { count: 0, times: [] };
@@ -573,30 +291,21 @@ app.post('/api/report', async (req, res) => {
         allData[key].times.unshift(timestamp);
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
-        
         res.json({ success: true, newCount: allData[key].count });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في تسجيل البلاغ' }); }
 });
-
 app.post('/api/undo', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
     const key = `${center}|${unit}`;
     try {
         const allData = await readData();
-        if (!allData[key] || allData[key].count === 0) {
-            return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
-        }
+        if (!allData[key] || allData[key].count === 0) return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
         allData[key].count--;
         allData[key].times.shift();
         await writeData(allData);
         res.json({ success: true, newCount: allData[key].count });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف البلاغ' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حذف البلاغ' }); }
 });
 
 // ============================================
@@ -607,213 +316,201 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
         const shiftId = parseInt(req.params.shiftId);
         const shifts = await readShifts();
         const shift = shifts.find(s => s.id === shiftId);
-        if (!shift) {
-            return res.status(404).json({ error: 'المناوبة غير موجودة' });
-        }
-        
+        if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
         const centersData = shift.centersData || {};
-        let totalStaff = 0;
-        let totalCars = 0;
-        let missingCenters = 0;
-        let readyCenters = 0;
-        let centerCount = 0;
-        const distribution = {};
-        const carDistribution = {};
-        
+        let totalStaff = 0, totalCars = 0, missingCenters = 0, readyCenters = 0, centerCount = 0;
+        const distribution = {}, carDistribution = {};
         for (let center in centersData) {
             const staffCount = parseInt(centersData[center]?.staffCount) || 0;
             const carsCount = parseInt(centersData[center]?.carsCount) || 0;
-            totalStaff += staffCount;
-            totalCars += carsCount;
-            centerCount++;
-            if (staffCount >= 2 && carsCount >= 1) {
-                readyCenters++;
-            } else {
-                missingCenters++;
-            }
-            distribution[center] = staffCount;
-            carDistribution[center] = carsCount;
+            totalStaff += staffCount; totalCars += carsCount; centerCount++;
+            if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+            distribution[center] = staffCount; carDistribution[center] = carsCount;
         }
-        
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-        res.json({
-            totalStaff,
-            totalCars,
-            missingCenters,
-            readyCenters,
-            centerCount,
-            readinessRate,
-            distribution,
-            carDistribution
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' });
-    }
+        res.json({ totalStaff, totalCars, missingCenters, readyCenters, centerCount, readinessRate, distribution, carDistribution });
+    } catch (error) { res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' }); }
 });
 
 // ============================================
 // API: المستندات (التحديثات التشغيلية)
 // ============================================
 app.get('/api/docs', async (req, res) => {
-    try {
-        const docs = await readDocs();
-        res.json({ success: true, docs });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب التحديثات' });
-    }
+    try { const docs = await readDocs(); res.json({ success: true, docs }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب التحديثات' }); }
 });
-
 app.post('/api/upload-doc', async (req, res) => {
     try {
         const { filename, fileData, description, fileType, category, priority } = req.body;
-        if (!filename || !fileData) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
+        if (!filename || !fileData) return res.status(400).json({ error: 'بيانات ناقصة' });
         const docs = await readDocs();
         const newDoc = {
-            id: Date.now().toString(),
-            filename: filename,
-            fileData: fileData,
-            fileType: fileType || 'application/octet-stream',
-            description: description || '',
-            category: category || 'أخرى',
-            priority: priority || 'normal',
-            uploader: req.body.uploader || 'المشرف',
-            uploadDate: new Date().toISOString(),
+            id: Date.now().toString(), filename, fileData, fileType: fileType || 'application/octet-stream',
+            description: description || '', category: category || 'أخرى', priority: priority || 'normal',
+            uploader: req.body.uploader || 'المشرف', uploadDate: new Date().toISOString(),
             uploadDateDisplay: formatLocalDateTime(new Date())
         };
         docs.push(newDoc);
         await writeDocs(docs);
         res.json({ success: true, doc: newDoc });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في رفع التحديث' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في رفع التحديث' }); }
 });
-
 app.get('/api/download-doc/:id', async (req, res) => {
     try {
         const docs = await readDocs();
         const doc = docs.find(d => d.id === req.params.id);
-        if (!doc) {
-            return res.status(404).json({ error: 'التحديث غير موجود' });
-        }
+        if (!doc) return res.status(404).json({ error: 'التحديث غير موجود' });
         const buffer = Buffer.from(doc.fileData, 'base64');
         res.setHeader('Content-Type', doc.fileType);
         res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
         res.send(buffer);
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تحميل التحديث' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في تحميل التحديث' }); }
 });
-
 app.delete('/api/delete-doc/:id', async (req, res) => {
-    try {
-        const docs = await readDocs();
-        const filtered = docs.filter(d => d.id !== req.params.id);
-        await writeDocs(filtered);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف التحديث' });
-    }
+    try { const docs = await readDocs(); const filtered = docs.filter(d => d.id !== req.params.id); await writeDocs(filtered); res.json({ success: true }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في حذف التحديث' }); }
 });
 
 // ============================================
 // API: هوية القطاع
 // ============================================
 app.get('/api/get-identity', async (req, res) => {
-    try {
-        await fs.access(IDENTITY_PATH);
-        res.json({ exists: true });
-    } catch (error) {
-        res.json({ exists: false });
-    }
+    try { await fs.access(IDENTITY_PATH); res.json({ exists: true }); } catch (error) { res.json({ exists: false }); }
 });
-
 app.post('/api/upload-identity', async (req, res) => {
     try {
-        const { fileData, filename } = req.body;
-        if (!fileData) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
+        const { fileData } = req.body;
+        if (!fileData) return res.status(400).json({ error: 'بيانات ناقصة' });
         const buffer = Buffer.from(fileData, 'base64');
         await fs.writeFile(IDENTITY_PATH, buffer);
         res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في رفع هوية القطاع' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في رفع هوية القطاع' }); }
 });
-
 app.get('/api/download-identity', async (req, res) => {
     try {
         const data = await fs.readFile(IDENTITY_PATH);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'inline; filename="identity.pdf"');
         res.send(data);
-    } catch (error) {
-        res.status(404).json({ error: 'لا توجد هوية محفوظة' });
-    }
+    } catch (error) { res.status(404).json({ error: 'لا توجد هوية محفوظة' }); }
 });
 
 // ============================================
 // API: الإسعاف الجوي
 // ============================================
 app.get('/api/air-ambulance', async (req, res) => {
-    try {
-        const records = await readAirRecords();
-        res.json({ success: true, records });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب سجلات الإسعاف الجوي' });
-    }
+    try { const records = await readAirRecords(); res.json({ success: true, records }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب سجلات الإسعاف الجوي' }); }
 });
-
 app.post('/api/save-air-ambulance', async (req, res) => {
     try {
         const { reportNumber, unit, hospital, dateTime, notes } = req.body;
-        if (!reportNumber || !unit || !hospital || !dateTime) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
+        if (!reportNumber || !unit || !hospital || !dateTime) return res.status(400).json({ error: 'بيانات ناقصة' });
         const records = await readAirRecords();
         const now = new Date();
         const newRecord = {
-            id: Date.now().toString(),
-            reportNumber,
-            unit,
-            hospital,
-            dateTime,
+            id: Date.now().toString(), reportNumber, unit, hospital, dateTime,
             dateTimeDisplay: formatLocalDateTime(new Date(dateTime)),
-            notes: notes || '',
-            createdAt: now.toISOString(),
-            createdAtDisplay: formatLocalDateTime(now)
+            notes: notes || '', createdAt: now.toISOString(), createdAtDisplay: formatLocalDateTime(now)
         };
         records.unshift(newRecord);
         await writeAirRecords(records);
         res.json({ success: true, record: newRecord });
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ بلاغ الإسعاف الجوي' }); }
+});
+app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
+    try { const records = await readAirRecords(); const filtered = records.filter(r => r.id !== req.params.id); await writeAirRecords(filtered); res.json({ success: true }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في حذف البلاغ' }); }
+});
+app.delete('/api/clear-air-ambulance', async (req, res) => {
+    try { await writeAirRecords([]); res.json({ success: true }); } catch (error) { res.status(500).json({ error: 'فشل في حذف جميع البلاغات' }); }
+});
+
+// ============================================
+// API: التصعيد (جديد)
+// ============================================
+app.get('/api/escalation', async (req, res) => {
+    try { const records = await readEscalations(); res.json({ success: true, records }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب سجل التصعيدات' }); }
+});
+
+app.post('/api/escalation', async (req, res) => {
+    try {
+        const { reportNumber, type, level, casualties, time, location, lat, lng, description, responseTime, agencies, fileData, fileType } = req.body;
+        if (!reportNumber || !type || !level) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readEscalations();
+        const now = new Date();
+        const newRecord = {
+            id: Date.now().toString(),
+            reportNumber,
+            type,
+            level,
+            casualties: parseInt(casualties) || 0,
+            time,
+            location: location || '',
+            lat: lat || null,
+            lng: lng || null,
+            description: description || '',
+            responseTime: responseTime || '',
+            agencies: agencies || [],
+            fileData: fileData || null,
+            fileType: fileType || null,
+            status: 'جديد',
+            createdAt: now.toISOString(),
+            createdAtDisplay: formatLocalDateTime(now)
+        };
+        records.unshift(newRecord);
+        await writeEscalations(records);
+        
+        // إرسال إشعار فوري إذا كان التصعيد عاجل جداً أو عالي
+        if (level === 'عاجل جداً' || level === 'عالي') {
+            sendPeakNotification({
+                title: `تصعيد عاجل: ${type}`,
+                details: `المستوى: ${level} | المصابين: ${casualties}${location ? ' | الموقع: ' + location : ''}`,
+                level: level,
+                type: type,
+                location: location || 'غير محدد',
+                casualties: casualties,
+                reportNumber: reportNumber
+            }, 'new_escalation_alert');
+        }
+        
+        res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ بلاغ الإسعاف الجوي' });
+        res.status(500).json({ error: 'فشل في حفظ التصعيد' });
     }
 });
 
-app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
+app.delete('/api/escalation/:id', async (req, res) => {
     try {
-        const records = await readAirRecords();
+        const records = await readEscalations();
         const filtered = records.filter(r => r.id !== req.params.id);
-        await writeAirRecords(filtered);
+        await writeEscalations(filtered);
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+        res.status(500).json({ error: 'فشل في حذف التصعيد' });
     }
 });
 
-app.delete('/api/clear-air-ambulance', async (req, res) => {
+app.post('/api/escalation-alert', async (req, res) => {
     try {
-        await writeAirRecords([]);
+        const { record } = req.body;
+        if (!record) return res.status(400).json({ error: 'بيانات ناقصة' });
+        sendPeakNotification({
+            title: `استدعاء فوري: ${record.type}`,
+            details: `المستوى: ${record.level} | المصابين: ${record.casualties}${record.location ? ' | الموقع: ' + record.location : ''}`,
+            level: record.level,
+            type: record.type,
+            location: record.location || 'غير محدد',
+            casualties: record.casualties,
+            reportNumber: record.reportNumber
+        }, 'urgent_escalation_call');
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
+        res.status(500).json({ error: 'فشل في إرسال التنبيه' });
     }
 });
 
@@ -826,22 +523,16 @@ app.get('/api/control-notes', async (req, res) => {
         const parsed = JSON.parse(data);
         res.json({ success: true, notes: parsed.notes || '' });
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.json({ success: true, notes: '' });
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الملاحظات' });
-        }
+        if (error.code === 'ENOENT') res.json({ success: true, notes: '' });
+        else res.status(500).json({ error: 'فشل في جلب الملاحظات' });
     }
 });
-
 app.post('/api/save-control-notes', async (req, res) => {
     try {
         const { notes } = req.body;
         await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ الملاحظات' }); }
 });
 
 // ============================================
@@ -852,200 +543,103 @@ app.get('/api/vacations', async (req, res) => {
         const data = await fs.readFile(VACATIONS_PATH, 'utf8');
         res.json(JSON.parse(data));
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.json([]);
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الإجازات' });
-        }
+        if (error.code === 'ENOENT') res.json([]);
+        else res.status(500).json({ error: 'فشل في جلب الإجازات' });
     }
 });
-
 app.post('/api/save-vacations', async (req, res) => {
     try {
         const { vacations } = req.body;
         await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في حفظ الإجازات' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ الإجازات' }); }
 });
 
 // ============================================
 // API: الرقم السري
 // ============================================
 app.get('/api/get-password', async (req, res) => {
-    try {
-        const password = await readPassword();
-        res.json({ success: true, password });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب الرقم السري' });
-    }
+    try { const password = await readPassword(); res.json({ success: true, password }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب الرقم السري' }); }
 });
-
 app.post('/api/change-password', async (req, res) => {
     try {
         const { oldPassword, newPassword } = req.body;
         const currentPassword = await readPassword();
-        
-        if (oldPassword !== currentPassword) {
-            return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
-        }
-        
-        if (!newPassword || newPassword.length < 4) {
-            return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
-        }
-        
+        if (oldPassword !== currentPassword) return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
+        if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
         await writePassword(newPassword);
         res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في تغيير الرقم السري' }); }
 });
 
 // ============================================
-// API: وقت الذروة (Server-based مع توقيت محلي صحيح)
+// API: وقت الذروة
 // ============================================
-
 app.get('/api/peak-data', async (req, res) => {
-    try {
-        const data = await readPeakData();
-        res.json({ success: true, data });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
-    }
+    try { const data = await readPeakData(); res.json({ success: true, data }); } 
+    catch (error) { res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' }); }
 });
 
 app.post('/api/peak-mission', async (req, res) => {
     try {
         const { location, unit, startTime, endTime, priority, notes, lat, lng } = req.body;
-        if (!location || !unit || !startTime || !endTime) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
-        
+        if (!location || !unit || !startTime || !endTime) return res.status(400).json({ error: 'بيانات ناقصة' });
         const data = await readPeakData();
         const now = new Date();
-        
-        // ===== التصحيح: تحويل التوقيت بشكل صحيح =====
-        // المتصفح يرسل التوقيت المحلي (الرياض)
-        // نحتاج إلى تحويله إلى UTC للتخزين، ثم إضافة 3 ساعات عند العرض
-        
-        // 1. إنشاء كائنات التاريخ من التوقيت المستلم (المحلي)
-        const startLocal = new Date(startTime);
-        const endLocal = new Date(endTime);
-        
-        // 2. تحويل إلى UTC للتخزين (نطرح 3 ساعات)
-        const startUTC = new Date(startLocal.getTime() - (3 * 60 * 60 * 1000));
-        const endUTC = new Date(endLocal.getTime() - (3 * 60 * 60 * 1000));
-        
+        const startUTC = new Date(new Date(startTime).getTime() - (3 * 60 * 60 * 1000));
+        const endUTC = new Date(new Date(endTime).getTime() - (3 * 60 * 60 * 1000));
         const mission = {
-            id: Date.now().toString(),
-            location,
-            lat: lat || null,
-            lng: lng || null,
-            unit,
-            // تخزين بصيغة UTC
-            startTime: startUTC.toISOString(),
-            endTime: endUTC.toISOString(),
-            // للعرض فقط (توقيت محلي)
-            startTimeDisplay: formatLocalDateTime(startUTC),
-            endTimeDisplay: formatLocalDateTime(endUTC),
-            priority: priority || 'عالية',
-            notes: notes || '',
-            status: 'نشط',
-            createdAt: now.toISOString(),
-            createdAtDisplay: formatLocalDateTime(now)
+            id: Date.now().toString(), location, lat: lat || null, lng: lng || null, unit,
+            startTime: startUTC.toISOString(), endTime: endUTC.toISOString(),
+            startTimeDisplay: formatLocalDateTime(startUTC), endTimeDisplay: formatLocalDateTime(endUTC),
+            priority: priority || 'عالية', notes: notes || '', status: 'نشط',
+            createdAt: now.toISOString(), createdAtDisplay: formatLocalDateTime(now)
         };
-        
         data.missions.unshift(mission);
         if (data.missions.length > 100) data.missions.pop();
-        
-        // سجل العمليات
         data.logs.unshift({
-            id: Date.now().toString(),
-            icon: '🟡',
-            action: 'مهمة جديدة',
-            details: unit + ' في ' + location,
-            priority: priority || 'عادي',
-            time: formatLocalTime(now),
-            date: formatLocalDate(now),
-            fullDate: now.toISOString()
+            id: Date.now().toString(), icon: '🟡', action: 'مهمة جديدة', details: unit + ' في ' + location,
+            priority: priority || 'عادي', time: formatLocalTime(now), date: formatLocalDate(now), fullDate: now.toISOString()
         });
         if (data.logs.length > 50) data.logs.pop();
-        
-        // التنبيه مع التوقيت الصحيح
         const alertData = {
-            id: Date.now().toString(),
-            title: 'تمركز مطلوب لـ ' + unit,
+            id: Date.now().toString(), title: 'تمركز مطلوب لـ ' + unit,
             details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + formatLocalDateTime(startUTC) + ' - ' + formatLocalDateTime(endUTC) + ')',
-            priority: priority || 'عالية',
-            unit: unit,
-            location: location,
-            startTime: startUTC.toISOString(),
-            endTime: endUTC.toISOString(),
-            startTimeDisplay: formatLocalDateTime(startUTC),
-            endTimeDisplay: formatLocalDateTime(endUTC),
-            notes: notes || '',
-            lat: lat || null,
-            lng: lng || null,
-            radius: 5000,
-            missionId: mission.id,
-            status: 'نشط',
-            createdAt: now.toISOString(),
-            createdAtDisplay: formatLocalDateTime(now),
-            read: false
+            priority: priority || 'عالية', unit, location,
+            startTime: startUTC.toISOString(), endTime: endUTC.toISOString(),
+            startTimeDisplay: formatLocalDateTime(startUTC), endTimeDisplay: formatLocalDateTime(endUTC),
+            notes: notes || '', lat: lat || null, lng: lng || null, radius: 5000,
+            missionId: mission.id, status: 'نشط', createdAt: now.toISOString(), createdAtDisplay: formatLocalDateTime(now), read: false
         };
         data.alerts.unshift(alertData);
         if (data.alerts.length > 50) data.alerts.pop();
-        
         await writePeakData(data);
-        
-        // إرسال إشعار فوري عبر SSE
         sendPeakNotification(alertData, 'new_peak_alert');
-        
         res.json({ success: true, mission });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ المهمة' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ المهمة' }); }
 });
 
 app.post('/api/peak-resolve', async (req, res) => {
     try {
         const { alertId } = req.body;
-        if (!alertId) {
-            return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
-        }
-        
+        if (!alertId) return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
         const data = await readPeakData();
         const alert = data.alerts.find(a => a.id === alertId);
         if (alert) {
             alert.status = 'منتهي';
             alert.resolvedAt = new Date().toISOString();
             alert.resolvedAtDisplay = formatLocalDateTime(new Date());
-            
             data.logs.unshift({
-                id: Date.now().toString(),
-                icon: '✅',
-                action: 'تم التنفيذ',
-                details: alert.details,
-                priority: alert.priority || 'عادي',
-                time: formatLocalTime(new Date()),
-                date: formatLocalDate(new Date()),
-                fullDate: new Date().toISOString()
+                id: Date.now().toString(), icon: '✅', action: 'تم التنفيذ', details: alert.details,
+                priority: alert.priority || 'عادي', time: formatLocalTime(new Date()), date: formatLocalDate(new Date()), fullDate: new Date().toISOString()
             });
             if (data.logs.length > 50) data.logs.pop();
             await writePeakData(data);
-            
-            // إرسال إشعار بحل التنبيه
-            sendPeakNotification({
-                ...alert,
-                status: 'منتهي'
-            }, 'resolved_peak_alert');
+            sendPeakNotification({ ...alert, status: 'منتهي' }, 'resolved_peak_alert');
         }
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في إنهاء التنبيه' });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في إنهاء التنبيه' }); }
 });
 
 // ============================================
@@ -1054,35 +648,31 @@ app.post('/api/peak-resolve', async (req, res) => {
 app.get('/api/center-geo', (req, res) => {
     res.json({ success: true, data: centerGeoData });
 });
+app.post('/api/save-center-geo', async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) return res.status(400).json({ error: 'بيانات ناقصة' });
+        for (let center in data) {
+            if (centerGeoData[center]) {
+                centerGeoData[center].center = data[center].center;
+                centerGeoData[center].radius = data[center].radius;
+                centerGeoData[center].address = data[center].address || centerGeoData[center].address;
+            }
+        }
+        res.json({ success: true, message: 'تم حفظ مواقع المراكز بنجاح' });
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ مواقع المراكز' }); }
+});
 
 app.post('/api/locate-report', (req, res) => {
     const { lat, lng } = req.body;
-    if (!lat || !lng) {
-        return res.status(400).json({ error: 'إحداثيات غير صالحة' });
-    }
-    
-    let foundCenter = null;
-    let minDistance = Infinity;
-    
+    if (!lat || !lng) return res.status(400).json({ error: 'إحداثيات غير صالحة' });
+    let foundCenter = null, minDistance = Infinity;
     for (let center in centerGeoData) {
         const data = centerGeoData[center];
-        const centerLat = data.center[0];
-        const centerLng = data.center[1];
-        
-        const distance = getDistance(lat, lng, centerLat, centerLng);
-        
-        if (distance < data.radius && distance < minDistance) {
-            minDistance = distance;
-            foundCenter = center;
-        }
+        const distance = getDistance(lat, lng, data.center[0], data.center[1]);
+        if (distance < data.radius && distance < minDistance) { minDistance = distance; foundCenter = center; }
     }
-    
-    res.json({
-        success: true,
-        center: foundCenter,
-        distance: minDistance,
-        location: foundCenter ? centerGeoData[foundCenter].address : 'غير معروف'
-    });
+    res.json({ success: true, center: foundCenter, distance: minDistance, location: foundCenter ? centerGeoData[foundCenter].address : 'غير معروف' });
 });
 
 // ============================================
@@ -1091,39 +681,24 @@ app.post('/api/locate-report', (req, res) => {
 app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
     try {
         const file = req.file;
-        if (!file) {
-            return res.status(400).json({ error: 'لا يوجد ملف' });
-        }
+        if (!file) return res.status(400).json({ error: 'لا يوجد ملف' });
         await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
         await fs.unlink(file.path);
         res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ الجدول: ' + error.message });
-    }
+    } catch (error) { res.status(500).json({ error: 'فشل في حفظ الجدول: ' + error.message }); }
 });
-
 app.get('/api/get-monthly-table', async (req, res) => {
     try {
         const data = await fs.readFile(MONTHLY_TABLE_PATH);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.send(data);
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
-        } else {
-            res.status(500).json({ error: 'فشل في جلب الجدول' });
-        }
+        if (error.code === 'ENOENT') res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
+        else res.status(500).json({ error: 'فشل في جلب الجدول' });
     }
 });
-
 app.get('/api/check-monthly-table', async (req, res) => {
-    try {
-        await fs.access(MONTHLY_TABLE_PATH);
-        res.json({ exists: true });
-    } catch (error) {
-        res.json({ exists: false });
-    }
+    try { await fs.access(MONTHLY_TABLE_PATH); res.json({ exists: true }); } catch (error) { res.json({ exists: false }); }
 });
 
 // ============================================
@@ -1133,12 +708,7 @@ app.get('/api/export', async (req, res) => {
     try {
         const reports = await readData();
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
-        let rows = [
-            ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
-            ["تاريخ التصدير:", formatLocalDateTime(new Date())],
-            [],
-            ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
-        ];
+        let rows = [["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"], ["تاريخ التصدير:", formatLocalDateTime(new Date())], [], ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]];
         for (let center in centersData) {
             for (let unit of centersData[center]) {
                 let key = `${center}|${unit}`;
@@ -1154,54 +724,9 @@ app.get('/api/export', async (req, res) => {
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
         res.status(200).send("\uFEFF" + csv);
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في تصدير البيانات' });
-    }
-});
-// ============================================
-// API: البيانات الجغرافية للمراكز (GET)
-// ============================================
-app.get('/api/center-geo', (req, res) => {
-    res.json({ success: true, data: centerGeoData });
+    } catch (error) { res.status(500).json({ error: 'فشل في تصدير البيانات' }); }
 });
 
-// ============================================
-// API: حفظ البيانات الجغرافية للمراكز (POST)
-// ============================================
-app.post('/api/save-center-geo', async (req, res) => {
-    try {
-        const { data } = req.body;
-        if (!data) {
-            return res.status(400).json({ error: 'بيانات ناقصة' });
-        }
-        
-        // تحديث البيانات الجغرافية
-        for (let center in data) {
-            if (centerGeoData[center]) {
-                centerGeoData[center].center = data[center].center;
-                centerGeoData[center].radius = data[center].radius;
-                centerGeoData[center].address = data[center].address || centerGeoData[center].address;
-            }
-        }
-        
-        res.json({ success: true, message: 'تم حفظ مواقع المراكز بنجاح' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'فشل في حفظ مواقع المراكز' });
-    }
-});
-
-// ============================================
-// API: بيانات وقت الذروة (GET) - تأكد من وجودها
-// ============================================
-app.get('/api/peak-data', async (req, res) => {
-    try {
-        const data = await readPeakData();
-        res.json({ success: true, data });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
-    }
-});
 // ============================================
 // تشغيل الخادم
 // ============================================
@@ -1214,7 +739,9 @@ app.listen(PORT, () => {
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
     console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
+    console.log(`📁 مسار بيانات التصعيد: ${ESCALATION_PATH}`);
     console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
     console.log(`🕒 التوقيت المحلي: ${formatLocalDateTime(new Date())}`);
     console.log(`📡 نظام الإشعارات اللحظية (SSE) مفعل`);
+    console.log(`🚨 نظام التصعيد للحوادث الكبرى مفعل`);
 });
