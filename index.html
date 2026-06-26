@@ -5393,5 +5393,61 @@ console.log('إحصاءات وقت الذروة متاحة');
 console.log('نظام التصعيد للحوادث الكبرى والكوارث متاح');
 console.log('نظام حفظ البيانات المنفصل + باك أب مفعل');
 </script>
+
+<!-- ===== نافذة المناوبات السابقة (app.js) ===== -->
+<div id="archiveShiftsModal" class="modal" data-modal>
+    <div class="modal-content" style="max-width:750px;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon primary" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-history"></i></span>
+                <div>
+                    <h2 style="margin:0; color:var(--primary-700);">المناوبات السابقة</h2>
+                    <p class="sub-title" style="margin:2px 0 0;">عرض وتصفح جميع المناوبات المحفوظة</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('archiveShiftsModal').style.display='none'; document.body.style.overflow='auto';" class="btn" style="padding:4px 12px; font-size:0.8rem;"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                <thead>
+                    <tr style="background:var(--primary-100); color:var(--primary-700);">
+                        <th style="padding:10px 12px; text-align:center; border-bottom:2px solid var(--primary-200);">#</th>
+                        <th style="padding:10px 12px; text-align:center; border-bottom:2px solid var(--primary-200);">التاريخ</th>
+                        <th style="padding:10px 12px; text-align:center; border-bottom:2px solid var(--primary-200);">النوع</th>
+                        <th style="padding:10px 12px; text-align:center; border-bottom:2px solid var(--primary-200);">البلاغات</th>
+                        <th style="padding:10px 12px; text-align:center; border-bottom:2px solid var(--primary-200);">إجراء</th>
+                    </tr>
+                </thead>
+                <tbody id="archiveShiftsBody">
+                    <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--gray-400);">جاري التحميل...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة كبار المسعفين (app.js) ===== -->
+<div id="chiefParamedicsModal" class="modal" data-modal>
+    <div class="modal-content" style="max-width:650px;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon primary" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-crown"></i></span>
+                <div>
+                    <h2 style="margin:0; color:var(--primary-700);">كبار المسعفين</h2>
+                    <p class="sub-title" style="margin:2px 0 0;">قائمة كبار المسعفين المسجلين</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('chiefParamedicsModal').style.display='none'; document.body.style.overflow='auto';" class="btn" style="padding:4px 12px; font-size:0.8rem;"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+        <div style="margin-bottom:12px; display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="addNewChief()" class="btn btn-primary" style="font-size:0.85rem;"><i class="fas fa-plus"></i> إضافة كبير مسعفين</button>
+        </div>
+        <div id="chiefParamedicsContent" style="max-height:60vh; overflow-y:auto;">
+            <div style="text-align:center; color:var(--gray-400); padding:30px;">جاري التحميل...</div>
+        </div>
+    </div>
+</div>
+
+<script src="/app.js"></script>
 </body>
 </html>

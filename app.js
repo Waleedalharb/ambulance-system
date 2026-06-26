@@ -214,24 +214,47 @@ async function showChiefParamedics() {
     }
 }
 
-function addNewChief() {
+async function addNewChief() {
     const name = prompt('👨‍⚕️ أدخل اسم كبير المسعفين:');
-    if (!name) return;
+    if (!name || !name.trim()) return;
 
     const sector = prompt('📍 أدخل القطاع:');
-    if (!sector) return;
+    if (!sector || !sector.trim()) return;
 
-    console.log(`➕ إضافة كبير مسعفين: ${name} - ${sector}`);
-    // سيتم التطبيق الكامل لاحقاً
-    alert('تم إضافة كبير المسعفين بنجاح! (سيتم حفظه قريباً)');
-    showChiefParamedics();
+    try {
+        const response = await fetch('/api/chiefs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim(), sector: sector.trim() })
+        });
+        if (!response.ok) throw new Error(`خطأ HTTP: ${response.status}`);
+        const result = await response.json();
+        if (result.success) {
+            showChiefParamedics();
+        } else {
+            alert('فشل في إضافة كبير المسعفين: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (error) {
+        console.error('❌ خطأ في إضافة كبير المسعفين:', error);
+        alert('خطأ في الاتصال: ' + error.message);
+    }
 }
 
-function deleteChief(chiefId) {
+async function deleteChief(chiefId) {
     if (!confirm('هل أنت متأكد من حذف كبير المسعفين؟')) return;
-    console.log(`🗑️ حذف كبير المسعفين: ${chiefId}`);
-    alert('تم حذف كبير المسعفين بنجاح!');
-    showChiefParamedics();
+    try {
+        const response = await fetch('/api/chiefs/' + chiefId, { method: 'DELETE' });
+        if (!response.ok) throw new Error(`خطأ HTTP: ${response.status}`);
+        const result = await response.json();
+        if (result.success) {
+            showChiefParamedics();
+        } else {
+            alert('فشل في حذف كبير المسعفين');
+        }
+    } catch (error) {
+        console.error('❌ خطأ في حذف كبير المسعفين:', error);
+        alert('خطأ في الاتصال: ' + error.message);
+    }
 }
 
 // ============================================
