@@ -492,6 +492,20 @@ app.delete('/api/shifts/:id', async (req, res) => {
 let themeUpdateClients = [];
 let peakEventClients = [];
 
+function broadcastToSseClients(clients, payload, errorLabel) {
+    return clients.filter(client => {
+        try {
+            client.res.write(payload);
+            return true;
+        } catch (error) {
+            if (errorLabel) {
+                console.error(errorLabel, error.message);
+            }
+            return false;
+        }
+    });
+}
+
 app.get('/api/theme-updates', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -511,15 +525,11 @@ app.get('/api/theme-updates', (req, res) => {
 
 function broadcastThemeUpdate(themeData) {
     const eventData = { type: 'theme_updated', data: themeData, timestamp: new Date().toISOString() };
-    themeUpdateClients = themeUpdateClients.filter(client => {
-        try {
-            client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
-            return true;
-        } catch (error) {
-            console.error('⚠️ فشل إرسال تحديث الثيم لعميل SSE:', error.message);
-            return false;
-        }
-    });
+    themeUpdateClients = broadcastToSseClients(
+        themeUpdateClients,
+        `data: ${JSON.stringify(eventData)}\n\n`,
+        '⚠️ فشل إرسال تحديث الثيم لعميل SSE:'
+    );
 }
 
 app.get('/api/peak-events', (req, res) => {
@@ -541,37 +551,17 @@ app.get('/api/peak-events', (req, res) => {
 
 function broadcastPeakEvent(alertData, type = 'new_peak_alert') {
     const eventData = { type, alert: alertData, timestamp: new Date().toISOString() };
-    peakEventClients = peakEventClients.filter(client => {
-        try {
-            client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
-            return true;
-        } catch (error) {
-            console.error('⚠️ فشل إرسال إشعار الذروة لعميل SSE:', error.message);
-            return false;
-        }
-    });
+    peakEventClients = broadcastToSseClients(
+        peakEventClients,
+        `data: ${JSON.stringify(eventData)}\n\n`,
+        '⚠️ فشل إرسال إشعار الذروة لعميل SSE:'
+    );
 }
 
 setInterval(() => {
     const heartbeat = `event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`;
-
-    themeUpdateClients = themeUpdateClients.filter(client => {
-        try {
-            client.res.write(heartbeat);
-            return true;
-        } catch (error) {
-            return false;
-        }
-    });
-
-    peakEventClients = peakEventClients.filter(client => {
-        try {
-            client.res.write(heartbeat);
-            return true;
-        } catch (error) {
-            return false;
-        }
-    });
+    themeUpdateClients = broadcastToSseClients(themeUpdateClients, heartbeat);
+    peakEventClients = broadcastToSseClients(peakEventClients, heartbeat);
 }, 30000);
 
 // ============================================

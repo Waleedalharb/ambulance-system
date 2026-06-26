@@ -2265,11 +2265,11 @@ async function fetchWithRetry(url, options, retryOptions) {
     var lastError = null;
 
     for (var attempt = 0; attempt <= retries; attempt++) {
+        var timer = null;
         try {
             var controller = new AbortController();
-            var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+            timer = setTimeout(function() { controller.abort(); }, timeoutMs);
             var response = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
-            clearTimeout(timer);
             if (!response.ok) {
                 throw new Error('HTTP ' + response.status);
             }
@@ -2283,6 +2283,8 @@ async function fetchWithRetry(url, options, retryOptions) {
             var waitMs = Math.min(baseDelayMs * Math.pow(2, attempt), MAX_RECONNECT_DELAY_MS);
             updateUpdateStatus('🔄 ' + label + '... المحاولة ' + (attempt + 1) + ' من ' + (retries + 1));
             await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
+        } finally {
+            if (timer) clearTimeout(timer);
         }
     }
 
@@ -4694,11 +4696,7 @@ document.addEventListener('DOMContentLoaded', function() {
     buildCentersTable();
     loadShifts();
     loadAllData();
-    if (typeof loadCenterGeo === 'function') {
-        loadCenterGeo();
-    } else {
-        console.error('❌ loadCenterGeo غير معرّفة');
-    }
+    loadCenterGeo();
     setTimeout(checkForAlerts, 1000);
     
     initNotificationSound();
