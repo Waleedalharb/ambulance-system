@@ -7,10 +7,32 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>منصة الجنوب - إدارة العمليات الإسعافية</title>
+
+    
+    <!-- ===== أيقونات الموقع (Favicon & PWA) ===== -->
+<!-- شعار المتصفح -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+
+<!-- ملف التطبيق (PWA) - للتثبيت على الأجهزة -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- أيقونة Apple (لأجهزة iPhone / iPad) -->
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+<!-- أيقونات بأحجام مختلفة (دعم إضافي) -->
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
     
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+    <!-- أيقونة الموقع (Favicon) -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+
+<!-- أيقونات لأجهزة Android / iOS (اختياري) -->
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     
     <meta name="theme-color" content="#0B1E33">
@@ -354,16 +376,6 @@
             background: #1DA851;
             border-color: #1DA851;
             box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
-        }
-
-        .btn-gold {
-            background: var(--gold);
-            color: var(--primary-900);
-            border: 1px solid var(--gold);
-        }
-        .btn-gold:hover {
-            background: #D4B03A;
-            border-color: #D4B03A;
         }
 
         .btn-coral {
@@ -1000,7 +1012,7 @@
                     <line x1="18" y1="44" x2="102" y2="44" stroke="#FFFFFF" stroke-width="1" opacity="0.15"/>
                 </svg>
                 <img id="brandLogoImage" src="" alt="شعار قطاع جنوب الرياض" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:4px;">
-                <img id="sectorLogoImage" src="" alt="شعار القطاع" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:4px;">
+                <img id="sectorLogoImage" src="" alt="شعار القطاع" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:4px">
             </div>
             <div class="text">
                 <h1>منصة الجنوب</h1>
@@ -1176,7 +1188,8 @@
         </div>
     </div>
 
-    <footer>⏱️ ضغطة = بلاغ | زر التراجع لحذف آخر بلاغ | زر "مناوبة جديدة" لبدء مناوبة جديدة</footer>
+    <footer>جميع الحقوق محفوظة © 2026 [
+        emsoperations.online]</footer>
 </div>
 
 <!-- ============================================================ -->
@@ -1498,7 +1511,7 @@
     </div>
 </div>
 
-<!-- ===== نافذة الإسعاف الجوي (تبقى للتوافق) ===== -->
+<!-- ===== نافذة الإسعاف الجوي ===== -->
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
@@ -3928,14 +3941,6 @@ setInterval(checkForAlerts, 10000);
 document.getElementById("newShiftBtn").onclick = startNewShift;
 document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
 document.getElementById("closeShiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
-document.getElementById("docsBtn").onclick = function() { openDocsPage(); };
-document.getElementById("airAmbulanceBtn").onclick = function() {
-    document.getElementById('airAmbulanceModal').style.display = 'flex';
-    loadAirRecords();
-    var now = new Date();
-    document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
-};
-document.getElementById("closeAirModal").onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
 document.getElementById("monthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
 document.getElementById("closeMonthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
 document.getElementById("controlBtn").onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };

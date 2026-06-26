@@ -24,13 +24,15 @@
         <input type="date" id="dailyDate" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
     </div>
     
+    <!-- ===== عدد الفرق المستجيبة (بدلاً من عدد البلاغات الإسعافية) ===== -->
     <div class="form-row">
         <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> عدد البلاغات الإسعافية:
+            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> عدد الفرق المستجيبة:
         </label>
-        <input type="number" id="dailyReports" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+        <input type="number" id="dailyResponseTeams" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
     </div>
     
+    <!-- ===== عدد بلاغات الإسعاف الجوي (يبقى كما هو) ===== -->
     <div class="form-row">
         <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
             <i class="fas fa-helicopter" style="color:var(--teal); width:18px;"></i> عدد بلاغات الإسعاف الجوي:
@@ -38,13 +40,56 @@
         <input type="number" id="dailyAir" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
     </div>
     
+    <!-- ===== البلاغات الحدودية (بدلاً من الحالات المنتهية) - قابل للكتابة ===== -->
     <div class="form-row">
         <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-check-circle" style="color:var(--teal); width:18px;"></i> الحالات المنتهية:
+            <i class="fas fa-border-all" style="color:var(--gold); width:18px;"></i> البلاغات الحدودية:
         </label>
-        <input type="number" id="dailyCompleted" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+        <input type="text" id="dailyBorderReports" placeholder="مثال: 3 بلاغات حدودية" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
     </div>
     
+    <!-- ===== تفعيل المسارات (جديد) ===== -->
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-route" style="color:var(--primary-500); width:18px;"></i> تفعيل المسارات:
+        </label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; background:white; padding:12px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm);">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath1" value="مسار 1" style="accent-color:var(--teal);"> مسار 1
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath2" value="مسار 2" style="accent-color:var(--teal);"> مسار 2
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath3" value="مسار 3" style="accent-color:var(--teal);"> مسار 3
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath4" value="مسار 4" style="accent-color:var(--teal);"> مسار 4
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath5" value="مسار 5" style="accent-color:var(--teal);"> مسار 5
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath6" value="مسار 6" style="accent-color:var(--teal);"> مسار 6
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath7" value="مسار 7" style="accent-color:var(--teal);"> مسار 7
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="dailyPath8" value="مسار 8" style="accent-color:var(--teal);"> مسار 8
+            </label>
+        </div>
+    </div>
+    
+    <!-- ===== خانة تعبئة النموذج (جديد) ===== -->
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-edit" style="color:var(--coral); width:18px;"></i> تعبئة النموذج:
+        </label>
+        <textarea id="dailyFormFill" rows="4" placeholder="أي ملاحظات أو تفاصيل إضافية عن التقرير اليومي..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
+    </div>
+    
+    <!-- ===== ملخص التقرير (يبقى كما هو) ===== -->
     <div class="form-row">
         <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
             <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> ملخص التقرير:
@@ -65,20 +110,77 @@
     </div>
 </div>
 
+<!-- ===== سجلات التقارير المحفوظة ===== -->
+<div class="saved-records" id="dailySavedRecords" style="display:block; margin-top:10px; max-height:200px; overflow-y:auto; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:15px; background:var(--gray-50);">
+    <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:var(--primary-700); display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-list-ul" style="color:var(--primary-700);"></i> التقارير المحفوظة
+    </h4>
+    <div id="dailyRecordsList">
+        <p style="text-align:center; color:var(--gray-400); font-size:0.85rem; padding:20px 0;">📭 لا توجد تقارير محفوظة</p>
+    </div>
+</div>
+
 <script>
+// ============================================
+// دوال التقرير اليومي
+// ============================================
+
 let dailyRecords = JSON.parse(localStorage.getItem('dailyRecords') || '[]');
 
 function initForm_daily() {
     document.getElementById('dailyDate').value = new Date().toISOString().split('T')[0];
+    renderDailyRecords();
+}
+
+function renderDailyRecords() {
+    const container = document.getElementById('dailyRecordsList');
+    if (!container) return;
+    if (dailyRecords.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); font-size:0.85rem; padding:20px 0;">📭 لا توجد تقارير محفوظة</p>';
+        return;
+    }
+    let html = '';
+    dailyRecords.forEach(function(record, index) {
+        const date = new Date(record.createdAt).toLocaleString('ar-SA');
+        const paths = record.paths && record.paths.length ? record.paths.join('، ') : 'لا يوجد';
+        html += `<div class="record-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--gray-200); font-size:0.8rem; flex-wrap:wrap; gap:5px;">
+            <div class="record-info" style="flex:1; min-width:150px;">
+                <strong style="color:var(--primary-700);">${record.reportNumber || 'بدون رقم'}</strong>
+                <span style="margin:0 5px;">|</span>
+                <span>📅 ${record.date || '-'}</span>
+                <span style="margin:0 5px;">|</span>
+                <span>🚑 ${record.responseTeams || 0}</span>
+                <span style="margin:0 5px;">|</span>
+                <span>✈️ ${record.air || 0}</span>
+                <span style="margin:0 5px;">|</span>
+                <span>📌 ${record.borderReports || '-'}</span>
+                <span style="font-size:0.65rem; color:var(--gray-600); display:block;">🛣️ المسارات: ${paths}</span>
+                <span class="rec-date" style="font-size:0.6rem; color:var(--gray-400); display:block;">🕒 ${date}</span>
+            </div>
+            <div class="record-actions">
+                <button onclick="deleteDailyReport(${index})" style="padding:2px 10px; border:1px solid var(--coral); background:white; color:var(--coral); border-radius:4px; cursor:pointer; font-size:0.7rem; transition:all 0.2s;">🗑️ حذف</button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
 }
 
 function saveDailyReport() {
     const reportNumber = document.getElementById('dailyReportNumber').value.trim();
     const date = document.getElementById('dailyDate').value;
-    const reports = parseInt(document.getElementById('dailyReports').value) || 0;
+    const responseTeams = parseInt(document.getElementById('dailyResponseTeams').value) || 0;
     const air = parseInt(document.getElementById('dailyAir').value) || 0;
-    const completed = parseInt(document.getElementById('dailyCompleted').value) || 0;
+    const borderReports = document.getElementById('dailyBorderReports').value.trim();
+    const formFill = document.getElementById('dailyFormFill').value.trim();
     const summary = document.getElementById('dailySummary').value.trim();
+    
+    // جمع المسارات المحددة
+    const paths = [];
+    document.querySelectorAll('#dailyPath1, #dailyPath2, #dailyPath3, #dailyPath4, #dailyPath5, #dailyPath6, #dailyPath7, #dailyPath8').forEach(function(cb) {
+        if (cb.checked) {
+            paths.push(cb.value);
+        }
+    });
 
     if (!reportNumber || !date) {
         alert('⚠️ الرجاء ملء رقم التقرير والتاريخ');
@@ -88,33 +190,56 @@ function saveDailyReport() {
     dailyRecords.unshift({
         reportNumber,
         date,
-        reports,
+        responseTeams,
         air,
-        completed,
+        borderReports,
+        paths,
+        formFill,
         summary,
         createdAt: new Date().toISOString()
     });
     localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
-    alert('✅ تم حفظ التقرير اليومي');
+    renderDailyRecords();
     clearDailyForm();
+    alert('✅ تم حفظ التقرير اليومي');
+}
+
+function deleteDailyReport(index) {
+    if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    dailyRecords.splice(index, 1);
+    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
+    renderDailyRecords();
 }
 
 function clearDailyForm() {
     document.getElementById('dailyReportNumber').value = '';
-    document.getElementById('dailyReports').value = 0;
+    document.getElementById('dailyResponseTeams').value = 0;
     document.getElementById('dailyAir').value = 0;
-    document.getElementById('dailyCompleted').value = 0;
+    document.getElementById('dailyBorderReports').value = '';
+    document.getElementById('dailyFormFill').value = '';
     document.getElementById('dailySummary').value = '';
     document.getElementById('dailyDate').value = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('#dailyPath1, #dailyPath2, #dailyPath3, #dailyPath4, #dailyPath5, #dailyPath6, #dailyPath7, #dailyPath8').forEach(function(cb) {
+        cb.checked = false;
+    });
 }
 
 function sendDailyWhatsApp() {
     const reportNumber = document.getElementById('dailyReportNumber').value.trim();
     const date = document.getElementById('dailyDate').value;
-    const reports = parseInt(document.getElementById('dailyReports').value) || 0;
+    const responseTeams = parseInt(document.getElementById('dailyResponseTeams').value) || 0;
     const air = parseInt(document.getElementById('dailyAir').value) || 0;
-    const completed = parseInt(document.getElementById('dailyCompleted').value) || 0;
+    const borderReports = document.getElementById('dailyBorderReports').value.trim();
+    const formFill = document.getElementById('dailyFormFill').value.trim();
     const summary = document.getElementById('dailySummary').value.trim();
+    
+    // جمع المسارات المحددة
+    const paths = [];
+    document.querySelectorAll('#dailyPath1, #dailyPath2, #dailyPath3, #dailyPath4, #dailyPath5, #dailyPath6, #dailyPath7, #dailyPath8').forEach(function(cb) {
+        if (cb.checked) {
+            paths.push(cb.value);
+        }
+    });
 
     if (!reportNumber || !date) {
         alert('⚠️ الرجاء ملء رقم التقرير والتاريخ');
@@ -126,9 +251,11 @@ function sendDailyWhatsApp() {
     message += '═══════════════════════════════════\n';
     message += 'رقم التقرير: ' + reportNumber + '\n';
     message += 'التاريخ: ' + date + '\n';
-    message += 'البلاغات الإسعافية: ' + reports + '\n';
+    message += 'عدد الفرق المستجيبة: ' + responseTeams + '\n';
     message += 'بلاغات الإسعاف الجوي: ' + air + '\n';
-    message += 'الحالات المنتهية: ' + completed + '\n';
+    if (borderReports) message += 'البلاغات الحدودية: ' + borderReports + '\n';
+    if (paths.length > 0) message += 'المسارات المفعلة: ' + paths.join('، ') + '\n';
+    if (formFill) message += 'تعبئة النموذج: ' + formFill + '\n';
     if (summary) message += 'الملخص: ' + summary + '\n';
     message += '═══════════════════════════════════\n';
     message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
