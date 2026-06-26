@@ -1,6 +1,6 @@
 {
   "name": "ambulance-system",
-  "version": "2.1.0",
+  "version": "2.0.0",
   "description": "منصة الجنوب - نظام إدارة العمليات الإسعافية لقطاع جنوب الرياض",
   "main": "server.js",
   "scripts": {
@@ -13,8 +13,7 @@
     "emergency",
     "saudi",
     "riyadh",
-    "south-sector",
-    "escalation"
+    "south-sector"
   ],
   "author": "فريق الجودة والتطوير - قطاع جنوب الرياض",
   "license": "ISC",
