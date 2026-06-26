@@ -12,6 +12,37 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ============================================
+// Rate Limiter (in-memory, for file access endpoints)
+// ============================================
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX = 30;
+
+function rateLimiter(req, res, next) {
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    if (now > entry.resetAt) {
+        entry.count = 0;
+        entry.resetAt = now + RATE_LIMIT_WINDOW_MS;
+    }
+    entry.count++;
+    rateLimitMap.set(ip, entry);
+    if (entry.count > RATE_LIMIT_MAX) {
+        return res.status(429).json({ error: 'طلبات كثيرة، يرجى الانتظار قليلاً' });
+    }
+    next();
+}
+
+// Periodically clean up old rate limit entries
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of rateLimitMap.entries()) {
+        if (now > entry.resetAt) rateLimitMap.delete(ip);
+    }
+}, RATE_LIMIT_WINDOW_MS);
+
+// ============================================
 // خدمة الملفات الثابتة - الصفحة الرئيسية
 // ============================================
 app.use(express.static(__dirname));
@@ -995,7 +1026,7 @@ app.post('/api/escalation-alert', async (req, res) => {
 // ============================================
 // API: الجدول الشهري
 // ============================================
-app.get('/api/check-monthly-table', async (req, res) => {
+app.get('/api/check-monthly-table', rateLimiter, async (req, res) => {
     try {
         await fs.access(MONTHLY_TABLE_PATH);
         res.json({ exists: true });
@@ -1004,7 +1035,7 @@ app.get('/api/check-monthly-table', async (req, res) => {
     }
 });
 
-app.get('/api/get-monthly-table', async (req, res) => {
+app.get('/api/get-monthly-table', rateLimiter, async (req, res) => {
     try {
         const data = await fs.readFile(MONTHLY_TABLE_PATH);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1015,7 +1046,7 @@ app.get('/api/get-monthly-table', async (req, res) => {
     }
 });
 
-app.post('/api/upload-monthly-table', async (req, res) => {
+app.post('/api/upload-monthly-table', rateLimiter, async (req, res) => {
     try {
         const { fileData } = req.body;
         if (!fileData) return res.status(400).json({ error: 'بيانات ناقصة' });
