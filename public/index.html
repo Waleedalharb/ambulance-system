@@ -43,6 +43,7 @@
             --gray-200: #D5DCE6;
             --gray-400: #9AAEBD;
             --gray-600: #6B7F94;
+            --gray-700: #5A6B7E;
             --gray-800: #2D3F52;
             --gray-900: #1A2633;
             --shadow-sm: 0 2px 8px rgba(11,30,51,0.06);
@@ -179,39 +180,222 @@
         .archive-row button { background: white; border: 1px solid var(--gray-200); padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 0.75rem; border-radius: var(--radius-sm); transition: all 0.2s; }
         .archive-row button:hover { background: var(--gray-50); }
 
-        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+        /* ===== شريط الأدوات الجديد ===== */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            align-items: center;
+            width: 100%;
+        }
+
         .btn {
             font-family: 'Inter', sans-serif;
-            padding: 6px 14px;
+            padding: 8px 18px;
             border-radius: 30px;
-            border: 1px solid var(--gray-200);
+            border: none;
             font-weight: 600;
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: white;
-            color: var(--gray-800);
+            letter-spacing: 0.3px;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
         }
-        .btn:hover { background: var(--gray-50); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-        .btn:active { transform: scale(0.97); }
-        .btn i { font-size: 0.8rem; }
-        .btn-primary { background: var(--primary-700); color: var(--white); border-color: var(--primary-700); }
-        .btn-primary:hover { background: var(--primary-900); border-color: var(--primary-900); }
-        .btn-teal { background: var(--teal); color: var(--white); border-color: var(--teal); }
-        .btn-teal:hover { background: #1F6B5E; }
-        .btn-coral { background: var(--coral); color: var(--white); border-color: var(--coral); }
-        .btn-coral:hover { background: #D45A4A; }
-        .btn-whatsapp { background: #25D366; color: var(--white); border-color: #25D366; border-radius: 30px; padding: 8px 24px; }
-        .btn-whatsapp:hover { background: #1DA851; border-color: #1DA851; }
-        .btn-gold { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
-        .btn-gold:hover { background: #D4B03A; border-color: #D4B03A; }
-        .btn-peak { background: var(--coral); color: white; border-color: var(--coral); }
-        .btn-peak:hover { background: #D45A4A; border-color: #D45A4A; }
-        .btn-theme { background: var(--gold); color: var(--primary-900); border-color: var(--gold); }
-        .btn-theme.active { background: var(--teal); color: white; border-color: var(--teal); }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.5s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .btn:active::after {
+            width: 200px;
+            height: 200px;
+        }
+
+        .btn i { font-size: 0.85rem; margin-left: 4px; }
+        .btn:hover { transform: translateY(-2px); }
+
+        /* ألوان الأزرار */
+        .btn-primary {
+            background: var(--primary-700);
+            color: var(--white);
+            border: 1px solid var(--primary-700);
+        }
+        .btn-primary:hover {
+            background: var(--primary-900);
+            border-color: var(--primary-900);
+            box-shadow: 0 4px 12px rgba(26, 58, 92, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--gray-700);
+            color: var(--white);
+            border: 1px solid var(--gray-600);
+        }
+        .btn-secondary:hover {
+            background: var(--gray-800);
+            border-color: var(--gray-700);
+            box-shadow: 0 4px 12px rgba(45, 63, 82, 0.3);
+        }
+
+        .btn-teal {
+            background: var(--teal);
+            color: var(--white);
+            border: 1px solid var(--teal);
+        }
+        .btn-teal:hover {
+            background: #1F6B5E;
+            border-color: #1F6B5E;
+            box-shadow: 0 4px 12px rgba(46, 139, 122, 0.3);
+        }
+
+        .btn-info {
+            background: #2980B9;
+            color: var(--white);
+            border: 1px solid #2980B9;
+        }
+        .btn-info:hover {
+            background: #1F6B9E;
+            border-color: #1F6B9E;
+            box-shadow: 0 4px 12px rgba(41, 128, 185, 0.3);
+        }
+
+        .btn-senior {
+            background: #8E44AD;
+            color: var(--white);
+            border: 1px solid #8E44AD;
+        }
+        .btn-senior:hover {
+            background: #7D3C98;
+            border-color: #7D3C98;
+            box-shadow: 0 4px 12px rgba(142, 68, 173, 0.3);
+        }
+
+        .btn-control {
+            background: #F39C12;
+            color: var(--white);
+            border: 1px solid #F39C12;
+        }
+        .btn-control:hover {
+            background: #D68910;
+            border-color: #D68910;
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+        }
+
+        .btn-peak {
+            background: var(--coral);
+            color: var(--white);
+            border: 1px solid var(--coral);
+        }
+        .btn-peak:hover {
+            background: #D45A4A;
+            border-color: #D45A4A;
+            box-shadow: 0 4px 12px rgba(232, 116, 97, 0.3);
+        }
+
+        .btn-theme {
+            background: linear-gradient(135deg, #E8C84A, #D4B03A);
+            color: var(--primary-900);
+            border: 1px solid #D4B03A;
+            font-weight: 700;
+        }
+        .btn-theme:hover {
+            background: linear-gradient(135deg, #D4B03A, #C4A030);
+            transform: translateY(-2px) rotate(-3deg);
+            box-shadow: 0 4px 12px rgba(232, 200, 74, 0.4);
+        }
+
+        .btn-theme-mode {
+            background: var(--gray-200);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+            padding: 8px 14px;
+        }
+        .btn-theme-mode:hover {
+            background: var(--gray-300);
+            transform: translateY(-2px);
+        }
+        .btn-theme-mode.active {
+            background: var(--teal);
+            color: white;
+            border-color: var(--teal);
+        }
+
+        .btn-forms {
+            background: linear-gradient(135deg, #2A5A7A, #1A3A5C);
+            color: white;
+            border: 1px solid #1A3A5C;
+        }
+        .btn-forms:hover {
+            background: linear-gradient(135deg, #1A3A5C, #0B1E33);
+            box-shadow: 0 4px 12px rgba(26, 58, 92, 0.3);
+        }
+
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+            border: 1px solid #25D366;
+        }
+        .btn-whatsapp:hover {
+            background: #1DA851;
+            border-color: #1DA851;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+        }
+
+        .btn-gold {
+            background: var(--gold);
+            color: var(--primary-900);
+            border: 1px solid var(--gold);
+        }
+        .btn-gold:hover {
+            background: #D4B03A;
+            border-color: #D4B03A;
+        }
+
+        .btn-coral {
+            background: var(--coral);
+            color: white;
+            border: 1px solid var(--coral);
+        }
+        .btn-coral:hover {
+            background: #D45A4A;
+            border-color: #D45A4A;
+        }
+
+        /* استجابة للأزرار */
+        @media (max-width: 992px) {
+            .btn { padding: 6px 14px; font-size: 0.7rem; }
+            .btn i { font-size: 0.75rem; }
+        }
+
+        @media (max-width: 650px) {
+            .toolbar {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                gap: 6px;
+            }
+            .btn {
+                padding: 8px 12px;
+                font-size: 0.7rem;
+                justify-content: center;
+            }
+            .btn i { font-size: 0.8rem; }
+            .toolbar .btn + .btn { margin-right: 0; }
+        }
 
         .viewing-badge { background: var(--gray-100); border: 1px solid var(--gray-200); padding: 4px 12px; font-size: 0.7rem; border-radius: 30px; display: inline-block; margin-right: 10px; }
         .update-status { text-align: left; font-size: 0.65rem; color: var(--teal); margin-top: 5px; }
@@ -231,7 +415,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ===== مؤشرات القوى العاملة المتطورة ===== */
+        /* ===== مؤشرات القوى العاملة ===== */
         .workforce-dashboard {
             background: var(--white);
             border-radius: var(--radius-lg);
@@ -461,12 +645,13 @@
         .form-row label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; color: var(--gray-800); }
         .form-row input, .form-row textarea, .form-row select {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--gray-200);
+            padding: 10px 14px;
+            border: 1.5px solid var(--gray-200);
             border-radius: var(--radius-sm);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-family: inherit;
             transition: border-color 0.2s;
+            background: white;
         }
         .form-row input:focus, .form-row textarea:focus, .form-row select:focus { outline: none; border-color: var(--primary-500); }
         .form-row textarea { resize: vertical; min-height: 60px; }
@@ -540,9 +725,9 @@
         .signature-row .sig-inputs input:focus { outline: none; border-color: var(--primary-500); }
         .signature-row .sig-inputs .sig-placeholder { font-size: 0.7rem; color: var(--gray-400); display: flex; align-items: center; gap: 4px; }
 
-        .saved-records { margin-top: 15px; max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 12px; background: var(--gray-50); display: none; }
+        .saved-records { margin-top: 15px; max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 15px; background: var(--gray-50); display: none; }
         .saved-records h4 { margin: 0 0 10px 0; font-size: 0.9rem; color: var(--primary-700); display: flex; align-items: center; gap: 8px; }
-        .record-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--gray-200); font-size: 0.8rem; flex-wrap: wrap; gap: 5px; }
+        .record-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--gray-200); font-size: 0.8rem; flex-wrap: wrap; gap: 5px; }
         .record-item:last-child { border-bottom: none; }
         .record-item .record-info { flex: 1; min-width: 150px; }
         .record-item .record-info strong { color: var(--primary-700); }
@@ -615,6 +800,26 @@
             background: var(--teal) !important;
             color: white !important;
             border-color: var(--teal) !important;
+        }
+
+        /* ===== تبويبات النماذج ===== */
+        .form-tab-btn {
+            padding: 6px 18px;
+            border-radius: 20px;
+            border: 1px solid var(--gray-200);
+            background: white;
+            color: var(--gray-800);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+        }
+        .form-tab-btn:hover { background: var(--gray-100); }
+        .form-tab-btn.active {
+            background: var(--primary-700);
+            color: white;
+            border-color: var(--primary-700);
         }
 
         footer { text-align: center; font-size: 0.65rem; color: var(--gray-400); margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
@@ -731,7 +936,6 @@
             .header-brand { justify-content: center; }
             .header-date { text-align: center; }
             .info-bar { flex-direction: column; align-items: stretch; }
-            .toolbar { justify-content: center; }
             .workforce-grid { grid-template-columns: 1fr; }
             .distribution-advanced { grid-template-columns: 1fr; }
             .distribution-unit-grid { grid-template-columns: repeat(2, 1fr); }
@@ -841,24 +1045,29 @@
             <button id="viewShiftBtn" class="btn">📋 عرض البلاغات</button>
         </div>
         <div class="toolbar">
+            <!-- ===== المجموعة الأولى: من اليمين ===== -->
             <button id="newShiftBtn" class="btn btn-primary"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
-            <button id="shiftBtn" class="btn"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
-            <button id="docsBtn" class="btn"><i class="fas fa-bullhorn"></i> التحديثات التشغيلية</button>
-            <button id="airAmbulanceBtn" class="btn"><i class="fas fa-helicopter"></i> الإسعاف الجوي</button>
-            <button id="controlBtn" class="btn"><i class="fas fa-sliders-h"></i> التحكم</button>
-            <button id="seniorShiftBtn" class="btn" style="background:var(--primary-700); color:white; border-color:var(--primary-700);"><i class="fas fa-user-md"></i> كبار المسعفين</button>
-            <button id="monthlyTableBtn" class="btn no-print"><i class="fas fa-calendar-alt"></i> الجدول</button>
-            <button id="themeBtn" class="btn btn-gold"><i class="fas fa-palette"></i> الثيمات</button>
-            <button id="themeModeToggle" class="btn btn-theme" onclick="toggleThemeMode()">
-                <i class="fas fa-expand"></i> وضع الثيم
-            </button>
+            <button id="shiftBtn" class="btn btn-secondary"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+            <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
+            <button id="monthlyTableBtn" class="btn btn-info"><i class="fas fa-calendar-alt"></i> الجدول</button>
+            <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
+            <button id="controlBtn" class="btn btn-control"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
+            <button id="formsBtn" class="btn btn-forms"><i class="fas fa-file-alt"></i> النماذج</button>
             <button id="peakTimeBtn" class="btn btn-peak"><i class="fas fa-clock"></i> وقت الذروة</button>
-            <button id="distributionBtn" class="btn"><i class="fas fa-ambulance"></i> التوزيع</button>
+
+            <!-- ===== فاصل ===== -->
+            <span style="flex:1;"></span>
+
+            <!-- ===== المجموعة الثانية: أقصى اليسار ===== -->
+            <button id="themeBtn" class="btn btn-theme" title="إدارة الثيمات"><i class="fas fa-palette"></i> الثيمات</button>
+            <button id="themeModeToggle" class="btn btn-theme-mode" onclick="toggleThemeMode()" title="تبديل وضع الثيم">
+                <i class="fas fa-expand"></i>
+            </button>
         </div>
     </div>
     <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
 
-    <!-- ===== مؤشرات القوى العاملة المتطورة ===== -->
+    <!-- ===== مؤشرات القوى العاملة ===== -->
     <div class="workforce-dashboard" id="workforceDashboard">
         <div class="workforce-header">
             <div class="workforce-title">
@@ -1289,7 +1498,7 @@
     </div>
 </div>
 
-<!-- ===== نافذة الإسعاف الجوي ===== -->
+<!-- ===== نافذة الإسعاف الجوي (تبقى للتوافق) ===== -->
 <div id="airAmbulanceModal" class="modal">
     <div class="modal-content" style="max-width:600px;">
         <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px;">
@@ -1335,7 +1544,7 @@
 <div id="controlModal" class="modal">
     <div class="modal-content" style="max-width:800px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="display:flex; align-items:center; gap:12px;"><span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span><h2 style="margin:0;">التحكم والتنسيق</h2></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span class="card-icon gold" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);"><i class="fas fa-sliders-h"></i></span><h2 style="margin:0;">تنسيق الإجازة</h2></div>
             <button id="changePasswordBtn" class="btn" style="background:var(--gold); color:var(--primary-900); border-color:var(--gold);"><i class="fas fa-key"></i> تغيير الرقم السري</button>
         </div>
         <p class="sub-title">أفراد التحكم والتنسيق - إجازات الموظفين</p>
@@ -1424,6 +1633,46 @@
             <button id="saveSeniorShift" class="btn btn-primary no-print"><i class="fas fa-save"></i> حفظ المناوبة</button>
             <button id="sendWhatsAppSeniorShift" class="btn btn-whatsapp no-print"><i class="fab fa-whatsapp"></i> إرسال واتساب</button>
             <button id="closeSeniorShift" class="btn no-print"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة النماذج الموحدة ===== -->
+<div id="formsModal" class="modal">
+    <div class="modal-content" style="max-width:95%; max-height:90vh;">
+        <div style="display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="card-icon primary" style="width:44px; height:44px; font-size:1.4rem; border-radius:var(--radius-md);">
+                    <i class="fas fa-file-alt"></i>
+                </span>
+                <div>
+                    <h2 style="margin:0; font-size:1.2rem;">📋 النماذج التشغيلية</h2>
+                    <span style="font-size:0.7rem; color:var(--gray-400);">اختر النموذج المناسب لإدخال البيانات وإرسالها عبر واتساب</span>
+                </div>
+            </div>
+            <button onclick="document.getElementById('formsModal').style.display='none'" class="btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- قائمة النماذج (أيقونات) -->
+        <div id="formsList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:15px; padding:10px; background:var(--gray-50); border-radius:var(--radius-md);">
+            <!-- سيتم ملؤها بواسطة JavaScript -->
+        </div>
+
+        <!-- حاوية النموذج المحدد -->
+        <div id="formContainer" style="background:var(--white); border-radius:var(--radius-md); border:1px solid var(--gray-200); padding:15px; min-height:300px; position:relative;">
+            <div id="formLoading" style="text-align:center; padding:40px 0; color:var(--gray-400);">
+                <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                <p style="margin-top:10px;">جاري تحميل النموذج...</p>
+            </div>
+            <div id="formContent"></div>
+        </div>
+
+        <div class="modal-buttons">
+            <button onclick="document.getElementById('formsModal').style.display='none'" class="btn">
+                <i class="fas fa-times"></i> إغلاق
+            </button>
         </div>
     </div>
 </div>
@@ -1678,12 +1927,14 @@ function toggleThemeMode() {
     if (header.classList.contains('theme-mode')) {
         header.classList.remove('theme-mode');
         btn.classList.remove('active');
-        btn.innerHTML = '<i class="fas fa-expand"></i> وضع الثيم';
+        btn.innerHTML = '<i class="fas fa-expand"></i>';
+        btn.title = 'تفعيل وضع الثيم';
         localStorage.setItem('themeMode', 'off');
     } else {
         header.classList.add('theme-mode');
         btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
+        btn.innerHTML = '<i class="fas fa-compress"></i>';
+        btn.title = 'إلغاء وضع الثيم';
         localStorage.setItem('themeMode', 'on');
     }
 }
@@ -1695,7 +1946,8 @@ function loadThemeMode() {
     if (mode === 'on' && header && btn) {
         header.classList.add('theme-mode');
         btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-compress"></i> إلغاء وضع الثيم';
+        btn.innerHTML = '<i class="fas fa-compress"></i>';
+        btn.title = 'إلغاء وضع الثيم';
     }
 }
 
@@ -2057,15 +2309,21 @@ function renderAdvancedDistribution() {
     container.innerHTML = '';
     container.className = 'distribution-advanced';
     
+    var allReports = reports || {};
+    
     for (var center in centersData) {
         var sectorDiv = document.createElement('div');
         sectorDiv.className = 'distribution-sector-card';
         
         var totalSectorReports = 0;
-        for (var i = 0; i < centersData[center].length; i++) {
-            var unit = centersData[center][i];
+        var sectorUnits = centersData[center] || [];
+        
+        for (var i = 0; i < sectorUnits.length; i++) {
+            var unit = sectorUnits[i];
             var key = center + '|' + unit;
-            totalSectorReports += (reports[key]?.count || 0);
+            if (allReports[key] && allReports[key].count) {
+                totalSectorReports += allReports[key].count;
+            }
         }
         
         var headerHtml = '<div class="distribution-sector-header">' +
@@ -2074,21 +2332,21 @@ function renderAdvancedDistribution() {
             '</div>';
         
         var gridHtml = '<div class="distribution-unit-grid">';
-        for (var j = 0; j < centersData[center].length; j++) {
-            var unit2 = centersData[center][j];
+        for (var j = 0; j < sectorUnits.length; j++) {
+            var unit2 = sectorUnits[j];
             var key2 = center + '|' + unit2;
-            var info = reports[key2] || { count: 0, times: [] };
+            var info = allReports[key2] || { count: 0, times: [] };
             var isZero = info.count === 0;
             var location = unitLocations[unit2] || 'لم يتم تحديد موقع';
             
-            gridHtml += '<div class="distribution-unit-item">' +
+            gridHtml += '<div class="distribution-unit-item" id="unit-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' +
                 (info.count > 0 ? '<span class="unit-badge">' + info.count + '</span>' : '') +
                 '<div class="unit-name">' + unit2 + '</div>' +
-                '<div class="unit-count ' + (isZero ? 'zero' : '') + '">' + info.count + '</div>' +
+                '<div class="unit-count ' + (isZero ? 'zero' : '') + '" id="count-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' + info.count + '</div>' +
                 '<div class="unit-actions">' +
-                '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;"><i class="fas fa-plus-circle"></i></button>' +
-                (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;"><i class="fas fa-undo-alt"></i></button>' : '') +
-                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;"><i class="fas fa-map-marker-alt"></i></button>' +
+                '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
+                (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:inline-flex;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:none;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>') +
+                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
                 '</div>' +
                 '</div>';
         }
@@ -2098,40 +2356,34 @@ function renderAdvancedDistribution() {
         container.appendChild(sectorDiv);
         
         // ربط الأحداث
-        sectorDiv.querySelectorAll('.report-btn').forEach(function(btn, idx) {
-            var unit = centersData[center][idx];
-            btn.onclick = function() {
-                addReportToServer(center, unit);
-                setTimeout(function() {
-                    renderAdvancedDistribution();
-                    updateTotal();
-                    calculateLiveReportStats();
-                    updateWorkforceStats();
-                    updateDistributionIndicator();
-                }, 300);
-            };
+        sectorDiv.querySelectorAll('.report-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var center = this.getAttribute('data-center');
+                var unit = this.getAttribute('data-unit');
+                if (center && unit) {
+                    addReportToServer(center, unit);
+                }
+            });
         });
         
-        sectorDiv.querySelectorAll('.undo-btn').forEach(function(btn, idx) {
-            var unit = centersData[center][idx];
-            btn.onclick = function() {
-                undoLastReport(center, unit);
-                setTimeout(function() {
-                    renderAdvancedDistribution();
-                    updateTotal();
-                    calculateLiveReportStats();
-                    updateWorkforceStats();
-                    updateDistributionIndicator();
-                }, 300);
-            };
+        sectorDiv.querySelectorAll('.undo-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var center = this.getAttribute('data-center');
+                var unit = this.getAttribute('data-unit');
+                if (center && unit) {
+                    undoLastReport(center, unit);
+                }
+            });
         });
         
-        sectorDiv.querySelectorAll('.preview-btn').forEach(function(btn, idx) {
-            var unit = centersData[center][idx];
-            var location = unitLocations[unit] || 'لم يتم تحديد موقع';
-            btn.onclick = function() {
-                openMapPreview(unit, location);
-            };
+        sectorDiv.querySelectorAll('.preview-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var unit = this.getAttribute('data-unit');
+                var location = this.getAttribute('data-location');
+                if (unit) {
+                    openMapPreview(unit, location || 'لم يتم تحديد موقع');
+                }
+            });
         });
     }
 }
@@ -2239,6 +2491,11 @@ async function loadAllData() {
             calculateLiveReportStats();
             updateWorkforceStats();
             updateDistributionIndicator();
+            
+            var distModal = document.getElementById('distributionModal');
+            if (distModal && distModal.style.display === 'flex') {
+                renderAdvancedDistribution();
+            }
         }
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + new Date().toLocaleTimeString();
@@ -2261,6 +2518,41 @@ function updateShiftStatus() {
     } else { status.innerHTML = '📌 لا توجد مناوبة نشطة'; }
 }
 
+function updateUnitCounter(center, unit) {
+    var key = center + '|' + unit;
+    var count = reports[key] ? reports[key].count : 0;
+    
+    var unitId = 'count-' + center.replace(/\s/g, '') + '-' + unit.replace(/\s/g, '');
+    var countElement = document.getElementById(unitId);
+    if (countElement) {
+        countElement.textContent = count;
+        countElement.className = 'unit-count' + (count === 0 ? ' zero' : '');
+    }
+    
+    var badgeId = 'unit-' + center.replace(/\s/g, '') + '-' + unit.replace(/\s/g, '') + ' .unit-badge';
+    var badgeElement = document.querySelector(badgeId);
+    if (badgeElement) {
+        if (count > 0) {
+            badgeElement.textContent = count;
+            badgeElement.style.display = 'inline-block';
+        } else {
+            badgeElement.style.display = 'none';
+        }
+    }
+    
+    var unitItem = document.getElementById('unit-' + center.replace(/\s/g, '') + '-' + unit.replace(/\s/g, ''));
+    if (unitItem) {
+        var undoBtn = unitItem.querySelector('.undo-btn');
+        if (undoBtn) {
+            if (count > 0) {
+                undoBtn.style.display = 'inline-flex';
+            } else {
+                undoBtn.style.display = 'none';
+            }
+        }
+    }
+}
+
 function calculateLiveReportStats() {
     var container = document.getElementById('liveReportStats');
     if (!container) return;
@@ -2272,7 +2564,7 @@ function calculateLiveReportStats() {
             total += report.count;
             var parts = key.split('|');
             var unit = parts.length > 1 ? parts[1] : key;
-            if (unit && unit.trim() !== '') {
+            if (unit && unit.trim() !== '' && unit !== 'undefined' && unit !== 'null') {
                 unitStats[unit] = (unitStats[unit] || 0) + report.count;
             }
         }
@@ -2301,10 +2593,9 @@ function calculateLiveReportStats() {
 }
 
 // ============================================
-// مؤشرات القوى العاملة المتطورة (تعكس بيانات التكميل)
+// مؤشرات القوى العاملة
 // ============================================
 function updateWorkforceStats() {
-    // محاولة جلب بيانات التكميل من المناوبة الحالية
     var shiftData = null;
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
@@ -2313,13 +2604,11 @@ function updateWorkforceStats() {
         }
     }
     
-    // إذا كان هناك بيانات تكميل، استخدمها
     if (shiftData && Object.keys(shiftData).length > 0) {
         updateWorkforceFromShiftData(shiftData);
         return;
     }
     
-    // وإلا استخدم البيانات التقديرية
     var totalUnits = 0;
     for (var center in centersData) {
         totalUnits += centersData[center].length;
@@ -2423,7 +2712,7 @@ function updateDistributionIndicator() {
             total += report.count;
             var parts = key.split('|');
             var unit = parts.length > 1 ? parts[1] : key;
-            if (unit && unit.trim() !== '') {
+            if (unit && unit.trim() !== '' && unit !== 'undefined' && unit !== 'null') {
                 unitStats[unit] = (unitStats[unit] || 0) + report.count;
             }
         }
@@ -2554,49 +2843,981 @@ async function startNewShift() {
 }
 
 // ============================================
-// ربط الأحداث الرئيسية
+// دوال إضافة البلاغات (من التوزيع)
 // ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    loadBrandLogo();
-    loadSavedThemeSettings();
-    loadThemeMode();
-    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
-    buildCentersTable();
-    loadShifts();
-    loadAllData();
-    setTimeout(checkForAlerts, 1000);
+async function addReportToServer(center, unit) {
+    if (isViewingArchiveShift) {
+        alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة.");
+        return;
+    }
+    if (!currentShiftId) {
+        alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
+        return;
+    }
+    if (!center || !unit) {
+        alert("⚠️ بيانات ناقصة");
+        return;
+    }
+    
+    try {
+        var response = await fetch('/api/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
+        });
+        var result = await response.json();
+        if (result.success) {
+            await loadAllData();
+            updateUnitCounter(center, unit);
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            updateTotal();
+            
+            var distModal = document.getElementById('distributionModal');
+            if (distModal.style.display === 'flex') {
+                renderAdvancedDistribution();
+            }
+        } else {
+            alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف"));
+        }
+    } catch (error) {
+        alert("❌ فشل في الاتصال بالخادم");
+    }
+}
+
+async function undoLastReport(center, unit) {
+    if (isViewingArchiveShift) {
+        alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة.");
+        return;
+    }
+    if (!center || !unit) {
+        alert("⚠️ بيانات ناقصة");
+        return;
+    }
+    
+    try {
+        var response = await fetch('/api/undo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
+        });
+        var result = await response.json();
+        if (result.success) {
+            await loadAllData();
+            updateUnitCounter(center, unit);
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            updateTotal();
+            
+            var distModal = document.getElementById('distributionModal');
+            if (distModal.style.display === 'flex') {
+                renderAdvancedDistribution();
+            }
+        } else if (result.error) {
+            alert(result.error);
+        }
+    } catch (error) {
+        alert("❌ فشل في التراجع");
+    }
+}
+
+// ============================================
+// دوال المناوبة (view, return, save, delete)
+// ============================================
+async function viewShiftReports() {
+    var select = document.getElementById('archiveSelect');
+    var shiftId = parseInt(select.value);
+    if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
+    try {
+        var response = await fetch('/api/shifts/' + shiftId);
+        var result = await response.json();
+        if (result && result.shift) {
+            currentViewingShift = result.shift;
+            isViewingArchiveShift = true;
+            viewingShiftId = shiftId;
+            reports = result.reports || {};
+            updateTotal();
+            loadShiftToForm(result.shift);
+            displayShiftReportStats(result.reports);
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
+            document.getElementById('viewingBadge').style.display = 'inline-block';
+            document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
+            document.getElementById('viewingBadge').innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
+            document.getElementById('updateStatus').innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + new Date().toLocaleTimeString();
+            document.getElementById('shiftModal').style.display = 'flex';
+        } else { alert("لا توجد بيانات في هذه المناوبة"); }
+    } catch (error) { console.error(error); alert("❌ فشل في تحميل المناوبة"); }
+}
+
+async function returnToCurrentShift() {
+    isViewingArchiveShift = false;
+    currentViewingShift = null;
+    viewingShiftId = null;
+    await loadAllData();
+    calculateLiveReportStats();
+    updateWorkforceStats();
+    updateDistributionIndicator();
+    document.getElementById('viewingBadge').style.display = 'none';
+    document.getElementById('returnToCurrentBtn').style.display = 'none';
+    document.getElementById('archiveSelect').value = '';
+    document.getElementById('updateStatus').innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + new Date().toLocaleTimeString();
+    document.getElementById('shiftModal').style.display = 'none';
+}
+
+async function saveShiftData() {
+    var shiftData = getShiftFromForm();
+    if (!shiftData.shiftType) { alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return; }
+    var targetId = viewingShiftId || currentShiftId;
+    if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
+    try {
+        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
+        var result = await response.json();
+        if (result.success) {
+            alert("✅ تم حفظ بيانات التكميل بنجاح");
+            await loadShifts();
+            await loadAllData();
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            if (viewingShiftId) {
+                var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
+                var viewResult = await viewResponse.json();
+                if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
+            }
+        } else { alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); }
+    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+}
+
+async function deleteCurrentShift() {
+    var targetId = viewingShiftId || currentShiftId;
+    if (!targetId) { alert("لا توجد مناوبة محددة للحذف"); return; }
+    if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
+    try {
+        var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE' });
+        var result = await response.json();
+        if (result.success) {
+            alert("✅ تم حذف المناوبة");
+            if (targetId === currentShiftId) { currentShiftId = null; }
+            if (targetId === viewingShiftId) {
+                viewingShiftId = null;
+                isViewingArchiveShift = false;
+                document.getElementById('viewingBadge').style.display = 'none';
+                document.getElementById('returnToCurrentBtn').style.display = 'none';
+            }
+            clearShiftForm();
+            await loadShifts();
+            await loadAllData();
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            document.getElementById('shiftModal').style.display = 'none';
+        } else { alert("❌ فشل في الحذف"); }
+    } catch (error) { alert("❌ خطأ في الاتصال"); }
+}
+
+function loadShiftToForm(shift) {
+    if (!shift) return;
+    viewingShiftId = shift.id;
+    document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
+    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
+    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        updateStatusIcon(i);
+    }
+    document.getElementById('generalNotes').value = shift.generalNotes || '';
+    setTimeout(calculateWorkforceStatsLocally, 100);
+    if (shift.id) { loadWorkforceStats(shift.id); }
+}
+
+function getShiftFromForm() {
+    var shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
+    var rapidLocations = {};
+    document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
+    var centersDataForm = {};
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        centersDataForm[center] = { staffCount: staffInput?.value || '', carsCount: carsInput?.value || '', notes: notesInput?.value || '' };
+    }
+    return { shiftType: shiftType, rapidLocations: rapidLocations, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
+}
+
+function clearShiftForm() {
+    document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
+    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
+    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
+    for (var i = 0; i < centerList.length; i++) {
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        if (staffInput) staffInput.value = '';
+        if (carsInput) carsInput.value = '';
+        if (notesInput) notesInput.value = '';
+        updateStatusIcon(i);
+    }
+    document.getElementById('generalNotes').value = '';
+    document.getElementById('workforceStats').style.display = 'none';
+    document.getElementById('shiftReportStats').style.display = 'none';
+}
+
+function displayShiftReportStats(reportsData) {
+    var container = document.getElementById('shiftReportStats');
+    var listContainer = document.getElementById('unitReportList');
+    if (!reportsData || Object.keys(reportsData).length === 0) { container.style.display = 'none'; return; }
+    var total = 0;
+    var unitStats = {};
+    for (var key in reportsData) {
+        var report = reportsData[key];
+        if (report && report.count > 0) {
+            total += report.count;
+            var parts = key.split('|');
+            var unit = parts.length > 1 ? parts[1] : key;
+            if (unit && unit.trim() !== '' && unit !== 'undefined' && unit !== 'null') {
+                unitStats[unit] = (unitStats[unit] || 0) + report.count;
+            }
+        }
+    }
+    if (total === 0) { container.style.display = 'none'; return; }
+    container.style.display = 'block';
+    document.getElementById('shiftTotalReports').innerText = total;
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    document.getElementById('topUnit').innerText = topUnit;
+    document.getElementById('topUnitCount').innerText = topCount;
+    listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
+    if (sortedUnits.length === 0) {
+        listContainer.innerHTML += '<p style="text-align:center; color:var(--gray-400); font-size:0.7rem;">لا توجد بيانات كافية</p>';
+        return;
+    }
+    sortedUnits.forEach(function(item) {
+        var percentage = Math.round((item[1] / total) * 100);
+        var div = document.createElement('div');
+        div.className = 'distribution-bar';
+        div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#1e466e;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#1e466e;"></div></div><span class="percent">' + percentage + '%</span>';
+        listContainer.appendChild(div);
+    });
+}
+
+async function loadWorkforceStats(shiftId) {
+    try {
+        var response = await fetch('/api/workforce-stats/' + shiftId);
+        var stats = await response.json();
+        if (stats.error) { document.getElementById('workforceStats').style.display = 'none'; return; }
+        document.getElementById('workforceStats').style.display = 'block';
+        document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
+        document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
+        document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
+        document.getElementById('staffSubText').innerText = 'موزعين على ' + stats.centerCount + ' مركز';
+        document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
+        document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
+        document.getElementById('readinessSubText').innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
+        var circumference = 2 * Math.PI * 42;
+        var offset = circumference - (stats.readinessRate / 100) * circumference;
+        var circle = document.getElementById('readinessCircle');
+        var text = document.getElementById('readinessText');
+        var color = '#c0392b';
+        if (stats.readinessRate >= 80) color = '#2a7f3e';
+        else if (stats.readinessRate >= 50) color = '#f39c12';
+        circle.setAttribute('stroke', color);
+        circle.style.strokeDashoffset = offset;
+        text.textContent = stats.readinessRate + '%';
+        var distList = document.getElementById('distributionList');
+        distList.innerHTML = '';
+        var total = stats.totalStaff || 1;
+        for (var center in stats.distribution) {
+            var count = stats.distribution[center];
+            var barWidth = Math.round((count / total) * 100);
+            var isReady = count >= 2;
+            var div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
+            distList.appendChild(div);
+        }
+        var carDistList = document.getElementById('carDistributionList');
+        carDistList.innerHTML = '';
+        var totalCars = stats.totalCars || 1;
+        for (var center2 in stats.carDistribution) {
+            var count2 = stats.carDistribution[center2];
+            var barWidth2 = Math.round((count2 / totalCars) * 100);
+            var hasCar = count2 >= 1;
+            var div2 = document.createElement('div');
+            div2.className = 'distribution-bar';
+            div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
+            carDistList.appendChild(div2);
+        }
+    } catch (error) { console.error(error); document.getElementById('workforceStats').style.display = 'none'; }
+}
+
+// ============================================
+// دوال كبار المسعفين
+// ============================================
+function renderSeniorRecords() {
+    var container = document.getElementById('seniorRecordsList');
+    var section = document.getElementById('seniorSavedRecords');
+    if (!container || !section) return;
+    if (seniorRecords.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    var html = '';
+    seniorRecords.forEach(function(record, index) {
+        var date = new Date(record.createdAt).toLocaleString('ar-SA');
+        var locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
+        html += '<div class="record-item"><div class="record-info"><strong>🚑 ' + (record.activeCars || 0) + '</strong><span style="margin:0 5px;">|</span><span>🔧 ' + (record.brokenCars || 0) + '</span><span style="margin:0 5px;">|</span><span>🔄 ' + (record.reserveCars || 0) + '</span><span style="margin:0 5px;">|</span><span>📊 ' + (record.overlapTeams || 0) + '</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ' + locations + '</span><span class="rec-date">🕒 ' + date + '</span>' + (record.assistantName ? '<span style="font-size:0.6rem; color:var(--primary-700);">👤 ' + record.assistantName + '</span>' : '') + '</div><div class="record-actions"><button onclick="deleteSeniorRecord(' + index + ')">🗑️ حذف</button></div></div>';
+    });
+    container.innerHTML = html;
+}
+
+function getSeniorShiftData() {
+    var activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
+    var brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
+    var reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
+    var overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
+    var locations = [];
+    document.querySelectorAll('.senior-location:checked').forEach(function(cb) { locations.push(cb.value); });
+    var notes = document.getElementById('seniorNotes').value.trim();
+    var assistantName = document.getElementById('seniorAssistantName').value.trim();
+    var assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
+    var chiefName = document.getElementById('seniorChiefName').value.trim();
+    var chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
+    var leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
+    var leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
+    return { activeCars: activeCars, brokenCars: brokenCars, reserveCars: reserveCars, overlapTeams: overlapTeams, locations: locations, notes: notes, assistantName: assistantName, assistantSignature: assistantSignature, chiefName: chiefName, chiefSignature: chiefSignature, leaderName: leaderName, leaderSignature: leaderSignature };
+}
+
+function saveSeniorRecordToLocal(data) {
+    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return false; }
+    seniorRecords.unshift({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() });
+    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+    renderSeniorRecords();
+    return true;
+}
+
+function clearSeniorShiftForm() {
+    document.getElementById('seniorActiveCars').value = 0;
+    document.getElementById('seniorBrokenCars').value = 0;
+    document.getElementById('seniorReserveCars').value = 0;
+    document.getElementById('seniorOverlapTeams').value = 0;
+    document.querySelectorAll('.senior-location').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('seniorNotes').value = '';
+    document.getElementById('seniorAssistantName').value = '';
+    document.getElementById('seniorAssistantSignature').value = '';
+    document.getElementById('seniorChiefName').value = '';
+    document.getElementById('seniorChiefSignature').value = '';
+    document.getElementById('seniorRegionLeaderName').value = '';
+    document.getElementById('seniorRegionLeaderSignature').value = '';
+}
+
+function deleteSeniorRecord(index) {
+    if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
+    seniorRecords.splice(index, 1);
+    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+    renderSeniorRecords();
+}
+
+function formatWhatsAppMessage(data) {
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('ar-SA');
+    var timeStr = now.toLocaleTimeString('ar-SA');
+    var locationsStr = data.locations && data.locations.length > 0 ? data.locations.join('، ') : 'لا يوجد';
+    var message = '';
+    message += 'تقرير مناوبة كبار المسعفين\n';
+    message += '═══════════════════════════\n';
+    message += 'التاريخ: ' + dateStr + '\n';
+    message += 'الوقت: ' + timeStr + '\n\n';
+    message += 'المركبات العاملة: ' + data.activeCars + '\n';
+    message += 'المركبات المتعطلة: ' + data.brokenCars + '\n';
+    message += 'مركبات الاحتياط: ' + data.reserveCars + '\n';
+    message += 'فرق الاوفر لاب: ' + data.overlapTeams + '\n';
+    message += 'مناطق التمركز: ' + locationsStr + '\n\n';
+    if (data.notes) { message += 'الملاحظات: ' + data.notes + '\n\n'; }
+    message += '═══════════════════════════\n';
+    message += 'التسليم والاستلام\n';
+    message += 'مساعد كبير المسعفين: ' + (data.assistantName || '———') + '\n';
+    message += 'كبير المسعفين: ' + (data.chiefName || '———') + '\n';
+    message += 'قائد المنطقة: ' + (data.leaderName || '———') + '\n';
+    message += '═══════════════════════════\n';
+    message += 'تم الإرسال: ' + dateStr + ' ' + timeStr;
+    return message;
+}
+
+function sendWhatsAppMessage(message) {
+    var encodedMessage = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encodedMessage, '_blank');
+}
+
+document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
+    var now = new Date();
+    var dateStr = now.toLocaleDateString('ar-SA');
+    document.getElementById('seniorAssistantDate').innerText = dateStr;
+    document.getElementById('seniorChiefDate').innerText = dateStr;
+    document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
+    document.getElementById('seniorPrintDate').innerText = dateStr + ' - ' + now.toLocaleTimeString('ar-SA');
+    document.getElementById('seniorShiftModal').style.display = 'flex';
+    renderSeniorRecords();
 });
 
-// فحص التنبيهات كل 10 ثواني
-setInterval(checkForAlerts, 10000);
+document.getElementById('closeSeniorShift')?.addEventListener('click', function() { document.getElementById('seniorShiftModal').style.display = 'none'; });
+document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
+    var data = getSeniorShiftData();
+    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
+    if (saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
+});
 
-document.getElementById("newShiftBtn").onclick = startNewShift;
-document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
-document.getElementById("closeShiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
-document.getElementById("docsBtn").onclick = function() { openDocsPage(); };
-document.getElementById("airAmbulanceBtn").onclick = function() {
-    document.getElementById('airAmbulanceModal').style.display = 'flex';
-    loadAirRecords();
+document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', function() {
+    var data = getSeniorShiftData();
+    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال'); return; }
+    saveSeniorRecordToLocal(data);
+    var message = formatWhatsAppMessage(data);
+    sendWhatsAppMessage(message);
+});
+
+// ============================================
+// نظام النماذج الموحدة - JavaScript
+// ============================================
+
+// تعريف النماذج المتاحة
+const FORM_DEFINITIONS = [
+    {
+        id: 'air',
+        name: 'الإسعاف الجوي',
+        icon: 'fa-helicopter',
+        color: '#2E8B7A',
+        file: 'form-air.html',
+        description: 'تسجيل بلاغات الإسعاف الجوي'
+    },
+    {
+        id: 'escalation',
+        name: 'التصعيد',
+        icon: 'fa-arrow-up',
+        color: '#E87461',
+        file: 'form-escalation.html',
+        description: 'تسجيل بلاغات التصعيد'
+    },
+    {
+        id: 'e',
+        name: 'حالات E',
+        icon: 'fa-heartbeat',
+        color: '#C0392B',
+        file: 'form-e.html',
+        description: 'حالات توقف قلب وتنفس'
+    },
+    {
+        id: 'incident',
+        name: 'بلاغ حادث',
+        icon: 'fa-exclamation-circle',
+        color: '#E8C84A',
+        file: 'form-incident.html',
+        description: 'تسجيل بلاغات الحوادث'
+    },
+    {
+        id: 'daily',
+        name: 'تقرير يومي',
+        icon: 'fa-calendar-day',
+        color: '#1A3A5C',
+        file: 'form-daily.html',
+        description: 'التقرير اليومي للعمليات'
+    }
+];
+
+let currentFormId = null;
+let loadedForms = {};
+
+function loadFormsList() {
+    const container = document.getElementById('formsList');
+    if (!container) return;
+
+    let html = '';
+    FORM_DEFINITIONS.forEach(form => {
+        html += `
+            <div onclick="loadForm('${form.id}')" 
+                 style="background:white; border-radius:var(--radius-md); padding:15px; text-align:center; cursor:pointer; border:2px solid var(--gray-200); transition:all 0.3s;"
+                 onmouseenter="this.style.borderColor='${form.color}'; this.style.transform='translateY(-3px)'; this.style.boxShadow='var(--shadow-md)'"
+                 onmouseleave="this.style.borderColor='var(--gray-200)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                <div style="width:50px; height:50px; border-radius:50%; background:${form.color}22; display:flex; align-items:center; justify-content:center; margin:0 auto 8px; font-size:1.6rem; color:${form.color};">
+                    <i class="fas ${form.icon}"></i>
+                </div>
+                <div style="font-weight:700; font-size:0.85rem; color:var(--gray-800);">${form.name}</div>
+                <div style="font-size:0.6rem; color:var(--gray-400); margin-top:4px;">${form.description}</div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+async function loadForm(formId) {
+    if (loadedForms[formId]) {
+        showFormContent(formId);
+        return;
+    }
+
+    const formDef = FORM_DEFINITIONS.find(f => f.id === formId);
+    if (!formDef) {
+        alert('❌ النموذج غير موجود');
+        return;
+    }
+
+    document.getElementById('formLoading').style.display = 'block';
+    document.getElementById('formContent').innerHTML = '';
+
+    try {
+        const response = await fetch(`/forms/${formDef.file}`);
+        if (!response.ok) throw new Error('فشل في تحميل النموذج');
+        
+        const html = await response.text();
+        loadedForms[formId] = html;
+        showFormContent(formId);
+        executeFormScripts(formId);
+        
+    } catch (error) {
+        console.error('خطأ في تحميل النموذج:', error);
+        document.getElementById('formContent').innerHTML = `
+            <div style="text-align:center; padding:40px 0; color:var(--coral);">
+                <i class="fas fa-exclamation-triangle" style="font-size:2rem;"></i>
+                <p style="margin-top:10px;">❌ فشل في تحميل النموذج: ${error.message}</p>
+                <button onclick="loadForm('${formId}')" class="btn btn-primary" style="margin-top:10px; padding:8px 24px; border-radius:30px; background:var(--primary-700); color:white; border:none; cursor:pointer;">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
+                </button>
+            </div>
+        `;
+    }
+}
+
+function showFormContent(formId) {
+    const content = document.getElementById('formContent');
+    const loading = document.getElementById('formLoading');
+    const html = loadedForms[formId];
+    
+    if (html) {
+        loading.style.display = 'none';
+        content.innerHTML = html;
+        currentFormId = formId;
+        
+        document.querySelectorAll('#formsList > div').forEach(el => {
+            el.style.borderColor = 'var(--gray-200)';
+            el.style.background = 'white';
+        });
+        const formDef = FORM_DEFINITIONS.find(f => f.id === formId);
+        if (formDef) {
+            const index = FORM_DEFINITIONS.findIndex(f => f.id === formId);
+            const items = document.querySelectorAll('#formsList > div');
+            if (index >= 0 && items[index]) {
+                items[index].style.borderColor = formDef.color;
+                items[index].style.background = formDef.color + '11';
+            }
+        }
+    }
+}
+
+function executeFormScripts(formId) {
+    setTimeout(() => {
+        const container = document.getElementById('formContent');
+        if (!container) return;
+        
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+            const newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach(attr => {
+                newScript.setAttribute(attr.name, attr.value);
+            });
+            newScript.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+        
+        if (typeof window[`initForm_${formId}`] === 'function') {
+            window[`initForm_${formId}`]();
+        }
+    }, 100);
+}
+
+document.getElementById('formsBtn')?.addEventListener('click', function() {
+    const modal = document.getElementById('formsModal');
+    modal.style.display = 'flex';
+    
+    if (!document.getElementById('formsList').children.length) {
+        loadFormsList();
+    }
+    
+    if (!currentFormId && FORM_DEFINITIONS.length > 0) {
+        loadForm(FORM_DEFINITIONS[0].id);
+    } else if (currentFormId) {
+        showFormContent(currentFormId);
+    }
+});
+
+// ============================================
+// دوال الجدول الشهري
+// ============================================
+async function loadSavedTable() {
+    var container = document.getElementById('excelTableContainer');
+    var status = document.getElementById('tableStatus');
+    try {
+        var response = await fetch('/api/check-monthly-table');
+        var result = await response.json();
+        if (result.exists) {
+            status.innerHTML = '⏳ جاري تحميل الجدول...';
+            var fileResponse = await fetch('/api/get-monthly-table');
+            var blob = await fileResponse.blob();
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    var data = new Uint8Array(event.target.result);
+                    workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
+                    renderAllSheets(workbookData);
+                    status.innerHTML = '✅ تم تحميل ' + workbookData.SheetNames.length + ' أوراق';
+                } catch (error) {
+                    status.innerHTML = '❌ خطأ في عرض الجدول';
+                    container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في عرض الجدول: ' + error.message + '</p>';
+                }
+            };
+            reader.readAsArrayBuffer(blob);
+        } else {
+            container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:30px 0;">📂 لا يوجد جدول شهري محفوظ. يرجى رفع ملف Excel.</p>';
+            status.innerHTML = '❌ لا يوجد جدول محفوظ';
+        }
+    } catch (error) {
+        container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في تحميل الجدول المحفوظ</p>';
+        status.innerHTML = '❌ خطأ في الاتصال';
+    }
+}
+
+function renderAllSheets(workbook) {
+    var container = document.getElementById('excelTableContainer');
+    var html = '';
+    if (workbook.SheetNames.length > 1) {
+        html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:10px;">';
+        workbook.SheetNames.forEach(function(name, index) {
+            var active = index === currentSheetIndex ? 'active' : '';
+            html += '<button class="sheet-tab ' + active + '" data-index="' + index + '">' + name + '</button>';
+        });
+        html += '</div>';
+    }
+    var sheetName = workbook.SheetNames[currentSheetIndex];
+    var sheet = workbook.Sheets[sheetName];
+    var htmlContent = XLSX.utils.sheet_to_html(sheet, { id: 'sheet-table', editable: false });
+    html += htmlContent;
+    container.innerHTML = html;
+    formatTable(container);
+    document.querySelectorAll('.sheet-tab').forEach(function(btn) {
+        btn.onclick = function() { currentSheetIndex = parseInt(this.dataset.index); renderAllSheets(workbookData); };
+    });
+}
+
+function formatTable(container) {
+    var table = container.querySelector('#sheet-table');
+    if (table) {
+        table.style.cssText = 'border-collapse: collapse; width: 100%; font-size: 0.7rem; direction: rtl;';
+        table.querySelectorAll('th, td').forEach(function(cell) { cell.style.border = '1px solid var(--gray-200)'; cell.style.padding = '4px 6px'; cell.style.textAlign = 'center'; cell.style.whiteSpace = 'nowrap'; cell.style.verticalAlign = 'middle'; });
+        table.querySelectorAll('th').forEach(function(th) { th.style.background = 'var(--gray-100)'; th.style.fontWeight = 'bold'; th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = '1'; });
+        table.style.minWidth = '100%'; table.style.width = 'auto';
+    }
+}
+
+document.getElementById('uploadExcelBtn')?.addEventListener('click', function() { document.getElementById('excelFileInput').click(); });
+document.getElementById('excelFileInput')?.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(event) {
+        try {
+            var data = new Uint8Array(event.target.result);
+            workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
+            renderAllSheets(workbookData);
+            var base64 = btoa(String.fromCharCode.apply(null, data));
+            var response = await fetch('/api/upload-monthly-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileData: base64 }) });
+            var result = await response.json();
+            if (result.success) { document.getElementById('tableStatus').innerHTML = '✅ تم حفظ ' + workbookData.SheetNames.length + ' أوراق بنجاح'; alert('✅ تم حفظ الجدول الشهري بنجاح'); } else { document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول'; alert('❌ فشل في حفظ الجدول'); }
+        } catch (error) { alert('❌ خطأ في قراءة الملف: ' + error.message); }
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+// ============================================
+// دوال التحكم والتنسيق
+// ============================================
+async function loadVacations() {
+    try {
+        var response = await fetch('/api/vacations');
+        var data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+            data.forEach(function(item, index) { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
+        }
+    } catch (error) { console.error("خطأ في تحميل الإجازات:", error); }
+}
+
+function renderControlList(editable) {
+    editable = editable || false;
+    var container = document.getElementById('controlList');
+    if (!container) return;
+    var html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
+    var colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
+    controlData.forEach(function(person, index) {
+        var initials = person.name.split(' ').slice(0, 2).map(function(n) { return n[0]; }).join('');
+        var color = colors[index % colors.length];
+        var startDate = person.vacationStart || '';
+        var endDate = person.vacationEnd || '';
+        var vacationDisplay = startDate && endDate ? '📅 ' + formatDate(startDate) + ' → ' + formatDate(endDate) : '📅 لا توجد إجازة';
+        html += '<div class="control-person"><div class="control-avatar" style="background:' + color + ';">' + initials + '</div><div class="control-info"><div class="name">' + person.name + '</div><div class="role">📌 ' + person.role + ' | كود: ' + person.code + '</div></div><div class="control-vacation">' + (editable ? '<div class="edit"><input type="date" id="start_' + index + '" value="' + startDate + '"><span>→</span><input type="date" id="end_' + index + '" value="' + endDate + '"></div>' : '<div class="display">' + vacationDisplay + '</div>') + '</div><div class="control-role-badge">' + (person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق') + '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    var parts = dateString.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+
+document.getElementById('editVacationsBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'flex'; document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); });
+document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
+    var password = document.getElementById('passwordInput').value;
+    try {
+        var response = await fetch('/api/get-password');
+        var result = await response.json();
+        var storedPassword = result.password || '1234';
+        if (password === storedPassword) {
+            isEditMode = true;
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            renderControlList(true);
+            document.getElementById('saveVacationsBtn').style.display = 'inline-block';
+            document.getElementById('editVacationsBtn').style.display = 'none';
+            alert('✅ تم تفعيل وضع التعديل');
+        } else { alert('❌ الرقم السري غير صحيح'); document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); }
+    } catch (error) { alert('❌ خطأ في التحقق من الرقم السري'); }
+});
+
+document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'none'; document.getElementById('passwordInput').value = ''; });
+document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
+    controlData.forEach(function(person, index) {
+        var startInput = document.getElementById('start_' + index);
+        var endInput = document.getElementById('end_' + index);
+        if (startInput && endInput) { person.vacationStart = startInput.value; person.vacationEnd = endInput.value; }
+    });
+    try {
+        var response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacations: controlData }) });
+        var result = await response.json();
+        if (result.success) {
+            alert('✅ تم حفظ الإجازات بنجاح');
+            isEditMode = false;
+            renderControlList(false);
+            document.getElementById('saveVacationsBtn').style.display = 'none';
+            document.getElementById('editVacationsBtn').style.display = 'inline-block';
+        } else { alert('❌ فشل في حفظ الإجازات'); }
+    } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
+});
+
+// ============================================
+// دوال التحديثات التشغيلية
+// ============================================
+function openDocsPage() {
+    document.getElementById('docsPage').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    loadDocsData();
+}
+
+function closeDocsPage() {
+    document.getElementById('docsPage').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+async function loadDocsData() {
+    try {
+        var response = await fetch('/api/docs');
+        var result = await response.json();
+        if (result.success) {
+            uploadedDocs = result.docs || [];
+            filteredDocs = [].concat(uploadedDocs);
+            renderDocsList();
+            updateStats();
+            document.getElementById('docsTotalCount').innerText = uploadedDocs.length;
+        }
+    } catch (error) { console.error('خطأ في تحميل التحديثات:', error); }
+}
+
+function renderDocsList() {
+    var container = document.getElementById('docsListContainer');
+    var sortedDocs = filteredDocs.slice().sort(function(a, b) { return new Date(b.uploadDate) - new Date(a.uploadDate); });
+    var start = (currentDocsPage - 1) * docsPerPage;
+    var end = start + docsPerPage;
+    var pageDocs = sortedDocs.slice(start, end);
+    if (pageDocs.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);"><i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i><h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3><p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p><button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button></div>';
+        document.getElementById('docsPagination').innerHTML = '';
+        document.getElementById('docsFilterCount').innerText = '0 تحديث';
+        return;
+    }
+    var isGrid = docsViewMode === 'grid';
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = isGrid ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
+    container.style.gap = '14px';
+    var html = '';
+    pageDocs.forEach(function(doc) {
+        var date = new Date(doc.uploadDate).toLocaleString('ar-SA');
+        var timeAgo = getTimeAgo(doc.uploadDate);
+        var icon = getFileIcon(doc.filename);
+        var category = doc.category || 'أخرى';
+        var priority = doc.priority || 'normal';
+        var color = getCategoryColor(category);
+        var priorityColor = getPriorityColor(priority);
+        html += '<div style="background:white; border-radius:var(--radius-md); padding:16px 20px; border-right:4px solid ' + color + '; box-shadow:var(--shadow-sm); transition:all 0.2s; position:relative; ' + (isGrid ? 'height:100%;' : '') + '">' +
+            (priority === 'urgent' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> عاجل</div>' : '') +
+            (priority === 'important' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-star"></i> مهم</div>' : '') +
+            '<div style="display:flex; gap:14px; align-items:flex-start; margin-top:' + (priority !== 'normal' ? '12px' : '0') + ';">' +
+            '<div style="width:48px; height:48px; border-radius:50%; background:' + color + '22; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0;">' + icon + '</div>' +
+            '<div style="flex:1; min-width:0;">' +
+            '<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:4px;">' +
+            '<span style="font-size:0.6rem; background:' + color + '22; color:' + color + '; padding:2px 10px; border-radius:20px; font-weight:600;">' + category + '</span>' +
+            '<span style="font-size:0.6rem; color:var(--gray-400);"><i class="far fa-clock"></i> ' + timeAgo + '</span>' +
+            '</div>' +
+            '<h3 style="margin:0; font-size:0.95rem; color:var(--gray-800);">' + doc.filename + '</h3>' +
+            (doc.description ? '<p style="margin:4px 0 0; color:var(--gray-600); font-size:0.8rem; line-height:1.5;">' + doc.description + '</p>' : '') +
+            '<div style="display:flex; gap:12px; margin-top:8px; font-size:0.65rem; color:var(--gray-400); flex-wrap:wrap;">' +
+            '<span><i class="far fa-calendar-alt"></i> ' + date + '</span>' +
+            '<span><i class="fas fa-user"></i> ' + (doc.uploader || 'المشرف') + '</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); flex-wrap:wrap;">' +
+            '<button onclick="openDocPreview(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-eye"></i> عرض</button>' +
+            '<button onclick="downloadDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-download"></i> تحميل</button>' +
+            '<button onclick="deleteDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--coral); color:var(--coral); margin-right:auto;"><i class="fas fa-trash"></i></button>' +
+            '</div>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+    updatePagination(filteredDocs.length);
+    document.getElementById('docsFilterCount').innerText = filteredDocs.length + ' تحديث (من ' + uploadedDocs.length + ')';
+}
+
+function updatePagination(total) {
+    var totalPages = Math.ceil(total / docsPerPage);
+    var container = document.getElementById('docsPagination');
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    var html = '<button onclick="goToDocsPage(' + (currentDocsPage - 1) + ')" class="btn" ' + (currentDocsPage === 1 ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-right"></i></button>';
+    for (var i = 1; i <= totalPages; i++) {
+        html += '<button onclick="goToDocsPage(' + i + ')" class="btn ' + (i === currentDocsPage ? 'btn-primary' : '') + '" style="padding:4px 12px; min-width:32px;">' + i + '</button>';
+    }
+    html += '<button onclick="goToDocsPage(' + (currentDocsPage + 1) + ')" class="btn" ' + (currentDocsPage === totalPages ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-left"></i></button>';
+    container.innerHTML = html;
+}
+
+function goToDocsPage(page) {
+    var totalPages = Math.ceil(filteredDocs.length / docsPerPage);
+    if (page < 1 || page > totalPages) return;
+    currentDocsPage = page;
+    renderDocsList();
+    document.getElementById('docsListContainer').scrollIntoView({ behavior: 'smooth' });
+}
+
+function filterDocs() {
+    var searchTerm = document.getElementById('searchDocsInput').value.toLowerCase();
+    var category = document.getElementById('filterDocsCategory').value;
+    var timeFilter = document.getElementById('filterDocsTime').value;
+    filteredDocs = uploadedDocs.filter(function(doc) {
+        var matchesSearch = doc.filename.toLowerCase().includes(searchTerm) || (doc.description || '').toLowerCase().includes(searchTerm);
+        var matchesCategory = category === 'all' || doc.category === category;
+        var now = new Date();
+        var docDate = new Date(doc.uploadDate);
+        var matchesTime = true;
+        switch(timeFilter) {
+            case 'today': matchesTime = docDate.toDateString() === now.toDateString(); break;
+            case 'week': var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); matchesTime = docDate >= weekAgo; break;
+            case 'month': var monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth() - 1); matchesTime = docDate >= monthAgo; break;
+            case 'year': var yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear() - 1); matchesTime = docDate >= yearAgo; break;
+            default: matchesTime = true;
+        }
+        return matchesSearch && matchesCategory && matchesTime;
+    });
+    currentDocsPage = 1;
+    renderDocsList();
+}
+
+function updateStats() {
+    var total = uploadedDocs.length;
+    var instructions = uploadedDocs.filter(function(d) { return d.category === 'تعليمات'; }).length;
+    var alerts = uploadedDocs.filter(function(d) { return d.category === 'تنبيه'; }).length;
+    var notifications = uploadedDocs.filter(function(d) { return d.category === 'إشعار'; }).length;
+    document.getElementById('statTotal').innerText = total;
+    document.getElementById('statInstructions').innerText = instructions;
+    document.getElementById('statAlerts').innerText = alerts;
+    document.getElementById('statNotifications').innerText = notifications;
+}
+
+function getTimeAgo(dateString) {
     var now = new Date();
-    document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
-};
-document.getElementById("closeAirModal").onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
-document.getElementById("monthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
-document.getElementById("closeMonthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
-document.getElementById("controlBtn").onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
-document.getElementById("closeControlBtn").onclick = function() {
-    document.getElementById('controlModal').style.display = 'none';
-    isEditMode = false;
-    document.getElementById('saveVacationsBtn').style.display = 'none';
-    document.getElementById('editVacationsBtn').style.display = 'inline-block';
-};
-document.getElementById("printShiftBtn").onclick = function() { window.print(); };
-document.getElementById("saveShiftBtn").onclick = saveShiftData;
-document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
-document.getElementById("viewShiftBtn").onclick = viewShiftReports;
-document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
+    var past = new Date(dateString);
+    var diff = Math.floor((now - past) / 1000);
+    if (diff < 60) return 'الآن';
+    if (diff < 3600) return 'منذ ' + Math.floor(diff / 60) + ' دقيقة';
+    if (diff < 86400) return 'منذ ' + Math.floor(diff / 3600) + ' ساعة';
+    if (diff < 604800) return 'منذ ' + Math.floor(diff / 86400) + ' يوم';
+    if (diff < 2592000) return 'منذ ' + Math.floor(diff / 604800) + ' أسبوع';
+    return 'منذ ' + Math.floor(diff / 2592000) + ' شهر';
+}
 
-// ===== بناء جدول المراكز =====
+function getFileIcon(filename) {
+    if (filename.match(/\.(pdf)$/i)) return '📄';
+    if (filename.match(/\.(doc|docx)$/i)) return '📝';
+    if (filename.match(/\.(xls|xlsx)$/i)) return '📊';
+    if (filename.match(/\.(png|jpg|jpeg|gif|svg)$/i)) return '🖼️';
+    if (filename.match(/\.(txt)$/i)) return '📃';
+    if (filename.match(/\.(zip|rar|7z)$/i)) return '📦';
+    return '📎';
+}
+
+function getCategoryColor(category) {
+    var colors = { 'تعليمات': '#1A3A5C', 'إشعار': '#E8C84A', 'تقرير': '#2E8B7A', 'جدول': '#2A5A7A', 'تنبيه': '#E87461', 'أخرى': '#6B7F94' };
+    return colors[category] || '#6B7F94';
+}
+
+function getPriorityColor(priority) {
+    var colors = { 'normal': '#6B7F94', 'important': '#E8C84A', 'urgent': '#E87461' };
+    return colors[priority] || '#6B7F94';
+}
+
+function changeViewMode() {
+    docsViewMode = document.getElementById('docsViewMode').value;
+    renderDocsList();
+}
+
+function openUploadModal() {
+    alert('📤 سيتم فتح نافذة رفع التحديثات الجديدة');
+}
+
+function openUrgentUploadModal() {
+    alert('🚨 سيتم فتح نافذة رفع تحديث عاجل');
+}
+
+async function downloadDoc(docId) { try { window.open('/api/download-doc/' + docId, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
+
+async function deleteDoc(docId) {
+    if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
+    try {
+        var response = await fetch('/api/delete-doc/' + docId, { method: 'DELETE' });
+        var result = await response.json();
+        if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
+    } catch (error) { alert('❌ خطأ في الاتصال'); }
+}
+
+// ============================================
+// وظائف بناء الجدول
+// ============================================
 function buildCentersTable() {
     var tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
@@ -2682,729 +3903,114 @@ function calculateWorkforceStatsLocally() {
         div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
         carDistList.appendChild(div2);
     }
-    
-    // تحديث مؤشرات القوى العاملة في الصفحة الرئيسية من بيانات التكميل
     if (totalStaff > 0 || totalCars > 0) {
         updateWorkforceDisplay(totalStaff, totalCars, readinessRate, missingCenters);
     }
 }
 
 // ============================================
-// دوال التحديثات التشغيلية
+// ربط الأحداث الرئيسية
 // ============================================
-function openDocsPage() {
-    document.getElementById('docsPage').style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    loadDocsData();
-}
-function closeDocsPage() {
-    document.getElementById('docsPage').style.display = 'none';
-    document.body.style.overflow = 'auto';
-}
-async function loadDocsData() {
-    try {
-        var response = await fetch('/api/docs');
-        var result = await response.json();
-        if (result.success) {
-            uploadedDocs = result.docs || [];
-            filteredDocs = [].concat(uploadedDocs);
-            renderDocsList();
-            updateStats();
-            document.getElementById('docsTotalCount').innerText = uploadedDocs.length;
-        }
-    } catch (error) { console.error('خطأ في تحميل التحديثات:', error); }
-}
-function renderDocsList() {
-    var container = document.getElementById('docsListContainer');
-    var sortedDocs = filteredDocs.slice().sort(function(a, b) { return new Date(b.uploadDate) - new Date(a.uploadDate); });
-    var start = (currentDocsPage - 1) * docsPerPage;
-    var end = start + docsPerPage;
-    var pageDocs = sortedDocs.slice(start, end);
-    if (pageDocs.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);"><i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i><h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3><p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p><button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button></div>';
-        document.getElementById('docsPagination').innerHTML = '';
-        document.getElementById('docsFilterCount').innerText = '0 تحديث';
-        return;
-    }
-    var isGrid = docsViewMode === 'grid';
-    container.style.display = 'grid';
-    container.style.gridTemplateColumns = isGrid ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
-    container.style.gap = '14px';
-    var html = '';
-    pageDocs.forEach(function(doc) {
-        var date = new Date(doc.uploadDate).toLocaleString('ar-SA');
-        var timeAgo = getTimeAgo(doc.uploadDate);
-        var icon = getFileIcon(doc.filename);
-        var category = doc.category || 'أخرى';
-        var priority = doc.priority || 'normal';
-        var color = getCategoryColor(category);
-        var priorityColor = getPriorityColor(priority);
-        html += '<div style="background:white; border-radius:var(--radius-md); padding:16px 20px; border-right:4px solid ' + color + '; box-shadow:var(--shadow-sm); transition:all 0.2s; position:relative; ' + (isGrid ? 'height:100%;' : '') + '">' +
-            (priority === 'urgent' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> عاجل</div>' : '') +
-            (priority === 'important' ? '<div style="position:absolute; top:-6px; left:16px; background:' + priorityColor + '; color:white; padding:2px 12px; border-radius:20px; font-size:0.6rem; font-weight:700;"><i class="fas fa-star"></i> مهم</div>' : '') +
-            '<div style="display:flex; gap:14px; align-items:flex-start; margin-top:' + (priority !== 'normal' ? '12px' : '0') + ';">' +
-            '<div style="width:48px; height:48px; border-radius:50%; background:' + color + '22; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0;">' + icon + '</div>' +
-            '<div style="flex:1; min-width:0;">' +
-            '<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:4px;">' +
-            '<span style="font-size:0.6rem; background:' + color + '22; color:' + color + '; padding:2px 10px; border-radius:20px; font-weight:600;">' + category + '</span>' +
-            '<span style="font-size:0.6rem; color:var(--gray-400);"><i class="far fa-clock"></i> ' + timeAgo + '</span>' +
-            '</div>' +
-            '<h3 style="margin:0; font-size:0.95rem; color:var(--gray-800);">' + doc.filename + '</h3>' +
-            (doc.description ? '<p style="margin:4px 0 0; color:var(--gray-600); font-size:0.8rem; line-height:1.5;">' + doc.description + '</p>' : '') +
-            '<div style="display:flex; gap:12px; margin-top:8px; font-size:0.65rem; color:var(--gray-400); flex-wrap:wrap;">' +
-            '<span><i class="far fa-calendar-alt"></i> ' + date + '</span>' +
-            '<span><i class="fas fa-user"></i> ' + (doc.uploader || 'المشرف') + '</span>' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-            '<div style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100); flex-wrap:wrap;">' +
-            '<button onclick="openDocPreview(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; background:var(--primary-100); border-color:var(--primary-200);"><i class="fas fa-eye"></i> عرض</button>' +
-            '<button onclick="downloadDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--gray-300);"><i class="fas fa-download"></i> تحميل</button>' +
-            '<button onclick="deleteDoc(\'' + doc.id + '\')" class="btn" style="padding:4px 14px; font-size:0.7rem; border-color:var(--coral); color:var(--coral); margin-right:auto;"><i class="fas fa-trash"></i></button>' +
-            '</div>' +
-            '</div>';
-    });
-    container.innerHTML = html;
-    updatePagination(filteredDocs.length);
-    document.getElementById('docsFilterCount').innerText = filteredDocs.length + ' تحديث (من ' + uploadedDocs.length + ')';
-}
-function updatePagination(total) {
-    var totalPages = Math.ceil(total / docsPerPage);
-    var container = document.getElementById('docsPagination');
-    if (totalPages <= 1) { container.innerHTML = ''; return; }
-    var html = '<button onclick="goToDocsPage(' + (currentDocsPage - 1) + ')" class="btn" ' + (currentDocsPage === 1 ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-right"></i></button>';
-    for (var i = 1; i <= totalPages; i++) {
-        html += '<button onclick="goToDocsPage(' + i + ')" class="btn ' + (i === currentDocsPage ? 'btn-primary' : '') + '" style="padding:4px 12px; min-width:32px;">' + i + '</button>';
-    }
-    html += '<button onclick="goToDocsPage(' + (currentDocsPage + 1) + ')" class="btn" ' + (currentDocsPage === totalPages ? 'disabled style="opacity:0.5;"' : '') + '><i class="fas fa-chevron-left"></i></button>';
-    container.innerHTML = html;
-}
-function goToDocsPage(page) {
-    var totalPages = Math.ceil(filteredDocs.length / docsPerPage);
-    if (page < 1 || page > totalPages) return;
-    currentDocsPage = page;
-    renderDocsList();
-    document.getElementById('docsListContainer').scrollIntoView({ behavior: 'smooth' });
-}
-function filterDocs() {
-    var searchTerm = document.getElementById('searchDocsInput').value.toLowerCase();
-    var category = document.getElementById('filterDocsCategory').value;
-    var timeFilter = document.getElementById('filterDocsTime').value;
-    filteredDocs = uploadedDocs.filter(function(doc) {
-        var matchesSearch = doc.filename.toLowerCase().includes(searchTerm) || (doc.description || '').toLowerCase().includes(searchTerm);
-        var matchesCategory = category === 'all' || doc.category === category;
-        var now = new Date();
-        var docDate = new Date(doc.uploadDate);
-        var matchesTime = true;
-        switch(timeFilter) {
-            case 'today': matchesTime = docDate.toDateString() === now.toDateString(); break;
-            case 'week': var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); matchesTime = docDate >= weekAgo; break;
-            case 'month': var monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth() - 1); matchesTime = docDate >= monthAgo; break;
-            case 'year': var yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear() - 1); matchesTime = docDate >= yearAgo; break;
-            default: matchesTime = true;
-        }
-        return matchesSearch && matchesCategory && matchesTime;
-    });
-    currentDocsPage = 1;
-    renderDocsList();
-}
-function updateStats() {
-    var total = uploadedDocs.length;
-    var instructions = uploadedDocs.filter(function(d) { return d.category === 'تعليمات'; }).length;
-    var alerts = uploadedDocs.filter(function(d) { return d.category === 'تنبيه'; }).length;
-    var notifications = uploadedDocs.filter(function(d) { return d.category === 'إشعار'; }).length;
-    document.getElementById('statTotal').innerText = total;
-    document.getElementById('statInstructions').innerText = instructions;
-    document.getElementById('statAlerts').innerText = alerts;
-    document.getElementById('statNotifications').innerText = notifications;
-}
-function getTimeAgo(dateString) {
+document.addEventListener('DOMContentLoaded', function() {
+    loadBrandLogo();
+    loadSavedThemeSettings();
+    loadThemeMode();
+    document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
+    buildCentersTable();
+    loadShifts();
+    loadAllData();
+    setTimeout(checkForAlerts, 1000);
+});
+
+// فحص التنبيهات كل 10 ثواني
+setInterval(checkForAlerts, 10000);
+
+document.getElementById("newShiftBtn").onclick = startNewShift;
+document.getElementById("shiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'flex'; loadShifts(); };
+document.getElementById("closeShiftBtn").onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
+document.getElementById("docsBtn").onclick = function() { openDocsPage(); };
+document.getElementById("airAmbulanceBtn").onclick = function() {
+    document.getElementById('airAmbulanceModal').style.display = 'flex';
+    loadAirRecords();
     var now = new Date();
-    var past = new Date(dateString);
-    var diff = Math.floor((now - past) / 1000);
-    if (diff < 60) return 'الآن';
-    if (diff < 3600) return 'منذ ' + Math.floor(diff / 60) + ' دقيقة';
-    if (diff < 86400) return 'منذ ' + Math.floor(diff / 3600) + ' ساعة';
-    if (diff < 604800) return 'منذ ' + Math.floor(diff / 86400) + ' يوم';
-    if (diff < 2592000) return 'منذ ' + Math.floor(diff / 604800) + ' أسبوع';
-    return 'منذ ' + Math.floor(diff / 2592000) + ' شهر';
-}
-function getFileIcon(filename) {
-    if (filename.match(/\.(pdf)$/i)) return '📄';
-    if (filename.match(/\.(doc|docx)$/i)) return '📝';
-    if (filename.match(/\.(xls|xlsx)$/i)) return '📊';
-    if (filename.match(/\.(png|jpg|jpeg|gif|svg)$/i)) return '🖼️';
-    if (filename.match(/\.(txt)$/i)) return '📃';
-    if (filename.match(/\.(zip|rar|7z)$/i)) return '📦';
-    return '📎';
-}
-function getCategoryColor(category) {
-    var colors = { 'تعليمات': '#1A3A5C', 'إشعار': '#E8C84A', 'تقرير': '#2E8B7A', 'جدول': '#2A5A7A', 'تنبيه': '#E87461', 'أخرى': '#6B7F94' };
-    return colors[category] || '#6B7F94';
-}
-function getPriorityColor(priority) {
-    var colors = { 'normal': '#6B7F94', 'important': '#E8C84A', 'urgent': '#E87461' };
-    return colors[priority] || '#6B7F94';
-}
-function changeViewMode() {
-    docsViewMode = document.getElementById('docsViewMode').value;
-    renderDocsList();
-}
-function openUploadModal() {
-    alert('📤 سيتم فتح نافذة رفع التحديثات الجديدة');
-}
-function openUrgentUploadModal() {
-    alert('🚨 سيتم فتح نافذة رفع تحديث عاجل');
-}
-async function downloadDoc(docId) { try { window.open('/api/download-doc/' + docId, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
-async function deleteDoc(docId) {
-    if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
-    try {
-        var response = await fetch('/api/delete-doc/' + docId, { method: 'DELETE' });
-        var result = await response.json();
-        if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
-    } catch (error) { alert('❌ خطأ في الاتصال'); }
-}
+    document.getElementById('airDateTime').value = now.toISOString().slice(0, 16);
+};
+document.getElementById("closeAirModal").onclick = function() { document.getElementById('airAmbulanceModal').style.display = 'none'; };
+document.getElementById("monthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
+document.getElementById("closeMonthlyTableBtn").onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
+document.getElementById("controlBtn").onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
+document.getElementById("closeControlBtn").onclick = function() {
+    document.getElementById('controlModal').style.display = 'none';
+    isEditMode = false;
+    document.getElementById('saveVacationsBtn').style.display = 'none';
+    document.getElementById('editVacationsBtn').style.display = 'inline-block';
+};
+document.getElementById("printShiftBtn").onclick = function() { window.print(); };
+document.getElementById("saveShiftBtn").onclick = saveShiftData;
+document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
+document.getElementById("viewShiftBtn").onclick = viewShiftReports;
+document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
 
 // ============================================
-// دوال الجدول الشهري
+// تغيير الرقم السري
 // ============================================
-async function loadSavedTable() {
-    var container = document.getElementById('excelTableContainer');
-    var status = document.getElementById('tableStatus');
+document.getElementById('changePasswordBtn')?.addEventListener('click', function() {
+    document.getElementById('changePasswordModal').style.display = 'flex';
+});
+
+document.getElementById('confirmChangePasswordBtn')?.addEventListener('click', async function() {
+    var oldPassword = document.getElementById('oldPasswordInput').value;
+    var newPassword = document.getElementById('newPasswordInput').value;
+    var confirmNew = document.getElementById('confirmNewPasswordInput').value;
+
+    if (!oldPassword || !newPassword || !confirmNew) {
+        alert('⚠️ الرجاء ملء جميع الحقول');
+        return;
+    }
+
+    if (newPassword !== confirmNew) {
+        alert('❌ الرقم السري الجديد وتأكيده غير متطابقين');
+        return;
+    }
+
+    if (newPassword.length < 4) {
+        alert('❌ الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل');
+        return;
+    }
+
     try {
-        var response = await fetch('/api/check-monthly-table');
+        var response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
         var result = await response.json();
-        if (result.exists) {
-            status.innerHTML = '⏳ جاري تحميل الجدول...';
-            var fileResponse = await fetch('/api/get-monthly-table');
-            var blob = await fileResponse.blob();
-            var reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    var data = new Uint8Array(event.target.result);
-                    workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
-                    renderAllSheets(workbookData);
-                    status.innerHTML = '✅ تم تحميل ' + workbookData.SheetNames.length + ' أوراق';
-                } catch (error) {
-                    status.innerHTML = '❌ خطأ في عرض الجدول';
-                    container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في عرض الجدول: ' + error.message + '</p>';
-                }
-            };
-            reader.readAsArrayBuffer(blob);
+        if (result.success) {
+            alert('✅ تم تغيير الرقم السري بنجاح');
+            document.getElementById('changePasswordModal').style.display = 'none';
+            document.getElementById('oldPasswordInput').value = '';
+            document.getElementById('newPasswordInput').value = '';
+            document.getElementById('confirmNewPasswordInput').value = '';
         } else {
-            container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:30px 0;">📂 لا يوجد جدول شهري محفوظ. يرجى رفع ملف Excel.</p>';
-            status.innerHTML = '❌ لا يوجد جدول محفوظ';
+            alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري'));
         }
     } catch (error) {
-        container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في تحميل الجدول المحفوظ</p>';
-        status.innerHTML = '❌ خطأ في الاتصال';
+        alert('❌ خطأ في الاتصال');
     }
-}
-function renderAllSheets(workbook) {
-    var container = document.getElementById('excelTableContainer');
-    var html = '';
-    if (workbook.SheetNames.length > 1) {
-        html += '<div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px solid var(--gray-200); padding-bottom:10px;">';
-        workbook.SheetNames.forEach(function(name, index) {
-            var active = index === currentSheetIndex ? 'active' : '';
-            html += '<button class="sheet-tab ' + active + '" data-index="' + index + '">' + name + '</button>';
-        });
-        html += '</div>';
-    }
-    var sheetName = workbook.SheetNames[currentSheetIndex];
-    var sheet = workbook.Sheets[sheetName];
-    var htmlContent = XLSX.utils.sheet_to_html(sheet, { id: 'sheet-table', editable: false });
-    html += htmlContent;
-    container.innerHTML = html;
-    formatTable(container);
-    document.querySelectorAll('.sheet-tab').forEach(function(btn) {
-        btn.onclick = function() { currentSheetIndex = parseInt(this.dataset.index); renderAllSheets(workbookData); };
-    });
-}
-function formatTable(container) {
-    var table = container.querySelector('#sheet-table');
-    if (table) {
-        table.style.cssText = 'border-collapse: collapse; width: 100%; font-size: 0.7rem; direction: rtl;';
-        table.querySelectorAll('th, td').forEach(function(cell) { cell.style.border = '1px solid var(--gray-200)'; cell.style.padding = '4px 6px'; cell.style.textAlign = 'center'; cell.style.whiteSpace = 'nowrap'; cell.style.verticalAlign = 'middle'; });
-        table.querySelectorAll('th').forEach(function(th) { th.style.background = 'var(--gray-100)'; th.style.fontWeight = 'bold'; th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = '1'; });
-        table.style.minWidth = '100%'; table.style.width = 'auto';
-    }
-}
-document.getElementById('uploadExcelBtn')?.addEventListener('click', function() { document.getElementById('excelFileInput').click(); });
-document.getElementById('excelFileInput')?.addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = async function(event) {
-        try {
-            var data = new Uint8Array(event.target.result);
-            workbookData = XLSX.read(data, { type: 'array', cellFormula: true, cellHTML: false, cellNF: true, cellStyles: true, dense: false, codepage: 1256, dateNF: 'yyyy-mm-dd' });
-            renderAllSheets(workbookData);
-            var base64 = btoa(String.fromCharCode.apply(null, data));
-            var response = await fetch('/api/upload-monthly-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileData: base64 }) });
-            var result = await response.json();
-            if (result.success) { document.getElementById('tableStatus').innerHTML = '✅ تم حفظ ' + workbookData.SheetNames.length + ' أوراق بنجاح'; alert('✅ تم حفظ الجدول الشهري بنجاح'); } else { document.getElementById('tableStatus').innerHTML = '❌ فشل في حفظ الجدول'; alert('❌ فشل في حفظ الجدول'); }
-        } catch (error) { alert('❌ خطأ في قراءة الملف: ' + error.message); }
-    };
-    reader.readAsArrayBuffer(file);
 });
 
-// ============================================
-// دوال التحكم والتنسيق
-// ============================================
-async function loadVacations() {
-    try {
-        var response = await fetch('/api/vacations');
-        var data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-            data.forEach(function(item, index) { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
-        }
-    } catch (error) { console.error("خطأ في تحميل الإجازات:", error); }
-}
-function renderControlList(editable) {
-    editable = editable || false;
-    var container = document.getElementById('controlList');
-    if (!container) return;
-    var html = '<div style="display:grid; grid-template-columns: 1fr; gap:8px;">';
-    var colors = ['#1e466e', '#2a7f3e', '#c0392b', '#f39c12', '#2980b9', '#8e44ad', '#27ae60', '#d35400', '#16a085'];
-    controlData.forEach(function(person, index) {
-        var initials = person.name.split(' ').slice(0, 2).map(function(n) { return n[0]; }).join('');
-        var color = colors[index % colors.length];
-        var startDate = person.vacationStart || '';
-        var endDate = person.vacationEnd || '';
-        var vacationDisplay = startDate && endDate ? '📅 ' + formatDate(startDate) + ' → ' + formatDate(endDate) : '📅 لا توجد إجازة';
-        html += '<div class="control-person"><div class="control-avatar" style="background:' + color + ';">' + initials + '</div><div class="control-info"><div class="name">' + person.name + '</div><div class="role">📌 ' + person.role + ' | كود: ' + person.code + '</div></div><div class="control-vacation">' + (editable ? '<div class="edit"><input type="date" id="start_' + index + '" value="' + startDate + '"><span>→</span><input type="date" id="end_' + index + '" value="' + endDate + '"></div>' : '<div class="display">' + vacationDisplay + '</div>') + '</div><div class="control-role-badge">' + (person.role === 'تحكم عملياتي' ? '🎛️ تحكم' : '📞 تنسيق') + '</div></div>';
-    });
-    html += '</div>';
-    container.innerHTML = html;
-}
-function formatDate(dateString) {
-    if (!dateString) return '';
-    var parts = dateString.split('-');
-    return parts[2] + '/' + parts[1] + '/' + parts[0];
-}
-document.getElementById('editVacationsBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'flex'; document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); });
-document.getElementById('confirmPasswordBtn')?.addEventListener('click', async function() {
-    var password = document.getElementById('passwordInput').value;
-    try {
-        var response = await fetch('/api/get-password');
-        var result = await response.json();
-        var storedPassword = result.password || '1234';
-        if (password === storedPassword) {
-            isEditMode = true;
-            document.getElementById('passwordModal').style.display = 'none';
-            document.getElementById('passwordInput').value = '';
-            renderControlList(true);
-            document.getElementById('saveVacationsBtn').style.display = 'inline-block';
-            document.getElementById('editVacationsBtn').style.display = 'none';
-            alert('✅ تم تفعيل وضع التعديل');
-        } else { alert('❌ الرقم السري غير صحيح'); document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); }
-    } catch (error) { alert('❌ خطأ في التحقق من الرقم السري'); }
+document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', function() {
+    document.getElementById('changePasswordModal').style.display = 'none';
+    document.getElementById('oldPasswordInput').value = '';
+    document.getElementById('newPasswordInput').value = '';
+    document.getElementById('confirmNewPasswordInput').value = '';
 });
-document.getElementById('cancelPasswordBtn')?.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'none'; document.getElementById('passwordInput').value = ''; });
-document.getElementById('saveVacationsBtn')?.addEventListener('click', async function() {
-    controlData.forEach(function(person, index) {
-        var startInput = document.getElementById('start_' + index);
-        var endInput = document.getElementById('end_' + index);
-        if (startInput && endInput) { person.vacationStart = startInput.value; person.vacationEnd = endInput.value; }
-    });
-    try {
-        var response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacations: controlData }) });
-        var result = await response.json();
-        if (result.success) {
-            alert('✅ تم حفظ الإجازات بنجاح');
-            isEditMode = false;
-            renderControlList(false);
-            document.getElementById('saveVacationsBtn').style.display = 'none';
-            document.getElementById('editVacationsBtn').style.display = 'inline-block';
-        } else { alert('❌ فشل في حفظ الإجازات'); }
-    } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
-});
-
-// ============================================
-// دوال المناوبة (view, return, save, delete)
-// ============================================
-async function viewShiftReports() {
-    var select = document.getElementById('archiveSelect');
-    var shiftId = parseInt(select.value);
-    if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
-    try {
-        var response = await fetch('/api/shifts/' + shiftId);
-        var result = await response.json();
-        if (result && result.shift) {
-            currentViewingShift = result.shift;
-            isViewingArchiveShift = true;
-            viewingShiftId = shiftId;
-            reports = result.reports || {};
-            updateTotal();
-            loadShiftToForm(result.shift);
-            displayShiftReportStats(result.reports);
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
-            document.getElementById('viewingBadge').style.display = 'inline-block';
-            document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
-            document.getElementById('viewingBadge').innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
-            document.getElementById('updateStatus').innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + new Date().toLocaleTimeString();
-            document.getElementById('shiftModal').style.display = 'flex';
-        } else { alert("لا توجد بيانات في هذه المناوبة"); }
-    } catch (error) { console.error(error); alert("❌ فشل في تحميل المناوبة"); }
-}
-async function returnToCurrentShift() {
-    isViewingArchiveShift = false;
-    currentViewingShift = null;
-    viewingShiftId = null;
-    await loadAllData();
-    calculateLiveReportStats();
-    updateWorkforceStats();
-    updateDistributionIndicator();
-    document.getElementById('viewingBadge').style.display = 'none';
-    document.getElementById('returnToCurrentBtn').style.display = 'none';
-    document.getElementById('archiveSelect').value = '';
-    document.getElementById('updateStatus').innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + new Date().toLocaleTimeString();
-    document.getElementById('shiftModal').style.display = 'none';
-}
-async function saveShiftData() {
-    var shiftData = getShiftFromForm();
-    if (!shiftData.shiftType) { alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return; }
-    var targetId = viewingShiftId || currentShiftId;
-    if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
-    try {
-        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
-        var result = await response.json();
-        if (result.success) {
-            alert("✅ تم حفظ بيانات التكميل بنجاح");
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            if (viewingShiftId) {
-                var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
-                var viewResult = await viewResponse.json();
-                if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
-            }
-        } else { alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
-}
-async function deleteCurrentShift() {
-    var targetId = viewingShiftId || currentShiftId;
-    if (!targetId) { alert("لا توجد مناوبة محددة للحذف"); return; }
-    if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
-    try {
-        var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE' });
-        var result = await response.json();
-        if (result.success) {
-            alert("✅ تم حذف المناوبة");
-            if (targetId === currentShiftId) { currentShiftId = null; }
-            if (targetId === viewingShiftId) {
-                viewingShiftId = null;
-                isViewingArchiveShift = false;
-                document.getElementById('viewingBadge').style.display = 'none';
-                document.getElementById('returnToCurrentBtn').style.display = 'none';
-            }
-            clearShiftForm();
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            document.getElementById('shiftModal').style.display = 'none';
-        } else { alert("❌ فشل في الحذف"); }
-    } catch (error) { alert("❌ خطأ في الاتصال"); }
-}
-function loadShiftToForm(shift) {
-    if (!shift) return;
-    viewingShiftId = shift.id;
-    document.getElementById('shiftDate').innerText = shift.shiftDate || new Date().toLocaleDateString('ar-SA');
-    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
-    for (var i = 0; i < centerList.length; i++) {
-        var center = centerList[i];
-        var data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '' };
-        var staffInput = document.getElementById('staff_' + i);
-        var carsInput = document.getElementById('cars_' + i);
-        var notesInput = document.getElementById('notes_' + i);
-        if (staffInput) staffInput.value = data.staffCount || '';
-        if (carsInput) carsInput.value = data.carsCount || '';
-        if (notesInput) notesInput.value = data.notes || '';
-        updateStatusIcon(i);
-    }
-    document.getElementById('generalNotes').value = shift.generalNotes || '';
-    setTimeout(calculateWorkforceStatsLocally, 100);
-    if (shift.id) { loadWorkforceStats(shift.id); }
-}
-function getShiftFromForm() {
-    var shiftType = document.querySelector('input[name="shiftType"]:checked')?.value || '';
-    var rapidLocations = {};
-    document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
-    var centersDataForm = {};
-    for (var i = 0; i < centerList.length; i++) {
-        var center = centerList[i];
-        var staffInput = document.getElementById('staff_' + i);
-        var carsInput = document.getElementById('cars_' + i);
-        var notesInput = document.getElementById('notes_' + i);
-        centersDataForm[center] = { staffCount: staffInput?.value || '', carsCount: carsInput?.value || '', notes: notesInput?.value || '' };
-    }
-    return { shiftType: shiftType, rapidLocations: rapidLocations, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
-}
-function clearShiftForm() {
-    document.getElementById('shiftDate').innerText = new Date().toLocaleDateString('ar-SA');
-    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
-    for (var i = 0; i < centerList.length; i++) {
-        var staffInput = document.getElementById('staff_' + i);
-        var carsInput = document.getElementById('cars_' + i);
-        var notesInput = document.getElementById('notes_' + i);
-        if (staffInput) staffInput.value = '';
-        if (carsInput) carsInput.value = '';
-        if (notesInput) notesInput.value = '';
-        updateStatusIcon(i);
-    }
-    document.getElementById('generalNotes').value = '';
-    document.getElementById('workforceStats').style.display = 'none';
-    document.getElementById('shiftReportStats').style.display = 'none';
-}
-function displayShiftReportStats(reportsData) {
-    var container = document.getElementById('shiftReportStats');
-    var listContainer = document.getElementById('unitReportList');
-    if (!reportsData || Object.keys(reportsData).length === 0) { container.style.display = 'none'; return; }
-    var total = 0;
-    var unitStats = {};
-    for (var key in reportsData) {
-        var report = reportsData[key];
-        if (report && report.count > 0) {
-            total += report.count;
-            var parts = key.split('|');
-            var unit = parts.length > 1 ? parts[1] : key;
-            if (unit && unit.trim() !== '') {
-                unitStats[unit] = (unitStats[unit] || 0) + report.count;
-            }
-        }
-    }
-    if (total === 0) { container.style.display = 'none'; return; }
-    container.style.display = 'block';
-    document.getElementById('shiftTotalReports').innerText = total;
-    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
-    var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
-    var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-    document.getElementById('topUnit').innerText = topUnit;
-    document.getElementById('topUnitCount').innerText = topCount;
-    listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
-    if (sortedUnits.length === 0) {
-        listContainer.innerHTML += '<p style="text-align:center; color:var(--gray-400); font-size:0.7rem;">لا توجد بيانات كافية</p>';
-        return;
-    }
-    sortedUnits.forEach(function(item) {
-        var percentage = Math.round((item[1] / total) * 100);
-        var div = document.createElement('div');
-        div.className = 'distribution-bar';
-        div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#1e466e;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#1e466e;"></div></div><span class="percent">' + percentage + '%</span>';
-        listContainer.appendChild(div);
-    });
-}
-async function loadWorkforceStats(shiftId) {
-    try {
-        var response = await fetch('/api/workforce-stats/' + shiftId);
-        var stats = await response.json();
-        if (stats.error) { document.getElementById('workforceStats').style.display = 'none'; return; }
-        document.getElementById('workforceStats').style.display = 'block';
-        document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
-        document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
-        document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
-        document.getElementById('staffSubText').innerText = 'موزعين على ' + stats.centerCount + ' مركز';
-        document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-        document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-        document.getElementById('readinessSubText').innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
-        var circumference = 2 * Math.PI * 42;
-        var offset = circumference - (stats.readinessRate / 100) * circumference;
-        var circle = document.getElementById('readinessCircle');
-        var text = document.getElementById('readinessText');
-        var color = '#c0392b';
-        if (stats.readinessRate >= 80) color = '#2a7f3e';
-        else if (stats.readinessRate >= 50) color = '#f39c12';
-        circle.setAttribute('stroke', color);
-        circle.style.strokeDashoffset = offset;
-        text.textContent = stats.readinessRate + '%';
-        var distList = document.getElementById('distributionList');
-        distList.innerHTML = '';
-        var total = stats.totalStaff || 1;
-        for (var center in stats.distribution) {
-            var count = stats.distribution[center];
-            var barWidth = Math.round((count / total) * 100);
-            var isReady = count >= 2;
-            var div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
-            distList.appendChild(div);
-        }
-        var carDistList = document.getElementById('carDistributionList');
-        carDistList.innerHTML = '';
-        var totalCars = stats.totalCars || 1;
-        for (var center2 in stats.carDistribution) {
-            var count2 = stats.carDistribution[center2];
-            var barWidth2 = Math.round((count2 / totalCars) * 100);
-            var hasCar = count2 >= 1;
-            var div2 = document.createElement('div');
-            div2.className = 'distribution-bar';
-            div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
-            carDistList.appendChild(div2);
-        }
-    } catch (error) { console.error(error); document.getElementById('workforceStats').style.display = 'none'; }
-}
-
-// ============================================
-// دوال كبار المسعفين
-// ============================================
-function renderSeniorRecords() {
-    var container = document.getElementById('seniorRecordsList');
-    var section = document.getElementById('seniorSavedRecords');
-    if (!container || !section) return;
-    if (seniorRecords.length === 0) { section.style.display = 'none'; return; }
-    section.style.display = 'block';
-    var html = '';
-    seniorRecords.forEach(function(record, index) {
-        var date = new Date(record.createdAt).toLocaleString('ar-SA');
-        var locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
-        html += '<div class="record-item"><div class="record-info"><strong>🚑 ' + (record.activeCars || 0) + '</strong><span style="margin:0 5px;">|</span><span>🔧 ' + (record.brokenCars || 0) + '</span><span style="margin:0 5px;">|</span><span>🔄 ' + (record.reserveCars || 0) + '</span><span style="margin:0 5px;">|</span><span>📊 ' + (record.overlapTeams || 0) + '</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ' + locations + '</span><span class="rec-date">🕒 ' + date + '</span>' + (record.assistantName ? '<span style="font-size:0.6rem; color:var(--primary-700);">👤 ' + record.assistantName + '</span>' : '') + '</div><div class="record-actions"><button onclick="deleteSeniorRecord(' + index + ')">🗑️ حذف</button></div></div>';
-    });
-    container.innerHTML = html;
-}
-function getSeniorShiftData() {
-    var activeCars = parseInt(document.getElementById('seniorActiveCars').value) || 0;
-    var brokenCars = parseInt(document.getElementById('seniorBrokenCars').value) || 0;
-    var reserveCars = parseInt(document.getElementById('seniorReserveCars').value) || 0;
-    var overlapTeams = parseInt(document.getElementById('seniorOverlapTeams').value) || 0;
-    var locations = [];
-    document.querySelectorAll('.senior-location:checked').forEach(function(cb) { locations.push(cb.value); });
-    var notes = document.getElementById('seniorNotes').value.trim();
-    var assistantName = document.getElementById('seniorAssistantName').value.trim();
-    var assistantSignature = document.getElementById('seniorAssistantSignature').value.trim();
-    var chiefName = document.getElementById('seniorChiefName').value.trim();
-    var chiefSignature = document.getElementById('seniorChiefSignature').value.trim();
-    var leaderName = document.getElementById('seniorRegionLeaderName').value.trim();
-    var leaderSignature = document.getElementById('seniorRegionLeaderSignature').value.trim();
-    return { activeCars: activeCars, brokenCars: brokenCars, reserveCars: reserveCars, overlapTeams: overlapTeams, locations: locations, notes: notes, assistantName: assistantName, assistantSignature: assistantSignature, chiefName: chiefName, chiefSignature: chiefSignature, leaderName: leaderName, leaderSignature: leaderSignature };
-}
-function saveSeniorRecordToLocal(data) {
-    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return false; }
-    seniorRecords.unshift({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() });
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    renderSeniorRecords();
-    return true;
-}
-function clearSeniorShiftForm() {
-    document.getElementById('seniorActiveCars').value = 0;
-    document.getElementById('seniorBrokenCars').value = 0;
-    document.getElementById('seniorReserveCars').value = 0;
-    document.getElementById('seniorOverlapTeams').value = 0;
-    document.querySelectorAll('.senior-location').forEach(function(cb) { cb.checked = false; });
-    document.getElementById('seniorNotes').value = '';
-    document.getElementById('seniorAssistantName').value = '';
-    document.getElementById('seniorAssistantSignature').value = '';
-    document.getElementById('seniorChiefName').value = '';
-    document.getElementById('seniorChiefSignature').value = '';
-    document.getElementById('seniorRegionLeaderName').value = '';
-    document.getElementById('seniorRegionLeaderSignature').value = '';
-}
-function deleteSeniorRecord(index) {
-    if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
-    seniorRecords.splice(index, 1);
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    renderSeniorRecords();
-}
-function formatWhatsAppMessage(data) {
-    var now = new Date();
-    var dateStr = now.toLocaleDateString('ar-SA');
-    var timeStr = now.toLocaleTimeString('ar-SA');
-    var locationsStr = data.locations && data.locations.length > 0 ? data.locations.join('، ') : 'لا يوجد';
-    var message = '';
-    message += 'تقرير مناوبة كبار المسعفين\n';
-    message += '═══════════════════════════\n';
-    message += 'التاريخ: ' + dateStr + '\n';
-    message += 'الوقت: ' + timeStr + '\n\n';
-    message += 'المركبات العاملة: ' + data.activeCars + '\n';
-    message += 'المركبات المتعطلة: ' + data.brokenCars + '\n';
-    message += 'مركبات الاحتياط: ' + data.reserveCars + '\n';
-    message += 'فرق الاوفر لاب: ' + data.overlapTeams + '\n';
-    message += 'مناطق التمركز: ' + locationsStr + '\n\n';
-    if (data.notes) { message += 'الملاحظات: ' + data.notes + '\n\n'; }
-    message += '═══════════════════════════\n';
-    message += 'التسليم والاستلام\n';
-    message += 'مساعد كبير المسعفين: ' + (data.assistantName || '———') + '\n';
-    message += 'كبير المسعفين: ' + (data.chiefName || '———') + '\n';
-    message += 'قائد المنطقة: ' + (data.leaderName || '———') + '\n';
-    message += '═══════════════════════════\n';
-    message += 'تم الإرسال: ' + dateStr + ' ' + timeStr;
-    return message;
-}
-function sendWhatsAppMessage(message) {
-    var encodedMessage = encodeURIComponent(message);
-    window.open('https://wa.me/?text=' + encodedMessage, '_blank');
-}
-document.getElementById('seniorShiftBtn')?.addEventListener('click', function() {
-    var now = new Date();
-    var dateStr = now.toLocaleDateString('ar-SA');
-    document.getElementById('seniorAssistantDate').innerText = dateStr;
-    document.getElementById('seniorChiefDate').innerText = dateStr;
-    document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
-    document.getElementById('seniorPrintDate').innerText = dateStr + ' - ' + now.toLocaleTimeString('ar-SA');
-    document.getElementById('seniorShiftModal').style.display = 'flex';
-    renderSeniorRecords();
-});
-document.getElementById('closeSeniorShift')?.addEventListener('click', function() { document.getElementById('seniorShiftModal').style.display = 'none'; });
-document.getElementById('saveSeniorShift')?.addEventListener('click', function() {
-    var data = getSeniorShiftData();
-    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
-    if (saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
-});
-document.getElementById('sendWhatsAppSeniorShift')?.addEventListener('click', function() {
-    var data = getSeniorShiftData();
-    if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال'); return; }
-    saveSeniorRecordToLocal(data);
-    var message = formatWhatsAppMessage(data);
-    sendWhatsAppMessage(message);
-});
-
-// ============================================
-// دوال إضافة البلاغات (من التوزيع)
-// ============================================
-async function addReportToServer(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة."); return; }
-    if (!currentShiftId) { alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً."); return; }
-    try {
-        var response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
-        var result = await response.json();
-        if (result.success) { 
-            await loadAllData(); 
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-        } else { alert("❌ فشل في تسجيل البلاغ: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ فشل في الاتصال بالخادم"); }
-}
-
-async function undoLastReport(center, unit) {
-    if (isViewingArchiveShift) { alert("⚠️ لا يمكن التراجع عن بلاغات مناوبة سابقة."); return; }
-    try {
-        var response = await fetch('/api/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: center, unit: unit }) });
-        var result = await response.json();
-        if (result.success) { 
-            await loadAllData(); 
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-        } else if (result.error) { alert(result.error); }
-    } catch (error) { alert("❌ فشل في التراجع"); }
-}
 
 // ============================================
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal'];
+    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal'];
     modals.forEach(function(id) {
         var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -3438,6 +4044,7 @@ console.log('📊 مؤشرات القوى العاملة تعكس بيانات �
 console.log('🌐 نظام وقت الذروة يعمل على الخادم (Server-based)');
 console.log('📍 تنبيهات وقت الذروة تظهر مع خريطة الموقع');
 console.log('🗺️ معاينة الخريطة للفرق متاحة من نافذة التوزيع');
+console.log('📋 النماذج الموحدة (الإسعاف الجوي، التصعيد، E، الحوادث، التقرير اليومي)');
 </script>
 </body>
 </html>
