@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
 // ============================================
 // مسارات ملفات البيانات

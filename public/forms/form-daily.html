@@ -1,0 +1,139 @@
+<!-- ===== نموذج التقرير اليومي ===== -->
+<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
+        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--primary-100); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--primary-700);">
+            <i class="fas fa-calendar-day"></i>
+        </div>
+        <div>
+            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">التقرير اليومي</h4>
+            <span style="font-size:0.7rem; color:var(--gray-600);">التقرير اليومي للعمليات</span>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم التقرير:
+        </label>
+        <input type="text" id="dailyReportNumber" placeholder="مثال: 2025-DAILY-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-calendar-alt" style="color:var(--gold); width:18px;"></i> التاريخ:
+        </label>
+        <input type="date" id="dailyDate" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> عدد البلاغات الإسعافية:
+        </label>
+        <input type="number" id="dailyReports" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-helicopter" style="color:var(--teal); width:18px;"></i> عدد بلاغات الإسعاف الجوي:
+        </label>
+        <input type="number" id="dailyAir" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-check-circle" style="color:var(--teal); width:18px;"></i> الحالات المنتهية:
+        </label>
+        <input type="number" id="dailyCompleted" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> ملخص التقرير:
+        </label>
+        <textarea id="dailySummary" rows="3" placeholder="ملخص التقرير اليومي..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
+    </div>
+    
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
+        <button onclick="saveDailyReport()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-save"></i> حفظ التقرير
+        </button>
+        <button onclick="sendDailyWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fab fa-whatsapp"></i> إرسال واتساب
+        </button>
+        <button onclick="clearDailyForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-eraser"></i> مسح
+        </button>
+    </div>
+</div>
+
+<script>
+let dailyRecords = JSON.parse(localStorage.getItem('dailyRecords') || '[]');
+
+function initForm_daily() {
+    document.getElementById('dailyDate').value = new Date().toISOString().split('T')[0];
+}
+
+function saveDailyReport() {
+    const reportNumber = document.getElementById('dailyReportNumber').value.trim();
+    const date = document.getElementById('dailyDate').value;
+    const reports = parseInt(document.getElementById('dailyReports').value) || 0;
+    const air = parseInt(document.getElementById('dailyAir').value) || 0;
+    const completed = parseInt(document.getElementById('dailyCompleted').value) || 0;
+    const summary = document.getElementById('dailySummary').value.trim();
+
+    if (!reportNumber || !date) {
+        alert('⚠️ الرجاء ملء رقم التقرير والتاريخ');
+        return;
+    }
+
+    dailyRecords.unshift({
+        reportNumber,
+        date,
+        reports,
+        air,
+        completed,
+        summary,
+        createdAt: new Date().toISOString()
+    });
+    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
+    alert('✅ تم حفظ التقرير اليومي');
+    clearDailyForm();
+}
+
+function clearDailyForm() {
+    document.getElementById('dailyReportNumber').value = '';
+    document.getElementById('dailyReports').value = 0;
+    document.getElementById('dailyAir').value = 0;
+    document.getElementById('dailyCompleted').value = 0;
+    document.getElementById('dailySummary').value = '';
+    document.getElementById('dailyDate').value = new Date().toISOString().split('T')[0];
+}
+
+function sendDailyWhatsApp() {
+    const reportNumber = document.getElementById('dailyReportNumber').value.trim();
+    const date = document.getElementById('dailyDate').value;
+    const reports = parseInt(document.getElementById('dailyReports').value) || 0;
+    const air = parseInt(document.getElementById('dailyAir').value) || 0;
+    const completed = parseInt(document.getElementById('dailyCompleted').value) || 0;
+    const summary = document.getElementById('dailySummary').value.trim();
+
+    if (!reportNumber || !date) {
+        alert('⚠️ الرجاء ملء رقم التقرير والتاريخ');
+        return;
+    }
+
+    let message = '';
+    message += 'التقرير اليومي\n';
+    message += '═══════════════════════════════════\n';
+    message += 'رقم التقرير: ' + reportNumber + '\n';
+    message += 'التاريخ: ' + date + '\n';
+    message += 'البلاغات الإسعافية: ' + reports + '\n';
+    message += 'بلاغات الإسعاف الجوي: ' + air + '\n';
+    message += 'الحالات المنتهية: ' + completed + '\n';
+    if (summary) message += 'الملخص: ' + summary + '\n';
+    message += '═══════════════════════════════════\n';
+    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+
+    const encoded = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+</script>

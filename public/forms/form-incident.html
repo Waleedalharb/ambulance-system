@@ -1,0 +1,212 @@
+<!-- ===== نموذج بلاغ حادث ===== -->
+<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
+        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:#FFF8E7; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--gold);">
+            <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <div>
+            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">بلاغ حادث</h4>
+            <span style="font-size:0.7rem; color:var(--gray-600);">تسجيل بلاغات الحوادث</span>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم البلاغ:
+        </label>
+        <input type="text" id="incReportNumber" placeholder="مثال: 2025-INC-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-calendar-clock" style="color:var(--gold); width:18px;"></i> تاريخ ووقت الحادث:
+        </label>
+        <input type="datetime-local" id="incDateTime" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-map-marker-alt" style="color:var(--coral); width:18px;"></i> موقع الحادث:
+        </label>
+        <input type="text" id="incLocation" placeholder="الموقع بالتفصيل" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-exclamation-triangle" style="color:var(--coral); width:18px;"></i> نوع الحادث:
+        </label>
+        <select id="incType" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+            <option value="">-- اختر نوع الحادث --</option>
+            <option value="تصادم مروري">تصادم مروري</option>
+            <option value="دهس">دهس</option>
+            <option value="انقلاب مركبة">انقلاب مركبة</option>
+            <option value="حريق">حريق</option>
+            <option value="غرق">غرق</option>
+            <option value="سقوط من ارتفاع">سقوط من ارتفاع</option>
+            <option value="إصابة عمل">إصابة عمل</option>
+            <option value="عنف">عنف</option>
+            <option value="حالة طبية طارئة">حالة طبية طارئة</option>
+            <option value="أخرى">أخرى</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-users" style="color:var(--teal); width:18px;"></i> عدد المصابين:
+        </label>
+        <input type="number" id="incInjuries" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-user-injured" style="color:var(--coral); width:18px;"></i> عدد الوفيات:
+        </label>
+        <input type="number" id="incDeaths" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> الفرقة المستجيبة:
+        </label>
+        <select id="incUnits" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+            <option value="">-- اختر الفرقة --</option>
+            <option value="سريع 1">سريع 1</option>
+            <option value="سريع 2">سريع 2</option>
+            <option value="سريع 3">سريع 3</option>
+            <option value="سريع 4">سريع 4</option>
+            <option value="جنوب 1">جنوب 1</option>
+            <option value="جنوب 2">جنوب 2</option>
+            <option value="جنوب 3">جنوب 3</option>
+            <option value="جنوب 4">جنوب 4</option>
+            <option value="جنوب 5">جنوب 5</option>
+            <option value="جنوب 6">جنوب 6</option>
+            <option value="جنوب 7">جنوب 7</option>
+            <option value="جنوب 8">جنوب 8</option>
+            <option value="جنوب 9">جنوب 9</option>
+            <option value="جنوب 10">جنوب 10</option>
+            <option value="جنوب 11">جنوب 11</option>
+            <option value="جنوب 12">جنوب 12</option>
+            <option value="جنوب 13">جنوب 13</option>
+            <option value="جنوب 14">جنوب 14</option>
+            <option value="جنوب 15">جنوب 15</option>
+            <option value="جنوب 16">جنوب 16</option>
+            <option value="جنوب 17">جنوب 17</option>
+            <option value="جنوب 18">جنوب 18</option>
+            <option value="جنوب 19">جنوب 19</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-hospital" style="color:var(--coral); width:18px;"></i> المستشفى المستلم:
+        </label>
+        <input type="text" id="incHospital" placeholder="اسم المستشفى" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> تفاصيل الحادث:
+        </label>
+        <textarea id="incDetails" rows="3" placeholder="التفاصيل الكاملة للحادث..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
+    </div>
+    
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
+        <button onclick="saveIncident()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-save"></i> حفظ البلاغ
+        </button>
+        <button onclick="sendIncidentWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fab fa-whatsapp"></i> إرسال واتساب
+        </button>
+        <button onclick="clearIncidentForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-eraser"></i> مسح
+        </button>
+    </div>
+</div>
+
+<script>
+let incidentRecords = JSON.parse(localStorage.getItem('incidentRecords') || '[]');
+
+function initForm_incident() {
+    document.getElementById('incDateTime').value = new Date().toISOString().slice(0, 16);
+}
+
+function saveIncident() {
+    const reportNumber = document.getElementById('incReportNumber').value.trim();
+    const dateTime = document.getElementById('incDateTime').value;
+    const location = document.getElementById('incLocation').value.trim();
+    const incType = document.getElementById('incType').value;
+    const injuries = parseInt(document.getElementById('incInjuries').value) || 0;
+    const deaths = parseInt(document.getElementById('incDeaths').value) || 0;
+    const unit = document.getElementById('incUnits').value;
+    const hospital = document.getElementById('incHospital').value.trim();
+    const details = document.getElementById('incDetails').value.trim();
+
+    if (!reportNumber || !location || !incType || !unit) {
+        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، نوع الحادث، الفرقة)');
+        return;
+    }
+
+    incidentRecords.unshift({
+        reportNumber,
+        dateTime,
+        location,
+        incType,
+        injuries,
+        deaths,
+        unit,
+        hospital,
+        details,
+        createdAt: new Date().toISOString()
+    });
+    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
+    alert('✅ تم حفظ بلاغ الحادث');
+    clearIncidentForm();
+}
+
+function clearIncidentForm() {
+    document.getElementById('incReportNumber').value = '';
+    document.getElementById('incLocation').value = '';
+    document.getElementById('incType').value = '';
+    document.getElementById('incInjuries').value = 0;
+    document.getElementById('incDeaths').value = 0;
+    document.getElementById('incUnits').value = '';
+    document.getElementById('incHospital').value = '';
+    document.getElementById('incDetails').value = '';
+    document.getElementById('incDateTime').value = new Date().toISOString().slice(0, 16);
+}
+
+function sendIncidentWhatsApp() {
+    const reportNumber = document.getElementById('incReportNumber').value.trim();
+    const dateTime = document.getElementById('incDateTime').value;
+    const location = document.getElementById('incLocation').value.trim();
+    const incType = document.getElementById('incType').value;
+    const injuries = parseInt(document.getElementById('incInjuries').value) || 0;
+    const deaths = parseInt(document.getElementById('incDeaths').value) || 0;
+    const unit = document.getElementById('incUnits').value;
+    const hospital = document.getElementById('incHospital').value.trim();
+    const details = document.getElementById('incDetails').value.trim();
+
+    if (!reportNumber || !location || !incType || !unit) {
+        alert('⚠️ الرجاء ملء الحقول المطلوبة');
+        return;
+    }
+
+    let message = '';
+    message += 'تقرير بلاغ حادث\n';
+    message += '═══════════════════════════════════\n';
+    message += 'رقم البلاغ: ' + reportNumber + '\n';
+    message += 'التاريخ والوقت: ' + dateTime.replace('T', ' ') + '\n';
+    message += 'الموقع: ' + location + '\n';
+    message += 'نوع الحادث: ' + incType + '\n';
+    message += 'عدد المصابين: ' + injuries + '\n';
+    message += 'عدد الوفيات: ' + deaths + '\n';
+    message += 'الفرقة المستجيبة: ' + unit + '\n';
+    if (hospital) message += 'المستشفى المستلم: ' + hospital + '\n';
+    if (details) message += 'التفاصيل: ' + details + '\n';
+    message += '═══════════════════════════════════\n';
+    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+
+    const encoded = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+</script>

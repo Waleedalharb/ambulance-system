@@ -1,0 +1,169 @@
+<!-- ===== نموذج الإسعاف الجوي ===== -->
+<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
+        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--teal-light); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--teal);">
+            <i class="fas fa-helicopter"></i>
+        </div>
+        <div>
+            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">الإسعاف الجوي</h4>
+            <span style="font-size:0.7rem; color:var(--gray-600);">تسجيل بلاغات الإسعاف الجوي</span>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم البلاغ:
+        </label>
+        <input type="text" id="airReportNumber" placeholder="مثال: 2025-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> الفرقة المرافقة:
+        </label>
+        <select id="airUnit" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+            <option value="">-- اختر الفرقة --</option>
+            <option value="سريع 1">سريع 1</option>
+            <option value="سريع 2">سريع 2</option>
+            <option value="سريع 3">سريع 3</option>
+            <option value="سريع 4">سريع 4</option>
+            <option value="جنوب 1">جنوب 1</option>
+            <option value="جنوب 2">جنوب 2</option>
+            <option value="جنوب 3">جنوب 3</option>
+            <option value="جنوب 4">جنوب 4</option>
+            <option value="جنوب 5">جنوب 5</option>
+            <option value="جنوب 6">جنوب 6</option>
+            <option value="جنوب 7">جنوب 7</option>
+            <option value="جنوب 8">جنوب 8</option>
+            <option value="جنوب 9">جنوب 9</option>
+            <option value="جنوب 10">جنوب 10</option>
+            <option value="جنوب 11">جنوب 11</option>
+            <option value="جنوب 12">جنوب 12</option>
+            <option value="جنوب 13">جنوب 13</option>
+            <option value="جنوب 14">جنوب 14</option>
+            <option value="جنوب 15">جنوب 15</option>
+            <option value="جنوب 16">جنوب 16</option>
+            <option value="جنوب 17">جنوب 17</option>
+            <option value="جنوب 18">جنوب 18</option>
+            <option value="جنوب 19">جنوب 19</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-hospital" style="color:var(--coral); width:18px;"></i> المستشفى المستلم:
+        </label>
+        <input type="text" id="airHospital" placeholder="اسم المستشفى" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-calendar-clock" style="color:var(--gold); width:18px;"></i> تاريخ ووقت النقل:
+        </label>
+        <input type="datetime-local" id="airDateTime" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    </div>
+    
+    <div class="form-row">
+        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
+            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> ملاحظات:
+        </label>
+        <textarea id="airNotes" rows="2" placeholder="أي ملاحظات إضافية..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
+    </div>
+    
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
+        <button onclick="saveAirForm()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-save"></i> حفظ البلاغ
+        </button>
+        <button onclick="sendAirWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fab fa-whatsapp"></i> إرسال واتساب
+        </button>
+        <button onclick="clearAirForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
+            <i class="fas fa-eraser"></i> مسح
+        </button>
+    </div>
+</div>
+
+<script>
+let airRecords = [];
+
+function initForm_air() {
+    document.getElementById('airDateTime').value = new Date().toISOString().slice(0, 16);
+    loadAirRecords();
+}
+
+async function loadAirRecords() {
+    try {
+        const response = await fetch('/api/air-ambulance');
+        const result = await response.json();
+        if (result.success) {
+            airRecords = result.records || [];
+        }
+    } catch (error) {
+        console.error("خطأ:", error);
+    }
+}
+
+function saveAirForm() {
+    const reportNumber = document.getElementById('airReportNumber').value.trim();
+    const unit = document.getElementById('airUnit').value;
+    const hospital = document.getElementById('airHospital').value.trim();
+    const dateTime = document.getElementById('airDateTime').value;
+    const notes = document.getElementById('airNotes').value.trim();
+
+    if (!reportNumber || !unit || !hospital || !dateTime) {
+        alert('⚠️ الرجاء ملء جميع الحقول المطلوبة');
+        return;
+    }
+
+    fetch('/api/save-air-ambulance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportNumber, unit, hospital, dateTime, notes })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('✅ تم حفظ بلاغ الإسعاف الجوي');
+            clearAirForm();
+        } else {
+            alert('❌ فشل في حفظ البلاغ');
+        }
+    })
+    .catch(() => alert('❌ خطأ في الاتصال'));
+}
+
+function clearAirForm() {
+    document.getElementById('airReportNumber').value = '';
+    document.getElementById('airUnit').value = '';
+    document.getElementById('airHospital').value = '';
+    document.getElementById('airNotes').value = '';
+    document.getElementById('airDateTime').value = new Date().toISOString().slice(0, 16);
+}
+
+function sendAirWhatsApp() {
+    const reportNumber = document.getElementById('airReportNumber').value.trim();
+    const unit = document.getElementById('airUnit').value;
+    const hospital = document.getElementById('airHospital').value.trim();
+    const dateTime = document.getElementById('airDateTime').value;
+    const notes = document.getElementById('airNotes').value.trim();
+
+    if (!reportNumber || !unit || !hospital || !dateTime) {
+        alert('⚠️ الرجاء ملء جميع الحقول المطلوبة');
+        return;
+    }
+
+    let message = '';
+    message += 'تقرير بلاغ الإسعاف الجوي\n';
+    message += '═══════════════════════════════════\n';
+    message += 'رقم البلاغ: ' + reportNumber + '\n';
+    message += 'الفرقة المرافقة: ' + unit + '\n';
+    message += 'المستشفى المستلم: ' + hospital + '\n';
+    message += 'تاريخ ووقت النقل: ' + dateTime.replace('T', ' ') + '\n';
+    if (notes) message += 'الملاحظات: ' + notes + '\n';
+    message += '═══════════════════════════════════\n';
+    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+
+    const encoded = encodeURIComponent(message);
+    window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+</script>
