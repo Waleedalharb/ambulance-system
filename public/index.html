@@ -10,24 +10,23 @@
 
     
     <!-- ===== أيقونات الموقع (Favicon & PWA) ===== -->
-<!-- شعار المتصفح -->
+<!-- شعار المتصفح (ICO) -->
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
 
-<!-- ملف التطبيق (PWA) - للتثبيت على الأجهزة -->
-<link rel="manifest" href="/manifest.json">
-
-<!-- أيقونة Apple (لأجهزة iPhone / iPad) -->
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-<!-- أيقونات بأحجام مختلفة (دعم إضافي) -->
+<!-- أيقونات بأحجام مختلفة للجوال والمتصفحات الحديثة -->
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
-    
-    <link rel="manifest" href="/manifest.json">
-    <!-- أيقونة الموقع (Favicon) -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+
+<!-- أيقونة أجهزة Apple (iPhone / iPad) -->
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+
+<!-- ملف التطبيق (PWA) للتثبيت على الأجهزة -->
+<link rel="manifest" href="/manifest.json">
 
 <!-- أيقونات لأجهزة Android / iOS (اختياري) -->
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
@@ -1482,7 +1481,34 @@
             <tr><td style="font-weight:bold;">سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
         </tbody></table>
         <h3><i class="fas fa-hospital icon-primary"></i> المراكز الإسعافية</h3>
-        <table id="centersTable"><thead><tr><th>المركز</th><th>عدد المسعفين</th><th>السيارات العاملة</th><th>الجاهزية</th><th>ملاحظات (تأخير / غياب)</th></tr></thead><tbody id="centersTableBody"></tbody></table>
+
+<!-- ===== أزرار الإجراءات السريعة ===== -->
+<div style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; padding:10px; background:var(--gray-50); border-radius:var(--radius-sm); align-items:center;">
+    <button onclick="setAllCentersComplete()" class="btn" style="background:#2a7f3e; color:white; border:none; padding:6px 16px; border-radius:20px; cursor:pointer;">
+        <i class="fas fa-check-double"></i> تكميل الكل
+    </button>
+    <button onclick="setAllCentersIncomplete()" class="btn" style="background:#c0392b; color:white; border:none; padding:6px 16px; border-radius:20px; cursor:pointer;">
+        <i class="fas fa-times"></i> إلغاء الكل
+    </button>
+    <span style="font-size:0.7rem; color:var(--gray-600); margin-right:auto;">
+        💡 اضغط "مكتمل" للمراكز الجاهزة، واملأ يدوياً للناقصة
+    </span>
+</div>
+
+<!-- ===== جدول المراكز ===== -->
+<table id="centersTable">
+    <thead>
+        <tr>
+            <th style="min-width:80px;">المركز</th>
+            <th style="min-width:60px;">الحالة</th>
+            <th style="min-width:70px;">المسعفين</th>
+            <th style="min-width:70px;">السيارات</th>
+            <th style="min-width:130px;">إجراء سريع</th>
+            <th>ملاحظات</th>
+        </tr>
+    </thead>
+    <tbody id="centersTableBody"></tbody>
+</table>
         <div id="workforceStats" class="stats-section" style="display:none;"><h3>📊 مؤشرات القوى العاملة</h3><div class="circle-stats-container">
             <div class="circle-stat"><div class="svg-circle-container"><svg class="svg-circle" viewBox="0 0 100 100"><circle class="svg-circle-bg" cx="50" cy="50" r="42"/><circle class="svg-circle-fg" id="readinessCircle" cx="50" cy="50" r="42" stroke="#2a7f3e" stroke-dasharray="263.89" stroke-dashoffset="263.89"/><text class="svg-circle-text" x="50" y="50" id="readinessText">0%</text></svg></div><div class="value" style="font-size:1rem; color:var(--primary-700);">نسبة الجاهزية</div><div class="sub-value" id="readinessSubText">0 / 0 مركز</div></div>
             <div class="circle-stat"><div class="value value-blue" id="totalStaffDisplay">0</div><div class="label">إجمالي المسعفين</div><div class="sub-value" id="staffSubText">موزعين على 0 مركز</div></div>
@@ -3835,13 +3861,52 @@ function buildCentersTable() {
     var tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
+    
     for (var i = 0; i < centerList.length; i++) {
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td style="font-weight:bold; font-size:0.75rem;">' + centerList[i] + '</td><td><input type="number" id="staff_' + i + '" style="width:50px; text-align:center;" min="0" max="4" value=""></td><td><input type="number" id="cars_' + i + '" style="width:50px; text-align:center;" min="0" max="2" value=""></td><td><span id="status_' + i + '" class="status-icon status-not">❌</span></td><td><input type="text" id="notes_' + i + '" style="width:100%; font-size:0.7rem;" value=""></td>';
+        tr.id = 'center-row-' + i;
+        
+        // أيقونة الحالة
+        var statusHtml = '<span id="status_' + i + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
+        
+        // أزرار الإجراء السريع
+        var actionHtml = `
+            <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                <button onclick="setCenterComplete(${i})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ✅ مكتمل
+                </button>
+                <button onclick="setCenterIncomplete(${i})" class="btn btn-danger" style="padding:2px 10px; font-size:0.6rem; background:#c0392b; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ❌ ناقص
+                </button>
+            </div>
+        `;
+        
+        tr.innerHTML = `
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td><input type="number" id="staff_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value=""></td>
+            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value=""></td>
+            <td style="text-align:center;">${actionHtml}</td>
+            <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
+        `;
+        
         var staffInput = tr.querySelector('#staff_' + i);
         var carsInput = tr.querySelector('#cars_' + i);
-        staffInput.addEventListener('input', function(idx) { return function() { updateStatusIcon(idx); calculateWorkforceStatsLocally(); }; }(i));
-        carsInput.addEventListener('input', function(idx) { return function() { updateStatusIcon(idx); calculateWorkforceStatsLocally(); }; }(i));
+        
+        staffInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+            };
+        }(i));
+        
+        carsInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+            };
+        }(i));
+        
         tbody.appendChild(tr);
     }
 }
@@ -3853,7 +3918,13 @@ function updateStatusIcon(index) {
     if (staffInput && carsInput && iconSpan) {
         var staffCount = parseInt(staffInput.value) || 0;
         var carsCount = parseInt(carsInput.value) || 0;
-        if (staffCount >= 2 && carsCount >= 1) { iconSpan.innerHTML = '✅'; iconSpan.className = 'status-icon status-ok'; } else { iconSpan.innerHTML = '❌'; iconSpan.className = 'status-icon status-not'; }
+        if (staffCount >= 2 && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
     }
 }
 
@@ -3919,6 +3990,114 @@ function calculateWorkforceStatsLocally() {
     if (totalStaff > 0 || totalCars > 0) {
         updateWorkforceDisplay(totalStaff, totalCars, readinessRate, missingCenters);
     }
+}
+
+// ============================================
+// إجراءات التكميل السريع للمراكز
+// ============================================
+
+// تعيين المركز كمكتمل (2 مسعف + 1 سيارة)
+function setCenterComplete(index) {
+    var staffInput = document.getElementById('staff_' + index);
+    var carsInput = document.getElementById('cars_' + index);
+    var notesInput = document.getElementById('notes_' + index);
+    var centerName = centerList[index] || 'المركز';
+    
+    if (staffInput) staffInput.value = 2;
+    if (carsInput) carsInput.value = 1;
+    if (notesInput) {
+        if (!notesInput.value.trim()) {
+            notesInput.value = '✅ مكتمل';
+        }
+    }
+    
+    updateStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    
+    var row = document.getElementById('center-row-' + index);
+    if (row) {
+        row.style.transition = 'background 0.5s';
+        row.style.background = '#e8f5e9';
+        setTimeout(function() {
+            row.style.background = '';
+        }, 1000);
+    }
+    
+    showToast('✅ ' + centerName + ' تم التكميل بنجاح', 'success');
+}
+
+// تعيين المركز كناقص (فارغ)
+function setCenterIncomplete(index) {
+    var staffInput = document.getElementById('staff_' + index);
+    var carsInput = document.getElementById('cars_' + index);
+    var notesInput = document.getElementById('notes_' + index);
+    var centerName = centerList[index] || 'المركز';
+    
+    if (staffInput) staffInput.value = '';
+    if (carsInput) carsInput.value = '';
+    if (notesInput) {
+        if (!notesInput.value.trim()) {
+            notesInput.value = '❌ بحاجة إلى تكميل';
+        }
+    }
+    
+    updateStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    
+    var row = document.getElementById('center-row-' + index);
+    if (row) {
+        row.style.transition = 'background 0.5s';
+        row.style.background = '#ffebee';
+        setTimeout(function() {
+            row.style.background = '';
+        }, 1000);
+    }
+    
+    showToast('⚠️ ' + centerName + ' بحاجة إلى تكميل', 'alert');
+}
+
+// تعيين جميع المراكز كمكتملة
+function setAllCentersComplete() {
+    if (!confirm('⚠️ هل أنت متأكد من تعيين جميع المراكز كمكتملة؟')) return;
+    
+    for (var i = 0; i < centerList.length; i++) {
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        
+        if (staffInput) staffInput.value = 2;
+        if (carsInput) carsInput.value = 1;
+        if (notesInput) {
+            if (!notesInput.value.trim()) {
+                notesInput.value = '✅ مكتمل (تلقائي)';
+            }
+        }
+        updateStatusIcon(i);
+    }
+    calculateWorkforceStatsLocally();
+    showToast('✅ تم تعيين جميع المراكز كمكتملة', 'success');
+}
+
+// تعيين جميع المراكز كناقصة
+function setAllCentersIncomplete() {
+    if (!confirm('⚠️ هل أنت متأكد من تعيين جميع المراكز كناقصة؟')) return;
+    
+    for (var i = 0; i < centerList.length; i++) {
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        
+        if (staffInput) staffInput.value = '';
+        if (carsInput) carsInput.value = '';
+        if (notesInput) {
+            if (!notesInput.value.trim()) {
+                notesInput.value = '❌ بحاجة إلى تكميل';
+            }
+        }
+        updateStatusIcon(i);
+    }
+    calculateWorkforceStatsLocally();
+    showToast('⚠️ تم تعيين جميع المراكز كناقصة', 'alert');
 }
 
 // ============================================
