@@ -216,16 +216,16 @@ async function showChiefParamedics() {
 
 async function addNewChief() {
     const name = prompt('👨‍⚕️ أدخل اسم كبير المسعفين:');
-    if (!name) return;
+    if (!name || !name.trim()) return;
 
     const sector = prompt('📍 أدخل القطاع:');
-    if (!sector) return;
+    if (!sector || !sector.trim()) return;
 
     try {
         const response = await fetch('/api/chiefs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, sector })
+            body: JSON.stringify({ name: name.trim(), sector: sector.trim() })
         });
         if (!response.ok) throw new Error(`خطأ HTTP: ${response.status}`);
         const result = await response.json();
