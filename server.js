@@ -545,9 +545,10 @@ function broadcastPeakEvent(alertData, type = 'new_peak_alert') {
         try {
             client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
             return true;
-        } catch (error) { }
-        console.error('⚠️ فشل إرسال إشعار الذروة لعميل SSE:', error.message);
-        return false;
+        } catch (error) {
+            console.error('⚠️ فشل إرسال إشعار الذروة لعميل SSE:', error.message);
+            return false;
+        }
     });
 }
 
