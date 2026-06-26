@@ -4023,11 +4023,14 @@ window.onclick = function(e) {
 };
 
 // ============================================
-// تحديث تلقائي
+// تحديث تلقائي كل 3 ثواني
 // ============================================
 setInterval(function() {
-    if (!isViewingArchiveShift) { checkForUpdates(); }
-}, 1000);
+    if (!isViewingArchiveShift) { 
+        checkForUpdates(); 
+        console.log('🔄 تحديث تلقائي للبيانات - ' + new Date().toLocaleTimeString());
+    }
+}, 3000);  // 3 ثواني
 
 async function checkForUpdates() {
     if (isViewingArchiveShift) return;
