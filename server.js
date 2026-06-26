@@ -558,7 +558,7 @@ function broadcastPeakEvent(alertData, type = 'new_peak_alert') {
     );
 }
 
-setInterval(() => {
+const heartbeatInterval = setInterval(() => {
     const heartbeat = `event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`;
     themeUpdateClients = broadcastToSseClients(themeUpdateClients, heartbeat);
     peakEventClients = broadcastToSseClients(peakEventClients, heartbeat);
