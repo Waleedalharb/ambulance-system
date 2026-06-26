@@ -65,6 +65,7 @@ const PEAK_DATA_PATH = path.join(DATA_DIR, 'peak-data.json');
 const ESCALATION_PATH = path.join(DATA_DIR, 'escalation-data.json');
 const THEME_PATH = path.join(DATA_DIR, 'theme-data.json');
 const CHIEF_PARAMEDICS_PATH = path.join(DATA_DIR, 'chief-paramedics.json');
+const CENTER_GEO_PATH = path.join(DATA_DIR, 'center-geo.json');
 const BACKUP_PATH = path.join(DATA_DIR, 'backups');
 
 let lastUpdateTime = Date.now();
@@ -184,6 +185,7 @@ async function readShifts() {
 
 async function writeShifts(data) {
     await writeDataFile(SHIFT_DATA_PATH, data);
+    lastUpdateTime = Date.now();
 }
 
 async function readDocs() {
@@ -208,6 +210,7 @@ async function readPeakData() {
 
 async function writePeakData(data) {
     await writeDataFile(PEAK_DATA_PATH, data);
+    lastUpdateTime = Date.now();
 }
 
 async function readEscalations() {
@@ -233,6 +236,7 @@ async function readThemeData() {
 
 async function writeThemeData(data) {
     await writeDataFile(THEME_PATH, data);
+    lastUpdateTime = Date.now();
 }
 
 async function readChiefParamedics() {
@@ -241,6 +245,15 @@ async function readChiefParamedics() {
 
 async function writeChiefParamedics(data) {
     await writeDataFile(CHIEF_PARAMEDICS_PATH, data);
+}
+
+async function readCenterGeo() {
+    return await readDataFile(CENTER_GEO_PATH, {});
+}
+
+async function writeCenterGeo(data) {
+    await writeDataFile(CENTER_GEO_PATH, data);
+    lastUpdateTime = Date.now();
 }
 
 // ============================================
@@ -327,6 +340,27 @@ app.get('/api/chiefs', async (req, res) => {
     }
 });
 
+app.get('/api/center-geo', async (req, res) => {
+    try {
+        const data = await readCenterGeo();
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('❌ /api/center-geo:', error);
+        res.status(500).json({ error: 'فشل في جلب بيانات المراكز الجغرافية' });
+    }
+});
+
+app.post('/api/center-geo', async (req, res) => {
+    try {
+        const payload = req.body && req.body.data ? req.body.data : {};
+        await writeCenterGeo(payload);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ POST /api/center-geo:', error);
+        res.status(500).json({ error: 'فشل في حفظ بيانات المراكز الجغرافية' });
+    }
+});
+
 app.post('/api/chiefs', async (req, res) => {
     try {
         const { name, sector, signature } = req.body;
@@ -380,6 +414,35 @@ app.get('/api/sync-all', async (req, res) => {
     }
 });
 
+app.get('/api/data', async (req, res) => {
+    try {
+        const data = await readData();
+        res.json({
+            data: data.reports || data.data || data,
+            centers: data.centers || {},
+            currentShiftId: data.currentShiftId || null,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ /api/data:', error);
+        res.status(500).json({ error: 'فشل في جلب البيانات' });
+    }
+});
+
+app.get('/api/last-update', (req, res) => {
+    res.json({ lastUpdate: lastUpdateTime });
+});
+
+app.get('/api/peak-data', async (req, res) => {
+    try {
+        const data = await readPeakData();
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('❌ /api/peak-data:', error);
+        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
+    }
+});
+
 // ============================================
 // API: المناوبات (باقي الكود السابق)
 // ============================================
@@ -392,10 +455,56 @@ app.get('/api/shifts', async (req, res) => {
     }
 });
 
+app.get('/api/shifts/:id', async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const shiftId = Number(req.params.id);
+        const shift = shifts.find(s => Number(s.id) === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        res.json({ shift, reports: shift.savedReports || {}, total: shift.totalReports || 0 });
+    } catch (error) {
+        console.error('❌ /api/shifts/:id:', error);
+        res.status(500).json({ error: 'فشل في جلب المناوبة' });
+    }
+});
+
+app.delete('/api/shifts/:id', async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const shiftId = Number(req.params.id);
+        const filtered = shifts.filter(s => Number(s.id) !== shiftId);
+        if (filtered.length === shifts.length) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        await writeShifts(filtered);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ DELETE /api/shifts/:id:', error);
+        res.status(500).json({ error: 'فشل في حذف المناوبة' });
+    }
+});
+
 // ============================================
 // Server-Sent Events للمزامنة
 // ============================================
 let themeUpdateClients = [];
+let peakEventClients = [];
+
+function broadcastToSseClients(clients, payload, errorLabel) {
+    return clients.filter(client => {
+        try {
+            client.res.write(payload);
+            return true;
+        } catch (error) {
+            if (errorLabel) {
+                console.error(errorLabel, error.message);
+            }
+            return false;
+        }
+    });
+}
 
 app.get('/api/theme-updates', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -416,12 +525,44 @@ app.get('/api/theme-updates', (req, res) => {
 
 function broadcastThemeUpdate(themeData) {
     const eventData = { type: 'theme_updated', data: themeData, timestamp: new Date().toISOString() };
-    themeUpdateClients.forEach(client => {
-        try {
-            client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
-        } catch (error) { }
-    });
+    themeUpdateClients = broadcastToSseClients(
+        themeUpdateClients,
+        `data: ${JSON.stringify(eventData)}\n\n`,
+        '⚠️ فشل إرسال تحديث الثيم لعميل SSE:'
+    );
 }
+
+app.get('/api/peak-events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const clientId = Date.now() + Math.floor(Math.random() * 1000);
+    const newClient = { id: clientId, res: res };
+    peakEventClients.push(newClient);
+
+    res.write(`data: ${JSON.stringify({ type: 'connected', message: 'متصل بنظام إشعارات الذروة', timestamp: new Date().toISOString() })}\n\n`);
+
+    req.on('close', () => {
+        peakEventClients = peakEventClients.filter(client => client.id !== clientId);
+    });
+});
+
+function broadcastPeakEvent(alertData, type = 'new_peak_alert') {
+    const eventData = { type, alert: alertData, timestamp: new Date().toISOString() };
+    peakEventClients = broadcastToSseClients(
+        peakEventClients,
+        `data: ${JSON.stringify(eventData)}\n\n`,
+        '⚠️ فشل إرسال إشعار الذروة لعميل SSE:'
+    );
+}
+
+const heartbeatInterval = setInterval(() => {
+    const heartbeat = `event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`;
+    themeUpdateClients = broadcastToSseClients(themeUpdateClients, heartbeat);
+    peakEventClients = broadcastToSseClients(peakEventClients, heartbeat);
+}, 30000);
 
 // ============================================
 // تشغيل الخادم

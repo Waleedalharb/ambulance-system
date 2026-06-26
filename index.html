@@ -1851,6 +1851,7 @@ function loadBrandLogo() {
                 svg.style.display = 'none';
                 console.log('تم تحميل الشعار المخصص');
             }
+            syncThemeSettingsToServer();
         }
     } catch(e) { console.log('لم يتم تحميل الشعار المخصص'); }
 }
@@ -1914,6 +1915,7 @@ document.getElementById('headerBgFile')?.addEventListener('change', function(e) 
             img.src = dataUrl;
         }
         alert('تم رفع خلفية الشريط العلوي بنجاح!');
+        syncThemeSettingsToServer();
     };
     reader.readAsDataURL(file);
 });
@@ -1932,6 +1934,7 @@ function removeHeaderBg() {
     }
     document.getElementById('headerBgPreview').style.display = 'none';
     alert('تم إزالة خلفية الشريط');
+    syncThemeSettingsToServer();
 }
 
 function applySectorLogo(dataUrl) {
@@ -1968,6 +1971,7 @@ document.getElementById('sectorLogoFile')?.addEventListener('change', function(e
         previewDiv.style.display = 'block';
         document.getElementById('sectorLogoPreviewImg').src = dataUrl;
         alert('تم رفع شعار القطاع بنجاح!');
+        syncThemeSettingsToServer();
     };
     reader.readAsDataURL(file);
 });
@@ -1977,6 +1981,7 @@ function removeSectorLogo() {
     applySectorLogo(null);
     document.getElementById('sectorLogoPreview').style.display = 'none';
     alert('تم إزالة شعار القطاع');
+    syncThemeSettingsToServer();
 }
 
 function loadSavedThemeSettings() {
@@ -2045,6 +2050,116 @@ function loadThemeMode() {
 document.getElementById('themeBtn')?.addEventListener('click', function() {
     document.getElementById('themeModal').style.display = 'flex';
 });
+
+function collectThemeSettings() {
+    return {
+        headerBg: localStorage.getItem('headerBackground') || null,
+        headerBgType: localStorage.getItem('headerBgType') || null,
+        sectorLogo: localStorage.getItem('sectorLogo') || null,
+        themeMode: localStorage.getItem('themeMode') || 'off'
+    };
+}
+
+function applyThemeSettings(data) {
+    if (!data) return;
+    if (data.headerBg) {
+        localStorage.setItem('headerBackground', data.headerBg);
+        if (data.headerBgType) localStorage.setItem('headerBgType', data.headerBgType);
+    } else {
+        localStorage.removeItem('headerBackground');
+        localStorage.removeItem('headerBgType');
+    }
+    if (data.sectorLogo) localStorage.setItem('sectorLogo', data.sectorLogo);
+    else localStorage.removeItem('sectorLogo');
+    localStorage.setItem('themeMode', data.themeMode === 'on' ? 'on' : 'off');
+
+    loadSavedThemeSettings();
+    loadThemeMode();
+}
+
+async function syncThemeSettingsToServer() {
+    try {
+        await fetchWithRetry('/api/theme-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(collectThemeSettings())
+        }, { retries: 2, timeoutMs: 8000, baseDelayMs: 1000, label: 'مزامنة الثيمات' });
+    } catch (error) {
+        console.error('فشل مزامنة الثيمات مع الخادم:', error);
+    }
+}
+
+async function loadThemeSettingsFromServer() {
+    try {
+        var response = await fetchWithRetry('/api/theme-settings', {}, { retries: 2, timeoutMs: 7000, baseDelayMs: 900, label: 'تحميل الثيمات' });
+        var result = await response.json();
+        if (result && result.success && result.data) {
+            applyThemeSettings(result.data);
+        }
+    } catch (error) {
+        console.error('تعذر تحميل الثيمات من الخادم:', error);
+    }
+}
+
+function startThemePollingFallback() {
+    if (themePollingFallbackTimer) return;
+    themePollingFallbackTimer = setInterval(loadThemeSettingsFromServer, 30000);
+}
+
+function stopThemePollingFallback() {
+    if (themePollingFallbackTimer) {
+        clearInterval(themePollingFallbackTimer);
+        themePollingFallbackTimer = null;
+    }
+}
+
+function scheduleThemeReconnect() {
+    if (themeReconnectTimer) return;
+    themeReconnectAttempts++;
+    var delay = Math.min(1000 * Math.pow(2, themeReconnectAttempts - 1), MAX_RECONNECT_DELAY_MS);
+    if (themeReconnectAttempts >= 3) {
+        startThemePollingFallback();
+    }
+    themeReconnectTimer = setTimeout(function() {
+        themeReconnectTimer = null;
+        connectThemeUpdates();
+    }, delay);
+}
+
+function connectThemeUpdates() {
+    if (themeEventSource) {
+        themeEventSource.close();
+        themeEventSource = null;
+    }
+    try {
+        themeEventSource = new EventSource('/api/theme-updates');
+        themeEventSource.onopen = function() {
+            themeReconnectAttempts = 0;
+            stopThemePollingFallback();
+        };
+        themeEventSource.onmessage = function(event) {
+            try {
+                var data = JSON.parse(event.data);
+                if (data.type === 'heartbeat' || data.type === 'connected') return;
+                if (data.type === 'theme_updated' && data.data) {
+                    applyThemeSettings(data.data);
+                }
+            } catch (error) {
+                console.error('خطأ في معالجة تحديث الثيم:', error);
+            }
+        };
+        themeEventSource.onerror = function() {
+            if (themeEventSource) {
+                themeEventSource.close();
+                themeEventSource = null;
+            }
+            scheduleThemeReconnect();
+        };
+    } catch (error) {
+        console.error('فشل الاتصال بقناة تحديث الثيم:', error);
+        scheduleThemeReconnect();
+    }
+}
 
 // ============================================
 // نظام التنبيهات
@@ -2115,6 +2230,15 @@ function checkForAlerts() {
 let eventSource = null;
 let peakNotificationSound = null;
 let isNotificationConnected = false;
+let peakReconnectAttempts = 0;
+let peakReconnectTimer = null;
+let peakPollingFallbackTimer = null;
+const MAX_RECONNECT_DELAY_MS = 30000;
+let themeEventSource = null;
+let themeReconnectAttempts = 0;
+let themeReconnectTimer = null;
+let themePollingFallbackTimer = null;
+let isCheckingForUpdates = false;
 
 function initNotificationSound() {
     try {
@@ -2124,6 +2248,76 @@ function initNotificationSound() {
     } catch(e) {
         console.log('تعذر تحميل الصوت');
     }
+}
+
+function updateUpdateStatus(text) {
+    var statusEl = document.getElementById('updateStatus');
+    if (statusEl) statusEl.innerHTML = text;
+}
+
+async function fetchWithRetry(url, options, retryOptions) {
+    options = options || {};
+    retryOptions = retryOptions || {};
+    var retries = typeof retryOptions.retries === 'number' ? retryOptions.retries : 3;
+    var timeoutMs = typeof retryOptions.timeoutMs === 'number' ? retryOptions.timeoutMs : 8000;
+    var baseDelayMs = typeof retryOptions.baseDelayMs === 'number' ? retryOptions.baseDelayMs : 1000;
+    var label = retryOptions.label || 'الاتصال بالخادم';
+    var lastError = null;
+
+    for (var attempt = 0; attempt <= retries; attempt++) {
+        var timer = null;
+        try {
+            var controller = new AbortController();
+            timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+            var response = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            if (attempt > 0) {
+                updateUpdateStatus('✅ تم استعادة الاتصال');
+            }
+            return response;
+        } catch (error) {
+            lastError = error;
+            if (attempt >= retries) break;
+            var waitMs = Math.min(baseDelayMs * Math.pow(2, attempt), MAX_RECONNECT_DELAY_MS);
+            updateUpdateStatus('🔄 ' + label + '... المحاولة ' + (attempt + 1) + ' من ' + (retries + 1));
+            await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
+    throw lastError;
+}
+
+function startPeakPollingFallback() {
+    if (peakPollingFallbackTimer) return;
+    peakPollingFallbackTimer = setInterval(function() {
+        checkForAlerts();
+    }, 10000);
+    console.warn('⚠️ تم تفعيل fallback polling للإشعارات');
+}
+
+function stopPeakPollingFallback() {
+    if (peakPollingFallbackTimer) {
+        clearInterval(peakPollingFallbackTimer);
+        peakPollingFallbackTimer = null;
+    }
+}
+
+function schedulePeakReconnect() {
+    if (peakReconnectTimer) return;
+    peakReconnectAttempts++;
+    var delay = Math.min(1000 * Math.pow(2, peakReconnectAttempts - 1), MAX_RECONNECT_DELAY_MS);
+    if (peakReconnectAttempts >= 3) {
+        startPeakPollingFallback();
+    }
+    updateUpdateStatus('⚠️ انقطاع الإشعارات - إعادة المحاولة خلال ' + Math.round(delay / 1000) + ' ثانية');
+    peakReconnectTimer = setTimeout(function() {
+        peakReconnectTimer = null;
+        connectPeakEvents();
+    }, delay);
 }
 
 function connectPeakEvents() {
@@ -2138,14 +2332,17 @@ function connectPeakEvents() {
         
         eventSource.onopen = function() {
             isNotificationConnected = true;
+            peakReconnectAttempts = 0;
+            stopPeakPollingFallback();
             console.log('تم الاتصال بخادم الإشعارات');
-            document.getElementById('updateStatus').innerHTML = 'متصل | الإشعارات اللحظية مفعلة';
+            updateUpdateStatus('متصل | الإشعارات اللحظية مفعلة');
         };
         
         eventSource.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
                 console.log('إشعار جديد:', data);
+                if (data.type === 'heartbeat') return;
                 
                 if (data.type === 'new_peak_alert' && data.alert && data.alert.status === 'نشط') {
                     handleNewPeakAlert(data.alert);
@@ -2160,19 +2357,30 @@ function connectPeakEvents() {
         };
         
         eventSource.onerror = function() {
-            if (isNotificationConnected) {
-                console.log('انقطاع الاتصال بخادم الإشعارات، إعادة المحاولة...');
-                isNotificationConnected = false;
-                document.getElementById('updateStatus').innerHTML = 'جاري إعادة الاتصال...';
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
             }
-            setTimeout(connectPeakEvents, 5000);
+            if (isNotificationConnected) console.log('انقطاع الاتصال بخادم الإشعارات');
+            isNotificationConnected = false;
+            schedulePeakReconnect();
         };
         
     } catch (error) {
         console.error('فشل في الاتصال بخادم الإشعارات:', error);
-        setTimeout(connectPeakEvents, 5000);
+        schedulePeakReconnect();
     }
 }
+
+window.addEventListener('online', function() {
+    updateUpdateStatus('🌐 عاد الاتصال بالإنترنت، جاري المزامنة...');
+    peakReconnectAttempts = 0;
+    connectPeakEvents();
+    themeReconnectAttempts = 0;
+    connectThemeUpdates();
+    loadThemeSettingsFromServer();
+    checkForUpdates();
+});
 
 function handleNewPeakAlert(alert) {
     if (peakNotificationSound) {
@@ -3256,6 +3464,73 @@ document.getElementById('manageCentersBtn')?.addEventListener('click', function(
 
 document.getElementById('peakStatsBtn')?.addEventListener('click', showPeakStats);
 
+var centerGeoData = JSON.parse(localStorage.getItem('centerGeoData') || '{}');
+
+function renderCentersManagement() {
+    var container = document.getElementById('centersListContainer');
+    if (!container) return;
+
+    container.innerHTML = centerList.map(function(centerName) {
+        var geo = centerGeoData[centerName] || {};
+        var lat = geo.lat || '';
+        var lng = geo.lng || '';
+        var radius = geo.radius || 5000;
+        return '<div style="background:#fff; border:1px solid var(--gray-200); border-radius:10px; padding:10px; margin-bottom:10px;">' +
+            '<div style="font-weight:700; margin-bottom:8px;">' + centerName + '</div>' +
+            '<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">' +
+            '<input type="number" step="any" data-center="' + centerName + '" data-key="lat" placeholder="خط العرض" value="' + lat + '">' +
+            '<input type="number" step="any" data-center="' + centerName + '" data-key="lng" placeholder="خط الطول" value="' + lng + '">' +
+            '<input type="number" data-center="' + centerName + '" data-key="radius" placeholder="النطاق (متر)" value="' + radius + '">' +
+            '</div></div>';
+    }).join('');
+}
+
+async function loadCenterGeo() {
+    try {
+        var response = await fetchWithRetry('/api/center-geo', {}, { retries: 2, timeoutMs: 5000, baseDelayMs: 800, label: 'تحميل بيانات المراكز الجغرافية' });
+        var result = await response.json();
+        if (result && result.success && result.data) {
+            centerGeoData = result.data;
+            localStorage.setItem('centerGeoData', JSON.stringify(centerGeoData));
+        }
+    } catch (error) {
+        console.error('تعذر تحميل البيانات الجغرافية للمراكز:', error);
+    }
+}
+
+async function saveCentersGeo() {
+    var inputs = document.querySelectorAll('#centersListContainer input[data-center]');
+    var nextGeo = {};
+    inputs.forEach(function(input) {
+        var center = input.getAttribute('data-center');
+        var key = input.getAttribute('data-key');
+        if (!nextGeo[center]) nextGeo[center] = {};
+        nextGeo[center][key] = input.value === '' ? null : Number(input.value);
+    });
+
+    centerGeoData = nextGeo;
+    localStorage.setItem('centerGeoData', JSON.stringify(centerGeoData));
+
+    try {
+        await fetchWithRetry('/api/center-geo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: centerGeoData })
+        }, { retries: 2, timeoutMs: 6000, baseDelayMs: 1000, label: 'حفظ المواقع الجغرافية' });
+    } catch (error) {
+        console.error('فشل حفظ المواقع الجغرافية على الخادم:', error);
+    }
+
+    showToast('تم حفظ مواقع المراكز', 'success');
+}
+
+function resetCentersGeo() {
+    centerGeoData = {};
+    localStorage.removeItem('centerGeoData');
+    renderCentersManagement();
+    showToast('تمت إعادة تعيين مواقع المراكز', 'info');
+}
+
 // ============================================
 // نظام التصعيد
 // ============================================
@@ -4092,7 +4367,7 @@ function showToast(message, type) {
 
 async function loadAllData() {
     try {
-        var response = await fetch('/api/data');
+        var response = await fetchWithRetry('/api/data', {}, { retries: 2, timeoutMs: 7000, baseDelayMs: 1000, label: 'تحميل البيانات الرئيسية' });
         var result = await response.json();
         centersData = result.centers;
         reports = result.data;
@@ -4104,9 +4379,10 @@ async function loadAllData() {
             updateDistributionIndicator();
         }
         updateShiftStatus();
-        document.getElementById("updateStatus").innerHTML = "متصل | آخر تحديث: " + new Date().toLocaleTimeString();
+        updateUpdateStatus("متصل | آخر تحديث: " + new Date().toLocaleTimeString());
     } catch (error) {
         console.error('خطأ في تحميل البيانات:', error);
+        updateUpdateStatus('⚠️ تعذر تحميل البيانات - سيتم إعادة المحاولة');
     }
 }
 
@@ -4350,7 +4626,7 @@ async function deleteAirRecord(recordId) {
 // ============================================
 async function loadShifts() {
     try {
-        var response = await fetch('/api/shifts');
+        var response = await fetchWithRetry('/api/shifts', {}, { retries: 2, timeoutMs: 7000, baseDelayMs: 1000, label: 'تحميل المناوبات' });
         allShifts = await response.json();
         var archiveSelect = document.getElementById('archiveSelect');
         archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
@@ -4364,7 +4640,10 @@ async function loadShifts() {
             if (shift.id === currentShiftId) { option.textContent += ' الحالية'; }
             archiveSelect.appendChild(option);
         });
-    } catch (error) {}
+    } catch (error) {
+        console.error('❌ فشل تحميل المناوبات:', error);
+        showToast('تعذر تحميل المناوبات، سيتم إعادة المحاولة تلقائياً', 'error');
+    }
 }
 
 function showShiftTypeDialog() {
@@ -4551,8 +4830,10 @@ setInterval(function() {
 
 async function checkForUpdates() {
     if (isViewingArchiveShift) return;
+    if (isCheckingForUpdates) return;
+    isCheckingForUpdates = true;
     try {
-        var response = await fetch('/api/last-update');
+        var response = await fetchWithRetry('/api/last-update', {}, { retries: 2, timeoutMs: 5000, baseDelayMs: 700, label: 'التحقق من التحديثات' });
         var data = await response.json();
         if (data.lastUpdate > lastKnownUpdate) {
             lastKnownUpdate = data.lastUpdate;
@@ -4561,7 +4842,11 @@ async function checkForUpdates() {
             updateWorkforceStats();
             updateDistributionIndicator();
         }
-    } catch (error) {}
+    } catch (error) {
+        console.error('⚠️ فشل التحقق من التحديثات:', error);
+    } finally {
+        isCheckingForUpdates = false;
+    }
 }
 
 // ============================================
@@ -4571,6 +4856,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadBrandLogo();
     loadSavedThemeSettings();
     loadThemeMode();
+    loadThemeSettingsFromServer();
+    connectThemeUpdates();
     document.getElementById("currentDate").innerText = new Date().toLocaleDateString("ar-SA");
     buildCentersTable();
     loadShifts();
@@ -4630,7 +4917,7 @@ document.getElementById("closeControlBtn").onclick = function() {
 };
 document.getElementById("printShiftBtn").onclick = function() { window.print(); };
 document.getElementById("saveShiftBtn").onclick = saveShiftData;
-document.getElementById("deleteShiftBtn").onclick = deleteCurrentShift;
+document.getElementById("deleteShiftBtn")?.addEventListener('click', deleteCurrentShift);
 document.getElementById("viewShiftBtn").onclick = viewShiftReports;
 document.getElementById("returnToCurrentBtn").onclick = returnToCurrentShift;
 
