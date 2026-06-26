@@ -51,6 +51,7 @@ app.get('*.html', (req, res) => {
 // مسار تخزين البيانات - Render Disk Storage
 // ============================================
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
 
@@ -788,7 +789,6 @@ app.get('/api/download-doc/:id', async (req, res) => {
         const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
         const contentType = ALLOWED_TYPES.includes(doc.fileType) ? doc.fileType : 'application/octet-stream';
         const buffer = Buffer.from(doc.fileData, 'base64');
-        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
         if (buffer.length > MAX_FILE_SIZE) return res.status(413).json({ error: 'حجم الملف كبير جداً' });
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.filename)}"`);
@@ -969,11 +969,16 @@ app.get('/api/peak-events', (req, res) => {
 
 function broadcastPeakAlert(alertData) {
     const eventData = JSON.stringify({ type: 'new_peak_alert', data: alertData });
+    const deadClients = [];
     peakEventClients.forEach(client => {
         try { client.res.write(`data: ${eventData}\n\n`); } catch (e) {
             console.error('خطأ في إرسال تنبيه SSE:', e.message);
+            deadClients.push(client.id);
         }
     });
+    if (deadClients.length > 0) {
+        peakEventClients = peakEventClients.filter(c => !deadClients.includes(c.id));
+    }
 }
 
 // ============================================
@@ -1045,9 +1050,8 @@ app.post('/api/upload-monthly-table', rateLimiter, async (req, res) => {
     try {
         const { fileData } = req.body;
         if (!fileData) return res.status(400).json({ error: 'بيانات ناقصة' });
-        const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
         const buffer = Buffer.from(fileData, 'base64');
-        if (buffer.length > MAX_UPLOAD_SIZE) return res.status(413).json({ error: 'حجم الملف كبير جداً (الحد الأقصى 10 ميجابايت)' });
+        if (buffer.length > MAX_FILE_SIZE) return res.status(413).json({ error: 'حجم الملف كبير جداً (الحد الأقصى 10 ميجابايت)' });
         await fs.writeFile(MONTHLY_TABLE_PATH, buffer);
         res.json({ success: true, message: 'تم رفع الجدول بنجاح' });
     } catch (error) {
