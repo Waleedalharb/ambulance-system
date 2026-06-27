@@ -1070,6 +1070,131 @@ app.get('/api/export', async (req, res) => {
 });
 
 // ============================================
+// API: غرفة العمليات التشغيلية
+// ============================================
+
+const OPS_UPLOAD_DIR = path.join(__dirname, 'public', 'uploads', 'operational');
+const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
+
+// التأكد من وجود المجلد والملف
+async function ensureOpsDir() {
+    try {
+        await fs.mkdir(OPS_UPLOAD_DIR, { recursive: true });
+        try {
+            await fs.access(OPS_METADATA_PATH);
+        } catch {
+            await fs.writeFile(OPS_METADATA_PATH, JSON.stringify([]));
+        }
+    } catch (e) {}
+}
+ensureOpsDir();
+
+// قراءة الميتاداتا
+async function readOpsMetadata() {
+    try {
+        const data = await fs.readFile(OPS_METADATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return [];
+    }
+}
+
+// كتابة الميتاداتا
+async function writeOpsMetadata(data) {
+    await fs.writeFile(OPS_METADATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// رفع الملفات
+const opsUpload = multer({ dest: OPS_UPLOAD_DIR, limits: { fileSize: 50 * 1024 * 1024 } });
+
+app.post('/api/upload-operational', opsUpload.array('files'), async (req, res) => {
+    try {
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'لا يوجد ملفات' });
+        }
+        
+        const metadata = await readOpsMetadata();
+        const results = [];
+        
+        for (const file of files) {
+            const ext = path.extname(file.originalname);
+            const newFilename = `${Date.now()}-${file.originalname}`;
+            const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
+            await fs.rename(file.path, newPath);
+            
+            const entry = {
+                id: Date.now() + Math.random().toString(36).substr(2, 4),
+                filename: file.originalname,
+                storedName: newFilename,
+                size: file.size,
+                mimeType: file.mimetype,
+                uploadDate: new Date().toISOString(),
+                uploader: req.body.uploader || 'المشرف',
+                category: req.body.category || 'عام',
+                note: req.body.note || '',
+                icon: file.mimetype.startsWith('image/') ? '🖼️' :
+                      file.mimetype === 'application/pdf' ? '📄' :
+                      file.mimetype.includes('word') ? '📝' :
+                      file.mimetype.includes('excel') ? '📊' : '📎'
+            };
+            metadata.unshift(entry);
+            results.push(entry);
+        }
+        
+        await writeOpsMetadata(metadata);
+        res.json({ success: true, count: results.length, files: results });
+    } catch (error) {
+        console.error('خطأ في رفع الملفات:', error);
+        res.status(500).json({ error: 'فشل في رفع الملفات' });
+    }
+});
+
+// جلب الملفات
+app.get('/api/operational-files', async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        res.json({ success: true, files: metadata });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+// تحميل ملف
+app.get('/api/download-operational/:id', async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const entry = metadata.find(f => f.id === req.params.id);
+        if (!entry) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
+        res.download(filePath, entry.filename);
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تحميل الملف' });
+    }
+});
+
+// حذف ملف
+app.delete('/api/delete-operational/:id', async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
+        try { await fs.unlink(filePath); } catch (e) {}
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الملف' });
+    }
+});
+
+// ============================================
 // تشغيل الخادم
 // ============================================
 app.listen(PORT, () => {

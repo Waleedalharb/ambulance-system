@@ -1012,6 +1012,81 @@
             #docsPage, #docsPage * { display: none !important; visibility: hidden !important; }
             .workforce-dashboard, .distribution-indicator { display: none !important; }
         }
+        /* ===== غرفة العمليات التشغيلية ===== */
+#operationsRoomModal .modal-content::-webkit-scrollbar {
+    width: 4px;
+}
+#operationsRoomModal .modal-content::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+}
+#operationsRoomModal .modal-content::-webkit-scrollbar-thumb {
+    background: rgba(0,212,255,0.3);
+    border-radius: 10px;
+}
+
+.ops-tab-btn.active {
+    background: rgba(0,212,255,0.1) !important;
+    color: #00D4FF !important;
+    border-color: rgba(0,212,255,0.15) !important;
+}
+.ops-tab-btn:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+#opsDropZone.dragover {
+    border-color: #00D4FF;
+    background: rgba(0,212,255,0.05);
+}
+
+.ops-file-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: all 0.3s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.ops-file-card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(0,212,255,0.2);
+}
+.ops-file-card .file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.ops-file-card .file-icon {
+    font-size: 1.6rem;
+}
+.ops-file-card .file-name {
+    color: white;
+    font-weight: 500;
+}
+.ops-file-card .file-meta {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.3);
+}
+.ops-file-card .file-badge {
+    font-size: 0.55rem;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: rgba(0,212,255,0.1);
+    color: #00D4FF;
+}
+.ops-file-card .file-badge.urgent {
+    background: rgba(255,0,0,0.15);
+    color: #FF4444;
+}
     </style>
 </head>
 <body>
@@ -1091,6 +1166,9 @@
             <span style="flex:1;"></span>
 
             <!-- ===== المجموعة الثانية: أقصى اليسار ===== -->
+             <button id="operationsRoomBtn" class="btn" style="background:linear-gradient(135deg, #00D4FF, #007BFF); color:white; border-color:#00D4FF;">
+    <i class="fas fa-rocket"></i> غرفة العمليات
+</button>
             <button id="themeBtn" class="btn btn-theme" title="إدارة الثيمات"><i class="fas fa-palette"></i> الثيمات</button>
             <button id="themeModeToggle" class="btn btn-theme-mode" onclick="toggleThemeMode()" title="تبديل وضع الثيم">
                 <i class="fas fa-expand"></i>
@@ -1782,6 +1860,147 @@
             <button onclick="document.getElementById('formsModal').style.display='none'" class="btn">
                 <i class="fas fa-times"></i> إغلاق
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== نافذة غرفة العمليات التشغيلية ===== -->
+<div id="operationsRoomModal" class="modal">
+    <div class="modal-content" style="max-width:95%; max-height:95vh; background: linear-gradient(135deg, #0B0E14, #1A1F2E); border: 1px solid rgba(0, 212, 255, 0.15);">
+        
+        <!-- الهيدر -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid rgba(0,212,255,0.1);">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:50px; height:50px; border-radius:12px; background:linear-gradient(135deg, #00D4FF, #007BFF); display:flex; align-items:center; justify-content:center; font-size:1.6rem; box-shadow:0 0 30px rgba(0,212,255,0.2);">
+                    <i class="fas fa-rocket" style="color:white;"></i>
+                </div>
+                <div>
+                    <h2 style="margin:0; color:white; font-size:1.4rem; letter-spacing:0.5px;">
+                        🚀 غرفة العمليات التشغيلية
+                    </h2>
+                    <span style="font-size:0.7rem; color:rgba(255,255,255,0.5);">
+                        <i class="fas fa-circle" style="color:#00D4FF; font-size:0.4rem;"></i> 
+                        منصة القيادة والتحديثات التشغيلية
+                    </span>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span id="opsLiveIndicator" style="display:flex; align-items:center; gap:6px; font-size:0.7rem; color:rgba(0,212,255,0.7);">
+                    <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#00FF00; animation:pulse 1.5s infinite;"></span>
+                    حية
+                </span>
+                <button onclick="document.getElementById('operationsRoomModal').style.display='none'" class="btn" style="background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1);">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- المحتوى -->
+        <div style="display:grid; grid-template-columns: 280px 1fr; gap:20px; height: calc(90vh - 120px);">
+            
+            <!-- الشريط الجانبي -->
+            <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:16px; border:1px solid rgba(255,255,255,0.05);">
+                <div style="margin-bottom:20px;">
+                    <h4 style="color:rgba(255,255,255,0.7); font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; margin:0 0 10px 0;">القائمة</h4>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <button onclick="opsSwitchTab('dashboard')" class="ops-tab-btn active" data-tab="dashboard" style="background:rgba(0,212,255,0.1); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 14px; border-radius:8px; cursor:pointer; text-align:right; font-family:inherit; font-size:0.85rem; display:flex; align-items:center; gap:10px; transition:all 0.3s;">
+                            <i class="fas fa-chart-pie"></i> لوحة القيادة
+                        </button>
+                        <button onclick="opsSwitchTab('files')" class="ops-tab-btn" data-tab="files" style="background:transparent; color:rgba(255,255,255,0.6); border:1px solid transparent; padding:10px 14px; border-radius:8px; cursor:pointer; text-align:right; font-family:inherit; font-size:0.85rem; display:flex; align-items:center; gap:10px; transition:all 0.3s;">
+                            <i class="fas fa-folder-open"></i> الأرشيف
+                        </button>
+                        <button onclick="opsSwitchTab('upload')" class="ops-tab-btn" data-tab="upload" style="background:transparent; color:rgba(255,255,255,0.6); border:1px solid transparent; padding:10px 14px; border-radius:8px; cursor:pointer; text-align:right; font-family:inherit; font-size:0.85rem; display:flex; align-items:center; gap:10px; transition:all 0.3s;">
+                            <i class="fas fa-cloud-upload-alt"></i> رفع ملف
+                        </button>
+                    </div>
+                </div>
+                <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                    <div style="font-size:0.7rem; color:rgba(255,255,255,0.3);">
+                        <div>📦 الملفات: <span id="opsTotalFiles">0</span></div>
+                        <div>📅 آخر تحديث: <span id="opsLastUpdate">-</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- المحتوى الرئيسي -->
+            <div style="background:rgba(255,255,255,0.02); border-radius:12px; padding:16px; border:1px solid rgba(255,255,255,0.05); overflow-y:auto;">
+
+                <!-- تبويب لوحة القيادة -->
+                <div id="ops-dashboard" class="ops-tab-content">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:20px;">
+                        <div style="background:rgba(0,212,255,0.05); border-radius:10px; padding:14px; border:1px solid rgba(0,212,255,0.08);">
+                            <div style="font-size:0.6rem; color:rgba(255,255,255,0.4);">إجمالي الملفات</div>
+                            <div style="font-size:1.6rem; font-weight:700; color:#00D4FF;" id="opsStatTotal">0</div>
+                        </div>
+                        <div style="background:rgba(255,215,0,0.05); border-radius:10px; padding:14px; border:1px solid rgba(255,215,0,0.08);">
+                            <div style="font-size:0.6rem; color:rgba(255,255,255,0.4);">التحديثات هذا الشهر</div>
+                            <div style="font-size:1.6rem; font-weight:700; color:#FFD700;" id="opsStatMonth">0</div>
+                        </div>
+                        <div style="background:rgba(0,255,0,0.05); border-radius:10px; padding:14px; border:1px solid rgba(0,255,0,0.08);">
+                            <div style="font-size:0.6rem; color:rgba(255,255,255,0.4);">آخر تحديث</div>
+                            <div style="font-size:0.9rem; font-weight:600; color:#00FF00;" id="opsStatLast">-</div>
+                        </div>
+                    </div>
+                    <div id="opsRecentFiles">
+                        <h4 style="color:rgba(255,255,255,0.6); font-size:0.8rem; margin:0 0 10px 0;">📄 أحدث الملفات</h4>
+                        <div id="opsRecentList"></div>
+                    </div>
+                </div>
+
+                <!-- تبويب الأرشيف -->
+                <div id="ops-files" class="ops-tab-content" style="display:none;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; align-items:center;">
+                        <input type="text" id="opsSearchInput" placeholder="🔍 بحث في الملفات..." style="flex:1; min-width:200px; padding:8px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:white; font-family:inherit;">
+                        <select id="opsFilterCategory" style="padding:8px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:white; font-family:inherit;">
+                            <option value="all">📂 الكل</option>
+                            <option value="تعميم">📢 تعميم</option>
+                            <option value="خطة">📋 خطة</option>
+                            <option value="تقرير">📊 تقرير</option>
+                            <option value="تعليمات">📝 تعليمات</option>
+                            <option value="عاجل">🚨 عاجل</option>
+                        </select>
+                        <button onclick="opsSearchFiles()" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:8px 16px;">
+                            <i class="fas fa-search"></i> بحث
+                        </button>
+                    </div>
+                    <div id="opsFileList"></div>
+                </div>
+
+                <!-- تبويب رفع الملف -->
+                <div id="ops-upload" class="ops-tab-content" style="display:none;">
+                    <div style="background:rgba(255,255,255,0.03); border:2px dashed rgba(255,255,255,0.1); border-radius:12px; padding:40px; text-align:center;" id="opsDropZone">
+                        <i class="fas fa-cloud-upload-alt" style="font-size:3rem; color:rgba(255,255,255,0.2);"></i>
+                        <p style="color:rgba(255,255,255,0.5); margin:10px 0;">اسحب الملفات هنا أو اضغط للاختيار</p>
+                        <input type="file" id="opsFileInput" style="display:none;" multiple>
+                        <button onclick="document.getElementById('opsFileInput').click()" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 24px;">
+                            <i class="fas fa-upload"></i> اختيار ملفات
+                        </button>
+                    </div>
+                    <div style="margin-top:15px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="color:rgba(255,255,255,0.6); font-size:0.8rem; display:block; margin-bottom:4px;">📂 التصنيف</label>
+                            <select id="opsCategorySelect" style="width:100%; padding:8px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:white; font-family:inherit;">
+                                <option value="تعميم">📢 تعميم</option>
+                                <option value="خطة">📋 خطة</option>
+                                <option value="تقرير">📊 تقرير</option>
+                                <option value="تعليمات">📝 تعليمات</option>
+                                <option value="عاجل">🚨 عاجل</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="color:rgba(255,255,255,0.6); font-size:0.8rem; display:block; margin-bottom:4px;">📝 ملاحظات</label>
+                            <input type="text" id="opsFileNote" placeholder="ملاحظة توضيحية..." style="width:100%; padding:8px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:white; font-family:inherit;">
+                        </div>
+                    </div>
+                    <button onclick="opsUploadFiles()" class="btn" style="margin-top:15px; background:linear-gradient(135deg, #00D4FF, #007BFF); color:white; border:none; padding:10px 24px; width:100%;">
+                        <i class="fas fa-cloud-upload-alt"></i> رفع الملفات
+                    </button>
+                    <div id="opsUploadProgress" style="display:none; margin-top:10px; width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+                        <div style="width:0%; height:100%; background:linear-gradient(90deg, #00D4FF, #007BFF); transition:width 0.5s;"></div>
+                    </div>
+                    <div id="opsUploadStatus" style="margin-top:10px;"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -4302,6 +4521,344 @@ console.log('🌐 نظام وقت الذروة يعمل على الخادم (Ser
 console.log('📍 تنبيهات وقت الذروة تظهر مع خريطة الموقع');
 console.log('🗺️ معاينة الخريطة للفرق متاحة من نافذة التوزيع');
 console.log('📋 النماذج الموحدة (الإسعاف الجوي، التصعيد، E، الحوادث، التقرير اليومي)');
+// ============================================
+// غرفة العمليات التشغيلية
+// ============================================
+
+let opsMetadata = [];
+
+// التبديل بين التبويبات
+function opsSwitchTab(tab) {
+    document.querySelectorAll('.ops-tab-content').forEach(el => el.style.display = 'none');
+    document.getElementById(`ops-${tab}`).style.display = 'block';
+    
+    document.querySelectorAll('.ops-tab-btn').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.ops-tab-btn[data-tab="${tab}"]`).classList.add('active');
+    
+    if (tab === 'files') opsRenderFiles();
+    if (tab === 'dashboard') opsLoadDashboard();
+}
+
+// تحميل البيانات
+async function opsLoadData() {
+    try {
+        const res = await fetch('/api/operational-files');
+        const data = await res.json();
+        opsMetadata = data.files || [];
+        return opsMetadata;
+    } catch (e) {
+        console.error('خطأ في تحميل البيانات:', e);
+        return [];
+    }
+}
+
+// عرض لوحة القيادة
+async function opsLoadDashboard() {
+    const files = await opsLoadData();
+    document.getElementById('opsStatTotal').textContent = files.length;
+    document.getElementById('opsStatMonth').textContent = files.filter(f => {
+        const d = new Date(f.uploadDate);
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+    if (files.length > 0) {
+        const last = new Date(files[0].uploadDate);
+        document.getElementById('opsStatLast').textContent = last.toLocaleDateString('ar-SA') + ' ' + last.toLocaleTimeString('ar-SA');
+    }
+    
+    const recent = files.slice(0, 5);
+    const container = document.getElementById('opsRecentList');
+    container.innerHTML = recent.map(f => opsFileCardHTML(f)).join('');
+}
+
+// عرض الأرشيف
+async function opsRenderFiles() {
+    const files = await opsLoadData();
+    const container = document.getElementById('opsFileList');
+    container.innerHTML = files.map(f => opsFileCardHTML(f)).join('');
+}
+
+// بطاقة الملف
+function opsFileCardHTML(file) {
+    const icon = file.icon || '📄';
+    const date = new Date(file.uploadDate).toLocaleString('ar-SA');
+    const badgeClass = file.category === 'عاجل' ? 'urgent' : '';
+    return `
+        <div class="ops-file-card">
+            <div class="file-info">
+                <span class="file-icon">${icon}</span>
+                <div>
+                    <div class="file-name">${file.filename}</div>
+                    <div class="file-meta">${file.uploader || 'المشرف'} · ${date} ${file.note ? '· ' + file.note : ''}</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <span class="file-badge ${badgeClass}">${file.category || 'عام'}</span>
+                <button onclick="opsDownloadFile('${file.id}')" class="btn" style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.05); padding:4px 10px; font-size:0.6rem;">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button onclick="opsDeleteFile('${file.id}')" class="btn" style="background:rgba(255,0,0,0.05); color:rgba(255,100,100,0.6); border:1px solid rgba(255,0,0,0.05); padding:4px 10px; font-size:0.6rem;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// رفع الملفات
+async function opsUploadFiles() {
+    const input = document.getElementById('opsFileInput');
+    const category = document.getElementById('opsCategorySelect').value;
+    const note = document.getElementById('opsFileNote').value.trim();
+    
+    if (!input.files || input.files.length === 0) {
+        alert('⚠️ الرجاء اختيار ملف أولاً');
+        return;
+    }
+    
+    const formData = new FormData();
+    for (let f of input.files) {
+        formData.append('files', f);
+    }
+    formData.append('category', category);
+    formData.append('note', note);
+    formData.append('uploader', 'المشرف');
+    
+    document.getElementById('opsUploadProgress').style.display = 'block';
+    document.getElementById('opsUploadStatus').innerHTML = '⏳ جاري الرفع...';
+    
+    try {
+        const res = await fetch('/api/upload-operational', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+        document.getElementById('opsUploadProgress').style.display = 'none';
+        
+        if (result.success) {
+            document.getElementById('opsUploadStatus').innerHTML = '✅ تم رفع ' + result.count + ' ملفات بنجاح';
+            document.getElementById('opsFileInput').value = '';
+            document.getElementById('opsFileNote').value = '';
+            await opsLoadData();
+            opsRenderFiles();
+            opsLoadDashboard();
+        } else {
+            document.getElementById('opsUploadStatus').innerHTML = '❌ فشل في الرفع: ' + (result.error || 'خطأ');
+        }
+    } catch (e) {
+        document.getElementById('opsUploadProgress').style.display = 'none';
+        document.getElementById('opsUploadStatus').innerHTML = '❌ خطأ في الاتصال';
+    }
+}
+
+// تحميل ملف
+function opsDownloadFile(id) {
+    window.open(`/api/download-operational/${id}`, '_blank');
+}
+
+// حذف ملف
+async function opsDeleteFile(id) {
+    if (!confirm('⚠️ هل أنت متأكد من حذف هذا الملف؟')) return;
+    try {
+        const res = await fetch(`/api/delete-operational/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.success) {
+            await opsLoadData();
+            opsRenderFiles();
+            opsLoadDashboard();
+        }
+    } catch (e) {
+        alert('❌ فشل في الحذف');
+    }
+}
+
+// البحث
+function opsSearchFiles() {
+    const term = document.getElementById('opsSearchInput').value.toLowerCase();
+    const category = document.getElementById('opsFilterCategory').value;
+    const container = document.getElementById('opsFileList');
+    
+    let filtered = opsMetadata;
+    if (term) filtered = filtered.filter(f => f.filename.toLowerCase().includes(term) || (f.note || '').toLowerCase().includes(term));
+    if (category !== 'all') filtered = filtered.filter(f => f.category === category);
+    
+    container.innerHTML = filtered.map(f => opsFileCardHTML(f)).join('');
+}
+
+// سحب وإفلات
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('opsDropZone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            const input = document.getElementById('opsFileInput');
+            const dt = new DataTransfer();
+            for (let f of files) dt.items.add(f);
+            input.files = dt.files;
+        });
+        dropZone.addEventListener('click', function() {
+            document.getElementById('opsFileInput').click();
+        });
+    }
+});
+
+// زر فتح الغرفة
+document.getElementById('operationsRoomBtn')?.addEventListener('click', function() {
+    document.getElementById('operationsRoomModal').style.display = 'flex';
+    opsSwitchTab('dashboard');
+    opsLoadDashboard();
+});
+
+console.log('✅ غرفة العمليات التشغيلية جاهزة');
+// ============================================
+// رفع الثيمات إلى السيرفر (لجميع المستخدمين)
+// ============================================
+
+async function uploadTheme() {
+    const fileInput = document.getElementById('headerBgFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('⚠️ الرجاء اختيار ملف أولاً');
+        return;
+    }
+    
+    // التحقق من نوع الملف
+    const validTypes = ['image/gif', 'image/png', 'image/jpeg', 'image/jpg', 'video/mp4', 'video/webm'];
+    if (!validTypes.includes(file.type)) {
+        alert('⚠️ نوع الملف غير مدعوم. يرجى اختيار صورة أو فيديو.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'background');
+    
+    try {
+        const response = await fetch('/api/upload-theme', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ تم رفع الثيم بنجاح لجميع المستخدمين');
+            await applyGlobalTheme();
+            fileInput.value = '';
+            // تحديث المعاينة
+            const previewDiv = document.getElementById('headerBgPreview');
+            if (previewDiv) {
+                previewDiv.style.display = 'block';
+                if (file.type.startsWith('video/')) {
+                    const video = document.getElementById('headerBgPreviewVideo');
+                    const img = document.getElementById('headerBgPreviewImg');
+                    if (video) {
+                        img.style.display = 'none';
+                        video.style.display = 'block';
+                        video.src = URL.createObjectURL(file);
+                        video.load();
+                    }
+                } else {
+                    const img = document.getElementById('headerBgPreviewImg');
+                    const video = document.getElementById('headerBgPreviewVideo');
+                    if (img) {
+                        video.style.display = 'none';
+                        img.style.display = 'block';
+                        img.src = URL.createObjectURL(file);
+                    }
+                }
+            }
+        } else {
+            alert('❌ فشل في رفع الثيم: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (error) {
+        console.error('❌ خطأ في الاتصال:', error);
+        alert('❌ خطأ في الاتصال بالسيرفر');
+    }
+}
+
+async function applyGlobalTheme() {
+    try {
+        const response = await fetch('/api/theme-settings');
+        const data = await response.json();
+        
+        console.log('📸 بيانات الثيم:', data);
+        
+        if (data.fileName) {
+            const header = document.getElementById('mainHeader');
+            
+            // إزالة أي فيديو قديم
+            const oldVideo = header.querySelector('.header-bg-video');
+            if (oldVideo) oldVideo.remove();
+            
+            // إزالة أي خلفية سابقة
+            header.style.backgroundImage = '';
+            header.style.background = '';
+            
+            if (data.fileType && data.fileType.startsWith('video/')) {
+                // فيديو
+                header.style.backgroundImage = 'none';
+                header.style.backgroundColor = '#0B1E33';
+                
+                const video = document.createElement('video');
+                video.className = 'header-bg-video';
+                video.src = `/uploads/${data.fileName}`;
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0.4;';
+                header.prepend(video);
+                video.load();
+                video.play().catch(() => console.log('تشغيل الفيديو تلقائياً'));
+                header.classList.remove('has-bg-image');
+            } else {
+                // صورة
+                header.style.backgroundImage = `url('/uploads/${data.fileName}')`;
+                header.style.backgroundSize = 'cover';
+                header.style.backgroundPosition = 'center';
+                header.style.backgroundRepeat = 'no-repeat';
+                header.classList.add('has-bg-image');
+            }
+        }
+    } catch (error) {
+        console.error('خطأ في تطبيق الثيم:', error);
+    }
+}
+
+async function removeGlobalTheme() {
+    if (!confirm('⚠️ هل أنت متأكد من إزالة الثيم العام؟')) return;
+    
+    try {
+        const response = await fetch('/api/remove-theme', { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            alert('✅ تم إزالة الثيم العام');
+            // إعادة الخلفية الافتراضية
+            const header = document.getElementById('mainHeader');
+            header.style.backgroundImage = '';
+            header.style.background = '';
+            header.style.backgroundColor = '';
+            header.classList.remove('has-bg-image');
+            const video = header.querySelector('.header-bg-video');
+            if (video) video.remove();
+            // إخفاء المعاينة
+            document.getElementById('headerBgPreview').style.display = 'none';
+        }
+    } catch (error) {
+        alert('❌ خطأ في الاتصال');
+    }
+}
 </script>
 </body>
 </html>
