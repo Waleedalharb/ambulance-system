@@ -1308,32 +1308,81 @@
             </div>
             <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
         </div>
+        
+        <!-- ===== خلفية الشريط العلوي ===== -->
         <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-image"></i> خلفية الشريط العلوي</h4>
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;">
+                <i class="fas fa-image"></i> خلفية الشريط العلوي
+                <span style="font-size:0.6rem; color:var(--teal); font-weight:400; margin-right:8px;">(عامة لجميع المستخدمين)</span>
+            </h4>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <input type="file" id="headerBgFile" accept=".gif,.png,.jpg,.jpeg,.mp4,.webm" style="display:none;">
-                <button onclick="document.getElementById('headerBgFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;"><i class="fas fa-upload"></i> اختيار صورة/فيديو</button>
-                <button onclick="removeHeaderBg()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;"><i class="fas fa-times"></i> إزالة الخلفية</button>
-                <button onclick="refreshThemes()" class="btn btn-teal" style="padding:6px 16px; font-size:0.8rem;"><i class="fas fa-sync"></i> تحديث</button>
+                
+                <!-- اختيار ملف -->
+                <button onclick="document.getElementById('headerBgFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار ملف
+                </button>
+                
+                <!-- رفع للجميع -->
+                <button onclick="uploadTheme()" class="btn" style="padding:6px 16px; font-size:0.8rem; background:var(--teal); color:white; border-color:var(--teal);">
+                    <i class="fas fa-globe"></i> رفع للجميع
+                </button>
+                
+                <!-- إزالة الثيم العام -->
+                <button onclick="removeGlobalTheme()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الثيم العام
+                </button>
+                
+                <!-- تحديث -->
+                <button onclick="refreshThemes()" class="btn btn-teal" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
             </div>
             <div id="headerBgPreview" style="margin-top:8px; display:none; border-radius:var(--radius-sm); overflow:hidden; max-height:100px;">
                 <img id="headerBgPreviewImg" src="" alt="معاينة الخلفية" style="width:100%; object-fit:cover; max-height:100px;">
                 <video id="headerBgPreviewVideo" src="" style="width:100%; object-fit:cover; max-height:100px; display:none;" autoplay loop muted></video>
             </div>
+            <div style="margin-top:6px; font-size:0.65rem; color:var(--gray-400);">
+                💡 الصورة/الفيديو المرفوع يشاهده جميع المستخدمين
+            </div>
         </div>
+        
+        <!-- ===== شعار القطاع ===== -->
         <div style="background:var(--gray-50); padding:12px; border-radius:var(--radius-md); margin-bottom:12px;">
-            <h4 style="margin:0 0 8px 0; font-size:0.85rem;"><i class="fas fa-building"></i> شعار القطاع</h4>
+            <h4 style="margin:0 0 8px 0; font-size:0.85rem;">
+                <i class="fas fa-building"></i> شعار القطاع
+                <span style="font-size:0.6rem; color:var(--teal); font-weight:400; margin-right:8px;">(عام لجميع المستخدمين)</span>
+            </h4>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <input type="file" id="sectorLogoFile" accept=".png,.jpg,.jpeg,.svg" style="display:none;">
-                <button onclick="document.getElementById('sectorLogoFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;"><i class="fas fa-upload"></i> اختيار شعار</button>
-                <button onclick="removeSectorLogo()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;"><i class="fas fa-times"></i> إزالة الشعار</button>
+                
+                <!-- اختيار شعار -->
+                <button onclick="document.getElementById('sectorLogoFile').click()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-upload"></i> اختيار شعار
+                </button>
+                
+                <!-- رفع شعار للجميع -->
+                <button onclick="uploadSectorLogo()" class="btn" style="padding:6px 16px; font-size:0.8rem; background:var(--teal); color:white; border-color:var(--teal);">
+                    <i class="fas fa-globe"></i> رفع للجميع
+                </button>
+                
+                <!-- إزالة الشعار -->
+                <button onclick="removeSectorLogo()" class="btn btn-coral" style="padding:6px 16px; font-size:0.8rem;">
+                    <i class="fas fa-times"></i> إزالة الشعار
+                </button>
             </div>
             <div id="sectorLogoPreview" style="margin-top:8px; display:none;">
                 <img id="sectorLogoPreviewImg" src="" alt="معاينة الشعار" style="max-width:100px; max-height:60px; border-radius:var(--radius-sm); border:1px solid var(--gray-200);">
             </div>
+            <div style="margin-top:6px; font-size:0.65rem; color:var(--gray-400);">
+                💡 الشعار المرفوع يشاهده جميع المستخدمين
+            </div>
         </div>
+        
         <div class="modal-buttons">
-            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button onclick="document.getElementById('themeModal').style.display='none'" class="btn">
+                <i class="fas fa-times"></i> إغلاق
+            </button>
         </div>
     </div>
 </div>

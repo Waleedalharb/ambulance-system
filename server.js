@@ -8,40 +8,49 @@ const PORT = process.env.PORT || 3002;
 // ============================================
 // مسارات ملفات البيانات
 // ============================================
-const DATA_PATH = '/data/ambulance-data.json';
-const SHIFT_DATA_PATH = '/data/shift-data.json';
-const MONTHLY_TABLE_PATH = '/data/monthly-table.xlsx';
-const DOCS_PATH = '/data/docs.json';
-const AIR_PATH = '/data/air-ambulance.json';
-const IDENTITY_PATH = '/data/identity.pdf';
-const CONTROL_NOTES_PATH = '/data/control-notes.json';
-const VACATIONS_PATH = '/data/vacations.json';
-const PASSWORD_PATH = '/data/password.json';
-const PEAK_DATA_PATH = '/data/peak-data.json';
+const DATA_PATH = path.join(__dirname, 'data', 'ambulance-data.json');
+const SHIFT_DATA_PATH = path.join(__dirname, 'data', 'shift-data.json');
+const MONTHLY_TABLE_PATH = path.join(__dirname, 'data', 'monthly-table.xlsx');
+const DOCS_PATH = path.join(__dirname, 'data', 'docs.json');
+const AIR_PATH = path.join(__dirname, 'data', 'air-ambulance.json');
+const IDENTITY_PATH = path.join(__dirname, 'data', 'identity.pdf');
+const CONTROL_NOTES_PATH = path.join(__dirname, 'data', 'control-notes.json');
+const VACATIONS_PATH = path.join(__dirname, 'data', 'vacations.json');
+const PASSWORD_PATH = path.join(__dirname, 'data', 'password.json');
+const PEAK_DATA_PATH = path.join(__dirname, 'data', 'peak-data.json');
+const THEME_SETTINGS_PATH = path.join(__dirname, 'data', 'theme-settings.json');
+
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
+// ============================================
+// التأكد من وجود مجلدات البيانات
+// ============================================
+async function ensureDataDir() {
+    try {
+        await fs.mkdir(path.join(__dirname, 'data'), { recursive: true });
+        await fs.mkdir(path.join(__dirname, 'data', 'temp'), { recursive: true });
+        await fs.mkdir(path.join(__dirname, 'public', 'uploads'), { recursive: true });
+    } catch (e) {}
+}
+ensureDataDir();
+
+// ============================================
 // Middleware
+// ============================================
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
 // ============================================
 // إعداد Multer لرفع الملفات
 // ============================================
 const upload = multer({
-    dest: '/data/temp/',
+    dest: path.join(__dirname, 'data', 'temp'),
     limits: { fileSize: 100 * 1024 * 1024 }
 });
-
-async function ensureTempDir() {
-    try {
-        await fs.mkdir('/data/temp', { recursive: true });
-    } catch (e) {}
-}
-ensureTempDir();
 
 // ============================================
 // بيانات قطاع الجنوب
@@ -128,9 +137,7 @@ async function readPassword() {
         const parsed = JSON.parse(data);
         return parsed.password || '1234';
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            return '1234';
-        }
+        if (error.code === 'ENOENT') return '1234';
         return '1234';
     }
 }
@@ -147,15 +154,30 @@ async function readPeakData() {
         const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            return { missions: [], alerts: [], logs: [] };
-        }
+        if (error.code === 'ENOENT') return { missions: [], alerts: [], logs: [] };
         return { missions: [], alerts: [], logs: [] };
     }
 }
 
 async function writePeakData(data) {
     await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الثيمات العامة
+// ============================================
+async function readThemeSettings() {
+    try {
+        const data = await fs.readFile(THEME_SETTINGS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return { fileType: null, fileName: null };
+        return { fileType: null, fileName: null };
+    }
+}
+
+async function writeThemeSettings(data) {
+    await fs.writeFile(THEME_SETTINGS_PATH, JSON.stringify(data, null, 2));
 }
 
 // ============================================
@@ -214,16 +236,16 @@ app.post('/api/start-new-shift', async (req, res) => {
         if (!shiftType) {
             return res.status(400).json({ error: 'نوع المناوبة مطلوب' });
         }
-        
+
         const currentReports = await readData();
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-        
+
         const now = new Date();
         const offset = 3;
         const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
         const shiftDate = saudiTime.toLocaleDateString('ar-SA');
         const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
-        
+
         const newShift = {
             id: Date.now(),
             shiftName: `${shiftType} - ${shiftDate} ${shiftTime}`,
@@ -238,15 +260,15 @@ app.post('/api/start-new-shift', async (req, res) => {
             generalNotes: "",
             lastUpdate: saudiTime.toISOString()
         };
-        
+
         const shifts = await readShifts();
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
-        
+
         await writeData({});
         currentShiftId = newShift.id;
-        
+
         res.json({ success: true, shiftId: newShift.id, shift: newShift });
     } catch (error) {
         console.error("خطأ في بدء المناوبة:", error);
@@ -260,22 +282,22 @@ app.post('/api/update-shift-data', async (req, res) => {
         if (!shiftId) {
             return res.status(400).json({ error: 'معرف المناوبة مطلوب' });
         }
-        
+
         const shifts = await readShifts();
         const index = shifts.findIndex(s => s.id === shiftId);
         if (index === -1) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
-        
+
         shifts[index].rapidLocations = shiftData.rapidLocations || {};
         shifts[index].centersData = shiftData.centersData || {};
         shifts[index].generalNotes = shiftData.generalNotes || "";
         shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
         shifts[index].lastUpdate = new Date().toISOString();
-        
+
         await writeShifts(shifts);
         currentShiftId = shiftId;
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error("خطأ في تحديث بيانات المناوبة:", error);
@@ -304,7 +326,7 @@ app.delete('/api/shifts/:id', async (req, res) => {
 app.post('/api/report', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
+
     const key = `${center}|${unit}`;
     const now = new Date();
     const offset = 3;
@@ -316,7 +338,7 @@ app.post('/api/report', async (req, res) => {
     const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
     const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
     const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    
+
     try {
         const allData = await readData();
         if (!allData[key]) allData[key] = { count: 0, times: [] };
@@ -324,7 +346,7 @@ app.post('/api/report', async (req, res) => {
         allData[key].times.unshift(timestamp);
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
-        
+
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
@@ -334,7 +356,7 @@ app.post('/api/report', async (req, res) => {
 app.post('/api/undo', async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
-    
+
     const key = `${center}|${unit}`;
     try {
         const allData = await readData();
@@ -361,7 +383,7 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
-        
+
         const centersData = shift.centersData || {};
         let totalStaff = 0;
         let totalCars = 0;
@@ -370,7 +392,7 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
         let centerCount = 0;
         const distribution = {};
         const carDistribution = {};
-        
+
         for (let center in centersData) {
             const staffCount = parseInt(centersData[center]?.staffCount) || 0;
             const carsCount = parseInt(centersData[center]?.carsCount) || 0;
@@ -385,7 +407,7 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
             distribution[center] = staffCount;
             carDistribution[center] = carsCount;
         }
-        
+
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
         res.json({
             totalStaff,
@@ -633,15 +655,15 @@ app.post('/api/change-password', async (req, res) => {
     try {
         const { oldPassword, newPassword } = req.body;
         const currentPassword = await readPassword();
-        
+
         if (oldPassword !== currentPassword) {
             return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
         }
-        
+
         if (!newPassword || newPassword.length < 4) {
             return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
         }
-        
+
         await writePassword(newPassword);
         res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
     } catch (error) {
@@ -667,7 +689,7 @@ app.post('/api/peak-mission', async (req, res) => {
         if (!location || !unit || !startTime || !endTime) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        
+
         const data = await readPeakData();
         const mission = {
             id: Date.now().toString(),
@@ -682,10 +704,10 @@ app.post('/api/peak-mission', async (req, res) => {
             status: 'نشط',
             createdAt: new Date().toISOString()
         };
-        
+
         data.missions.unshift(mission);
         if (data.missions.length > 100) data.missions.pop();
-        
+
         data.logs.unshift({
             id: Date.now().toString(),
             icon: '🟡',
@@ -696,7 +718,7 @@ app.post('/api/peak-mission', async (req, res) => {
             date: new Date().toISOString()
         });
         if (data.logs.length > 50) data.logs.pop();
-        
+
         data.alerts.unshift({
             id: Date.now().toString(),
             title: 'تمركز مطلوب لـ ' + unit,
@@ -715,7 +737,7 @@ app.post('/api/peak-mission', async (req, res) => {
             createdAt: new Date().toISOString()
         });
         if (data.alerts.length > 50) data.alerts.pop();
-        
+
         await writePeakData(data);
         res.json({ success: true, mission });
     } catch (error) {
@@ -730,7 +752,7 @@ app.post('/api/peak-resolve', async (req, res) => {
         if (!alertId) {
             return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
         }
-        
+
         const data = await readPeakData();
         const alert = data.alerts.find(a => a.id === alertId);
         if (alert) {
@@ -750,6 +772,103 @@ app.post('/api/peak-resolve', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في إنهاء التنبيه' });
+    }
+});
+
+// ============================================
+// API: الثيمات العامة (لجميع المستخدمين)
+// ============================================
+
+// رفع الثيم (خلفية أو شعار)
+app.post('/api/upload-theme', upload.single('file'), async (req, res) => {
+    try {
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'لا يوجد ملف' });
+        }
+
+        const type = req.body.type || 'background'; // 'background' أو 'logo'
+        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        
+        // تحديد البادئة حسب النوع
+        const prefix = type === 'logo' ? 'logo.' : 'header-bg.';
+        
+        // حذف الملفات القديمة من نفس النوع
+        const files = await fs.readdir(uploadsDir);
+        for (const f of files) {
+            if (f.startsWith(prefix)) {
+                await fs.unlink(path.join(uploadsDir, f));
+            }
+        }
+
+        // إعادة تسمية الملف الجديد
+        const ext = file.originalname.split('.').pop();
+        const newFileName = `${prefix}${ext}`;
+        const newPath = path.join(uploadsDir, newFileName);
+        await fs.rename(file.path, newPath);
+
+        // حفظ الإعدادات
+        const currentSettings = await readThemeSettings();
+        if (type === 'logo') {
+            currentSettings.logoFileName = newFileName;
+            currentSettings.logoFileType = file.mimetype;
+        } else {
+            currentSettings.fileType = file.mimetype;
+            currentSettings.fileName = newFileName;
+        }
+        currentSettings.updatedAt = new Date().toISOString();
+        await writeThemeSettings(currentSettings);
+
+        res.json({ success: true, message: 'تم رفع الملف بنجاح', fileName: newFileName });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في رفع الملف' });
+    }
+});
+
+// جلب الثيم الحالي (الخلفية + الشعار)
+app.get('/api/theme-settings', async (req, res) => {
+    try {
+        const data = await readThemeSettings();
+        // التأكد من وجود جميع الحقول
+        res.json({
+            fileType: data.fileType || null,
+            fileName: data.fileName || null,
+            logoFileName: data.logoFileName || null,
+            logoFileType: data.logoFileType || null,
+            updatedAt: data.updatedAt || null
+        });
+    } catch (error) {
+        res.json({ 
+            fileType: null, 
+            fileName: null,
+            logoFileName: null,
+            logoFileType: null,
+            updatedAt: null
+        });
+    }
+});
+
+// حذف جميع الثيمات (الخلفية + الشعار)
+app.delete('/api/remove-theme', async (req, res) => {
+    try {
+        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        const files = await fs.readdir(uploadsDir);
+        for (const f of files) {
+            if (f.startsWith('header-bg.') || f.startsWith('logo.')) {
+                await fs.unlink(path.join(uploadsDir, f));
+            }
+        }
+        await writeThemeSettings({ 
+            fileType: null, 
+            fileName: null,
+            logoFileName: null,
+            logoFileType: null,
+            updatedAt: new Date().toISOString()
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إزالة الثيمات' });
     }
 });
 
@@ -840,23 +959,23 @@ app.post('/api/locate-report', (req, res) => {
     if (!lat || !lng) {
         return res.status(400).json({ error: 'إحداثيات غير صالحة' });
     }
-    
+
     let foundCenter = null;
     let minDistance = Infinity;
-    
+
     for (let center in centerGeoData) {
         const data = centerGeoData[center];
         const centerLat = data.center[0];
         const centerLng = data.center[1];
-        
+
         const distance = getDistance(lat, lng, centerLat, centerLng);
-        
+
         if (distance < data.radius && distance < minDistance) {
             minDistance = distance;
             foundCenter = center;
         }
     }
-    
+
     res.json({
         success: true,
         center: foundCenter,
@@ -962,5 +1081,7 @@ app.listen(PORT, () => {
     console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
     console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
     console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
+    console.log(`📁 مسار إعدادات الثيمات: ${THEME_SETTINGS_PATH}`);
     console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
+    console.log(`📸 مجلد رفع الثيمات: ${path.join(__dirname, 'public', 'uploads')}`);
 });
