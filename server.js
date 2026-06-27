@@ -2,8 +2,46 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
+const WebSocket = require('ws');
 const app = express();
 const PORT = process.env.PORT || 3002;
+
+// ============================================
+// WebSocket Server - تحديث فوري
+// ============================================
+const WS_PORT = 8080;
+const wss = new WebSocket.Server({ port: WS_PORT });
+
+var clients = [];
+
+wss.on('connection', function(ws) {
+    console.log('🟢 WebSocket client connected');
+    clients.push(ws);
+    
+    // إرسال رسالة ترحيب
+    ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر' }));
+    
+    ws.on('close', function() {
+        console.log('🔴 WebSocket client disconnected');
+        clients = clients.filter(function(c) { return c !== ws; });
+    });
+    
+    ws.on('error', function(err) {
+        console.error('WebSocket error:', err);
+    });
+});
+
+// دالة لبث الرسائل لجميع المتصلين
+function broadcast(data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+}
+
+console.log('🔌 WebSocket server running on ws://localhost:' + WS_PORT);
 
 // ============================================
 // مسارات ملفات البيانات
@@ -43,6 +81,20 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// ============================================
+// PWA routes
+// ============================================
+app.get('/manifest.json', function(req, res) {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+app.get('/sw.js', function(req, res) {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.sendFile(path.join(__dirname, 'sw.js'));
+});
 
 // ============================================
 // إعداد Multer لرفع الملفات
@@ -257,6 +309,8 @@ app.post('/api/start-new-shift', async (req, res) => {
             totalReports: total,
             rapidLocations: {},
             centersData: {},
+            vehicleData: {},
+            fuelData: {},
             generalNotes: "",
             lastUpdate: saudiTime.toISOString()
         };
@@ -347,6 +401,14 @@ app.post('/api/report', async (req, res) => {
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
 
+        // بث البلاغ الجديد لجميع المتصلين
+        broadcast({
+            type: 'new_report',
+            center: center,
+            unit: unit,
+            message: 'بلاغ جديد: ' + unit + ' في ' + center
+        });
+
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
@@ -390,12 +452,20 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
         let missingCenters = 0;
         let readyCenters = 0;
         let centerCount = 0;
+        let readyVehicles = 0;
+        let maintenanceVehicles = 0;
+        let brokenVehicles = 0;
+        let lowFuel = 0;
         const distribution = {};
         const carDistribution = {};
+        const vehicleStatus = {};
+        const fuelStatus = {};
 
         for (let center in centersData) {
             const staffCount = parseInt(centersData[center]?.staffCount) || 0;
             const carsCount = parseInt(centersData[center]?.carsCount) || 0;
+            const vehStatus = centersData[center]?.vehicleStatus || '';
+            const fuelLvl = centersData[center]?.fuelLevel || '';
             totalStaff += staffCount;
             totalCars += carsCount;
             centerCount++;
@@ -404,8 +474,14 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
             } else {
                 missingCenters++;
             }
+            if (vehStatus === 'ready') readyVehicles++;
+            else if (vehStatus === 'maintenance') maintenanceVehicles++;
+            else if (vehStatus === 'broken') brokenVehicles++;
+            if (fuelLvl === 'low') lowFuel++;
             distribution[center] = staffCount;
             carDistribution[center] = carsCount;
+            vehicleStatus[center] = vehStatus;
+            fuelStatus[center] = fuelLvl;
         }
 
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
@@ -416,8 +492,14 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
             readyCenters,
             centerCount,
             readinessRate,
+            readyVehicles,
+            maintenanceVehicles,
+            brokenVehicles,
+            lowFuel,
             distribution,
-            carDistribution
+            carDistribution,
+            vehicleStatus,
+            fuelStatus
         });
     } catch (error) {
         console.error(error);
@@ -818,6 +900,12 @@ app.post('/api/upload-theme', upload.single('file'), async (req, res) => {
         }
         currentSettings.updatedAt = new Date().toISOString();
         await writeThemeSettings(currentSettings);
+
+        // بث تحديث الثيم لجميع المتصلين
+        broadcast({
+            type: 'theme_updated',
+            message: 'تم تحديث الثيم'
+        });
 
         res.json({ success: true, message: 'تم رفع الملف بنجاح', fileName: newFileName });
     } catch (error) {
