@@ -44,19 +44,28 @@ function broadcast(data) {
 console.log('🔌 WebSocket server running on ws://localhost:' + WS_PORT);
 
 // ============================================
-// مسارات ملفات البيانات
+// مسار التخزين الرئيسي (Render Disk أو محلي)
 // ============================================
-const DATA_PATH = path.join(__dirname, 'data', 'ambulance-data.json');
-const SHIFT_DATA_PATH = path.join(__dirname, 'data', 'shift-data.json');
-const MONTHLY_TABLE_PATH = path.join(__dirname, 'data', 'monthly-table.xlsx');
-const DOCS_PATH = path.join(__dirname, 'data', 'docs.json');
-const AIR_PATH = path.join(__dirname, 'data', 'air-ambulance.json');
-const IDENTITY_PATH = path.join(__dirname, 'data', 'identity.pdf');
-const CONTROL_NOTES_PATH = path.join(__dirname, 'data', 'control-notes.json');
-const VACATIONS_PATH = path.join(__dirname, 'data', 'vacations.json');
-const PASSWORD_PATH = path.join(__dirname, 'data', 'password.json');
-const PEAK_DATA_PATH = path.join(__dirname, 'data', 'peak-data.json');
-const THEME_SETTINGS_PATH = path.join(__dirname, 'data', 'theme-settings.json');
+// في Render: عيّن متغير البيئة RENDER_DISK_PATH = /data
+// أو استخدم المسار الافتراضي داخل المشروع (للتطوير المحلي)
+const STORAGE_PATH = process.env.RENDER_DISK_PATH || path.join(__dirname, 'data');
+
+console.log('📂 مسار التخزين الرئيسي:', STORAGE_PATH);
+
+// ============================================
+// مسارات ملفات البيانات (على Render Disk)
+// ============================================
+const DATA_PATH = path.join(STORAGE_PATH, 'ambulance-data.json');
+const SHIFT_DATA_PATH = path.join(STORAGE_PATH, 'shift-data.json');
+const MONTHLY_TABLE_PATH = path.join(STORAGE_PATH, 'monthly-table.xlsx');
+const DOCS_PATH = path.join(STORAGE_PATH, 'docs.json');
+const AIR_PATH = path.join(STORAGE_PATH, 'air-ambulance.json');
+const IDENTITY_PATH = path.join(STORAGE_PATH, 'identity.pdf');
+const CONTROL_NOTES_PATH = path.join(STORAGE_PATH, 'control-notes.json');
+const VACATIONS_PATH = path.join(STORAGE_PATH, 'vacations.json');
+const PASSWORD_PATH = path.join(STORAGE_PATH, 'password.json');
+const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
+const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
 
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
@@ -66,10 +75,16 @@ let currentShiftId = null;
 // ============================================
 async function ensureDataDir() {
     try {
-        await fs.mkdir(path.join(__dirname, 'data'), { recursive: true });
-        await fs.mkdir(path.join(__dirname, 'data', 'temp'), { recursive: true });
-        await fs.mkdir(path.join(__dirname, 'public', 'uploads'), { recursive: true });
-    } catch (e) {}
+        // المجلد الرئيسي على Render Disk (أو محلي)
+        await fs.mkdir(STORAGE_PATH, { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'temp'), { recursive: true });
+        // مجلد رفع الملفات على Render Disk
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads'), { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
+        console.log('✅ تم التأكد من وجود مجلدات البيانات');
+    } catch (e) {
+        console.error('❌ خطأ في إنشاء مجلدات البيانات:', e.message);
+    }
 }
 ensureDataDir();
 
@@ -80,7 +95,8 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
+app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads')));
 
 // ============================================
 // PWA routes
@@ -100,7 +116,7 @@ app.get('/sw.js', function(req, res) {
 // إعداد Multer لرفع الملفات
 // ============================================
 const upload = multer({
-    dest: path.join(__dirname, 'data', 'temp'),
+    dest: path.join(STORAGE_PATH, 'temp'),
     limits: { fileSize: 100 * 1024 * 1024 }
 });
 
@@ -870,7 +886,7 @@ app.post('/api/upload-theme', upload.single('file'), async (req, res) => {
         }
 
         const type = req.body.type || 'background'; // 'background' أو 'logo'
-        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        const uploadsDir = path.join(STORAGE_PATH, 'uploads');
         
         // تحديد البادئة حسب النوع
         const prefix = type === 'logo' ? 'logo.' : 'header-bg.';
@@ -940,7 +956,7 @@ app.get('/api/theme-settings', async (req, res) => {
 // حذف جميع الثيمات (الخلفية + الشعار)
 app.delete('/api/remove-theme', async (req, res) => {
     try {
-        const uploadsDir = path.join(__dirname, 'public', 'uploads');
+        const uploadsDir = path.join(STORAGE_PATH, 'uploads');
         const files = await fs.readdir(uploadsDir);
         for (const f of files) {
             if (f.startsWith('header-bg.') || f.startsWith('logo.')) {
@@ -1161,7 +1177,7 @@ app.get('/api/export', async (req, res) => {
 // API: غرفة العمليات التشغيلية
 // ============================================
 
-const OPS_UPLOAD_DIR = path.join(__dirname, 'public', 'uploads', 'operational');
+const OPS_UPLOAD_DIR = path.join(STORAGE_PATH, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
 
 // التأكد من وجود المجلد والملف
@@ -1296,5 +1312,5 @@ app.listen(PORT, () => {
     console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
     console.log(`📁 مسار إعدادات الثيمات: ${THEME_SETTINGS_PATH}`);
     console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
-    console.log(`📸 مجلد رفع الثيمات: ${path.join(__dirname, 'public', 'uploads')}`);
+    console.log(`📸 مجلد رفع الثيمات: ${path.join(STORAGE_PATH, 'uploads')}`);
 });

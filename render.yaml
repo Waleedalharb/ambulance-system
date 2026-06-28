@@ -1,0 +1,28 @@
+# ============================================
+# إعداد Render.com مع Render Disk
+# ============================================
+# هذا الملف يُبسّط إعداد المشروع على Render
+# انسخ محتواه في ملف render.yaml في جذر المشروع
+# أو استخدم واجهة Render لإضافة الـ Disk يدوياً
+# ============================================
+
+services:
+  - type: web
+    name: ambulance-management-system
+    env: node
+    region: frankfurt  # اختر المنطقة الأقرب لك
+    plan: standard     # يجب أن يكون على الأقل Standard لاستخدام Render Disk
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # ⭐ مهم: هذا مسار Render Disk
+      - key: RENDER_DISK_PATH
+        value: /data
+    disk:
+      name: ambulance-data-disk
+      mountPath: /data
+      sizeGB: 10        # حجم الـ Disk بالجيجا (يمكنك زيادته)
