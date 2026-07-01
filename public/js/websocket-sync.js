@@ -1,12 +1,44 @@
 // ============================================
 // WebSocket Sync Client — جميع الصفحات
-// يتصل بالخادم ويستقبل broadcast updates
+// يتصل بالخادم ويستقبل broadcast updates + يعرض إشعارات
 // ============================================
 (function() {
     var authToken = localStorage.getItem('authToken');
     if (!authToken) {
         console.log('Sync: no authToken, skipping WebSocket');
         return;
+    }
+
+    // =====================
+    // إشعارات بسيطة تعمل في جميع الصفحات
+    // =====================
+    function showSyncToast(message) {
+        // إذا الصفحة فيها showToast (operations-command.html) استخدمها
+        if (typeof showToast === 'function') {
+            showToast('info', 'تحديث', message);
+            return;
+        }
+        // إذا الصفحة فيها showNotification (index.html) استخدمها
+        if (typeof showNotification === 'function') {
+            showNotification('تحديث', message, 'info', 3000);
+            return;
+        }
+        // fallback: أنشئ إشعار بسيط
+        var toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:99999; background:#1E3A5F; color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); animation:slideDown 0.3s ease; direction:rtl;';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3000);
+    }
+
+    // =====================
+    // إضافة animation CSS
+    // =====================
+    if (!document.getElementById('sync-toast-style')) {
+        var style = document.createElement('style');
+        style.id = 'sync-toast-style';
+        style.textContent = '@keyframes slideDown { from { opacity:0; transform:translate(-50%, -20px); } to { opacity:1; transform:translate(-50%, 0); } }';
+        document.head.appendChild(style);
     }
 
     var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -23,6 +55,18 @@
             var data = JSON.parse(event.data);
             console.log('📡 Sync received:', data.type, data.message || '');
 
+            // إذا رسالة بسيطة handshake
+            if (data.type === 'connected') {
+                console.log('WS:', data.message);
+                return;
+            }
+
+            // عرض إشعار بسيط
+            if (data.message) {
+                showSyncToast(data.message);
+            }
+
+            // تحديث البيانات
             switch(data.type) {
                 case 'new_report':
                     if (typeof refreshReports === 'function') refreshReports();
@@ -30,7 +74,15 @@
                     if (typeof loadAllData === 'function') loadAllData();
                     break;
                 case 'shift_started':
+                    if (typeof loadShifts === 'function') loadShifts();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
                 case 'shift_updated':
+                    if (typeof loadShifts === 'function') loadShifts();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
                 case 'shift_deleted':
                     if (typeof loadShifts === 'function') loadShifts();
                     if (typeof loadData === 'function') loadData();
@@ -70,9 +122,6 @@
                     break;
                 case 'theme_updated':
                     if (typeof applyGlobalTheme === 'function') applyGlobalTheme();
-                    break;
-                case 'connected':
-                    // handshake, ignore
                     break;
                 default:
                     console.log('Sync: unknown type', data.type);
