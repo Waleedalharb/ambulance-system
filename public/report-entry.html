@@ -1392,13 +1392,21 @@ async function getRecords() {
         });
         if (resp.ok) {
             var result = await resp.json();
-            serverRecordsCache = (result && result.records) || [];
+            // Handle both formats: {success: true, records: [...]} and [...] directly
+            if (Array.isArray(result)) {
+                serverRecordsCache = result;
+            } else if (result && result.records) {
+                serverRecordsCache = result.records;
+            } else {
+                serverRecordsCache = [];
+            }
             return serverRecordsCache;
         }
     } catch(e) {
         console.error('Failed to fetch records:', e);
     }
-    return [];
+    serverRecordsCache = [];
+    return serverRecordsCache;
 }
 
 async function saveRecords(records) {
