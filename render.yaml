@@ -1,28 +1,51 @@
 # ============================================
-# إعداد Render.com مع Render Disk
-# ============================================
-# هذا الملف يُبسّط إعداد المشروع على Render
-# انسخ محتواه في ملف render.yaml في جذر المشروع
-# أو استخدم واجهة Render لإضافة الـ Disk يدوياً
+# Render.com Deployment Configuration
+# منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض
 # ============================================
 
 services:
   - type: web
     name: ambulance-management-system
     env: node
-    region: frankfurt  # اختر المنطقة الأقرب لك
-    plan: standard     # يجب أن يكون على الأقل Standard لاستخدام Render Disk
+    region: frankfurt
+    plan: standard     # Required for Render Disk
     buildCommand: npm install
     startCommand: node server.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      # ⭐ مهم: هذا مسار Render Disk
+      # ⭐ CRITICAL: Render Disk mount path
       - key: RENDER_DISK_PATH
         value: /data
+      # ⭐ CRITICAL: Set strong JWT secret in Render dashboard (Secret type)
+      # - key: JWT_SECRET
+      #   generateValue: true
+      # ⭐ CRITICAL: Set default passwords in Render dashboard (Secret type)
+      # - key: DEFAULT_ADMIN_PASSWORD
+      #   value: [set in Render dashboard]
+      # - key: DEFAULT_DIRECTOR_PASSWORD
+      #   value: [set in Render dashboard]
+      # - key: DEFAULT_USER_PASSWORD
+      #   value: [set in Render dashboard]
+      # Optional: Restrict CORS in production
+      # - key: CORS_ORIGIN
+      #   value: https://your-domain.com
     disk:
       name: ambulance-data-disk
       mountPath: /data
-      sizeGB: 10        # حجم الـ Disk بالجيجا (يمكنك زيادته)
+      sizeGB: 10
+
+# ============================================
+# IMPORTANT SECURITY NOTES FOR RENDER DASHBOARD:
+# ============================================
+# 1. Go to Render Dashboard → Environment → Add Secret:
+#    - JWT_SECRET: Use: openssl rand -base64 64
+# 2. Add these as Secret env vars (NOT plain text):
+#    - DEFAULT_ADMIN_PASSWORD
+#    - DEFAULT_DIRECTOR_PASSWORD
+#    - DEFAULT_USER_PASSWORD
+# 3. Set CORS_ORIGIN to your actual domain if you have one
+# ============================================

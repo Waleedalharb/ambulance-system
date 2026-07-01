@@ -1,212 +1,152 @@
 <!-- ===== نموذج بلاغ حادث ===== -->
-<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
-        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:#FFF8E7; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--gold);">
-            <i class="fas fa-exclamation-circle"></i>
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-car-crash" style="color:var(--primary-700);"></i>
+        معلومات البلاغ
+    </div>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ</label>
+            <input type="text" id="incReportNumber" placeholder="E-2025-XXXX">
         </div>
-        <div>
-            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">بلاغ حادث</h4>
-            <span style="font-size:0.7rem; color:var(--gray-600);">تسجيل بلاغات الحوادث</span>
+        <div class="form-group">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> التاريخ والوقت</label>
+            <input type="datetime-local" id="incDateTime">
         </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم البلاغ:
-        </label>
-        <input type="text" id="incReportNumber" placeholder="مثال: 2025-INC-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-exclamation-circle" style="color:var(--coral);"></i> نوع الحادث</label>
+            <select id="incType">
+                <option value="">-- اختر --</option>
+                <option value="تصادم مروري">تصادم مروري</option>
+                <option value="دهس">دهس</option>
+                <option value="انقلاب مركبة">انقلاب مركبة</option>
+                <option value="حريق">حريق</option>
+                <option value="غرق">غرق</option>
+                <option value="سقوط من ارتفاع">سقوط من ارتفاع</option>
+                <option value="إصابة عمل">إصابة عمل</option>
+                <option value="عنف">عنف</option>
+                <option value="حالة طبية طارئة">حالة طبية طارئة</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> الموقع</label>
+            <input type="text" id="incLocation" placeholder="حي / شارع">
+        </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-calendar-clock" style="color:var(--gold); width:18px;"></i> تاريخ ووقت الحادث:
-        </label>
-        <input type="datetime-local" id="incDateTime" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-map-marker-alt" style="color:var(--coral); width:18px;"></i> موقع الحادث:
-        </label>
-        <input type="text" id="incLocation" placeholder="الموقع بالتفصيل" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-exclamation-triangle" style="color:var(--coral); width:18px;"></i> نوع الحادث:
-        </label>
-        <select id="incType" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-            <option value="">-- اختر نوع الحادث --</option>
-            <option value="تصادم مروري">تصادم مروري</option>
-            <option value="دهس">دهس</option>
-            <option value="انقلاب مركبة">انقلاب مركبة</option>
-            <option value="حريق">حريق</option>
-            <option value="غرق">غرق</option>
-            <option value="سقوط من ارتفاع">سقوط من ارتفاع</option>
-            <option value="إصابة عمل">إصابة عمل</option>
-            <option value="عنف">عنف</option>
-            <option value="حالة طبية طارئة">حالة طبية طارئة</option>
-            <option value="أخرى">أخرى</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-users" style="color:var(--teal); width:18px;"></i> عدد المصابين:
-        </label>
-        <input type="number" id="incInjuries" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-user-injured" style="color:var(--coral); width:18px;"></i> عدد الوفيات:
-        </label>
-        <input type="number" id="incDeaths" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> الفرقة المستجيبة:
-        </label>
-        <select id="incUnits" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-            <option value="">-- اختر الفرقة --</option>
-            <option value="سريع 1">سريع 1</option>
-            <option value="سريع 2">سريع 2</option>
-            <option value="سريع 3">سريع 3</option>
-            <option value="سريع 4">سريع 4</option>
-            <option value="جنوب 1">جنوب 1</option>
-            <option value="جنوب 2">جنوب 2</option>
-            <option value="جنوب 3">جنوب 3</option>
-            <option value="جنوب 4">جنوب 4</option>
-            <option value="جنوب 5">جنوب 5</option>
-            <option value="جنوب 6">جنوب 6</option>
-            <option value="جنوب 7">جنوب 7</option>
-            <option value="جنوب 8">جنوب 8</option>
-            <option value="جنوب 9">جنوب 9</option>
-            <option value="جنوب 10">جنوب 10</option>
-            <option value="جنوب 11">جنوب 11</option>
-            <option value="جنوب 12">جنوب 12</option>
-            <option value="جنوب 13">جنوب 13</option>
-            <option value="جنوب 14">جنوب 14</option>
-            <option value="جنوب 15">جنوب 15</option>
-            <option value="جنوب 16">جنوب 16</option>
-            <option value="جنوب 17">جنوب 17</option>
-            <option value="جنوب 18">جنوب 18</option>
-            <option value="جنوب 19">جنوب 19</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-hospital" style="color:var(--coral); width:18px;"></i> المستشفى المستلم:
-        </label>
-        <input type="text" id="incHospital" placeholder="اسم المستشفى" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> تفاصيل الحادث:
-        </label>
-        <textarea id="incDetails" rows="3" placeholder="التفاصيل الكاملة للحادث..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
-    </div>
-    
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
-        <button onclick="saveIncident()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-save"></i> حفظ البلاغ
-        </button>
-        <button onclick="sendIncidentWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fab fa-whatsapp"></i> إرسال واتساب
-        </button>
-        <button onclick="clearIncidentForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-eraser"></i> مسح
-        </button>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-ambulance" style="color:var(--teal);"></i> الفرقة</label>
+            <select id="incUnit">
+                <option value="">-- اختر الفرقة --</option>
+                <option value="سريع 1">سريع 1</option>
+                <option value="سريع 2">سريع 2</option>
+                <option value="سريع 3">سريع 3</option>
+                <option value="سريع 4">سريع 4</option>
+                <option value="جنوب 1">جنوب 1</option>
+                <option value="جنوب 2">جنوب 2</option>
+                <option value="جنوب 3">جنوب 3</option>
+                <option value="جنوب 4">جنوب 4</option>
+                <option value="جنوب 5">جنوب 5</option>
+                <option value="جنوب 6">جنوب 6</option>
+                <option value="جنوب 7">جنوب 7</option>
+                <option value="جنوب 8">جنوب 8</option>
+                <option value="جنوب 9">جنوب 9</option>
+                <option value="جنوب 10">جنوب 10</option>
+                <option value="جنوب 11">جنوب 11</option>
+                <option value="جنوب 12">جنوب 12</option>
+                <option value="جنوب 13">جنوب 13</option>
+                <option value="جنوب 14">جنوب 14</option>
+                <option value="جنوب 15">جنوب 15</option>
+                <option value="جنوب 16">جنوب 16</option>
+                <option value="جنوب 17">جنوب 17</option>
+                <option value="جنوب 18">جنوب 18</option>
+                <option value="جنوب 19">جنوب 19</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-hospital" style="color:var(--teal);"></i> المركز</label>
+            <select id="incCenter">
+                <option value="">-- اختر المركز --</option>
+                <option value="المنصورة">المنصورة</option>
+                <option value="الشيخ زايد">الشيخ زايد</option>
+                <option value="حي الواحات">حي الواحات</option>
+                <option value="المناخ">المناخ</option>
+                <option value="المريوطية">المريوطية</option>
+                <option value="طرة">طرة</option>
+                <option value="مطرية">مطرية</option>
+                <option value="البساتين">البساتين</option>
+                <option value="الخليفة">الخليفة</option>
+                <option value="الشفاء">الشفاء</option>
+                <option value="عكاظ">عكاظ</option>
+                <option value="الدار البيضاء">الدار البيضاء</option>
+                <option value="طريق الملك فهد">طريق الملك فهد</option>
+                <option value="مستشفى الملك خالد">مستشفى الملك خالد</option>
+            </select>
+        </div>
     </div>
 </div>
 
-<script>
-let incidentRecords = JSON.parse(localStorage.getItem('incidentRecords') || '[]');
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-user-injured" style="color:var(--coral);"></i>
+        معلومات المريض
+    </div>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-user" style="color:var(--primary-700);"></i> اسم المريض</label>
+            <input type="text" id="incPatientName" placeholder="الاسم الكامل">
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-users" style="color:var(--teal);"></i> العمر</label>
+            <input type="number" id="incAge" placeholder="العمر" min="0">
+        </div>
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-venus-mars" style="color:var(--primary-700);"></i> الجنس</label>
+        <select id="incGender">
+            <option value="">-- اختر --</option>
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+        </select>
+    </div>
+</div>
 
-function initForm_incident() {
-    document.getElementById('incDateTime').value = new Date().toISOString().slice(0, 16);
-}
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-notes-medical" style="color:var(--coral);"></i>
+        تفاصيل الحالة
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-stethoscope" style="color:var(--coral);"></i> وصف الحالة</label>
+        <textarea id="incDescription" rows="3" placeholder="وصف تفصيلي للحالة..."></textarea>
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-procedures" style="color:var(--teal);"></i> الإجراءات المتخذة</label>
+        <textarea id="incActions" rows="3" placeholder="الإجراءات الأولية..."></textarea>
+    </div>
+</div>
 
-function saveIncident() {
-    const reportNumber = document.getElementById('incReportNumber').value.trim();
-    const dateTime = document.getElementById('incDateTime').value;
-    const location = document.getElementById('incLocation').value.trim();
-    const incType = document.getElementById('incType').value;
-    const injuries = parseInt(document.getElementById('incInjuries').value) || 0;
-    const deaths = parseInt(document.getElementById('incDeaths').value) || 0;
-    const unit = document.getElementById('incUnits').value;
-    const hospital = document.getElementById('incHospital').value.trim();
-    const details = document.getElementById('incDetails').value.trim();
+<div class="form-actions">
+    <button onclick="clearIncidentForm()" class="btn btn-danger">
+        <i class="fas fa-times"></i> إلغاء
+    </button>
+    <button onclick="saveIncident()" class="btn btn-primary">
+        <i class="fas fa-save"></i> حفظ
+    </button>
+    <button onclick="sendIncidentWhatsApp()" class="btn btn-success">
+        <i class="fab fa-whatsapp"></i> إرسال
+    </button>
+</div>
 
-    if (!reportNumber || !location || !incType || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، نوع الحادث، الفرقة)');
-        return;
-    }
-
-    incidentRecords.unshift({
-        reportNumber,
-        dateTime,
-        location,
-        incType,
-        injuries,
-        deaths,
-        unit,
-        hospital,
-        details,
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
-    alert('✅ تم حفظ بلاغ الحادث');
-    clearIncidentForm();
-}
-
-function clearIncidentForm() {
-    document.getElementById('incReportNumber').value = '';
-    document.getElementById('incLocation').value = '';
-    document.getElementById('incType').value = '';
-    document.getElementById('incInjuries').value = 0;
-    document.getElementById('incDeaths').value = 0;
-    document.getElementById('incUnits').value = '';
-    document.getElementById('incHospital').value = '';
-    document.getElementById('incDetails').value = '';
-    document.getElementById('incDateTime').value = new Date().toISOString().slice(0, 16);
-}
-
-function sendIncidentWhatsApp() {
-    const reportNumber = document.getElementById('incReportNumber').value.trim();
-    const dateTime = document.getElementById('incDateTime').value;
-    const location = document.getElementById('incLocation').value.trim();
-    const incType = document.getElementById('incType').value;
-    const injuries = parseInt(document.getElementById('incInjuries').value) || 0;
-    const deaths = parseInt(document.getElementById('incDeaths').value) || 0;
-    const unit = document.getElementById('incUnits').value;
-    const hospital = document.getElementById('incHospital').value.trim();
-    const details = document.getElementById('incDetails').value.trim();
-
-    if (!reportNumber || !location || !incType || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
-
-    let message = '';
-    message += 'تقرير بلاغ حادث\n';
-    message += '═══════════════════════════════════\n';
-    message += 'رقم البلاغ: ' + reportNumber + '\n';
-    message += 'التاريخ والوقت: ' + dateTime.replace('T', ' ') + '\n';
-    message += 'الموقع: ' + location + '\n';
-    message += 'نوع الحادث: ' + incType + '\n';
-    message += 'عدد المصابين: ' + injuries + '\n';
-    message += 'عدد الوفيات: ' + deaths + '\n';
-    message += 'الفرقة المستجيبة: ' + unit + '\n';
-    if (hospital) message += 'المستشفى المستلم: ' + hospital + '\n';
-    if (details) message += 'التفاصيل: ' + details + '\n';
-    message += '═══════════════════════════════════\n';
-    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
-
-    const encoded = encodeURIComponent(message);
-    window.open('https://wa.me/?text=' + encoded, '_blank');
-}
-</script>
+<div class="form-card" style="margin-top:16px; background:var(--gray-50);">
+    <div class="form-card-title">
+        <i class="fas fa-eye" style="color:var(--primary-700);"></i>
+        البلاغات المحفوظة
+    </div>
+    <div id="incidentPreviewList" style="max-height:300px; overflow-y:auto;">
+        <p style="text-align:center; color:var(--gray-400); padding:20px;">📭 لا توجد بلاغات محفوظة</p>
+    </div>
+</div>

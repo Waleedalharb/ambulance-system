@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "backup": "node scripts/backup.js backup",
+    "backup-list": "node scripts/backup.js list",
+    "backup-cleanup": "node scripts/backup.js cleanup"
   },
   "keywords": [
     "ambulance",
@@ -18,8 +21,16 @@
   "author": "فريق الجودة والتطوير - قطاع جنوب الرياض",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
     "express": "^4.22.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
+    "sqlite3": "^6.0.1",
+    "tar": "^7.5.19",
     "ws": "^8.21.0"
   },
   "devDependencies": {

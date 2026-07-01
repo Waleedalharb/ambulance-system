@@ -2,6 +2,7 @@
 /data-backup/ 
 /backup/ 
 node_modules/ 
+database.db 
 package-lock.json 
 *.log 
 .DS_Store 

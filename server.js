@@ -3,33 +3,51 @@ const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
 const WebSocket = require('ws');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+const cors = require('cors');
+const securityConfig = require('./config/security');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// ============================================
-// WebSocket Server - تحديث فوري
-// ============================================
-const WS_PORT = 8080;
-const wss = new WebSocket.Server({ port: WS_PORT });
+const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE } = securityConfig;
 
+// ============================================
+// WebSocket Server - تحديث فوري (uses same HTTP server for Render compatibility)
+// ============================================
 var clients = [];
+var wss = null; // Will be initialized after HTTP server starts
 
-wss.on('connection', function(ws) {
-    console.log('🟢 WebSocket client connected');
-    clients.push(ws);
-    
-    // إرسال رسالة ترحيب
-    ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر' }));
-    
-    ws.on('close', function() {
-        console.log('🔴 WebSocket client disconnected');
-        clients = clients.filter(function(c) { return c !== ws; });
+function initWebSocket(server) {
+    wss = new WebSocket.Server({ server, path: '/ws' });
+    wss.on('connection', function(ws, req) {
+        // Basic origin check for WebSocket
+        const origin = req.headers.origin;
+        const allowedOrigins = process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [];
+        if (process.env.NODE_ENV === 'production' && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+            ws.close(1008, 'Origin not allowed');
+            return;
+        }
+        
+        console.log('🟢 WebSocket client connected from', origin || 'unknown');
+        clients.push(ws);
+        
+        ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر' }));
+        
+        ws.on('close', function() {
+            console.log('🔴 WebSocket client disconnected');
+            clients = clients.filter(function(c) { return c !== ws; });
+        });
+        
+        ws.on('error', function(err) {
+            console.error('WebSocket error:', err);
+        });
     });
-    
-    ws.on('error', function(err) {
-        console.error('WebSocket error:', err);
-    });
-});
+    console.log('🔌 WebSocket server attached to HTTP server on /ws');
+}
 
 // دالة لبث الرسائل لجميع المتصلين
 function broadcast(data) {
@@ -40,8 +58,6 @@ function broadcast(data) {
         }
     });
 }
-
-console.log('🔌 WebSocket server running on ws://localhost:' + WS_PORT);
 
 // ============================================
 // مسار التخزين الرئيسي (Render Disk أو محلي)
@@ -66,6 +82,7 @@ const VACATIONS_PATH = path.join(STORAGE_PATH, 'vacations.json');
 const PASSWORD_PATH = path.join(STORAGE_PATH, 'password.json');
 const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
 const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
+const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
 
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
@@ -73,6 +90,37 @@ let currentShiftId = null;
 // ============================================
 // التأكد من وجود مجلدات البيانات
 // ============================================
+async function initDefaultUsers() {
+    try {
+        await fs.access(USERS_PATH);
+    } catch {
+        const salt = await bcrypt.genSalt(12); // Increased from 10 to 12
+        // Use env vars for default passwords, or generate secure random ones
+        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || crypto.randomBytes(12).toString('hex');
+        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || crypto.randomBytes(12).toString('hex');
+        const userPass = process.env.DEFAULT_USER_PASSWORD || crypto.randomBytes(12).toString('hex');
+        
+        const defaultUsers = [
+            { id: 'admin-1', username: 'admin', password: await bcrypt.hash(adminPass, salt), name: 'مدير النظام', role: 'admin', isActive: true },
+            { id: 'director-1', username: 'director', password: await bcrypt.hash(directorPass, salt), name: 'مدير العمليات', role: 'director', isActive: true },
+            { id: 'user-1', username: 'user', password: await bcrypt.hash(userPass, salt), name: 'مستخدم', role: 'user', isActive: true }
+        ];
+        await fs.writeFile(USERS_PATH, JSON.stringify(defaultUsers, null, 2));
+        console.log('✅ تم إنشاء المستخدمين الافتراضيين');
+        if (!process.env.DEFAULT_ADMIN_PASSWORD) {
+            console.log('⚠️  DEFAULT_ADMIN_PASSWORD not set. Generated secure password. Check your logs for first-time login.');
+            console.log('   Admin password:', adminPass);
+        }
+        if (!process.env.DEFAULT_DIRECTOR_PASSWORD) {
+            console.log('   Director password:', directorPass);
+        }
+        if (!process.env.DEFAULT_USER_PASSWORD) {
+            console.log('   User password:', userPass);
+        }
+        console.log('🔒 Set DEFAULT_ADMIN_PASSWORD, DEFAULT_DIRECTOR_PASSWORD, DEFAULT_USER_PASSWORD env vars for persistent passwords.');
+    }
+}
+
 async function ensureDataDir() {
     try {
         // المجلد الرئيسي على Render Disk (أو محلي)
@@ -81,6 +129,7 @@ async function ensureDataDir() {
         // مجلد رفع الملفات على Render Disk
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads'), { recursive: true });
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
+        await initDefaultUsers();
         console.log('✅ تم التأكد من وجود مجلدات البيانات');
     } catch (e) {
         console.error('❌ خطأ في إنشاء مجلدات البيانات:', e.message);
@@ -89,14 +138,109 @@ async function ensureDataDir() {
 ensureDataDir();
 
 // ============================================
-// Middleware
+// Security & Performance Middleware
 // ============================================
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+// 1. Security Headers (Helmet)
+app.use(helmet(HELMET_CONFIG));
+
+// 2. Gzip Compression
+app.use(compression());
+
+// 3. CORS
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// 4. Body Parser (reduced limits)
+app.use(express.json({ limit: JSON_LIMIT }));
+app.use(express.urlencoded({ limit: URLENCODED_LIMIT, extended: true }));
+
+// 5. Global Rate Limiting
+const globalLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: RATE_LIMIT_MAX_REQUESTS,
+    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use(globalLimiter);
+
+// 6. Login Rate Limiting (stricter)
+const loginLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: LOGIN_RATE_LIMIT_MAX,
+    message: { error: 'عدد محاولات تسجيل الدخول مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+});
+app.use('/api/auth/login', loginLimiter);
+
+function authenticate(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(403).json({ error: 'توكن غير صالح' });
+    }
+}
+
+function authorize(roles) {
+    return (req, res, next) => {
+        if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
+        if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'ليس لديك الصلاحية' });
+        next();
+    };
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
 // ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
 app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads')));
+
+// ============================================
+// API: المصادقة (JWT)
+// ============================================
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبة' });
+        
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const user = users.find(u => u.username === username && u.isActive);
+        if (!user) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        
+        const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.json({ success: true, token, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تسجيل الدخول' });
+    }
+});
+
+app.get('/api/auth/me', authenticate, (req, res) => {
+    res.json({ success: true, user: req.user });
+});
+
+app.post('/api/auth/logout', authenticate, (req, res) => {
+    res.json({ success: true, message: 'تم تسجيل الخروج' });
+});
+
+app.get('/api/users', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        res.json({ success: true, users: users.map(u => ({ id: u.id, username: u.username, name: u.name, role: u.role, isActive: u.isActive })) });
+    } catch (error) { res.status(500).json({ error: 'فشل في جلب المستخدمين' }); }
+});
 
 // ============================================
 // PWA routes
@@ -113,12 +257,34 @@ app.get('/sw.js', function(req, res) {
 });
 
 // ============================================
-// إعداد Multer لرفع الملفات
+// إعداد Multer لرفع الملفات (مع حماية أفضل)
 // ============================================
+const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'];
+
 const upload = multer({
     dest: path.join(STORAGE_PATH, 'temp'),
-    limits: { fileSize: 100 * 1024 * 1024 }
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype));
+        }
+    }
 });
+
+// Multer error handler middleware
+function handleMulterError(err, req, res, next) {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: 'حجم الملف كبير جداً. الحد الأقصى 20 ميجابايت.' });
+        }
+        return res.status(400).json({ error: 'خطأ في رفع الملف: ' + err.message });
+    } else if (err) {
+        return res.status(400).json({ error: err.message });
+    }
+    next();
+}
 
 // ============================================
 // بيانات قطاع الجنوب
@@ -298,7 +464,7 @@ app.get('/api/shifts/:id', async (req, res) => {
     }
 });
 
-app.post('/api/start-new-shift', async (req, res) => {
+app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftType } = req.body;
         if (!shiftType) {
@@ -346,7 +512,7 @@ app.post('/api/start-new-shift', async (req, res) => {
     }
 });
 
-app.post('/api/update-shift-data', async (req, res) => {
+app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftId, shiftData } = req.body;
         if (!shiftId) {
@@ -375,7 +541,7 @@ app.post('/api/update-shift-data', async (req, res) => {
     }
 });
 
-app.delete('/api/shifts/:id', async (req, res) => {
+app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, res) => {
     try {
         const shifts = await readShifts();
         const id = parseInt(req.params.id);
@@ -393,7 +559,7 @@ app.delete('/api/shifts/:id', async (req, res) => {
 // ============================================
 // API: البلاغات
 // ============================================
-app.post('/api/report', async (req, res) => {
+app.post('/api/report', authenticate, async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
@@ -431,7 +597,7 @@ app.post('/api/report', async (req, res) => {
     }
 });
 
-app.post('/api/undo', async (req, res) => {
+app.post('/api/undo', authenticate, async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
@@ -535,7 +701,7 @@ app.get('/api/docs', async (req, res) => {
     }
 });
 
-app.post('/api/upload-doc', async (req, res) => {
+app.post('/api/upload-doc', authenticate, async (req, res) => {
     try {
         const { filename, fileData, description, fileType, category, priority } = req.body;
         if (!filename || !fileData) {
@@ -578,7 +744,7 @@ app.get('/api/download-doc/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/delete-doc/:id', async (req, res) => {
+app.delete('/api/delete-doc/:id', authenticate, async (req, res) => {
     try {
         const docs = await readDocs();
         const filtered = docs.filter(d => d.id !== req.params.id);
@@ -601,7 +767,7 @@ app.get('/api/get-identity', async (req, res) => {
     }
 });
 
-app.post('/api/upload-identity', async (req, res) => {
+app.post('/api/upload-identity', authenticate, async (req, res) => {
     try {
         const { fileData, filename } = req.body;
         if (!fileData) {
@@ -701,7 +867,7 @@ app.get('/api/control-notes', async (req, res) => {
     }
 });
 
-app.post('/api/save-control-notes', async (req, res) => {
+app.post('/api/save-control-notes', authenticate, async (req, res) => {
     try {
         const { notes } = req.body;
         await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
@@ -727,7 +893,7 @@ app.get('/api/vacations', async (req, res) => {
     }
 });
 
-app.post('/api/save-vacations', async (req, res) => {
+app.post('/api/save-vacations', authenticate, async (req, res) => {
     try {
         const { vacations } = req.body;
         await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
@@ -738,9 +904,11 @@ app.post('/api/save-vacations', async (req, res) => {
 });
 
 // ============================================
-// API: الرقم السري
+// API: الرقم السري (Secured - requires authentication)
 // ============================================
-app.get('/api/get-password', async (req, res) => {
+// ⚠️  This endpoint returns a sensitive PIN. It requires admin/director auth.
+// Consider removing this endpoint entirely and handling PIN verification server-side.
+app.get('/api/get-password', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const password = await readPassword();
         res.json({ success: true, password });
@@ -749,17 +917,23 @@ app.get('/api/get-password', async (req, res) => {
     }
 });
 
-app.post('/api/change-password', async (req, res) => {
+app.post('/api/change-password', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { oldPassword, newPassword } = req.body;
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ error: 'الرقم السري القديم والجديد مطلوبان' });
+        }
         const currentPassword = await readPassword();
 
         if (oldPassword !== currentPassword) {
             return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
         }
 
-        if (!newPassword || newPassword.length < 4) {
+        if (newPassword.length < 4) {
             return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
+        }
+        if (newPassword.length > 50) {
+            return res.status(400).json({ error: 'الرقم السري طويل جداً' });
         }
 
         await writePassword(newPassword);
@@ -878,7 +1052,7 @@ app.post('/api/peak-resolve', async (req, res) => {
 // ============================================
 
 // رفع الثيم (خلفية أو شعار)
-app.post('/api/upload-theme', upload.single('file'), async (req, res) => {
+app.post('/api/upload-theme', authenticate, upload.single('file'), handleMulterError, async (req, res) => {
     try {
         const file = req.file;
         if (!file) {
@@ -1102,7 +1276,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 // ============================================
 // API: الجدول الشهري
 // ============================================
-app.post('/api/upload-monthly-table', upload.single('file'), async (req, res) => {
+app.post('/api/upload-monthly-table', authenticate, upload.single('file'), handleMulterError, async (req, res) => {
     try {
         const file = req.file;
         if (!file) {
@@ -1209,9 +1383,9 @@ async function writeOpsMetadata(data) {
 }
 
 // رفع الملفات
-const opsUpload = multer({ dest: OPS_UPLOAD_DIR, limits: { fileSize: 50 * 1024 * 1024 } });
+const opsUpload = multer({ dest: OPS_UPLOAD_DIR, limits: { fileSize: OPS_MAX_FILE_SIZE } });
 
-app.post('/api/upload-operational', opsUpload.array('files'), async (req, res) => {
+app.post('/api/upload-operational', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
     try {
         const files = req.files;
         if (!files || files.length === 0) {
@@ -1280,7 +1454,7 @@ app.get('/api/download-operational/:id', async (req, res) => {
 });
 
 // حذف ملف
-app.delete('/api/delete-operational/:id', async (req, res) => {
+app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
         const index = metadata.findIndex(f => f.id === req.params.id);
@@ -1299,9 +1473,43 @@ app.delete('/api/delete-operational/:id', async (req, res) => {
 });
 
 // ============================================
-// تشغيل الخادم
+// Health Check & Monitoring
 // ============================================
-app.listen(PORT, () => {
+app.get('/health', async (req, res) => {
+    const health = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: process.env.npm_package_version || '2.0.0',
+        env: process.env.NODE_ENV || 'development'
+    };
+    res.status(200).json(health);
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'المسار غير موجود' });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('❌ Error:', err.stack || err.message);
+    if (err.status === 413 || err.message && err.message.includes('file size')) {
+        return res.status(413).json({ error: 'حجم الملف كبير جداً' });
+    }
+    res.status(err.status || 500).json({ error: 'خطأ في الخادم' });
+});
+
+// ============================================
+// تشغيل الخادم + WebSocket + Graceful Shutdown
+// ============================================
+const server = require('http').createServer(app);
+
+// Initialize WebSocket on same HTTP server
+initWebSocket(server);
+
+server.listen(PORT, () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
     console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
@@ -1313,4 +1521,39 @@ app.listen(PORT, () => {
     console.log(`📁 مسار إعدادات الثيمات: ${THEME_SETTINGS_PATH}`);
     console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
     console.log(`📸 مجلد رفع الثيمات: ${path.join(STORAGE_PATH, 'uploads')}`);
+    console.log(`🔒 Security: Helmet, Rate Limiting, CORS enabled`);
+    console.log(`📡 WebSocket attached on path /ws`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+        console.log('✅ HTTP server closed');
+        if (wss) {
+            wss.clients.forEach(client => client.close());
+            wss.close(() => {
+                console.log('✅ WebSocket server closed');
+                process.exit(0);
+            });
+        } else {
+            process.exit(0);
+        }
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received. Shutting down gracefully...');
+    server.close(() => {
+        console.log('✅ HTTP server closed');
+        if (wss) {
+            wss.clients.forEach(client => client.close());
+            wss.close(() => {
+                console.log('✅ WebSocket server closed');
+                process.exit(0);
+            });
+        } else {
+            process.exit(0);
+        }
+    });
 });

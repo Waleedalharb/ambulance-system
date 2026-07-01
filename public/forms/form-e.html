@@ -1,221 +1,118 @@
 <!-- ===== نموذج E - حالات توقف قلب وتنفس ===== -->
-<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
-        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--coral-light); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--coral);">
-            <i class="fas fa-heartbeat"></i>
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-heartbeat" style="color:var(--coral);"></i>
+        معلومات البلاغ
+    </div>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ:</label>
+            <input type="text" id="eReportNumber" placeholder="مثال: 2025-E-001">
         </div>
-        <div>
-            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">حالات توقف قلب وتنفس (E)</h4>
-            <span style="font-size:0.7rem; color:var(--gray-600);">E = Emergency Cardiac Arrest</span>
+        <div class="form-group">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ:</label>
+            <input type="datetime-local" id="eDateTime">
         </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم البلاغ:
-        </label>
-        <input type="text" id="eReportNumber" placeholder="مثال: 2025-E-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع الحالة:</label>
+            <input type="text" id="eLocation" placeholder="الموقع بالتفصيل">
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-user" style="color:var(--teal);"></i> عمر المريض:</label>
+            <input type="number" id="eAge" placeholder="العمر" min="0">
+        </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-calendar-clock" style="color:var(--gold); width:18px;"></i> تاريخ ووقت البلاغ:
-        </label>
-        <input type="datetime-local" id="eDateTime" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-venus-mars" style="color:var(--primary-700);"></i> الجنس:</label>
+            <select id="eGender">
+                <option value="">-- اختر --</option>
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-ambulance" style="color:var(--teal);"></i> الفرقة المستجيبة:</label>
+            <select id="eUnit">
+                <option value="">-- اختر الفرقة --</option>
+                <option value="سريع 1">سريع 1</option>
+                <option value="سريع 2">سريع 2</option>
+                <option value="سريع 3">سريع 3</option>
+                <option value="سريع 4">سريع 4</option>
+                <option value="جنوب 1">جنوب 1</option>
+                <option value="جنوب 2">جنوب 2</option>
+                <option value="جنوب 3">جنوب 3</option>
+                <option value="جنوب 4">جنوب 4</option>
+                <option value="جنوب 5">جنوب 5</option>
+                <option value="جنوب 6">جنوب 6</option>
+                <option value="جنوب 7">جنوب 7</option>
+                <option value="جنوب 8">جنوب 8</option>
+                <option value="جنوب 9">جنوب 9</option>
+                <option value="جنوب 10">جنوب 10</option>
+                <option value="جنوب 11">جنوب 11</option>
+                <option value="جنوب 12">جنوب 12</option>
+                <option value="جنوب 13">جنوب 13</option>
+                <option value="جنوب 14">جنوب 14</option>
+                <option value="جنوب 15">جنوب 15</option>
+                <option value="جنوب 16">جنوب 16</option>
+                <option value="جنوب 17">جنوب 17</option>
+                <option value="جنوب 18">جنوب 18</option>
+                <option value="جنوب 19">جنوب 19</option>
+            </select>
+        </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-map-marker-alt" style="color:var(--coral); width:18px;"></i> موقع الحالة:
-        </label>
-        <input type="text" id="eLocation" placeholder="الموقع بالتفصيل" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+</div>
+
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-hospital" style="color:var(--coral);"></i>
+        تفاصيل الحالة
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-user" style="color:var(--teal); width:18px;"></i> عمر المريض:
-        </label>
-        <input type="number" id="eAge" placeholder="العمر" min="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-clock" style="color:var(--gold);"></i> وقت الاستجابة (دقائق):</label>
+            <input type="number" id="eResponseTime" placeholder="عدد الدقائق" min="0">
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-hospital" style="color:var(--coral);"></i> المستشفى المستلم:</label>
+            <input type="text" id="eHospital" placeholder="اسم المستشفى">
+        </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-venus-mars" style="color:var(--primary-700); width:18px;"></i> الجنس:
-        </label>
-        <select id="eGender" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-            <option value="">-- اختر --</option>
-            <option value="ذكر">ذكر</option>
-            <option value="أنثى">أنثى</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-ambulance" style="color:var(--teal); width:18px;"></i> الفرقة المستجيبة:
-        </label>
-        <select id="eUnit" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-            <option value="">-- اختر الفرقة --</option>
-            <option value="سريع 1">سريع 1</option>
-            <option value="سريع 2">سريع 2</option>
-            <option value="سريع 3">سريع 3</option>
-            <option value="سريع 4">سريع 4</option>
-            <option value="جنوب 1">جنوب 1</option>
-            <option value="جنوب 2">جنوب 2</option>
-            <option value="جنوب 3">جنوب 3</option>
-            <option value="جنوب 4">جنوب 4</option>
-            <option value="جنوب 5">جنوب 5</option>
-            <option value="جنوب 6">جنوب 6</option>
-            <option value="جنوب 7">جنوب 7</option>
-            <option value="جنوب 8">جنوب 8</option>
-            <option value="جنوب 9">جنوب 9</option>
-            <option value="جنوب 10">جنوب 10</option>
-            <option value="جنوب 11">جنوب 11</option>
-            <option value="جنوب 12">جنوب 12</option>
-            <option value="جنوب 13">جنوب 13</option>
-            <option value="جنوب 14">جنوب 14</option>
-            <option value="جنوب 15">جنوب 15</option>
-            <option value="جنوب 16">جنوب 16</option>
-            <option value="جنوب 17">جنوب 17</option>
-            <option value="جنوب 18">جنوب 18</option>
-            <option value="جنوب 19">جنوب 19</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-clock" style="color:var(--gold); width:18px;"></i> وقت الاستجابة (دقائق):
-        </label>
-        <input type="number" id="eResponseTime" placeholder="عدد الدقائق" min="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-hospital" style="color:var(--coral); width:18px;"></i> المستشفى المستلم:
-        </label>
-        <input type="text" id="eHospital" placeholder="اسم المستشفى" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-check-circle" style="color:var(--teal); width:18px;"></i> الحالة النهائية:
-        </label>
-        <select id="eOutcome" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
+    <div class="form-group">
+        <label><i class="fas fa-check-circle" style="color:var(--teal);"></i> الحالة النهائية:</label>
+        <select id="eOutcome">
             <option value="">-- اختر --</option>
             <option value="ROSC تم الإنعاش بنجاح">ROSC تم الإنعاش بنجاح</option>
             <option value="تم النقل للمستشفى">تم النقل للمستشفى</option>
             <option value="متوفى">متوفى</option>
         </select>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> ملاحظات:
-        </label>
-        <textarea id="eNotes" rows="2" placeholder="أي ملاحظات إضافية..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
-    </div>
-    
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
-        <button onclick="saveE()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-save"></i> حفظ البلاغ
-        </button>
-        <button onclick="sendEWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fab fa-whatsapp"></i> إرسال واتساب
-        </button>
-        <button onclick="clearEForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-eraser"></i> مسح
-        </button>
+    <div class="form-group">
+        <label><i class="fas fa-pen" style="color:var(--gray-600);"></i> ملاحظات:</label>
+        <textarea id="eNotes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea>
     </div>
 </div>
 
-<script>
-let eRecords = JSON.parse(localStorage.getItem('eRecords') || '[]');
+<div class="form-actions">
+    <button onclick="clearEForm()" class="btn btn-warning">
+        <i class="fas fa-eraser"></i> مسح
+    </button>
+    <button onclick="saveE()" class="btn btn-primary">
+        <i class="fas fa-save"></i> حفظ البلاغ
+    </button>
+    <button onclick="sendEWhatsApp()" class="btn btn-success">
+        <i class="fab fa-whatsapp"></i> إرسال واتساب
+    </button>
+</div>
 
-function initForm_e() {
-    document.getElementById('eDateTime').value = new Date().toISOString().slice(0, 16);
-}
-
-function saveE() {
-    const reportNumber = document.getElementById('eReportNumber').value.trim();
-    const dateTime = document.getElementById('eDateTime').value;
-    const location = document.getElementById('eLocation').value.trim();
-    const age = document.getElementById('eAge').value;
-    const gender = document.getElementById('eGender').value;
-    const unit = document.getElementById('eUnit').value;
-    const responseTime = document.getElementById('eResponseTime').value;
-    const hospital = document.getElementById('eHospital').value.trim();
-    const outcome = document.getElementById('eOutcome').value;
-    const notes = document.getElementById('eNotes').value.trim();
-
-    if (!reportNumber || !location || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، الفرقة)');
-        return;
-    }
-
-    eRecords.unshift({
-        reportNumber,
-        dateTime,
-        location,
-        age,
-        gender,
-        unit,
-        responseTime,
-        hospital,
-        outcome,
-        notes,
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('eRecords', JSON.stringify(eRecords));
-    alert('✅ تم حفظ حالة E');
-    clearEForm();
-}
-
-function clearEForm() {
-    document.getElementById('eReportNumber').value = '';
-    document.getElementById('eLocation').value = '';
-    document.getElementById('eAge').value = '';
-    document.getElementById('eGender').value = '';
-    document.getElementById('eUnit').value = '';
-    document.getElementById('eResponseTime').value = '';
-    document.getElementById('eHospital').value = '';
-    document.getElementById('eOutcome').value = '';
-    document.getElementById('eNotes').value = '';
-    document.getElementById('eDateTime').value = new Date().toISOString().slice(0, 16);
-}
-
-function sendEWhatsApp() {
-    const reportNumber = document.getElementById('eReportNumber').value.trim();
-    const dateTime = document.getElementById('eDateTime').value;
-    const location = document.getElementById('eLocation').value.trim();
-    const age = document.getElementById('eAge').value;
-    const gender = document.getElementById('eGender').value;
-    const unit = document.getElementById('eUnit').value;
-    const responseTime = document.getElementById('eResponseTime').value;
-    const hospital = document.getElementById('eHospital').value.trim();
-    const outcome = document.getElementById('eOutcome').value;
-    const notes = document.getElementById('eNotes').value.trim();
-
-    if (!reportNumber || !location || !unit) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
-
-    let message = '';
-    message += 'تقرير حالة توقف قلب وتنفس (E)\n';
-    message += '═══════════════════════════════════\n';
-    message += 'رقم البلاغ: ' + reportNumber + '\n';
-    message += 'التاريخ والوقت: ' + dateTime.replace('T', ' ') + '\n';
-    message += 'الموقع: ' + location + '\n';
-    if (age) message += 'العمر: ' + age + ' سنة\n';
-    if (gender) message += 'الجنس: ' + gender + '\n';
-    message += 'الفرقة المستجيبة: ' + unit + '\n';
-    if (responseTime) message += 'وقت الاستجابة: ' + responseTime + ' دقيقة\n';
-    if (hospital) message += 'المستشفى المستلم: ' + hospital + '\n';
-    if (outcome) message += 'الحالة النهائية: ' + outcome + '\n';
-    if (notes) message += 'الملاحظات: ' + notes + '\n';
-    message += '═══════════════════════════════════\n';
-    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
-
-    const encoded = encodeURIComponent(message);
-    window.open('https://wa.me/?text=' + encoded, '_blank');
-}
-</script>
+<div class="form-card" style="margin-top:16px; background:var(--gray-50);">
+    <div class="form-card-title">
+        <i class="fas fa-eye" style="color:var(--primary-700);"></i>
+        الحالات المحفوظة
+    </div>
+    <div id="ePreviewList" style="max-height:300px; overflow-y:auto;">
+        <p style="text-align:center; color:var(--gray-400); padding:20px;">📭 لا توجد حالات محفوظة</p>
+    </div>
+</div>

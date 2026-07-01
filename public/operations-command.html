@@ -1,0 +1,2431 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض | South Sector Emergency Operations Platform">
+<title>غرفة العمليات الذكية | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</title>
+
+<!-- ═══════════════════════════════════════════
+     Brand Identity & Favicons
+     ═══════════════════════════════════════════ -->
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+<link rel="icon" type="image/png" sizes="128x128" href="/favicon-128x128.png">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon-256x256.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon-512x512.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1E3A5F">
+<meta name="apple-mobile-web-app-title" content="منصة الجنوب">
+
+<!-- ═══════════════════════════════════════════
+     External Resources
+     ═══════════════════════════════════════════ -->
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- Font Awesome 6.5.1 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<!-- Leaflet.js Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════
+       غرفة العمليات الذكية - EOCC - Smart Operations Command Center
+       نظام إدارة العمليات والطوارئ والمراقبة اللحظية
+       Developed: 2025 | Vanilla JS + CSS3 + HTML5
+   ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────────
+   CSS Variables - متغيرات التصميم الرئيسية
+   ────────────────────────────────────────────────────────────── */
+:root {
+  /* الألوان الرئيسية */
+  --bg: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-glass: rgba(241, 245, 249, 0.8);
+  --border: #E2E8F0;
+  --neon: #2563EB;
+  --neon-green: #10B981;
+  --gold: #F59E0B;
+  --coral: #EF4444;
+  --purple: #8B5CF6;
+  --orange: #F97316;
+  --text: #1E293B;
+  --text-muted: #64748B;
+  /* أبعاد التخطيط */
+  --sidebar-width: 260px;
+  --header-height: 70px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 20px;
+  --shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+  --shadow-glow: none;
+  --shadow-glow-green: none;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Global Reset & Base Styles
+   ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; font-size:16px; }
+body {
+  font-family:'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  direction:rtl;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+a { text-decoration:none; color:inherit; }
+button { border:none; outline:none; cursor:pointer; font-family:inherit; }
+ul, ol { list-style:none; }
+img { max-width:100%; display:block; }
+input, select, textarea { font-family:inherit; }
+
+/* ──────────────────────────────────────────────────────────────
+   Scrollbar مخصص - Custom Scrollbar
+   ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(37,99,235,0.2); border-radius:10px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(37,99,235,0.4); }
+::-webkit-scrollbar-corner { background:transparent; }
+
+/* ──────────────────────────────────────────────────────────────
+   Animation Keyframes - تأثيرات الحركة
+   ────────────────────────────────────────────────────────────── */
+
+/* Fade In من الأسفل */
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(18px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+/* Fade In من اليمين (للعربية RTL) */
+@keyframes fadeInLeft {
+  from { opacity:0; transform:translateX(35px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+/* Fade In من اليسار */
+@keyframes fadeInRight {
+  from { opacity:0; transform:translateX(-35px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+/* انزلاق من الأعلى */
+@keyframes slideDown {
+  from { opacity:0; transform:translateY(-25px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+/* انزلاق من الأسفل */
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(25px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+/* نبضة إضاءة */
+@keyframes pulseGlow {
+  0%,100% { box-shadow:0 0 8px rgba(0,212,255,0.12); }
+  50%     { box-shadow:0 0 28px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.08); }
+}
+/* نبضة خضراء */
+@keyframes pulseGlowGreen {
+  0%,100% { box-shadow:0 0 8px rgba(6,214,160,0.12); }
+  50%     { box-shadow:0 0 28px rgba(6,214,160,0.35); }
+}
+/* نبضة حمراء */
+@keyframes pulseGlowRed {
+  0%,100% { box-shadow:0 0 8px rgba(239,71,111,0.12); }
+  50%     { box-shadow:0 0 28px rgba(239,71,111,0.4); }
+}
+/* شريط متحرك */
+@keyframes marquee {
+  0%   { transform:translateX(0%); }
+  100% { transform:translateX(-50%); }
+}
+/* طفو */
+@keyframes float {
+  0%,100% { transform:translateY(0); }
+  50%     { transform:translateY(-8px); }
+}
+/* تألق */
+@keyframes shimmer {
+  0% { background-position:-200% 0; }
+  100% { background-position:200% 0; }
+}
+/* دوران */
+@keyframes spin {
+  to { transform:rotate(360deg); }
+}
+/* كتابة نص */
+@keyframes typing {
+  from { width:0; }
+  to   { width:100%; }
+}
+/* وميض المؤشر */
+@keyframes blink {
+  50% { border-color:transparent; }
+}
+/* عدّاد صاعد */
+@keyframes countUp {
+  from { opacity:0; transform:scale(0.6) translateY(10px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+/* اهتزاز الجرس */
+@keyframes ring {
+  0%   { transform:rotate(0); }
+  10%  { transform:rotate(18deg); }
+  20%  { transform:rotate(-18deg); }
+  30%  { transform:rotate(12deg); }
+  40%  { transform:rotate(-12deg); }
+  50%  { transform:rotate(6deg); }
+  60%  { transform:rotate(-6deg); }
+  100% { transform:rotate(0); }
+}
+/* تدرج متحرك للخلفية */
+@keyframes gradientShift {
+  0%   { background-position:0% 50%; }
+  50%  { background-position:100% 50%; }
+  100% { background-position:0% 50%; }
+}
+/* دخول بطاقة */
+@keyframes cardEnter {
+  from { opacity:0; transform:translateY(20px) scale(0.96); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+/* وميض تنبيه */
+@keyframes alertFlash {
+  0%,100% { opacity:1; }
+  50%     { opacity:0.5; }
+}
+/* تموج دائري */
+@keyframes ripple {
+  0%   { transform:scale(1); opacity:0.6; }
+  100% { transform:scale(2.5); opacity:0; }
+}
+/* ظهور تدريجي */
+@keyframes staggerFade {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════
+       الشريط العلوي (Top Header / Navigation Bar)
+       Glassmorphism Header with Backdrop Blur
+   ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════ */
+.topbar {
+  position:fixed; top:0; left:0; right:0; z-index:1000;
+  height:var(--header-height);
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 26px;
+  animation:slideDown 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+.topbar-right { display:flex; align-items:center; gap:20px; }
+
+/* ── الشعار ── */
+.logo {
+  display:flex; align-items:center; gap:14px;
+}
+.logo-icon {
+  width:44px; height:44px;
+  background:var(--neon);
+  border-radius:var(--radius-sm);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:900; font-size:18px; color:#fff;
+  position:relative;
+}
+.logo-text { display:flex; flex-direction:column; }
+.logo-title { font-size:19px; font-weight:800; color:var(--text); letter-spacing:0.5px; }
+.logo-sub  { font-size:11px; color:var(--text-muted); letter-spacing:0.8px; }
+
+/* ── شريط الإشعارات المتحرك (Marquee) ── */
+.marquee-wrapper {
+  flex:1; max-width:460px; overflow:hidden;
+  background:var(--bg-glass);
+  border:1px solid var(--border);
+  border-radius:22px; padding:6px 18px;
+  margin:0 16px;
+  position:relative;
+}
+.marquee-wrapper::before,
+.marquee-wrapper::after {
+  content:''; position:absolute; top:0; bottom:0; width:30px; z-index:2; pointer-events:none;
+}
+.marquee-wrapper::before { right:0; background:linear-gradient(to left, rgba(248,250,252,0.95), transparent); }
+.marquee-wrapper::after  { left:0; background:linear-gradient(to right, rgba(248,250,252,0.95), transparent); }
+.marquee-track {
+  display:flex; white-space:nowrap;
+  animation:marquee 22s linear infinite;
+}
+.marquee-track:hover { animation-play-state:paused; }
+.marquee-track span {
+  display:inline-flex; align-items:center; gap:10px;
+  padding:0 32px;
+  font-size:12px; color:var(--coral); font-weight:500;
+}
+.marquee-track i { color:var(--coral); font-size:10px; animation:ring 3s ease infinite; }
+
+/* ── صندوق الساعة والتاريخ ── */
+.clock-box { display:flex; align-items:center; gap:14px; }
+.time-display {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:7px 16px;
+  transition:border-color 0.3s ease;
+}
+.time-display:hover { border-color:rgba(37,99,235,0.2); }
+.time-display i { color:var(--neon); font-size:13px; }
+#clock-time { font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:1.5px; }
+#clock-date { font-size:11.5px; color:var(--text-muted); font-weight:500; }
+
+/* ── أزرار الشريط العلوي ── */
+.topbar-actions { display:flex; align-items:center; gap:10px; }
+.btn-icon {
+  width:40px; height:40px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text-muted);
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  font-size:15px; position:relative; overflow:hidden;
+}
+.btn-icon::before {
+  content:''; position:absolute; inset:0;
+  background:rgba(37,99,235,0.06);
+  opacity:0; transition:opacity 0.3s ease;
+}
+.btn-icon:hover {
+  background:rgba(37,99,235,0.06); border-color:rgba(37,99,235,0.25);
+  color:var(--neon); transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(37,99,235,0.08);
+}
+.btn-icon:hover::before { opacity:1; }
+.btn-icon:active { transform:translateY(0) scale(0.96); }
+
+.btn-back {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 18px;
+  background:rgba(37,99,235,0.06);
+  border:1px solid rgba(37,99,235,0.18);
+  border-radius:var(--radius-sm); color:var(--neon);
+  font-size:12.5px; font-weight:600;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  position:relative; overflow:hidden;
+}
+.btn-back::after {
+  content:''; position:absolute; inset:0;
+  background:rgba(37,99,235,0.08);
+  opacity:0; transition:opacity 0.3s ease;
+}
+.btn-back:hover {
+  border-color:rgba(37,99,235,0.4);
+  box-shadow:0 4px 12px rgba(37,99,235,0.08);
+  transform:translateY(-1px);
+}
+.btn-back:hover::after { opacity:1; }
+.btn-back i { position:relative; z-index:1; }
+.btn-back span { position:relative; z-index:1; }
+
+/* زر الجوال */
+.d-md-none { display:none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════
+       القسم الجانبي (Sidebar Navigation)
+       Fixed Side Panel with Menu Items
+   ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════ */
+.sidebar {
+  position:fixed; top:var(--header-height); right:0;
+  width:var(--sidebar-width); bottom:0; z-index:900;
+  background:var(--bg-card);
+  border-left:1px solid var(--border);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  display:flex; flex-direction:column;
+  transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  overflow-y:auto; overflow-x:hidden;
+}
+.sidebar-nav { padding:18px 12px; flex:1; }
+.sidebar-nav .nav-label {
+  font-size:10px; font-weight:700;
+  color:var(--text-muted); text-transform:uppercase;
+  letter-spacing:1.5px; padding:0 10px 12px;
+  display:flex; align-items:center; gap:8px;
+}
+.sidebar-nav .nav-label::after {
+  content:''; flex:1; height:1px; background:var(--border); margin-right:8px;
+}
+
+/* عناصر التنقل */
+.nav-item {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px; margin-bottom:3px;
+  border-radius:var(--radius-sm);
+  color:var(--text-muted); font-size:13px; font-weight:500;
+  cursor:pointer; transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  position:relative; overflow:hidden; user-select:none;
+}
+.nav-item::before {
+  content:''; position:absolute; right:0; top:50%; transform:translateY(-50%);
+  width:3px; height:0; border-radius:3px;
+  background:var(--neon);
+  transition:height 0.3s cubic-bezier(0.16,1,0.3,1);
+}
+.nav-item::after {
+  content:''; position:absolute; inset:0;
+  background:rgba(37,99,235,0.03);
+  opacity:0; transition:opacity 0.3s ease;
+}
+.nav-item:hover {
+  background:var(--bg-glass); color:var(--text);
+  transform:translateX(-3px);
+}
+.nav-item:hover::before { height:60%; }
+.nav-item:hover::after { opacity:1; }
+.nav-item.active {
+  background:rgba(0,212,255,0.06);
+  color:var(--neon); font-weight:600;
+}
+.nav-item.active::before { height:70%; }
+.nav-item.active::after { opacity:1; }
+.nav-item i { width:22px; text-align:center; font-size:15px; position:relative; z-index:1; }
+.nav-item span { position:relative; z-index:1; }
+
+/* شارة عدد جديد */
+.nav-badge {
+  position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  min-width:20px; height:20px; padding:0 6px;
+  background:var(--coral); color:#fff;
+  border-radius:10px; font-size:10px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  z-index:2;
+}
+
+/* ── شريط البحث الموحد في السايدبار ── */
+.sidebar-search {
+  padding:14px 12px 18px;
+  border-top:1px solid var(--border);
+  position:relative;
+}
+.sidebar-search input {
+  width:100%; padding:10px 36px 10px 14px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text);
+  font-family:inherit; font-size:12px;
+  transition:all 0.3s ease;
+}
+.sidebar-search input:focus {
+  outline:none; border-color:rgba(37,99,235,0.3);
+  box-shadow:0 0 14px rgba(37,99,235,0.06);
+  background:rgba(37,99,235,0.02);
+}
+.sidebar-search input::placeholder { color:var(--text-muted); opacity:0.6; }
+.sidebar-search i {
+  position:absolute; right:22px; top:50%; transform:translateY(-50%);
+  color:var(--text-muted); font-size:13px; transition:color 0.3s;
+}
+.sidebar-search input:focus + i { color:var(--neon); }
+
+/* ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════
+       المحتوى الرئيسي (Main Content Area)
+   ═══════════════════════════════════════════════════════════════
+   ═══════════════════════════════════════════════════════════════ */
+.main-content {
+  margin-right:var(--sidebar-width);
+  margin-top:var(--header-height);
+  padding:24px 26px 40px;
+  min-height:calc(100vh - var(--header-height));
+}
+
+/* ── الأقسام ── */
+.section-page { display:none; animation:fadeIn 0.45s cubic-bezier(0.16,1,0.3,1); }
+.section-page.active { display:block; }
+.section-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:26px;
+  animation:fadeInLeft 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.section-header h2 {
+  font-size:23px; font-weight:800;
+  color:var(--text);
+  display:flex; align-items:center; gap:10px;
+}
+.section-header h2 i { font-size:18px; }
+.section-header p { font-size:13px; color:var(--text-muted); margin-top:5px; }
+
+/* ── شارات الحالة ── */
+.badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 12px; border-radius:20px;
+  font-size:11px; font-weight:600;
+}
+.badge-primary { background:rgba(37,99,235,0.1); color:var(--neon); }
+.badge-warning { background:rgba(245,158,11,0.12); color:var(--gold); }
+.badge-danger  { background:rgba(239,68,68,0.12); color:var(--coral); }
+.badge-success { background:rgba(16,185,129,0.12); color:var(--neon-green); }
+.badge-info    { background:rgba(139,92,246,0.12); color:var(--purple); }
+
+/* ═══════════════════════════════════════════════════════════════
+       بطاقات الإحصائيات (Stat Cards Grid)
+   ═══════════════════════════════════════════════════════════════ */
+.stats-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr);
+  gap:16px; margin-bottom:24px;
+}
+.stat-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:22px 20px;
+  position:relative; overflow:hidden;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  animation:cardEnter 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+.stat-card:nth-child(1) { animation-delay:0s; }
+.stat-card:nth-child(2) { animation-delay:0.08s; }
+.stat-card:nth-child(3) { animation-delay:0.16s; }
+.stat-card:nth-child(4) { animation-delay:0.24s; }
+
+/* خط علوي ملون */
+.stat-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:var(--card-color);
+}
+/* خلفية متدرجة خفيفة - disabled for clean SaaS look */
+.stat-card::after { display:none; }
+.stat-card:hover {
+  transform:translateY(-4px);
+  box-shadow:var(--shadow);
+  border-color:rgba(37,99,235,0.15);
+}
+
+/* ألوان البطاقات */
+.stat-card.coral   { --card-color:var(--coral);   --card-glow:rgba(239,71,111,0.3); }
+.stat-card.neon-g  { --card-color:var(--neon-green);--card-glow:rgba(6,214,160,0.3); }
+.stat-card.neon    { --card-color:var(--neon);     --card-glow:rgba(0,212,255,0.3); }
+.stat-card.gold    { --card-color:var(--gold);     --card-glow:rgba(255,209,102,0.3); }
+
+.stat-icon {
+  width:46px; height:46px; border-radius:var(--radius-sm);
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; margin-bottom:16px;
+  background:rgba(var(--card-rgb),0.1);
+  color:var(--card-color);
+  transition:transform 0.3s ease;
+}
+.stat-card:hover .stat-icon { transform:scale(1.08); }
+.stat-card.coral   .stat-icon { background:rgba(239,71,111,0.1); }
+.stat-card.neon-g  .stat-icon { background:rgba(6,214,160,0.1); }
+.stat-card.neon    .stat-icon { background:rgba(0,212,255,0.1); }
+.stat-card.gold    .stat-icon { background:rgba(255,209,102,0.1); }
+
+.stat-value {
+  font-size:34px; font-weight:900;
+  color:var(--card-color); line-height:1;
+  margin-bottom:8px; letter-spacing:-0.5px;
+  animation:countUp 0.7s cubic-bezier(0.16,1,0.3,1);
+}
+.stat-label { font-size:12.5px; color:var(--text-muted); font-weight:500; }
+.stat-change {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:11.5px; margin-top:10px; padding:3px 10px;
+  border-radius:20px; font-weight:600;
+}
+.stat-change.up   { color:var(--neon-green); background:rgba(6,214,160,0.1); }
+.stat-change.down { color:var(--coral);      background:rgba(239,71,111,0.1); }
+
+/* زر إجراء داخل البطاقة */
+.stat-action {
+  margin-top:14px; padding-top:12px;
+  border-top:1px solid var(--border);
+}
+.btn-sm {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 15px; font-size:11.5px; font-weight:600;
+  border-radius:var(--radius-sm); transition:all 0.3s ease;
+  cursor:pointer; font-family:inherit;
+}
+.btn-coral {
+  background:rgba(239,71,111,0.1); color:var(--coral);
+  border:1px solid rgba(239,71,111,0.18);
+}
+.btn-coral:hover { background:rgba(239,71,111,0.2); transform:translateY(-1px); }
+.btn-neon {
+  background:rgba(0,212,255,0.08); color:var(--neon);
+  border:1px solid rgba(0,212,255,0.18);
+}
+.btn-neon:hover { background:rgba(0,212,255,0.16); transform:translateY(-1px); }
+.btn-green {
+  background:rgba(6,214,160,0.1); color:var(--neon-green);
+  border:1px solid rgba(6,214,160,0.18);
+}
+.btn-green:hover { background:rgba(6,214,160,0.2); transform:translateY(-1px); }
+
+/* ═══════════════════════════════════════════════════════════════
+       شبكة المحتوى (Content Grid System)
+   ═══════════════════════════════════════════════════════════════ */
+.content-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:16px; margin-bottom:24px;
+}
+.content-grid.wide { grid-template-columns:1fr; }
+.content-grid.three { grid-template-columns:repeat(3, 1fr); }
+
+/* ═══════════════════════════════════════════════════════════════
+       البطاقة الزجاجية العامة (Glass Card Component)
+   ═══════════════════════════════════════════════════════════════ */
+.glass-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:22px;
+  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+  animation:cardEnter 0.5s cubic-bezier(0.16,1,0.3,1);
+  position:relative; overflow:hidden;
+}
+.glass-card::before {
+  content:''; position:absolute; top:0; right:0; width:120px; height:120px;
+  background:radial-gradient(circle, rgba(37,99,235,0.03), transparent 70%);
+  pointer-events:none;
+}
+.glass-card:hover { border-color:rgba(37,99,235,0.08); }
+.glass-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:18px; position:relative; z-index:1;
+}
+.glass-card-header h3 {
+  font-size:15px; font-weight:700; color:var(--text);
+  display:flex; align-items:center; gap:8px;
+}
+.glass-card-header h3 i { color:var(--neon); font-size:14px; }
+
+/* ═══════════════════════════════════════════════════════════════
+       التوجيهات والتعاميم (Directives Section)
+   ═══════════════════════════════════════════════════════════════ */
+.directive-item {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:13px 0; border-bottom:1px solid var(--border);
+  transition:all 0.3s ease; cursor:pointer;
+  animation:staggerFade 0.4s ease both;
+}
+.directive-item:nth-child(1) { animation-delay:0s; }
+.directive-item:nth-child(2) { animation-delay:0.06s; }
+.directive-item:nth-child(3) { animation-delay:0.12s; }
+.directive-item:nth-child(4) { animation-delay:0.18s; }
+.directive-item:nth-child(5) { animation-delay:0.24s; }
+.directive-item:last-child { border-bottom:none; }
+.directive-item:hover { padding-right:8px; background:rgba(37,99,235,0.03); }
+.directive-pin {
+  width:32px; height:32px; flex-shrink:0;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--text-muted); font-size:12px; cursor:pointer;
+  transition:all 0.25s ease;
+}
+.directive-pin:hover { background:rgba(255,209,102,0.1); color:var(--gold); }
+.directive-pin.pinned { color:var(--gold); background:rgba(255,209,102,0.12); border-color:rgba(255,209,102,0.2); }
+.directive-pin.pinned i { transform:rotate(0); }
+.directive-pin i { transition:transform 0.25s ease; }
+.directive-pin:not(.pinned) i { transform:rotate(45deg); opacity:0.5; }
+.directive-body { flex:1; }
+.directive-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:4px; line-height:1.5; }
+.directive-meta { font-size:11px; color:var(--text-muted); }
+.directive-meta span { margin-left:12px; }
+.directive-meta i { margin-left:3px; font-size:9px; }
+
+/* ═══════════════════════════════════════════════════════════════
+       التنبيهات والإشعارات (Alerts Section)
+   ═══════════════════════════════════════════════════════════════ */
+.alert-item {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:13px 16px; margin-bottom:10px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  border-right:3px solid var(--alert-color);
+  animation:fadeInLeft 0.45s cubic-bezier(0.16,1,0.3,1) both;
+  transition:all 0.3s ease;
+}
+.alert-item:nth-child(1) { animation-delay:0s; }
+.alert-item:nth-child(2) { animation-delay:0.1s; }
+.alert-item:nth-child(3) { animation-delay:0.2s; }
+.alert-item:nth-child(4) { animation-delay:0.3s; }
+.alert-item:hover { background:rgba(241,245,249,0.6); transform:translateX(-4px); }
+
+.alert-item.high   { --alert-color:var(--coral);      --alert-rgb:239,71,111; }
+.alert-item.medium { --alert-color:var(--gold);       --alert-rgb:255,209,102; }
+.alert-item.low    { --alert-color:var(--neon-green); --alert-rgb:6,214,160; }
+
+.alert-icon {
+  width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0;
+  background:rgba(var(--alert-rgb),0.1);
+  color:var(--alert-color);
+}
+.alert-item.high   .alert-icon { animation:alertFlash 2s ease infinite; }
+.alert-body { flex:1; }
+.alert-title { font-size:12.5px; font-weight:700; color:var(--text); line-height:1.5; }
+.alert-desc  { font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.6; }
+.alert-time  { font-size:10.5px; color:var(--text-muted); white-space:nowrap; flex-shrink:0; margin-top:2px; }
+.alert-badge { font-size:9px; padding:2px 8px; border-radius:10px; margin-right:8px; font-weight:600; }
+.alert-item.high   .alert-badge { background:rgba(239,71,111,0.12); color:var(--coral); }
+.alert-item.medium .alert-badge { background:rgba(255,209,102,0.12); color:var(--gold); }
+.alert-item.low    .alert-badge { background:rgba(6,214,160,0.12); color:var(--neon-green); }
+
+/* ═══════════════════════════════════════════════════════════════
+       Progress Bars الدائرية (Circular Progress Indicators)
+   ═══════════════════════════════════════════════════════════════ */
+.circular-progress-wrapper {
+  display:flex; align-items:center; justify-content:space-around;
+  padding:20px 0; flex-wrap:wrap; gap:20px;
+}
+.circular-progress {
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  position:relative;
+}
+.circle-svg { transform:rotate(-90deg); }
+.circle-bg { fill:none; stroke:rgba(226,232,240,0.6); stroke-width:8; }
+.circle-fill {
+  fill:none; stroke-width:8; stroke-linecap:round;
+  transition:stroke-dashoffset 2s cubic-bezier(0.16,1,0.3,1);
+}
+.circle-pct   { font-size:20px; font-weight:800; }
+.circle-label { font-size:12px; color:var(--text-muted); font-weight:500; }
+
+/* ═══════════════════════════════════════════════════════════════
+       شريط الفلاتر (Filter Bar Component)
+   ═══════════════════════════════════════════════════════════════ */
+.filter-bar {
+  display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap;
+  animation:fadeIn 0.4s ease;
+}
+.filter-bar select, .filter-bar input {
+  padding:9px 16px; background:var(--bg-glass);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  color:var(--text); font-family:inherit; font-size:12.5px;
+  min-width:160px; transition:all 0.3s ease;
+}
+.filter-bar select:focus, .filter-bar input:focus {
+  outline:none; border-color:rgba(37,99,235,0.3);
+  box-shadow:0 0 12px rgba(37,99,235,0.06);
+}
+.filter-bar select option { background:var(--bg); color:var(--text); }
+.filter-bar input::placeholder { color:var(--text-muted); opacity:0.6; }
+
+/* ═══════════════════════════════════════════════════════════════
+       بطاقات المرجعيات التشغيلية (Reference Cards)
+   ═══════════════════════════════════════════════════════════════ */
+.ref-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; }
+.ref-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1); cursor:pointer;
+  animation:cardEnter 0.45s cubic-bezier(0.16,1,0.3,1) both;
+  position:relative; overflow:hidden;
+}
+.ref-card:nth-child(1) { animation-delay:0s; }
+.ref-card:nth-child(2) { animation-delay:0.07s; }
+.ref-card:nth-child(3) { animation-delay:0.14s; }
+.ref-card:nth-child(4) { animation-delay:0.21s; }
+.ref-card:nth-child(5) { animation-delay:0.28s; }
+.ref-card:nth-child(6) { animation-delay:0.35s; }
+.ref-card:nth-child(7) { animation-delay:0.42s; }
+.ref-card:nth-child(8) { animation-delay:0.49s; }
+.ref-card:hover {
+  transform:translateY(-4px);
+  border-color:rgba(37,99,235,0.15);
+  box-shadow:var(--shadow);
+}
+.ref-card:hover .ref-icon { transform:scale(1.1) rotate(-5deg); }
+.ref-header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.ref-icon {
+  width:44px; height:44px; border-radius:var(--radius-sm);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; flex-shrink:0;
+  transition:transform 0.3s ease;
+}
+.ref-icon.protocol { background:rgba(239,71,111,0.1);  color:var(--coral); }
+.ref-icon.guide    { background:rgba(0,212,255,0.1);   color:var(--neon); }
+.ref-icon.form     { background:rgba(255,209,102,0.1); color:var(--gold); }
+.ref-icon.sop      { background:rgba(6,214,160,0.1);   color:var(--neon-green); }
+.ref-title { font-size:13.5px; font-weight:700; color:var(--text); margin-bottom:4px; }
+.ref-desc { font-size:12px; color:var(--text-muted); margin-bottom:12px; line-height:1.7; }
+.ref-meta { display:flex; align-items:center; gap:14px; font-size:11px; color:var(--text-muted); }
+.ref-meta i { margin-left:3px; font-size:9px; }
+.ref-actions { display:flex; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+
+/* ═══════════════════════════════════════════════════════════════
+       بطاقات المستشفيات (Hospital Cards)
+   ═══════════════════════════════════════════════════════════════ */
+.hosp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(310px, 1fr)); gap:16px; }
+.hosp-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  animation:cardEnter 0.45s cubic-bezier(0.16,1,0.3,1) both;
+}
+.hosp-card:nth-child(1)  { animation-delay:0s; }
+.hosp-card:nth-child(2)  { animation-delay:0.05s; }
+.hosp-card:nth-child(3)  { animation-delay:0.1s; }
+.hosp-card:nth-child(4)  { animation-delay:0.15s; }
+.hosp-card:nth-child(5)  { animation-delay:0.2s; }
+.hosp-card:nth-child(6)  { animation-delay:0.25s; }
+.hosp-card:nth-child(7)  { animation-delay:0.3s; }
+.hosp-card:nth-child(8)  { animation-delay:0.35s; }
+.hosp-card:nth-child(9)  { animation-delay:0.4s; }
+.hosp-card:nth-child(10) { animation-delay:0.45s; }
+.hosp-card:nth-child(11) { animation-delay:0.5s; }
+.hosp-card:nth-child(12) { animation-delay:0.55s; }
+.hosp-card:hover {
+  transform:translateY(-4px);
+  border-color:rgba(37,99,235,0.12);
+  box-shadow:var(--shadow);
+}
+.hosp-header {
+  padding:16px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:12px;
+  background:var(--bg-glass);
+}
+.hosp-icon {
+  width:42px; height:42px; border-radius:var(--radius-sm);
+  background:rgba(239,71,111,0.1); color:var(--coral);
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px;
+}
+.hosp-name { font-size:14px; font-weight:700; color:var(--text); }
+.hosp-type { font-size:11.5px; color:var(--text-muted); }
+.hosp-body { padding:16px 18px; }
+.hosp-detail { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:12.5px; color:var(--text-muted); }
+.hosp-detail i { width:18px; color:var(--neon); font-size:12px; }
+.hosp-detail.phone { color:var(--text); font-weight:700; direction:ltr; text-align:right; font-size:13px; }
+.hosp-detail.phone i { color:var(--coral); }
+.hosp-detail.emergency { color:var(--coral); font-weight:700; direction:ltr; }
+.hosp-actions { display:flex; gap:6px; padding:12px 18px; border-top:1px solid var(--border); flex-wrap:wrap; }
+
+/* ═══════════════════════════════════════════════════════════════
+       مركز الملفات (File Center)
+   ═══════════════════════════════════════════════════════════════ */
+.drop-zone {
+  border:2px dashed rgba(37,99,235,0.15);
+  border-radius:var(--radius); padding:44px 24px;
+  text-align:center; cursor:pointer;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  margin-bottom:22px;
+  background:var(--bg-glass);
+  position:relative; overflow:hidden;
+}
+.drop-zone::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(circle at 50% 50%, rgba(37,99,235,0.04), transparent 70%);
+  opacity:0; transition:opacity 0.4s ease;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color:var(--neon);
+  background:rgba(37,99,235,0.04);
+  transform:scale(1.005);
+}
+.drop-zone:hover::before { opacity:1; }
+.drop-zone.dragover { border-color:var(--neon-green); }
+.drop-zone i { font-size:44px; color:var(--neon); margin-bottom:14px; transition:transform 0.3s ease; }
+.drop-zone:hover i { transform:translateY(-4px); }
+.drop-zone h4 { font-size:16px; font-weight:700; color:var(--text); margin-bottom:7px; }
+.drop-zone p { font-size:12.5px; color:var(--text-muted); margin-bottom:10px; }
+.drop-zone .file-types { font-size:12px; color:var(--text-muted); margin-top:10px; }
+.drop-zone .file-types i { font-size:18px; margin:0 5px; }
+
+/* عناصر قائمة الملفات */
+.file-list-item {
+  display:flex; align-items:center; gap:14px;
+  padding:13px 16px; margin-bottom:8px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-sm); cursor:pointer;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  animation:staggerFade 0.35s ease both;
+}
+.file-list-item:hover { border-color:rgba(37,99,235,0.15); background:rgba(37,99,235,0.02); transform:translateX(-4px); }
+.file-icon { width:44px; height:44px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; transition:transform 0.3s ease; }
+.file-list-item:hover .file-icon { transform:scale(1.08); }
+.file-icon.pdf  { background:rgba(239,71,111,0.1);  color:var(--coral); }
+.file-icon.word { background:rgba(0,212,255,0.1);   color:var(--neon); }
+.file-icon.excel{ background:rgba(6,214,160,0.1);   color:var(--neon-green); }
+.file-icon.ppt  { background:rgba(255,209,102,0.1); color:var(--gold); }
+.file-icon.img  { background:rgba(168,85,247,0.1);  color:var(--purple); }
+.file-info { flex:1; }
+.file-name { font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:3px; }
+.file-meta { font-size:11px; color:var(--text-muted); }
+.file-actions { display:flex; gap:4px; opacity:0; transition:opacity 0.25s ease; }
+.file-list-item:hover .file-actions { opacity:1; }
+
+/* ═══════════════════════════════════════════════════════════════
+       عارض المستندات (Document Viewer Modal)
+   ═══════════════════════════════════════════════════════════════ */
+.doc-viewer-overlay {
+  position:fixed; inset:0; z-index:5000;
+  background:rgba(30,41,59,0.6); backdrop-filter:blur(10px);
+  display:none !important; align-items:center; justify-content:center;
+  animation:fadeIn 0.35s ease;
+}
+.doc-viewer-overlay.active { display:flex !important; }
+.doc-viewer-box {
+  width:92%; max-width:960px; height:88vh;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  display:flex; flex-direction:column;
+  animation:slideDown 0.35s cubic-bezier(0.16,1,0.3,1);
+  box-shadow:0 24px 80px rgba(148,163,184,0.2);
+}
+.doc-viewer-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 22px; border-bottom:1px solid var(--border);
+  background:var(--bg-glass);
+}
+.doc-viewer-header h4 { font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; }
+.doc-viewer-close {
+  width:34px; height:34px; border-radius:var(--radius-sm);
+  background:var(--bg-glass); border:1px solid var(--border);
+  color:var(--text-muted); display:flex; align-items:center; justify-content:center;
+  transition:all 0.25s ease; cursor:pointer;
+}
+.doc-viewer-close:hover { color:var(--coral); background:rgba(239,71,111,0.1); }
+.doc-viewer-body { flex:1; position:relative; overflow:hidden; }
+.doc-viewer-body iframe { width:100%; height:100%; border:none; background:#fff; }
+.doc-viewer-placeholder {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; color:var(--text-muted); gap:14px;
+}
+.doc-viewer-placeholder i { font-size:52px; color:var(--neon); opacity:0.5; }
+.doc-viewer-actions {
+  display:flex; gap:8px; padding:12px 22px;
+  border-top:1px solid var(--border);
+  background:var(--bg-glass);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+       الخط الزمني (Timeline Component)
+   ═══════════════════════════════════════════════════════════════ */
+.timeline { position:relative; padding:24px 0; }
+.timeline::before {
+  content:''; position:absolute; right:26px; top:0; bottom:0;
+  width:2px;
+  background:var(--border);
+}
+.timeline-item { position:relative; padding-right:65px; margin-bottom:28px; }
+.timeline-dot {
+  position:absolute; right:17px; top:6px;
+  width:20px; height:20px; border-radius:50%;
+  border:4px solid var(--bg); z-index:2;
+  box-shadow:0 2px 6px rgba(148,163,184,0.2);
+}
+.timeline-dot.directive { background:var(--coral); }
+.timeline-dot.file     { background:var(--neon); }
+.timeline-dot.protocol { background:var(--neon-green); }
+.timeline-dot.event    { background:var(--gold); }
+/* تموج حول النقطة - removed for clean SaaS look */
+.timeline-dot::after { display:none; }
+
+.timeline-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:16px;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+  animation:fadeInRight 0.45s ease both;
+}
+.timeline-card:hover { border-color:rgba(37,99,235,0.15); transform:translateX(-4px); }
+.timeline-title { font-size:13.5px; font-weight:700; color:var(--text); margin-bottom:5px; }
+.timeline-desc  { font-size:12px; color:var(--text-muted); margin-bottom:8px; line-height:1.6; }
+.timeline-meta  { font-size:11.5px; color:var(--text-muted); display:flex; gap:16px; }
+.timeline-meta i { margin-left:4px; font-size:10px; }
+
+/* ═══════════════════════════════════════════════════════════════
+       الإعلانات العاجلة (Announcements)
+   ═══════════════════════════════════════════════════════════════ */
+.announce-pinned { margin-bottom:18px; }
+.announce-pinned-title {
+  font-size:14px; font-weight:700; color:var(--gold);
+  margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+.announce-normal-title {
+  font-size:14px; font-weight:700; color:var(--text-muted);
+  margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+.announce-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px; margin-bottom:14px;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  border-right:4px solid transparent;
+  animation:cardEnter 0.45s ease both;
+}
+.announce-card:hover { border-color:rgba(37,99,235,0.1); transform:translateY(-3px); box-shadow:var(--shadow); }
+.announce-card.pinned { border-right-color:var(--gold); background:rgba(255,209,102,0.025); }
+.announce-card.urgent { border-right-color:var(--coral); }
+.announce-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.announce-pin-icon { color:var(--gold); font-size:14px; }
+.announce-urgent-icon { color:var(--coral); font-size:14px; animation:ring 2.5s ease infinite; }
+.announce-title { font-size:14.5px; font-weight:700; color:var(--text); flex:1; }
+.announce-body { font-size:12.5px; color:var(--text-muted); line-height:1.8; margin-bottom:12px; }
+.announce-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.announce-date { font-size:11.5px; color:var(--text-muted); }
+.announce-date i { margin-left:4px; }
+
+/* ═══════════════════════════════════════════════════════════════
+       الخريطة التفاعلية (Interactive Map)
+   ═══════════════════════════════════════════════════════════════ */
+.map-container {
+  height:520px; border-radius:var(--radius);
+  border:1px solid var(--border); overflow:hidden;
+  background:var(--bg-card);
+  position:relative;
+}
+#operationsMap { width:100%; height:100%; border-radius:var(--radius); }
+.map-legend {
+  display:flex; gap:24px; margin-top:14px; flex-wrap:wrap;
+  padding:12px 16px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+}
+.legend-item { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); }
+.legend-dot { width:12px; height:12px; border-radius:50%; }
+
+/* ═══════════════════════════════════════════════════════════════
+       المساعد الذكي (AI Chat Assistant)
+   ═══════════════════════════════════════════════════════════════ */
+.chat-fab {
+  position:fixed; bottom:28px; left:28px; z-index:2000;
+  width:58px; height:58px;
+  background:var(--neon);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:23px;
+  box-shadow:0 4px 16px rgba(37,99,235,0.25);
+  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+  animation:float 3.5s ease infinite;
+  cursor:pointer; border:none;
+}
+.chat-fab::after {
+  content:''; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(37,99,235,0.15);
+  animation:ripple 2.5s ease infinite;
+}
+.chat-fab:hover { transform:scale(1.1); box-shadow:0 6px 24px rgba(37,99,235,0.35); }
+.chat-fab:active { transform:scale(0.95); }
+.chat-box {
+  position:fixed; bottom:100px; left:28px; z-index:2000;
+  width:380px; max-height:500px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  display:none !important; flex-direction:column;
+  overflow:hidden;
+  animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.chat-box.active { display:flex !important; }
+.chat-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px;
+  background:var(--bg-glass);
+  border-bottom:1px solid var(--border);
+}
+.chat-header h4 { font-size:13.5px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+.chat-header h4 i { color:var(--neon); font-size:15px; }
+.chat-status { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--neon-green); }
+.chat-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--neon-green); }
+.chat-close { color:var(--text-muted); font-size:13px; cursor:pointer; transition:color 0.2s; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); }
+.chat-close:hover { color:var(--coral); background:rgba(239,71,111,0.1); }
+.chat-messages {
+  flex:1; overflow-y:auto; padding:16px;
+  display:flex; flex-direction:column; gap:12px;
+  max-height:340px;
+}
+.chat-msg { max-width:88%; padding:11px 16px; border-radius:16px; font-size:12.5px; line-height:1.7; animation:fadeIn 0.3s ease; }
+.chat-msg.bot { align-self:flex-start; background:var(--bg-glass); color:var(--text); border:1px solid var(--border); border-bottom-right-radius:4px; }
+.chat-msg.user { align-self:flex-end; background:var(--neon); color:#fff; border-bottom-left-radius:4px; }
+.chat-msg.bot.welcome { background:rgba(37,99,235,0.04); border-color:rgba(37,99,235,0.12); }
+.chat-input-row {
+  display:flex; gap:8px; padding:10px 14px;
+  border-top:1px solid var(--border); background:var(--bg-glass);
+}
+.chat-input-row input {
+  flex:1; padding:9px 14px; background:var(--bg-glass);
+  border:1px solid var(--border); border-radius:22px;
+  color:var(--text); font-family:inherit; font-size:12px;
+  transition:all 0.3s ease;
+}
+.chat-input-row input:focus { outline:none; border-color:rgba(37,99,235,0.3); box-shadow:0 0 12px rgba(37,99,235,0.06); }
+.chat-input-row input::placeholder { color:rgba(138,155,176,0.45); }
+.chat-send {
+  width:36px; height:36px; border-radius:50%;
+  background:var(--neon);
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  transition:all 0.25s ease; cursor:pointer; border:none;
+}
+.chat-send:hover { transform:scale(1.12); box-shadow:0 4px 14px rgba(37,99,235,0.25); }
+.chat-send:active { transform:scale(0.95); }
+
+/* أسئلة سريعة */
+.quick-questions { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.quick-q {
+  padding:6px 12px; border-radius:14px;
+  background:rgba(37,99,235,0.05); border:1px solid rgba(37,99,235,0.1);
+  color:var(--neon); font-size:11.5px; cursor:pointer;
+  transition:all 0.25s ease;
+}
+.quick-q:hover { background:rgba(37,99,235,0.12); transform:translateY(-1px); }
+
+/* مؤشر الكتابة */
+.typing-indicator { display:flex; gap:4px; padding:10px 14px; }
+.typing-indicator span { width:7px; height:7px; border-radius:50%; background:var(--neon); animation:typingBounce 1s ease infinite; }
+.typing-indicator span:nth-child(2) { animation-delay:0.15s; }
+.typing-indicator span:nth-child(3) { animation-delay:0.3s; }
+@keyframes typingBounce {
+  0%,60%,100% { transform:translateY(0); }
+  30%        { transform:translateY(-6px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+       Toast Notifications - إشعارات منبثقة
+   ═══════════════════════════════════════════════════════════════ */
+.toast-container {
+  position:fixed; top:85px; right:24px; z-index:6000;
+  display:flex; flex-direction:column; gap:10px;
+  pointer-events:none;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+.toast {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:14px 18px;
+  display:flex; align-items:center; gap:12px;
+  min-width:280px; max-width:360px;
+  box-shadow:var(--shadow);
+  animation:slideUp 0.4s cubic-bezier(0.16,1,0.3,1);
+  pointer-events:all;
+  border-right:3px solid var(--toast-color);
+}
+.toast.success { --toast-color:var(--neon-green); }
+.toast.error   { --toast-color:var(--coral); }
+.toast.info    { --toast-color:var(--neon); }
+.toast.warning { --toast-color:var(--gold); }
+.toast-icon { font-size:18px; color:var(--toast-color); }
+.toast-body { flex:1; }
+.toast-title { font-size:13px; font-weight:700; color:var(--text); }
+.toast-text  { font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+.toast-close { color:var(--text-muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
+.toast-close:hover { color:var(--coral); }
+
+/* ═══════════════════════════════════════════════════════════════
+       Loading Spinner
+   ═══════════════════════════════════════════════════════════════ */
+.spinner {
+  width:40px; height:40px; border-radius:50%;
+  border:3px solid rgba(37,99,235,0.1);
+  border-top-color:var(--neon);
+  animation:spin 0.8s linear infinite;
+  margin:30px auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+       Keyboard Shortcuts Help Modal
+   ═══════════════════════════════════════════════════════════════ */
+.shortcuts-modal {
+  position:fixed; inset:0; z-index:5500;
+  background:rgba(30,41,59,0.5); backdrop-filter:blur(8px);
+  display:none !important; align-items:center; justify-content:center;
+  animation:fadeIn 0.3s ease;
+}
+.shortcuts-modal.active { display:flex !important; }
+.shortcuts-box {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; width:420px; max-width:90vw;
+  animation:slideDown 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.shortcuts-box h3 { font-size:16px; font-weight:700; color:var(--text); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.shortcuts-box h3 i { color:var(--neon); }
+.shortcut-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+.shortcut-row:last-child { border-bottom:none; }
+.shortcut-key { background:var(--bg-glass); border:1px solid var(--border); border-radius:6px; padding:3px 10px; font-size:11px; font-weight:600; color:var(--neon); font-family:monospace; }
+
+/* ═══════════════════════════════════════════════════════════════
+       Status Indicator Dots
+   ═══════════════════════════════════════════════════════════════ */
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.status-dot.online  { background:var(--neon-green); }
+.status-dot.warning { background:var(--gold); }
+.status-dot.offline { background:var(--coral); }
+
+/* ═══════════════════════════════════════════════════════════════
+       Empty State Illustration
+   ═══════════════════════════════════════════════════════════════ */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:50px 20px; text-align:center;
+}
+.empty-state i { font-size:48px; color:var(--text-muted); opacity:0.3; margin-bottom:16px; }
+.empty-state h4 { font-size:15px; color:var(--text-muted); margin-bottom:6px; }
+.empty-state p { font-size:12px; color:var(--text-muted); opacity:0.7; }
+
+/* ═══════════════════════════════════════════════════════════════
+       Tooltip Component
+   ═══════════════════════════════════════════════════════════════ */
+[data-tooltip] { position:relative; }
+[data-tooltip]::before {
+  content:attr(data-tooltip); position:absolute; bottom:calc(100% + 8px); left:50%;
+  transform:translateX(-50%) scale(0.9); opacity:0;
+  background:var(--bg-card); border:1px solid var(--border);
+  color:var(--text); font-size:11px; padding:5px 12px; border-radius:8px;
+  white-space:nowrap; pointer-events:none;
+  transition:all 0.25s ease; z-index:10;
+}
+[data-tooltip]:hover::before { opacity:1; transform:translateX(-50%) scale(1); }
+
+/* ═══════════════════════════════════════════════════════════════
+       Responsive Design - تصميم متجاوب
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width:1200px) {
+  .stats-grid { grid-template-columns:repeat(2, 1fr); }
+  .content-grid.three { grid-template-columns:repeat(2, 1fr); }
+}
+@media (max-width:900px) {
+  .content-grid { grid-template-columns:1fr; }
+  .content-grid.three { grid-template-columns:1fr; }
+  .ref-grid { grid-template-columns:1fr; }
+  .hosp-grid { grid-template-columns:1fr; }
+}
+@media (max-width:768px) {
+  .sidebar { transform:translateX(100%); z-index:1100; }
+  .sidebar.open { transform:translateX(0); box-shadow:-4px 0 40px rgba(148,163,184,0.2); }
+  .main-content { margin-right:0; padding:18px 14px 30px; }
+  .stats-grid { grid-template-columns:1fr; }
+  .marquee-wrapper { display:none; }
+  .chat-box { width:calc(100vw - 32px); left:16px; }
+  .section-header { flex-direction:column; align-items:flex-start; gap:10px; }
+  .map-container { height:380px; }
+  .topbar { padding:0 14px; }
+  .d-md-none { display:flex !important; }
+  .filter-bar select, .filter-bar input { min-width:100%; }
+}
+@media (max-width:480px) {
+  .stats-grid { gap:12px; }
+  .topbar-actions .btn-back span { display:none; }
+  .topbar-actions .btn-back { padding:9px 12px; }
+  .doc-viewer-box { width:96%; height:90vh; }
+  .chat-box { width:calc(100vw - 24px); left:12px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+       Dark Mode Overrides - تبديل الوضع الفاتح
+   ═══════════════════════════════════════════════════════════════ */
+body.dark-mode {
+  --bg: #0F172A;
+  --bg-card: rgba(30,41,59,0.95);
+  --bg-glass: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.08);
+  --text: #E2E8F0;
+  --text-muted: #94A3B8;
+}
+body.dark-mode .topbar { background:rgba(15,23,42,0.95); border-bottom-color:rgba(255,255,255,0.08); }
+body.dark-mode .sidebar { background:rgba(30,41,59,0.95); }
+body.dark-mode .drop-zone { background:rgba(255,255,255,0.02); }
+body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
+
+/* ═══════════════════════════════════════════════════════════════
+       Utility Classes - فصول مساعدة
+   ═══════════════════════════════════════════════════════════════ */
+.text-coral   { color:var(--coral); }
+.text-neon    { color:var(--neon); }
+.text-green   { color:var(--neon-green); }
+.text-gold    { color:var(--gold); }
+.text-purple  { color:var(--purple); }
+.text-orange  { color:var(--orange); }
+.text-muted   { color:var(--text-muted); }
+.mt-8  { margin-top:8px; }
+.mt-12 { margin-top:12px; }
+.mt-16 { margin-top:16px; }
+.mb-8  { margin-bottom:8px; }
+.mb-12 { margin-bottom:12px; }
+.mb-16 { margin-bottom:16px; }
+.flex { display:flex; }
+.items-center { align-items:center; }
+.gap-6 { gap:6px; }
+.gap-8 { gap:8px; }
+.gap-12 { gap:12px; }
+.hidden { display:none !important; }
+</style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         الشريط العلوي (Top Header / Navigation Bar)
+         تصميم زجاجي مع تأثير blur وشريط إشعارات متحرك
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-right">
+    <!-- الشعار -->
+    <div class="logo">
+      <img src="logo.png" alt="South Sector Emergency Operations Platform" style="width:42px;height:42px;border-radius:8px;object-fit:contain;margin-left:10px;">
+      <div class="logo-text">
+        <span class="logo-title">منصة إدارة العمليات الإسعافية</span>
+        <span class="logo-sub">قطاع جنوب الرياض – South Sector Emergency Operations Platform</span>
+      </div>
+    </div>
+
+    <!-- شريط الإشعارات المتحرك (Marquee) -->
+    <div class="marquee-wrapper">
+      <div class="marquee-track" id="marqueeTrack">
+        <span><i class="fas fa-exclamation-triangle"></i> تنبيه: تمركز فوري للفرق - حادث مروري على طريق الملك فهد</span>
+        <span><i class="fas fa-info-circle"></i> تعميم جديد: تحديث بروتوكول الاستجابة السريعة رقم 45 لسنة 2025</span>
+        <span><i class="fas fa-bell"></i> إعلان: ورشة تدريبية في إدارة الأزمات يوم الأحد القادم الساعة 9 ص</span>
+        <span><i class="fas fa-exclamation-triangle"></i> تنبيه: تمركز فوري للفرق - حادث مروري على طريق الملك فهد</span>
+        <span><i class="fas fa-info-circle"></i> تعميم جديد: تحديث بروتوكول الاستجابة السريعة رقم 45 لسنة 2025</span>
+        <span><i class="fas fa-bell"></i> إعلان: ورشة تدريبية في إدارة الأزمات يوم الأحد القادم الساعة 9 ص</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- الساعة والتاريخ الرقمي -->
+  <div class="clock-box">
+    <div class="time-display">
+      <i class="far fa-clock"></i>
+      <span id="clock-time">00:00:00</span>
+    </div>
+    <span id="clock-date">---</span>
+  </div>
+
+  <!-- أزرار الإجراءات -->
+  <div class="topbar-actions">
+    <button class="btn-back" onclick="window.location.href='index.html'" data-tooltip="العودة للصفحة الرئيسية">
+      <i class="fas fa-arrow-right"></i>
+      <span>الرجوع للرئيسية</span>
+    </button>
+    <button class="btn-icon" id="darkModeToggle" data-tooltip="تبديل الوضع الداكن/الفاتح">
+      <i class="fas fa-moon"></i>
+    </button>
+    <button class="btn-icon" id="kbdShortcuts" data-tooltip="اختصارات لوحة المفاتيح (؟)">
+      <i class="fas fa-keyboard"></i>
+    </button>
+    <button class="btn-icon d-md-none" id="menuToggle" title="القائمة">
+      <i class="fas fa-bars"></i>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         القسم الجانبي (Sidebar Navigation Menu)
+         قائمة الأقسام مع أيقونات Font Awesome
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-label">القائمة الرئيسية</div>
+
+    <div class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')">
+      <i class="fas fa-tachometer-alt"></i>
+      <span>لوحة القيادة</span>
+      <span class="nav-badge" style="display:none;">0</span>
+    </div>
+    <div class="nav-item" data-section="references" onclick="switchSection('references')">
+      <i class="fas fa-book"></i>
+      <span>المرجعيات التشغيلية</span>
+    </div>
+    <div class="nav-item" data-section="hospitals" onclick="switchSection('hospitals')">
+      <i class="fas fa-hospital"></i>
+      <span>دليل المستشفيات</span>
+    </div>
+    <div class="nav-item" data-section="files" onclick="switchSection('files')">
+      <i class="fas fa-folder-open"></i>
+      <span>مركز الملفات</span>
+      <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item" data-section="timeline" onclick="switchSection('timeline')">
+      <i class="fas fa-stream"></i>
+      <span>الخط الزمني</span>
+    </div>
+    <div class="nav-item" data-section="announcements" onclick="switchSection('announcements')">
+      <i class="fas fa-bullhorn"></i>
+      <span>الإعلانات العاجلة</span>
+      <span class="nav-badge" style="background:var(--gold); color:#1E293B;">2</span>
+    </div>
+    <div class="nav-item" data-section="map" onclick="switchSection('map')">
+      <i class="fas fa-map-marked-alt"></i>
+      <span>الخريطة التفاعلية</span>
+    </div>
+  </nav>
+
+  <!-- شريط البحث الموحد -->
+  <div class="sidebar-search">
+    <input type="text" id="globalSearch" placeholder="ابحث في غرفة العمليات..." autocomplete="off">
+    <i class="fas fa-search"></i>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         المحتوى الرئيسي (Main Content Area)
+         يحتوي على جميع أقسام التطبيق
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<main class="main-content" id="mainContent">
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       A. لوحة القيادة (Dashboard) - القسم الافتراضي
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page active" id="section-dashboard">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-tachometer-alt"></i> لوحة القيادة</h2>
+        <p>نظرة شاملة على العمليات والإحصائيات اللحظية والمؤشرات التشغيلية</p>
+      </div>
+      <span class="badge badge-primary"><span class="status-dot online" style="margin-left:4px;"></span> النظام متصل</span>
+    </div>
+
+    <!-- بطاقات الإحصائيات -->
+    <div class="stats-grid" id="dashboardStats"></div>
+
+    <!-- شبكة محتوى: التوجيهات + التنبيهات -->
+    <div class="content-grid">
+      <!-- التوجيهات الجديدة -->
+      <div class="glass-card">
+        <div class="glass-card-header">
+          <h3><i class="fas fa-thumbtack"></i> التوجيهات والتعاميم</h3>
+          <span class="badge badge-warning" id="dirCount">0</span>
+        </div>
+        <div id="directivesList"></div>
+      </div>
+
+      <!-- التنبيهات الفورية -->
+      <div class="glass-card">
+        <div class="glass-card-header">
+          <h3><i class="fas fa-bell"></i> التنبيهات الفورية</h3>
+          <span class="badge badge-danger" id="alertCount">0</span>
+        </div>
+        <div id="alertsList"></div>
+      </div>
+    </div>
+
+    <!-- مؤشرات التشغيل الدائرية -->
+    <div class="glass-card" style="margin-top:16px;">
+      <div class="glass-card-header">
+        <h3><i class="fas fa-chart-pie"></i> مؤشرات التشغيل اللحظية</h3>
+        <span class="badge badge-success">محدث للتو</span>
+      </div>
+      <div class="circular-progress-wrapper" id="opIndicators"></div>
+    </div>
+
+    <!-- جدول آخر النشاطات -->
+    <div class="glass-card" style="margin-top:16px;">
+      <div class="glass-card-header">
+        <h3><i class="fas fa-history"></i> آخر النشاطات</h3>
+        <span class="badge badge-info">15 نشاط</span>
+      </div>
+      <div id="activityList"></div>
+    </div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       B. المرجعيات التشغيلية (Operational References)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-references">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-book"></i> المرجعيات التشغيلية</h2>
+        <p>بروتوكولات، أدلة إرشادية، نماذج، وإجراءات التشغيل المعتمدة (SOPs)</p>
+      </div>
+      <span class="badge badge-info" id="refTotalCount">8 مرجعية</span>
+    </div>
+    <div class="filter-bar">
+      <select id="refFilterType" onchange="renderReferences()">
+        <option value="">كل الأنواع</option>
+        <option value="protocol">بروتوكولات</option>
+        <option value="guide">أدلة إرشادية</option>
+        <option value="form">نماذج</option>
+        <option value="sop">إجراءات تشغيل (SOP)</option>
+      </select>
+      <select id="refFilterDept" onchange="renderReferences()">
+        <option value="">كل الأقسام</option>
+        <option value="طوارئ">طوارئ</option>
+        <option value="عمليات">عمليات</option>
+        <option value="جودة">جودة</option>
+        <option value="إداري">إداري</option>
+      </select>
+      <select id="refFilterStatus" onchange="renderReferences()">
+        <option value="">كل الحالات</option>
+        <option value="active">نشط</option>
+        <option value="review">قيد المراجعة</option>
+        <option value="archived">مؤرشف</option>
+      </select>
+      <input type="text" id="refSearch" placeholder="بحث في المرجعيات..." oninput="renderReferences()">
+    </div>
+    <div class="ref-grid" id="referencesGrid"></div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       C. دليل المستشفيات (Hospital Directory)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-hospitals">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-hospital"></i> دليل المستشفيات</h2>
+        <p>دليل شامل بالمستشفيات ومراكز الطوارئ الشريكة مع أرقام التواصل</p>
+      </div>
+      <span class="badge badge-success" id="hospTotalCount">12 مستشفى</span>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="hospSearch" placeholder="ابحث باسم المستشفى أو التخصص..." oninput="renderHospitals()" style="min-width:300px;">
+      <select id="hospFilterType" onchange="renderHospitals()" style="min-width:160px;">
+        <option value="">كل الأنواع</option>
+        <option value="عام">مستشفى عام</option>
+        <option value="متخصص">مركز متخصص</option>
+        <option value="مجمع">مجمع طبي</option>
+        <option value="طوارئ">مركز طوارئ</option>
+      </select>
+    </div>
+    <div class="hosp-grid" id="hospitalsGrid"></div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       D. مركز الملفات الذكي (Smart File Center)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-files">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-folder-open"></i> مركز الملفات الذكي</h2>
+        <p>رفع، إدارة، وعرض المستندات والملفات بأنواعها المختلفة</p>
+      </div>
+    </div>
+    <!-- منطقة الرفع بالسحب والإفلات -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" style="display:none;">
+      <i class="fas fa-cloud-upload-alt"></i>
+      <h4>اسحب الملفات هنا أو انقر للاختيار</h4>
+      <p>يدعم: PDF, Word, Excel, PowerPoint, JPG, PNG</p>
+      <div class="file-types">
+        <i class="fas fa-file-pdf" style="color:var(--coral)"></i>
+        <i class="fas fa-file-word" style="color:var(--neon);margin:0 5px;"></i>
+        <i class="fas fa-file-excel" style="color:var(--neon-green);margin:0 5px;"></i>
+        <i class="fas fa-file-powerpoint" style="color:var(--gold);margin:0 5px;"></i>
+        <i class="fas fa-file-image" style="color:var(--purple);margin:0 5px;"></i>
+      </div>
+    </div>
+    <!-- قائمة الملفات المرفوعة -->
+    <div class="glass-card">
+      <div class="glass-card-header">
+        <h3><i class="fas fa-list"></i> الملفات المرفوعة</h3>
+        <span class="badge badge-primary" id="fileCount">0 ملف</span>
+      </div>
+      <div id="filesList"></div>
+    </div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       E. الخط الزمني (Timeline)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-timeline">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-stream"></i> الخط الزمني</h2>
+        <p>سجل الأحداث والتعاميم والتحديثات التشغيلية</p>
+      </div>
+      <div class="filter-bar" style="margin:0;">
+        <select id="timelineFilter" onchange="renderTimeline()" style="min-width:160px;">
+          <option value="">كل الأنواع</option>
+          <option value="directive">تعاميم</option>
+          <option value="file">ملفات</option>
+          <option value="protocol">بروتوكولات</option>
+          <option value="event">أحداث</option>
+        </select>
+      </div>
+    </div>
+    <div class="glass-card">
+      <div class="timeline" id="timelineContainer"></div>
+    </div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       F. الإعلانات العاجلة (Urgent Announcements)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-announcements">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-bullhorn"></i> الإعلانات العاجلة</h2>
+        <p>إعلانات وتعاميم وقرارات عاجلة وإدارية</p>
+      </div>
+    </div>
+    <div id="announcementsContainer"></div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       G. الخريطة التفاعلية (Interactive Map)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="section-page" id="section-map">
+    <div class="section-header">
+      <div>
+        <h2><i class="fas fa-map-marked-alt"></i> الخريطة التفاعلية</h2>
+        <p>مواقع المستشفيات والمراكز الصحية على خريطة الرياض</p>
+      </div>
+    </div>
+    <div class="map-container">
+      <div id="operationsMap"></div>
+    </div>
+    <div class="map-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div> مستشفى عام</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--neon)"></div> مركز متخصص</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--neon-green)"></div> مجمع طبي</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div> مركز طوارئ</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         عارض المستندات (Document Viewer Modal)
+         نافذة منبثقة لعرض الملفات مباشرة
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="doc-viewer-overlay" id="docViewerOverlay">
+  <div class="doc-viewer-box">
+    <div class="doc-viewer-header">
+      <h4 id="docViewerTitle"><i class="fas fa-file-alt" style="margin-left:8px;"></i> عارض المستندات</h4>
+      <button class="doc-viewer-close" onclick="closeDocViewer()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="doc-viewer-body">
+      <div class="doc-viewer-placeholder" id="docViewerPlaceholder">
+        <i class="fas fa-file-alt"></i>
+        <p>اختر ملفاً من القائمة لعرضه هنا</p>
+        <span style="font-size:11px; color:var(--text-muted);">سيتم فتح الملف في التطبيق المناسب</span>
+      </div>
+      <iframe id="docViewerFrame" style="display:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <div class="doc-viewer-actions">
+      <button class="btn-sm btn-neon" onclick="downloadCurrentDoc()"><i class="fas fa-download"></i> تحميل</button>
+      <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="printCurrentDoc()"><i class="fas fa-print"></i> طباعة</button>
+      <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);margin-right:auto;" onclick="closeDocViewer()"><i class="fas fa-times"></i> إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         المساعد الذكي (AI Chat Assistant FAB)
+         زر عائم مع نافذة محادثة
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()" data-tooltip="المساعد الذكي">
+  <i class="fas fa-robot"></i>
+</button>
+<div class="chat-box" id="chatBox">
+  <div class="chat-header">
+    <h4><i class="fas fa-robot"></i> اسأل غرفة العمليات</h4>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="chat-status">متصل</span>
+      <span class="chat-close" onclick="toggleChat()"><i class="fas fa-times"></i></span>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="اكتب سؤالك هنا..." onkeypress="if(event.key==='Enter')sendChatMessage()">
+    <button class="chat-send" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Toast Notifications Container
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Keyboard Shortcuts Modal
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="shortcuts-modal" id="shortcutsModal">
+  <div class="shortcuts-box">
+    <h3><i class="fas fa-keyboard"></i> اختصارات لوحة المفاتيح</h3>
+    <div class="shortcut-row"><span>الانتقال للوحة القيادة</span><span class="shortcut-key">1</span></div>
+    <div class="shortcut-row"><span>المرجعيات التشغيلية</span><span class="shortcut-key">2</span></div>
+    <div class="shortcut-row"><span>دليل المستشفيات</span><span class="shortcut-key">3</span></div>
+    <div class="shortcut-row"><span>مركز الملفات</span><span class="shortcut-key">4</span></div>
+    <div class="shortcut-row"><span>الخط الزمني</span><span class="shortcut-key">5</span></div>
+    <div class="shortcut-row"><span>الإعلانات العاجلة</span><span class="shortcut-key">6</span></div>
+    <div class="shortcut-row"><span>الخريطة التفاعلية</span><span class="shortcut-key">7</span></div>
+    <div class="shortcut-row"><span>المساعد الذكي</span><span class="shortcut-key">Q</span></div>
+    <div class="shortcut-row"><span>البحث الموحد</span><span class="shortcut-key">/</span></div>
+    <div class="shortcut-row"><span>وضع الظلام</span><span class="shortcut-key">D</span></div>
+    <div class="shortcut-row"><span>هذه النافذة</span><span class="shortcut-key">?</span></div>
+    <div class="shortcut-row" style="margin-top:8px;"><button class="btn-sm btn-neon" onclick="toggleShortcutsModal()" style="width:100%;justify-content:center;"><i class="fas fa-check"></i> فهمت</button></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════
+         JavaScript - كود التطبيق الكامل
+         Vanilla JavaScript - لا frameworks
+     ═══════════════════════════════════════════════════════════════
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//     EOCC - غرفة العمليات الذكية
+//     Smart Operations Command Center
+//     All data and logic in one file - Vanilla JS
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  البيانات التجريبية (Demo Data)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** بيانات لوحة القيادة الرئيسية **/
+const dashboardData = {
+  stats: [
+    { label:'البلاغات اليوم',      value:127, change:+12, changeLabel:'+12% عن الأمس', color:'coral',  icon:'fa-exclamation-circle', action:'إدخال بلاغات', link:'report-entry.html' },
+    { label:'المناوبات النشطة',    value:18,  change:+3,  changeLabel:'3 جديدة',       color:'neon-g', icon:'fa-user-shield' },
+    { label:'الفرق العاملة',       value:34,  change:-2,  changeLabel:'2 مغادرة',      color:'neon',   icon:'fa-users' },
+    { label:'نسبة الجاهزية',       value:'94%',change:+2, changeLabel:'+2% هذا الأسبوع',color:'gold',  icon:'fa-chart-line' }
+  ],
+  directives: [
+    { id:1, title:'تعميم رقم 44/2025: تحديث بروتوكول الاستجابة السريعة',            dept:'العمليات', date:'2025-01-15', pinned:true },
+    { id:2, title:'قرار إداري: تعديل جدول المناوبات الشتوية',                        dept:'الإداري',  date:'2025-01-14', pinned:false },
+    { id:3, title:'تعميم عاجل: إجراءات الوقاية من فيروسات التنفس الموسمية',       dept:'الجودة',   date:'2025-01-13', pinned:true },
+    { id:4, title:'توجيه: تفعيل غرفة العمليات على مدار 24 ساعة',                    dept:'الطوارئ',  date:'2025-01-12', pinned:false },
+    { id:5, title:'تعميم: تحديث دليل المستشفيات الشريكة وإضافة 3 مستشفيات جديدة',  dept:'العمليات', date:'2025-01-10', pinned:false },
+    { id:6, title:'قرار: تعيين رئيس جديد لقسم العمليات الميدانية',                  dept:'الإداري',  date:'2025-01-08', pinned:false },
+  ],
+  alerts: [
+    { id:1, title:'حادث مروري متعدد على طريق الملك فهد',                    desc:'تمركز 4 فرق إسعافية - 12 مصاب بحالات متفاوتة',            level:'high',   time:'منذ 5 دقائق' },
+    { id:2, title:'انقطاع كهرباء جزئي في مستشفى الصحة الوطنية',            desc:'الطاقة الاحتياطية تعمل حالياً - فريق الصيانة في الطريق',    level:'medium', time:'منذ 18 دقيقة' },
+    { id:3, title:'تأخر وصول 2 فرقة إسعاف عن الجدول المحدد',              desc:'السبب: ازدحام مروري شديد - تم إعادة التوجيه لمسارات بديلة', level:'low',    time:'منذ 32 دقيقة' },
+    { id:4, title:'تقرير يومي: اكتمال 98% من المهام المجدولة',              desc:'معدل الاستجابة ممتاز - لم يتم تسجيل أي شكاوى',             level:'low',    time:'منذ ساعة' },
+    { id:5, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',       desc:'من الساعة 4 عصراً حتى 10 مساءً - أخذ الحيطة والحذر',       level:'medium', time:'منذ ساعتين' },
+  ],
+  indicators: [
+    { label:'توفر الفرق',     value:94, color:'#06D6A0' },
+    { label:'معدل الاستجابة', value:87, color:'#00D4FF' },
+    { label:'الموارد',        value:78, color:'#FFD166' },
+    { label:'الجاهزية',       value:96, color:'#EF476F' },
+  ],
+  activities: [
+    { id:1, title:'تسجيل بلاغ جديد - حادث مروري',                    user:'أحمد الخالد',  time:'منذ 5 دق',    icon:'fa-plus-circle', color:'var(--coral)' },
+    { id:2, title:'تحديث بروتوكول الاستجابة السريعة',                user:'سارة المنيف', time:'منذ 15 دق',   icon:'fa-edit',        color:'var(--neon)' },
+    { id:3, title:'تمركز فرقة إسعاف في موقع الحادث',                user:'فهد العتيبي',  time:'منذ 20 دق',   icon:'fa-ambulance',   color:'var(--neon-green)' },
+    { id:4, title:'رفع ملف: تقرير البلاغات اليومية',                 user:'نورة السالم',  time:'منذ 35 دق',   icon:'fa-upload',      color:'var(--gold)' },
+    { id:5, title:'إضافة ملاحظة على مستشفى الملك فهد',              user:'خالد الزهراني',time:'منذ ساعة',    icon:'fa-sticky-note', color:'var(--purple)' },
+    { id:6, title:'إغلاق بلاغ - حريق محدود في مستودع الأدوية',      user:'محمد القحطاني',time:'منذ ساعتين',  icon:'fa-check-circle',color:'var(--neon-green)' },
+    { id:7, title:'تحديث حالة فرقة الإسعاف رقم 12',                  user:'عبدالله الشمري',time:'منذ 3 ساعات', icon:'fa-sync',        color:'var(--neon)' },
+  ]
+};
+
+/** بيانات المرجعيات التشغيلية **/
+const referencesData = [
+  { id:1, title:'بروتوكول الاستجابة السريعة',            type:'protocol', dept:'طوارئ',  status:'active', desc:'الإجراءات المعتمدة للاستجابة السريعة في حالات الطوارئ والكوارث، يشمل جميع المراحل من الاستلام حتى الإغلاق.', date:'2025-01-10' },
+  { id:2, title:'دليل الإجراءات التشغيلية - الطوارئ',    type:'sop',      dept:'طوارئ',  status:'active', desc:'دليل شامل يوضح الإجراءات التشغيلية المعتمدة في قسم الطوارئ مع الرسوم البيانية والخرائط الذهنية.', date:'2025-01-08' },
+  { id:3, title:'نموذج تقرير البلاغ اليومي',             type:'form',     dept:'عمليات', status:'active', desc:'نموذج موحد لتسجيل وتوثيق البلاغات الواردة على مدار اليوم مع تصنيفاتها وأولوياتها.', date:'2025-01-05' },
+  { id:4, title:'دليل التواصل مع المستشفيات الشريكة',    type:'guide',    dept:'عمليات', status:'active', desc:'دليل يحتوي على أرقام الطوارئ والتواصل لجميع المستشفيات الشريكة مع بيانات التحديث.', date:'2024-12-28' },
+  { id:5, title:'بروتوكول التعامل مع الحوادث الجماعية',   type:'protocol', dept:'طوارئ',  status:'review', desc:'إجراءات التعامل مع الحوادث التي تتضمن 5 مصابين فأكثر، تشمل التصنيف والتوجيه.', date:'2024-12-20' },
+  { id:6, title:'دليل ضمان الجودة - غرف العمليات',       type:'sop',      dept:'جودة',   status:'active', desc:'معايير وإجراءات ضمان الجودة لعمليات غرفة القيادة والتحكم والتقييم الدوري.', date:'2024-12-15' },
+  { id:7, title:'نموذج طلب إجازة / منحة للعاملين',       type:'form',     dept:'إداري',  status:'active', desc:'النموذج المعتمد لطلبات الإجازات والمنح للعاملين في غرفة العمليات.', date:'2024-12-10' },
+  { id:8, title:'الإجراءات الإدارية في حالات الطوارئ',   type:'sop',      dept:'إداري',  status:'archived', desc:'الإجراءات الإدارية المتبعة أثناء حالات الطوارئ والأزمات وآلية التوثيق.', date:'2024-12-01' },
+];
+
+/** بيانات المستشفيات الشريكة **/
+const hospitalsData = [
+  { id:1, name:'مستشفى الملك فهد التخصصي',    type:'عام',   specialty:'جراحة - طوارئ - عناية مركزة',         address:'الرياض - حي العليا - شارع الملك فهد',       phone:'011-275-0000', emergency:'011-275-1111', hours:'24 ساعة' },
+  { id:2, name:'مستشفى الملك فيصل التخصصي',   type:'متخصص', specialty:'أورام - علاج كيميائي - إشعاعي',        address:'الرياض - حي الملز - شارع مكة',              phone:'011-464-7272', emergency:'011-464-7000', hours:'24 ساعة' },
+  { id:3, name:'مستشفى الصحة الوطنية',         type:'عام',   specialty:'طوارئ - باطنية - جراحة عامة',         address:'الرياض - شمال الرياض - طريق الملك سلمان',   phone:'011-275-8000', emergency:'011-275-8111', hours:'24 ساعة' },
+  { id:4, name:'مستشفى د. سليمان الحبيب',     type:'مجمع',  specialty:'جميع التخصصات الطبية والجراحية',        address:'الرياض - طريق الخرج - حي الروضة',           phone:'011-525-0000', emergency:'011-525-0001', hours:'24 ساعة' },
+  { id:5, name:'مستشفى الإيمان العام',        type:'عام',   specialty:'طوارئ - نساء وولادة - أطفال',          address:'الرياض - حي الروضة - شارع الإمام البخاري',  phone:'011-208-0000', emergency:'011-208-1111', hours:'24 ساعة' },
+  { id:6, name:'مركز طوارئ الغدير',           type:'طوارئ', specialty:'طوارئ فقط - استقبال 24 ساعة',          address:'الرياض - حي الغدير - طريق الدائري الشرقي',  phone:'011-477-0000', emergency:'011-477-0000', hours:'24 ساعة' },
+  { id:7, name:'مستشفى المواساة',             type:'مجمع',  specialty:'قلب - عظام - جلدية - باطنية',          address:'الرياض - حي الروابي - طريق الأمير محمد',    phone:'011-454-3333', emergency:'011-454-3000', hours:'16 ساعة' },
+  { id:8, name:'مستشفى الحرس الوطني',         type:'عام',   specialty:'طوارئ - جراحة - عناية مركزة',          address:'الرياض - حي الروضة - شارع عسير',            phone:'011-252-0088', emergency:'011-252-0000', hours:'24 ساعة' },
+  { id:9, name:'مستشفى عين التخصصي',          type:'متخصص', specialty:'عيون - تجميل - ليزر - جراحة',          address:'الرياض - حي العليا - طريق العروبة',         phone:'011-460-9000', emergency:'011-460-9111', hours:'12 ساعة' },
+  { id:10, name:'مستشفى الأندلسية',           type:'مجمع',  specialty:'جميع التخصصات والفحوصات المتقدمة',      address:'الرياض - طريق الملك سلمان - حي الملقا',     phone:'920-007-997',  emergency:'920-007-998',  hours:'24 ساعة' },
+  { id:11, name:'مستشفى السعودي الألماني',    type:'عام',   specialty:'قلب - أعصاب - عمود فقري - طوارئ',      address:'الرياض - حي الملقا - طريق الأمير تركي',     phone:'011-275-0001', emergency:'011-275-0111', hours:'24 ساعة' },
+  { id:12, name:'مركز طب الأسرة - العليا',    type:'طوارئ', specialty:'أسرة - طوارئ خفيفة - فحوصات',          address:'الرياض - حي العليا - شارع العليا العام',    phone:'011-462-0000', emergency:'011-462-0000', hours:'18 ساعة' },
+];
+
+/** بيانات الملفات المرفوعة **/
+let filesData = [
+  { id:1, name:'تقرير البلاغات - يناير 2025.pdf',         type:'pdf',  size:'2.4 MB', date:'2025-01-15', url:'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
+  { id:2, name:'جدول المناوبات الشتوية.docx',             type:'word', size:'156 KB', date:'2025-01-14', url:'#' },
+  { id:3, name:'إحصائيات الاستجابة - الربع الرابع 2024.xlsx', type:'excel', size:'890 KB', date:'2025-01-10', url:'#' },
+  { id:4, name:'عرض الجاهزية التشغيلية.pptx',             type:'ppt',  size:'3.1 MB', date:'2025-01-08', url:'#' },
+  { id:5, name:'خريطة توزيع الفرق الميدانية.jpg',         type:'img',  size:'1.2 MB', date:'2025-01-05', url:'#' },
+];
+
+/** بيانات الخط الزمني **/
+const timelineData = [
+  { id:1, title:'إصدار تعميم 44/2025: تحديث بروتوكول الاستجابة',    type:'directive', desc:'تحديث شامل لبروتوكول الاستجابة السريعة بما يتوافق مع المعايير الدولية الجديدة', date:'2025-01-15', time:'10:30 ص' },
+  { id:2, title:'رفع ملف: تقرير البلاغات الشهري',                   type:'file',      desc:'تم رفع التقرير الشهري للبلاغات الواردة خلال شهر يناير', date:'2025-01-15', time:'09:15 ص' },
+  { id:3, title:'تحديث بروتوكول التعامل مع الحوادث الكيميائية',     type:'protocol',  desc:'إضافة إجراءات جديدة وتحديثات على البروتوكول الحالي', date:'2025-01-14', time:'14:45 م' },
+  { id:4, title:'تدريب الفرق الميدانية على الإسعاف المتقدم',        type:'event',     desc:'ورشة تدريبية شملت 25 فرد من الفرق الميدانية على تقنيات الإسعاف المتقدم', date:'2025-01-13', time:'08:00 ص' },
+  { id:5, title:'إضافة مستشفى السعودي الألماني للدليل',             type:'event',     desc:'تم إضافة المستشفى وتحديث بيانات الاتصال لدليل المستشفيات', date:'2025-01-12', time:'11:20 ص' },
+  { id:6, title:'تعميم عاجل: إجراءات وقائية من الفيروسات التنفسية', type:'directive', desc:'تفعيل إجراءات الوقاية من فيروسات التنفسية الموسمية في جميع المرافق', date:'2025-01-10', time:'16:00 م' },
+  { id:7, title:'صيانة دورية لأنظمة غرفة العمليات',                type:'event',     desc:'إجراء صيانة دورية شاملة لجميع أنظمة غرفة العمليات والاتصالات', date:'2025-01-08', time:'02:00 ص' },
+  { id:8, title:'تحديث دليل المستشفيات الشريكة',                    type:'file',      desc:'تحديث الأرقام والعناوين والتخصصات لـ 12 مستشفى شريك', date:'2025-01-05', time:'10:00 ص' },
+];
+
+/** بيانات الإعلانات العاجلة **/
+const announcementsData = [
+  { id:1, title:'إجازة يوم التأسيس',                                body:'تعلن غرفة العمليات عن إجازة يوم التأسيس يوم الخميس 2025/02/20. سيتم تشغيل غرفة الطوارئ بحد أدنى من الكادر. نأمل من جميع المناوبين تسوية أوضاعهم قبل الإجازة والتأكد من تسليم المهام للمناوبين القادمين.', date:'2025-01-15', pinned:true,  urgent:false },
+  { id:2, title:'تحديث عاجل: بروتوكول الاستجابة السريعة',           body:'تم تحديث بروتوكول الاستجابة السريعة بإجراءات جديدة للحوادث الكيميائية والبيولوجية. يرجى من جميع المناوبين الاطلاع على النسخة الجديدة فوراً وطباعتها للمرجع السريع.', date:'2025-01-14', pinned:true,  urgent:true },
+  { id:3, title:'ورشة تدريبية: إدارة الأزمات والكوارث',              body:'تعلن إدارة التدريب عن إقامة ورشة تدريبية متخصصة في إدارة الأزمات والكوارث يوم الأحد القادم الموافق 2025/01/19 الساعة 9 صباحاً في القاعة الرئيسية بالدور الثاني. حضوركم إلزامي.', date:'2025-01-13', pinned:false, urgent:false },
+  { id:4, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',  body:'تنبيه من المركز الوطني للأرصاد: أمطار رعدية غزيرة متوقعة على منطقة الرياض اليوم من الساعة 4 عصراً حتى 10 مساءً. يرجى أخذ الحيطة والحذر وتأمين المعدات الميدانية.', date:'2025-01-12', pinned:false, urgent:true },
+];
+
+/** بيانات المساعد الذكي - الأسئلة والأجوبة **/
+const chatResponses = [
+  { q:'كيف أدخل بلاغ جديد',         a:'يمكنك الدخول إلى صفحة "إدخال البلاغات" من خلال الضغط على زر "إدخال بلاغات" في بطاقة البلاغات في لوحة القيادة، أو الانتقال مباشرة لصفحة report-entry.html' },
+  { q:'ما هي البلاغات المسجلة اليوم', a:'عدد البلاغات المسجلة اليوم هو 127 بلاغاً، بزيادة 12% عن يوم أمس. يمكنك الاطلاع على التفاصيل الكاملة من لوحة القيادة.' },
+  { q:'كيف أتواصل مع المستشفيات',    a:'يمكنك الانتقال لقسم "دليل المستشفيات" من القائمة الجانبية. يحتوي على أرقام الطوارئ والتواصل لجميع المستشفيات الشريكة مع خيار الاتصال المباشر أو نسخ الرقم.' },
+  { q:'أين أجد البروتوكولات',        a:'جميع البروتوكولات والأدلة التشغيلية متاحة في قسم "المرجعيات التشغيلية" من القائمة الجانبية. يمكنك البحث أو الفلترة حسب القسم أو النوع أو الحالة.' },
+  { q:'ما هي أوقات المناوبات',       a:'تعمل غرفة العمليات على مدار 24 ساعة. المناوبات الحالية: 18 مناوبة نشطة. يمكنك الاطلاع على جدول المناوبات من مركز الملفات.' },
+  { q:'ما هي المستشفيات المتاحة',    a:'يوجد 12 مستشفى شريك متاح: 4 مستشفيات عامة، 3 مجمعات طبية، 2 مراكز متخصصة، و3 مراكز طوارئ. تجدهم جميعاً في دليل المستشفيات.' },
+  { q:'كيف أرفع ملف',                a:'انتقل لمركز الملفات ثم اسحب الملفات لمنطقة الرفع أو انقر عليها لاختيار الملفات. ندعم PDF, Word, Excel, PowerPoint, والصور.' },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  الدوال الرئيسية (Core Functions)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * switchSection() - التبديل بين أقسام التطبيق
+ * تقوم بتحديث القائمة الجانبية وإظهار القسم المطلوب
+ */
+function switchSection(sectionName) {
+  // تحديث القائمة الجانبية - إزالة active من الكل وإضافته للمحدد
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.section === sectionName);
+  });
+  // إظهار القسم المطلوب وإخفاء الباقي
+  document.querySelectorAll('.section-page').forEach(el => {
+    el.classList.toggle('active', el.id === 'section-' + sectionName);
+  });
+  // تهيئة الخريطة عند أول زيارة للقسم
+  if (sectionName === 'map') { setTimeout(initMap, 150); }
+  // إغلاق السايدبار في وضع الجوال
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+  }
+}
+
+/**
+ * renderDashboard() - رسم لوحة القيادة بالكامل
+ * تشمل: الإحصائيات، التوجيهات، التنبيهات، المؤشرات، النشاطات
+ */
+function renderDashboard() {
+  // ── 1. بطاقات الإحصائيات ──
+  const statsEl = document.getElementById('dashboardStats');
+  statsEl.innerHTML = dashboardData.stats.map((s, i) => `
+    <div class="stat-card ${s.color}" style="animation-delay:${i*0.1}s">
+      <div class="stat-icon"><i class="fas ${s.icon}"></i></div>
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-change ${s.change >= 0 ? 'up' : 'down'}">
+        <i class="fas fa-arrow-${s.change >= 0 ? 'up' : 'down'}"></i> ${s.changeLabel}
+      </div>
+      ${s.action ? `<div class="stat-action"><a href="${s.link || '#'}" class="btn-sm btn-${s.color === 'coral' ? 'coral' : s.color === 'neon' ? 'neon' : s.color === 'neon-g' ? 'green' : 'neon'}"><i class="fas fa-plus"></i> ${s.action}</a></div>` : ''}
+    </div>
+  `).join('');
+
+  // ── 2. قائمة التوجيهات والتعاميم ──
+  const dirEl = document.getElementById('directivesList');
+  document.getElementById('dirCount').textContent = dashboardData.directives.length;
+  dirEl.innerHTML = dashboardData.directives.map(d => `
+    <div class="directive-item">
+      <div class="directive-pin ${d.pinned ? 'pinned' : ''}" onclick="togglePin(${d.id})" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
+        <i class="fas fa-thumbtack ${d.pinned ? '' : 'fa-rotate-45'}"></i>
+      </div>
+      <div class="directive-body">
+        <div class="directive-title">${d.title}</div>
+        <div class="directive-meta"><span><i class="fas fa-building"></i> ${d.dept}</span><span><i class="far fa-calendar"></i> ${d.date}</span>${d.pinned ? '<span style="color:var(--gold)"><i class="fas fa-star"></i> مثبت</span>' : ''}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // ── 3. قائمة التنبيهات الفورية ──
+  const alertEl = document.getElementById('alertsList');
+  document.getElementById('alertCount').textContent = dashboardData.alerts.length;
+  alertEl.innerHTML = dashboardData.alerts.map(a => `
+    <div class="alert-item ${a.level}">
+      <div class="alert-icon"><i class="fas ${a.level === 'high' ? 'fa-exclamation-triangle' : a.level === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i></div>
+      <div class="alert-body">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-desc">${a.desc}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <span class="alert-time">${a.time}</span>
+        <span class="alert-badge">${a.level === 'high' ? 'عاجل' : a.level === 'medium' ? 'متوسط' : 'عادي'}</span>
+      </div>
+    </div>
+  `).join('');
+
+  // ── 4. مؤشرات التشغيل الدائرية ──
+  const indEl = document.getElementById('opIndicators');
+  indEl.innerHTML = dashboardData.indicators.map(ind => {
+    const r = 50, circ = 2 * Math.PI * r;
+    const offset = circ - (ind.value / 100) * circ;
+    return `
+    <div class="circular-progress">
+      <svg width="130" height="130" class="circle-svg" style="--circ-color:${ind.color};">
+        <circle cx="65" cy="65" r="${r}" class="circle-bg"/>
+        <circle cx="65" cy="65" r="${r}" class="circle-fill"
+          stroke="${ind.color}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
+          data-offset="${offset}"/>
+      </svg>
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+        <span class="circle-pct" style="color:${ind.color};">${ind.value}%</span>
+      </div>
+      <div class="circle-label">${ind.label}</div>
+    </div>`;
+  }).join('');
+  // تفعيل animation لتحريك الدوائر
+  setTimeout(() => {
+    document.querySelectorAll('.circle-fill').forEach(c => {
+      c.style.strokeDashoffset = c.dataset.offset;
+    });
+  }, 400);
+
+  // ── 5. قائمة آخر النشاطات ──
+  const actEl = document.getElementById('activityList');
+  actEl.innerHTML = dashboardData.activities.map(a => `
+    <div class="directive-item" style="animation-delay:${a.id * 0.06}s">
+      <div class="directive-pin" style="color:${a.color}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
+        <i class="fas ${a.icon}"></i>
+      </div>
+      <div class="directive-body">
+        <div class="directive-title">${a.title}</div>
+        <div class="directive-meta"><span><i class="fas fa-user"></i> ${a.user}</span><span><i class="far fa-clock"></i> ${a.time}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/** تبديل حالة التثبيت للتوجيه **/
+function togglePin(id) {
+  const d = dashboardData.directives.find(x => x.id === id);
+  if (d) { d.pinned = !d.pinned; renderDashboard(); }
+}
+
+/**
+ * renderReferences() - رسم المرجعيات التشغيلية مع الفلترة
+ * يدعم الفلترة حسب النوع والقسم والحالة والبحث النصي
+ */
+function renderReferences() {
+  const typeF  = document.getElementById('refFilterType').value;
+  const deptF  = document.getElementById('refFilterDept').value;
+  const statF  = document.getElementById('refFilterStatus').value;
+  const srch   = document.getElementById('refSearch').value.toLowerCase();
+  const typeLabels = { protocol:'بروتوكول', guide:'دليل إرشادي', form:'نموذج', sop:'SOP' };
+  const typeIcons  = { protocol:'fa-file-medical', guide:'fa-book-open', form:'fa-file-alt', sop:'fa-tasks' };
+  const statusLabels = { active:'نشط', review:'قيد المراجعة', archived:'مؤرشف' };
+  const statusBadges = { active:'success', review:'warning', archived:'info' };
+
+  let filtered = referencesData.filter(r => {
+    return (!typeF || r.type === typeF) && (!deptF || r.dept === deptF) &&
+           (!statF || r.status === statF) &&
+           (!srch || r.title.includes(srch) || r.desc.includes(srch));
+  });
+
+  document.getElementById('refTotalCount').textContent = filtered.length + ' مرجعية';
+  document.getElementById('referencesGrid').innerHTML = filtered.map(r => `
+    <div class="ref-card" onclick="showToast('info','فتح المرجعية','جارٍ فتح: ${r.title}')">
+      <div class="ref-header">
+        <div class="ref-icon ${r.type}"><i class="fas ${typeIcons[r.type] || 'fa-file'}"></i></div>
+        <div>
+          <div class="ref-title">${r.title}</div>
+          <div class="mt-8">
+            <span class="badge badge-${r.type === 'protocol' ? 'danger' : r.type === 'sop' ? 'success' : r.type === 'form' ? 'warning' : 'primary'}">${typeLabels[r.type]}</span>
+            <span class="badge badge-info" style="margin-right:4px;">${r.dept}</span>
+            <span class="badge badge-${statusBadges[r.status]}" style="margin-right:4px;">${statusLabels[r.status]}</span>
+          </div>
+        </div>
+      </div>
+      <div class="ref-desc">${r.desc}</div>
+      <div class="ref-meta"><span><i class="far fa-calendar"></i> ${r.date}</span><span><i class="fas fa-file"></i> ${r.type.toUpperCase()}</span></div>
+      <div class="ref-actions">
+        <button class="btn-sm btn-neon" onclick="event.stopPropagation(); showToast('info','عرض الملف','جارٍ فتح الملف...')"><i class="fas fa-eye"></i> عرض</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="event.stopPropagation(); showToast('success','تم النسخ','تم نسخ المعلومات للحافظة')"><i class="fas fa-copy"></i> نسخ</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="event.stopPropagation(); showToast('info','مشاركة','تم فتح خيارات المشاركة')"><i class="fas fa-share-alt"></i> مشاركة</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/**
+ * renderHospitals() - رسم دليل المستشفيات مع البحث والفلترة
+ */
+function renderHospitals() {
+  const srch    = document.getElementById('hospSearch').value.toLowerCase();
+  const typeF   = document.getElementById('hospFilterType').value;
+  const filtered = hospitalsData.filter(h => {
+    return (!srch || h.name.includes(srch) || h.specialty.includes(srch)) &&
+           (!typeF || h.type === typeF);
+  });
+
+  document.getElementById('hospTotalCount').textContent = filtered.length + ' مستشفى';
+  document.getElementById('hospitalsGrid').innerHTML = filtered.map(h => `
+    <div class="hosp-card">
+      <div class="hosp-header">
+        <div class="hosp-icon"><i class="fas fa-hospital"></i></div>
+        <div style="flex:1;">
+          <div class="hosp-name">${h.name}</div>
+          <div class="hosp-type">${h.type === 'عام' ? 'مستشفى عام' : h.type === 'متخصص' ? 'مركز متخصص' : h.type === 'مجمع' ? 'مجمع طبي' : 'مركز طوارئ'} · ${h.specialty}</div>
+        </div>
+        <span class="badge badge-${h.hours === '24 ساعة' ? 'success' : 'warning'}">${h.hours}</span>
+      </div>
+      <div class="hosp-body">
+        <div class="hosp-detail"><i class="fas fa-map-marker-alt"></i> ${h.address}</div>
+        <div class="hosp-detail phone"><i class="fas fa-phone"></i> ${h.phone}</div>
+        <div class="hosp-detail emergency"><i class="fas fa-ambulance"></i> طوارئ: ${h.emergency}</div>
+      </div>
+      <div class="hosp-actions">
+        <button class="btn-sm btn-neon" onclick="showToast('info','الاتصال','جارٍ الاتصال: ${h.emergency}')"><i class="fas fa-phone"></i> اتصال</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="navigator.clipboard.writeText('${h.emergency}'); showToast('success','تم النسخ','تم نسخ رقم الطوارئ')"><i class="fas fa-copy"></i> نسخ</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('info','مشاركة','تم فتح خيارات المشاركة')"><i class="fas fa-share-alt"></i> مشاركة</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('warning','ملاحظة','فتح نافذة إضافة ملاحظة')"><i class="fas fa-sticky-note"></i> ملاحظة</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/**
+ * renderFiles() - رسم قائمة الملفات المرفوعة
+ */
+function renderFiles() {
+  const iconMap = { pdf:'fa-file-pdf', word:'fa-file-word', excel:'fa-file-excel', ppt:'fa-file-powerpoint', img:'fa-file-image' };
+  document.getElementById('fileCount').textContent = filesData.length + ' ملف';
+  if (!filesData.length) {
+    document.getElementById('filesList').innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-folder-open"></i>
+        <h4>لا توجد ملفات مرفوعة</h4>
+        <p>اسحب الملفات لمنطقة الرفع أعلاه أو انقر لاختيار ملفات</p>
+      </div>`;
+    return;
+  }
+  document.getElementById('filesList').innerHTML = filesData.map((f, i) => `
+    <div class="file-list-item" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" style="animation-delay:${i*0.06}s">
+      <div class="file-icon ${f.type}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-meta">${f.size} · ${f.date}</div>
+      </div>
+      <div class="file-actions" onclick="event.stopPropagation();">
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" title="عرض"><i class="fas fa-eye"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="navigator.clipboard.writeText('${f.name}'); showToast('success','تم النسخ','تم نسخ اسم الملف')" title="نسخ"><i class="fas fa-copy"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;color:var(--coral);" onclick="deleteFile(${f.id})" title="حذف"><i class="fas fa-trash"></i></button>
+      </div>
+      <i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:11px;margin-right:4px;"></i>
+    </div>
+  `).join('');
+}
+
+/** حذف ملف من القائمة **/
+function deleteFile(id) {
+  filesData = filesData.filter(f => f.id !== id);
+  renderFiles();
+  showToast('success','تم الحذف','تم حذف الملف بنجاح');
+}
+
+/**
+ * openDocViewer() - فتح عارض المستندات المنبثق
+ */
+function openDocViewer(title, url, type) {
+  document.getElementById('docViewerOverlay').classList.add('active');
+  document.getElementById('docViewerTitle').innerHTML = `<i class="fas fa-file-alt" style="margin-left:8px;"></i> ${title}`;
+  const frame = document.getElementById('docViewerFrame');
+  const placeholder = document.getElementById('docViewerPlaceholder');
+  window.currentDocUrl = url;
+  window.currentDocTitle = title;
+  if (type === 'pdf' && url && url !== '#') {
+    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
+  } else if (type === 'img' && url && url !== '#') {
+    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
+  } else {
+    frame.style.display = 'none'; placeholder.style.display = 'flex';
+    placeholder.innerHTML = `<i class="fas fa-file-alt"></i><p>معاينة الملف "${title}"</p><span style="font-size:11px;">سيتم فتح الملف في التطبيق المناسب</span>`;
+  }
+}
+function closeDocViewer() {
+  document.getElementById('docViewerOverlay').classList.remove('active');
+  document.getElementById('docViewerFrame').src = '';
+}
+function downloadCurrentDoc() {
+  if (window.currentDocUrl && window.currentDocUrl !== '#') {
+    const a = document.createElement('a'); a.href = window.currentDocUrl; a.download = window.currentDocTitle || 'download'; a.click();
+    showToast('success','تحميل','جارٍ تحميل الملف...');
+  } else { showToast('error','تعذر التحميل','الملف غير متوفر للتحميل'); }
+}
+function printCurrentDoc() {
+  const frame = document.getElementById('docViewerFrame');
+  if (frame.style.display !== 'none') { frame.contentWindow.print(); }
+  else { showToast('info','طباعة','فتح نافذة الطباعة...'); }
+}
+// إغلاق بالنقر خارج النافذة
+document.getElementById('docViewerOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('docViewerOverlay')) closeDocViewer();
+});
+
+/**
+ * Drag & Drop - السحب والإفلات لرفع الملفات
+ */
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover'); });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+/** معالجة الملفات المرفوعة **/
+function handleFiles(fileList) {
+  const typeMap = {
+    pdf:'pdf', doc:'word', docx:'word', xls:'excel', xlsx:'excel',
+    ppt:'ppt', pptx:'ppt', jpg:'img', jpeg:'img', png:'img'
+  };
+  let count = 0;
+  Array.from(fileList).forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const type = typeMap[ext] || 'pdf';
+    const size = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
+    const url = URL.createObjectURL(file);
+    filesData.unshift({ id:Date.now()+Math.random(), name:file.name, type, size, date:new Date().toISOString().split('T')[0], url });
+    count++;
+  });
+  renderFiles();
+  if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف بنجاح');
+}
+
+/**
+ * renderTimeline() - رسم الخط الزمني
+ */
+function renderTimeline() {
+  const filter = document.getElementById('timelineFilter').value;
+  let filtered = timelineData;
+  if (filter) filtered = timelineData.filter(t => t.type === filter);
+
+  document.getElementById('timelineContainer').innerHTML = filtered.map(t => `
+    <div class="timeline-item">
+      <div class="timeline-dot ${t.type}"></div>
+      <div class="timeline-card">
+        <div class="timeline-title">${t.title}</div>
+        <div class="timeline-desc">${t.desc}</div>
+        <div class="timeline-meta">
+          <span><i class="far fa-calendar"></i> ${t.date}</span>
+          <span><i class="far fa-clock"></i> ${t.time}</span>
+          <span style="color:${t.type === 'directive' ? 'var(--coral)' : t.type === 'file' ? 'var(--neon)' : t.type === 'protocol' ? 'var(--neon-green)' : 'var(--gold)'}"><i class="fas fa-tag"></i> ${t.type === 'directive' ? 'تعميم' : t.type === 'file' ? 'ملف' : t.type === 'protocol' ? 'بروتوكول' : 'حدث'}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/**
+ * renderAnnouncements() - رسم الإعلانات العاجلة
+ */
+function renderAnnouncements() {
+  const container = document.getElementById('announcementsContainer');
+  const pinned = announcementsData.filter(a => a.pinned);
+  const normal = announcementsData.filter(a => !a.pinned);
+
+  let html = '';
+  if (pinned.length) {
+    html += `<div class="announce-pinned"><div class="announce-pinned-title"><i class="fas fa-thumbtack"></i> إعلانات مثبتة</div>`;
+    pinned.forEach((a, i) => { html += renderAnnounceCard(a, i * 0.1); });
+    html += `</div>`;
+  }
+  if (normal.length) {
+    html += `<div class="announce-normal-title"><i class="fas fa-list"></i> إعلانات سابقة</div>`;
+    normal.forEach((a, i) => { html += renderAnnounceCard(a, i * 0.1); });
+  }
+  container.innerHTML = html;
+}
+function renderAnnounceCard(a, delay) {
+  return `
+    <div class="announce-card ${a.pinned ? 'pinned' : ''} ${a.urgent ? 'urgent' : ''}" style="animation-delay:${delay}s">
+      <div class="announce-header">
+        ${a.pinned ? '<i class="fas fa-thumbtack announce-pin-icon"></i>' : ''}
+        ${a.urgent ? '<i class="fas fa-bell announce-urgent-icon"></i>' : ''}
+        <span class="announce-title">${a.title}</span>
+        ${a.urgent ? '<span class="badge badge-danger">عاجل</span>' : ''}
+      </div>
+      <div class="announce-body">${a.body}</div>
+      <div class="announce-footer">
+        <span class="announce-date"><i class="far fa-calendar"></i> ${a.date}</span>
+        <button class="btn-sm btn-neon" onclick="showToast('info','مشاركة','تم نسخ رابط الإعلان')"><i class="fas fa-share-alt"></i> مشاركة</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * initMap() - تهيئة الخريطة التفاعلية بـ Leaflet.js
+ * تعرض مواقع المستشفيات في مدينة الرياض
+ */
+let mapInstance = null;
+function initMap() {
+  if (mapInstance) return;
+  const map = L.map('operationsMap').setView([24.7136, 46.6753], 12);
+  // استخدام خريطة داكنة من CARTO
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd', maxZoom:19
+  }).addTo(map);
+
+  // إحداثيات المستشفيات
+  const hospCoords = [
+    { name:'مستشفى الملك فهد',      lat:24.7136, lng:46.6753, type:'عام' },
+    { name:'مستشفى الملك فيصل',     lat:24.6892, lng:46.7028, type:'متخصص' },
+    { name:'مستشفى الصحة الوطنية',  lat:24.7682, lng:46.6013, type:'عام' },
+    { name:'م. د. سليمان الحبيب',   lat:24.6383, lng:46.7675, type:'مجمع' },
+    { name:'مستشفى الإيمان',        lat:24.7345, lng:46.6987, type:'عام' },
+    { name:'مركز طوارئ الغدير',     lat:24.7923, lng:46.7123, type:'طوارئ' },
+    { name:'مستشفى المواساة',       lat:24.7521, lng:46.6534, type:'مجمع' },
+    { name:'مستشفى الحرس الوطني',   lat:24.7111, lng:46.7245, type:'عام' },
+    { name:'مستشفى عين التخصصي',    lat:24.6998, lng:46.6856, type:'متخصص' },
+    { name:'مستشفى الأندلسية',      lat:24.7234, lng:46.6456, type:'مجمع' },
+    { name:'م. السعودي الألماني',   lat:24.7656, lng:46.6234, type:'عام' },
+    { name:'مركز طب الأسرة',        lat:24.7098, lng:46.6689, type:'طوارئ' },
+  ];
+  const colorMap = { 'عام':'#EF476F', 'متخصص':'#00D4FF', 'مجمع':'#06D6A0', 'طوارئ':'#FFD166' };
+
+  // إضافة علامات للمستشفيات
+  hospCoords.forEach(h => {
+    const marker = L.circleMarker([h.lat, h.lng], {
+      radius:11, fillColor:colorMap[h.type] || '#00D4FF',
+      color:'#fff', weight:2.5, opacity:0.9, fillOpacity:0.75
+    }).addTo(map);
+    marker.bindPopup(`<div style="text-align:center;font-family:'IBM Plex Sans Arabic',Inter,sans-serif;"><b style="font-size:13px;">${h.name}</b><br/><span style="font-size:11px;color:#666;">${h.type}</span></div>`);
+  });
+
+  // دوائر حرارية حول المناطق المزدحمة
+  hospCoords.forEach(h => {
+    L.circle([h.lat, h.lng], { radius:600, color:colorMap[h.type], weight:1, fillOpacity:0.04 }).addTo(map);
+  });
+
+  mapInstance = map;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  المساعد الذكي (Chat Assistant)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+let chatOpen = false;
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatBox').classList.toggle('active', chatOpen);
+  if (chatOpen && !document.getElementById('chatMessages').children.length) {
+    addBotMsg('welcome', 'مرحباً بك! أنا مساعد غرفة العمليات الذكي. كيف يمكنني مساعدتك اليوم؟', true);
+    // عرض الأسئلة السريعة
+    const qDiv = document.createElement('div');
+    qDiv.className = 'quick-questions';
+    qDiv.innerHTML = chatResponses.slice(0, 5).map(r => `<span class="quick-q" onclick="sendQuick('${r.q}')">${r.q}؟</span>`).join('');
+    document.getElementById('chatMessages').appendChild(qDiv);
+    // التركيز على حقل الإدخال
+    setTimeout(() => document.getElementById('chatInput').focus(), 300);
+  }
+}
+function addBotMsg(cls, text, isWelcome) {
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg bot' + (isWelcome ? ' welcome' : '');
+  msg.textContent = text;
+  document.getElementById('chatMessages').appendChild(msg);
+  scrollChat();
+}
+function addUserMsg(text) {
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg user';
+  msg.textContent = text;
+  document.getElementById('chatMessages').appendChild(msg);
+  scrollChat();
+}
+function scrollChat() {
+  const c = document.getElementById('chatMessages');
+  c.scrollTop = c.scrollHeight;
+}
+function sendQuick(q) {
+  addUserMsg(q + '؟');
+  // مؤشر كتابة
+  showTyping();
+  setTimeout(() => { hideTyping(); respond(q); }, 800);
+}
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  addUserMsg(text);
+  input.value = '';
+  showTyping();
+  setTimeout(() => { hideTyping(); respond(text); }, 800);
+}
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'chat-msg bot typing-msg';
+  div.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+  div.id = 'typingIndicator';
+  document.getElementById('chatMessages').appendChild(div);
+  scrollChat();
+}
+function hideTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+function respond(text) {
+  const q = text.toLowerCase().replace(/[؟?]/g, '').trim();
+  const match = chatResponses.find(r => {
+    const rq = r.q.toLowerCase().replace(/[؟?]/g, '').trim();
+    return q.includes(rq.substring(0, 8)) || rq.includes(q.substring(0, 8));
+  });
+  addBotMsg('', match ? match.a : 'شكراً لسؤالك! سأقوم بتحويل استفسارك للفريق المختص. يمكنك التواصل المباشر مع غرفة العمليات على الرقم الداخلي 911 أو مراجعة قسم المرجعيات التشغيلية.');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Toast Notifications - الإشعارات المنبثقة
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function showToast(type, title, message) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const iconMap = { success:'fa-check-circle', error:'fa-times-circle', info:'fa-info-circle', warning:'fa-exclamation-triangle' };
+  toast.innerHTML = `
+    <div class="toast-icon"><i class="fas ${iconMap[type]}"></i></div>
+    <div class="toast-body"><div class="toast-title">${title}</div><div class="toast-text">${message}</div></div>
+    <span class="toast-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></span>
+  `;
+  container.appendChild(toast);
+  // إزالة تلقائياً بعد 4 ثواني
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 4000);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Keyboard Shortcuts - اختصارات لوحة المفاتيح
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function toggleShortcutsModal() {
+  document.getElementById('shortcutsModal').classList.toggle('active');
+}
+document.getElementById('shortcutsModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('shortcutsModal')) toggleShortcutsModal();
+});
+
+document.addEventListener('keydown', e => {
+  // تجاهل إذا كان المستخدم يكتب في حقل إدخال
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  const key = e.key;
+  const map = { '1':'dashboard', '2':'references', '3':'hospitals', '4':'files', '5':'timeline', '6':'announcements', '7':'map' };
+  if (map[key]) { e.preventDefault(); switchSection(map[key]); }
+  else if (key === 'q' || key === 'Q') { e.preventDefault(); toggleChat(); }
+  else if (key === '/') { e.preventDefault(); document.getElementById('globalSearch').focus(); }
+  else if (key === 'd' || key === 'D') { e.preventDefault(); document.getElementById('darkModeToggle').click(); }
+  else if (key === '?' || key === '؟') { e.preventDefault(); toggleShortcutsModal(); }
+  else if (key === 'Escape') {
+    closeDocViewer(); toggleShortcutsModal(false);
+    if (chatOpen) toggleChat();
+  }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  الساعة الرقمية (Digital Clock)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function updateClock() {
+  try {
+    const now = new Date();
+    const timeEl = document.getElementById('clock-time');
+    const dateEl = document.getElementById('clock-date');
+    if (timeEl) timeEl.textContent = now.toLocaleTimeString('ar-SA', { hour12:false }) || '--:--:--';
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('ar-SA', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) || '---';
+  } catch (e) {
+    const timeEl = document.getElementById('clock-time');
+    const dateEl = document.getElementById('clock-date');
+    if (timeEl) timeEl.textContent = '--:--:--';
+    if (dateEl) dateEl.textContent = '---';
+  }
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Dark Mode Toggle - تبديل الوضع الداكن/الفاتح
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+document.getElementById('darkModeToggle').addEventListener('click', function() {
+  document.body.classList.toggle('dark-mode');
+  const icon = this.querySelector('i');
+  const isDark = document.body.classList.contains('dark-mode');
+  icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+  // إعادة تهيئة الخريطة إذا كانت ظاهرة
+  if (mapInstance && document.getElementById('section-map').classList.contains('active')) {
+    setTimeout(() => mapInstance.invalidateSize(), 300);
+  }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  القائمة الجانبية (Mobile Sidebar Toggle)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+document.getElementById('menuToggle')?.addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  البحث الموحد (Global Search)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+document.getElementById('globalSearch').addEventListener('input', e => {
+  const v = e.target.value.trim().toLowerCase();
+  if (!v || v.length < 2) return;
+  // البحث في المستشفيات
+  const foundHosp = hospitalsData.some(h => h.name.toLowerCase().includes(v) || h.specialty.toLowerCase().includes(v));
+  if (foundHosp) { switchSection('hospitals'); document.getElementById('hospSearch').value = e.target.value; renderHospitals(); return; }
+  // البحث في المرجعيات
+  const foundRef = referencesData.some(r => r.title.toLowerCase().includes(v) || r.desc.toLowerCase().includes(v));
+  if (foundRef) { switchSection('references'); document.getElementById('refSearch').value = e.target.value; renderReferences(); return; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Shortcuts Button
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+document.getElementById('kbdShortcuts').addEventListener('click', toggleShortcutsModal);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  تهيئة الصفحة عند التحميل (Page Initialization)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderDashboard();
+  renderReferences();
+  renderHospitals();
+  renderFiles();
+  renderTimeline();
+  renderAnnouncements();
+
+  // Toast ترحيبي
+  setTimeout(() => {
+    showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
+  }, 800);
+});
+</script>
+
+</body>
+</html>

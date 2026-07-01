@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض | South Sector Emergency Operations Platform">
+<title>معلومات بلاغات الفرق المدخلة | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</title>
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1E3A5F">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+/* ============================================
+   نظام معلومات بلاغات الفرق المدخلة
+   قطاع الجنوب - الإدارة العامة للإسعاف
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --p900: #1E293B;
+    --p700: #1E293B;
+    --p500: #2563EB;
+    --p100: #EFF6FF;
+    --teal: #10B981;
+    --teal-light: #ECFDF5;
+    --coral: #EF4444;
+    --coral-light: #FEF2F2;
+    --gold: #F59E0B;
+    --gold-light: #FFFBEB;
+    --white: #FFFFFF;
+    --g50: #F8FAFC;
+    --g100: #F1F5F9;
+    --g200: #E2E8F0;
+    --g400: #94A3B8;
+    --g600: #64748B;
+    --g700: #64748B;
+    --g800: #1E293B;
+    --g900: #1E293B;
+    --shadow-sm: 0 1px 3px rgba(148, 163, 184, 0.08);
+    --shadow-md: 0 4px 12px rgba(148, 163, 184, 0.12);
+    --shadow-lg: 0 4px 12px rgba(148, 163, 184, 0.12);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+}
+
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    background: #F8FAFC;
+    color: var(--g800);
+    direction: rtl;
+    text-align: right;
+    min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
+}
+
+/* ========== الشريط العلوي ========== */
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #2563EB;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.topbar .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+}
+
+.topbar .brand i {
+    font-size: 26px;
+    color: rgba(255,255,255,0.85);
+}
+
+.topbar .brand h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+}
+
+.topbar .brand .sub {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+}
+.btn-back-main {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 18px; background: rgba(255,255,255,0.15);
+    color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px; font-size: 14px; font-weight: 500;
+    cursor: pointer; text-decoration: none; transition: all 0.2s;
+}
+.btn-back-main:hover { background: rgba(255,255,255,0.25); }
+
+.topbar .clock-area {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.topbar .clock-area .clock-time {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.9);
+}
+
+.topbar .clock-area .clock-date {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+}
+
+.btn-darkmode {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    transition: all 0.2s;
+}
+
+.btn-darkmode:hover {
+    background: rgba(255,255,255,0.22);
+}
+
+/* ========== المحتوى ========== */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* ========== إحصائيات سريعة ========== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.stat-card {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+    border: 1px solid #E2E8F0;
+    transition: all 0.2s;
+    border-right: 4px solid var(--teal);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-card:nth-child(2) { border-right-color: var(--p500); }
+.stat-card:nth-child(3) { border-right-color: var(--gold); }
+.stat-card:nth-child(4) { border-right-color: var(--coral); }
+
+.stat-card .stat-label {
+    font-size: 12px;
+    color: var(--g600);
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.stat-card .stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--p900);
+}
+
+.stat-card .stat-unit {
+    font-size: 12px;
+    color: var(--g400);
+    margin-top: 4px;
+}
+
+/* ========== أزرار التحكم ========== */
+.controls-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+}
+
+.btn-teal {
+    background: #2563EB;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08);
+}
+
+.btn-teal:hover {
+    background: #1D4ED8;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.btn-coral {
+    background: #EF4444;
+    color: #fff;
+}
+
+.btn-coral:hover {
+    background: #DC2626;
+}
+
+.btn-secondary {
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #E2E8F0;
+}
+
+.btn-secondary:hover {
+    background: #E2E8F0;
+}
+
+.btn-danger {
+    background: #EF4444;
+    color: #fff;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* ========== بطاقات المراكز ========== */
+.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--p900);
+    margin: 28px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-title i {
+    color: var(--teal);
+    font-size: 20px;
+}
+
+.centers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.center-card {
+    background: #FFFFFF;
+    border-radius: 24px;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+    border: 1px solid #E2E8F0;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.center-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.center-header {
+    background: #2563EB;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: none;
+}
+
+.center-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.center-header h3 i {
+    color: rgba(255,255,255,0.9);
+}
+
+.center-header .badge {
+    background: rgba(255, 255, 255, 0.95);
+    color: #1E293B;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.units-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+}
+
+.unit-box {
+    flex: 1;
+    min-width: 100px;
+    padding: 14px 10px;
+    text-align: center;
+    border-left: 1px solid var(--g200);
+    border-bottom: 1px solid var(--g200);
+}
+
+.unit-box:last-child {
+    border-left: none;
+}
+
+.unit-box .unit-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--g700);
+    margin-bottom: 6px;
+}
+
+.unit-counter {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--p900);
+    margin: 8px 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.unit-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.btn-add {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #2563EB;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08);
+}
+
+.btn-add:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.btn-undo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--g100);
+    color: var(--g600);
+    border: 1px solid var(--g200);
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-undo:hover {
+    background: var(--coral-light);
+    color: var(--coral);
+    border-color: var(--coral);
+}
+
+/* ========== Modal ========== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(30, 41, 59, 0.5);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.modal-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+.modal-box {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(148, 163, 184, 0.12);
+    transform: translateY(20px) scale(0.9);
+    transition: transform 0.3s;
+}
+
+.modal-overlay.active .modal-box {
+    transform: translateY(0) scale(1);
+    animation: modalOpen 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes modalOpen {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+    background: #2563EB;
+    padding: 20px 24px;
+    border-bottom: none;
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-header h2 i {
+    color: rgba(255,255,255,0.9);
+}
+
+.btn-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    color: #fff;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.1) rotate(90deg);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--g700);
+    margin-bottom: 6px;
+}
+
+.form-group label .req {
+    color: var(--coral);
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    background: #FFFFFF;
+    color: var(--g800);
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(148, 163, 184, 0.04);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #2563EB;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 70px;
+}
+
+select.form-control {
+    cursor: pointer;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* أنواع البلاغات */
+.type-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.type-chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid var(--g200);
+    background: var(--white);
+    color: var(--g700);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.type-chip:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+}
+
+.type-chip.active {
+    border-color: var(--teal);
+    background: var(--teal-light);
+    color: var(--teal);
+}
+
+/* ألوان خاصة لكل نوع بلاغ */
+.type-chip[data-type="حادث مروري"].active {
+    border-color: #EF4444;
+    background: #FEF2F2;
+    color: #DC2626;
+}
+.type-chip[data-type="حالة مرضية"].active {
+    border-color: #10B981;
+    background: #ECFDF5;
+    color: #059669;
+}
+.type-chip[data-type="حريق"].active {
+    border-color: #F59E0B;
+    background: #FFFBEB;
+    color: #D97706;
+}
+.type-chip[data-type="إصابة"].active {
+    border-color: #EF4444;
+    background: #FEF2F2;
+    color: #DC2626;
+}
+.type-chip[data-type="حالة ولادة"].active {
+    border-color: #2563EB;
+    background: #EFF6FF;
+    color: #1D4ED8;
+}
+.type-chip[data-type="سقوط"].active {
+    border-color: #2563EB;
+    background: #EFF6FF;
+    color: #1D4ED8;
+}
+.type-chip[data-type="اختناق"].active {
+    border-color: #F59E0B;
+    background: #FFFBEB;
+    color: #D97706;
+}
+.type-chip[data-type="آخر"].active {
+    border-color: var(--g400);
+    background: var(--g100);
+    color: var(--g700);
+}
+
+/* وقت الاستجابة */
+.response-display {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    margin-top: 4px;
+}
+
+.response-display.good {
+    background: var(--teal-light);
+    color: var(--teal);
+}
+.response-display.warning {
+    background: var(--gold-light);
+    color: #D97706;
+}
+.response-display.danger {
+    background: var(--coral-light);
+    color: var(--coral);
+}
+.response-display.empty {
+    background: var(--g100);
+    color: var(--g400);
+}
+
+/* ========== جدول السجل ========== */
+.table-section {
+    background: var(--white);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 32px;
+}
+
+.table-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--g200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.table-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--p900);
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--g100);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+}
+
+.filter-tab {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--g600);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-tab.active {
+    background: var(--white);
+    color: var(--p900);
+    box-shadow: var(--shadow-sm);
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+table.data-table th {
+    background: var(--g50);
+    color: var(--g700);
+    font-weight: 600;
+    padding: 12px 16px;
+    text-align: right;
+    border-bottom: 1px solid var(--g200);
+    white-space: nowrap;
+}
+
+table.data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--g100);
+    color: var(--g800);
+    vertical-align: middle;
+}
+
+table.data-table tr:hover td {
+    background: var(--g50);
+}
+
+.badge-type {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-type.accident { background: #FEF2F2; color: #DC2626; }
+.badge-type.medical { background: #ECFDF5; color: #059669; }
+.badge-type.fire { background: #FFFBEB; color: #D97706; }
+.badge-type.injury { background: #FEF2F2; color: #DC2626; }
+.badge-type.birth { background: #EFF6FF; color: #1D4ED8; }
+.badge-type.fall { background: #EFF6FF; color: #1D4ED8; }
+.badge-type.choking { background: #FFFBEB; color: #D97706; }
+.badge-type.other { background: var(--g100); color: var(--g700); }
+
+.response-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.response-badge.good { background: var(--teal-light); color: var(--teal); }
+.response-badge.warning { background: var(--gold-light); color: #D97706; }
+.response-badge.danger { background: var(--coral-light); color: var(--coral); }
+
+.btn-table-action {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    margin-right: 4px;
+}
+
+.btn-table-action.delete {
+    background: var(--coral-light);
+    color: var(--coral);
+}
+
+.btn-table-action.delete:hover {
+    background: var(--coral);
+    color: #fff;
+}
+
+/* رابط الفرقة في الجدول */
+.unit-link {
+    color: var(--p700);
+    cursor: pointer;
+    border-bottom: 1px dashed var(--p500);
+    transition: all 0.2s;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.unit-link:hover {
+    background: var(--p100);
+    color: var(--p900);
+    border-bottom-style: solid;
+}
+
+/* Modal تفاصيل الفرقة */
+.unit-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(30, 41, 59, 0.5);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.unit-modal-overlay.active { display: flex; }
+.unit-modal-box {
+    background: #fff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 700px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(148, 163, 184, 0.12);
+    border: 1px solid #E2E8F0;
+}
+.unit-modal-header {
+    background: #2563EB;
+    color: #fff;
+    padding: 18px 24px;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.unit-modal-header h3 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.unit-modal-header h3 i { color: rgba(255,255,255,0.85); }
+.unit-modal-close {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.unit-modal-close:hover { background: rgba(255,255,255,0.3); transform: rotate(90deg); }
+.unit-modal-body { padding: 20px 24px; }
+.unit-modal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.unit-stat-card {
+    background: var(--g50);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    border: 1px solid var(--g200);
+}
+.unit-stat-card .value { font-size: 22px; font-weight: 800; color: var(--p700); }
+.unit-stat-card .label { font-size: 11px; color: var(--g600); margin-top: 4px; }
+.unit-detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.unit-detail-table thead th {
+    background: var(--g100);
+    padding: 10px;
+    text-align: center;
+    border-bottom: 2px solid var(--g200);
+    font-weight: 600;
+    color: var(--g700);
+    position: sticky;
+    top: 0;
+}
+.unit-detail-table tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--g100);
+    text-align: center;
+}
+.unit-detail-table tbody tr:hover { background: var(--g50); }
+.unit-detail-table .type-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.unit-detail-table .resp-good { color: #10B981; font-weight: 700; }
+.unit-detail-table .resp-warn { color: #F59E0B; font-weight: 700; }
+.unit-detail-table .resp-bad { color: #EF4444; font-weight: 700; }
+
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--g400);
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+/* ========== Toast ========== */
+.toast-container {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+}
+
+.toast {
+    padding: 14px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    animation: slideInLeft 0.3s ease, fadeOut 0.3s ease 2.7s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 260px;
+}
+
+.toast.success { background: #10B981; }
+.toast.error { background: #EF4444; }
+.toast.info { background: #2563EB; }
+
+@keyframes slideInLeft {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* ========== Footer ========== */
+.footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    color: var(--g400);
+    border-top: 1px solid var(--g200);
+    margin-top: 40px;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+    .topbar {
+        padding: 10px 16px;
+    }
+    .topbar .brand h1 {
+        font-size: 15px;
+    }
+    .container {
+        padding: 16px;
+    }
+    .centers-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .modal-box {
+        max-width: 100%;
+        max-height: 95vh;
+    }
+    .clock-area {
+        flex-direction: column;
+        gap: 4px !important;
+        align-items: flex-start !important;
+    }
+    .topbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .units-row {
+        flex-direction: column;
+    }
+    .unit-box {
+        border-left: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        text-align: right;
+        padding: 10px 14px;
+    }
+    .unit-actions {
+        margin-top: 0;
+    }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--g50);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--g200);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--g400);
+}
+</style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+
+<!-- ========== الشريط العلوي ========== -->
+<div class="topbar">
+    <a href="javascript:void(0);" onclick="window.location.href='index.html'" class="btn-back-main"><i class="fas fa-arrow-right"></i> الرجوع للرئيسية</a>
+    <div class="brand">
+        <img src="logo.png" alt="South Sector Emergency Operations Platform" style="width:36px;height:36px;border-radius:8px;object-fit:contain;margin-left:10px;">
+        <div>
+            <h1>معلومات بلاغات الفرق المدخلة</h1>
+            <div class="sub">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</div>
+        </div>
+    </div>
+    <div class="clock-area">
+        <div>
+            <div class="clock-time" id="liveClock">--:--:--</div>
+            <div class="clock-date" id="liveDate">---</div>
+        </div>
+        
+    </div>
+</div>
+
+<!-- ========== المحتوى ========== -->
+<div class="container">
+
+    <!-- إحصائيات سريعة -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-calendar-day"></i> بلاغات اليوم</div>
+            <div class="stat-value" id="statToday">0</div>
+            <div class="stat-unit">بلاغ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-calendar-alt"></i> بلاغات الشهر</div>
+            <div class="stat-value" id="statMonth">0</div>
+            <div class="stat-unit">بلاغ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-trophy"></i> أكثر فرقة</div>
+            <div class="stat-value" id="statTopUnit" style="font-size:18px;">-</div>
+            <div class="stat-unit" id="statTopUnitCount"></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fas fa-stopwatch"></i> متوسط الاستجابة</div>
+            <div class="stat-value" id="statAvgResponse">0</div>
+            <div class="stat-unit">دقيقة</div>
+        </div>
+    </div>
+
+    <!-- أزرار التحكم -->
+    <div class="controls-bar">
+        <button class="btn btn-teal" onclick="openAdvancedModal()">
+            <i class="fas fa-plus-circle"></i> إدخال متقدم
+        </button>
+        <button class="btn btn-secondary" onclick="exportCSV()">
+            <i class="fas fa-file-csv"></i> تصدير CSV
+        </button>
+        <button class="btn btn-danger" onclick="clearAllData()">
+            <i class="fas fa-trash-alt"></i> مسح الكل
+        </button>
+    </div>
+
+    <!-- واجهة الإدخال السريع -->
+    <div class="section-title">
+        <i class="fas fa-hospital"></i>
+        توزيع البلاغات - مراكز قطاع الجنوب
+    </div>
+
+    <div class="centers-grid" id="centersGrid">
+        <!-- يملأ بالـ JavaScript -->
+    </div>
+
+    <!-- جدول السجل -->
+    <div class="section-title">
+        <i class="fas fa-history"></i>
+        سجل البلاغات المدخلة
+    </div>
+
+    <div class="table-section">
+        <div class="table-header">
+            <h3><i class="fas fa-list"></i> البلاغات</h3>
+            <div class="filter-tabs">
+                <button class="filter-tab active" onclick="setFilter('today')">اليوم</button>
+                <button class="filter-tab" onclick="setFilter('week')">الأسبوع</button>
+                <button class="filter-tab" onclick="setFilter('month')">الشهر</button>
+                <button class="filter-tab" onclick="setFilter('all')">الكل</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table" id="recordsTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>النوع</th>
+                        <th>الفرقة</th>
+                        <th>المركز</th>
+                        <th>وقت التحرك</th>
+                        <th>وقت المباشرة</th>
+                        <th>الاستجابة</th>
+                        <th>الموقع</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="recordsTableBody">
+                    <!-- يملأ بالـ JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+    <i class="fas fa-heartbeat"></i> الإدارة العامة للإسعاف - قطاع الجنوب
+</div>
+
+<!-- ========== Modal سريع ========== -->
+<div class="modal-overlay" id="quickModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2><i class="fas fa-plus-circle"></i> إضافة بلاغ سريع</h2>
+            <button class="btn-close" onclick="closeQuickModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="quickForm" onsubmit="saveQuickReport(event)">
+                <div class="form-group">
+                    <label>نوع البلاغ <span class="req">*</span></label>
+                    <div class="type-selector" id="quickTypeSelector">
+                        <!-- يملأ بالـ JS -->
+                    </div>
+                    <input type="hidden" id="quickType" value="">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>المركز</label>
+                        <input type="text" class="form-control" id="quickCenter" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>الفرقة</label>
+                        <input type="text" class="form-control" id="quickUnit" readonly>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>وقت التحرك <span class="req">*</span></label>
+                        <input type="time" class="form-control" id="quickDispatch" required>
+                    </div>
+                    <div class="form-group">
+                        <label>وقت المباشرة <span class="req">*</span></label>
+                        <input type="time" class="form-control" id="quickArrival" required onchange="calcQuickResponse()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>وقت الاستجابة</label>
+                    <div class="response-display empty" id="quickResponseDisplay">--</div>
+                    <input type="hidden" id="quickResponseText" value="">
+                    <input type="hidden" id="quickResponseSeconds" value="0">
+                </div>
+
+                <div class="form-group">
+                    <label>الموقع</label>
+                    <input type="text" class="form-control" id="quickLocation" placeholder="اكتب موقع البلاغ...">
+                </div>
+
+                <div class="form-group">
+                    <label>ملاحظات</label>
+                    <textarea class="form-control" id="quickNotes" placeholder="ملاحظات إضافية (اختياري)..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-teal" style="width:100%; justify-content:center; padding:14px;">
+                    <i class="fas fa-save"></i> حفظ البلاغ
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========== Modal متقدم ========== -->
+<div class="modal-overlay" id="advancedModal">
+    <div class="modal-box" style="max-width:640px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-edit"></i> إدخال بلاغ متقدم</h2>
+            <button class="btn-close" onclick="closeAdvancedModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="advancedForm" onsubmit="saveAdvancedReport(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>رقم البلاغ</label>
+                        <input type="text" class="form-control" id="advReportNumber" placeholder="رقم البلاغ">
+                    </div>
+                    <div class="form-group">
+                        <label>الأولوية</label>
+                        <select class="form-control" id="advPriority">
+                            <option value="عادي">عادي</option>
+                            <option value="مهم">مهم</option>
+                            <option value="عاجل">عاجل</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>نوع البلاغ <span class="req">*</span></label>
+                    <div class="type-selector" id="advTypeSelector">
+                        <!-- يملأ بالـ JS -->
+                    </div>
+                    <input type="hidden" id="advType" value="">
+                </div>
+
+                <div class="form-group">
+                    <label>الموقع</label>
+                    <input type="text" class="form-control" id="advLocation" placeholder="موقع البلاغ...">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>المركز <span class="req">*</span></label>
+                        <select class="form-control" id="advCenter" onchange="updateAdvUnits()" required>
+                            <option value="">اختر المركز</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الفرقة <span class="req">*</span></label>
+                        <select class="form-control" id="advUnit" required>
+                            <option value="">اختر الفرقة</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>وقت التحرك <span class="req">*</span></label>
+                        <input type="time" class="form-control" id="advDispatch" required>
+                    </div>
+                    <div class="form-group">
+                        <label>وقت المباشرة <span class="req">*</span></label>
+                        <input type="time" class="form-control" id="advArrival" required onchange="calcAdvResponse()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>وقت الاستجابة (محسوب تلقائياً)</label>
+                    <div class="response-display empty" id="advResponseDisplay">--</div>
+                    <input type="hidden" id="advResponseText" value="">
+                    <input type="hidden" id="advResponseSeconds" value="0">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>الموزع</label>
+                        <input type="text" class="form-control" id="advDispatcher" placeholder="اسم الموزع">
+                    </div>
+                    <div class="form-group">
+                        <label>التاريخ</label>
+                        <input type="date" class="form-control" id="advDate">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>ملاحظات</label>
+                    <textarea class="form-control" id="advNotes" placeholder="ملاحظات..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-teal" style="width:100%; justify-content:center; padding:14px;">
+                    <i class="fas fa-save"></i> حفظ البلاغ
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============================================
+     JavaScript
+     ============================================ -->
+<script>
+// ========== البيانات ==========
+var centersData = {
+    "المنصورة":   ["جنوب 1", "سريع 3"],
+    "الخالدية":   ["جنوب 2"],
+    "منفوحة":     ["جنوب 3"],
+    "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 2"],
+    "الإسكان":    ["جنوب 6"],
+    "الحائر":     ["جنوب 7"],
+    "الشفاء":     ["جنوب 8", "سريع 1"],
+    "عكاظ":       ["جنوب 9"],
+    "ديراب":      ["جنوب 10"],
+    "الفرق الإضافية": ["جنوب 11", "جنوب 12", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+};
+
+var reportTypes = ["حادث مروري", "حالة مرضية", "حريق", "إصابة", "حالة ولادة", "سقوط", "اختناق", "آخر"];
+
+var STORAGE_KEY = "reportEntryRecords";
+var currentFilter = "today";
+var tempUnitCounters = {}; // عداد مؤقت لكل فرقة قبل الحفظ
+
+// أنواع البلاغات مع الألوان
+var typeBadgeMap = {
+    "حادث مروري": "accident",
+    "حالة مرضية": "medical",
+    "حريق": "fire",
+    "إصابة": "injury",
+    "حالة ولادة": "birth",
+    "سقوط": "fall",
+    "اختناق": "choking",
+    "آخر": "other"
+};
+
+// ========== عند التحميل ==========
+document.addEventListener("DOMContentLoaded", function() {
+    initData();
+    renderCenters();
+    renderTypeSelectors();
+    renderTable();
+    updateStats();
+    startClock();
+    initDarkMode();
+    populateAdvCenters();
+});
+
+// ========== تهيئة البيانات ==========
+function initData() {
+    var existing = localStorage.getItem(STORAGE_KEY);
+    var records = existing ? JSON.parse(existing) : [];
+    if (!records || records.length === 0) {
+        var today = getTodayDate();
+        var demoRecords = [
+            { id: 1719654600000, reportNumber: "B-001", type: "حادث مروري", center: "المنصورة", unit: "جنوب 1", dispatchTime: "14:30", arrivalTime: "14:38", responseTime: "8 د", responseSeconds: 480, date: today, location: "شارع عثمان بن عفان", priority: "عاجل", dispatcher: "", notes: "" },
+            { id: 1719657000000, reportNumber: "B-002", type: "حالة مرضية", center: "الشفاء", unit: "جنوب 8", dispatchTime: "15:10", arrivalTime: "15:16", responseTime: "6 د", responseSeconds: 360, date: today, location: "طريق خريص", priority: "مهم", dispatcher: "", notes: "" },
+            { id: 1719660000000, reportNumber: "B-003", type: "حريق", center: "الخالدية", unit: "جنوب 2", dispatchTime: "16:00", arrivalTime: "16:22", responseTime: "22 د", responseSeconds: 1320, date: today, location: "شارع الأمير محمد", priority: "عاجل", dispatcher: "", notes: "" },
+            { id: 1719634500000, reportNumber: "B-004", type: "إصابة", center: "الحائر", unit: "جنوب 7", dispatchTime: "10:15", arrivalTime: "10:21", responseTime: "6 د", responseSeconds: 360, date: today, location: "طريق المدينة المنورة", priority: "عادي", dispatcher: "", notes: "" },
+            { id: 1719627000000, reportNumber: "B-005", type: "حالة ولادة", center: "الدار البيضاء", unit: "جنوب 4", dispatchTime: "08:30", arrivalTime: "08:41", responseTime: "11 د", responseSeconds: 660, date: today, location: "سوق الدار البيضاء", priority: "عاجل", dispatcher: "", notes: "" }
+        ];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(demoRecords));
+    }
+    // تهيئة العدادات المؤقتة
+    resetTempCounters();
+}
+
+function resetTempCounters() {
+    tempUnitCounters = {};
+    var records = getRecords();
+    for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (!tempUnitCounters[r.unit]) {
+            tempUnitCounters[r.unit] = 0;
+        }
+        tempUnitCounters[r.unit]++;
+    }
+}
+
+function getRecords() {
+    var data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveRecords(records) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function getTodayDate() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+}
+
+// ========== الساعة الحية ==========
+function startClock() {
+    function tick() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, "0");
+        var m = String(now.getMinutes()).padStart(2, "0");
+        var s = String(now.getSeconds()).padStart(2, "0");
+        document.getElementById("liveClock").textContent = h + ":" + m + ":" + s;
+
+        var days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+        var months = ["يناير", "فبراير", "مارس", "إبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        var dayName = days[now.getDay()];
+        var monthName = months[now.getMonth()];
+        var dateStr = dayName + "، " + now.getDate() + " " + monthName + " " + now.getFullYear() + " م";
+
+        // محاولة الحصول على التاريخ الهجري
+        try {
+            var hijri = new Intl.DateTimeFormat("ar-SA-u-ca-islamic", {
+                day: "numeric", month: "long", year: "numeric"
+            }).format(now);
+            dateStr += " - " + hijri;
+        } catch(e) {
+            // إذا لم يكن مدعوماً
+        }
+
+        document.getElementById("liveDate").textContent = dateStr;
+    }
+    tick();
+    setInterval(tick, 1000);
+}
+
+// ========== الوضع الليلي ==========
+function initDarkMode() {
+    var saved = localStorage.getItem("reportEntryDarkMode");
+    if (saved === "true") {
+        document.documentElement.setAttribute("data-theme", "dark");
+        updateDarkModeBtn(true);
+    }
+}
+
+function toggleDarkMode() {
+    var saved = localStorage.getItem("reportEntryDarkMode");
+    if (saved === "true") {
+        document.documentElement.removeAttribute("data-theme");
+        localStorage.setItem("reportEntryDarkMode", "false");
+        updateDarkModeBtn(false);
+    } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+        localStorage.setItem("reportEntryDarkMode", "true");
+        updateDarkModeBtn(true);
+    }
+}
+
+function updateDarkModeBtn(isDark) {
+    var btn = document.getElementById("darkModeBtn");
+    if (!btn) return;
+    if (isDark) {
+        btn.innerHTML = '<i class="fas fa-sun"></i> <span id="darkModeText">الوضع النهاري</span>';
+    } else {
+        btn.innerHTML = '<i class="fas fa-moon"></i> <span id="darkModeText">الوضع الليلي</span>';
+    }
+}
+
+// ========== عرض المراكز ==========
+function renderCenters() {
+    var container = document.getElementById("centersGrid");
+    var html = "";
+    var centerNames = Object.keys(centersData);
+
+    for (var i = 0; i < centerNames.length; i++) {
+        var centerName = centerNames[i];
+        var units = centersData[centerName];
+        var unitsCount = units.length;
+
+        html += '<div class="center-card">';
+        html += '<div class="center-header">';
+        html += '<h3><i class="fas fa-hospital-alt"></i> ' + centerName + '</h3>';
+        html += '<span class="badge">' + unitsCount + ' فرق' + (unitsCount > 1 && unitsCount < 11 ? 'ة' : '') + '</span>';
+        html += '</div>';
+        html += '<div class="units-row">';
+
+        for (var j = 0; j < units.length; j++) {
+            var unitName = units[j];
+            var count = tempUnitCounters[unitName] || 0;
+            html += '<div class="unit-box">';
+            html += '<div class="unit-name">' + unitName + '</div>';
+            html += '<div class="unit-counter" id="counter_' + unitName.replace(/\s/g, "_") + '">' + count + '</div>';
+            html += '<div class="unit-actions">';
+            html += '<button class="btn-add" onclick="openQuickModal(\'' + centerName + '\', \'' + unitName + '\')" title="إضافة بلاغ">';
+            html += '<i class="fas fa-plus"></i></button>';
+            html += '<button class="btn-undo" onclick="undoLastReport(\'' + unitName + '\')" title="تراجع">';
+            html += '<i class="fas fa-undo"></i></button>';
+            html += '</div></div>';
+        }
+
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+}
+
+// ========== عرض محددات نوع البلاغ ==========
+function renderTypeSelectors() {
+    var quickContainer = document.getElementById("quickTypeSelector");
+    var advContainer = document.getElementById("advTypeSelector");
+
+    var html = "";
+    for (var i = 0; i < reportTypes.length; i++) {
+        var t = reportTypes[i];
+        html += '<button type="button" class="type-chip" data-type="' + t + '" onclick="selectType(this, \'' + t + '\')">' + t + '</button>';
+    }
+
+    quickContainer.innerHTML = html;
+    advContainer.innerHTML = html;
+}
+
+// ========== اختيار نوع البلاغ ==========
+function selectType(btn, type) {
+    var container = btn.parentElement;
+    var chips = container.querySelectorAll(".type-chip");
+    for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.remove("active");
+    }
+    btn.classList.add("active");
+
+    var input = container.nextElementSibling;
+    if (input && input.tagName === "INPUT") {
+        input.value = type;
+    }
+}
+
+// ========== Modal سريع ==========
+var currentQuickCenter = "";
+var currentQuickUnit = "";
+
+function openQuickModal(center, unit) {
+    currentQuickCenter = center;
+    currentQuickUnit = unit;
+
+    document.getElementById("quickCenter").value = center;
+    document.getElementById("quickUnit").value = unit;
+    document.getElementById("quickLocation").value = "";
+    document.getElementById("quickNotes").value = "";
+    document.getElementById("quickType").value = "";
+    document.getElementById("quickResponseDisplay").className = "response-display empty";
+    document.getElementById("quickResponseDisplay").textContent = "--";
+    document.getElementById("quickResponseText").value = "";
+    document.getElementById("quickResponseSeconds").value = "0";
+
+    // إعادة تعيين نوع البلاغ
+    var chips = document.querySelectorAll("#quickTypeSelector .type-chip");
+    for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.remove("active");
+    }
+
+    // ملء الوقت الحالي
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2, "0");
+    var m = String(now.getMinutes()).padStart(2, "0");
+    var timeStr = h + ":" + m;
+    document.getElementById("quickDispatch").value = timeStr;
+    document.getElementById("quickArrival").value = "";
+
+    document.getElementById("quickModal").classList.add("active");
+}
+
+function closeQuickModal() {
+    document.getElementById("quickModal").classList.remove("active");
+}
+
+// ========== Modal متقدم ==========
+function openAdvancedModal() {
+    document.getElementById("advancedForm").reset();
+    document.getElementById("advResponseDisplay").className = "response-display empty";
+    document.getElementById("advResponseDisplay").textContent = "--";
+    document.getElementById("advResponseText").value = "";
+    document.getElementById("advResponseSeconds").value = "0";
+    document.getElementById("advType").value = "";
+
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2, "0");
+    var m = String(now.getMinutes()).padStart(2, "0");
+    var timeStr = h + ":" + m;
+    document.getElementById("advDispatch").value = timeStr;
+    document.getElementById("advDate").value = getTodayDate();
+
+    var chips = document.querySelectorAll("#advTypeSelector .type-chip");
+    for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.remove("active");
+    }
+
+    document.getElementById("advancedModal").classList.add("active");
+}
+
+function closeAdvancedModal() {
+    document.getElementById("advancedModal").classList.remove("active");
+}
+
+function populateAdvCenters() {
+    var select = document.getElementById("advCenter");
+    var centerNames = Object.keys(centersData);
+    for (var i = 0; i < centerNames.length; i++) {
+        var opt = document.createElement("option");
+        opt.value = centerNames[i];
+        opt.textContent = centerNames[i];
+        select.appendChild(opt);
+    }
+}
+
+function updateAdvUnits() {
+    var center = document.getElementById("advCenter").value;
+    var unitSelect = document.getElementById("advUnit");
+    unitSelect.innerHTML = '<option value="">اختر الفرقة</option>';
+
+    if (center && centersData[center]) {
+        var units = centersData[center];
+        for (var i = 0; i < units.length; i++) {
+            var opt = document.createElement("option");
+            opt.value = units[i];
+            opt.textContent = units[i];
+            unitSelect.appendChild(opt);
+        }
+    }
+}
+
+// ========== حساب وقت الاستجابة ==========
+function calcQuickResponse() {
+    calcResponse(
+        document.getElementById("quickDispatch").value,
+        document.getElementById("quickArrival").value,
+        "quickResponseDisplay",
+        "quickResponseText",
+        "quickResponseSeconds"
+    );
+}
+
+function calcAdvResponse() {
+    calcResponse(
+        document.getElementById("advDispatch").value,
+        document.getElementById("advArrival").value,
+        "advResponseDisplay",
+        "advResponseText",
+        "advResponseSeconds"
+    );
+}
+
+function calcResponse(dispatchVal, arrivalVal, displayId, textId, secondsId) {
+    var display = document.getElementById(displayId);
+    var textInput = document.getElementById(textId);
+    var secondsInput = document.getElementById(secondsId);
+
+    if (!dispatchVal || !arrivalVal) {
+        display.className = "response-display empty";
+        display.textContent = "--";
+        textInput.value = "";
+        secondsInput.value = "0";
+        return;
+    }
+
+    var dParts = dispatchVal.split(":");
+    var aParts = arrivalVal.split(":");
+    var dMinutes = parseInt(dParts[0]) * 60 + parseInt(dParts[1]);
+    var aMinutes = parseInt(aParts[0]) * 60 + parseInt(aParts[1]);
+
+    if (aMinutes < dMinutes) {
+        aMinutes += 24 * 60; // عبر منتصف الليل
+    }
+
+    var diffSeconds = (aMinutes - dMinutes) * 60;
+    var diffMinutes = Math.floor(diffSeconds / 60);
+    var remainingSeconds = diffSeconds % 60;
+
+    var text = diffMinutes + " د " + (remainingSeconds > 0 ? remainingSeconds + " ث" : "");
+    display.textContent = text;
+    textInput.value = text;
+    secondsInput.value = diffSeconds;
+
+    // تلوين حسب الأداء
+    if (diffMinutes < 8) {
+        display.className = "response-display good";
+    } else if (diffMinutes <= 15) {
+        display.className = "response-display warning";
+    } else {
+        display.className = "response-display danger";
+    }
+}
+
+// ========== حفظ البلاغ السريع ==========
+function saveQuickReport(event) {
+    event.preventDefault();
+
+    var type = document.getElementById("quickType").value;
+    if (!type) {
+        showToast("يرجى اختيار نوع البلاغ", "error");
+        return;
+    }
+
+    var dispatchTime = document.getElementById("quickDispatch").value;
+    var arrivalTime = document.getElementById("quickArrival").value;
+
+    if (!dispatchTime || !arrivalTime) {
+        showToast("يرجى ملء أوقات التحرك والمباشرة", "error");
+        return;
+    }
+
+    var responseText = document.getElementById("quickResponseText").value || "";
+    var responseSeconds = parseInt(document.getElementById("quickResponseSeconds").value) || 0;
+
+    var record = {
+        id: Date.now(),
+        reportNumber: "",
+        type: type,
+        location: document.getElementById("quickLocation").value || "",
+        priority: "عادي",
+        center: currentQuickCenter,
+        unit: currentQuickUnit,
+        dispatchTime: dispatchTime,
+        arrivalTime: arrivalTime,
+        responseTime: responseText,
+        responseSeconds: responseSeconds,
+        dispatcher: "",
+        notes: document.getElementById("quickNotes").value || "",
+        date: getTodayDate(),
+        timestamp: Date.now()
+    };
+
+    var records = getRecords();
+    records.unshift(record);
+    saveRecords(records);
+
+    // تحديث العداد المؤقت
+    if (!tempUnitCounters[currentQuickUnit]) {
+        tempUnitCounters[currentQuickUnit] = 0;
+    }
+    tempUnitCounters[currentQuickUnit]++;
+
+    // تحديث واجهة المستخدم
+    renderCenters();
+    renderTable();
+    updateStats();
+    closeQuickModal();
+    showToast("تم حفظ البلاغ بنجاح!", "success");
+}
+
+// ========== حفظ البلاغ المتقدم ==========
+function saveAdvancedReport(event) {
+    event.preventDefault();
+
+    var type = document.getElementById("advType").value;
+    if (!type) {
+        showToast("يرجى اختيار نوع البلاغ", "error");
+        return;
+    }
+
+    var dispatchTime = document.getElementById("advDispatch").value;
+    var arrivalTime = document.getElementById("advArrival").value;
+
+    if (!dispatchTime || !arrivalTime) {
+        showToast("يرجى ملء أوقات التحرك والمباشرة", "error");
+        return;
+    }
+
+    var responseText = document.getElementById("advResponseText").value || "";
+    var responseSeconds = parseInt(document.getElementById("advResponseSeconds").value) || 0;
+    var center = document.getElementById("advCenter").value;
+    var unit = document.getElementById("advUnit").value;
+
+    var record = {
+        id: Date.now(),
+        reportNumber: document.getElementById("advReportNumber").value || "",
+        type: type,
+        location: document.getElementById("advLocation").value || "",
+        priority: document.getElementById("advPriority").value || "عادي",
+        center: center,
+        unit: unit,
+        dispatchTime: dispatchTime,
+        arrivalTime: arrivalTime,
+        responseTime: responseText,
+        responseSeconds: responseSeconds,
+        dispatcher: document.getElementById("advDispatcher").value || "",
+        notes: document.getElementById("advNotes").value || "",
+        date: document.getElementById("advDate").value || getTodayDate(),
+        timestamp: Date.now()
+    };
+
+    var records = getRecords();
+    records.unshift(record);
+    saveRecords(records);
+
+    if (unit) {
+        if (!tempUnitCounters[unit]) {
+            tempUnitCounters[unit] = 0;
+        }
+        tempUnitCounters[unit]++;
+    }
+
+    renderCenters();
+    renderTable();
+    updateStats();
+    closeAdvancedModal();
+    showToast("تم حفظ البلاغ بنجاح!", "success");
+}
+
+// ========== تراجع ==========
+function undoLastReport(unitName) {
+    var records = getRecords();
+    var found = false;
+
+    for (var i = 0; i < records.length; i++) {
+        if (records[i].unit === unitName) {
+            records.splice(i, 1);
+            found = true;
+            break;
+        }
+    }
+
+    if (found) {
+        saveRecords(records);
+        resetTempCounters();
+        renderCenters();
+        renderTable();
+        updateStats();
+        showToast("تم التراجع عن آخر بلاغ", "info");
+    } else {
+        showToast("لا توجد بلاغات لهذه الفرقة", "error");
+    }
+}
+
+// ========== عرض الجدول ==========
+function renderTable() {
+    var tbody = document.getElementById("recordsTableBody");
+    var records = getFilteredRecords();
+
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-inbox"></i> لا توجد بلاغات</div></td></tr>';
+        return;
+    }
+
+    var html = "";
+    for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        var badgeClass = typeBadgeMap[r.type] || "other";
+        var respClass = "danger";
+        if (r.responseSeconds < 480) {
+            respClass = "good";
+        } else if (r.responseSeconds <= 900) {
+            respClass = "warning";
+        }
+
+        html += '<tr>';
+        html += '<td>' + (records.length - i) + '</td>';
+        html += '<td><span class="badge-type ' + badgeClass + '">' + (r.type || "-") + '</span></td>';
+        html += '<td><strong class="unit-link" onclick="showUnitDetails(\'' + (r.unit || "-") + '\')">' + (r.unit || "-") + '</strong></td>';
+        html += '<td>' + (r.center || "-") + '</td>';
+        html += '<td>' + (r.dispatchTime || "-") + '</td>';
+        html += '<td>' + (r.arrivalTime || "-") + '</td>';
+        html += '<td><span class="response-badge ' + respClass + '">' + (r.responseTime || "-") + '</span></td>';
+        html += '<td>' + (r.location || "-") + '</td>';
+        html += '<td>';
+        html += '<button class="btn-table-action delete" onclick="deleteReport(' + r.id + ')" title="حذف">';
+        html += '<i class="fas fa-trash"></i></button>';
+        html += '</td>';
+        html += '</tr>';
+    }
+
+    tbody.innerHTML = html;
+}
+
+// ========== فلترة السجلات ==========
+function getFilteredRecords() {
+    var records = getRecords();
+    var today = getTodayDate();
+    var now = new Date();
+
+    if (currentFilter === "all") {
+        return records;
+    }
+
+    var filtered = [];
+    for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (currentFilter === "today") {
+            if (r.date === today) {
+                filtered.push(r);
+            }
+        } else if (currentFilter === "week") {
+            var rDate = new Date(r.date + "T00:00:00");
+            var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (rDate >= weekAgo) {
+                filtered.push(r);
+            }
+        } else if (currentFilter === "month") {
+            var parts = r.date.split("-");
+            if (parseInt(parts[0]) === now.getFullYear() && parseInt(parts[1]) === (now.getMonth() + 1)) {
+                filtered.push(r);
+            }
+        }
+    }
+    return filtered;
+}
+
+function setFilter(filter) {
+    currentFilter = filter;
+    var tabs = document.querySelectorAll(".filter-tab");
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove("active");
+    }
+    event.target.classList.add("active");
+    renderTable();
+}
+
+// ========== حذف بلاغ ==========
+function deleteReport(id) {
+    if (!confirm("هل أنت متأكد من حذف هذا البلاغ؟")) {
+        return;
+    }
+    var records = getRecords();
+    var newRecords = [];
+    for (var i = 0; i < records.length; i++) {
+        if (records[i].id !== id) {
+            newRecords.push(records[i]);
+        }
+    }
+    saveRecords(newRecords);
+    resetTempCounters();
+    renderCenters();
+    renderTable();
+    updateStats();
+    showToast("تم حذف البلاغ", "info");
+}
+
+// ========== الإحصائيات ==========
+function updateStats() {
+    var records = getRecords();
+    var today = getTodayDate();
+
+    // بلاغات اليوم
+    var todayCount = 0;
+    var monthCount = 0;
+    var now = new Date();
+
+    // حساب أكثر فرقة ومتوسط الاستجابة لليوم
+    var unitCounts = {};
+    var totalResponseToday = 0;
+    var todayResponseCount = 0;
+
+    for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (r.date === today) {
+            todayCount++;
+            if (r.responseSeconds > 0) {
+                totalResponseToday += r.responseSeconds;
+                todayResponseCount++;
+            }
+        }
+        var parts = r.date.split("-");
+        if (parseInt(parts[0]) === now.getFullYear() && parseInt(parts[1]) === (now.getMonth() + 1)) {
+            monthCount++;
+        }
+        if (r.unit) {
+            if (!unitCounts[r.unit]) {
+                unitCounts[r.unit] = 0;
+            }
+            unitCounts[r.unit]++;
+        }
+    }
+
+    document.getElementById("statToday").textContent = todayCount;
+    document.getElementById("statMonth").textContent = monthCount;
+
+    // أكثر فرقة
+    var topUnit = "-";
+    var topCount = 0;
+    var unitNames = Object.keys(unitCounts);
+    for (var j = 0; j < unitNames.length; j++) {
+        if (unitCounts[unitNames[j]] > topCount) {
+            topCount = unitCounts[unitNames[j]];
+            topUnit = unitNames[j];
+        }
+    }
+    document.getElementById("statTopUnit").textContent = topUnit;
+    document.getElementById("statTopUnitCount").textContent = topCount > 0 ? topCount + " بلاغ" : "";
+
+    // متوسط الاستجابة
+    var avgMin = 0;
+    if (todayResponseCount > 0) {
+        avgMin = Math.round((totalResponseToday / todayResponseCount) / 60);
+    }
+    document.getElementById("statAvgResponse").textContent = avgMin;
+}
+
+// ========== تصدير CSV ==========
+function exportCSV() {
+    var records = getFilteredRecords();
+    if (records.length === 0) {
+        showToast("لا توجد بيانات للتصدير", "error");
+        return;
+    }
+
+    var headers = ["#", "رقم البلاغ", "النوع", "الموقع", "الأولوية", "المركز", "الفرقة", "وقت التحرك", "وقت المباشرة", "وقت الاستجابة", "الموزع", "التاريخ", "ملاحظات"];
+    var csv = "\uFEFF"; // BOM for Arabic
+    csv += headers.join(",") + "\n";
+
+    for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        var row = [
+            i + 1,
+            r.reportNumber || "",
+            r.type || "",
+            r.location || "",
+            r.priority || "",
+            r.center || "",
+            r.unit || "",
+            r.dispatchTime || "",
+            r.arrivalTime || "",
+            r.responseTime || "",
+            r.dispatcher || "",
+            r.date || "",
+            (r.notes || "").replace(/,/g, " ")
+        ];
+        csv += row.join(",") + "\n";
+    }
+
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "بلاغات_الفرق_" + getTodayDate() + ".csv";
+    link.click();
+    showToast("تم تصدير البيانات بنجاح", "success");
+}
+
+// ========== مسح الكل ==========
+function clearAllData() {
+    if (!confirm("هل أنت متأكد من مسح جميع البيانات؟ لا يمكن التراجع!")) {
+        return;
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    resetTempCounters();
+    renderCenters();
+    renderTable();
+    updateStats();
+    showToast("تم مسح جميع البيانات", "error");
+}
+
+// ========== Toast Notifications ==========
+function showToast(message, type) {
+    var container = document.getElementById("toastContainer");
+    var toast = document.createElement("div");
+    toast.className = "toast " + (type || "info");
+
+    var icon = "info-circle";
+    if (type === "success") icon = "check-circle";
+    if (type === "error") icon = "exclamation-circle";
+
+    toast.innerHTML = '<i class="fas fa-' + icon + '"></i> ' + message;
+    container.appendChild(toast);
+
+    setTimeout(function() {
+        if (toast.parentElement) {
+            toast.parentElement.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// ========== إغلاق Modal عند الضغط على الخلفية ==========
+document.addEventListener("click", function(e) {
+    if (e.target.classList.contains("modal-overlay")) {
+        e.target.classList.remove("active");
+    }
+});
+
+// ========== دعم مفتاح Escape ==========
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+        document.getElementById("quickModal").classList.remove("active");
+        document.getElementById("advancedModal").classList.remove("active");
+        document.getElementById("unitDetailModal").classList.remove("active");
+    }
+});
+
+// ========== عرض تفاصيل الفرقة ==========
+function showUnitDetails(unitName) {
+    var records = getRecords();
+    var unitRecords = [];
+    for (var i = 0; i < records.length; i++) {
+        if (records[i].unit === unitName) {
+            unitRecords.push(records[i]);
+        }
+    }
+
+    if (unitRecords.length === 0) {
+        showToast('لا توجد بلاغات لهذه الفرقة', 'warning');
+        return;
+    }
+
+    // تحديث العنوان
+    document.getElementById('unitDetailTitle').textContent = 'تفاصيل فرقة ' + unitName;
+    document.getElementById('unitDetailCount').textContent = unitRecords.length + ' بلاغ';
+
+    // إحصائيات
+    var urgentCount = 0, totalResp = 0, goodResp = 0;
+    var typeStats = {};
+    for (var i = 0; i < unitRecords.length; i++) {
+        var r = unitRecords[i];
+        if (r.priority === 'عاجل') urgentCount++;
+        if (r.responseSeconds) {
+            totalResp += r.responseSeconds;
+            if (r.responseSeconds <= 480) goodResp++;
+        }
+        typeStats[r.type] = (typeStats[r.type] || 0) + 1;
+    }
+    document.getElementById('unitStatTotal').textContent = unitRecords.length;
+    document.getElementById('unitStatUrgent').textContent = urgentCount;
+    document.getElementById('unitStatAvg').textContent = unitRecords.length > 0 ? Math.round(totalResp / unitRecords.length / 60) + ' د' : '--';
+
+    // الأكثر تكراراً
+    var topType = '', topCount = 0;
+    for (var t in typeStats) {
+        if (typeStats[t] > topCount) { topCount = typeStats[t]; topType = t; }
+    }
+    document.getElementById('unitStatTop').textContent = topType || '--';
+
+    // بناء جدول التفاصيل
+    var html = '';
+    for (var i = 0; i < unitRecords.length; i++) {
+        var r = unitRecords[i];
+        var badgeClass = typeBadgeMap[r.type] || 'other';
+        var respClass = 'resp-bad';
+        if (!r.responseSeconds) respClass = '';
+        else if (r.responseSeconds < 480) respClass = 'resp-good';
+        else if (r.responseSeconds <= 900) respClass = 'resp-warn';
+
+        html += '<tr>';
+        html += '<td>' + (i + 1) + '</td>';
+        html += '<td><span class="badge-type ' + badgeClass + '">' + (r.type || '-') + '</span></td>';
+        html += '<td>' + (r.dispatchTime || '-') + '</td>';
+        html += '<td>' + (r.arrivalTime || '-') + '</td>';
+        html += '<td class="' + respClass + '">' + (r.responseTime || '-') + '</td>';
+        html += '<td>' + (r.location || '-') + '</td>';
+        html += '<td>' + (r.notes || '-') + '</td>';
+        html += '</tr>';
+    }
+    document.getElementById('unitDetailTableBody').innerHTML = html;
+
+    // فتح المودال
+    document.getElementById('unitDetailModal').classList.add('active');
+}
+
+function closeUnitModal() {
+    document.getElementById('unitDetailModal').classList.remove('active');
+}
+</script>
+
+<!-- Modal تفاصيل الفرقة -->
+<div class="unit-modal-overlay" id="unitDetailModal" onclick="if(event.target===this)closeUnitModal()">
+    <div class="unit-modal-box">
+        <div class="unit-modal-header">
+            <h3><i class="fas fa-ambulance"></i> <span id="unitDetailTitle">تفاصيل الفرقة</span></h3>
+            <button class="unit-modal-close" onclick="closeUnitModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="unit-modal-body">
+            <!-- إحصائيات -->
+            <div class="unit-modal-stats">
+                <div class="unit-stat-card">
+                    <div class="value" id="unitStatTotal">0</div>
+                    <div class="label">إجمالي البلاغات</div>
+                </div>
+                <div class="unit-stat-card">
+                    <div class="value" id="unitStatUrgent" style="color:#EF4444;">0</div>
+                    <div class="label">الحالات العاجلة</div>
+                </div>
+                <div class="unit-stat-card">
+                    <div class="value" id="unitStatAvg" style="color:#F59E0B;">0</div>
+                    <div class="label">متوسط الاستجابة</div>
+                </div>
+                <div class="unit-stat-card">
+                    <div class="value" id="unitStatTop" style="color:#1E293B;">--</div>
+                    <div class="label">أكثر نوع</div>
+                </div>
+            </div>
+
+            <!-- جدول التفاصيل -->
+            <div style="overflow:auto; max-height:45vh; border:1px solid var(--g200); border-radius:8px;">
+                <table class="unit-detail-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>النوع</th>
+                            <th>وقت التحرك</th>
+                            <th>وقت المباشرة</th>
+                            <th>الاستجابة</th>
+                            <th>الموقع</th>
+                            <th>ملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="unitDetailTableBody"></tbody>
+                </table>
+            </div>
+
+            <p style="text-align:center; color:var(--g400); font-size:12px; margin-top:12px;">
+                <i class="fas fa-info-circle"></i> <span id="unitDetailCount">0 بلاغ</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script src="smart-toolbar.js"></script>
+</body>
+</html>

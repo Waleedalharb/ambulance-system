@@ -45,8 +45,8 @@ self.addEventListener('fetch', function(event) {
                 if (event.request.mode === 'navigate') {
                     return new Response(
                         '<html dir="rtl"><head><meta charset="UTF-8"><title>الجنوب - Offline</title>' +
-                        '<style>body{font-family:Arial;background:#0B1E33;color:white;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;text-align:center;padding:20px;}' +
-                        'h1{color:#E87461;}p{color:#9AAEBD;}.btn{background:#1A3A5C;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;margin-top:20px;font-size:1rem;}</style></head>' +
+                        '<style>body{font-family:Arial;background:#1E293B;color:white;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;text-align:center;padding:20px;}' +
+                        'h1{color:#EF4444;}p{color:#94A3B8;}.btn{background:#2563EB;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;margin-top:20px;font-size:1rem;}</style></head>' +
                         '<body><h1>⚠️ لا يوجد اتصال</h1><p>تم تخزين البيانات محلياً.<br>سيتم المزامنة عند العودة.</p>' +
                         '<button class="btn" onclick="location.reload()">🔄 إعادة المحاولة</button></body></html>',
                         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }

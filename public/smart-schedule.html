@@ -1,0 +1,2673 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض | South Sector Emergency Operations Platform">
+    <title>نظام الجداول | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- PDF.js for PDF reading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <!-- html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* ==========================================
+           نظام الجداول - Tables System
+           CSS Variables & Base Styles
+           ========================================== */
+        :root {
+            --bg: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-glass: #F8FAFC;
+            --border: #E2E8F0;
+            --primary: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --purple: #8B5CF6;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --font: 'Inter', sans-serif;
+            --shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+        /* ==========================================
+           الشريط العلوي - Top Bar
+           ========================================== */
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #FFFFFF;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .logo i { font-size: 1.5rem; }
+
+        .top-bar-center {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .live-clock {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--success);
+            background: #ECFDF5;
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1px solid #A7F3D0;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #F8FAFC;
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: #1D4ED8;
+        }
+
+        .btn-coral { background: var(--danger); border: none; color: #fff; }
+        .btn-coral:hover { background: #DC2626; }
+        .btn-gold { background: var(--warning); border: none; color: #1E293B; font-weight: 600; }
+        .btn-gold:hover { background: #D97706; }
+        .btn-green { background: var(--success); border: none; color: #fff; }
+        .btn-green:hover { background: #059669; }
+        .btn-purple { background: var(--purple); border: none; color: #fff; }
+        .btn-purple:hover { background: #7C3AED; }
+
+        /* ==========================================
+           الحاوية الرئيسية - Main Container
+           ========================================== */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .section {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+
+        .section:hover {
+            border-color: #CBD5E1;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text);
+        }
+
+        .section-title i { font-size: 1.2rem; color: var(--primary); }
+
+        /* ==========================================
+           قسم رفع الملفات - Upload Section
+           ========================================== */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-glass);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            transform: scale(1.01);
+            background: #EFF6FF;
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .drop-zone-text {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .drop-zone-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        .upload-progress {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .upload-progress.active { display: block; }
+
+        .progress-bar {
+            height: 8px;
+            background: #E2E8F0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* قائمة الملفات المحفوظة */
+        .saved-files-list {
+            margin-top: 16px;
+        }
+
+        .saved-file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .saved-file-item:hover {
+            border-color: var(--primary);
+            background: #F8FAFC;
+        }
+
+        .saved-file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .saved-file-icon { font-size: 1.2rem; color: var(--primary); }
+
+        .saved-file-name { font-weight: 500; font-size: 0.9rem; }
+
+        .saved-file-date { font-size: 0.75rem; color: var(--text-muted); }
+
+        .saved-file-actions { display: flex; gap: 6px; }
+
+        .btn-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+        }
+
+        .btn-icon:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .btn-icon.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+        /* ==========================================
+           تحليل البيانات - Analysis Section
+           ========================================== */
+        .analysis-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 32px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .analysis-result {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .analysis-result i {
+            font-size: 2.5rem;
+            color: var(--success);
+            margin-bottom: 12px;
+        }
+
+        .analysis-result h3 {
+            color: var(--success);
+            margin-bottom: 8px;
+        }
+
+        /* ==========================================
+           البحث - Search Bar
+           ========================================== */
+        .search-bar {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 14px 18px 14px 50px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-bar input::placeholder { color: var(--text-muted); }
+
+        .search-bar i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* نتائج البحث */
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-top: 8px;
+            display: none;
+            box-shadow: var(--shadow);
+        }
+
+        .search-results.active { display: block; }
+
+        .search-result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-result-item:hover {
+            background: #F8FAFC;
+        }
+
+        .search-result-item:last-child { border-bottom: none; }
+
+        .search-result-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #EFF6FF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .search-result-details { flex: 1; }
+
+        .search-result-name { font-weight: 600; font-size: 0.9rem; }
+
+        .search-result-meta { font-size: 0.8rem; color: var(--text-muted); }
+
+        /* ==========================================
+           أزرار العرض - View Buttons
+           ========================================== */
+        .view-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .view-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text-muted);
+            font-family: var(--font);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .view-btn:hover {
+            background: #F8FAFC;
+            color: var(--text);
+            border-color: #CBD5E1;
+        }
+
+        .view-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* ==========================================
+           الفلاتر - Filters
+           ========================================== */
+        .filters-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #F8FAFC;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 150px;
+            flex: 1;
+        }
+
+        .filter-group label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .filter-group select, .filter-group input {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-group select:focus, .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* ==========================================
+           الجداول - Tables
+           ========================================== */
+        .data-table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .data-table thead th {
+            background: #F8FAFC;
+            color: var(--text);
+            font-weight: 600;
+            padding: 14px 16px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table tbody td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .data-table tbody tr {
+            transition: all 0.2s;
+        }
+
+        .data-table tbody tr:hover {
+            background: #F8FAFC;
+        }
+
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        /* شارات الحالة - Status Badges */
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-shift-morning { background: #DBEAFE; color: #2563EB; }
+        .badge-shift-evening { background: #E9D5FF; color: #7C3AED; }
+        .badge-shift-night { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+        .badge-status-work { background: #D1FAE5; color: #059669; }
+        .badge-status-off { background: #FEE2E2; color: #DC2626; }
+        .badge-status-leave { background: #FEF3C7; color: #D97706; }
+        .badge-status-rest { background: #F1F5F9; color: #64748B; }
+
+        /* ==========================================
+           بطاقات الإحصائيات - Stats Cards
+           ========================================== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card:hover {
+            border-color: #CBD5E1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(148, 163, 184, 0.15);
+        }
+
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+        }
+
+        .stat-icon.blue { background: #DBEAFE; color: #2563EB; }
+        .stat-icon.green { background: #D1FAE5; color: #059669; }
+        .stat-icon.gold { background: #FEF3C7; color: #D97706; }
+        .stat-icon.coral { background: #FEE2E2; color: #DC2626; }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* ==========================================
+           الرسوم البيانية - Charts
+           ========================================== */
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            padding: 16px;
+        }
+
+        /* ==========================================
+           التقويم الشهري - Monthly Calendar
+           ========================================== */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .calendar-header-day {
+            text-align: center;
+            padding: 10px;
+            font-weight: 700;
+            color: var(--text);
+            font-size: 0.85rem;
+            background: #F8FAFC;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .calendar-day {
+            min-height: 90px;
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            border-color: var(--primary);
+            background: #F8FAFC;
+        }
+
+        .calendar-day-number {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+
+        .calendar-day.today {
+            border-color: var(--primary);
+            background: #EFF6FF;
+        }
+
+        .calendar-shift-count {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .calendar-shifts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            margin-top: 4px;
+        }
+
+        .calendar-shift-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-morning { background: #2563EB; }
+        .dot-evening { background: #7C3AED; }
+        .dot-night { background: #64748B; }
+        .dot-off { background: #EF4444; }
+
+        /* ==========================================
+           العرض الأسبوعي - Weekly View
+           ========================================== */
+        .weekly-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .weekly-day-col {
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .weekly-day-header {
+            background: #F8FAFC;
+            padding: 10px;
+            text-align: center;
+            font-weight: 700;
+            color: var(--text);
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .weekly-day-content {
+            padding: 8px;
+            min-height: 200px;
+        }
+
+        .weekly-employee-item {
+            padding: 6px 8px;
+            background: #F8FAFC;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .weekly-employee-name { font-weight: 600; }
+
+        .weekly-employee-shift {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ==========================================
+           Document Viewer Modal
+           ========================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+            box-shadow: var(--shadow);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #F8FAFC;
+        }
+
+        .modal-title {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: #fff;
+            border-color: var(--danger);
+        }
+
+        .doc-iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        /* ==========================================
+           Toast Notifications
+           ========================================== */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: 10px;
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+            box-shadow: var(--shadow);
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(-20px); }
+        }
+
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+        .toast.info { border-color: var(--primary); }
+
+        /* ==========================================
+           Responsive
+           ========================================== */
+        @media (max-width: 768px) {
+            .top-bar { flex-wrap: wrap; gap: 10px; padding: 10px 16px; }
+            .logo { font-size: 1rem; }
+            .container { padding: 16px; }
+            .weekly-grid, .calendar-grid { grid-template-columns: repeat(2, 1fr); }
+            .view-buttons { justify-content: center; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ==========================================
+           Animations
+           ========================================== */
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Utility */
+        .text-center { text-align: center; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 12px; }
+        .mb-3 { margin-bottom: 12px; }
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+
+        /* Month Navigation */
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .month-nav-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .month-nav-btn:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .month-nav-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+            min-width: 150px;
+            text-align: center;
+        }
+    </style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+    <!-- ==========================================
+         الشريط العلوي
+         ========================================== -->
+    <nav class="top-bar">
+        <div class="logo">
+            <img src="logo.png" alt="South Sector Emergency Operations Platform" style="width:36px;height:36px;border-radius:8px;object-fit:contain;margin-left:10px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;">
+                <span style="font-size:1.2rem;font-weight:700;">نظام الجداول</span>
+                <span style="font-size:0.7rem;color:#64748B;">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
+            </div>
+        </div>
+        <div class="top-bar-center">
+            <div class="live-clock" id="liveClock">--:--:--</div>
+        </div>
+        <div class="top-bar-actions">
+            <button class="btn" onclick="window.location.href='index.html'">
+                <i class="fas fa-home"></i>
+                <span>الرجوع للرئيسية</span>
+            </button>
+            
+        </div>
+    </nav>
+
+    <!-- ==========================================
+         الحاوية الرئيسية
+         ========================================== -->
+    <div class="container">
+        <!-- قسم رفع الملفات -->
+        <div class="section fade-in">
+            <div class="section-title">
+                <i class="fas fa-cloud-upload-alt"></i>
+                رفع ملف الجدول
+            </div>
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf">
+                <i class="fas fa-file-import"></i>
+                <div class="drop-zone-text">اسحب ملف Excel أو PDF هنا</div>
+                <div class="drop-zone-hint">أو اضغط لاختيار الملف (.xlsx, .xls, .pdf)</div>
+                <div class="upload-progress" id="uploadProgress">
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+            </div>
+            </div>
+            <!-- قائمة الملفات المحفوظة -->
+            <div class="saved-files-list" id="savedFilesList"></div>
+        </div>
+
+        <!-- قسم تحليل البيانات -->
+        <div class="section hidden" id="analysisSection">
+            <div class="section-title">
+                <i class="fas fa-microscope"></i>
+                تحليل البيانات
+            </div>
+            <div class="analysis-status" id="analysisStatus">
+                <div class="spinner"></div>
+                <span>جاري تحليل الملف...</span>
+            </div>
+            <div class="analysis-result hidden" id="analysisResult">
+                <i class="fas fa-check-circle"></i>
+                <h3 id="analysisText">تم استخراج البيانات بنجاح</h3>
+                <p class="text-muted" id="analysisDetails"></p>
+            </div>
+            <!-- جدول بيانات الموظفين المستخرجة -->
+            <div class="data-table-container mt-3 hidden" id="extractedTableContainer">
+                <table class="data-table" id="extractedTable">
+                    <thead><tr></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- شريط البحث الفوري -->
+        <div class="section fade-in" id="searchSection">
+            <div class="section-title">
+                <i class="fas fa-search"></i>
+                البحث الفوري
+            </div>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="ابحث عن موظف، يوم، مناوبة، موقع..." oninput="handleSearch(this.value)">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+        </div>
+
+        <!-- أزرار العرض -->
+        <div class="section fade-in">
+            <div class="section-title">
+                <i class="fas fa-eye"></i>
+                عرض الجدول
+            </div>
+            <div class="view-buttons">
+                <button class="view-btn active" data-view="daily">
+                    <i class="fas fa-sun"></i> عرض يومي
+                </button>
+                <button class="view-btn" data-view="weekly">
+                    <i class="fas fa-calendar-week"></i> عرض أسبوعي
+                </button>
+                <button class="view-btn" data-view="monthly">
+                    <i class="fas fa-calendar-alt"></i> عرض شهري
+                </button>
+                <button class="view-btn" data-view="employee">
+                    <i class="fas fa-user"></i> عرض حسب الموظف
+                </button>
+            </div>
+
+            <!-- الفلاتر -->
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar"></i> التاريخ</label>
+                    <input type="date" id="filterDate" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar-alt"></i> الشهر</label>
+                    <input type="month" id="filterMonth" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-map-marker-alt"></i> الموقع</label>
+                    <select id="filterLocation" onchange="applyFilters()">
+                        <option value="">الكل</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-clock"></i> نوع المناوبة</label>
+                    <select id="filterShift" onchange="applyFilters()">
+                        <option value="">الكل</option>
+                        <option value="صباحية">صباحية</option>
+                        <option value="مسائية">مسائية</option>
+                        <option value="ليلية">ليلية</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-info-circle"></i> الحالة</label>
+                    <select id="filterStatus" onchange="applyFilters()">
+                        <option value="">الكل</option>
+                        <option value="دوام">دوام</option>
+                        <option value="إجازة">إجازة</option>
+                        <option value="راحة">راحة</option>
+                        <option value="OFF">OFF</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- منطقة العرض الرئيسي -->
+            <div id="mainViewArea">
+                <!-- يتم ملؤها ديناميكياً -->
+            </div>
+        </div>
+
+        <!-- الإحصائيات -->
+        <div class="section fade-in">
+            <div class="section-title">
+                <i class="fas fa-chart-line"></i>
+                الإحصائيات والتحليلات
+            </div>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+                    <div class="stat-value" id="statTotalEmployees">0</div>
+                    <div class="stat-label">إجمالي الموظفين</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
+                    <div class="stat-value" id="statTodayShifts">0</div>
+                    <div class="stat-label">المناوبات اليوم</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon gold"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-value" id="statCoverage">0%</div>
+                    <div class="stat-label">نسبة التغطية</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon coral"><i class="fas fa-user-slash"></i></div>
+                    <div class="stat-value" id="statLeaves">0</div>
+                    <div class="stat-label">الإجازات / الراحات</div>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="section" style="padding:16px;">
+                    <div class="section-title" style="font-size:0.95rem;">
+                        <i class="fas fa-chart-pie"></i> توزيع المناوبات
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="shiftsChart"></canvas>
+                    </div>
+                </div>
+                <div class="section" style="padding:16px;">
+                    <div class="section-title" style="font-size:0.95rem;">
+                        <i class="fas fa-chart-bar"></i> توزيع الموظفين حسب الموقع
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="locationsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- أزرار التصدير -->
+        <div class="section fade-in">
+            <div class="section-title">
+                <i class="fas fa-download"></i>
+                التصدير
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button class="btn btn-green" onclick="exportToExcel()">
+                    <i class="fas fa-file-excel"></i> تصدير Excel
+                </button>
+                <button class="btn btn-coral" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf"></i> تصدير PDF
+                </button>
+                <button class="btn btn-purple" onclick="printSchedule()">
+                    <i class="fas fa-print"></i> طباعة
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         Document Viewer Modal
+         ========================================== -->
+    <div class="modal-overlay" id="docModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-file-alt"></i>
+                    <span id="modalTitle">عرض الملف</span>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-icon" onclick="copyDocumentContent()" title="نسخ">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="btn-icon" onclick="downloadDocument()" title="تحميل">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="modal-close" onclick="closeDocumentViewer()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- iframe أو table -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ==========================================
+         JavaScript
+         ========================================== -->
+    <script>
+        // ==========================================
+        // المتغيرات العامة - Global Variables
+        // ==========================================
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('❌ JS Error:', msg, 'at line', line, 'col', col);
+            return true;
+        };
+        console.log('🚀 Script loaded — starting initialization...');
+        function pad2(n) { n = parseInt(n); return n < 10 ? '0' + n : '' + n; }
+        var employees = [];
+        var currentView = 'daily';
+        var savedFiles = [];
+        var currentFile = null;
+        var charts = {};
+        var currentMonth = new Date();
+        var selectedEmployee = null;
+
+        var ARABIC_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        var ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+        // ==========================================
+        // التهيئة - Initialization
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOMContentLoaded fired');
+            try { initClock(); } catch(e) { console.error('initClock failed:', e); }
+            try { loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
+            try { loadFromIndexedDB(); } catch(e) { console.error('loadFromIndexedDB failed:', e); }
+            try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
+            try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
+            try { setupDemoData(); } catch(e) { console.error('setupDemoData failed:', e); }
+            try { setupViewButtons(); } catch(e) { console.error('setupViewButtons failed:', e); }
+            try { setupFilterListeners(); } catch(e) { console.error('setupFilterListeners failed:', e); }
+            setTimeout(function() {
+                try { updateStats(); } catch(e) { console.error('updateStats failed:', e); }
+                try { renderCharts(); } catch(e) { console.error('renderCharts failed:', e); }
+                try { renderCurrentView(); } catch(e) { console.error('renderCurrentView failed:', e); }
+                try { populateLocationFilter(); } catch(e) { console.error('populateLocationFilter failed:', e); }
+            }, 500);
+        });
+
+        // ==========================================
+        // ربط أزرار العرض - View Buttons
+        // ==========================================
+        function setupViewButtons() {
+            document.querySelectorAll('.view-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var view = this.getAttribute('data-view');
+                    if (view) setView(view);
+                });
+            });
+        }
+
+        // ==========================================
+        // ربط الفلاتر - Filter Listeners
+        // ==========================================
+        function setupFilterListeners() {
+            var shiftSelect = document.getElementById('filterShift');
+            if (shiftSelect) {
+                shiftSelect.innerHTML = '<option value="">الكل</option><option value="دوام 12 ساعة">دوام 12 ساعة</option><option value="دوام ليلي 12 ساعة">دوام ليلي 12 ساعة</option><option value="صباح">صباح</option><option value="إجازة">إجازة</option><option value="تدريب">تدريب</option><option value="راحة">راحة</option>';
+            }
+        }
+
+        // ==========================================
+        // الساعة الحية - Live Clock
+        // ==========================================
+        function initClock() {
+            try {
+                var clockEl = document.getElementById('liveClock');
+                console.log('⏰ initClock called, liveClock element:', clockEl);
+                if (!clockEl) { console.warn('liveClock element not found'); return; }
+                function pad(n) { return n < 10 ? '0' + n : '' + n; }
+                function update() {
+                    var now = new Date();
+                    var h = pad(now.getHours());
+                    var m = pad(now.getMinutes());
+                    var s = pad(now.getSeconds());
+                    clockEl.textContent = h + ':' + m + ':' + s;
+                }
+                update();
+                setInterval(update, 1000);
+            } catch(e) { console.error('initClock error:', e); }
+        }
+
+        // ==========================================
+        // Dark Mode
+        // ==========================================
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            var icon = document.getElementById('darkModeIcon');
+            if (document.body.classList.contains('dark-mode')) {
+                if (icon) icon.className = 'fas fa-sun';
+                showToast('تم تفعيل الوضع الداكن', 'info');
+            } else {
+                if (icon) icon.className = 'fas fa-moon';
+                showToast('تم إلغاء الوضع الداكن', 'info');
+            }
+        }
+
+        // ==========================================
+        // قسم رفع الملفات - File Upload
+        // ==========================================
+        function setupDragAndDrop() {
+            try {
+                var dz = document.getElementById('dropZone');
+                if (!dz) { console.error('dropZone not found'); return; }
+                console.log('✅ setupDragAndDrop: dropZone found');
+                dz.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    dz.classList.add('dragover');
+                });
+                dz.addEventListener('dragleave', function() {
+                    dz.classList.remove('dragover');
+                });
+                dz.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    dz.classList.remove('dragover');
+                    if (e.dataTransfer.files.length > 0) {
+                        handleFileUpload(e.dataTransfer.files[0]);
+                    }
+                });
+                // input[type="file"] inside drop-zone handles click natively via CSS overlay
+                console.log('✅ Drag & Drop events attached');
+            } catch(e) { console.error('setupDragAndDrop error:', e); }
+        }
+
+        function setupFileInput() {
+            try {
+                var fi = document.getElementById('fileInput');
+                if (!fi) { console.error('fileInput not found'); return; }
+                fi.addEventListener('change', function(e) {
+                    console.log('📁 fileInput change:', e.target.files.length, 'files');
+                    if (e.target.files.length > 0) {
+                        handleFileUpload(e.target.files[0]);
+                    }
+                });
+                console.log('✅ File input change listener attached');
+            } catch(e) { console.error('setupFileInput error:', e); }
+        }
+
+        function handleFileUpload(file) {
+            try {
+                console.log('📁 handleFileUpload called:', file.name, file.size, file.type);
+                currentFile = file;
+                var ext = file.name.split('.').pop().toLowerCase();
+                console.log('📎 Extension:', ext);
+                var validExts = ['xlsx','xls','pdf'];
+                if (validExts.indexOf(ext) === -1) {
+                    showToast('نوع الملف غير مدعوم. يرجى رفع ملف Excel أو PDF', 'error');
+                    return;
+                }
+                // حفظ الملف في القائمة
+                var fileInfo = {
+                    id: Date.now(),
+                    name: file.name,
+                    type: ext,
+                    size: file.size,
+                    date: new Date().toISOString()
+                };
+                savedFiles.unshift(fileInfo);
+                localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+                renderSavedFiles();
+                // عرض شريط التقدم
+                document.getElementById('uploadProgress').classList.add('active');
+                updateProgress(0);
+                // تحليل الملف
+                document.getElementById('analysisSection').classList.remove('hidden');
+                document.getElementById('analysisStatus').classList.remove('hidden');
+                document.getElementById('analysisResult').classList.add('hidden');
+                document.getElementById('extractedTableContainer').classList.add('hidden');
+                // محاكاة التقدم
+                var progress = 0;
+                var interval = setInterval(function() {
+                    progress += Math.random() * 15;
+                    if (progress >= 100) { progress = 100; clearInterval(interval); }
+                    updateProgress(Math.round(progress));
+                }, 200);
+                // معالجة الملف
+                console.log('⏳ Starting file processing in 1.5s...');
+                setTimeout(function() {
+                    console.log('🚀 Processing file now...');
+                    if (ext === 'pdf') {
+                        parsePDF(file);
+                    } else {
+                        parseExcel(file);
+                    }
+                }, 1500);
+            } catch(e) { console.error('handleFileUpload error:', e); }
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = percent + '%';
+        }
+
+        // ==========================================
+        // قراءة Excel - Parse Excel
+        // ==========================================
+        function parseExcel(file) {
+            console.log('📊 parseExcel called');
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('✅ FileReader loaded, size:', e.target.result.byteLength);
+                try {
+                    var data = new Uint8Array(e.target.result);
+                    var workbook = XLSX.read(data, { type: 'array' });
+                    console.log('📑 Workbook sheets:', workbook.SheetNames);
+                    var result = extractEmployees(workbook);
+                    console.log('👥 Extracted employees:', result.length);
+                    employees = result;
+                    saveToIndexedDB();
+                    finishAnalysis(result.length);
+                    showExtractedTable(result);
+                    updateStats();
+                    renderCharts();
+                    renderCurrentView();
+                    populateLocationFilter();
+                    showToast('تم استخراج ' + result.length + ' موظف من ملف Excel', 'success');
+                } catch(err) {
+                    showToast('خطأ في قراءة الملف: ' + err.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ============================================
+        // استخراج بيانات جداول قطاع الجنوب - الهيكل الخاص
+        // ============================================
+        // الهيكل: كل sheet = شهر → فرق (تدخل سريع/جنوب) → موظفين → مناوبات حسب اليوم
+        // المناوبات: D12=دوام 12ص, N12=دوام 12ل, V=إجازة, M=صباح, C=تدريب, R=راحة
+        // ============================================
+        function extractEmployees(workbook) {
+            console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
+            var allEmployees = [];
+            var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
+            var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
+            var sheetNames = workbook.SheetNames;
+            
+            for (var s = 0; s < sheetNames.length; s++) {
+                console.log('📄 Processing sheet:', sheetNames[s]);
+                var sheetName = sheetNames[s];
+                var sheet = workbook.Sheets[sheetName];
+                var jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                if (jsonData.length < 10) continue;
+                
+                // استخراج الشهر والسنة من الصفوف الأولى
+                var monthNum = 0, yearNum = 2026;
+                for (var i = 0; i < 5 && i < jsonData.length; i++) {
+                    var r0 = jsonData[i][0];
+                    var r1 = jsonData[i][1];
+                    // Row 0: 'الشهر', 'السنة' → skip, Row 1: 5, 2026 → extract
+                    if (r0 === 'الشهر') continue; // skip header row
+                    if (typeof r0 === 'number' && r0 > 0 && r0 < 13) {
+                        monthNum = r0;
+                    }
+                    if (typeof r1 === 'number' && r1 > 2000) {
+                        yearNum = r1;
+                    }
+                }
+                // Fallback: try row 1 directly
+                if (monthNum === 0 && jsonData[1]) {
+                    if (typeof jsonData[1][0] === 'number' && jsonData[1][0] > 0 && jsonData[1][0] < 13) {
+                        monthNum = jsonData[1][0];
+                    }
+                    if (typeof jsonData[1][1] === 'number' && jsonData[1][1] > 2000) {
+                        yearNum = jsonData[1][1];
+                    }
+                }
+                
+                // تمرير الصفوف والبحث عن الفرق
+                var currentTeam = '';
+                var currentTeamNote = '';
+                var dayNames = [];
+                var dayNumbers = [];
+                
+                for (var i = 5; i < jsonData.length; i++) {
+                    var row = jsonData[i];
+                    if (!row || row.length === 0) continue;
+                    var colA = row[0];
+                    
+                    // اكتشاف هيدر الفرقة أو القسم ("تدخل سريع 1", "جنوب 1", "القائد الميداني", "التحكم والتنسيق", "الدعم اللوجستي", "مناوبو باص الاستجابة", "المنتدبين", "إجازة")
+                    if (colA && typeof colA === 'string' && (
+                        (colA.match(/^(تدخل\s+سريع|جنوب)\s*\d+$/) && colA.length < 30) ||
+                        colA === 'القائد الميداني' ||
+                        colA === 'التحكم والتنسيق' ||
+                        colA === 'الدعم اللوجستي' ||
+                        colA === 'مناوبو باص الاستجابة' ||
+                        colA === 'المنتدبين' ||
+                        colA === 'إجازة'
+                    )) {
+                        currentTeam = colA;
+                        currentTeamNote = row[4] || '';
+                        dayNames = [];
+                        dayNumbers = [];
+                        continue;
+                    }
+                    
+                    // اكتشاف صف أيام الأسبوع
+                    if (colA === null && row[4] && typeof row[4] === 'string' && 
+                        (row[4].indexOf('الأحد') !== -1 || row[4].indexOf('الاثنين') !== -1 || row[4].indexOf('الثلاثاء') !== -1)) {
+                        for (var c = 4; c < row.length && c < 36; c++) {
+                            if (row[c]) {
+                                dayNames[c] = String(row[c]);
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // اكتشاف صف أرقام الأيام
+                    if (colA && String(colA).indexOf('كود') !== -1 && row[1] && String(row[1]).indexOf('الاسم') !== -1) {
+                        for (var c = 4; c < row.length && c < 36; c++) {
+                            if (row[c] && !isNaN(parseInt(row[c]))) {
+                                dayNumbers[c] = parseInt(row[c]);
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // اكتشاف صف موظف (عنده كود رقمي + اسم)
+                    if (colA && (typeof colA === 'number' || !isNaN(parseInt(colA))) && 
+                        row[1] && typeof row[1] === 'string' && row[1].length > 5) {
+                        
+                        var empCode = String(parseInt(colA));
+                        var empName = String(row[1]).trim();
+                        var empPhone = row[2] ? String(row[2]).trim() : '';
+                        var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
+                        
+                        if (!empName || empName.length < 3) continue;
+                        
+                        // استخراج المناوبات
+                        var schedule = [];
+                        for (var c = 4; c < row.length && c < 36; c++) {
+                            var shiftCode = row[c];
+                            if (!shiftCode || String(shiftCode).trim() === '') continue;
+                            shiftCode = String(shiftCode).trim();
+                            
+                            var dayNum = dayNumbers[c] || (c - 3);
+                            var dayName = dayNames[c] || ARABIC_DAYS[(dayNum - 1) % 7];
+                            var dateStr = yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum);
+                            
+                            var shiftName = shiftMap[shiftCode] || shiftCode;
+                            var shiftTime = shiftTimeMap[shiftCode] || '';
+                            var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
+                            
+                            schedule.push({
+                                day: dayName,
+                                date: dateStr,
+                                shift: shiftName,
+                                shiftCode: shiftCode,
+                                time: shiftTime,
+                                location: currentTeam || 'غير محدد',
+                                status: status
+                            });
+                        }
+                        
+                        if (schedule.length > 0) {
+                            allEmployees.push({
+                                id: empCode,
+                                name: empName,
+                                jobTitle: empJob,
+                                employeeNumber: empCode,
+                                phone: empPhone,
+                                team: currentTeam,
+                                schedule: schedule
+                            });
+                        }
+                    }
+                }
+            }
+            
+            console.log('✅ extractEmployees done, total:', allEmployees.length);
+            return allEmployees.length > 0 ? allEmployees : generateDemoData();
+        }
+
+        function findColumnIndex(headers, keywords) {
+            for (var i = 0; i < headers.length; i++) {
+                var h = String(headers[i]).toLowerCase().trim();
+                for (var k = 0; k < keywords.length; k++) {
+                    if (h.indexOf(keywords[k].toLowerCase()) !== -1) return i;
+                }
+            }
+            return -1;
+        }
+
+        function generateDate(index) {
+            var d = new Date(2026, 5, 29);
+            d.setDate(d.getDate() + index);
+            return d.toISOString().split('T')[0];
+        }
+
+        function generatePhone() {
+            return '05' + Math.floor(Math.random() * 90000000 + 10000000);
+        }
+
+        // ==========================================
+        // قراءة PDF باستخدام PDF.js + Tesseract OCR
+        // ==========================================
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        function parsePDF(file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                processPDFData(e.target.result);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function processPDFData(arrayBuffer) {
+            try {
+                showToast('جاري قراءة ملف PDF...', 'info');
+                var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                console.log('📄 PDF pages:', pdf.numPages);
+                
+                var allEmployees = [];
+                var allTeams = [];
+                var currentTeam = '';
+                var dayNumbers = [];
+                var dayNames = [];
+                var monthNum = 6;
+                var yearNum = 2026;
+                
+                for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    showToast('جاري معالجة الصفحة ' + pageNum + ' من ' + pdf.numPages + '...', 'info');
+                    
+                    // تحويل الصفحة لصورة
+                    var page = await pdf.getPage(pageNum);
+                    var scale = 2.0;
+                    var viewport = page.getViewport({ scale: scale });
+                    var canvas = document.createElement('canvas');
+                    var context = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    // OCR على الصورة
+                    console.log('🔍 OCR on page', pageNum);
+                    var result = await Tesseract.recognize(canvas, 'ara', {
+                        logger: function(m) {
+                            if (m.status === 'recognizing text') {
+                                console.log('OCR progress:', Math.round(m.progress * 100) + '%');
+                            }
+                        }
+                    });
+                    
+                    var ocrText = result.data.text;
+                    console.log('📝 Page', pageNum, 'OCR chars:', ocrText.length);
+                    
+                    // معالجة نص OCR
+                    var pageResult = parseOCRPage(ocrText, monthNum, yearNum);
+                    
+                    // دمج النتائج
+                    for (var t = 0; t < pageResult.teams.length; t++) {
+                        var team = pageResult.teams[t];
+                        // ابحث عن الفرقة الموجودة
+                        var existingTeam = null;
+                        for (var et = 0; et < allTeams.length; et++) {
+                            if (allTeams[et].name === team.name) {
+                                existingTeam = allTeams[et];
+                                break;
+                            }
+                        }
+                        if (existingTeam) {
+                            existingTeam.employees = existingTeam.employees.concat(team.employees);
+                        } else {
+                            allTeams.push(team);
+                        }
+                    }
+                }
+                
+                // تحويل الفرق لقائمة موظفين
+                var totalEmps = 0;
+                for (var t = 0; t < allTeams.length; t++) {
+                    var team = allTeams[t];
+                    for (var e = 0; e < team.employees.length; e++) {
+                        team.employees[e].team = team.name;
+                        allEmployees.push(team.employees[e]);
+                        totalEmps++;
+                    }
+                }
+                
+                console.log('✅ PDF parsed:', totalEmps, 'employees in', allTeams.length, 'teams');
+                
+                if (allEmployees.length === 0) {
+                    showToast('لم يتم العثور على بيانات في ملف PDF. سيتم استخدام البيانات التجريبية.', 'warning');
+                    allEmployees = generateDemoData();
+                }
+                
+                employees = allEmployees;
+                saveToIndexedDB();
+                finishAnalysis(allEmployees.length);
+                showExtractedTable(allEmployees);
+                updateStats();
+                renderCharts();
+                renderCurrentView();
+                populateLocationFilter();
+                showToast('تم استخراج ' + allEmployees.length + ' موظف من ' + allTeams.length + ' فريق', 'success');
+                
+            } catch(err) {
+                console.error('PDF Error:', err);
+                showToast('خطأ في قراءة PDF: ' + err.message, 'error');
+                finishAnalysis(0);
+            }
+        }
+
+        // معالجة نص OCR لكل صفحة
+        function parseOCRPage(ocrText, monthNum, yearNum) {
+            var lines = ocrText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+            
+            var teams = [];
+            var currentTeam = null;
+            var currentEmployees = [];
+            var dayNumbers = [];
+            var dayNames = [];
+            var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
+            var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                
+                // اكتشاف الفرقة: "تدخل سريع 1" أو "جنوب 1" أو "قائد ميداني" أو "تحكم وتنسيق" أو "دعم لوجستي"
+                var teamMatch = line.match(/^(تدخل\s+سريع\s*\d+|جنوب\s*\d+|قائد\s+ميداني|تحكم\s+وتنسيق|دعم\s+لوجستي)/);
+                if (teamMatch && line.length < 50) {
+                    if (currentTeam && currentEmployees.length > 0) {
+                        teams.push({ name: currentTeam, employees: currentEmployees });
+                    }
+                    currentTeam = teamMatch[1];
+                    currentEmployees = [];
+                    dayNumbers = [];
+                    dayNames = [];
+                    continue;
+                }
+                
+                // اكتشاف أرقام الأيام (1-31)
+                var numMatch = line.match(/\b(\d{1,2})\b.*\b(\d{1,2})\b.*\b(\d{1,2})\b.*\b(\d{1,2})\b.*\b(\d{1,2})\b/);
+                if (numMatch && !line.match(/[\u0600-\u06FF]{4,}/)) {
+                    // This might be day numbers row
+                    var nums = line.match(/\b(\d{1,2})\b/g);
+                    if (nums && nums.length > 20) {
+                        dayNumbers = nums.map(Number);
+                        continue;
+                    }
+                }
+                
+                // اكتشاف أيام الأسبوع
+                if (line.match(/الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت/) && line.length < 200) {
+                    var days = line.match(/الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت/g);
+                    if (days && days.length > 10) {
+                        dayNames = days;
+                        continue;
+                    }
+                }
+                
+                // اكتشاف صف موظف
+                // النمط: أرقام في البداية (كود) + اسم عربي + مناوبات
+                var empMatch = line.match(/^(\d{3,6})\s+([\u0600-\u06FF\s]{5,30})\s+(.*)/);
+                if (empMatch && currentTeam) {
+                    var empCode = empMatch[1];
+                    var empName = empMatch[2].trim();
+                    var rest = empMatch[3];
+                    
+                    // استخراج المناوبات من بقية السطر
+                    var shiftMatches = rest.match(/\b(D12|N12|V|M|C|R)\b/g);
+                    
+                    if (shiftMatches && shiftMatches.length > 3) {
+                        var schedule = [];
+                        for (var s = 0; s < shiftMatches.length && s < dayNumbers.length; s++) {
+                            var shiftCode = shiftMatches[s];
+                            var dayNum = dayNumbers[s] || (s + 1);
+                            var shiftInfo = shiftMap[shiftCode] || shiftCode;
+                            var shiftTime = shiftTimeMap[shiftCode] || '';
+                            var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
+                            
+                            schedule.push({
+                                day: dayNames[s] || ARABIC_DAYS[(dayNum - 1) % 7],
+                                date: yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum),
+                                shift: shiftInfo,
+                                shiftCode: shiftCode,
+                                time: shiftTime,
+                                location: currentTeam,
+                                status: status
+                            });
+                        }
+                        
+                        if (schedule.length > 0) {
+                            currentEmployees.push({
+                                id: empCode,
+                                name: empName,
+                                jobTitle: 'مسعف',
+                                employeeNumber: empCode,
+                                phone: '',
+                                team: currentTeam,
+                                schedule: schedule
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // حفظ آخر فريق
+            if (currentTeam && currentEmployees.length > 0) {
+                teams.push({ name: currentTeam, employees: currentEmployees });
+            }
+            
+            return { teams: teams };
+        }
+
+        // ==========================================
+        // إنهاء التحليل
+        // ==========================================
+        function finishAnalysis(count) {
+            document.getElementById('uploadProgress').classList.remove('active');
+            document.getElementById('analysisStatus').classList.add('hidden');
+            document.getElementById('analysisResult').classList.remove('hidden');
+            document.getElementById('analysisText').textContent = 'تم استخراج ' + count + ' موظف من الملف';
+            document.getElementById('analysisDetails').textContent = 'تم حفظ البيانات في التخزين المحلي';
+            document.getElementById('extractedTableContainer').classList.remove('hidden');
+        }
+
+        function showExtractedTable(data) {
+            var thead = document.querySelector('#extractedTable thead tr');
+            var tbody = document.querySelector('#extractedTable tbody');
+            thead.innerHTML = '<th>الرقم</th><th>الاسم</th><th>المسمى الوظيفي</th><th>رقم الجوال</th><th>عدد المناوبات</th>';
+            tbody.innerHTML = '';
+            for (var i = 0; i < Math.min(data.length, 20); i++) {
+                var emp = data[i];
+                var row = document.createElement('tr');
+                row.innerHTML = '<td>' + emp.id + '</td>' +
+                    '<td><strong>' + emp.name + '</strong></td>' +
+                    '<td>' + emp.jobTitle + '</td>' +
+                    '<td>' + emp.phone + '</td>' +
+                    '<td><span class="badge badge-status-work">' + emp.schedule.length + ' مناوبة</span></td>';
+                tbody.appendChild(row);
+            }
+        }
+
+        // ==========================================
+        // التخزين المحلي - Storage
+        // ==========================================
+        var DB_NAME = 'SmartScheduleDB';
+        var DB_VERSION = 1;
+        var db = null;
+
+        function openDB() {
+            return new Promise(function(resolve) {
+                var req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = function(e) {
+                    var database = e.target.result;
+                    if (!database.objectStoreNames.contains('employees')) {
+                        database.createObjectStore('employees', { keyPath: 'id' });
+                    }
+                };
+                req.onsuccess = function(e) {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                req.onerror = function() { resolve(null); };
+            });
+        }
+
+        async function saveToIndexedDB() {
+            var database = await openDB();
+            if (!database) return;
+            var tx = database.transaction('employees', 'readwrite');
+            var store = tx.objectStore('employees');
+            for (var i = 0; i < employees.length; i++) {
+                store.put(employees[i]);
+            }
+        }
+
+        async function loadFromIndexedDB() {
+            var database = await openDB();
+            if (!database) return;
+            var tx = database.transaction('employees', 'readonly');
+            var store = tx.objectStore('employees');
+            var req = store.getAll();
+            req.onsuccess = function(e) {
+                if (e.target.result.length > 0) {
+                    employees = e.target.result;
+                    updateStats();
+                    renderCharts();
+                    renderCurrentView();
+                    populateLocationFilter();
+                }
+            };
+        }
+
+        function saveToLocalStorage(data) {
+            localStorage.setItem('ss_employees', JSON.stringify(data || employees));
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                var data = localStorage.getItem('ss_employees');
+                return data ? JSON.parse(data) : null;
+            } catch(e) { return null; }
+        }
+
+        function loadSavedFiles() {
+            try {
+                var files = localStorage.getItem('ss_savedFiles');
+                savedFiles = files ? JSON.parse(files) : [];
+                renderSavedFiles();
+            } catch(e) { savedFiles = []; }
+        }
+
+        function getSavedFiles() { return savedFiles; }
+
+        function renderSavedFiles() {
+            var container = document.getElementById('savedFilesList');
+            if (savedFiles.length === 0) { container.innerHTML = ''; return; }
+            var html = '<div style="font-weight:700; margin-bottom:10px; color:var(--primary); font-size:0.9rem;"><i class="fas fa-history"></i> الملفات المرفوعة مؤخراً:</div>';
+            for (var i = 0; i < Math.min(savedFiles.length, 5); i++) {
+                var f = savedFiles[i];
+                var icon = f.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-excel';
+                var date = new Date(f.date).toLocaleDateString('ar-SA');
+                html += '<div class="saved-file-item">' +
+                    '<div class="saved-file-info">' +
+                    '<i class="fas ' + icon + ' saved-file-icon"></i>' +
+                    '<div><div class="saved-file-name">' + f.name + '</div>' +
+                    '<div class="saved-file-date">' + date + '</div></div></div>' +
+                    '<div class="saved-file-actions">' +
+                    '<button class="btn-icon" onclick="openDocumentViewer(' + f.id + ')" title="عرض"><i class="fas fa-eye"></i></button>' +
+                    '<button class="btn-icon danger" onclick="deleteSavedFile(' + f.id + ')" title="حذف"><i class="fas fa-trash"></i></button></div></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function deleteSavedFile(id) {
+            savedFiles = savedFiles.filter(function(f) { return f.id !== id; });
+            localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+            renderSavedFiles();
+            showToast('تم حذف الملف', 'info');
+        }
+
+        // ==========================================
+        // البيانات التجريبية - Demo Data
+        // ==========================================
+        function setupDemoData() {
+            if (employees.length > 0) return;
+            var saved = loadFromLocalStorage();
+            if (saved && saved.length > 0) {
+                employees = saved;
+                return;
+            }
+            employees = generateDemoData();
+            saveToIndexedDB();
+            saveToLocalStorage();
+            populateLocationFilter();
+        }
+
+        function generateDemoData() {
+            try {
+                // لا بيانات تلقائية - المستخدم يرفع ملفه الخاص
+                showToast('يرجى رفع ملف Excel أو PDF أولاً', 'info');
+            } catch(e) { console.error('generateDemoData error:', e); }
+            return [];
+        }
+
+        // ==========================================
+        // البحث الفوري - Instant Search
+        // ==========================================
+        function handleSearch(query) {
+            var resultsDiv = document.getElementById('searchResults');
+            if (!query || query.trim().length === 0) {
+                resultsDiv.classList.remove('active');
+                return;
+            }
+            query = query.toLowerCase().trim();
+            var results = searchEmployees(query);
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="search-result-item"><div class="search-result-details"><div class="search-result-name">لا توجد نتائج</div></div></div>';
+            } else {
+                var html = '';
+                for (var i = 0; i < Math.min(results.length, 10); i++) {
+                    var r = results[i];
+                    var icon = r.type === 'employee' ? 'fa-user' : r.type === 'shift' ? 'fa-clock' : 'fa-calendar';
+                    var badge = '';
+                    if (r.shift) badge = '<span class="badge badge-shift-' + (r.shift === 'صباحية' ? 'morning' : r.shift === 'مسائية' ? 'evening' : 'night') + '">' + r.shift + '</span>';
+                    else if (r.status) badge = '<span class="badge badge-status-' + (r.status === 'دوام' ? 'work' : r.status === 'إجازة' ? 'off' : 'rest') + '">' + r.status + '</span>';
+                    html += '<div class="search-result-item" onclick="selectSearchResult(' + i + ')">' +
+                        '<div class="search-result-icon"><i class="fas ' + icon + '"></i></div>' +
+                        '<div class="search-result-details">' +
+                        '<div class="search-result-name">' + r.name + '</div>' +
+                        '<div class="search-result-meta">' + (r.day || '') + ' ' + (r.date || '') + ' ' + (r.location || '') + '</div></div>' +
+                        '<div>' + badge + '</div></div>';
+                }
+                resultsDiv.innerHTML = html;
+            }
+            resultsDiv.classList.add('active');
+            window._searchResults = results;
+        }
+
+        function searchEmployees(query) {
+            var results = [];
+            for (var i = 0; i < employees.length; i++) {
+                var emp = employees[i];
+                if (emp.name.toLowerCase().indexOf(query) !== -1 || emp.id.toLowerCase().indexOf(query) !== -1 || emp.jobTitle.toLowerCase().indexOf(query) !== -1) {
+                    results.push({ type: 'employee', name: emp.name, id: emp.id, employee: emp });
+                }
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    var sch = emp.schedule[s];
+                    if (sch.day.indexOf(query) !== -1 || sch.date.indexOf(query) !== -1 || sch.shift.toLowerCase().indexOf(query) !== -1 || sch.location.toLowerCase().indexOf(query) !== -1 || sch.status.indexOf(query) !== -1) {
+                        results.push({ type: 'shift', name: emp.name, day: sch.day, date: sch.date, shift: sch.shift, location: sch.location, status: sch.status, employee: emp });
+                    }
+                }
+            }
+            return results;
+        }
+
+        function selectSearchResult(index) {
+            var r = window._searchResults[index];
+            if (!r) return;
+            document.getElementById('searchResults').classList.remove('active');
+            if (r.employee) {
+                setView('employee');
+                selectedEmployee = r.employee.id;
+                renderEmployeeView(selectedEmployee);
+            }
+        }
+
+        // ==========================================
+        // أزرار العرض - View Switching
+        // ==========================================
+        function setView(view) {
+            try {
+                console.log('🔘 setView called:', view);
+                currentView = view;
+                var buttons = document.querySelectorAll('.view-btn');
+                for (var i = 0; i < buttons.length; i++) {
+                    var btnView = buttons[i].getAttribute('data-view');
+                    buttons[i].classList.toggle('active', btnView === view);
+                }
+                renderCurrentView();
+            } catch(err) {
+                console.error('❌ setView error:', err);
+                showToast('خطأ: ' + err.message, 'error');
+            }
+        }
+
+        function renderCurrentView() {
+            var container = document.getElementById('mainViewArea');
+            container.innerHTML = '';
+            switch (currentView) {
+                case 'daily': renderDailyView(); break;
+                case 'weekly': renderWeeklyView(); break;
+                case 'monthly': renderMonthlyView(); break;
+                case 'employee': renderEmployeeView(selectedEmployee); break;
+            }
+        }
+
+        // ==========================================
+        // العرض اليومي - Daily View
+        // ==========================================
+        function renderDailyView() {
+            var container = document.getElementById('mainViewArea');
+            // احصل على الأيام من الموظفين المفلترين
+            var filtered = getFilteredEmployees();
+            var uniqueDays = [];
+            var daysSeen = {};
+            for (var i = 0; i < filtered.length; i++) {
+                for (var s = 0; s < filtered[i].schedule.length; s++) {
+                    var sch = filtered[i].schedule[s];
+                    if (!daysSeen[sch.date]) {
+                        daysSeen[sch.date] = true;
+                        uniqueDays.push({ date: sch.date, day: sch.day });
+                    }
+                }
+            }
+            uniqueDays.sort(function(a, b) { return a.date.localeCompare(b.date); });
+            
+            var html = '<div class="filter-group" style="max-width:300px; margin-bottom:16px;">' +
+                '<label>اختيار اليوم</label>' +
+                '<select id="dailyDaySelect" onchange="renderDailyTable(this.value)">';
+            if (uniqueDays.length === 0) {
+                html += '<option>لا توجد أيام متاحة</option>';
+            } else {
+                for (var i = 0; i < uniqueDays.length; i++) {
+                    var d = uniqueDays[i];
+                    html += '<option value="' + d.date + '">' + d.day + ' (' + d.date + ')</option>';
+                }
+            }
+            html += '</select></div>' +
+                '<div id="dailyTableContainer"></div>';
+            container.innerHTML = html;
+            if (uniqueDays.length > 0) renderDailyTable(uniqueDays[0].date);
+        }
+
+        function renderDailyTable(dateStr) {
+            var container = document.getElementById('dailyTableContainer');
+            var dayData = [];
+            var filtered = getFilteredEmployees();
+            for (var i = 0; i < filtered.length; i++) {
+                var emp = filtered[i];
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    if (emp.schedule[s].date === dateStr) {
+                        dayData.push({ employee: emp, shift: emp.schedule[s] });
+                    }
+                }
+            }
+            var html = '<div class="data-table-container"><table class="data-table"><thead><tr>' +
+                '<th>الموظف</th><th>المسمى الوظيفي</th><th>الفرقة</th><th>المناوبة</th><th>الوقت</th><th>الحالة</th>' +
+                '</tr></thead><tbody>';
+            if (dayData.length === 0) {
+                html += '<tr><td colspan="6" class="text-center" style="padding:30px; color:var(--text-muted);">لا يوجد موظفين في هذا اليوم</td></tr>';
+            } else {
+                for (var d = 0; d < dayData.length; d++) {
+                    var item = dayData[d];
+                    var emp = item.employee;
+                    var sch = item.shift;
+                    var shiftClass = sch.shift === 'صباح' ? 'badge-shift-morning' : sch.shift === 'دوام 12 ساعة' ? 'badge-shift-evening' : sch.shift === 'دوام ليلي 12 ساعة' ? 'badge-shift-night' : '';
+                    var statusClass = sch.status === 'دوام' ? 'badge-status-work' : sch.status === 'إجازة' ? 'badge-status-off' : 'badge-status-rest';
+                    html += '<tr>' +
+                        '<td><strong>' + emp.name + '</strong></td>' +
+                        '<td>' + emp.jobTitle + '</td>' +
+                        '<td>' + (emp.team || '-') + '</td>' +
+                        '<td>' + (sch.shift ? '<span class="badge ' + shiftClass + '">' + sch.shift + '</span>' : '-') + '</td>' +
+                        '<td>' + (sch.time || '-') + '</td>' +
+                        '<td><span class="badge ' + statusClass + '">' + sch.status + '</span></td>' +
+                        '</tr>';
+                }
+            }
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // العرض الأسبوعي - Weekly View
+        // ==========================================
+        function renderWeeklyView() {
+            var container = document.getElementById('mainViewArea');
+            var html = '<div class="weekly-grid">';
+            for (var d = 0; d < 7; d++) {
+                var dayName = ARABIC_DAYS[d];
+                html += '<div class="weekly-day-col">' +
+                    '<div class="weekly-day-header">' + dayName + '</div>' +
+                    '<div class="weekly-day-content" id="weeklyDay_' + d + '"></div>' +
+                    '</div>';
+            }
+            html += '</div>';
+            container.innerHTML = html;
+            // ملء البيانات من الموظفين المفلترين
+            var filtered = getFilteredEmployees();
+            for (var day = 0; day < 7; day++) {
+                var dayContent = document.getElementById('weeklyDay_' + day);
+                var dayEmployees = [];
+                for (var i = 0; i < filtered.length; i++) {
+                    var emp = filtered[i];
+                    for (var s = 0; s < emp.schedule.length; s++) {
+                        if (emp.schedule[s].day === ARABIC_DAYS[day] && emp.schedule[s].status === 'دوام') {
+                            dayEmployees.push({ name: emp.name, shift: emp.schedule[s].shift, team: emp.team || emp.schedule[s].location });
+                        }
+                    }
+                }
+                var content = '';
+                if (dayEmployees.length === 0) {
+                    content = '<div style="text-align:center; color:var(--text-muted); padding:20px 0; font-size:0.8rem;">لا يوجد</div>';
+                } else {
+                    for (var e = 0; e < dayEmployees.length; e++) {
+                        var de = dayEmployees[e];
+                        content += '<div class="weekly-employee-item">' +
+                            '<span class="weekly-employee-name">' + de.name + '</span>' +
+                            '<span class="weekly-employee-shift">' + de.shift + ' - ' + de.team + '</span>' +
+                            '</div>';
+                    }
+                }
+                dayContent.innerHTML = content;
+            }
+        }
+
+        // ==========================================
+        // العرض الشهري - Monthly View
+        // ==========================================
+        function renderMonthlyView() {
+            var container = document.getElementById('mainViewArea');
+            var year = currentMonth.getFullYear();
+            var month = currentMonth.getMonth();
+            var firstDay = new Date(year, month, 1);
+            var lastDay = new Date(year, month + 1, 0);
+            var startDayOfWeek = firstDay.getDay();
+            var daysInMonth = lastDay.getDate();
+            var html = '<div class="month-nav">' +
+                '<button class="month-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-right"></i></button>' +
+                '<div class="month-nav-title">' + ARABIC_MONTHS[month] + ' ' + year + '</div>' +
+                '<button class="month-nav-btn" onclick="changeMonth(1)"><i class="fas fa-chevron-left"></i></button>' +
+                '</div>' +
+                '<div class="calendar-grid">';
+            // رؤوس الأيام
+            for (var h = 0; h < 7; h++) {
+                html += '<div class="calendar-header-day">' + ARABIC_DAYS[h] + '</div>';
+            }
+            // الأيام الفارغة في البداية
+            for (var empty = 0; empty < startDayOfWeek; empty++) {
+                html += '<div class="calendar-day other-month"></div>';
+            }
+            // أيام الشهر
+            for (var day = 1; day <= daysInMonth; day++) {
+                var dateStr = year + '-' + pad2(month + 1) + '-' + pad2(day);
+                var isToday = dateStr === new Date().toISOString().split('T')[0];
+                // عد الموظفين في هذا اليوم
+                var shiftCounts = { 'صباحية': 0, 'مسائية': 0, 'ليلية': 0, 'OFF': 0, 'إجازة': 0 };
+                var totalEmp = 0;
+                for (var i = 0; i < employees.length; i++) {
+                    var emp = employees[i];
+                    for (var s = 0; s < emp.schedule.length; s++) {
+                        if (emp.schedule[s].date === dateStr) {
+                            totalEmp++;
+                            var sh = emp.schedule[s].shift || emp.schedule[s].status;
+                            if (shiftCounts[sh] !== undefined) shiftCounts[sh]++;
+                        }
+                    }
+                }
+                var dayClass = isToday ? 'calendar-day today' : 'calendar-day';
+                html += '<div class="' + dayClass + '">' +
+                    '<div class="calendar-day-number">' + day + '</div>' +
+                    '<div class="calendar-shift-count">' + totalEmp + ' موظف</div>' +
+                    '<div class="calendar-shifts">' +
+                    (shiftCounts['صباحية'] > 0 ? '<span class="calendar-shift-dot dot-morning" title="صباحية: ' + shiftCounts['صباحية'] + '"></span>' : '') +
+                    (shiftCounts['مسائية'] > 0 ? '<span class="calendar-shift-dot dot-evening" title="مسائية: ' + shiftCounts['مسائية'] + '"></span>' : '') +
+                    (shiftCounts['ليلية'] > 0 ? '<span class="calendar-shift-dot dot-night" title="ليلية: ' + shiftCounts['ليلية'] + '"></span>' : '') +
+                    (shiftCounts['إجازة'] > 0 ? '<span class="calendar-shift-dot dot-off" title="إجازة: ' + shiftCounts['إجازة'] + '"></span>' : '') +
+                    '</div></div>';
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function changeMonth(delta) {
+            currentMonth.setMonth(currentMonth.getMonth() + delta);
+            renderMonthlyView();
+        }
+
+        // ==========================================
+        // عرض حسب الموظف - Employee View
+        // ==========================================
+        function renderEmployeeView(empId) {
+            var container = document.getElementById('mainViewArea');
+            // قائمة الموظفين dropdown
+            var html = '<div class="filter-group" style="max-width:300px; margin-bottom:16px;">' +
+                '<label>اختيار الموظف</label>' +
+                '<select id="employeeSelect" onchange="renderEmployeeTable(this.value)">' +
+                '<option value="">اختر موظف...</option>';
+            for (var i = 0; i < employees.length; i++) {
+                var emp = employees[i];
+                var sel = emp.id === empId ? ' selected' : '';
+                html += '<option value="' + emp.id + '"' + sel + '>' + emp.name + ' - ' + emp.jobTitle + '</option>';
+            }
+            html += '</select></div>' +
+                '<div id="employeeTableContainer"></div>';
+            container.innerHTML = html;
+            if (empId) {
+                renderEmployeeTable(empId);
+            }
+        }
+
+        function renderEmployeeTable(empId) {
+            var container = document.getElementById('employeeTableContainer');
+            var emp = employees.find(function(e) { return e.id === empId; });
+            if (!emp) { container.innerHTML = ''; return; }
+            selectedEmployee = empId;
+            var html = '<div style="margin-bottom:16px; padding:16px; background:var(--bg-glass); border-radius:10px; border:1px solid var(--border);">' +
+                '<div style="display:flex; gap:24px; flex-wrap:wrap;">' +
+                '<div><strong>الاسم:</strong> ' + emp.name + '</div>' +
+                '<div><strong>المسمى:</strong> ' + emp.jobTitle + '</div>' +
+                '<div><strong>رقم الموظف:</strong> ' + emp.employeeNumber + '</div>' +
+                '<div><strong>الجوال:</strong> ' + emp.phone + '</div>' +
+                '</div></div>';
+            html += '<div class="data-table-container"><table class="data-table"><thead><tr>' +
+                '<th>اليوم</th><th>التاريخ</th><th>المناوبة</th><th>الوقت</th><th>الموقع</th><th>الحالة</th>' +
+                '</tr></thead><tbody>';
+            for (var s = 0; s < emp.schedule.length; s++) {
+                var sch = emp.schedule[s];
+                var shiftClass = sch.shift === 'صباحية' ? 'badge-shift-morning' : sch.shift === 'مسائية' ? 'badge-shift-evening' : sch.shift === 'ليلية' ? 'badge-shift-night' : '';
+                var statusClass = sch.status === 'دوام' ? 'badge-status-work' : sch.status === 'إجازة' ? 'badge-status-off' : 'badge-status-rest';
+                html += '<tr>' +
+                    '<td>' + sch.day + '</td>' +
+                    '<td>' + sch.date + '</td>' +
+                    '<td>' + (sch.shift ? '<span class="badge ' + shiftClass + '">' + sch.shift + '</span>' : '-') + '</td>' +
+                    '<td>' + (sch.time || '-') + '</td>' +
+                    '<td>' + (sch.location || '-') + '</td>' +
+                    '<td><span class="badge ' + statusClass + '">' + sch.status + '</span></td>' +
+                    '</tr>';
+            }
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // الفلاتر - Filters
+        // ==========================================
+        function populateLocationFilter() {
+            var select = document.getElementById('filterLocation');
+            // قائمة المواقع الوهمية (demo) - نستبعدها
+            var blockedLocs = ['محايل عسير','المطار','سراة عبيدة','جرش','خميس مشيط','خالد بن فهد','غير محدد',''];
+            var locations = {};
+            for (var i = 0; i < employees.length; i++) {
+                // نفضل استخدام team بدلاً من location
+                var team = employees[i].team;
+                if (team && blockedLocs.indexOf(team) === -1) {
+                    locations[team] = true;
+                }
+                // نسقط من location في schedule
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    var loc = employees[i].schedule[s].location;
+                    if (loc && blockedLocs.indexOf(loc) === -1) {
+                        locations[loc] = true;
+                    }
+                }
+            }
+            var currentVal = select.value;
+            var html = '<option value="">الكل</option>';
+            var locs = Object.keys(locations).sort();
+            for (var l = 0; l < locs.length; l++) {
+                html += '<option value="' + locs[l] + '">' + locs[l] + '</option>';
+            }
+            select.innerHTML = html;
+            select.value = currentVal;
+        }
+
+        function applyFilters() {
+            renderCurrentView();
+        }
+
+        function getFilteredEmployees() {
+            var dateFilter = document.getElementById('filterDate').value;
+            var monthFilter = document.getElementById('filterMonth').value;
+            var locFilter = document.getElementById('filterLocation').value;
+            var shiftFilter = document.getElementById('filterShift').value;
+            var statusFilter = document.getElementById('filterStatus').value;
+            var result = [];
+            for (var i = 0; i < employees.length; i++) {
+                var emp = JSON.parse(JSON.stringify(employees[i]));
+                emp.schedule = emp.schedule.filter(function(s) {
+                    if (dateFilter && s.date !== dateFilter) return false;
+                    if (monthFilter && !s.date.startsWith(monthFilter)) return false;
+                    if (locFilter && s.location !== locFilter) return false;
+                    if (shiftFilter && s.shift !== shiftFilter) return false;
+                    if (statusFilter && s.status !== statusFilter) return false;
+                    return true;
+                });
+                if (emp.schedule.length > 0) result.push(emp);
+            }
+            return result;
+        }
+
+        function getUniqueDays() {
+            var days = {};
+            for (var i = 0; i < employees.length; i++) {
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    var sch = employees[i].schedule[s];
+                    if (!days[sch.date]) days[sch.date] = sch.day;
+                }
+            }
+            var result = [];
+            var keys = Object.keys(days).sort();
+            for (var k = 0; k < keys.length; k++) {
+                result.push({ date: keys[k], day: days[keys[k]] });
+            }
+            return result;
+        }
+
+        // ==========================================
+        // الإحصائيات - Statistics
+        // ==========================================
+        function calculateStats() {
+            var today = new Date().toISOString().split('T')[0];
+            var totalEmployees = employees.length;
+            var todayShifts = 0;
+            var leaves = 0;
+            var totalSlots = 0;
+            for (var i = 0; i < employees.length; i++) {
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    var sch = employees[i].schedule[s];
+                    totalSlots++;
+                    if (sch.date === today && sch.status === 'دوام') todayShifts++;
+                    if (sch.status === 'إجازة' || sch.status === 'راحة' || sch.status === 'OFF') leaves++;
+                }
+            }
+            var coverage = totalSlots > 0 ? Math.round(((totalSlots - leaves) / totalSlots) * 100) : 0;
+            return { totalEmployees: totalEmployees, todayShifts: todayShifts, coverage: coverage, leaves: leaves };
+        }
+
+        function updateStats() {
+            var stats = calculateStats();
+            document.getElementById('statTotalEmployees').textContent = stats.totalEmployees;
+            document.getElementById('statTodayShifts').textContent = stats.todayShifts;
+            document.getElementById('statCoverage').textContent = stats.coverage + '%';
+            document.getElementById('statLeaves').textContent = stats.leaves;
+        }
+
+        // ==========================================
+        // الرسوم البيانية - Charts
+        // ==========================================
+        function renderCharts() {
+            renderShiftsChart();
+            renderLocationsChart();
+        }
+
+        function renderShiftsChart() {
+            var ctx = document.getElementById('shiftsChart');
+            if (!ctx) return;
+            var shiftCounts = { 'صباحية': 0, 'مسائية': 0, 'ليلية': 0, 'إجازة': 0, 'راحة': 0, 'OFF': 0 };
+            for (var i = 0; i < employees.length; i++) {
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    var sh = employees[i].schedule[s];
+                    if (sh.status !== 'دوام') {
+                        if (shiftCounts[sh.status] !== undefined) shiftCounts[sh.status]++;
+                    } else if (shiftCounts[sh.shift] !== undefined) {
+                        shiftCounts[sh.shift]++;
+                    }
+                }
+            }
+            if (charts.shifts) charts.shifts.destroy();
+            charts.shifts = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['صباحية', 'مسائية', 'ليلية', 'إجازة', 'راحة', 'OFF'],
+                    datasets: [{
+                        data: [shiftCounts['صباحية'], shiftCounts['مسائية'], shiftCounts['ليلية'], shiftCounts['إجازة'], shiftCounts['راحة'], shiftCounts['OFF']],
+                        backgroundColor: ['#2563EB', '#8B5CF6', '#64748B', '#EF4444', '#F59E0B', '#94A3B8'],
+                        borderColor: '#FFFFFF',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#1E293B', font: { family: 'Inter' }, padding: 15 } }
+                    }
+                }
+            });
+        }
+
+        function renderLocationsChart() {
+            var ctx = document.getElementById('locationsChart');
+            if (!ctx) return;
+            var locCounts = {};
+            for (var i = 0; i < employees.length; i++) {
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    var loc = employees[i].schedule[s].location;
+                    if (loc) locCounts[loc] = (locCounts[loc] || 0) + 1;
+                }
+            }
+            var labels = Object.keys(locCounts).sort();
+            var data = labels.map(function(l) { return locCounts[l]; });
+            var colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#3B82F6', '#F97316', '#EC4899'];
+            if (charts.locations) charts.locations.destroy();
+            charts.locations = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'عدد المناوبات',
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#64748B', font: { family: 'Inter' } }, grid: { color: '#F1F5F9' } },
+                        y: { ticks: { color: '#64748B', font: { family: 'Inter' } }, grid: { color: '#F1F5F9' } }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // Document Viewer
+        // ==========================================
+        function openDocumentViewer(fileId) {
+            var file = savedFiles.find(function(f) { return f.id === fileId; });
+            if (!file) { showToast('الملف غير موجود', 'error'); return; }
+            document.getElementById('modalTitle').textContent = file.name;
+            document.getElementById('docModal').classList.add('active');
+            showToast('جاري فتح الملف...', 'info');
+        }
+
+        function closeDocumentViewer() {
+            document.getElementById('docModal').classList.remove('active');
+        }
+
+        function copyDocumentContent() {
+            var content = document.getElementById('modalBody').textContent;
+            navigator.clipboard.writeText(content).then(function() {
+                showToast('تم نسخ المحتوى', 'success');
+            });
+        }
+
+        function downloadDocument() {
+            showToast('جاري التحميل...', 'info');
+        }
+
+        // ==========================================
+        // التصدير - Export
+        // ==========================================
+        function exportToExcel() {
+            var wb = XLSX.utils.book_new();
+            // ورقة الموظفين
+            var empData = [['الرقم','الاسم','المسمى الوظيفي','رقم الموظف','الجوال']];
+            for (var i = 0; i < employees.length; i++) {
+                var e = employees[i];
+                empData.push([e.id, e.name, e.jobTitle, e.employeeNumber, e.phone]);
+            }
+            var ws1 = XLSX.utils.aoa_to_sheet(empData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'الموظفين');
+            // ورقة المناوبات
+            var shiftData = [['الموظف','اليوم','التاريخ','المناوبة','الوقت','الموقع','الحالة']];
+            for (var j = 0; j < employees.length; j++) {
+                var emp = employees[j];
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    var sch = emp.schedule[s];
+                    shiftData.push([emp.name, sch.day, sch.date, sch.shift, sch.time, sch.location, sch.status]);
+                }
+            }
+            var ws2 = XLSX.utils.aoa_to_sheet(shiftData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'المناوبات');
+            XLSX.writeFile(wb, 'الجداول.xlsx');
+            showToast('تم تصدير الملف بنجاح', 'success');
+        }
+
+        function exportToPDF() {
+            var element = document.getElementById('mainViewArea');
+            if (!element || element.innerHTML.trim() === '') {
+                showToast('لا يوجد محتوى للتصدير', 'error'); return;
+            }
+            var opt = {
+                margin: 10,
+                filename: 'الجداول.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save().then(function() {
+                showToast('تم تصدير PDF بنجاح', 'success');
+            });
+        }
+
+        function printSchedule() {
+            var content = document.getElementById('mainViewArea').innerHTML;
+            if (!content || content.trim() === '') { showToast('لا يوجد محتوى للطباعة', 'error'); return; }
+            var w = window.open('', '_blank');
+            w.document.write('<html dir="rtl"><head><title>طباعة الجدول</title><style>' +
+                'body{font-family:Arial; padding:20px;} table{border-collapse:collapse; width:100%;} ' +
+                'th,td{border:1px solid #333; padding:8px; text-align:right;} ' +
+                'th{background:#f0f0f0;}</style></head><body>' + content + '</body></html>');
+            w.document.close();
+            w.focus();
+            setTimeout(function() { w.print(); }, 500);
+        }
+
+        // ==========================================
+        // Toast Notifications
+        // ==========================================
+        function showToast(message, type) {
+            var container = document.getElementById('toastContainer');
+            var toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+            toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
+            container.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+
+        // ==========================================
+        // إغلاق المودال عند النقر خارج المحتوى
+        // ==========================================
+        document.getElementById('docModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDocumentViewer();
+        });
+
+        // نشر الـ functions على window عشان onclick attributes تقدر تلاقيها
+        window.setView = setView;
+        window.applyFilters = applyFilters;
+        window.exportToExcel = exportToExcel;
+        window.exportToPDF = exportToPDF;
+        window.printSchedule = printSchedule;
+                window.closeDocumentViewer = closeDocumentViewer;
+        window.changeMonth = changeMonth;
+        window.openDocumentViewer = openDocumentViewer;
+        window.deleteSavedFile = deleteSavedFile;
+        window.selectSearchResult = selectSearchResult;
+        window.copyDocumentContent = copyDocumentContent;
+        window.downloadDocument = downloadDocument;
+        window.renderDailyTable = renderDailyTable;
+        window.renderEmployeeTable = renderEmployeeTable;
+        console.log('✅ جميع الدوال متاحة في window');
+    </script>
+</body>
+</html>

@@ -1,216 +1,112 @@
 <!-- ===== نموذج التصعيد ===== -->
-<div style="background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:10px; border:1px solid var(--gray-200);">
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:12px; border-bottom:2px solid var(--gray-200);">
-        <div style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--coral-light); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--coral);">
-            <i class="fas fa-arrow-up"></i>
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-arrow-up" style="color:var(--coral);"></i>
+        معلومات البلاغ
+    </div>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-hashtag" style="color:var(--primary-700);"></i> رقم البلاغ:</label>
+            <input type="text" id="escReportNumber" placeholder="مثال: 2025-ESC-001">
         </div>
-        <div>
-            <h4 style="margin:0; color:var(--primary-700); font-size:1rem;">التصعيد</h4>
-            <span style="font-size:0.7rem; color:var(--gray-600);">تسجيل بلاغات التصعيد</span>
-        </div>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-hashtag" style="color:var(--primary-700); width:18px;"></i> رقم البلاغ:
-        </label>
-        <input type="text" id="escReportNumber" placeholder="مثال: 2025-ESC-001" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-calendar-clock" style="color:var(--gold); width:18px;"></i> تاريخ ووقت البلاغ:
-        </label>
-        <input type="datetime-local" id="escDateTime" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-map-marker-alt" style="color:var(--coral); width:18px;"></i> موقع البلاغ:
-        </label>
-        <input type="text" id="escLocation" placeholder="الموقع بالتفصيل" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-exclamation-triangle" style="color:var(--coral); width:18px;"></i> نوع الحدث:
-        </label>
-        <select id="escEventType" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-            <option value="">-- اختر نوع الحدث --</option>
-            <option value="كارثة طبيعية">كارثة طبيعية</option>
-            <option value="حادث تصادم مروري">حادث تصادم مروري</option>
-            <option value="حريق">حريق</option>
-            <option value="إصابة في المدارس">إصابة في المدارس</option>
-            <option value="إصابة رياضية">إصابة رياضية</option>
-            <option value="حالة طارئة صحية">حالة طارئة صحية</option>
-            <option value="حادث عمل">حادث عمل</option>
-            <option value="غرق">غرق</option>
-            <option value="انهيار مبنى">انهيار مبنى</option>
-            <option value="تلوث كيميائي">تلوث كيميائي</option>
-            <option value="حادث كهربائي">حادث كهربائي</option>
-            <option value="عنف أسري">عنف أسري</option>
-            <option value="اعتداء">اعتداء</option>
-            <option value="أخرى">أخرى</option>
-        </select>
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-users" style="color:var(--teal); width:18px;"></i> عدد المصابين:
-        </label>
-        <input type="number" id="escInjuries" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-user-injured" style="color:var(--coral); width:18px;"></i> عدد الوفيات:
-        </label>
-        <input type="number" id="escDeaths" min="0" value="0" style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s; background:white;">
-    </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-building" style="color:var(--primary-500); width:18px;"></i> الجهات المشاركة (اختياري):
-        </label>
-        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:6px; background:white; padding:12px; border-radius:var(--radius-sm); border:1.5px solid var(--gray-200);">
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="وزارة الصحة" style="accent-color:var(--primary-700);"> وزارة الصحة
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="الإسعاف الجوي" style="accent-color:var(--primary-700);"> الإسعاف الجوي
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="الدفاع المدني" style="accent-color:var(--primary-700);"> الدفاع المدني
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="الدوريات الأمنية" style="accent-color:var(--primary-700);"> الدوريات الأمنية
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="أمن الطرق" style="accent-color:var(--primary-700);"> أمن الطرق
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="المرور" style="accent-color:var(--primary-700);"> المرور
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="أمانة الرياض (شرشورة)" style="accent-color:var(--primary-700);"> أمانة الرياض (شرشورة)
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
-                <input type="checkbox" class="esc-agency" value="الهلال الأحمر" style="accent-color:var(--primary-700);"> الهلال الأحمر
-            </label>
+        <div class="form-group">
+            <label><i class="fas fa-calendar-clock" style="color:var(--gold);"></i> تاريخ ووقت البلاغ:</label>
+            <input type="datetime-local" id="escDateTime">
         </div>
     </div>
-    
-    <div class="form-row">
-        <label style="font-weight:600; font-size:0.85rem; color:var(--gray-800); display:block; margin-bottom:4px;">
-            <i class="fas fa-pen" style="color:var(--gray-600); width:18px;"></i> تفاصيل البلاغ:
-        </label>
-        <textarea id="escDetails" rows="3" placeholder="التفاصيل الكاملة للبلاغ..." style="width:100%; padding:10px 14px; border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; resize:vertical; transition:border-color 0.2s; background:white;"></textarea>
-    </div>
-    
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px; padding-top:15px; border-top:1px solid var(--gray-200);">
-        <button onclick="saveEscalation()" class="btn btn-primary" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--primary-700); color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-save"></i> حفظ البلاغ
-        </button>
-        <button onclick="sendEscalationWhatsApp()" class="btn btn-whatsapp" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:#25D366; color:white; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fab fa-whatsapp"></i> إرسال واتساب
-        </button>
-        <button onclick="clearEscalationForm()" class="btn" style="padding:8px 24px; border-radius:30px; font-size:0.85rem; background:var(--gray-100); color:var(--gray-600); border:1px solid var(--gray-200); cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;">
-            <i class="fas fa-eraser"></i> مسح
-        </button>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-map-marker-alt" style="color:var(--coral);"></i> موقع البلاغ:</label>
+            <input type="text" id="escLocation" placeholder="الموقع بالتفصيل">
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-exclamation-triangle" style="color:var(--coral);"></i> نوع الحدث:</label>
+            <select id="escEventType">
+                <option value="">-- اختر نوع الحدث --</option>
+                <option value="كارثة طبيعية">كارثة طبيعية</option>
+                <option value="حادث تصادم مروري">حادث تصادم مروري</option>
+                <option value="حريق">حريق</option>
+                <option value="إصابة في المدارس">إصابة في المدارس</option>
+                <option value="إصابة رياضية">إصابة رياضية</option>
+                <option value="حالة طارئة صحية">حالة طارئة صحية</option>
+                <option value="حادث عمل">حادث عمل</option>
+                <option value="غرق">غرق</option>
+                <option value="انهيار مبنى">انهيار مبنى</option>
+                <option value="تلوث كيميائي">تلوث كيميائي</option>
+                <option value="حادث كهربائي">حادث كهربائي</option>
+                <option value="عنف أسري">عنف أسري</option>
+                <option value="اعتداء">اعتداء</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
     </div>
 </div>
 
-<script>
-let escalationRecords = JSON.parse(localStorage.getItem('escalationRecords') || '[]');
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-chart-bar" style="color:var(--teal);"></i>
+        إحصائيات
+    </div>
+    <div class="form-row-grid">
+        <div class="form-group">
+            <label><i class="fas fa-users" style="color:var(--teal);"></i> عدد المصابين:</label>
+            <input type="number" id="escInjuries" min="0" value="0">
+        </div>
+        <div class="form-group">
+            <label><i class="fas fa-user-injured" style="color:var(--coral);"></i> عدد الوفيات:</label>
+            <input type="number" id="escDeaths" min="0" value="0">
+        </div>
+    </div>
+</div>
 
-function initForm_escalation() {
-    document.getElementById('escDateTime').value = new Date().toISOString().slice(0, 16);
-}
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-building" style="color:var(--primary-500);"></i>
+        الجهات المشاركة (اختياري)
+    </div>
+    <div class="form-group">
+        <div class="checkbox-grid">
+            <label><input type="checkbox" class="esc-agency" value="وزارة الصحة"> وزارة الصحة</label>
+            <label><input type="checkbox" class="esc-agency" value="الإسعاف الجوي"> الإسعاف الجوي</label>
+            <label><input type="checkbox" class="esc-agency" value="الدفاع المدني"> الدفاع المدني</label>
+            <label><input type="checkbox" class="esc-agency" value="الدوريات الأمنية"> الدوريات الأمنية</label>
+            <label><input type="checkbox" class="esc-agency" value="أمن الطرق"> أمن الطرق</label>
+            <label><input type="checkbox" class="esc-agency" value="المرور"> المرور</label>
+            <label><input type="checkbox" class="esc-agency" value="أمانة الرياض (شرشورة)"> أمانة الرياض (شرشورة)</label>
+            <label><input type="checkbox" class="esc-agency" value="الهلال الأحمر"> الهلال الأحمر</label>
+        </div>
+    </div>
+</div>
 
-function saveEscalation() {
-    const reportNumber = document.getElementById('escReportNumber').value.trim();
-    const dateTime = document.getElementById('escDateTime').value;
-    const location = document.getElementById('escLocation').value.trim();
-    const eventType = document.getElementById('escEventType').value;
-    const injuries = parseInt(document.getElementById('escInjuries').value) || 0;
-    const deaths = parseInt(document.getElementById('escDeaths').value) || 0;
-    const details = document.getElementById('escDetails').value.trim();
-    
-    const agencies = [];
-    document.querySelectorAll('.esc-agency:checked').forEach(function(cb) {
-        agencies.push(cb.value);
-    });
+<div class="form-card">
+    <div class="form-card-title">
+        <i class="fas fa-pen" style="color:var(--gray-600);"></i>
+        التفاصيل
+    </div>
+    <div class="form-group">
+        <label><i class="fas fa-pen" style="color:var(--gray-600);"></i> تفاصيل البلاغ:</label>
+        <textarea id="escDetails" rows="3" placeholder="التفاصيل الكاملة للبلاغ..."></textarea>
+    </div>
+</div>
 
-    if (!reportNumber || !location || !eventType) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة (رقم البلاغ، الموقع، نوع الحدث)');
-        return;
-    }
+<div class="form-actions">
+    <button onclick="clearEscalationForm()" class="btn btn-warning">
+        <i class="fas fa-eraser"></i> مسح
+    </button>
+    <button onclick="saveEscalation()" class="btn btn-primary">
+        <i class="fas fa-save"></i> حفظ البلاغ
+    </button>
+    <button onclick="sendEscalationWhatsApp()" class="btn btn-success">
+        <i class="fab fa-whatsapp"></i> إرسال واتساب
+    </button>
+</div>
 
-    escalationRecords.unshift({
-        reportNumber,
-        dateTime,
-        location,
-        eventType,
-        injuries,
-        deaths,
-        agencies,
-        details,
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('escalationRecords', JSON.stringify(escalationRecords));
-    alert('✅ تم حفظ بلاغ التصعيد');
-    clearEscalationForm();
-}
-
-function clearEscalationForm() {
-    document.getElementById('escReportNumber').value = '';
-    document.getElementById('escLocation').value = '';
-    document.getElementById('escEventType').value = '';
-    document.getElementById('escInjuries').value = 0;
-    document.getElementById('escDeaths').value = 0;
-    document.getElementById('escDetails').value = '';
-    document.querySelectorAll('.esc-agency').forEach(function(cb) { cb.checked = false; });
-    document.getElementById('escDateTime').value = new Date().toISOString().slice(0, 16);
-}
-
-function sendEscalationWhatsApp() {
-    const reportNumber = document.getElementById('escReportNumber').value.trim();
-    const dateTime = document.getElementById('escDateTime').value;
-    const location = document.getElementById('escLocation').value.trim();
-    const eventType = document.getElementById('escEventType').value;
-    const injuries = parseInt(document.getElementById('escInjuries').value) || 0;
-    const deaths = parseInt(document.getElementById('escDeaths').value) || 0;
-    const details = document.getElementById('escDetails').value.trim();
-    
-    const agencies = [];
-    document.querySelectorAll('.esc-agency:checked').forEach(function(cb) {
-        agencies.push(cb.value);
-    });
-
-    if (!reportNumber || !location || !eventType) {
-        alert('⚠️ الرجاء ملء الحقول المطلوبة');
-        return;
-    }
-
-    let message = '';
-    message += 'تقرير بلاغ تصعيد\n';
-    message += '═══════════════════════════════════\n';
-    message += 'رقم البلاغ: ' + reportNumber + '\n';
-    message += 'التاريخ والوقت: ' + dateTime.replace('T', ' ') + '\n';
-    message += 'الموقع: ' + location + '\n';
-    message += 'نوع الحدث: ' + eventType + '\n';
-    message += 'عدد المصابين: ' + injuries + '\n';
-    message += 'عدد الوفيات: ' + deaths + '\n';
-    if (agencies.length > 0) {
-        message += 'الجهات المشاركة: ' + agencies.join('، ') + '\n';
-    }
-    if (details) {
-        message += 'التفاصيل: ' + details + '\n';
-    }
-    message += '═══════════════════════════════════\n';
-    message += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
-
-    const encoded = encodeURIComponent(message);
-    window.open('https://wa.me/?text=' + encoded, '_blank');
-}
-</script>
+<div class="form-card" style="margin-top:16px; background:var(--gray-50);">
+    <div class="form-card-title">
+        <i class="fas fa-eye" style="color:var(--primary-700);"></i>
+        البلاغات المحفوظة
+    </div>
+    <div id="escalationPreviewList" style="max-height:300px; overflow-y:auto;">
+        <p style="text-align:center; color:var(--gray-400); padding:20px;">📭 لا توجد بلاغات محفوظة</p>
+    </div>
+</div>
