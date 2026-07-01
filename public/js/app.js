@@ -856,12 +856,12 @@ var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_a
     renderAuditLog();
 });
 
-async function addAuditEntry(type, action, detail, user) {
+async function addAuditEntry(category, action, details, user) {
     var entry = {
         id: Date.now().toString(),
-        type: type || 'system',
+        category: category || 'system',
         action: action || '',
-        detail: detail || '',
+        details: details || '',
         user: user || 'المشرف',
         timestamp: new Date().toISOString()
     };
@@ -873,7 +873,7 @@ async function addAuditEntry(type, action, detail, user) {
         await apiFetch('/api/audit-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ entry: entry })
+            body: JSON.stringify({ action: entry.action, details: entry.details, category: entry.category })
         });
     } catch (e) { console.error('Failed to save audit entry:', e); }
 }
@@ -883,7 +883,7 @@ function renderAuditLog() {
     if (!container) return;
 
     var filtered = currentAuditFilter === 'all' ? auditLog : auditLog.filter(function(e) {
-        return e.type === currentAuditFilter;
+        return e.category === currentAuditFilter;
     });
 
     if (filtered.length === 0) {
@@ -909,10 +909,10 @@ function renderAuditLog() {
         html +=
             '<div class="audit-entry">' +
                 '<span class="audit-time">' + timeStr + '</span>' +
-                '<span class="audit-icon ' + entry.type + '">' + (icons[entry.type] || '&#x2699;&#xFE0F;') + '</span>' +
+                '<span class="audit-icon ' + entry.category + '">' + (icons[entry.category] || '&#x2699;&#xFE0F;') + '</span>' +
                 '<div class="audit-content">' +
                     '<div class="audit-action">' + entry.action + '</div>' +
-                    '<div class="audit-detail">' + entry.detail + '</div>' +
+                    '<div class="audit-detail">' + entry.details + '</div>' +
                 '</div>' +
                 '<span class="audit-user">' + entry.user + '</span>' +
             '</div>';
@@ -947,7 +947,7 @@ async function refreshAuditLog() {
     try {
         var res = await apiFetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
         var data = await res.json();
-        auditLog = data && data.log ? data.log : (Array.isArray(data) ? data : []);
+        auditLog = data && data.logs ? data.logs : (Array.isArray(data) ? data : []);
     } catch (e) {
         auditLog = [];
     }
@@ -958,7 +958,7 @@ function exportAuditLog() {
     var csv = 'الوقت,النوع,الإجراء,التفاصيل,المستخدم\n';
     for (var i = 0; i < auditLog.length; i++) {
         var e = auditLog[i];
-        csv += e.timestamp + ',' + e.type + ',' + (e.action || '') + ',' + (e.detail || '') + ',' + (e.user || '') + '\n';
+        csv += e.timestamp + ',' + e.category + ',' + (e.action || '') + ',' + (e.details || '') + ',' + (e.user || '') + '\n';
     }
 
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -8308,14 +8308,22 @@ async function savePeakPlan() {
         createdAt: new Date().toISOString()
     };
 
-    peakPlans.unshift(plan);
     try {
         await apiFetch('/api/peak-plans', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ plans: peakPlans })
+            body: JSON.stringify({
+                title: title,
+                description: notes || '',
+                location: location,
+                units: unit ? [unit] : [],
+                startTime: startTime,
+                endTime: endTime,
+                priority: priority
+            })
         });
     } catch (e) { console.error('Failed to save peak plans:', e); }
+    peakPlans.unshift(plan);
     clearPeakForm();
     alert('✅ تم حفظ خطة التمركز');
     switchPeakTab('dashboard');

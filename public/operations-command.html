@@ -1708,8 +1708,9 @@ async function loadDashboardData() {
   try {
     const res = await apiFetch('/api/dashboard');
     if (res.ok) {
-      const data = await res.json();
-      if (data && data.stats) dashboardData = data;
+      const raw = await res.json();
+      const payload = (raw && (raw.data || raw.dashboard)) || (Array.isArray(raw) ? {} : raw);
+      if (payload && payload.stats) dashboardData = payload;
     }
   } catch (e) { console.error('Failed to load dashboard:', e); }
   renderDashboard();
@@ -1722,9 +1723,10 @@ async function loadReferencesData() {
   try {
     const res = await apiFetch('/api/references');
     if (res.ok) {
-      referencesData = await res.json();
+      const raw = await res.json();
+      referencesData = (raw && (raw.data || raw.records || raw.references)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load references:', e); }
+  } catch (e) { console.error('Failed to load references:', e); referencesData = []; }
   renderReferences();
 }
 
@@ -1735,9 +1737,10 @@ async function loadHospitalsData() {
   try {
     const res = await apiFetch('/api/hospitals');
     if (res.ok) {
-      hospitalsData = await res.json();
+      const raw = await res.json();
+      hospitalsData = (raw && (raw.data || raw.records || raw.hospitals)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load hospitals:', e); }
+  } catch (e) { console.error('Failed to load hospitals:', e); hospitalsData = []; }
   renderHospitals();
 }
 
@@ -1748,9 +1751,10 @@ async function loadFilesData() {
   try {
     const res = await apiFetch('/api/ops-files');
     if (res.ok) {
-      filesData = await res.json();
+      const raw = await res.json();
+      filesData = (raw && (raw.data || raw.records || raw.files)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load files:', e); }
+  } catch (e) { console.error('Failed to load files:', e); filesData = []; }
   renderFiles();
 }
 
@@ -1761,9 +1765,10 @@ async function loadTimelineData() {
   try {
     const res = await apiFetch('/api/timeline');
     if (res.ok) {
-      timelineData = await res.json();
+      const raw = await res.json();
+      timelineData = (raw && (raw.data || raw.records || raw.timeline)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load timeline:', e); }
+  } catch (e) { console.error('Failed to load timeline:', e); timelineData = []; }
   renderTimeline();
 }
 
@@ -1774,9 +1779,10 @@ async function loadAnnouncementsData() {
   try {
     const res = await apiFetch('/api/announcements');
     if (res.ok) {
-      announcementsData = await res.json();
+      const raw = await res.json();
+      announcementsData = (raw && (raw.data || raw.records || raw.announcements)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load announcements:', e); }
+  } catch (e) { console.error('Failed to load announcements:', e); announcementsData = []; }
   renderAnnouncements();
 }
 
@@ -1821,6 +1827,9 @@ function switchSection(sectionName) {
  * تشمل: الإحصائيات، التوجيهات، التنبيهات، المؤشرات، النشاطات
  */
 function renderDashboard() {
+  if (!dashboardData || typeof dashboardData !== 'object' || Array.isArray(dashboardData)) {
+    dashboardData = { stats: [], directives: [], alerts: [], indicators: [], activities: [] };
+  }
   // ── 1. بطاقات الإحصائيات ──
   const statsEl = document.getElementById('dashboardStats');
   statsEl.innerHTML = dashboardData.stats.map((s, i) => `
@@ -1919,6 +1928,7 @@ function togglePin(id) {
  * يدعم الفلترة حسب النوع والقسم والحالة والبحث النصي
  */
 function renderReferences() {
+  if (!Array.isArray(referencesData)) referencesData = [];
   const typeF  = document.getElementById('refFilterType').value;
   const deptF  = document.getElementById('refFilterDept').value;
   const statF  = document.getElementById('refFilterStatus').value;
@@ -1963,6 +1973,7 @@ function renderReferences() {
  * renderHospitals() - رسم دليل المستشفيات مع البحث والفلترة
  */
 function renderHospitals() {
+  if (!Array.isArray(hospitalsData)) hospitalsData = [];
   const srch    = document.getElementById('hospSearch').value.toLowerCase();
   const typeF   = document.getElementById('hospFilterType').value;
   const filtered = hospitalsData.filter(h => {
@@ -2000,6 +2011,7 @@ function renderHospitals() {
  * renderFiles() - رسم قائمة الملفات المرفوعة
  */
 function renderFiles() {
+  if (!Array.isArray(filesData)) filesData = [];
   const iconMap = { pdf:'fa-file-pdf', word:'fa-file-word', excel:'fa-file-excel', ppt:'fa-file-powerpoint', img:'fa-file-image' };
   document.getElementById('fileCount').textContent = filesData.length + ' ملف';
   if (!filesData.length) {
@@ -2125,6 +2137,7 @@ async function handleFiles(fileList) {
  * renderTimeline() - رسم الخط الزمني
  */
 function renderTimeline() {
+  if (!Array.isArray(timelineData)) timelineData = [];
   const filter = document.getElementById('timelineFilter').value;
   let filtered = timelineData;
   if (filter) filtered = timelineData.filter(t => t.type === filter);
@@ -2149,6 +2162,7 @@ function renderTimeline() {
  * renderAnnouncements() - رسم الإعلانات العاجلة
  */
 function renderAnnouncements() {
+  if (!Array.isArray(announcementsData)) announcementsData = [];
   const container = document.getElementById('announcementsContainer');
   const pinned = announcementsData.filter(a => a.pinned);
   const normal = announcementsData.filter(a => !a.pinned);

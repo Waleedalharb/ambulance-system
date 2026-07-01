@@ -2416,6 +2416,16 @@ app.get('/api/operational-files', authenticate, async (req, res) => {
     }
 });
 
+// GET /api/ops-files - alias for operations-command.html compatibility
+app.get('/api/ops-files', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        res.json({ success: true, files: metadata });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
 // تحميل ملف
 app.get('/api/download-operational/:id', authenticate, async (req, res) => {
     try {
