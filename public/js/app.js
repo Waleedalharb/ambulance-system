@@ -485,8 +485,62 @@ function handleWebSocketMessage(data) {
             showNotification('جدول شهري', data.message, 'info', 3000);
             if (typeof loadSavedTable === 'function') loadSavedTable();
             break;
+        case 'shift_started':
+            showNotification('مناوبة جديدة', data.message, 'info', 4000);
+            loadShifts();
+            loadAllData();
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            break;
+        case 'shift_updated':
+            showNotification('تحديث المناوبة', data.message, 'info', 3000);
+            loadShifts();
+            loadAllData();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            break;
+        case 'shift_deleted':
+            showNotification('مناوبة محذوفة', data.message, 'info', 3000);
+            loadShifts();
+            loadAllData();
+            calculateLiveReportStats();
+            updateWorkforceStats();
+            updateDistributionIndicator();
+            break;
         case 'identity_uploaded':
             showNotification('هوية القطاع', data.message, 'info', 3000);
+            break;
+        case 'control_notes_updated':
+            showNotification('تم التحديث', data.message, 'info', 3000);
+            if (typeof loadControlNotes === 'function') loadControlNotes();
+            break;
+        case 'vacations_updated':
+            showNotification('تم التحديث', data.message, 'info', 3000);
+            if (typeof loadVacations === 'function') loadVacations();
+            if (document.getElementById('controlModal') && document.getElementById('controlModal').style.display === 'flex' && typeof renderControlList === 'function') {
+                renderControlList(false);
+            }
+            break;
+        case 'peak_mission_added':
+            showNotification('مهمة جديدة', data.message, 'info', 5000);
+            if (typeof checkForAlerts === 'function') checkForAlerts();
+            break;
+        case 'peak_alert_resolved':
+            showNotification('تم الإنهاء', data.message, 'info', 3000);
+            if (typeof checkForAlerts === 'function') checkForAlerts();
+            break;
+        case 'air_ambulance_saved':
+            showNotification('إسعاف جوي', data.message, 'info', 4000);
+            if (typeof loadAirRecords === 'function') loadAirRecords();
+            break;
+        case 'air_ambulance_deleted':
+            showNotification('إسعاف جوي', data.message, 'info', 3000);
+            if (typeof loadAirRecords === 'function') loadAirRecords();
+            break;
+        case 'air_ambulance_cleared':
+            showNotification('إسعاف جوي', data.message, 'info', 3000);
+            if (typeof loadAirRecords === 'function') loadAirRecords();
             break;
         case 'connected':
             console.log('WS:', data.message);
@@ -2357,7 +2411,7 @@ async function startNewShift() {
     if (!shiftType) return;
     if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (shiftType === 'صباحية' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
     try {
-        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: shiftType }) });
+        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftType: shiftType }) });
         var result = await response.json();
         if (result.success) {
             currentShiftId = result.shiftId;
@@ -2467,7 +2521,7 @@ async function viewShiftReports() {
     var shiftId = parseInt(select.value);
     if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
     try {
-        var response = await fetch('/api/shifts/' + shiftId);
+        var response = await fetch('/api/shifts/' + shiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
         var result = await response.json();
         if (result && result.shift) {
             currentViewingShift = result.shift;
@@ -2511,7 +2565,7 @@ async function saveShiftData() {
     var targetId = viewingShiftId || currentShiftId;
     if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
     try {
-        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
+        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
         var result = await response.json();
         if (result.success) {
             alert("✅ تم حفظ بيانات التكميل بنجاح");
@@ -2521,7 +2575,7 @@ async function saveShiftData() {
             updateWorkforceStats();
             updateDistributionIndicator();
             if (viewingShiftId) {
-                var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
+                var viewResponse = await fetch('/api/shifts/' + viewingShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 var viewResult = await viewResponse.json();
                 if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
             }
@@ -2534,7 +2588,7 @@ async function deleteCurrentShift() {
     if (!targetId) { alert("لا توجد مناوبة محددة للحذف"); return; }
     if (!confirm("⚠️ هل أنت متأكد من حذف هذه المناوبة؟")) return;
     try {
-        var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE' });
+        var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } });
         var result = await response.json();
         if (result.success) {
             alert("✅ تم حذف المناوبة");
@@ -4159,6 +4213,17 @@ async function loadVacations() {
             data.forEach(function(item, index) { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
         }
     } catch (error) { console.error("خطأ في تحميل الإجازات:", error); }
+}
+
+async function loadControlNotes() {
+    try {
+        var response = await fetch('/api/control-notes', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            var textarea = document.getElementById('controlNotes');
+            if (textarea) textarea.value = result.notes || '';
+        }
+    } catch (error) { console.error("خطأ في تحميل ملاحظات التحكم:", error); }
 }
 
 function renderControlList(editable) {

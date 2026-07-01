@@ -533,6 +533,13 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         await writeData({});
         currentShiftId = newShift.id;
 
+        broadcast({
+            type: 'shift_started',
+            message: 'تم بدء مناوبة جديدة: ' + newShift.shiftName,
+            shiftId: newShift.id,
+            shiftType: shiftType
+        });
+
         res.json({ success: true, shiftId: newShift.id, shift: newShift });
     } catch (error) {
         console.error("خطأ في بدء المناوبة:", error);
@@ -562,6 +569,12 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         await writeShifts(shifts);
         currentShiftId = shiftId;
 
+        broadcast({
+            type: 'shift_updated',
+            message: 'تم تحديث بيانات المناوبة',
+            shiftId: shiftId
+        });
+
         res.json({ success: true });
     } catch (error) {
         console.error("خطأ في تحديث بيانات المناوبة:", error);
@@ -575,6 +588,13 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
         const id = parseInt(req.params.id);
         const filtered = shifts.filter(s => s.id !== id);
         await writeShifts(filtered);
+
+        broadcast({
+            type: 'shift_deleted',
+            message: 'تم حذف المناوبة',
+            shiftId: id
+        });
+
         if (currentShiftId === id) {
             currentShiftId = null;
         }
@@ -871,6 +891,13 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
         };
         records.unshift(newRecord);
         await writeAirRecords(records);
+
+        broadcast({
+            type: 'air_ambulance_saved',
+            message: 'بلاغ إسعاف جوي جديد: ' + reportNumber,
+            record: newRecord
+        });
+
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -883,6 +910,13 @@ app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
         const records = await readAirRecords();
         const filtered = records.filter(r => r.id !== req.params.id);
         await writeAirRecords(filtered);
+
+        broadcast({
+            type: 'air_ambulance_deleted',
+            message: 'تم حذف بلاغ إسعاف جوي',
+            recordId: req.params.id
+        });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
@@ -892,6 +926,12 @@ app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
 app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         await writeAirRecords([]);
+
+        broadcast({
+            type: 'air_ambulance_cleared',
+            message: 'تم حذف جميع بلاغات الإسعاف الجوي'
+        });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
@@ -919,6 +959,12 @@ app.post('/api/save-control-notes', authenticate, async (req, res) => {
     try {
         const { notes } = req.body;
         await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
+        
+        broadcast({
+            type: 'control_notes_updated',
+            message: 'تم تحديث ملاحظات التحكم والتنسيق'
+        });
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
@@ -945,6 +991,12 @@ app.post('/api/save-vacations', authenticate, async (req, res) => {
     try {
         const { vacations } = req.body;
         await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
+        
+        broadcast({
+            type: 'vacations_updated',
+            message: 'تم تحديث إجازات التحكم والتنسيق'
+        });
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الإجازات' });
@@ -1059,6 +1111,13 @@ app.post('/api/peak-mission', authenticate, async (req, res) => {
         if (data.alerts.length > 50) data.alerts.pop();
 
         await writePeakData(data);
+
+        broadcast({
+            type: 'peak_mission_added',
+            message: 'مهمة جديدة في وقت الذروة: ' + unit + ' في ' + location,
+            mission: mission
+        });
+
         res.json({ success: true, mission });
     } catch (error) {
         console.error(error);
@@ -1088,6 +1147,12 @@ app.post('/api/peak-resolve', authenticate, async (req, res) => {
             });
             if (data.logs.length > 50) data.logs.pop();
             await writePeakData(data);
+
+            broadcast({
+                type: 'peak_alert_resolved',
+                message: 'تم إنهاء تنبيه وقت الذروة',
+                alertId: alertId
+            });
         }
         res.json({ success: true });
     } catch (error) {
