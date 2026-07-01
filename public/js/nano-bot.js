@@ -10,7 +10,7 @@
     const NANO_CONFIG = {
         name: 'نــانــو',
         role: 'المساعد الذكي',
-        avatar: '/images/nano-character.png',
+        avatar: '/images/nano_animated.webp',
         greetingDelay: 2000,
         tipInterval: 300000, // 5 minutes
         wsReconnectInterval: 5000
@@ -193,7 +193,7 @@
             avatar.className = 'nano-bot-avatar idle';
             avatar.id = 'nanoBotAvatar';
             avatar.innerHTML = `
-                <img src="${NANO_CONFIG.avatar}" alt="${NANO_CONFIG.name}" onerror="this.src=''">
+                <img src="${NANO_CONFIG.avatar}" alt="${NANO_CONFIG.name}" onerror="this.src='/images/nano-character.png'">
                 <div class="nano-bot-badge" id="nanoBadge" style="display:none">0</div>
                 <div class="nano-bot-tooltip">مرحباً! أنا ${NANO_CONFIG.name}</div>
             `;
@@ -205,7 +205,7 @@
             this.chatWindow.innerHTML = `
                 <div class="nano-chat-header">
                     <div class="nano-header-avatar">
-                        <img src="${NANO_CONFIG.avatar}" alt="${NANO_CONFIG.name}" onerror="this.src=''">
+                        <img src="${NANO_CONFIG.avatar}" alt="${NANO_CONFIG.name}" onerror="this.src='/images/nano-character.png'">
                     </div>
                     <div class="nano-header-info">
                         <h4>${NANO_CONFIG.name}</h4>
