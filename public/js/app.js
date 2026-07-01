@@ -530,6 +530,19 @@ function handleWebSocketMessage(data) {
             showNotification('تم الإنهاء', data.message, 'info', 3000);
             if (typeof checkForAlerts === 'function') checkForAlerts();
             break;
+        case 'peak_plan_added':
+            showNotification('خطة جديدة', data.message, 'info', 4000);
+            if (typeof refreshPeakDashboard === 'function') refreshPeakDashboard();
+            if (typeof checkForAlerts === 'function') checkForAlerts();
+            break;
+        case 'peak_plan_updated':
+            showNotification('تم التحديث', data.message, 'info', 3000);
+            if (typeof refreshPeakDashboard === 'function') refreshPeakDashboard();
+            break;
+        case 'peak_plan_deleted':
+            showNotification('تم الحذف', data.message, 'info', 3000);
+            if (typeof refreshPeakDashboard === 'function') refreshPeakDashboard();
+            break;
         case 'air_ambulance_saved':
             showNotification('إسعاف جوي', data.message, 'info', 4000);
             if (typeof loadAirRecords === 'function') loadAirRecords();
@@ -2588,16 +2601,28 @@ async function returnToCurrentShift() {
     document.getElementById('shiftModal').style.display = 'none';
 }
 
-async function saveShiftData() {
+// debounce helper for auto-save
+function debounce(func, wait) {
+    var timeout;
+    return function() {
+        var context = this, args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(function() {
+            func.apply(context, args);
+        }, wait);
+    };
+}
+
+async function saveShiftData(silent) {
     var shiftData = getShiftFromForm();
-    if (!shiftData.shiftType) { alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return; }
+    if (!shiftData.shiftType) { if (!silent) alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return false; }
     var targetId = viewingShiftId || currentShiftId;
-    if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
+    if (!targetId) { if (!silent) alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return false; }
     try {
         var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
         var result = await response.json();
         if (result.success) {
-            alert("✅ تم حفظ بيانات التكميل بنجاح");
+            if (!silent) alert("✅ تم حفظ بيانات التكميل بنجاح");
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
@@ -2608,8 +2633,9 @@ async function saveShiftData() {
                 var viewResult = await viewResponse.json();
                 if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
             }
-        } else { alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+            return true;
+        } else { if (!silent) alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); return false; }
+    } catch (error) { if (!silent) alert("❌ خطأ في الاتصال: " + error.message); return false; }
 }
 
 async function deleteCurrentShift() {
@@ -5461,18 +5487,27 @@ var _autoSaveTimer = null;
 var _pendingChanges = false;
 
 function initAutoSave() {
+    // stop old polling if any
     if (_autoSaveTimer) clearInterval(_autoSaveTimer);
-    _autoSaveTimer = setInterval(function() {
-        if (_pendingChanges && currentShiftId) {
-            autoSaveShift();
-        }
-    }, 30000); // كل 30 ثانية
 
-    // مراقبة التغييرات
     var container = document.getElementById('shiftModal');
-    if (container) {
-        container.addEventListener('input', function() { _pendingChanges = true; });
-        container.addEventListener('change', function() { _pendingChanges = true; });
+    if (!container) return;
+
+    // create debounced auto-save once
+    if (!window._debouncedAutoSave) {
+        window._debouncedAutoSave = debounce(function() {
+            if (currentShiftId) autoSaveShift();
+        }, 500);
+    }
+
+    // add listeners to all inputs once
+    if (!container._autoSaveListenersAdded) {
+        var inputs = container.querySelectorAll('input, textarea, select');
+        inputs.forEach(function(input) {
+            input.addEventListener('input', function() { _pendingChanges = true; window._debouncedAutoSave(); });
+            input.addEventListener('change', function() { _pendingChanges = true; window._debouncedAutoSave(); });
+        });
+        container._autoSaveListenersAdded = true;
     }
 }
 
@@ -5481,19 +5516,22 @@ async function autoSaveShift() {
     try {
         var shiftData = getShiftFromForm();
         if (!shiftData.shiftType) return;
-
-        await fetch('/api/update-shift-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ shiftId: currentShiftId, shiftData: shiftData })
-        });
-
-        _pendingChanges = false;
-        showAutoSaveIndicator();
-    } catch (e) { /* silently fail */ }
+        showAutoSaveIndicator('saving');
+        var success = await saveShiftData(true);
+        if (success) {
+            _pendingChanges = false;
+            showAutoSaveIndicator('saved');
+        } else {
+            var indicator = document.getElementById('autoSaveIndicator');
+            if (indicator) indicator.style.opacity = '0';
+        }
+    } catch (e) {
+        var indicator = document.getElementById('autoSaveIndicator');
+        if (indicator) indicator.style.opacity = '0';
+    }
 }
 
-function showAutoSaveIndicator() {
+function showAutoSaveIndicator(state) {
     var indicator = document.getElementById('autoSaveIndicator');
     if (!indicator) {
         indicator = document.createElement('div');
@@ -5501,9 +5539,17 @@ function showAutoSaveIndicator() {
         indicator.style.cssText = 'position:fixed; bottom:20px; left:20px; background:var(--teal); color:white; padding:6px 14px; border-radius:20px; font-size:0.7rem; z-index:99999; opacity:0; transition:opacity 0.5s;';
         document.body.appendChild(indicator);
     }
-    indicator.textContent = '\u2713 تم الحفظ التلقائي ' + getSaudiTime();
+    if (state === 'saving') {
+        indicator.textContent = 'جاري الحفظ التلقائي...';
+        indicator.style.background = '#F59E0B';
+    } else {
+        indicator.textContent = '\u2713 تم الحفظ التلقائي ' + getSaudiTime();
+        indicator.style.background = 'var(--teal)';
+    }
     indicator.style.opacity = '1';
-    setTimeout(function() { indicator.style.opacity = '0'; }, 3000);
+    if (state !== 'saving') {
+        setTimeout(function() { indicator.style.opacity = '0'; }, 3000);
+    }
 }
 
 // تحذير عند الإغلاق مع تغييرات
@@ -8307,8 +8353,18 @@ async function savePeakPlan() {
         createdAt: new Date().toISOString()
     };
 
+    var indicator = document.getElementById('peakAutoSaveIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'peakAutoSaveIndicator';
+        indicator.style.cssText = 'position:fixed; bottom:20px; left:20px; background:var(--primary-700); color:white; padding:6px 14px; border-radius:20px; font-size:0.7rem; z-index:99999; opacity:0; transition:opacity 0.5s;';
+        document.body.appendChild(indicator);
+    }
+    indicator.textContent = 'جاري الحفظ...';
+    indicator.style.opacity = '1';
+
     try {
-        await apiFetch('/api/peak-plans', {
+        var response = await apiFetch('/api/peak-plans', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({
@@ -8321,10 +8377,29 @@ async function savePeakPlan() {
                 priority: priority
             })
         });
-    } catch (e) { console.error('Failed to save peak plans:', e); }
+        if (response.ok) {
+            indicator.textContent = '\u2713 تم الحفظ ' + getSaudiTime();
+            setTimeout(function() { indicator.style.opacity = '0'; }, 3000);
+            showNotification('تم الحفظ', 'تم حفظ خطة التمركز بنجاح', 'success', 3000);
+            // بث فوري لجميع المستخدمين
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'peak_plan_broadcast', message: 'خطة تمركز جديدة: ' + title, plan: plan }));
+            }
+        } else {
+            indicator.textContent = '\u2715 فشل الحفظ';
+            setTimeout(function() { indicator.style.opacity = '0'; }, 3000);
+            showNotification('خطأ', 'فشل في حفظ خطة التمركز', 'error', 3000);
+            return;
+        }
+    } catch (e) {
+        console.error('Failed to save peak plans:', e);
+        indicator.textContent = '\u2715 فشل الحفظ';
+        setTimeout(function() { indicator.style.opacity = '0'; }, 3000);
+        showNotification('خطأ', 'فشل في الاتصال بالسيرفر', 'error', 3000);
+        return;
+    }
     peakPlans.unshift(plan);
     clearPeakForm();
-    alert('✅ تم حفظ خطة التمركز');
     switchPeakTab('dashboard');
     refreshPeakDashboard();
     startPeakReminders(plan);
@@ -8369,6 +8444,17 @@ function sendPeakAlert() {
     msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
+
+// ----- Auto Save: Submit handler for peak plan form -----
+document.addEventListener('DOMContentLoaded', function() {
+    var peakForm = document.getElementById('peakPlanForm');
+    if (peakForm) {
+        peakForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            savePeakPlan();
+        });
+    }
+});
 
 // ----- Dashboard -----
 function refreshPeakDashboard() {

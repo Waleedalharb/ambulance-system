@@ -610,6 +610,7 @@
                     <!-- Left: Form -->
                     <div class="peak-form-card">
                         <h3><i class="fas fa-plus-circle" style="color:var(--primary-700);"></i> إنشاء خطة تمركز جديدة</h3>
+                        <form id="peakPlanForm" onsubmit="event.preventDefault();">
                         <div class="form-row-grid">
                             <div class="form-group">
                                 <label>عنوان الخطة</label>
@@ -698,10 +699,11 @@
                             <textarea id="peakNotes" rows="2" placeholder="أي ملاحظات..."></textarea>
                         </div>
                         <div class="form-actions">
-                            <button onclick="clearPeakForm()" class="btn btn-danger"><i class="fas fa-eraser"></i> مسح</button>
-                            <button onclick="savePeakPlan()" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الخطة</button>
-                            <button onclick="sendPeakAlert()" class="btn btn-success"><i class="fas fa-bell"></i> إرسال تنبيه</button>
+                            <button type="button" onclick="clearPeakForm()" class="btn btn-danger"><i class="fas fa-eraser"></i> مسح</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الخطة</button>
+                            <button type="button" onclick="sendPeakAlert()" class="btn btn-success"><i class="fas fa-bell"></i> إرسال تنبيه</button>
                         </div>
+                        </form>
                     </div>
                     <!-- Right: AI Suggestions -->
                     <div class="peak-form-card" style="background:var(--gray-50);">

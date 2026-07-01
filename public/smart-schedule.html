@@ -1523,6 +1523,7 @@
                     renderCurrentView();
                     populateLocationFilter();
                     showToast('تم استخراج ' + result.length + ' موظف من ملف Excel', 'success');
+                    await saveToServer();
                 } catch(err) {
                     showToast('خطأ في قراءة الملف: ' + err.message, 'error');
                 }
@@ -1800,6 +1801,7 @@
                 renderCurrentView();
                 populateLocationFilter();
                 showToast('تم استخراج ' + allEmployees.length + ' موظف من ' + allTeams.length + ' فريق', 'success');
+                await saveToServer();
                 
             } catch(err) {
                 console.error('PDF Error:', err);
@@ -1918,7 +1920,7 @@
             document.getElementById('analysisStatus').classList.add('hidden');
             document.getElementById('analysisResult').classList.remove('hidden');
             document.getElementById('analysisText').textContent = 'تم استخراج ' + count + ' موظف من الملف';
-            document.getElementById('analysisDetails').textContent = 'يرجى الضغط على "حفظ البيانات على السيرفر" لحفظ البيانات';
+            document.getElementById('analysisDetails').textContent = 'سيتم حفظ البيانات تلقائياً على السيرفر...';
             document.getElementById('extractedTableContainer').classList.remove('hidden');
             var saveArea = document.getElementById('saveActionArea');
             if (saveArea) saveArea.classList.remove('hidden');
@@ -1984,7 +1986,9 @@
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 var result = await res.json();
-                showToast('تم حفظ البيانات بنجاح على السيرفر', 'success');
+                showToast('تم حفظ البيانات تلقائياً على الخادم', 'success');
+                var saveArea = document.getElementById('saveActionArea');
+                if (saveArea) saveArea.classList.add('hidden');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات على السيرفر'; }
                 return true;
             } catch(e) {
