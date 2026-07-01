@@ -452,11 +452,11 @@ function handleWebSocketMessage(data) {
             break;
         case 'doc_uploaded':
             showNotification('مستند جديد', data.message, 'info', 4000);
-            loadDocs();
+            loadDocsData();
             break;
         case 'doc_deleted':
             showNotification('مستند محذوف', data.message, 'info', 3000);
-            loadDocs();
+            loadDocsData();
             break;
         case 'ops_files_uploaded':
             showNotification('ملفات جديدة', data.message, 'info', 4000);
@@ -468,6 +468,7 @@ function handleWebSocketMessage(data) {
             break;
         case 'monthly_table_uploaded':
             showNotification('جدول شهري', data.message, 'info', 3000);
+            if (typeof loadSavedTable === 'function') loadSavedTable();
             break;
         case 'identity_uploaded':
             showNotification('هوية القطاع', data.message, 'info', 3000);
