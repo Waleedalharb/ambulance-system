@@ -749,6 +749,13 @@ app.post('/api/upload-doc', authenticate, async (req, res) => {
         };
         docs.push(newDoc);
         await writeDocs(docs);
+        
+        broadcast({
+            type: 'doc_uploaded',
+            message: 'تم رفع مستند جديد: ' + newDoc.filename,
+            doc: { id: newDoc.id, filename: newDoc.filename, category: newDoc.category }
+        });
+        
         res.json({ success: true, doc: newDoc });
     } catch (error) {
         console.error(error);
@@ -777,6 +784,13 @@ app.delete('/api/delete-doc/:id', authenticate, async (req, res) => {
         const docs = await readDocs();
         const filtered = docs.filter(d => d.id !== req.params.id);
         await writeDocs(filtered);
+        
+        broadcast({
+            type: 'doc_deleted',
+            message: 'تم حذف مستند',
+            docId: req.params.id
+        });
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف التحديث' });
@@ -803,6 +817,12 @@ app.post('/api/upload-identity', authenticate, async (req, res) => {
         }
         const buffer = Buffer.from(fileData, 'base64');
         await fs.writeFile(IDENTITY_PATH, buffer);
+        
+        broadcast({
+            type: 'identity_uploaded',
+            message: 'تم تحديث هوية القطاع'
+        });
+        
         res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
     } catch (error) {
         console.error(error);
@@ -1312,6 +1332,12 @@ app.post('/api/upload-monthly-table', authenticate, upload.single('file'), handl
         }
         await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
         await fs.unlink(file.path);
+        
+        broadcast({
+            type: 'monthly_table_uploaded',
+            message: 'تم رفع جدول شهري جديد'
+        });
+        
         res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
     } catch (error) {
         console.error(error);
@@ -1449,6 +1475,14 @@ app.post('/api/upload-operational', authenticate, opsUpload.array('files'), hand
         }
         
         await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_files_uploaded',
+            message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+            count: results.length,
+            files: results.map(f => ({ id: f.id, filename: f.filename, category: f.category }))
+        });
+        
         res.json({ success: true, count: results.length, files: results });
     } catch (error) {
         console.error('خطأ في رفع الملفات:', error);
@@ -1494,6 +1528,13 @@ app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
         try { await fs.unlink(filePath); } catch (e) {}
         metadata.splice(index, 1);
         await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_file_deleted',
+            message: 'تم حذف ملف تشغيلي',
+            fileId: req.params.id
+        });
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف الملف' });

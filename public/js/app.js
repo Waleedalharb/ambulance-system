@@ -450,6 +450,28 @@ function handleWebSocketMessage(data) {
             showNotification('تم التحديث', 'تم تحديث الثيم من قبل مشرف آخر', 'info', 3000);
             applyGlobalTheme();
             break;
+        case 'doc_uploaded':
+            showNotification('مستند جديد', data.message, 'info', 4000);
+            loadDocs();
+            break;
+        case 'doc_deleted':
+            showNotification('مستند محذوف', data.message, 'info', 3000);
+            loadDocs();
+            break;
+        case 'ops_files_uploaded':
+            showNotification('ملفات جديدة', data.message, 'info', 4000);
+            if (typeof opsLoadData === 'function') opsLoadData();
+            break;
+        case 'ops_file_deleted':
+            showNotification('ملف محذوف', data.message, 'info', 3000);
+            if (typeof opsLoadData === 'function') opsLoadData();
+            break;
+        case 'monthly_table_uploaded':
+            showNotification('جدول شهري', data.message, 'info', 3000);
+            break;
+        case 'identity_uploaded':
+            showNotification('هوية القطاع', data.message, 'info', 3000);
+            break;
         case 'connected':
             console.log('WS:', data.message);
             break;
