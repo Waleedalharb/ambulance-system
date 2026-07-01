@@ -373,12 +373,13 @@ var wsFallbackInterval = null;
 
 function initWebSocket() {
     try {
-        var wsHost = window.location.host.split(':')[0];
-        ws = new WebSocket('ws://' + wsHost + ':8080');
+        var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        var wsUrl = protocol + window.location.host + '/ws';
+        ws = new WebSocket(wsUrl);
         
         ws.onopen = function() {
             wsConnected = true;
-            console.log('✅ WebSocket connected');
+            console.log('✅ WebSocket connected to', wsUrl);
             showNotification('متصل', 'تم الاتصال بالتحديثات الفورية', 'success', 2000);
             // إيقاف fallback عند الاتصال الناجح
             if (wsFallbackInterval) {
