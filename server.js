@@ -113,30 +113,44 @@ async function initDefaultUsers() {
     try {
         await fs.access(USERS_PATH);
     } catch {
-        const salt = await bcrypt.genSalt(12); // Increased from 10 to 12
-        // Use env vars for default passwords, or generate secure random ones
-        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || require('crypto').randomBytes(16).toString('hex');
-        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || require('crypto').randomBytes(16).toString('hex');
-        const userPass = process.env.DEFAULT_USER_PASSWORD || require('crypto').randomBytes(16).toString('hex');
-        
-        const defaultUsers = [
-            { id: 'admin-1', username: 'admin', password: await bcrypt.hash(adminPass, salt), name: 'مدير النظام', role: 'admin', isActive: true },
-            { id: 'director-1', username: 'director', password: await bcrypt.hash(directorPass, salt), name: 'مدير العمليات', role: 'director', isActive: true },
-            { id: 'user-1', username: 'user', password: await bcrypt.hash(userPass, salt), name: 'مستخدم', role: 'user', isActive: true }
+        const salt = await bcrypt.genSalt(12);
+        const employees = [
+            { id: 'emp-4252', username: '4252', name: 'سلطان ابراهيم يوسف اليوسف التميمي', role: 'admin' },
+            { id: 'emp-101353', username: '101353', name: 'هيثم حويكم هليل العنزي', role: 'admin' },
+            { id: 'emp-102462', username: '102462', name: 'وليد معلا الحربي', role: 'admin' },
+            { id: 'emp-11120', username: '11120', name: 'عوض عبدالعزيز عوض الاسمري', role: 'admin' },
+            { id: 'emp-102752', username: '102752', name: 'محمد نايف صنهات العتيبي', role: 'admin' },
+            { id: 'emp-10717', username: '10717', name: 'عطاالله خالد عطوي الرويلي', role: 'admin' },
+            { id: 'emp-101915', username: '101915', name: 'مبارك هذال مبارك ال بريك', role: 'admin' },
+            { id: 'emp-8323', username: '8323', name: 'تركي عتيق الله خيرالله المطيري', role: 'admin' },
+            { id: 'emp-10373', username: '10373', name: 'سامي صالح عناد العنزي', role: 'admin' },
+            { id: 'emp-6182', username: '6182', name: 'مشعل علي هديرس الحجيلي', role: 'admin' },
+            { id: 'emp-9666', username: '9666', name: 'راشد محمد راشد الخرعان', role: 'admin' },
+            { id: 'emp-11079', username: '11079', name: 'مبارك محسن مبارك العجمي', role: 'admin' },
+            { id: 'emp-8745', username: '8745', name: 'خالد محمد عبدالمجيد العياضي', role: 'admin' },
+            { id: 'emp-7454', username: '7454', name: 'عادل خليف دخيل المطيري', role: 'admin' },
+            { id: 'emp-692', username: '692', name: 'فواز حميد خلاف الظفيري', role: 'admin' },
+            { id: 'emp-61277', username: '61277', name: 'زياد سعيد جبران الشهراني', role: 'admin' },
+            { id: 'emp-8968', username: '8968', name: 'موسى علي احمد غروي', role: 'admin' },
+            { id: 'emp-61296', username: '61296', name: 'سامي منور عبدالله المطيري', role: 'admin' },
+            { id: 'emp-6263', username: '6263', name: 'عبدالرحمن نائف مضحي الحربي', role: 'admin' }
         ];
+        const defaultUsers = [];
+        for (const emp of employees) {
+            const tempPassword = emp.username; // الرقم السري المؤقت = الكود
+            defaultUsers.push({
+                id: emp.id,
+                username: emp.username,
+                name: emp.name,
+                password: await bcrypt.hash(tempPassword, salt),
+                role: emp.role,
+                isActive: true
+            });
+        }
         await fs.writeFile(USERS_PATH, JSON.stringify(defaultUsers, null, 2));
-        console.log('✅ تم إنشاء المستخدمين الافتراضيين');
-        if (!process.env.DEFAULT_ADMIN_PASSWORD) {
-            console.log('⚠️  DEFAULT_ADMIN_PASSWORD not set. Generated secure password. Check your logs for first-time login.');
-            console.log('   Admin password:', adminPass);
-        }
-        if (!process.env.DEFAULT_DIRECTOR_PASSWORD) {
-            console.log('   Director password:', directorPass);
-        }
-        if (!process.env.DEFAULT_USER_PASSWORD) {
-            console.log('   User password:', userPass);
-        }
-        console.log('🔒 Set DEFAULT_ADMIN_PASSWORD, DEFAULT_DIRECTOR_PASSWORD, DEFAULT_USER_PASSWORD env vars for persistent passwords.');
+        console.log('✅ تم إنشاء 19 مستخدم للموظفين');
+        console.log('⚠️  الرقم السري المؤقت لكل موظف = كود الموظف (الرقم)');
+        console.log('🔒 يجب على كل موظف تغيير رقمه السري بعد أول تسجيل دخول');
     }
 }
 
@@ -266,7 +280,7 @@ app.post('/api/auth/login', async (req, res) => {
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
         
-        const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        const token = jwt.sign({ id: user.id, username: user.username, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
         res.json({ success: true, token, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل الدخول' });
@@ -279,6 +293,36 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 
 app.post('/api/auth/logout', authenticate, (req, res) => {
     res.json({ success: true, message: 'تم تسجيل الخروج' });
+});
+
+app.post('/api/auth/change-password', authenticate, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'كلمة المرور الحالية والجديدة مطلوبة' });
+        }
+        if (newPassword.length < 4) {
+            return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون 4 أحرف على الأقل' });
+        }
+
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const userIndex = users.findIndex(u => u.username === req.user.username && u.isActive);
+        if (userIndex === -1) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+        const user = users[userIndex];
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) return res.status(401).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+
+        const salt = await bcrypt.genSalt(12);
+        users[userIndex].password = await bcrypt.hash(newPassword, salt);
+        await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2));
+
+        broadcast({ type: 'password_changed', message: 'تم تغيير كلمة المرور', username: user.username });
+        res.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'فشل في تغيير كلمة المرور' });
+    }
 });
 
 app.get('/api/users', authenticate, authorize(['admin']), async (req, res) => {
@@ -2871,7 +2915,7 @@ app.post('/api/audit-log', authenticate, async (req, res) => {
             action,
             details: details || '',
             category: category || 'general',
-            user: req.user.username || 'unknown',
+            user: req.user.name || req.user.username || 'unknown',
             role: req.user.role || 'unknown',
             timestamp: new Date().toISOString()
         };

@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v9-2026-07-01';
+    var APP_VERSION = 'v10-2026-07-01';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -875,7 +875,7 @@ async function addAuditEntry(category, action, details, user) {
         category: category || 'system',
         action: action || 'system',
         details: details || '',
-        user: user || 'المشرف',
+        user: user || (currentUser && currentUser.name) || 'مستخدم',
         timestamp: new Date().toISOString()
     };
 
@@ -990,7 +990,7 @@ function setupAutoAuditLogging() {
     if (typeof startNewShift === 'function') {
         startNewShift = function() {
             var result = origStartNewShift.apply(this, arguments);
-            addAuditEntry('shift', 'بدء مناوبة جديدة', '', 'المشرف');
+            addAuditEntry('shift', 'بدء مناوبة جديدة', '', (currentUser && currentUser.name) || 'مستخدم');
             return result;
         };
     }
@@ -1000,7 +1000,7 @@ function setupAutoAuditLogging() {
     if (typeof addReportToServer === 'function') {
         addReportToServer = function(center, unit) {
             var result = origAddReport.apply(this, arguments);
-            addAuditEntry('report', 'تسجيل بلاغ', center + ' - ' + unit, 'المشرف');
+            addAuditEntry('report', 'تسجيل بلاغ', center + ' - ' + unit, (currentUser && currentUser.name) || 'مستخدم');
             return result;
         };
     }
@@ -1350,7 +1350,7 @@ function ratePeakResponse(rating) {
     showNotification('\u062A\u0645 \u0627\u0644\u062A\u0642\u064A\u064A\u0645', messages[rating] || '\u2713 \u062A\u0645', 'success', 4000);
 
     // Add audit log
-    addAuditEntry('system', '\u062A\u0642\u064A\u064A\u0645 \u0627\u0633\u062A\u062C\u0627\u0628\u0629', unit + ' - ' + rating + ' \u0646\u062C\u0648\u0645', '\u0627\u0644\u0645\u0634\u0631\u0641');
+    addAuditEntry('system', '\u062A\u0642\u064A\u064A\u0645 \u0627\u0633\u062A\u062C\u0627\u0628\u0629', unit + ' - ' + rating + ' \u0646\u062C\u0648\u0645', (currentUser && currentUser.name) || 'مستخدم');
 }
 
 function playUrgentAlertSound() {
@@ -1682,7 +1682,7 @@ function findNearestUnit() {
 
         // تسجيل
         if (typeof addAuditEntry === 'function') {
-            addAuditEntry('system', 'البحث عن أقرب فرقة', nearest.unit + ' - ' + nearest.center, 'المشرف');
+            addAuditEntry('system', 'البحث عن أقرب فرقة', nearest.unit + ' - ' + nearest.center, (currentUser && currentUser.name) || 'مستخدم');
         }
 
     }, function(error) {
@@ -6151,7 +6151,7 @@ function exportShiftPDF() {
     html2pdf().set(opt).from(container).save().then(function() {
         document.body.removeChild(container);
         showNotification('تم التصدير', 'تم تصدير التقرير بنجاح', 'success', 3000);
-        addAuditEntry('file', 'تصدير PDF', 'تقرير تكميل ' + shiftTypeLabel, 'المشرف');
+        addAuditEntry('file', 'تصدير PDF', 'تقرير تكميل ' + shiftTypeLabel, (currentUser && currentUser.name) || 'مستخدم');
     }).catch(function(err) {
         document.body.removeChild(container);
         console.error(err);
@@ -6234,7 +6234,7 @@ function exportAllShiftsPDF() {
     html2pdf().set(opt).from(container).save().then(function() {
         document.body.removeChild(container);
         showNotification('تم التصدير', 'تم تصدير جميع التقارير', 'success', 3000);
-        addAuditEntry('file', 'تصدير PDF', 'جميع تقارير التكميل', 'المشرف');
+        addAuditEntry('file', 'تصدير PDF', 'جميع تقارير التكميل', (currentUser && currentUser.name) || 'مستخدم');
     }).catch(function(err) {
         document.body.removeChild(container);
         console.error(err);
@@ -6498,16 +6498,23 @@ setInterval(checkForAlerts, 30000);
 // ============================================
 // تغيير الرقم السري
 // ============================================
+// Change Password Modal
+// ============================================
+window.showChangePasswordModal = function() {
+    var modal = document.getElementById('changePasswordModal');
+    if (modal) modal.style.display = 'flex';
+};
+
 var el_changePasswordBtn=document.getElementById("changePasswordBtn");if(el_changePasswordBtn)el_changePasswordBtn.addEventListener('click', function() {
     document.getElementById('changePasswordModal').style.display = 'flex';
 });
 
 var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBtn");if(el_confirmChangePasswordBtn)el_confirmChangePasswordBtn.addEventListener('click', async function() {
-    var oldPassword = document.getElementById('oldPasswordInput').value;
+    var currentPassword = document.getElementById('oldPasswordInput').value;
     var newPassword = document.getElementById('newPasswordInput').value;
     var confirmNew = document.getElementById('confirmNewPasswordInput').value;
 
-    if (!oldPassword || !newPassword || !confirmNew) {
+    if (!currentPassword || !newPassword || !confirmNew) {
         alert('⚠️ الرجاء ملء جميع الحقول');
         return;
     }
@@ -6523,10 +6530,10 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
     }
 
     try {
-        var response = await fetch('/api/change-password', {
+        var response = await fetch('/api/auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ oldPassword, newPassword })
+            body: JSON.stringify({ currentPassword, newPassword })
         });
         var result = await response.json();
         if (result.success) {
