@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v4-2026-07-01';
+    var APP_VERSION = 'v9-2026-07-01';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -2384,7 +2384,16 @@ function openShiftModal() {
 async function loadShifts() {
     try {
         var response = await fetch('/api/shifts', { headers: { 'Authorization': 'Bearer ' + authToken } });
-        allShifts = await response.json();
+        var data = await response.json();
+        if (Array.isArray(data)) {
+            allShifts = data;
+        } else if (data && data.error) {
+            console.error('Server error loading shifts:', data.error);
+            allShifts = [];
+        } else {
+            console.error('Unexpected shifts response:', data);
+            allShifts = [];
+        }
         var archiveSelect = document.getElementById('archiveSelect');
         archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
         allShifts.forEach(function(shift) {
@@ -7746,54 +7755,57 @@ document.head.appendChild(flashStyle);
 // ============================================
 var originalCheckForAlerts = checkForAlerts;
 checkForAlerts = function() {
+    if (!authToken) { console.log('checkForAlerts: no authToken, skipping'); return; }
     apiFetch('/api/peak-data', { headers: { 'Authorization': 'Bearer ' + authToken } })
-        .then(function(res) { return res.json(); })
+        .then(function(res) {
+            if (res.status === 401 || res.status === 403) { console.log('checkForAlerts: auth failed, skipping'); return null; }
+            return res.json();
+        })
         .then(function(result) {
-            if (result.success) {
-                var alerts = result.data.alerts || [];
-                var activeAlerts = alerts.filter(function(a) { return a.status === 'نشط'; });
-                var dismissed = localStorage.getItem('alertDismissed') === 'true';
-                var shownAlert = localStorage.getItem('lastShownPeakAlert');
-                
-                // Update stats bar if visible
-                var statAlerts = document.getElementById('statAlerts');
-                if (statAlerts) statAlerts.textContent = activeAlerts.length;
-                
-                if (activeAlerts.length > 0 && !dismissed) {
-                    var latestAlert = activeAlerts[0];
-                    if (latestAlert.id !== shownAlert) {
-                        // Show the alert modal
-                        showPeakAlert({
-                            unit: latestAlert.unit || (latestAlert.title ? latestAlert.title.replace('تمركز مطلوب لـ ', '') : '-') || '-',
-                            location: latestAlert.location || '-',
-                            startTime: latestAlert.startTime || '-',
-                            endTime: latestAlert.endTime || '-',
-                            notes: latestAlert.notes || 'لا توجد ملاحظات',
-                            lat: latestAlert.lat || 24.7136,
-                            lng: latestAlert.lng || 46.6753,
-                            radius: latestAlert.radius || 5000,
-                            id: latestAlert.id,
-                            priority: latestAlert.priority || 'عالية',
-                            details: latestAlert.details
-                        });
-                        localStorage.setItem('lastShownPeakAlert', latestAlert.id);
-                        
-                        // Multi-channel notification
-                        sendMultiChannelNotification(
-                            '\uD83D\uDEA8 تنبيه تمركز - ' + (latestAlert.unit || '-'),
-                            'موقع: ' + (latestAlert.location || '-') + ' | من ' + (latestAlert.startTime || '-') + ' إلى ' + (latestAlert.endTime || '-'),
-                            {
-                                tag: 'peak-' + latestAlert.id,
-                                requireInteraction: true,
-                                vibratePattern: [500, 200, 500, 200, 500, 200, 1000],
-                                flashColor: latestAlert.priority === 'عالية' ? '#EF4444' : '#F59E0B'
-                            }
-                        );
-                    }
+            if (!result || !result.success) return;
+            var alerts = result.data.alerts || [];
+            var activeAlerts = alerts.filter(function(a) { return a.status === 'نشط'; });
+            var dismissed = localStorage.getItem('alertDismissed') === 'true';
+            var shownAlert = localStorage.getItem('lastShownPeakAlert');
+            
+            // Update stats bar if visible
+            var statAlerts = document.getElementById('statAlerts');
+            if (statAlerts) statAlerts.textContent = activeAlerts.length;
+            
+            if (activeAlerts.length > 0 && !dismissed) {
+                var latestAlert = activeAlerts[0];
+                if (latestAlert.id !== shownAlert) {
+                    // Show the alert modal
+                    showPeakAlert({
+                        unit: latestAlert.unit || (latestAlert.title ? latestAlert.title.replace('تمركز مطلوب لـ ', '') : '-') || '-',
+                        location: latestAlert.location || '-',
+                        startTime: latestAlert.startTime || '-',
+                        endTime: latestAlert.endTime || '-',
+                        notes: latestAlert.notes || 'لا توجد ملاحظات',
+                        lat: latestAlert.lat || 24.7136,
+                        lng: latestAlert.lng || 46.6753,
+                        radius: latestAlert.radius || 5000,
+                        id: latestAlert.id,
+                        priority: latestAlert.priority || 'عالية',
+                        details: latestAlert.details
+                    });
+                    localStorage.setItem('lastShownPeakAlert', latestAlert.id);
+                    
+                    // Multi-channel notification
+                    sendMultiChannelNotification(
+                        '\uD83D\uDEA8 تنبيه تمركز - ' + (latestAlert.unit || '-'),
+                        'موقع: ' + (latestAlert.location || '-') + ' | من ' + (latestAlert.startTime || '-') + ' إلى ' + (latestAlert.endTime || '-'),
+                        {
+                            tag: 'peak-' + latestAlert.id,
+                            requireInteraction: true,
+                            vibratePattern: [500, 200, 500, 200, 500, 200, 1000],
+                            flashColor: latestAlert.priority === 'عالية' ? '#EF4444' : '#F59E0B'
+                        }
+                    );
                 }
             }
         })
-        .catch(function() {});
+        .catch(function(err) { console.error('checkForAlerts error:', err); });
 };
 
 // ============================================
