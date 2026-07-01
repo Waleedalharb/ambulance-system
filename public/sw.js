@@ -1,5 +1,5 @@
 // Service Worker - منصة الجنوب
-var CACHE_NAME = 'janoub-cache-v3';
+var CACHE_NAME = 'janoub-cache-v4';
 var urlsToCache = [
     '/',
     '/index.html'
