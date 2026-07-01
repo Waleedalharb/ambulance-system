@@ -1426,7 +1426,7 @@ function renderAdvancedDistribution() {
                 '<div class="unit-actions">' +
                 '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
                 (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:inline-flex;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:none;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>') +
-                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
+                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
                 '</div>' +
                 '</div>';
         }
