@@ -13,14 +13,21 @@
     // إشعارات بسيطة تعمل في جميع الصفحات
     // =====================
     function showSyncToast(message) {
-        if (typeof showToast === 'function') {
-            showToast('info', 'تحديث', message);
-            return;
-        }
+        // try showNotification first (app.js has this)
         if (typeof showNotification === 'function') {
             showNotification('تحديث', message, 'info', 3000);
             return;
         }
+        // try showToast next (report-entry.html has showToast(message, type))
+        if (typeof showToast === 'function') {
+            try {
+                showToast(message, 'info');
+                return;
+            } catch(e) {
+                // showToast may have different signature, fallback
+            }
+        }
+        // fallback DOM toast
         var toast = document.createElement('div');
         toast.textContent = message;
         toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:99999; background:#1E3A5F; color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); animation:slideDown 0.3s ease; direction:rtl;';
@@ -63,7 +70,7 @@
             if (typeof syncUpdate === 'function') {
                 console.log('🔄 Calling syncUpdate() for type:', data.type);
                 syncUpdate();
-                return;
+                // لا return هنا — استمر في الـ switch للـ fallback
             }
 
             // fallback: الدوال القديمة + الأنواع الجديدة

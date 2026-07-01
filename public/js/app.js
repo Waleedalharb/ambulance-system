@@ -8891,9 +8891,17 @@ if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); openPeakTim
 // ==========================================
 // syncUpdate — لـ websocket-sync.js (جميع الصفحات)
 // ==========================================
-window.syncUpdate = function() {
+window.syncUpdate = async function() {
     console.log('🔄 syncUpdate called in index.html (app.js)');
-    loadAllData();
+    await loadAllData();
+    // جلب بيانات الأنظمة الأخرى
+    try { await syncReportEntryData(); } catch(e) { console.log('syncReportEntryData skipped:', e.message); }
+    try { await loadIncidentRecords(); } catch(e) { console.log('loadIncidentRecords skipped:', e.message); }
+    try { await loadSeniorRecords(); } catch(e) { console.log('loadSeniorRecords skipped:', e.message); }
+    try { await loadERecords(); } catch(e) { console.log('loadERecords skipped:', e.message); }
+    try { await loadEscalationRecords(); } catch(e) { console.log('loadEscalationRecords skipped:', e.message); }
+    try { await loadDailyReports(); } catch(e) { console.log('loadDailyReports skipped:', e.message); }
+    try { await loadAirRecordsFromServer(); } catch(e) { console.log('loadAirRecords skipped:', e.message); }
     calculateLiveReportStats();
     updateWorkforceStats();
     updateDistributionIndicator();
