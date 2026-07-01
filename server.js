@@ -1180,8 +1180,8 @@ app.get('/api/air-ambulance', authenticate, async (req, res) => {
 
 app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
     try {
-        const { reportNumber, unit, hospital, dateTime, notes } = req.body;
-        if (!reportNumber || !unit || !hospital || !dateTime) {
+        const { reportNumber, dateTime, pickupLocation, destinationHospital, diagnosis, reason, patientName, patientAge, unit, paramedic } = req.body;
+        if (!reportNumber || !unit || !dateTime || !destinationHospital) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         const records = await readAirRecords();
@@ -1189,9 +1189,9 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
             id: Date.now().toString(),
             reportNumber,
             unit,
-            hospital,
+            hospital: destinationHospital,
             dateTime,
-            notes: notes || '',
+            notes: `pickup: ${pickupLocation}, diagnosis: ${diagnosis}, reason: ${reason}, patient: ${patientName}, age: ${patientAge}, paramedic: ${paramedic}`,
             createdAt: new Date().toISOString()
         };
         records.unshift(newRecord);
@@ -2683,27 +2683,19 @@ app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
 app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const { name, reason, timestamp } = req.body;
-        if (!name || !reason) {
+        const { absences } = req.body;
+        if (!absences || !Array.isArray(absences)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const absences = await readShiftAbsences();
-        const newAbsence = {
-            id: Date.now().toString(),
-            shiftId,
-            name,
-            reason,
-            timestamp: timestamp || new Date().toISOString(),
-            createdAt: new Date().toISOString()
-        };
-        absences.unshift(newAbsence);
-        await writeShiftAbsences(absences);
+        const allAbsences = await readShiftAbsences();
+        const filtered = allAbsences.filter(a => a.shiftId !== shiftId);
+        const newAbsences = absences.map((a, i) => ({ ...a, shiftId, id: a.id ? String(a.id) : (Date.now() + i).toString() }));
+        await writeShiftAbsences([...filtered, ...newAbsences]);
         broadcast({
             type: 'shift_absence_added',
-            message: 'تم إضافة غياب جديد للمناوبة',
-            absence: newAbsence
+            message: 'تم تحديث سجل الغياب'
         });
-        res.json({ success: true, absence: newAbsence });
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الغياب' });
     }
@@ -2742,27 +2734,19 @@ app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
 app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const { content, author, timestamp } = req.body;
-        if (!content) {
+        const { notes } = req.body;
+        if (!notes || !Array.isArray(notes)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const notes = await readShiftNotes();
-        const newNote = {
-            id: Date.now().toString(),
-            shiftId,
-            content,
-            author: author || req.user.name || 'مجهول',
-            timestamp: timestamp || new Date().toISOString(),
-            createdAt: new Date().toISOString()
-        };
-        notes.unshift(newNote);
-        await writeShiftNotes(notes);
+        const allNotes = await readShiftNotes();
+        const filtered = allNotes.filter(n => n.shiftId !== shiftId);
+        const newNotes = notes.map((n, i) => ({ ...n, shiftId, id: n.id ? String(n.id) : (Date.now() + i).toString() }));
+        await writeShiftNotes([...filtered, ...newNotes]);
         broadcast({
             type: 'shift_note_added',
-            message: 'تم إضافة ملاحظة جديدة للمناوبة',
-            note: newNote
+            message: 'تم تحديث سجل الملاحظات'
         });
-        res.json({ success: true, note: newNote });
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الملاحظة' });
     }
@@ -2827,6 +2811,22 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
         res.json({ success: true, plan: newPlan });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ خطة الذروة' });
+    }
+});
+
+app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        const plans = await readPeakPlans();
+        const plan = plans.find(p => p.id === id);
+        if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
+        Object.assign(plan, updates);
+        await writePeakPlans(plans);
+        broadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan });
+        res.json({ success: true, plan });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تحديث خطة الذروة' });
     }
 });
 

@@ -860,7 +860,7 @@ async function addAuditEntry(category, action, details, user) {
     var entry = {
         id: Date.now().toString(),
         category: category || 'system',
-        action: action || '',
+        action: action || 'system',
         details: details || '',
         user: user || 'المشرف',
         timestamp: new Date().toISOString()
@@ -1190,7 +1190,7 @@ async function resolvePeakAlertFromModal() {
     try {
         var response = await fetch('/api/peak-resolve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ alertId: currentPeakAlertId })
         });
         var result = await response.json();
@@ -2481,7 +2481,7 @@ async function addReportToServer(center, unit) {
     try {
         var response = await fetch('/api/report', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
         });
         var result = await response.json();
@@ -2518,7 +2518,7 @@ async function undoLastReport(center, unit) {
     try {
         var response = await fetch('/api/undo', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
         });
         var result = await response.json();
@@ -4585,7 +4585,7 @@ var el_saveVacationsBtn=document.getElementById("saveVacationsBtn");if(el_saveVa
         if (startInput && endInput) { person.vacationStart = startInput.value; person.vacationEnd = endInput.value; }
     });
     try {
-        var response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacations: controlData }) });
+        var response = await fetch('/api/save-vacations', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ vacations: controlData }) });
         var result = await response.json();
         if (result.success) {
             alert('✅ تم حفظ الإجازات بنجاح');
@@ -5484,7 +5484,7 @@ async function autoSaveShift() {
 
         await fetch('/api/update-shift-data', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ shiftId: currentShiftId, shiftData: shiftData })
         });
 
@@ -6479,7 +6479,7 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
     try {
         var response = await fetch('/api/change-password', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
             body: JSON.stringify({ oldPassword, newPassword })
         });
         var result = await response.json();
@@ -6642,7 +6642,7 @@ setInterval(function() {
 async function checkForUpdates() {
     if (isViewingArchiveShift) return;
     try {
-        var response = await apiFetch('/api/last-update');
+        var response = await apiFetch('/api/last-update', { headers: { 'Authorization': 'Bearer ' + authToken } });
         var data = await response.json();
         if (data.lastUpdate > lastKnownUpdate) {
             lastKnownUpdate = data.lastUpdate;
@@ -8183,7 +8183,7 @@ async function loadAuditLog() {
     try {
         var res = await apiFetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
         var data = await res.json();
-        auditLog = data && data.log ? data.log : (Array.isArray(data) ? data : []);
+        auditLog = data && data.logs ? data.logs : (Array.isArray(data) ? data : []);
     } catch (e) {
         auditLog = [];
     }
@@ -8502,12 +8502,12 @@ async function confirmPeakArrival(planId) {
     if (!plan) return;
     plan.arrivalTime = new Date().toISOString();
     try {
-        await apiFetch('/api/peak-plans', {
-            method: 'POST',
+        await apiFetch('/api/peak-plans/' + planId, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ plans: peakPlans })
+            body: JSON.stringify({ arrivalTime: plan.arrivalTime })
         });
-    } catch (e) { console.error('Failed to save peak plans:', e); }
+    } catch (e) { console.error('Failed to update peak plan arrival:', e); }
     renderPeakDeployments();
     refreshPeakDashboard();
     showToast('✅ تم تأكيد وصول ' + plan.unit, 'success');
@@ -8519,12 +8519,12 @@ async function confirmPeakDeparture(planId) {
     if (!plan) return;
     plan.departureTime = new Date().toISOString();
     try {
-        await apiFetch('/api/peak-plans', {
-            method: 'POST',
+        await apiFetch('/api/peak-plans/' + planId, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ plans: peakPlans })
+            body: JSON.stringify({ departureTime: plan.departureTime })
         });
-    } catch (e) { console.error('Failed to save peak plans:', e); }
+    } catch (e) { console.error('Failed to update peak plan departure:', e); }
     renderPeakDeployments();
     refreshPeakDashboard();
     showToast('✅ تم تأكيد مغادرة ' + plan.unit, 'success');
@@ -8537,12 +8537,12 @@ async function resolvePeakPlan(planId) {
     plan.status = 'completed';
     plan.departureTime = plan.departureTime || new Date().toISOString();
     try {
-        await apiFetch('/api/peak-plans', {
-            method: 'POST',
+        await apiFetch('/api/peak-plans/' + planId, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ plans: peakPlans })
+            body: JSON.stringify({ status: plan.status, departureTime: plan.departureTime })
         });
-    } catch (e) { console.error('Failed to save peak plans:', e); }
+    } catch (e) { console.error('Failed to update peak plan resolve:', e); }
     stopPeakCountdown(planId);
     renderPeakDeployments();
     refreshPeakDashboard();
