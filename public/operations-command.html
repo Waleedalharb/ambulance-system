@@ -2425,6 +2425,19 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
   }, 800);
 });
+
+// ==========================================
+// syncUpdate — لـ websocket-sync.js
+// ==========================================
+window.syncUpdate = function() {
+  console.log('🔄 syncUpdate called in operations-command.html');
+  renderDashboard();
+  renderReferences();
+  renderHospitals();
+  renderFiles();
+  renderTimeline();
+  renderAnnouncements();
+};
 </script>
 
     <script src="js/websocket-sync.js"></script>

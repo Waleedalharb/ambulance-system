@@ -1,6 +1,6 @@
 // ============================================
 // WebSocket Sync Client — جميع الصفحات
-// يتصل بالخادم ويستقبل broadcast updates + يعرض إشعارات
+// يتصل بالخادم ويستقبل broadcast updates + يعرض إشعارات + يحدث البيانات
 // ============================================
 (function() {
     var authToken = localStorage.getItem('authToken');
@@ -13,17 +13,14 @@
     // إشعارات بسيطة تعمل في جميع الصفحات
     // =====================
     function showSyncToast(message) {
-        // إذا الصفحة فيها showToast (operations-command.html) استخدمها
         if (typeof showToast === 'function') {
             showToast('info', 'تحديث', message);
             return;
         }
-        // إذا الصفحة فيها showNotification (index.html) استخدمها
         if (typeof showNotification === 'function') {
             showNotification('تحديث', message, 'info', 3000);
             return;
         }
-        // fallback: أنشئ إشعار بسيط
         var toast = document.createElement('div');
         toast.textContent = message;
         toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:99999; background:#1E3A5F; color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3); animation:slideDown 0.3s ease; direction:rtl;';
@@ -31,9 +28,6 @@
         setTimeout(function() { toast.remove(); }, 3000);
     }
 
-    // =====================
-    // إضافة animation CSS
-    // =====================
     if (!document.getElementById('sync-toast-style')) {
         var style = document.createElement('style');
         style.id = 'sync-toast-style';
@@ -55,18 +49,24 @@
             var data = JSON.parse(event.data);
             console.log('📡 Sync received:', data.type, data.message || '');
 
-            // إذا رسالة بسيطة handshake
             if (data.type === 'connected') {
                 console.log('WS:', data.message);
                 return;
             }
 
-            // عرض إشعار بسيط
+            // عرض إشعار
             if (data.message) {
                 showSyncToast(data.message);
             }
 
-            // تحديث البيانات
+            // ✅ الطريقة الجديدة: syncUpdate() في كل صفحة
+            if (typeof syncUpdate === 'function') {
+                console.log('🔄 Calling syncUpdate() for type:', data.type);
+                syncUpdate();
+                return;
+            }
+
+            // fallback: الدوال القديمة
             switch(data.type) {
                 case 'new_report':
                     if (typeof refreshReports === 'function') refreshReports();
@@ -74,15 +74,7 @@
                     if (typeof loadAllData === 'function') loadAllData();
                     break;
                 case 'shift_started':
-                    if (typeof loadShifts === 'function') loadShifts();
-                    if (typeof loadData === 'function') loadData();
-                    if (typeof loadAllData === 'function') loadAllData();
-                    break;
                 case 'shift_updated':
-                    if (typeof loadShifts === 'function') loadShifts();
-                    if (typeof loadData === 'function') loadData();
-                    if (typeof loadAllData === 'function') loadAllData();
-                    break;
                 case 'shift_deleted':
                     if (typeof loadShifts === 'function') loadShifts();
                     if (typeof loadData === 'function') loadData();

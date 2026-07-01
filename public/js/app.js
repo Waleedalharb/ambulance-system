@@ -8490,3 +8490,13 @@ cleanupPeakPlans();
 // Update the sidebar button
 var sidebarPeak = document.getElementById('sidebarPeak');
 if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); openPeakTimeModal(); };
+// ==========================================
+// syncUpdate — لـ websocket-sync.js (جميع الصفحات)
+// ==========================================
+window.syncUpdate = function() {
+    console.log('🔄 syncUpdate called in index.html (app.js)');
+    loadAllData();
+    calculateLiveReportStats();
+    updateWorkforceStats();
+    updateDistributionIndicator();
+};

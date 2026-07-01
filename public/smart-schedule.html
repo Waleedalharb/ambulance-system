@@ -2652,13 +2652,13 @@
             if (e.target === this) closeDocumentViewer();
         });
 
-        // نشر الـ functions على window عشان onclick attributes تقدر تلاقيها
+        // نشر الـ functions على window
         window.setView = setView;
         window.applyFilters = applyFilters;
         window.exportToExcel = exportToExcel;
         window.exportToPDF = exportToPDF;
         window.printSchedule = printSchedule;
-                window.closeDocumentViewer = closeDocumentViewer;
+        window.closeDocumentViewer = closeDocumentViewer;
         window.changeMonth = changeMonth;
         window.openDocumentViewer = openDocumentViewer;
         window.deleteSavedFile = deleteSavedFile;
@@ -2667,6 +2667,16 @@
         window.downloadDocument = downloadDocument;
         window.renderDailyTable = renderDailyTable;
         window.renderEmployeeTable = renderEmployeeTable;
+
+        // ==========================================
+        // syncUpdate — لـ websocket-sync.js
+        // ==========================================
+        window.syncUpdate = function() {
+            console.log('🔄 syncUpdate called in smart-schedule.html');
+            loadData();
+            loadSavedTable(true);
+        };
+
         console.log('✅ جميع الدوال متاحة في window');
     </script>
     <script src="js/websocket-sync.js"></script>

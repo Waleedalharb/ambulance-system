@@ -2165,6 +2165,14 @@ function showUnitDetails(unitName) {
 function closeUnitModal() {
     document.getElementById('unitDetailModal').classList.remove('active');
 }
+
+// ==========================================
+// syncUpdate — لـ websocket-sync.js
+// ==========================================
+window.syncUpdate = function() {
+    console.log('🔄 syncUpdate called in report-entry.html');
+    loadData();
+};
 </script>
 
 <!-- Modal تفاصيل الفرقة -->
