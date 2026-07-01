@@ -20,8 +20,12 @@ module.exports = {
     
     // Rate limiting configuration
     RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    RATE_LIMIT_MAX_REQUESTS: 100, // per IP per window
-    LOGIN_RATE_LIMIT_MAX: 10, // login attempts per 15 min
+    RATE_LIMIT_MAX_REQUESTS: 2000, // per IP per window (increased from 100)
+    LOGIN_RATE_LIMIT_MAX: 20, // login attempts per 15 min (increased from 10)
+    
+    // API-specific lighter limits for read-heavy endpoints
+    API_READ_LIMIT_WINDOW_MS: 1 * 60 * 1000, // 1 minute
+    API_READ_LIMIT_MAX: 120, // per IP per minute for read APIs
     
     // CORS configuration
     CORS_ORIGIN: process.env.CORS_ORIGIN || '*',

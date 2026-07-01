@@ -32,11 +32,27 @@ services:
       #   value: [set in Render dashboard]
       # Optional: Restrict CORS in production
       # - key: CORS_ORIGIN
-      #   value: https://your-domain.com
+      #   value: https://emsoperations.online
     disk:
       name: ambulance-data-disk
       mountPath: /data
       sizeGB: 10
+
+# Daily automated backup at 3:17 AM (off-peak minute)
+cronJobs:
+  - type: cron
+    name: ambulance-daily-backup
+    env: node
+    region: frankfurt
+    plan: starter
+    schedule: "17 3 * * *"
+    buildCommand: npm install
+    startCommand: node scripts/backup.js backup
+    envVars:
+      - key: RENDER_DISK_PATH
+        value: /data
+      - key: BACKUP_DIR
+        value: /data/backups
 
 # ============================================
 # IMPORTANT SECURITY NOTES FOR RENDER DASHBOARD:
@@ -48,4 +64,5 @@ services:
 #    - DEFAULT_DIRECTOR_PASSWORD
 #    - DEFAULT_USER_PASSWORD
 # 3. Set CORS_ORIGIN to your actual domain if you have one
+# 4. Set CORS_ORIGIN: https://emsoperations.online
 # ============================================

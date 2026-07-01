@@ -4,6 +4,27 @@
 var currentUser = null;
 var authToken = localStorage.getItem('authToken') || null;
 
+// ============================================
+// fetch wrapper with 429 graceful handling
+// ============================================
+var _rateLimitBackoff = false;
+async function apiFetch(url, options) {
+    try {
+        var response = await fetch(url, options);
+        if (response.status === 429) {
+            if (!_rateLimitBackoff) {
+                _rateLimitBackoff = true;
+                showNotification('تنبيه', 'الخادم مشغول، جاري تقليل سرعة التحديث...', 'warning', 5000);
+                setTimeout(function() { _rateLimitBackoff = false; }, 30000);
+            }
+            throw new Error('429 Too Many Requests');
+        }
+        return response;
+    } catch (error) {
+        throw error;
+    }
+}
+
 function showNotification(title, message, type, duration) {
     var container = document.getElementById('toastContainer');
     if (!container) { console.log('[' + type + '] ' + title + ': ' + message); return; }
@@ -451,7 +472,7 @@ function startFallbackInterval() {
             loadAllData();
             applyGlobalTheme();
         }
-    }, 30000);
+    }, 60000); // 60 ثانية
 }
 
 // ============================================
@@ -5960,8 +5981,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     btn = document.getElementById("returnToCurrentBtn"); if (btn) btn.onclick = returnToCurrentShift;
 });
 
-// فحص التنبيهات كل 10 ثواني
-setInterval(checkForAlerts, 10000);
+// فحص التنبيهات كل 30 ثانية (بدلاً من 10 ثواني لتقليل الضغط)
+setInterval(checkForAlerts, 30000);
 
 // ============================================
 // تغيير الرقم السري
@@ -6145,19 +6166,18 @@ window.onclick = function(e) {
 };
 
 // ============================================
-// تحديث تلقائي كل 3 ثواني
+// تحديث تلقائي كل 10 ثواني (بدلاً من 3 ثواني لتقليل الضغط)
 // ============================================
 setInterval(function() {
     if (!isViewingArchiveShift) { 
         checkForUpdates(); 
-        console.log('🔄 تحديث تلقائي للبيانات - ' + getSaudiTime());
     }
-}, 3000);  // 3 ثواني
+}, 10000);  // 10 ثواني
 
 async function checkForUpdates() {
     if (isViewingArchiveShift) return;
     try {
-        var response = await fetch('/api/last-update');
+        var response = await apiFetch('/api/last-update');
         var data = await response.json();
         if (data.lastUpdate > lastKnownUpdate) {
             lastKnownUpdate = data.lastUpdate;
@@ -7287,7 +7307,7 @@ document.head.appendChild(flashStyle);
 // ============================================
 var originalCheckForAlerts = checkForAlerts;
 checkForAlerts = function() {
-    fetch('/api/peak-data', { headers: { 'Authorization': 'Bearer ' + authToken } })
+    apiFetch('/api/peak-data', { headers: { 'Authorization': 'Bearer ' + authToken } })
         .then(function(res) { return res.json(); })
         .then(function(result) {
             if (result.success) {

@@ -14,7 +14,7 @@ const securityConfig = require('./config/security');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE } = securityConfig;
+const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
 
 // ============================================
 // WebSocket Server - تحديث فوري (uses same HTTP server for Render compatibility)
@@ -97,9 +97,9 @@ async function initDefaultUsers() {
     } catch {
         const salt = await bcrypt.genSalt(12); // Increased from 10 to 12
         // Use env vars for default passwords, or generate secure random ones
-        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || '1234';
-        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || '1234';
-        const userPass = process.env.DEFAULT_USER_PASSWORD || '1234';
+        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || require('crypto').randomBytes(16).toString('hex');
+        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || require('crypto').randomBytes(16).toString('hex');
+        const userPass = process.env.DEFAULT_USER_PASSWORD || require('crypto').randomBytes(16).toString('hex');
         
         const defaultUsers = [
             { id: 'admin-1', username: 'admin', password: await bcrypt.hash(adminPass, salt), name: 'مدير النظام', role: 'admin', isActive: true },
@@ -155,21 +155,53 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 4. Body Parser (reduced limits)
+// 4. Static Files (BEFORE rate limiting — never rate-limit assets)
+const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0,
+    etag: true,
+    lastModified: true
+}));
+app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
+    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
+}));
+// ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
+app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads'), {
+    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
+}));
+
+// 5. Body Parser (reduced limits)
 app.use(express.json({ limit: JSON_LIMIT }));
 app.use(express.urlencoded({ limit: URLENCODED_LIMIT, extended: true }));
 
-// 5. Global Rate Limiting
+// 6. Global Rate Limiting (skip static files & health check)
 const globalLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
     max: RATE_LIMIT_MAX_REQUESTS,
     message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+        // Never rate-limit health checks, static assets, or WebSocket upgrade
+        if (req.path === '/health') return true;
+        if (req.path.startsWith('/sw.js')) return true;
+        if (req.path.startsWith('/manifest.json')) return true;
+        if (req.headers.upgrade === 'websocket') return true;
+        return false;
+    }
 });
 app.use(globalLimiter);
 
-// 6. Login Rate Limiting (stricter)
+// 7. Lighter rate limit for read-heavy API endpoints
+const apiReadLimiter = rateLimit({
+    windowMs: API_READ_LIMIT_WINDOW_MS,
+    max: API_READ_LIMIT_MAX,
+    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// 8. Login Rate Limiting (stricter)
 const loginLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
     max: LOGIN_RATE_LIMIT_MAX,
@@ -200,11 +232,6 @@ function authorize(roles) {
         next();
     };
 }
-
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/forms', express.static(path.join(__dirname, 'public/forms')));
-// ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
-app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads')));
 
 // ============================================
 // API: المصادقة (JWT)
@@ -418,7 +445,7 @@ async function writeThemeSettings(data) {
 // ============================================
 // API: جلب البيانات
 // ============================================
-app.get('/api/data', async (req, res) => {
+app.get('/api/data', authenticate, async (req, res) => {
     try {
         const data = await readData();
         res.json({
@@ -438,7 +465,7 @@ app.get('/api/last-update', (req, res) => {
 // ============================================
 // API: المناوبات
 // ============================================
-app.get('/api/shifts', async (req, res) => {
+app.get('/api/shifts', authenticate, async (req, res) => {
     try {
         const shifts = await readShifts();
         res.json(shifts);
@@ -447,7 +474,7 @@ app.get('/api/shifts', async (req, res) => {
     }
 });
 
-app.get('/api/shifts/:id', async (req, res) => {
+app.get('/api/shifts/:id', authenticate, async (req, res) => {
     try {
         const shifts = await readShifts();
         const shiftId = parseInt(req.params.id);
@@ -620,7 +647,7 @@ app.post('/api/undo', authenticate, async (req, res) => {
 // ============================================
 // API: إحصائيات القوى العاملة
 // ============================================
-app.get('/api/workforce-stats/:shiftId', async (req, res) => {
+app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         const shifts = await readShifts();
@@ -693,7 +720,7 @@ app.get('/api/workforce-stats/:shiftId', async (req, res) => {
 // ============================================
 // API: المستندات (التحديثات التشغيلية)
 // ============================================
-app.get('/api/docs', async (req, res) => {
+app.get('/api/docs', authenticate, async (req, res) => {
     try {
         const docs = await readDocs();
         res.json({ success: true, docs });
@@ -729,7 +756,7 @@ app.post('/api/upload-doc', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/download-doc/:id', async (req, res) => {
+app.get('/api/download-doc/:id', authenticate, async (req, res) => {
     try {
         const docs = await readDocs();
         const doc = docs.find(d => d.id === req.params.id);
@@ -759,7 +786,7 @@ app.delete('/api/delete-doc/:id', authenticate, async (req, res) => {
 // ============================================
 // API: هوية القطاع
 // ============================================
-app.get('/api/get-identity', async (req, res) => {
+app.get('/api/get-identity', authenticate, async (req, res) => {
     try {
         await fs.access(IDENTITY_PATH);
         res.json({ exists: true });
@@ -783,7 +810,7 @@ app.post('/api/upload-identity', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/download-identity', async (req, res) => {
+app.get('/api/download-identity', authenticate, async (req, res) => {
     try {
         const data = await fs.readFile(IDENTITY_PATH);
         res.setHeader('Content-Type', 'application/pdf');
@@ -797,7 +824,7 @@ app.get('/api/download-identity', async (req, res) => {
 // ============================================
 // API: الإسعاف الجوي
 // ============================================
-app.get('/api/air-ambulance', async (req, res) => {
+app.get('/api/air-ambulance', authenticate, async (req, res) => {
     try {
         const records = await readAirRecords();
         res.json({ success: true, records });
@@ -806,7 +833,7 @@ app.get('/api/air-ambulance', async (req, res) => {
     }
 });
 
-app.post('/api/save-air-ambulance', async (req, res) => {
+app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
     try {
         const { reportNumber, unit, hospital, dateTime, notes } = req.body;
         if (!reportNumber || !unit || !hospital || !dateTime) {
@@ -831,7 +858,7 @@ app.post('/api/save-air-ambulance', async (req, res) => {
     }
 });
 
-app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
+app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
     try {
         const records = await readAirRecords();
         const filtered = records.filter(r => r.id !== req.params.id);
@@ -842,7 +869,7 @@ app.delete('/api/delete-air-ambulance/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/clear-air-ambulance', async (req, res) => {
+app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         await writeAirRecords([]);
         res.json({ success: true });
@@ -854,7 +881,7 @@ app.delete('/api/clear-air-ambulance', async (req, res) => {
 // ============================================
 // API: ملاحظات التحكم والتنسيق
 // ============================================
-app.get('/api/control-notes', async (req, res) => {
+app.get('/api/control-notes', authenticate, async (req, res) => {
     try {
         const data = await fs.readFile(CONTROL_NOTES_PATH, 'utf8');
         const parsed = JSON.parse(data);
@@ -881,7 +908,7 @@ app.post('/api/save-control-notes', authenticate, async (req, res) => {
 // ============================================
 // API: إجازات التحكم والتنسيق
 // ============================================
-app.get('/api/vacations', async (req, res) => {
+app.get('/api/vacations', authenticate, async (req, res) => {
     try {
         const data = await fs.readFile(VACATIONS_PATH, 'utf8');
         res.json(JSON.parse(data));
@@ -947,7 +974,7 @@ app.post('/api/change-password', authenticate, authorize(['admin', 'director']),
 // ============================================
 // API: وقت الذروة (Server-based)
 // ============================================
-app.get('/api/peak-data', async (req, res) => {
+app.get('/api/peak-data', authenticate, async (req, res) => {
     try {
         const data = await readPeakData();
         res.json({ success: true, data });
@@ -956,7 +983,7 @@ app.get('/api/peak-data', async (req, res) => {
     }
 });
 
-app.post('/api/peak-mission', async (req, res) => {
+app.post('/api/peak-mission', authenticate, async (req, res) => {
     try {
         const { location, unit, startTime, endTime, priority, notes, lat, lng } = req.body;
         if (!location || !unit || !startTime || !endTime) {
@@ -1019,7 +1046,7 @@ app.post('/api/peak-mission', async (req, res) => {
     }
 });
 
-app.post('/api/peak-resolve', async (req, res) => {
+app.post('/api/peak-resolve', authenticate, async (req, res) => {
     try {
         const { alertId } = req.body;
         if (!alertId) {
@@ -1129,7 +1156,7 @@ app.get('/api/theme-settings', async (req, res) => {
 });
 
 // حذف جميع الثيمات (الخلفية + الشعار)
-app.delete('/api/remove-theme', async (req, res) => {
+app.delete('/api/remove-theme', authenticate, async (req, res) => {
     try {
         const uploadsDir = path.join(STORAGE_PATH, 'uploads');
         const files = await fs.readdir(uploadsDir);
@@ -1318,7 +1345,7 @@ app.get('/api/check-monthly-table', async (req, res) => {
 // ============================================
 // API: تصدير Excel
 // ============================================
-app.get('/api/export', async (req, res) => {
+app.get('/api/export', authenticate, async (req, res) => {
     try {
         const reports = await readData();
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
@@ -1430,7 +1457,7 @@ app.post('/api/upload-operational', authenticate, opsUpload.array('files'), hand
 });
 
 // جلب الملفات
-app.get('/api/operational-files', async (req, res) => {
+app.get('/api/operational-files', authenticate, async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
         res.json({ success: true, files: metadata });
@@ -1440,7 +1467,7 @@ app.get('/api/operational-files', async (req, res) => {
 });
 
 // تحميل ملف
-app.get('/api/download-operational/:id', async (req, res) => {
+app.get('/api/download-operational/:id', authenticate, async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
         const entry = metadata.find(f => f.id === req.params.id);
@@ -1486,6 +1513,61 @@ app.get('/health', async (req, res) => {
         env: process.env.NODE_ENV || 'development'
     };
     res.status(200).json(health);
+});
+
+// Disk usage endpoint for monitoring (admin only)
+app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execAsync = util.promisify(exec);
+        
+        let diskInfo = { total: 'N/A', used: 'N/A', available: 'N/A', percent: 'N/A' };
+        
+        try {
+            // Try df command (Linux/Unix)
+            const { stdout } = await execAsync(`df -h "${STORAGE_PATH}"`);
+            const lines = stdout.trim().split('\n');
+            if (lines.length >= 2) {
+                const parts = lines[1].split(/\s+/);
+                diskInfo = {
+                    total: parts[1] || 'N/A',
+                    used: parts[2] || 'N/A',
+                    available: parts[3] || 'N/A',
+                    percent: parts[4] || 'N/A'
+                };
+            }
+        } catch (e) {
+            // Fallback: calculate directory size manually
+            let totalSize = 0;
+            async function calcDir(dirPath) {
+                const entries = await fs.readdir(dirPath, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dirPath, entry.name);
+                    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+                    if (entry.isDirectory()) {
+                        await calcDir(fullPath);
+                    } else {
+                        const stat = await fs.stat(fullPath);
+                        totalSize += stat.size;
+                    }
+                }
+            }
+            await calcDir(STORAGE_PATH);
+            const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+            const sizeGB = (totalSize / 1024 / 1024 / 1024).toFixed(2);
+            diskInfo = {
+                total: '10 GB (Render Disk)',
+                used: `${sizeMB} MB (${sizeGB} GB)`,
+                available: `${(10 - parseFloat(sizeGB)).toFixed(2)} GB`,
+                percent: `${((parseFloat(sizeGB) / 10) * 100).toFixed(1)}%`
+            };
+        }
+        
+        res.json({ success: true, disk: diskInfo, storagePath: STORAGE_PATH });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب معلومات القرص' });
+    }
 });
 
 // 404 handler
