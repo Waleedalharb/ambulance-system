@@ -848,7 +848,7 @@ function refreshAnalytics() {
 // سجل العمليات (Audit Log)
 // ============================================
 
-var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
+var auditLog = [];
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
@@ -856,7 +856,7 @@ var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_a
     renderAuditLog();
 });
 
-function addAuditEntry(type, action, detail, user) {
+async function addAuditEntry(type, action, detail, user) {
     var entry = {
         id: Date.now().toString(),
         type: type || 'system',
@@ -869,7 +869,13 @@ function addAuditEntry(type, action, detail, user) {
     auditLog.unshift(entry);
     if (auditLog.length > 200) auditLog = auditLog.slice(0, 200);
 
-    localStorage.setItem('auditLog', JSON.stringify(auditLog));
+    try {
+        await apiFetch('/api/audit-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ entry: entry })
+        });
+    } catch (e) { console.error('Failed to save audit entry:', e); }
 }
 
 function renderAuditLog() {
@@ -924,16 +930,27 @@ function filterAuditLog(type, btn) {
     renderAuditLog();
 }
 
-function clearAuditLog() {
+async function clearAuditLog() {
     if (!confirm('&#x26A0;&#xFE0F; هل أنت متأكد من مسح جميع السجلات؟')) return;
     auditLog = [];
-    localStorage.removeItem('auditLog');
+    try {
+        await apiFetch('/api/audit-log', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+    } catch (e) { console.error('Failed to clear audit log:', e); }
     renderAuditLog();
     showNotification('تم المسح', 'تم مسح سجل العمليات بنجاح', 'success', 2000);
 }
 
-function refreshAuditLog() {
-    auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
+async function refreshAuditLog() {
+    try {
+        var res = await apiFetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var data = await res.json();
+        auditLog = data && data.log ? data.log : (Array.isArray(data) ? data : []);
+    } catch (e) {
+        auditLog = [];
+    }
     renderAuditLog();
 }
 
@@ -1809,6 +1826,9 @@ async function loadAllData() {
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
         
+        await loadPeakPlans();
+        await loadAuditLog();
+        
         // تحديث الإنجازات ولوحة الصدارة
         if (document.getElementById('achievementsModal').style.display === 'flex') {
             renderAchievements();
@@ -2067,12 +2087,12 @@ function calculateLiveReportStats() {
 // ============================================
 // مزامنة بيانات إدخال بلاغات الفرق
 // ============================================
-function syncReportEntryData() {
+async function syncReportEntryData() {
     try {
-        var stored = localStorage.getItem('reportEntryRecords');
-        if (!stored) return;
-        var records = JSON.parse(stored);
-        if (!records || !records.length) return;
+        var response = await fetch('/api/report-entry', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (!result.success || !result.records || !result.records.length) return;
+        var records = result.records;
         var today = new Date().toISOString().split('T')[0];
         var todayRecords = records.filter(function(r) { return r.date === today; });
         if (todayRecords.length === 0) return;
@@ -2635,6 +2655,7 @@ function loadShiftToForm(shift) {
     initShiftProgressBar();
     loadShiftEventLog();
     loadAbsenceRecords();
+    loadShiftNotes();
     updateShiftKPIs();
     loadShiftComparison();
     initAutoSave();
@@ -2812,12 +2833,27 @@ function getSeniorShiftData() {
     return { activeCars: activeCars, brokenCars: brokenCars, reserveCars: reserveCars, overlapTeams: overlapTeams, locations: locations, notes: notes, assistantName: assistantName, assistantSignature: assistantSignature, chiefName: chiefName, chiefSignature: chiefSignature, leaderName: leaderName, leaderSignature: leaderSignature };
 }
 
-function saveSeniorRecordToLocal(data) {
+async function saveSeniorRecordToLocal(data) {
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return false; }
-    seniorRecords.unshift({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() });
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    renderSeniorRecords();
-    return true;
+    var record = { activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() };
+    try {
+        var response = await fetch('/api/senior-shifts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            seniorRecords.unshift(result.record);
+            renderSeniorRecords();
+            return true;
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
+    return false;
 }
 
 function clearSeniorShiftForm() {
@@ -2835,10 +2871,26 @@ function clearSeniorShiftForm() {
     document.getElementById('seniorRegionLeaderSignature').value = '';
 }
 
-function deleteSeniorRecord(index) {
+async function deleteSeniorRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذه المناوبة؟')) return;
+    var record = seniorRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/senior-shifts/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     seniorRecords.splice(index, 1);
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
     renderSeniorRecords();
 }
 
@@ -2873,7 +2925,7 @@ function sendWhatsAppMessage(message) {
     window.open('https://wa.me/?text=' + encodedMessage, '_blank');
 }
 
-var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShiftBtn)el_seniorShiftBtn.addEventListener('click', function() {
+var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShiftBtn)el_seniorShiftBtn.addEventListener('click', async function() {
     var now = new Date();
     var dateStr = getSaudiDate();
     document.getElementById('seniorAssistantDate').innerText = dateStr;
@@ -2881,20 +2933,21 @@ var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShif
     document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
     document.getElementById('seniorPrintDate').innerText = dateStr + ' - ' + getSaudiTime();
     document.getElementById('seniorShiftModal').style.display = 'flex';
+    await loadSeniorRecords();
     renderSeniorRecords();
 });
 
 var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { document.getElementById('seniorShiftModal').style.display = 'none'; });
-var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', function() {
+var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', async function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
-    if (saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
+    if (await saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
 });
 
-var el_sendWhatsAppSeniorShift=document.getElementById("sendWhatsAppSeniorShift");if(el_sendWhatsAppSeniorShift)el_sendWhatsAppSeniorShift.addEventListener('click', function() {
+var el_sendWhatsAppSeniorShift=document.getElementById("sendWhatsAppSeniorShift");if(el_sendWhatsAppSeniorShift)el_sendWhatsAppSeniorShift.addEventListener('click', async function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال'); return; }
-    saveSeniorRecordToLocal(data);
+    await saveSeniorRecordToLocal(data);
     var message = formatWhatsAppMessage(data);
     sendWhatsAppMessage(message);
 });
@@ -3080,9 +3133,24 @@ function executeFormScripts(formId) {
 // ============================================
 
 // ----- نموذج بلاغ حادث (incident) -----
-var incidentRecords = JSON.parse(localStorage.getItem('incidentRecords') || '[]');
+var incidentRecords = [];
 
-function initForm_incident() {
+async function loadIncidentRecords() {
+    try {
+        var response = await fetch('/api/incidents', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            incidentRecords = result.records || [];
+        } else {
+            incidentRecords = [];
+        }
+    } catch (e) {
+        incidentRecords = [];
+    }
+}
+
+async function initForm_incident() {
+    await loadIncidentRecords();
     var now = new Date();
     var dt = now.toISOString().slice(0, 16);
     var el = document.getElementById('incDateTime');
@@ -3090,7 +3158,7 @@ function initForm_incident() {
     renderIncidentPreview();
 }
 
-function saveIncident() {
+async function saveIncident() {
     var reportNumber = (document.getElementById('incReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('incDateTime') || {}).value || '';
     var type = (document.getElementById('incType') || {}).value || '';
@@ -3108,7 +3176,7 @@ function saveIncident() {
         return;
     }
 
-    incidentRecords.unshift({
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         type: type,
@@ -3121,11 +3189,25 @@ function saveIncident() {
         description: description.trim(),
         actions: actions.trim(),
         createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
-    alert('✅ تم حفظ بلاغ الحادث');
-    clearIncidentForm();
-    renderIncidentPreview();
+    };
+    try {
+        var response = await fetch('/api/incidents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            incidentRecords.unshift(result.record);
+            alert('✅ تم حفظ بلاغ الحادث');
+            clearIncidentForm();
+            renderIncidentPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 function clearIncidentForm() {
@@ -3205,17 +3287,48 @@ function renderIncidentPreview() {
     container.innerHTML = html;
 }
 
-function deleteIncidentRecord(index) {
+async function deleteIncidentRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    var record = incidentRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/incidents/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     incidentRecords.splice(index, 1);
-    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
     renderIncidentPreview();
 }
 
 // ----- نموذج تسليم مناوبة كبار المسعفين (senior) -----
-var seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+var seniorRecords = [];
 
-function initForm_senior() {
+async function loadSeniorRecords() {
+    try {
+        var response = await fetch('/api/senior-shifts', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            seniorRecords = result.records || [];
+        } else {
+            seniorRecords = [];
+        }
+    } catch (e) {
+        seniorRecords = [];
+    }
+}
+
+async function initForm_senior() {
+    await loadSeniorRecords();
     var today = new Date().toISOString().slice(0, 10);
     var dtEls = ['senAsstDate', 'senChiefDate', 'senCmdrDate'];
     dtEls.forEach(function(id) {
@@ -3225,7 +3338,7 @@ function initForm_senior() {
     renderSeniorPreview();
 }
 
-function saveSenior() {
+async function saveSenior() {
     var workingCars = (document.getElementById('senWorkingCars') || {}).value || '0';
     var brokenCars = (document.getElementById('senBrokenCars') || {}).value || '0';
     var reserveCars = (document.getElementById('senReserveCars') || {}).value || '0';
@@ -3257,7 +3370,7 @@ function saveSenior() {
         return;
     }
 
-    seniorRecords.unshift({
+    var record = {
         workingCars: workingCars,
         brokenCars: brokenCars,
         reserveCars: reserveCars,
@@ -3274,11 +3387,25 @@ function saveSenior() {
         cmdrSign: cmdrSign.trim(),
         cmdrDate: cmdrDate,
         createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    alert('✅ تم حفظ مناوبة كبار المسعفين');
-    clearSeniorForm();
-    renderSeniorPreview();
+    };
+    try {
+        var response = await fetch('/api/senior-shifts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            seniorRecords.unshift(result.record);
+            alert('✅ تم حفظ مناوبة كبار المسعفين');
+            clearSeniorForm();
+            renderSeniorPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 function clearSeniorForm() {
@@ -3376,15 +3503,44 @@ function renderSeniorPreview() {
     container.innerHTML = html;
 }
 
-function deleteSeniorRecord(index) {
+async function deleteSeniorRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    var record = seniorRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/senior-shifts/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     seniorRecords.splice(index, 1);
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+    renderSeniorRecords();
     renderSeniorPreview();
 }
 
 // ----- نموذج الإسعاف الجوي (air) -----
-var airRecords = JSON.parse(localStorage.getItem('airRecords') || '[]');
+var airRecords = [];
+
+async function loadAirRecordsFromServer() {
+    try {
+        var response = await fetch('/api/air-ambulance', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            airRecords = result.records || [];
+        }
+    } catch (e) {
+        console.error('Failed to load air records:', e);
+    }
+}
 
 function initForm_air() {
     var el = document.getElementById('airDateTime');
@@ -3392,7 +3548,7 @@ function initForm_air() {
     renderAirPreview();
 }
 
-function saveAirAmbulance() {
+async function saveAirAmbulance() {
     var reportNumber = (document.getElementById('airReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('airDateTime') || {}).value || '';
     var pickupLocation = (document.getElementById('airPickupLocation') || {}).value || '';
@@ -3409,23 +3565,27 @@ function saveAirAmbulance() {
         return;
     }
 
-    airRecords.unshift({
-        reportNumber: reportNumber.trim(),
-        dateTime: dateTime,
-        pickupLocation: pickupLocation.trim(),
-        destinationHospital: destinationHospital.trim(),
-        diagnosis: diagnosis.trim(),
-        reason: reason.trim(),
-        patientName: patientName.trim(),
-        patientAge: patientAge,
-        unit: unit,
-        paramedic: paramedic.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('airRecords', JSON.stringify(airRecords));
-    alert('✅ تم حفظ طلب الإسعاف الجوي');
-    clearAirForm();
-    renderAirPreview();
+    try {
+        var response = await fetch('/api/save-air-ambulance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({
+                reportNumber, dateTime, pickupLocation, destinationHospital,
+                diagnosis, reason, patientName, patientAge, unit, paramedic
+            })
+        });
+        var result = await response.json();
+        if (result.success) {
+            alert('✅ تم حفظ طلب الإسعاف الجوي');
+            clearAirForm();
+            await loadAirRecordsFromServer();
+            renderAirPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 function clearAirForm() {
@@ -3497,20 +3657,39 @@ function renderAirPreview() {
     container.innerHTML = html;
 }
 
-function deleteAirRecord(index) {
+async function deleteAirRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    airRecords.splice(index, 1);
-    localStorage.setItem('airRecords', JSON.stringify(airRecords));
-    renderAirPreview();
+    var record = airRecords[index];
+    if (!record || !record.id) return;
+    try {
+        var response = await fetch('/api/delete-air-ambulance/' + record.id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+        var result = await response.json();
+        if (result.success) {
+            await loadAirRecordsFromServer();
+            renderAirPreview();
+        } else {
+            alert('❌ فشل في الحذف: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 // ----- نموذج التقرير اليومي (daily) -----
 var dailyRecords = [];
 
-function initForm_daily() {
+async function initForm_daily() {
     try {
-        var saved = localStorage.getItem('dailyRecords');
-        dailyRecords = saved ? JSON.parse(saved) : [];
+        var response = await fetch('/api/daily-reports', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            dailyRecords = result.records || [];
+        } else {
+            dailyRecords = [];
+        }
     } catch (e) { dailyRecords = []; }
     var el = document.getElementById('dailyDate');
     if (el) el.value = new Date().toISOString().split('T')[0];
@@ -3543,7 +3722,7 @@ function renderDailyPreview() {
     container.innerHTML = html;
 }
 
-function saveDailyReport() {
+async function saveDailyReport() {
     var reportNumber = (document.getElementById('dailyReportNumber') || {}).value || '';
     var date = (document.getElementById('dailyDate') || {}).value || '';
     var responseTeams = (document.getElementById('dailyResponseTeams') || {}).value || 0;
@@ -3562,7 +3741,7 @@ function saveDailyReport() {
         return;
     }
 
-    dailyRecords.unshift({
+    var record = {
         reportNumber: reportNumber.trim(),
         date: date,
         responseTeams: parseInt(responseTeams) || 0,
@@ -3572,17 +3751,47 @@ function saveDailyReport() {
         formFill: formFill.trim(),
         summary: summary.trim(),
         createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
-    alert('✅ تم حفظ التقرير اليومي');
-    clearDailyForm();
-    renderDailyPreview();
+    };
+    try {
+        var response = await fetch('/api/daily-reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            dailyRecords.unshift(result.record);
+            alert('✅ تم حفظ التقرير اليومي');
+            clearDailyForm();
+            renderDailyPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
-function deleteDailyRecord(index) {
+async function deleteDailyRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    var record = dailyRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/daily-reports/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     dailyRecords.splice(index, 1);
-    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
     renderDailyPreview();
 }
 
@@ -3637,15 +3846,30 @@ function sendDailyWhatsApp() {
 }
 
 // ----- نموذج E - حالات توقف قلب وتنفس (e) -----
-var eRecords = JSON.parse(localStorage.getItem('eRecords') || '[]');
+var eRecords = [];
 
-function initForm_e() {
+async function loadERecords() {
+    try {
+        var response = await fetch('/api/e-cases', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            eRecords = result.records || [];
+        } else {
+            eRecords = [];
+        }
+    } catch (e) {
+        eRecords = [];
+    }
+}
+
+async function initForm_e() {
+    await loadERecords();
     var el = document.getElementById('eDateTime');
     if (el) el.value = new Date().toISOString().slice(0, 16);
     renderEPreview();
 }
 
-function saveE() {
+async function saveE() {
     var reportNumber = (document.getElementById('eReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('eDateTime') || {}).value || '';
     var location = (document.getElementById('eLocation') || {}).value || '';
@@ -3662,7 +3886,7 @@ function saveE() {
         return;
     }
 
-    eRecords.unshift({
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         location: location.trim(),
@@ -3674,11 +3898,25 @@ function saveE() {
         outcome: outcome,
         notes: notes.trim(),
         createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('eRecords', JSON.stringify(eRecords));
-    alert('✅ تم حفظ حالة E');
-    clearEForm();
-    renderEPreview();
+    };
+    try {
+        var response = await fetch('/api/e-cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            eRecords.unshift(result.record);
+            alert('✅ تم حفظ حالة E');
+            clearEForm();
+            renderEPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 function clearEForm() {
@@ -3754,23 +3992,54 @@ function renderEPreview() {
     container.innerHTML = html;
 }
 
-function deleteERecord(index) {
+async function deleteERecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    var record = eRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/e-cases/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     eRecords.splice(index, 1);
-    localStorage.setItem('eRecords', JSON.stringify(eRecords));
     renderEPreview();
 }
 
 // ----- نموذج التصعيد (escalation) -----
-var escalationRecords = JSON.parse(localStorage.getItem('escalationRecords') || '[]');
+var escalationRecords = [];
 
-function initForm_escalation() {
+async function loadEscalationRecords() {
+    try {
+        var response = await fetch('/api/escalations', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (result.success) {
+            escalationRecords = result.records || [];
+        } else {
+            escalationRecords = [];
+        }
+    } catch (e) {
+        escalationRecords = [];
+    }
+}
+
+async function initForm_escalation() {
+    await loadEscalationRecords();
     var el = document.getElementById('escDateTime');
     if (el) el.value = new Date().toISOString().slice(0, 16);
     renderEscalationPreview();
 }
 
-function saveEscalation() {
+async function saveEscalation() {
     var reportNumber = (document.getElementById('escReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('escDateTime') || {}).value || '';
     var location = (document.getElementById('escLocation') || {}).value || '';
@@ -3788,7 +4057,7 @@ function saveEscalation() {
         return;
     }
 
-    escalationRecords.unshift({
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         location: location.trim(),
@@ -3798,11 +4067,25 @@ function saveEscalation() {
         agencies: agencies,
         details: details.trim(),
         createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('escalationRecords', JSON.stringify(escalationRecords));
-    alert('✅ تم حفظ بلاغ التصعيد');
-    clearEscalationForm();
-    renderEscalationPreview();
+    };
+    try {
+        var response = await fetch('/api/escalations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify(record)
+        });
+        var result = await response.json();
+        if (result.success) {
+            escalationRecords.unshift(result.record);
+            alert('✅ تم حفظ بلاغ التصعيد');
+            clearEscalationForm();
+            renderEscalationPreview();
+        } else {
+            alert('❌ فشل في الحفظ: ' + (result.error || 'خطأ غير معروف'));
+        }
+    } catch (e) {
+        alert('❌ فشل في الاتصال بالخادم');
+    }
 }
 
 function clearEscalationForm() {
@@ -3876,10 +4159,26 @@ function renderEscalationPreview() {
     container.innerHTML = html;
 }
 
-function deleteEscalationRecord(index) {
+async function deleteEscalationRecord(index) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
+    var record = escalationRecords[index];
+    if (record && record.id) {
+        try {
+            var response = await fetch('/api/escalations/' + record.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            var result = await response.json();
+            if (!result.success) {
+                alert('❌ فشل في حذف السجل من الخادم');
+                return;
+            }
+        } catch (e) {
+            alert('❌ فشل في الاتصال بالخادم');
+            return;
+        }
+    }
     escalationRecords.splice(index, 1);
-    localStorage.setItem('escalationRecords', JSON.stringify(escalationRecords));
     renderEscalationPreview();
 }
 
@@ -4736,14 +5035,22 @@ function toggleEventLog() {
     }
 }
 
-function loadShiftEventLog() {
+async function loadShiftEventLog() {
     var section = document.getElementById('shiftEventLogSection');
     var container = document.getElementById('shiftEventLog');
     if (!section || !container) return;
 
-    var key = 'shiftEventLog_' + (currentShiftId || 'temp');
-    var stored = localStorage.getItem(key);
-    shiftEventLog = stored ? JSON.parse(stored) : [];
+    if (!currentShiftId) {
+        shiftEventLog = [];
+    } else {
+        try {
+            var res = await apiFetch('/api/shift-events/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var data = await res.json();
+            shiftEventLog = data && data.events ? data.events : (Array.isArray(data) ? data : []);
+        } catch (e) {
+            shiftEventLog = [];
+        }
+    }
 
     if (shiftEventLog.length > 0) section.style.display = 'block';
 
@@ -4753,7 +5060,7 @@ function loadShiftEventLog() {
     }
 }
 
-function addShiftEvent(type, text, source) {
+async function addShiftEvent(type, text, source) {
     if (!currentShiftId) return;
     var evt = {
         time: getSaudiTime(),
@@ -4762,8 +5069,13 @@ function addShiftEvent(type, text, source) {
         source: source || 'auto'  // 'auto' or 'manual'
     };
     shiftEventLog.push(evt);
-    var key = 'shiftEventLog_' + currentShiftId;
-    localStorage.setItem(key, JSON.stringify(shiftEventLog));
+    try {
+        await apiFetch('/api/shift-events/' + currentShiftId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ events: shiftEventLog })
+        });
+    } catch (e) { console.error('Failed to save shift events:', e); }
 
     var section = document.getElementById('shiftEventLogSection');
     if (section) section.style.display = 'block';
@@ -4795,11 +5107,17 @@ function addManualShiftEvent() {
     input.value = '';
 }
 
-function clearShiftEventLog() {
+async function clearShiftEventLog() {
     if (!confirm('\u26a0\ufe0f هل أنت متأكد من مسح سجل الأحداث؟')) return;
     shiftEventLog = [];
-    var key = 'shiftEventLog_' + (currentShiftId || 'temp');
-    localStorage.removeItem(key);
+    if (currentShiftId) {
+        try {
+            await apiFetch('/api/shift-events/' + currentShiftId, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+        } catch (e) { console.error('Failed to clear shift events:', e); }
+    }
     var container = document.getElementById('shiftEventLog');
     if (container) container.innerHTML = '';
     var section = document.getElementById('shiftEventLogSection');
@@ -4974,16 +5292,27 @@ function updateAbsenceSummary() {
     if (perEl) perEl.textContent = counts.permission;
 }
 
-function saveAbsenceRecords() {
+async function saveAbsenceRecords() {
     if (currentShiftId) {
-        localStorage.setItem('absenceRecords_' + currentShiftId, JSON.stringify(absenceRecords));
+        try {
+            await apiFetch('/api/shift-absences/' + currentShiftId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({ absences: absenceRecords })
+            });
+        } catch (e) { console.error('Failed to save absence records:', e); }
     }
 }
 
-function loadAbsenceRecords() {
+async function loadAbsenceRecords() {
     if (currentShiftId) {
-        var stored = localStorage.getItem('absenceRecords_' + currentShiftId);
-        absenceRecords = stored ? JSON.parse(stored) : [];
+        try {
+            var res = await apiFetch('/api/shift-absences/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var data = await res.json();
+            absenceRecords = data && data.absences ? data.absences : (Array.isArray(data) ? data : []);
+        } catch (e) {
+            absenceRecords = [];
+        }
     } else {
         absenceRecords = [];
     }
@@ -5283,8 +5612,31 @@ function toggleNoteResolved(id) {
     }
 }
 
-function saveShiftNotes() {
-    if (currentShiftId) localStorage.setItem('shiftNotes_' + currentShiftId, JSON.stringify(shiftNotes));
+async function saveShiftNotes() {
+    if (currentShiftId) {
+        try {
+            await apiFetch('/api/shift-notes/' + currentShiftId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({ notes: shiftNotes })
+            });
+        } catch (e) { console.error('Failed to save shift notes:', e); }
+    }
+}
+
+async function loadShiftNotes() {
+    if (currentShiftId) {
+        try {
+            var res = await apiFetch('/api/shift-notes/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var data = await res.json();
+            shiftNotes = data && data.notes ? data.notes : (Array.isArray(data) ? data : []);
+        } catch (e) {
+            shiftNotes = [];
+        }
+    } else {
+        shiftNotes = [];
+    }
+    renderShiftNotes();
 }
 
 
@@ -7249,24 +7601,6 @@ var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)e
 
 
 // ============================================
-// سجل العمليات (Audit Log)
-// ============================================
-
-var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
-var currentAuditFilter = 'all';
-
-var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
-    document.getElementById('auditLogModal').style.display = 'flex';
-    renderAuditLog();
-});
-
-
-
-
-
-
-
-// ============================================
 // تصدير PDF (html2pdf.js)
 // ============================================
 
@@ -7822,12 +8156,34 @@ window.fetch = function(url, options) {
 };
 
 
+// ----- Load peak plans from server -----
+async function loadPeakPlans() {
+    try {
+        var res = await apiFetch('/api/peak-plans', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var data = await res.json();
+        peakPlans = data && data.plans ? data.plans : (Array.isArray(data) ? data : []);
+    } catch (e) {
+        peakPlans = [];
+    }
+}
+
+// ----- Load audit log from server -----
+async function loadAuditLog() {
+    try {
+        var res = await apiFetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var data = await res.json();
+        auditLog = data && data.log ? data.log : (Array.isArray(data) ? data : []);
+    } catch (e) {
+        auditLog = [];
+    }
+}
+
 // ============================================
 // PEAK TIME SYSTEM v2 — نظام إدارة وقت الذروة
 // ============================================
 
-var peakPlans = JSON.parse(localStorage.getItem('peakPlans') || '[]');
-var peakAssignments = JSON.parse(localStorage.getItem('peakAssignments') || '[]');
+var peakPlans = [];
+var peakAssignments = [];
 var peakCurrentTab = 'dashboard';
 var peakCountdownIntervals = {};
 
@@ -7901,7 +8257,7 @@ function initPeakFormDefaults() {
 }
 
 // ----- Save Plan -----
-function savePeakPlan() {
+async function savePeakPlan() {
     var title = document.getElementById('peakPlanTitle').value.trim();
     var planType = document.getElementById('peakPlanType').value;
     var location = document.getElementById('peakLocation').value.trim();
@@ -7941,7 +8297,13 @@ function savePeakPlan() {
     };
 
     peakPlans.unshift(plan);
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    try {
+        await apiFetch('/api/peak-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ plans: peakPlans })
+        });
+    } catch (e) { console.error('Failed to save peak plans:', e); }
     clearPeakForm();
     alert('✅ تم حفظ خطة التمركز');
     switchPeakTab('dashboard');
@@ -8116,34 +8478,52 @@ function buildPeakDeploymentRow(plan, compact) {
     return html;
 }
 
-function confirmPeakArrival(planId) {
+async function confirmPeakArrival(planId) {
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
     plan.arrivalTime = new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    try {
+        await apiFetch('/api/peak-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ plans: peakPlans })
+        });
+    } catch (e) { console.error('Failed to save peak plans:', e); }
     renderPeakDeployments();
     refreshPeakDashboard();
     showToast('✅ تم تأكيد وصول ' + plan.unit, 'success');
     playPeakSound('arrival');
 }
 
-function confirmPeakDeparture(planId) {
+async function confirmPeakDeparture(planId) {
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
     plan.departureTime = new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    try {
+        await apiFetch('/api/peak-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ plans: peakPlans })
+        });
+    } catch (e) { console.error('Failed to save peak plans:', e); }
     renderPeakDeployments();
     refreshPeakDashboard();
     showToast('✅ تم تأكيد مغادرة ' + plan.unit, 'success');
 }
 
-function resolvePeakPlan(planId) {
+async function resolvePeakPlan(planId) {
     if (!confirm('⚠️ هل أنت متأكد من إنهاء هذه الخطة؟')) return;
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
     plan.status = 'completed';
     plan.departureTime = plan.departureTime || new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    try {
+        await apiFetch('/api/peak-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ plans: peakPlans })
+        });
+    } catch (e) { console.error('Failed to save peak plans:', e); }
     stopPeakCountdown(planId);
     renderPeakDeployments();
     refreshPeakDashboard();
@@ -8481,7 +8861,6 @@ function cleanupPeakPlans() {
             p.status = 'completed';
         }
     });
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
 }
 
 // Run cleanup on startup

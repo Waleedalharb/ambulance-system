@@ -66,13 +66,15 @@
                 return;
             }
 
-            // fallback: الدوال القديمة
+            // fallback: الدوال القديمة + الأنواع الجديدة
             switch(data.type) {
+                // التقارير القديمة
                 case 'new_report':
                     if (typeof refreshReports === 'function') refreshReports();
                     if (typeof loadData === 'function') loadData();
                     if (typeof loadAllData === 'function') loadAllData();
                     break;
+                // الورديات
                 case 'shift_started':
                 case 'shift_updated':
                 case 'shift_deleted':
@@ -80,41 +82,188 @@
                     if (typeof loadData === 'function') loadData();
                     if (typeof loadAllData === 'function') loadAllData();
                     break;
+                // ملاحظات التحكم
                 case 'control_notes_updated':
+                case 'control_notes_cleared':
                     if (typeof loadControlNotes === 'function') loadControlNotes();
                     break;
+                // الإجازات
                 case 'vacations_updated':
+                case 'vacations_cleared':
                     if (typeof loadVacations === 'function') loadVacations();
                     if (typeof renderControlList === 'function') renderControlList(false);
                     break;
+                // الطيران
                 case 'air_ambulance_saved':
                 case 'air_ambulance_deleted':
                 case 'air_ambulance_cleared':
                     if (typeof loadAirRecords === 'function') loadAirRecords();
                     break;
+                // الذروة القديمة
                 case 'peak_mission_added':
                 case 'peak_alert_resolved':
+                case 'peak_mission_deleted':
                     if (typeof checkForAlerts === 'function') checkForAlerts();
+                    if (typeof loadPeakPlans === 'function') loadPeakPlans();
                     break;
+                // المستندات
                 case 'doc_uploaded':
                 case 'doc_deleted':
                     if (typeof loadDocsData === 'function') loadDocsData();
                     break;
+                // ملفات العمليات
                 case 'ops_files_uploaded':
                 case 'ops_file_deleted':
                     if (typeof opsLoadData === 'function') opsLoadData();
                     if (typeof renderFiles === 'function') renderFiles();
                     break;
+                // الجدول الشهري
                 case 'monthly_table_uploaded':
+                case 'monthly_table_deleted':
                     if (typeof loadSavedTable === 'function') loadSavedTable(true);
                     if (typeof loadData === 'function') loadData();
                     break;
+                // الهوية
                 case 'identity_uploaded':
                     if (typeof loadData === 'function') loadData();
                     break;
+                // الثيم
                 case 'theme_updated':
+                case 'theme_removed':
                     if (typeof applyGlobalTheme === 'function') applyGlobalTheme();
+                    if (typeof loadTheme === 'function') loadTheme();
                     break;
+
+                // ====== الأنواع الجديدة: report-entry ======
+                case 'report_entry_added':
+                case 'report_entry_deleted':
+                case 'report_entry_cleared':
+                    if (typeof getRecords === 'function') getRecords();
+                    if (typeof loadReports === 'function') loadReports();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+
+                // ====== الأنواع الجديدة: smart-schedule ======
+                case 'schedule_employees_updated':
+                case 'schedule_employees_cleared':
+                    if (typeof loadFromServer === 'function') loadFromServer();
+                    if (typeof loadEmployees === 'function') loadEmployees();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'schedule_files_updated':
+                    if (typeof loadSavedFiles === 'function') loadSavedFiles();
+                    if (typeof loadFiles === 'function') loadFiles();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+
+                // ====== الأنواع الجديدة: operations-command ======
+                case 'dashboard_updated':
+                    if (typeof renderDashboard === 'function') renderDashboard();
+                    if (typeof loadDashboard === 'function') loadDashboard();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'hospitals_updated':
+                    if (typeof renderHospitals === 'function') renderHospitals();
+                    if (typeof loadHospitals === 'function') loadHospitals();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'references_updated':
+                    if (typeof renderReferences === 'function') renderReferences();
+                    if (typeof loadReferences === 'function') loadReferences();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'timeline_updated':
+                    if (typeof renderTimeline === 'function') renderTimeline();
+                    if (typeof loadTimeline === 'function') loadTimeline();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'announcements_updated':
+                case 'announcement_deleted':
+                    if (typeof renderAnnouncements === 'function') renderAnnouncements();
+                    if (typeof loadAnnouncements === 'function') loadAnnouncements();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+
+                // ====== الأنواع الجديدة: app.js forms ======
+                case 'incident_added':
+                case 'incident_deleted':
+                    if (typeof loadIncidents === 'function') loadIncidents();
+                    if (typeof loadIncidentRecords === 'function') loadIncidentRecords();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'senior_shift_added':
+                case 'senior_shift_deleted':
+                    if (typeof loadSeniorShifts === 'function') loadSeniorShifts();
+                    if (typeof loadShiftRecords === 'function') loadShiftRecords();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'e_case_added':
+                case 'e_case_deleted':
+                    if (typeof loadECases === 'function') loadECases();
+                    if (typeof loadERecords === 'function') loadERecords();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'escalation_added':
+                case 'escalation_deleted':
+                    if (typeof loadEscalations === 'function') loadEscalations();
+                    if (typeof loadEscalationRecords === 'function') loadEscalationRecords();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'daily_report_added':
+                case 'daily_report_deleted':
+                    if (typeof loadDailyReports === 'function') loadDailyReports();
+                    if (typeof loadDailyRecords === 'function') loadDailyRecords();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+
+                // ====== الأنواع الجديدة: app.js logs ======
+                case 'shift_event_added':
+                case 'shift_event_deleted':
+                    if (typeof loadShiftEvents === 'function') loadShiftEvents();
+                    if (typeof loadEventLog === 'function') loadEventLog();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'shift_absence_added':
+                case 'shift_absence_deleted':
+                    if (typeof loadShiftAbsences === 'function') loadShiftAbsences();
+                    if (typeof loadAbsenceRecords === 'function') loadAbsenceRecords();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'shift_note_added':
+                case 'shift_note_deleted':
+                    if (typeof loadShiftNotes === 'function') loadShiftNotes();
+                    if (typeof loadNotes === 'function') loadNotes();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'peak_plan_added':
+                case 'peak_plan_deleted':
+                    if (typeof loadPeakPlans === 'function') loadPeakPlans();
+                    if (typeof checkForAlerts === 'function') checkForAlerts();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+                case 'audit_log_added':
+                    if (typeof loadAuditLog === 'function') loadAuditLog();
+                    if (typeof renderAuditLog === 'function') renderAuditLog();
+                    if (typeof loadData === 'function') loadData();
+                    break;
+
+                // ====== أنواع أخرى ======
+                case 'report_undone':
+                    if (typeof loadReports === 'function') loadReports();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
+                    break;
+                case 'password_changed':
+                    // no specific refresh needed, toast already shown
+                    break;
+
                 default:
                     console.log('Sync: unknown type', data.type);
             }

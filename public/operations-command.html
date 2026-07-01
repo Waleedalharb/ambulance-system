@@ -1686,105 +1686,99 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 // ═══════════════════════════════════════════════════════════════
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  البيانات التجريبية (Demo Data)
+//  البيانات من الخادم (Server Data)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+const authToken = localStorage.getItem('authToken');
+
+function apiFetch(url, options) {
+  options = options || {};
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = 'Bearer ' + authToken;
+  if (!options.headers['Content-Type'] && options.method && options.method !== 'GET') {
+    options.headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, options);
+}
+
 /** بيانات لوحة القيادة الرئيسية **/
-const dashboardData = {
-  stats: [
-    { label:'البلاغات اليوم',      value:127, change:+12, changeLabel:'+12% عن الأمس', color:'coral',  icon:'fa-exclamation-circle', action:'إدخال بلاغات', link:'report-entry.html' },
-    { label:'المناوبات النشطة',    value:18,  change:+3,  changeLabel:'3 جديدة',       color:'neon-g', icon:'fa-user-shield' },
-    { label:'الفرق العاملة',       value:34,  change:-2,  changeLabel:'2 مغادرة',      color:'neon',   icon:'fa-users' },
-    { label:'نسبة الجاهزية',       value:'94%',change:+2, changeLabel:'+2% هذا الأسبوع',color:'gold',  icon:'fa-chart-line' }
-  ],
-  directives: [
-    { id:1, title:'تعميم رقم 44/2025: تحديث بروتوكول الاستجابة السريعة',            dept:'العمليات', date:'2025-01-15', pinned:true },
-    { id:2, title:'قرار إداري: تعديل جدول المناوبات الشتوية',                        dept:'الإداري',  date:'2025-01-14', pinned:false },
-    { id:3, title:'تعميم عاجل: إجراءات الوقاية من فيروسات التنفس الموسمية',       dept:'الجودة',   date:'2025-01-13', pinned:true },
-    { id:4, title:'توجيه: تفعيل غرفة العمليات على مدار 24 ساعة',                    dept:'الطوارئ',  date:'2025-01-12', pinned:false },
-    { id:5, title:'تعميم: تحديث دليل المستشفيات الشريكة وإضافة 3 مستشفيات جديدة',  dept:'العمليات', date:'2025-01-10', pinned:false },
-    { id:6, title:'قرار: تعيين رئيس جديد لقسم العمليات الميدانية',                  dept:'الإداري',  date:'2025-01-08', pinned:false },
-  ],
-  alerts: [
-    { id:1, title:'حادث مروري متعدد على طريق الملك فهد',                    desc:'تمركز 4 فرق إسعافية - 12 مصاب بحالات متفاوتة',            level:'high',   time:'منذ 5 دقائق' },
-    { id:2, title:'انقطاع كهرباء جزئي في مستشفى الصحة الوطنية',            desc:'الطاقة الاحتياطية تعمل حالياً - فريق الصيانة في الطريق',    level:'medium', time:'منذ 18 دقيقة' },
-    { id:3, title:'تأخر وصول 2 فرقة إسعاف عن الجدول المحدد',              desc:'السبب: ازدحام مروري شديد - تم إعادة التوجيه لمسارات بديلة', level:'low',    time:'منذ 32 دقيقة' },
-    { id:4, title:'تقرير يومي: اكتمال 98% من المهام المجدولة',              desc:'معدل الاستجابة ممتاز - لم يتم تسجيل أي شكاوى',             level:'low',    time:'منذ ساعة' },
-    { id:5, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',       desc:'من الساعة 4 عصراً حتى 10 مساءً - أخذ الحيطة والحذر',       level:'medium', time:'منذ ساعتين' },
-  ],
-  indicators: [
-    { label:'توفر الفرق',     value:94, color:'#06D6A0' },
-    { label:'معدل الاستجابة', value:87, color:'#00D4FF' },
-    { label:'الموارد',        value:78, color:'#FFD166' },
-    { label:'الجاهزية',       value:96, color:'#EF476F' },
-  ],
-  activities: [
-    { id:1, title:'تسجيل بلاغ جديد - حادث مروري',                    user:'أحمد الخالد',  time:'منذ 5 دق',    icon:'fa-plus-circle', color:'var(--coral)' },
-    { id:2, title:'تحديث بروتوكول الاستجابة السريعة',                user:'سارة المنيف', time:'منذ 15 دق',   icon:'fa-edit',        color:'var(--neon)' },
-    { id:3, title:'تمركز فرقة إسعاف في موقع الحادث',                user:'فهد العتيبي',  time:'منذ 20 دق',   icon:'fa-ambulance',   color:'var(--neon-green)' },
-    { id:4, title:'رفع ملف: تقرير البلاغات اليومية',                 user:'نورة السالم',  time:'منذ 35 دق',   icon:'fa-upload',      color:'var(--gold)' },
-    { id:5, title:'إضافة ملاحظة على مستشفى الملك فهد',              user:'خالد الزهراني',time:'منذ ساعة',    icon:'fa-sticky-note', color:'var(--purple)' },
-    { id:6, title:'إغلاق بلاغ - حريق محدود في مستودع الأدوية',      user:'محمد القحطاني',time:'منذ ساعتين',  icon:'fa-check-circle',color:'var(--neon-green)' },
-    { id:7, title:'تحديث حالة فرقة الإسعاف رقم 12',                  user:'عبدالله الشمري',time:'منذ 3 ساعات', icon:'fa-sync',        color:'var(--neon)' },
-  ]
-};
+let dashboardData = { stats: [], directives: [], alerts: [], indicators: [], activities: [] };
+
+async function loadDashboardData() {
+  try {
+    const res = await apiFetch('/api/dashboard');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.stats) dashboardData = data;
+    }
+  } catch (e) { console.error('Failed to load dashboard:', e); }
+  renderDashboard();
+}
 
 /** بيانات المرجعيات التشغيلية **/
-const referencesData = [
-  { id:1, title:'بروتوكول الاستجابة السريعة',            type:'protocol', dept:'طوارئ',  status:'active', desc:'الإجراءات المعتمدة للاستجابة السريعة في حالات الطوارئ والكوارث، يشمل جميع المراحل من الاستلام حتى الإغلاق.', date:'2025-01-10' },
-  { id:2, title:'دليل الإجراءات التشغيلية - الطوارئ',    type:'sop',      dept:'طوارئ',  status:'active', desc:'دليل شامل يوضح الإجراءات التشغيلية المعتمدة في قسم الطوارئ مع الرسوم البيانية والخرائط الذهنية.', date:'2025-01-08' },
-  { id:3, title:'نموذج تقرير البلاغ اليومي',             type:'form',     dept:'عمليات', status:'active', desc:'نموذج موحد لتسجيل وتوثيق البلاغات الواردة على مدار اليوم مع تصنيفاتها وأولوياتها.', date:'2025-01-05' },
-  { id:4, title:'دليل التواصل مع المستشفيات الشريكة',    type:'guide',    dept:'عمليات', status:'active', desc:'دليل يحتوي على أرقام الطوارئ والتواصل لجميع المستشفيات الشريكة مع بيانات التحديث.', date:'2024-12-28' },
-  { id:5, title:'بروتوكول التعامل مع الحوادث الجماعية',   type:'protocol', dept:'طوارئ',  status:'review', desc:'إجراءات التعامل مع الحوادث التي تتضمن 5 مصابين فأكثر، تشمل التصنيف والتوجيه.', date:'2024-12-20' },
-  { id:6, title:'دليل ضمان الجودة - غرف العمليات',       type:'sop',      dept:'جودة',   status:'active', desc:'معايير وإجراءات ضمان الجودة لعمليات غرفة القيادة والتحكم والتقييم الدوري.', date:'2024-12-15' },
-  { id:7, title:'نموذج طلب إجازة / منحة للعاملين',       type:'form',     dept:'إداري',  status:'active', desc:'النموذج المعتمد لطلبات الإجازات والمنح للعاملين في غرفة العمليات.', date:'2024-12-10' },
-  { id:8, title:'الإجراءات الإدارية في حالات الطوارئ',   type:'sop',      dept:'إداري',  status:'archived', desc:'الإجراءات الإدارية المتبعة أثناء حالات الطوارئ والأزمات وآلية التوثيق.', date:'2024-12-01' },
-];
+let referencesData = [];
+
+async function loadReferencesData() {
+  try {
+    const res = await apiFetch('/api/references');
+    if (res.ok) {
+      referencesData = await res.json();
+    }
+  } catch (e) { console.error('Failed to load references:', e); }
+  renderReferences();
+}
 
 /** بيانات المستشفيات الشريكة **/
-const hospitalsData = [
-  { id:1, name:'مستشفى الملك فهد التخصصي',    type:'عام',   specialty:'جراحة - طوارئ - عناية مركزة',         address:'الرياض - حي العليا - شارع الملك فهد',       phone:'011-275-0000', emergency:'011-275-1111', hours:'24 ساعة' },
-  { id:2, name:'مستشفى الملك فيصل التخصصي',   type:'متخصص', specialty:'أورام - علاج كيميائي - إشعاعي',        address:'الرياض - حي الملز - شارع مكة',              phone:'011-464-7272', emergency:'011-464-7000', hours:'24 ساعة' },
-  { id:3, name:'مستشفى الصحة الوطنية',         type:'عام',   specialty:'طوارئ - باطنية - جراحة عامة',         address:'الرياض - شمال الرياض - طريق الملك سلمان',   phone:'011-275-8000', emergency:'011-275-8111', hours:'24 ساعة' },
-  { id:4, name:'مستشفى د. سليمان الحبيب',     type:'مجمع',  specialty:'جميع التخصصات الطبية والجراحية',        address:'الرياض - طريق الخرج - حي الروضة',           phone:'011-525-0000', emergency:'011-525-0001', hours:'24 ساعة' },
-  { id:5, name:'مستشفى الإيمان العام',        type:'عام',   specialty:'طوارئ - نساء وولادة - أطفال',          address:'الرياض - حي الروضة - شارع الإمام البخاري',  phone:'011-208-0000', emergency:'011-208-1111', hours:'24 ساعة' },
-  { id:6, name:'مركز طوارئ الغدير',           type:'طوارئ', specialty:'طوارئ فقط - استقبال 24 ساعة',          address:'الرياض - حي الغدير - طريق الدائري الشرقي',  phone:'011-477-0000', emergency:'011-477-0000', hours:'24 ساعة' },
-  { id:7, name:'مستشفى المواساة',             type:'مجمع',  specialty:'قلب - عظام - جلدية - باطنية',          address:'الرياض - حي الروابي - طريق الأمير محمد',    phone:'011-454-3333', emergency:'011-454-3000', hours:'16 ساعة' },
-  { id:8, name:'مستشفى الحرس الوطني',         type:'عام',   specialty:'طوارئ - جراحة - عناية مركزة',          address:'الرياض - حي الروضة - شارع عسير',            phone:'011-252-0088', emergency:'011-252-0000', hours:'24 ساعة' },
-  { id:9, name:'مستشفى عين التخصصي',          type:'متخصص', specialty:'عيون - تجميل - ليزر - جراحة',          address:'الرياض - حي العليا - طريق العروبة',         phone:'011-460-9000', emergency:'011-460-9111', hours:'12 ساعة' },
-  { id:10, name:'مستشفى الأندلسية',           type:'مجمع',  specialty:'جميع التخصصات والفحوصات المتقدمة',      address:'الرياض - طريق الملك سلمان - حي الملقا',     phone:'920-007-997',  emergency:'920-007-998',  hours:'24 ساعة' },
-  { id:11, name:'مستشفى السعودي الألماني',    type:'عام',   specialty:'قلب - أعصاب - عمود فقري - طوارئ',      address:'الرياض - حي الملقا - طريق الأمير تركي',     phone:'011-275-0001', emergency:'011-275-0111', hours:'24 ساعة' },
-  { id:12, name:'مركز طب الأسرة - العليا',    type:'طوارئ', specialty:'أسرة - طوارئ خفيفة - فحوصات',          address:'الرياض - حي العليا - شارع العليا العام',    phone:'011-462-0000', emergency:'011-462-0000', hours:'18 ساعة' },
-];
+let hospitalsData = [];
+
+async function loadHospitalsData() {
+  try {
+    const res = await apiFetch('/api/hospitals');
+    if (res.ok) {
+      hospitalsData = await res.json();
+    }
+  } catch (e) { console.error('Failed to load hospitals:', e); }
+  renderHospitals();
+}
 
 /** بيانات الملفات المرفوعة **/
-let filesData = [
-  { id:1, name:'تقرير البلاغات - يناير 2025.pdf',         type:'pdf',  size:'2.4 MB', date:'2025-01-15', url:'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { id:2, name:'جدول المناوبات الشتوية.docx',             type:'word', size:'156 KB', date:'2025-01-14', url:'#' },
-  { id:3, name:'إحصائيات الاستجابة - الربع الرابع 2024.xlsx', type:'excel', size:'890 KB', date:'2025-01-10', url:'#' },
-  { id:4, name:'عرض الجاهزية التشغيلية.pptx',             type:'ppt',  size:'3.1 MB', date:'2025-01-08', url:'#' },
-  { id:5, name:'خريطة توزيع الفرق الميدانية.jpg',         type:'img',  size:'1.2 MB', date:'2025-01-05', url:'#' },
-];
+let filesData = [];
+
+async function loadFilesData() {
+  try {
+    const res = await apiFetch('/api/ops-files');
+    if (res.ok) {
+      filesData = await res.json();
+    }
+  } catch (e) { console.error('Failed to load files:', e); }
+  renderFiles();
+}
 
 /** بيانات الخط الزمني **/
-const timelineData = [
-  { id:1, title:'إصدار تعميم 44/2025: تحديث بروتوكول الاستجابة',    type:'directive', desc:'تحديث شامل لبروتوكول الاستجابة السريعة بما يتوافق مع المعايير الدولية الجديدة', date:'2025-01-15', time:'10:30 ص' },
-  { id:2, title:'رفع ملف: تقرير البلاغات الشهري',                   type:'file',      desc:'تم رفع التقرير الشهري للبلاغات الواردة خلال شهر يناير', date:'2025-01-15', time:'09:15 ص' },
-  { id:3, title:'تحديث بروتوكول التعامل مع الحوادث الكيميائية',     type:'protocol',  desc:'إضافة إجراءات جديدة وتحديثات على البروتوكول الحالي', date:'2025-01-14', time:'14:45 م' },
-  { id:4, title:'تدريب الفرق الميدانية على الإسعاف المتقدم',        type:'event',     desc:'ورشة تدريبية شملت 25 فرد من الفرق الميدانية على تقنيات الإسعاف المتقدم', date:'2025-01-13', time:'08:00 ص' },
-  { id:5, title:'إضافة مستشفى السعودي الألماني للدليل',             type:'event',     desc:'تم إضافة المستشفى وتحديث بيانات الاتصال لدليل المستشفيات', date:'2025-01-12', time:'11:20 ص' },
-  { id:6, title:'تعميم عاجل: إجراءات وقائية من الفيروسات التنفسية', type:'directive', desc:'تفعيل إجراءات الوقاية من فيروسات التنفسية الموسمية في جميع المرافق', date:'2025-01-10', time:'16:00 م' },
-  { id:7, title:'صيانة دورية لأنظمة غرفة العمليات',                type:'event',     desc:'إجراء صيانة دورية شاملة لجميع أنظمة غرفة العمليات والاتصالات', date:'2025-01-08', time:'02:00 ص' },
-  { id:8, title:'تحديث دليل المستشفيات الشريكة',                    type:'file',      desc:'تحديث الأرقام والعناوين والتخصصات لـ 12 مستشفى شريك', date:'2025-01-05', time:'10:00 ص' },
-];
+let timelineData = [];
+
+async function loadTimelineData() {
+  try {
+    const res = await apiFetch('/api/timeline');
+    if (res.ok) {
+      timelineData = await res.json();
+    }
+  } catch (e) { console.error('Failed to load timeline:', e); }
+  renderTimeline();
+}
 
 /** بيانات الإعلانات العاجلة **/
-const announcementsData = [
-  { id:1, title:'إجازة يوم التأسيس',                                body:'تعلن غرفة العمليات عن إجازة يوم التأسيس يوم الخميس 2025/02/20. سيتم تشغيل غرفة الطوارئ بحد أدنى من الكادر. نأمل من جميع المناوبين تسوية أوضاعهم قبل الإجازة والتأكد من تسليم المهام للمناوبين القادمين.', date:'2025-01-15', pinned:true,  urgent:false },
-  { id:2, title:'تحديث عاجل: بروتوكول الاستجابة السريعة',           body:'تم تحديث بروتوكول الاستجابة السريعة بإجراءات جديدة للحوادث الكيميائية والبيولوجية. يرجى من جميع المناوبين الاطلاع على النسخة الجديدة فوراً وطباعتها للمرجع السريع.', date:'2025-01-14', pinned:true,  urgent:true },
-  { id:3, title:'ورشة تدريبية: إدارة الأزمات والكوارث',              body:'تعلن إدارة التدريب عن إقامة ورشة تدريبية متخصصة في إدارة الأزمات والكوارث يوم الأحد القادم الموافق 2025/01/19 الساعة 9 صباحاً في القاعة الرئيسية بالدور الثاني. حضوركم إلزامي.', date:'2025-01-13', pinned:false, urgent:false },
-  { id:4, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',  body:'تنبيه من المركز الوطني للأرصاد: أمطار رعدية غزيرة متوقعة على منطقة الرياض اليوم من الساعة 4 عصراً حتى 10 مساءً. يرجى أخذ الحيطة والحذر وتأمين المعدات الميدانية.', date:'2025-01-12', pinned:false, urgent:true },
-];
+let announcementsData = [];
+
+async function loadAnnouncementsData() {
+  try {
+    const res = await apiFetch('/api/announcements');
+    if (res.ok) {
+      announcementsData = await res.json();
+    }
+  } catch (e) { console.error('Failed to load announcements:', e); }
+  renderAnnouncements();
+}
 
 /** بيانات المساعد الذكي - الأسئلة والأجوبة **/
 const chatResponses = [
@@ -2035,7 +2029,10 @@ function renderFiles() {
 }
 
 /** حذف ملف من القائمة **/
-function deleteFile(id) {
+async function deleteFile(id) {
+  try {
+    await apiFetch('/api/ops-files/' + id, { method: 'DELETE' });
+  } catch (e) { console.error('Failed to delete file from server:', e); }
   filesData = filesData.filter(f => f.id !== id);
   renderFiles();
   showToast('success','تم الحذف','تم حذف الملف بنجاح');
@@ -2096,20 +2093,30 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
-function handleFiles(fileList) {
+async function handleFiles(fileList) {
   const typeMap = {
     pdf:'pdf', doc:'word', docx:'word', xls:'excel', xlsx:'excel',
     ppt:'ppt', pptx:'ppt', jpg:'img', jpeg:'img', png:'img'
   };
   let count = 0;
-  Array.from(fileList).forEach(file => {
+  const uploadedFiles = [];
+  for (const file of Array.from(fileList)) {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = typeMap[ext] || 'pdf';
     const size = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
     const url = URL.createObjectURL(file);
-    filesData.unshift({ id:Date.now()+Math.random(), name:file.name, type, size, date:new Date().toISOString().split('T')[0], url });
+    const fileObj = { id:Date.now()+Math.random(), name:file.name, type, size, date:new Date().toISOString().split('T')[0], url };
+    uploadedFiles.push(fileObj);
+    // Send to server
+    try {
+      await apiFetch('/api/ops-files', {
+        method: 'POST',
+        body: JSON.stringify(fileObj)
+      });
+    } catch (e) { console.error('Failed to upload file to server:', e); }
     count++;
-  });
+  }
+  filesData = uploadedFiles.concat(filesData);
   renderFiles();
   if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف بنجاح');
 }
@@ -2413,12 +2420,12 @@ document.getElementById('kbdShortcuts').addEventListener('click', toggleShortcut
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 document.addEventListener('DOMContentLoaded', () => {
-  renderDashboard();
-  renderReferences();
-  renderHospitals();
-  renderFiles();
-  renderTimeline();
-  renderAnnouncements();
+  loadDashboardData();
+  loadReferencesData();
+  loadHospitalsData();
+  loadFilesData();
+  loadTimelineData();
+  loadAnnouncementsData();
 
   // Toast ترحيبي
   setTimeout(() => {
@@ -2431,12 +2438,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 window.syncUpdate = function() {
   console.log('🔄 syncUpdate called in operations-command.html');
-  renderDashboard();
-  renderReferences();
-  renderHospitals();
-  renderFiles();
-  renderTimeline();
-  renderAnnouncements();
+  loadDashboardData();
+  loadReferencesData();
+  loadHospitalsData();
+  loadFilesData();
+  loadTimelineData();
+  loadAnnouncementsData();
 };
 </script>
 

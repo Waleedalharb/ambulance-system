@@ -1285,6 +1285,7 @@
         };
         console.log('🚀 Script loaded — starting initialization...');
         function pad2(n) { n = parseInt(n); return n < 10 ? '0' + n : '' + n; }
+        function getAuthToken() { return localStorage.getItem('authToken') || ''; }
         var employees = [];
         var currentView = 'daily';
         var savedFiles = [];
@@ -1299,11 +1300,11 @@
         // ==========================================
         // التهيئة - Initialization
         // ==========================================
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log('🚀 DOMContentLoaded fired');
             try { initClock(); } catch(e) { console.error('initClock failed:', e); }
-            try { loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
-            try { loadFromIndexedDB(); } catch(e) { console.error('loadFromIndexedDB failed:', e); }
+            try { await loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
+            try { await loadFromServer(); } catch(e) { console.error('loadFromServer failed:', e); }
             try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
             try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
             try { setupDemoData(); } catch(e) { console.error('setupDemoData failed:', e); }
@@ -1416,7 +1417,7 @@
             } catch(e) { console.error('setupFileInput error:', e); }
         }
 
-        function handleFileUpload(file) {
+        async function handleFileUpload(file) {
             try {
                 console.log('📁 handleFileUpload called:', file.name, file.size, file.type);
                 currentFile = file;
@@ -1436,7 +1437,7 @@
                     date: new Date().toISOString()
                 };
                 savedFiles.unshift(fileInfo);
-                localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+                await saveFilesToServer();
                 renderSavedFiles();
                 // عرض شريط التقدم
                 document.getElementById('uploadProgress').classList.add('active');
@@ -1474,10 +1475,10 @@
         // ==========================================
         // قراءة Excel - Parse Excel
         // ==========================================
-        function parseExcel(file) {
+        async function parseExcel(file) {
             console.log('📊 parseExcel called');
             var reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 console.log('✅ FileReader loaded, size:', e.target.result.byteLength);
                 try {
                     var data = new Uint8Array(e.target.result);
@@ -1486,7 +1487,7 @@
                     var result = extractEmployees(workbook);
                     console.log('👥 Extracted employees:', result.length);
                     employees = result;
-                    saveToIndexedDB();
+                    await saveToServer();
                     finishAnalysis(result.length);
                     showExtractedTable(result);
                     updateStats();
@@ -1764,7 +1765,7 @@
                 }
                 
                 employees = allEmployees;
-                saveToIndexedDB();
+                await saveToServer();
                 finishAnalysis(allEmployees.length);
                 showExtractedTable(allEmployees);
                 updateStats();
@@ -1935,50 +1936,75 @@
             });
         }
 
-        async function saveToIndexedDB() {
-            var database = await openDB();
-            if (!database) return;
-            var tx = database.transaction('employees', 'readwrite');
-            var store = tx.objectStore('employees');
-            for (var i = 0; i < employees.length; i++) {
-                store.put(employees[i]);
+        async function saveToServer() {
+            try {
+                var token = getAuthToken();
+                var res = await fetch('/api/schedule/employees', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(employees)
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+            } catch(e) {
+                console.error('saveToServer error:', e);
+                showToast('خطأ في حفظ البيانات', 'error');
             }
         }
 
-        async function loadFromIndexedDB() {
-            var database = await openDB();
-            if (!database) return;
-            var tx = database.transaction('employees', 'readonly');
-            var store = tx.objectStore('employees');
-            var req = store.getAll();
-            req.onsuccess = function(e) {
-                if (e.target.result.length > 0) {
-                    employees = e.target.result;
+        async function loadFromServer() {
+            try {
+                var token = getAuthToken();
+                var res = await fetch('/api/schedule/employees', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                var data = await res.json();
+                if (data && data.length > 0) {
+                    employees = data;
                     updateStats();
                     renderCharts();
                     renderCurrentView();
                     populateLocationFilter();
                 }
-            };
+            } catch(e) { console.error('loadFromServer error:', e); }
         }
 
-        function saveToLocalStorage(data) {
-            localStorage.setItem('ss_employees', JSON.stringify(data || employees));
-        }
-
-        function loadFromLocalStorage() {
+        async function loadSavedFiles() {
             try {
-                var data = localStorage.getItem('ss_employees');
-                return data ? JSON.parse(data) : null;
-            } catch(e) { return null; }
-        }
-
-        function loadSavedFiles() {
-            try {
-                var files = localStorage.getItem('ss_savedFiles');
-                savedFiles = files ? JSON.parse(files) : [];
+                var token = getAuthToken();
+                var res = await fetch('/api/schedule/files', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                var data = await res.json();
+                savedFiles = data || [];
                 renderSavedFiles();
-            } catch(e) { savedFiles = []; }
+            } catch(e) {
+                console.error('loadSavedFiles error:', e);
+                savedFiles = [];
+                renderSavedFiles();
+            }
+        }
+
+        async function saveFilesToServer() {
+            try {
+                var token = getAuthToken();
+                var res = await fetch('/api/schedule/files', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(savedFiles)
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+            } catch(e) {
+                console.error('saveFilesToServer error:', e);
+                showToast('خطأ في حفظ قائمة الملفات', 'error');
+            }
         }
 
         function getSavedFiles() { return savedFiles; }
@@ -2003,9 +2029,9 @@
             container.innerHTML = html;
         }
 
-        function deleteSavedFile(id) {
+        async function deleteSavedFile(id) {
             savedFiles = savedFiles.filter(function(f) { return f.id !== id; });
-            localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+            await saveFilesToServer();
             renderSavedFiles();
             showToast('تم حذف الملف', 'info');
         }
@@ -2013,22 +2039,17 @@
         // ==========================================
         // البيانات التجريبية - Demo Data
         // ==========================================
-        function setupDemoData() {
+        async function setupDemoData() {
             if (employees.length > 0) return;
-            var saved = loadFromLocalStorage();
-            if (saved && saved.length > 0) {
-                employees = saved;
-                return;
+            try {
+                await loadFromServer();
+            } catch(e) {
+                console.error('setupDemoData error:', e);
             }
-            employees = generateDemoData();
-            saveToIndexedDB();
-            saveToLocalStorage();
-            populateLocationFilter();
         }
 
         function generateDemoData() {
             try {
-                // لا بيانات تلقائية - المستخدم يرفع ملفه الخاص
                 showToast('يرجى رفع ملف Excel أو PDF أولاً', 'info');
             } catch(e) { console.error('generateDemoData error:', e); }
             return [];
@@ -2673,8 +2694,8 @@
         // ==========================================
         window.syncUpdate = function() {
             console.log('🔄 syncUpdate called in smart-schedule.html');
-            loadData();
-            loadSavedTable(true);
+            loadFromServer();
+            loadSavedFiles();
         };
 
         console.log('✅ جميع الدوال متاحة في window');

@@ -1338,7 +1338,7 @@ var centersData = {
 
 var reportTypes = ["حادث مروري", "حالة مرضية", "حريق", "إصابة", "حالة ولادة", "سقوط", "اختناق", "آخر"];
 
-var STORAGE_KEY = "reportEntryRecords";
+var serverRecordsCache = null;
 var currentFilter = "today";
 var tempUnitCounters = {}; // عداد مؤقت لكل فرقة قبل الحفظ
 
@@ -1355,39 +1355,26 @@ var typeBadgeMap = {
 };
 
 // ========== عند التحميل ==========
-document.addEventListener("DOMContentLoaded", function() {
-    initData();
+document.addEventListener("DOMContentLoaded", async function() {
+    await loadData();
     renderCenters();
     renderTypeSelectors();
-    renderTable();
-    updateStats();
+    await renderTable();
+    await updateStats();
     startClock();
     initDarkMode();
     populateAdvCenters();
 });
 
-// ========== تهيئة البيانات ==========
-function initData() {
-    var existing = localStorage.getItem(STORAGE_KEY);
-    var records = existing ? JSON.parse(existing) : [];
-    if (!records || records.length === 0) {
-        var today = getTodayDate();
-        var demoRecords = [
-            { id: 1719654600000, reportNumber: "B-001", type: "حادث مروري", center: "المنصورة", unit: "جنوب 1", dispatchTime: "14:30", arrivalTime: "14:38", responseTime: "8 د", responseSeconds: 480, date: today, location: "شارع عثمان بن عفان", priority: "عاجل", dispatcher: "", notes: "" },
-            { id: 1719657000000, reportNumber: "B-002", type: "حالة مرضية", center: "الشفاء", unit: "جنوب 8", dispatchTime: "15:10", arrivalTime: "15:16", responseTime: "6 د", responseSeconds: 360, date: today, location: "طريق خريص", priority: "مهم", dispatcher: "", notes: "" },
-            { id: 1719660000000, reportNumber: "B-003", type: "حريق", center: "الخالدية", unit: "جنوب 2", dispatchTime: "16:00", arrivalTime: "16:22", responseTime: "22 د", responseSeconds: 1320, date: today, location: "شارع الأمير محمد", priority: "عاجل", dispatcher: "", notes: "" },
-            { id: 1719634500000, reportNumber: "B-004", type: "إصابة", center: "الحائر", unit: "جنوب 7", dispatchTime: "10:15", arrivalTime: "10:21", responseTime: "6 د", responseSeconds: 360, date: today, location: "طريق المدينة المنورة", priority: "عادي", dispatcher: "", notes: "" },
-            { id: 1719627000000, reportNumber: "B-005", type: "حالة ولادة", center: "الدار البيضاء", unit: "جنوب 4", dispatchTime: "08:30", arrivalTime: "08:41", responseTime: "11 د", responseSeconds: 660, date: today, location: "سوق الدار البيضاء", priority: "عاجل", dispatcher: "", notes: "" }
-        ];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(demoRecords));
-    }
-    // تهيئة العدادات المؤقتة
+// ========== تحميل البيانات من الخادم ==========
+async function loadData() {
+    serverRecordsCache = await getRecords();
     resetTempCounters();
 }
 
 function resetTempCounters() {
     tempUnitCounters = {};
-    var records = getRecords();
+    var records = serverRecordsCache || [];
     for (var i = 0; i < records.length; i++) {
         var r = records[i];
         if (!tempUnitCounters[r.unit]) {
@@ -1397,13 +1384,71 @@ function resetTempCounters() {
     }
 }
 
-function getRecords() {
-    var data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+async function getRecords() {
+    try {
+        var authToken = localStorage.getItem('authToken');
+        var resp = await fetch('/api/report-entry', {
+            headers: { 'Authorization': 'Bearer ' + (authToken || '') }
+        });
+        if (resp.ok) {
+            var records = await resp.json();
+            return records;
+        }
+    } catch(e) {
+        console.error('Failed to fetch records:', e);
+    }
+    return [];
 }
 
-function saveRecords(records) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+async function saveRecords(records) {
+    var authToken = localStorage.getItem('authToken');
+    var serverRecords = serverRecordsCache || [];
+
+    var serverIds = {};
+    for (var i = 0; i < serverRecords.length; i++) {
+        serverIds[serverRecords[i].id] = true;
+    }
+
+    // POST new records
+    for (var i = 0; i < records.length; i++) {
+        if (!serverIds[records[i].id]) {
+            try {
+                await fetch('/api/report-entry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + (authToken || '')
+                    },
+                    body: JSON.stringify(records[i])
+                });
+            } catch(e) {
+                console.error('Failed to POST record:', e);
+            }
+        }
+    }
+
+    // DELETE removed records
+    var recordIds = {};
+    for (var i = 0; i < records.length; i++) {
+        recordIds[records[i].id] = true;
+    }
+
+    for (var i = 0; i < serverRecords.length; i++) {
+        if (!recordIds[serverRecords[i].id]) {
+            try {
+                await fetch('/api/report-entry/' + serverRecords[i].id, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + (authToken || '')
+                    }
+                });
+            } catch(e) {
+                console.error('Failed to DELETE record:', e);
+            }
+        }
+    }
+
+    serverRecordsCache = records.slice();
 }
 
 function getTodayDate() {
@@ -1702,7 +1747,7 @@ function calcResponse(dispatchVal, arrivalVal, displayId, textId, secondsId) {
 }
 
 // ========== حفظ البلاغ السريع ==========
-function saveQuickReport(event) {
+async function saveQuickReport(event) {
     event.preventDefault();
 
     var type = document.getElementById("quickType").value;
@@ -1740,9 +1785,9 @@ function saveQuickReport(event) {
         timestamp: Date.now()
     };
 
-    var records = getRecords();
+    var records = await getRecords();
     records.unshift(record);
-    saveRecords(records);
+    await saveRecords(records);
 
     // تحديث العداد المؤقت
     if (!tempUnitCounters[currentQuickUnit]) {
@@ -1752,14 +1797,14 @@ function saveQuickReport(event) {
 
     // تحديث واجهة المستخدم
     renderCenters();
-    renderTable();
-    updateStats();
+    await renderTable();
+    await updateStats();
     closeQuickModal();
     showToast("تم حفظ البلاغ بنجاح!", "success");
 }
 
 // ========== حفظ البلاغ المتقدم ==========
-function saveAdvancedReport(event) {
+async function saveAdvancedReport(event) {
     event.preventDefault();
 
     var type = document.getElementById("advType").value;
@@ -1799,9 +1844,9 @@ function saveAdvancedReport(event) {
         timestamp: Date.now()
     };
 
-    var records = getRecords();
+    var records = await getRecords();
     records.unshift(record);
-    saveRecords(records);
+    await saveRecords(records);
 
     if (unit) {
         if (!tempUnitCounters[unit]) {
@@ -1811,15 +1856,15 @@ function saveAdvancedReport(event) {
     }
 
     renderCenters();
-    renderTable();
-    updateStats();
+    await renderTable();
+    await updateStats();
     closeAdvancedModal();
     showToast("تم حفظ البلاغ بنجاح!", "success");
 }
 
 // ========== تراجع ==========
-function undoLastReport(unitName) {
-    var records = getRecords();
+async function undoLastReport(unitName) {
+    var records = await getRecords();
     var found = false;
 
     for (var i = 0; i < records.length; i++) {
@@ -1831,11 +1876,11 @@ function undoLastReport(unitName) {
     }
 
     if (found) {
-        saveRecords(records);
+        await saveRecords(records);
         resetTempCounters();
         renderCenters();
-        renderTable();
-        updateStats();
+        await renderTable();
+        await updateStats();
         showToast("تم التراجع عن آخر بلاغ", "info");
     } else {
         showToast("لا توجد بلاغات لهذه الفرقة", "error");
@@ -1843,9 +1888,9 @@ function undoLastReport(unitName) {
 }
 
 // ========== عرض الجدول ==========
-function renderTable() {
+async function renderTable() {
     var tbody = document.getElementById("recordsTableBody");
-    var records = getFilteredRecords();
+    var records = await getFilteredRecords();
 
     if (records.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-inbox"></i> لا توجد بلاغات</div></td></tr>';
@@ -1883,8 +1928,8 @@ function renderTable() {
 }
 
 // ========== فلترة السجلات ==========
-function getFilteredRecords() {
-    var records = getRecords();
+async function getFilteredRecords() {
+    var records = await getRecords();
     var today = getTodayDate();
     var now = new Date();
 
@@ -1926,28 +1971,28 @@ function setFilter(filter) {
 }
 
 // ========== حذف بلاغ ==========
-function deleteReport(id) {
+async function deleteReport(id) {
     if (!confirm("هل أنت متأكد من حذف هذا البلاغ؟")) {
         return;
     }
-    var records = getRecords();
+    var records = await getRecords();
     var newRecords = [];
     for (var i = 0; i < records.length; i++) {
         if (records[i].id !== id) {
             newRecords.push(records[i]);
         }
     }
-    saveRecords(newRecords);
+    await saveRecords(newRecords);
     resetTempCounters();
     renderCenters();
-    renderTable();
-    updateStats();
+    await renderTable();
+    await updateStats();
     showToast("تم حذف البلاغ", "info");
 }
 
 // ========== الإحصائيات ==========
-function updateStats() {
-    var records = getRecords();
+async function updateStats() {
+    var records = await getRecords();
     var today = getTodayDate();
 
     // بلاغات اليوم
@@ -2006,8 +2051,8 @@ function updateStats() {
 }
 
 // ========== تصدير CSV ==========
-function exportCSV() {
-    var records = getFilteredRecords();
+async function exportCSV() {
+    var records = await getFilteredRecords();
     if (records.length === 0) {
         showToast("لا توجد بيانات للتصدير", "error");
         return;
@@ -2046,15 +2091,27 @@ function exportCSV() {
 }
 
 // ========== مسح الكل ==========
-function clearAllData() {
+async function clearAllData() {
     if (!confirm("هل أنت متأكد من مسح جميع البيانات؟ لا يمكن التراجع!")) {
         return;
     }
-    localStorage.removeItem(STORAGE_KEY);
+    var authToken = localStorage.getItem('authToken');
+    var records = await getRecords();
+    for (var i = 0; i < records.length; i++) {
+        try {
+            await fetch('/api/report-entry/' + records[i].id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + (authToken || '') }
+            });
+        } catch(e) {
+            console.error('Failed to delete record:', e);
+        }
+    }
+    serverRecordsCache = [];
     resetTempCounters();
     renderCenters();
-    renderTable();
-    updateStats();
+    await renderTable();
+    await updateStats();
     showToast("تم مسح جميع البيانات", "error");
 }
 
@@ -2095,8 +2152,8 @@ document.addEventListener("keydown", function(e) {
 });
 
 // ========== عرض تفاصيل الفرقة ==========
-function showUnitDetails(unitName) {
-    var records = getRecords();
+async function showUnitDetails(unitName) {
+    var records = await getRecords();
     var unitRecords = [];
     for (var i = 0; i < records.length; i++) {
         if (records[i].unit === unitName) {
@@ -2169,9 +2226,12 @@ function closeUnitModal() {
 // ==========================================
 // syncUpdate — لـ websocket-sync.js
 // ==========================================
-window.syncUpdate = function() {
+window.syncUpdate = async function() {
     console.log('🔄 syncUpdate called in report-entry.html');
-    loadData();
+    await loadData();
+    renderCenters();
+    await renderTable();
+    await updateStats();
 };
 </script>
 

@@ -84,6 +84,24 @@ const PASSWORD_PATH = path.join(STORAGE_PATH, 'password.json');
 const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
 const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
 const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
+const SHIFT_EVENTS_PATH = path.join(STORAGE_PATH, 'shift-events.json');
+const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
+const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
+const PEAK_PLANS_PATH = path.join(STORAGE_PATH, 'peak-plans.json');
+const AUDIT_LOG_PATH = path.join(STORAGE_PATH, 'audit-log.json');
+const INCIDENTS_PATH = path.join(STORAGE_PATH, 'incidents.json');
+const SENIOR_SHIFTS_PATH = path.join(STORAGE_PATH, 'senior-shifts.json');
+const E_CASES_PATH = path.join(STORAGE_PATH, 'e-cases.json');
+const ESCALATIONS_PATH = path.join(STORAGE_PATH, 'escalations.json');
+const DAILY_REPORTS_PATH = path.join(STORAGE_PATH, 'daily-reports.json');
+const SCHEDULE_EMPLOYEES_PATH = path.join(STORAGE_PATH, 'schedule-employees.json');
+const SCHEDULE_FILES_PATH = path.join(STORAGE_PATH, 'schedule-files.json');
+const REPORT_ENTRY_PATH = path.join(STORAGE_PATH, 'report-entry.json');
+const DASHBOARD_PATH = path.join(STORAGE_PATH, 'dashboard.json');
+const HOSPITALS_PATH = path.join(STORAGE_PATH, 'hospitals.json');
+const REFERENCES_PATH = path.join(STORAGE_PATH, 'references.json');
+const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
+const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
 
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
@@ -443,6 +461,285 @@ async function writeThemeSettings(data) {
 }
 
 // ============================================
+// دوال سجل الأحداث والغيابات والملاحظات للمناوبات
+// ============================================
+async function readShiftEvents() {
+    try {
+        const data = await fs.readFile(SHIFT_EVENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftEvents(data) {
+    await fs.writeFile(SHIFT_EVENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readShiftAbsences() {
+    try {
+        const data = await fs.readFile(SHIFT_ABSENCES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftAbsences(data) {
+    await fs.writeFile(SHIFT_ABSENCES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readShiftNotes() {
+    try {
+        const data = await fs.readFile(SHIFT_NOTES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftNotes(data) {
+    await fs.writeFile(SHIFT_NOTES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readPeakPlans() {
+    try {
+        const data = await fs.readFile(PEAK_PLANS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writePeakPlans(data) {
+    await fs.writeFile(PEAK_PLANS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readAuditLog() {
+    try {
+        const data = await fs.readFile(AUDIT_LOG_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeAuditLog(data) {
+    await fs.writeFile(AUDIT_LOG_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال سجلات الحوادث
+// ============================================
+async function readIncidents() {
+    try {
+        const data = await fs.readFile(INCIDENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeIncidents(data) {
+    await fs.writeFile(INCIDENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال مناوبات كبار الضباط
+// ============================================
+async function readSeniorShifts() {
+    try {
+        const data = await fs.readFile(SENIOR_SHIFTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeSeniorShifts(data) {
+    await fs.writeFile(SENIOR_SHIFTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال حالات الطوارئ (E-Cases)
+// ============================================
+async function readECases() {
+    try {
+        const data = await fs.readFile(E_CASES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeECases(data) {
+    await fs.writeFile(E_CASES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال بلاغات التصعيد
+// ============================================
+async function readEscalations() {
+    try {
+        const data = await fs.readFile(ESCALATIONS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeEscalations(data) {
+    await fs.writeFile(ESCALATIONS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال التقارير اليومية
+// ============================================
+async function readDailyReports() {
+    try {
+        const data = await fs.readFile(DAILY_REPORTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeDailyReports(data) {
+    await fs.writeFile(DAILY_REPORTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الجدولة الذكية
+// ============================================
+async function readScheduleEmployees() {
+    try {
+        const data = await fs.readFile(SCHEDULE_EMPLOYEES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeScheduleEmployees(data) {
+    await fs.writeFile(SCHEDULE_EMPLOYEES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readScheduleFiles() {
+    try {
+        const data = await fs.readFile(SCHEDULE_FILES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeScheduleFiles(data) {
+    await fs.writeFile(SCHEDULE_FILES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال تسجيل البلاغات (Report Entry)
+// ============================================
+async function readReportEntry() {
+    try {
+        const data = await fs.readFile(REPORT_ENTRY_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeReportEntry(data) {
+    await fs.writeFile(REPORT_ENTRY_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال غرفة العمليات (Operations Command)
+// ============================================
+async function readDashboard() {
+    try {
+        const data = await fs.readFile(DASHBOARD_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeDashboard(data) {
+    await fs.writeFile(DASHBOARD_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readHospitals() {
+    try {
+        const data = await fs.readFile(HOSPITALS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeHospitals(data) {
+    await fs.writeFile(HOSPITALS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readReferences() {
+    try {
+        const data = await fs.readFile(REFERENCES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeReferences(data) {
+    await fs.writeFile(REFERENCES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readTimeline() {
+    try {
+        const data = await fs.readFile(TIMELINE_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeTimeline(data) {
+    await fs.writeFile(TIMELINE_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readAnnouncements() {
+    try {
+        const data = await fs.readFile(ANNOUNCEMENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeAnnouncements(data) {
+    await fs.writeFile(ANNOUNCEMENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
 // API: جلب البيانات
 // ============================================
 app.get('/api/data', authenticate, async (req, res) => {
@@ -658,6 +955,14 @@ app.post('/api/undo', authenticate, async (req, res) => {
         allData[key].count--;
         allData[key].times.shift();
         await writeData(allData);
+
+        broadcast({
+            type: 'report_undone',
+            message: 'تم التراجع عن بلاغ: ' + unit + ' في ' + center,
+            center: center,
+            unit: unit
+        });
+
         res.json({ success: true, newCount: allData[key].count });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
@@ -939,6 +1244,296 @@ app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'direct
 });
 
 // ============================================
+// API: الحوادث
+// ============================================
+app.get('/api/incidents', authenticate, async (req, res) => {
+    try {
+        const records = await readIncidents();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الحوادث' });
+    }
+});
+
+app.post('/api/incidents', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readIncidents();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeIncidents(records);
+
+        broadcast({
+            type: 'incident_added',
+            message: 'تم إضافة حادث جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ الحادث' });
+    }
+});
+
+app.delete('/api/incidents/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readIncidents();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeIncidents(filtered);
+
+        broadcast({
+            type: 'incident_deleted',
+            message: 'تم حذف حادث',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الحادث' });
+    }
+});
+
+// ============================================
+// API: مناوبات كبار الضباط
+// ============================================
+app.get('/api/senior-shifts', authenticate, async (req, res) => {
+    try {
+        const records = await readSeniorShifts();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب مناوبات كبار الضباط' });
+    }
+});
+
+app.post('/api/senior-shifts', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readSeniorShifts();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeSeniorShifts(records);
+
+        broadcast({
+            type: 'senior_shift_added',
+            message: 'تم إضافة مناوبة كبار الضباط',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ مناوبة كبار الضباط' });
+    }
+});
+
+app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readSeniorShifts();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeSeniorShifts(filtered);
+
+        broadcast({
+            type: 'senior_shift_deleted',
+            message: 'تم حذف مناوبة كبار الضباط',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف مناوبة كبار الضباط' });
+    }
+});
+
+// ============================================
+// API: حالات الطوارئ (E-Cases)
+// ============================================
+app.get('/api/e-cases', authenticate, async (req, res) => {
+    try {
+        const records = await readECases();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب حالات الطوارئ' });
+    }
+});
+
+app.post('/api/e-cases', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readECases();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeECases(records);
+
+        broadcast({
+            type: 'e_case_added',
+            message: 'تم إضافة حالة طوارئ جديدة',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ حالة الطوارئ' });
+    }
+});
+
+app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readECases();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeECases(filtered);
+
+        broadcast({
+            type: 'e_case_deleted',
+            message: 'تم حذف حالة طوارئ',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف حالة الطوارئ' });
+    }
+});
+
+// ============================================
+// API: بلاغات التصعيد
+// ============================================
+app.get('/api/escalations', authenticate, async (req, res) => {
+    try {
+        const records = await readEscalations();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بلاغات التصعيد' });
+    }
+});
+
+app.post('/api/escalations', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readEscalations();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeEscalations(records);
+
+        broadcast({
+            type: 'escalation_added',
+            message: 'تم إضافة بلاغ تصعيد جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ بلاغ التصعيد' });
+    }
+});
+
+app.delete('/api/escalations/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readEscalations();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeEscalations(filtered);
+
+        broadcast({
+            type: 'escalation_deleted',
+            message: 'تم حذف بلاغ تصعيد',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف بلاغ التصعيد' });
+    }
+});
+
+// ============================================
+// API: التقارير اليومية
+// ============================================
+app.get('/api/daily-reports', authenticate, async (req, res) => {
+    try {
+        const records = await readDailyReports();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التقارير اليومية' });
+    }
+});
+
+app.post('/api/daily-reports', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readDailyReports();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeDailyReports(records);
+
+        broadcast({
+            type: 'daily_report_added',
+            message: 'تم إضافة تقرير يومي جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ التقرير اليومي' });
+    }
+});
+
+app.delete('/api/daily-reports/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readDailyReports();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeDailyReports(filtered);
+
+        broadcast({
+            type: 'daily_report_deleted',
+            message: 'تم حذف تقرير يومي',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف التقرير اليومي' });
+    }
+});
+
+// ============================================
 // API: ملاحظات التحكم والتنسيق
 // ============================================
 app.get('/api/control-notes', authenticate, async (req, res) => {
@@ -971,6 +1566,21 @@ app.post('/api/save-control-notes', authenticate, async (req, res) => {
     }
 });
 
+app.delete('/api/control-notes', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes: '', updatedAt: new Date().toISOString() }));
+        
+        broadcast({
+            type: 'control_notes_cleared',
+            message: 'تم مسح ملاحظات التحكم والتنسيق'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في مسح الملاحظات' });
+    }
+});
+
 // ============================================
 // API: إجازات التحكم والتنسيق
 // ============================================
@@ -1000,6 +1610,21 @@ app.post('/api/save-vacations', authenticate, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الإجازات' });
+    }
+});
+
+app.delete('/api/vacations', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await fs.writeFile(VACATIONS_PATH, JSON.stringify([]));
+        
+        broadcast({
+            type: 'vacations_cleared',
+            message: 'تم مسح الإجازات'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في مسح الإجازات' });
     }
 });
 
@@ -1037,6 +1662,12 @@ app.post('/api/change-password', authenticate, authorize(['admin', 'director']),
         }
 
         await writePassword(newPassword);
+
+        broadcast({
+            type: 'password_changed',
+            message: 'تم تغيير الرقم السري'
+        });
+
         res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
@@ -1160,6 +1791,40 @@ app.post('/api/peak-resolve', authenticate, async (req, res) => {
     }
 });
 
+app.delete('/api/peak-mission/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const id = req.params.id;
+        const data = await readPeakData();
+        const mission = data.missions.find(m => m.id === id);
+        if (!mission) {
+            return res.status(404).json({ error: 'المهمة غير موجودة' });
+        }
+        data.missions = data.missions.filter(m => m.id !== id);
+        data.alerts = data.alerts.filter(a => a.missionId !== id);
+        data.logs.unshift({
+            id: Date.now().toString(),
+            icon: '🔴',
+            action: 'مهمة محذوفة',
+            details: mission.unit + ' في ' + mission.location,
+            priority: mission.priority || 'عادي',
+            time: new Date().toLocaleTimeString('ar-SA'),
+            date: new Date().toISOString()
+        });
+        if (data.logs.length > 50) data.logs.pop();
+        await writePeakData(data);
+
+        broadcast({
+            type: 'peak_mission_deleted',
+            message: 'تم حذف مهمة وقت الذروة: ' + mission.unit + ' في ' + mission.location,
+            missionId: id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف المهمة' });
+    }
+});
+
 // ============================================
 // API: الثيمات العامة (لجميع المستخدمين)
 // ============================================
@@ -1257,9 +1922,170 @@ app.delete('/api/remove-theme', authenticate, async (req, res) => {
             logoFileType: null,
             updatedAt: new Date().toISOString()
         });
+
+        broadcast({
+            type: 'theme_removed',
+            message: 'تم إزالة الثيمات'
+        });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في إزالة الثيمات' });
+    }
+});
+
+// ============================================
+// API: غرفة العمليات (Operations Command)
+// ============================================
+
+// Dashboard
+app.get('/api/dashboard', authenticate, async (req, res) => {
+    try {
+        const data = await readDashboard();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات' });
+    }
+});
+
+app.post('/api/dashboard', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeDashboard(data);
+        broadcast({
+            type: 'dashboard_updated',
+            message: 'تم تحديث لوحة المعلومات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ لوحة المعلومات' });
+    }
+});
+
+// Hospitals
+app.get('/api/hospitals', authenticate, async (req, res) => {
+    try {
+        const data = await readHospitals();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المستشفيات' });
+    }
+});
+
+app.post('/api/hospitals', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeHospitals(data);
+        broadcast({
+            type: 'hospitals_updated',
+            message: 'تم تحديث قائمة المستشفيات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ المستشفيات' });
+    }
+});
+
+// References
+app.get('/api/references', authenticate, async (req, res) => {
+    try {
+        const data = await readReferences();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المراجع' });
+    }
+});
+
+app.post('/api/references', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeReferences(data);
+        broadcast({
+            type: 'references_updated',
+            message: 'تم تحديث المراجع'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ المراجع' });
+    }
+});
+
+// Timeline
+app.get('/api/timeline', authenticate, async (req, res) => {
+    try {
+        const data = await readTimeline();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الخط الزمني' });
+    }
+});
+
+app.post('/api/timeline', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeTimeline(data);
+        broadcast({
+            type: 'timeline_updated',
+            message: 'تم تحديث الخط الزمني'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الخط الزمني' });
+    }
+});
+
+// Announcements
+app.get('/api/announcements', authenticate, async (req, res) => {
+    try {
+        const data = await readAnnouncements();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الإعلانات' });
+    }
+});
+
+app.post('/api/announcements', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeAnnouncements(data);
+        broadcast({
+            type: 'announcements_updated',
+            message: 'تم تحديث الإعلانات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الإعلانات' });
+    }
+});
+
+app.delete('/api/announcements/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const data = await readAnnouncements();
+        const filtered = data.filter(item => item.id !== req.params.id);
+        await writeAnnouncements(filtered);
+        broadcast({
+            type: 'announcement_deleted',
+            message: 'تم حذف إعلان',
+            id: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الإعلان' });
     }
 });
 
@@ -1440,6 +2266,24 @@ app.get('/api/check-monthly-table', authenticate, async (req, res) => {
     }
 });
 
+app.delete('/api/monthly-table', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        await fs.unlink(MONTHLY_TABLE_PATH);
+
+        broadcast({
+            type: 'monthly_table_deleted',
+            message: 'تم حذف الجدول الشهري'
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
+        }
+        res.status(500).json({ error: 'فشل في حذف الجدول الشهري' });
+    }
+});
+
 // ============================================
 // API: تصدير Excel
 // ============================================
@@ -1614,6 +2458,74 @@ app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
 });
 
 // ============================================
+// API: الجدولة الذكية (Smart Schedule)
+// ============================================
+app.get('/api/schedule/employees', authenticate, async (req, res) => {
+    try {
+        const employees = await readScheduleEmployees();
+        res.json({ success: true, employees });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات الموظفين' });
+    }
+});
+
+app.post('/api/schedule/employees', authenticate, async (req, res) => {
+    try {
+        const employees = Array.isArray(req.body) ? req.body : req.body.employees;
+        if (!employees || !Array.isArray(employees)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeScheduleEmployees(employees);
+        broadcast({
+            type: 'schedule_employees_updated',
+            message: 'تم تحديث بيانات الموظفين'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ بيانات الموظفين' });
+    }
+});
+
+app.get('/api/schedule/files', authenticate, async (req, res) => {
+    try {
+        const files = await readScheduleFiles();
+        res.json({ success: true, files });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+app.post('/api/schedule/files', authenticate, async (req, res) => {
+    try {
+        const files = Array.isArray(req.body) ? req.body : req.body.files;
+        if (!files || !Array.isArray(files)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeScheduleFiles(files);
+        broadcast({
+            type: 'schedule_files_updated',
+            message: 'تم تحديث الملفات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملفات' });
+    }
+});
+
+app.delete('/api/schedule/employees', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await writeScheduleEmployees([]);
+        broadcast({
+            type: 'schedule_employees_cleared',
+            message: 'تم حذف جميع بيانات الموظفين'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف بيانات الموظفين' });
+    }
+});
+
+// ============================================
 // Health Check & Monitoring
 // ============================================
 app.get('/health', async (req, res) => {
@@ -1680,6 +2592,362 @@ app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async
         res.json({ success: true, disk: diskInfo, storagePath: STORAGE_PATH });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب معلومات القرص' });
+    }
+});
+
+// ============================================
+// API: سجل الأحداث والغيابات والملاحظات للمناوبات
+// ============================================
+
+// Shift Events
+app.get('/api/shift-events/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const events = await readShiftEvents();
+        const filtered = events.filter(e => e.shiftId === shiftId);
+        res.json({ success: true, events: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الأحداث' });
+    }
+});
+
+app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { type, description, timestamp } = req.body;
+        if (!type || !description) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const events = await readShiftEvents();
+        const newEvent = {
+            id: Date.now().toString(),
+            shiftId,
+            type,
+            description,
+            timestamp: timestamp || new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        };
+        events.unshift(newEvent);
+        await writeShiftEvents(events);
+        broadcast({
+            type: 'shift_event_added',
+            message: 'تم إضافة حدث جديد للمناوبة',
+            event: newEvent
+        });
+        res.json({ success: true, event: newEvent });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الحدث' });
+    }
+});
+
+app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, eventId } = req.params;
+        const events = await readShiftEvents();
+        const filtered = events.filter(e => !(e.shiftId === parseInt(shiftId) && e.id === eventId));
+        await writeShiftEvents(filtered);
+        broadcast({
+            type: 'shift_event_deleted',
+            message: 'تم حذف حدث من المناوبة',
+            shiftId: parseInt(shiftId),
+            eventId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الحدث' });
+    }
+});
+
+// Shift Absences
+app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const absences = await readShiftAbsences();
+        const filtered = absences.filter(a => a.shiftId === shiftId);
+        res.json({ success: true, absences: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الغيابات' });
+    }
+});
+
+app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { name, reason, timestamp } = req.body;
+        if (!name || !reason) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const absences = await readShiftAbsences();
+        const newAbsence = {
+            id: Date.now().toString(),
+            shiftId,
+            name,
+            reason,
+            timestamp: timestamp || new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        };
+        absences.unshift(newAbsence);
+        await writeShiftAbsences(absences);
+        broadcast({
+            type: 'shift_absence_added',
+            message: 'تم إضافة غياب جديد للمناوبة',
+            absence: newAbsence
+        });
+        res.json({ success: true, absence: newAbsence });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الغياب' });
+    }
+});
+
+app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, absenceId } = req.params;
+        const absences = await readShiftAbsences();
+        const filtered = absences.filter(a => !(a.shiftId === parseInt(shiftId) && a.id === absenceId));
+        await writeShiftAbsences(filtered);
+        broadcast({
+            type: 'shift_absence_deleted',
+            message: 'تم حذف غياب من المناوبة',
+            shiftId: parseInt(shiftId),
+            absenceId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الغياب' });
+    }
+});
+
+// Shift Notes
+app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const notes = await readShiftNotes();
+        const filtered = notes.filter(n => n.shiftId === shiftId);
+        res.json({ success: true, notes: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملاحظات' });
+    }
+});
+
+app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { content, author, timestamp } = req.body;
+        if (!content) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const notes = await readShiftNotes();
+        const newNote = {
+            id: Date.now().toString(),
+            shiftId,
+            content,
+            author: author || req.user.name || 'مجهول',
+            timestamp: timestamp || new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        };
+        notes.unshift(newNote);
+        await writeShiftNotes(notes);
+        broadcast({
+            type: 'shift_note_added',
+            message: 'تم إضافة ملاحظة جديدة للمناوبة',
+            note: newNote
+        });
+        res.json({ success: true, note: newNote });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملاحظة' });
+    }
+});
+
+app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, noteId } = req.params;
+        const notes = await readShiftNotes();
+        const filtered = notes.filter(n => !(n.shiftId === parseInt(shiftId) && n.id === noteId));
+        await writeShiftNotes(filtered);
+        broadcast({
+            type: 'shift_note_deleted',
+            message: 'تم حذف ملاحظة من المناوبة',
+            shiftId: parseInt(shiftId),
+            noteId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الملاحظة' });
+    }
+});
+
+// ============================================
+// API: خطط وقت الذروة
+// ============================================
+app.get('/api/peak-plans', authenticate, async (req, res) => {
+    try {
+        const plans = await readPeakPlans();
+        res.json({ success: true, plans });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب خطط الذروة' });
+    }
+});
+
+app.post('/api/peak-plans', authenticate, async (req, res) => {
+    try {
+        const { title, description, location, units, startTime, endTime, priority } = req.body;
+        if (!title || !location) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const plans = await readPeakPlans();
+        const newPlan = {
+            id: Date.now().toString(),
+            title,
+            description: description || '',
+            location,
+            units: units || [],
+            startTime: startTime || '',
+            endTime: endTime || '',
+            priority: priority || 'عادي',
+            createdAt: new Date().toISOString(),
+            createdBy: req.user.username || 'unknown'
+        };
+        plans.unshift(newPlan);
+        await writePeakPlans(plans);
+        broadcast({
+            type: 'peak_plan_added',
+            message: 'تم إضافة خطة ذروة جديدة: ' + title,
+            plan: newPlan
+        });
+        res.json({ success: true, plan: newPlan });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ خطة الذروة' });
+    }
+});
+
+app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
+    try {
+        const plans = await readPeakPlans();
+        const filtered = plans.filter(p => p.id !== req.params.id);
+        await writePeakPlans(filtered);
+        broadcast({
+            type: 'peak_plan_deleted',
+            message: 'تم حذف خطة ذروة',
+            planId: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف خطة الذروة' });
+    }
+});
+
+// ============================================
+// API: سجل التدقيق
+// ============================================
+app.get('/api/audit-log', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const logs = await readAuditLog();
+        res.json({ success: true, logs });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+app.post('/api/audit-log', authenticate, async (req, res) => {
+    try {
+        const { action, details, category } = req.body;
+        if (!action) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const logs = await readAuditLog();
+        const newEntry = {
+            id: Date.now().toString(),
+            action,
+            details: details || '',
+            category: category || 'general',
+            user: req.user.username || 'unknown',
+            role: req.user.role || 'unknown',
+            timestamp: new Date().toISOString()
+        };
+        logs.unshift(newEntry);
+        if (logs.length > 500) logs.pop();
+        await writeAuditLog(logs);
+        broadcast({
+            type: 'audit_log_added',
+            message: 'تم إضافة سجل تدقيق جديد',
+            entry: newEntry
+        });
+        res.json({ success: true, entry: newEntry });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ سجل التدقيق' });
+    }
+});
+
+// ============================================
+// API: تسجيل البلاغات (Report Entry)
+// ============================================
+app.get('/api/report-entry', authenticate, async (req, res) => {
+    try {
+        const records = await readReportEntry();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب البلاغات' });
+    }
+});
+
+app.post('/api/report-entry', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record || typeof record !== 'object') {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readReportEntry();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeReportEntry(records);
+
+        broadcast({
+            type: 'report_entry_added',
+            message: 'تم تسجيل بلاغ جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ البلاغ' });
+    }
+});
+
+app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readReportEntry();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeReportEntry(filtered);
+
+        broadcast({
+            type: 'report_entry_deleted',
+            message: 'تم حذف بلاغ',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await writeReportEntry([]);
+
+        broadcast({
+            type: 'report_entry_cleared',
+            message: 'تم حذف جميع البلاغات'
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
     }
 });
 
