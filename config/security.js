@@ -46,7 +46,7 @@ module.exports = {
                 scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdnjs.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net"],
                 scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"], // Allow inline event handlers (onclick, onchange, etc.)
                 styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
-                fontSrc: ["'self'", "https://fonts.gstatic.com"],
+                fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
                 imgSrc: ["'self'", "data:", "blob:", "https://unpkg.com", "https://*.tile.openstreetmap.org", "https://tile.openstreetmap.org"],
                 connectSrc: ["'self'", "wss:", "ws:", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://cdnjs.cloudflare.com"],
                 mediaSrc: ["'self'"],
