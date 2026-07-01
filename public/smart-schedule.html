@@ -227,6 +227,7 @@
             cursor: pointer;
             z-index: 10;
         }
+        .drop-zone i {
             font-size: 1.8rem;
             color: var(--primary);
             margin-bottom: 8px;
@@ -1021,7 +1022,6 @@
         }
     </style>
 <base target="_blank">
-<base target="_blank">
 </head>
 <body>
     <!-- ==========================================
@@ -1067,7 +1067,6 @@
                     <div class="progress-text" id="progressText">0%</div>
                 </div>
             </div>
-            </div>
             <!-- قائمة الملفات المحفوظة -->
             <div class="saved-files-list" id="savedFilesList"></div>
         </div>
@@ -1086,6 +1085,12 @@
                 <i class="fas fa-check-circle"></i>
                 <h3 id="analysisText">تم استخراج البيانات بنجاح</h3>
                 <p class="text-muted" id="analysisDetails"></p>
+            </div>
+            <!-- أزرار الحفظ -->
+            <div class="flex gap-2 mt-3 hidden" id="saveActionArea" style="justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-green" id="saveBtn" onclick="saveToServer()">
+                    <i class="fas fa-save"></i> حفظ البيانات على السيرفر
+                </button>
             </div>
             <!-- جدول بيانات الموظفين المستخرجة -->
             <div class="data-table-container mt-3 hidden" id="extractedTableContainer">
@@ -1487,7 +1492,6 @@
                     var result = extractEmployees(workbook);
                     console.log('👥 Extracted employees:', result.length);
                     employees = result;
-                    await saveToServer();
                     finishAnalysis(result.length);
                     showExtractedTable(result);
                     updateStats();
@@ -1765,7 +1769,6 @@
                 }
                 
                 employees = allEmployees;
-                await saveToServer();
                 finishAnalysis(allEmployees.length);
                 showExtractedTable(allEmployees);
                 updateStats();
@@ -1891,8 +1894,10 @@
             document.getElementById('analysisStatus').classList.add('hidden');
             document.getElementById('analysisResult').classList.remove('hidden');
             document.getElementById('analysisText').textContent = 'تم استخراج ' + count + ' موظف من الملف';
-            document.getElementById('analysisDetails').textContent = 'تم حفظ البيانات في التخزين المحلي';
+            document.getElementById('analysisDetails').textContent = 'يرجى الضغط على "حفظ البيانات على السيرفر" لحفظ البيانات';
             document.getElementById('extractedTableContainer').classList.remove('hidden');
+            var saveArea = document.getElementById('saveActionArea');
+            if (saveArea) saveArea.classList.remove('hidden');
         }
 
         function showExtractedTable(data) {
@@ -1939,6 +1944,12 @@
         async function saveToServer() {
             try {
                 var token = getAuthToken();
+                if (!employees || employees.length === 0) {
+                    showToast('لا توجد بيانات للحفظ', 'error');
+                    return false;
+                }
+                var btn = document.getElementById('saveBtn');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...'; }
                 var res = await fetch('/api/schedule/employees', {
                     method: 'POST',
                     headers: {
@@ -1948,9 +1959,16 @@
                     body: JSON.stringify(employees)
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
+                var result = await res.json();
+                showToast('تم حفظ البيانات بنجاح على السيرفر', 'success');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات على السيرفر'; }
+                return true;
             } catch(e) {
                 console.error('saveToServer error:', e);
-                showToast('خطأ في حفظ البيانات', 'error');
+                showToast('خطأ في حفظ البيانات: ' + e.message, 'error');
+                var btn = document.getElementById('saveBtn');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات على السيرفر'; }
+                return false;
             }
         }
 
@@ -1962,14 +1980,19 @@
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 var data = await res.json();
-                if (data && data.length > 0) {
-                    employees = data;
+                var empList = Array.isArray(data) ? data : (data && data.employees ? data.employees : []);
+                if (empList.length > 0) {
+                    employees = empList;
                     updateStats();
                     renderCharts();
                     renderCurrentView();
                     populateLocationFilter();
+                    showToast('تم تحميل البيانات من السيرفر', 'success');
                 }
-            } catch(e) { console.error('loadFromServer error:', e); }
+            } catch(e) { 
+                console.error('loadFromServer error:', e); 
+                showToast('تعذر تحميل البيانات من السيرفر', 'error');
+            }
         }
 
         async function loadSavedFiles() {
@@ -2688,6 +2711,7 @@
         window.downloadDocument = downloadDocument;
         window.renderDailyTable = renderDailyTable;
         window.renderEmployeeTable = renderEmployeeTable;
+        window.saveToServer = saveToServer;
 
         // ==========================================
         // syncUpdate — لـ websocket-sync.js
