@@ -2027,7 +2027,7 @@
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 var data = await res.json();
-                savedFiles = data || [];
+                savedFiles = (data && data.files) || [];
                 renderSavedFiles();
             } catch(e) {
                 console.error('loadSavedFiles error:', e);
