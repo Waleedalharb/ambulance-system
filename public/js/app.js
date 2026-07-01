@@ -8975,6 +8975,71 @@ cleanupPeakPlans();
 // Update the sidebar button
 var sidebarPeak = document.getElementById('sidebarPeak');
 if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); openPeakTimeModal(); };
+
+// ==========================================
+// سجل العمليات (Audit Log) — نافذة ودوال
+// ==========================================
+var currentAuditFilter = 'all';
+
+function openAuditLogModal() {
+    document.getElementById('auditLogModal').style.display = 'flex';
+    loadAuditLog().then(function() { renderAuditLogModal(); });
+}
+
+function closeAuditLogModal() {
+    document.getElementById('auditLogModal').style.display = 'none';
+}
+
+function filterAuditLog(category) {
+    currentAuditFilter = category;
+    renderAuditLogModal();
+}
+
+function renderAuditLogModal() {
+    var container = document.getElementById('auditLogContainer');
+    if (!container) return;
+
+    var filtered = currentAuditFilter === 'all' ? auditLog : auditLog.filter(function(e) {
+        return e.category === currentAuditFilter;
+    });
+
+    if (!filtered || filtered.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:20px;">📭 لا توجد سجلات</p>';
+        return;
+    }
+
+    var icons = {
+        report: '📊',
+        shift: '📋',
+        system: '⚙️',
+        file: '📁',
+        user: '👤',
+        peak: '⏰'
+    };
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+        var entry = filtered[i];
+        var icon = icons[entry.category] || '📝';
+        var date = entry.timestamp ? new Date(entry.timestamp).toLocaleString('ar-SA') : '-';
+        var userName = entry.user || 'غير معروف';
+        var roleLabel = entry.role === 'admin' ? '👑 مدير' : entry.role === 'director' ? '🎯 مدير عمليات' : '👤 مستخدم';
+
+        html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:10px 12px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; background:var(--white);">';
+        html += '<div style="flex:1;">';
+        html += '<div style="font-weight:600; font-size:0.85rem; color:var(--text);">' + icon + ' ' + (entry.action || '-') + '</div>';
+        html += '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px;">' + (entry.details || '') + '</div>';
+        html += '<div style="font-size:0.7rem; color:var(--gray-400); margin-top:4px;">🕐 ' + date + '</div>';
+        html += '</div>';
+        html += '<div style="text-align:left; min-width:120px;">';
+        html += '<span style="font-size:0.75rem; color:var(--primary-700); font-weight:600;">' + userName + '</span>';
+        html += '<span style="font-size:0.65rem; color:var(--gray-400); display:block;">' + roleLabel + '</span>';
+        html += '</div>';
+        html += '</div>';
+    }
+    container.innerHTML = html;
+}
+
 // ==========================================
 // syncUpdate — لـ websocket-sync.js (جميع الصفحات)
 // ==========================================
