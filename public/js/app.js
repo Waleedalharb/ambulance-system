@@ -8374,7 +8374,8 @@ async function savePeakPlan() {
                 units: unit ? [unit] : [],
                 startTime: startTime,
                 endTime: endTime,
-                priority: priority
+                priority: priority,
+                status: 'active'
             })
         });
         if (response.ok) {

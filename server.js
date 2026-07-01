@@ -2798,6 +2798,7 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
             startTime: startTime || '',
             endTime: endTime || '',
             priority: priority || 'عادي',
+            status: 'active',
             createdAt: new Date().toISOString(),
             createdBy: req.user.username || 'unknown'
         };

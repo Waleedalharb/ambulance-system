@@ -1794,7 +1794,7 @@ async function saveQuickReport(event) {
         timestamp: Date.now()
     };
 
-    var records = await getRecords();
+    var records = (await getRecords()).slice();
     records.unshift(record);
     await saveRecords(records);
 
@@ -1853,7 +1853,7 @@ async function saveAdvancedReport(event) {
         timestamp: Date.now()
     };
 
-    var records = await getRecords();
+    var records = (await getRecords()).slice();
     records.unshift(record);
     await saveRecords(records);
 
