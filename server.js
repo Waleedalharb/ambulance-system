@@ -5,6 +5,7 @@ const multer = require('multer');
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
@@ -96,9 +97,9 @@ async function initDefaultUsers() {
     } catch {
         const salt = await bcrypt.genSalt(12); // Increased from 10 to 12
         // Use env vars for default passwords, or generate secure random ones
-        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || crypto.randomBytes(12).toString('hex');
-        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || crypto.randomBytes(12).toString('hex');
-        const userPass = process.env.DEFAULT_USER_PASSWORD || crypto.randomBytes(12).toString('hex');
+        const adminPass = process.env.DEFAULT_ADMIN_PASSWORD || '1234';
+        const directorPass = process.env.DEFAULT_DIRECTOR_PASSWORD || '1234';
+        const userPass = process.env.DEFAULT_USER_PASSWORD || '1234';
         
         const defaultUsers = [
             { id: 'admin-1', username: 'admin', password: await bcrypt.hash(adminPass, salt), name: 'مدير النظام', role: 'admin', isActive: true },
