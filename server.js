@@ -1345,10 +1345,13 @@ app.post('/api/upload-monthly-table', authenticate, upload.single('file'), handl
     }
 });
 
-app.get('/api/get-monthly-table', async (req, res) => {
+app.get('/api/get-monthly-table', authenticate, async (req, res) => {
     try {
         const data = await fs.readFile(MONTHLY_TABLE_PATH);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.send(data);
     } catch (error) {
         if (error.code === 'ENOENT') {
@@ -1359,11 +1362,15 @@ app.get('/api/get-monthly-table', async (req, res) => {
     }
 });
 
-app.get('/api/check-monthly-table', async (req, res) => {
+app.get('/api/check-monthly-table', authenticate, async (req, res) => {
     try {
         await fs.access(MONTHLY_TABLE_PATH);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.json({ exists: true });
     } catch (error) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.json({ exists: false });
     }
 });

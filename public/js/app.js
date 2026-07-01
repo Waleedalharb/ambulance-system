@@ -5,6 +5,21 @@ var currentUser = null;
 var authToken = localStorage.getItem('authToken') || null;
 
 // ============================================
+// App Version Check — force refresh on update
+// ============================================
+(function() {
+    var APP_VERSION = 'v3-2026-07-01';
+    var storedVersion = localStorage.getItem('appVersion');
+    if (storedVersion && storedVersion !== APP_VERSION) {
+        console.log('🔄 App updated. Forcing refresh...');
+        localStorage.setItem('appVersion', APP_VERSION);
+        location.reload(true);
+    } else {
+        localStorage.setItem('appVersion', APP_VERSION);
+    }
+})();
+
+// ============================================
 // fetch wrapper with 429 graceful handling
 // ============================================
 var _rateLimitBackoff = false;
@@ -3838,15 +3853,17 @@ var el_formsBtn=document.getElementById("formsBtn");if(el_formsBtn)el_formsBtn.a
 var currentTableData = []; // صفوف الجدول الحالي للبحث
 var isTableFullscreen = false;
 
-async function loadSavedTable() {
+async function loadSavedTable(force) {
     var container = document.getElementById('excelTableContainer');
     var status = document.getElementById('tableStatus');
     try {
-        var response = await fetch('/api/check-monthly-table', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        // Cache-busting: add timestamp to force fresh fetch
+        var cacheBuster = force ? '?_=' + Date.now() : '';
+        var response = await fetch('/api/check-monthly-table' + cacheBuster, { headers: { 'Authorization': 'Bearer ' + authToken } });
         var result = await response.json();
         if (result.exists) {
             status.innerHTML = '⏳ جاري التحميل...';
-            var fileResponse = await fetch('/api/get-monthly-table', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var fileResponse = await fetch('/api/get-monthly-table' + cacheBuster, { headers: { 'Authorization': 'Bearer ' + authToken } });
             var blob = await fileResponse.blob();
             var reader = new FileReader();
             reader.onload = function(event) {
