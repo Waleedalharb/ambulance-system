@@ -1421,6 +1421,15 @@
                         handleFileUpload(e.target.files[0]);
                     }
                 });
+                // Fallback: attach directly to the drop zone click
+                var dz = document.getElementById('dropZone');
+                if (dz) {
+                    dz.addEventListener('click', function(e) {
+                        if (e.target === dz || e.target.closest('.drop-zone')) {
+                            fi.click();
+                        }
+                    });
+                }
                 console.log('✅ File input change listener attached');
             } catch(e) { console.error('setupFileInput error:', e); }
         }
@@ -1436,7 +1445,14 @@
                     showToast('نوع الملف غير مدعوم. يرجى رفع ملف Excel أو PDF', 'error');
                     return;
                 }
-                // حفظ الملف في القائمة
+                // التحقق من تسجيل الدخول
+                var token = getAuthToken();
+                if (!token) {
+                    showToast('⚠️ يجب تسجيل الدخول أولاً لرفع الملفات', 'error');
+                    alert('⚠️ يجب تسجيل الدخول أولاً لرفع الملفات');
+                    return;
+                }
+                // حفظ الملف في القائمة (في الخلفية، لا ننتظر)
                 var fileInfo = {
                     id: Date.now(),
                     name: file.name,
@@ -1445,7 +1461,7 @@
                     date: new Date().toISOString()
                 };
                 savedFiles.unshift(fileInfo);
-                await saveFilesToServer();
+                saveFilesToServer().catch(function(e) { console.error('Background save failed:', e); });
                 renderSavedFiles();
                 // عرض شريط التقدم
                 document.getElementById('uploadProgress').classList.add('active');
@@ -1455,6 +1471,7 @@
                 document.getElementById('analysisStatus').classList.remove('hidden');
                 document.getElementById('analysisResult').classList.add('hidden');
                 document.getElementById('extractedTableContainer').classList.add('hidden');
+                document.getElementById('saveActionArea').classList.add('hidden');
                 // محاكاة التقدم
                 var progress = 0;
                 var interval = setInterval(function() {
@@ -1472,7 +1489,11 @@
                         parseExcel(file);
                     }
                 }, 1500);
-            } catch(e) { console.error('handleFileUpload error:', e); }
+            } catch(e) { 
+                console.error('handleFileUpload error:', e);
+                showToast('خطأ غير متوقع: ' + e.message, 'error');
+                alert('خطأ غير متوقع: ' + e.message);
+            }
         }
 
         function updateProgress(percent) {
