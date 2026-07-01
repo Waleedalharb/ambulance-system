@@ -1458,10 +1458,11 @@ function renderAdvancedDistribution() {
         
         sectorDiv.querySelectorAll('.preview-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
+                var center = this.getAttribute('data-center');
                 var unit = this.getAttribute('data-unit');
                 var location = this.getAttribute('data-location');
                 if (unit) {
-                    openMapPreview(unit, location || 'لم يتم تحديد موقع');
+                    openMapPreview(unit, center, location || 'لم يتم تحديد موقع');
                 }
             });
         });
@@ -1557,17 +1558,106 @@ var unitLocations = {
 
 var map = null;
 var mapMarkers = [];
+var currentMapCenter = '';
+var currentMapUnit = '';
+var mapEditMode = false;
+var tempMarker = null;
 
-function openMapPreview(unit, location) {
+function openMapPreview(unit, center, location) {
+    currentMapUnit = unit;
+    currentMapCenter = center;
+    mapEditMode = false;
+    if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
+
     var modal = document.getElementById('mapModal');
     document.getElementById('mapModalTitle').innerText = '📍 معاينة موقع ' + unit;
     document.getElementById('mapLocationText').innerText = '📍 الموقع: ' + location;
     document.getElementById('nearestUnitResult').innerHTML = '';
     modal.style.display = 'flex';
 
+    // Reset edit button
+    var editBtn = document.getElementById('mapEditBtn');
+    if (editBtn) {
+        editBtn.innerHTML = '<i class="fas fa-map-marker-alt"></i> تعديل الموقع';
+        editBtn.style.background = 'var(--gold)';
+        editBtn.style.color = '#333';
+    }
+    var hint = document.getElementById('mapEditHint');
+    if (hint) hint.style.display = 'none';
+
     setTimeout(function() {
         initLeafletMap(unit);
     }, 200);
+}
+
+function toggleMapEditMode() {
+    mapEditMode = !mapEditMode;
+    var editBtn = document.getElementById('mapEditBtn');
+    var hint = document.getElementById('mapEditHint');
+
+    if (mapEditMode) {
+        if (editBtn) {
+            editBtn.innerHTML = '<i class="fas fa-save"></i> حفظ الموقع';
+            editBtn.style.background = 'var(--neon-green)';
+            editBtn.style.color = '#fff';
+        }
+        if (hint) hint.style.display = 'block';
+        showNotification('وضع التعديل', 'انقر على الخريطة لتحديد موقع جديد', 'info', 3000);
+
+        // Click handler on map
+        if (map) {
+            map.on('click', function(e) {
+                if (!mapEditMode) return;
+                var lat = e.latlng.lat;
+                var lng = e.latlng.lng;
+
+                // Remove old temp marker
+                if (tempMarker) { map.removeLayer(tempMarker); }
+                // Add new temp marker
+                tempMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '<div style="background:#EF476F; width:24px; height:24px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:bold;">!</div>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(map);
+                tempMarker.bindPopup('<b>' + currentMapUnit + '</b><br>موقع جديد محدد').openPopup();
+
+                // Save automatically
+                saveUnitLocation(currentMapCenter, currentMapUnit, lat, lng);
+            });
+        }
+    } else {
+        if (editBtn) {
+            editBtn.innerHTML = '<i class="fas fa-map-marker-alt"></i> تعديل الموقع';
+            editBtn.style.background = 'var(--gold)';
+            editBtn.style.color = '#333';
+        }
+        if (hint) hint.style.display = 'none';
+        if (map) { map.off('click'); }
+    }
+}
+
+async function saveUnitLocation(center, unit, lat, lng) {
+    try {
+        var res = await apiFetch('/api/unit-locations', {
+            method: 'POST',
+            body: JSON.stringify({ center, unit, lat, lng })
+        });
+        var result = await res.json();
+        if (result.success) {
+            unitLocations = result.locations;
+            showNotification('تم الحفظ', 'تم تحديث موقع ' + unit + ' بنجاح', 'success', 3000);
+            // Refresh map markers
+            initLeafletMap(unit);
+        } else {
+            showNotification('فشل الحفظ', result.error || 'تعذر حفظ الموقع', 'error', 3000);
+        }
+    } catch (e) {
+        console.error('Failed to save location:', e);
+        showNotification('فشل الحفظ', 'خطأ في الاتصال بالسيرفر', 'error', 3000);
+    }
 }
 
 function initLeafletMap(focusUnit) {
@@ -1617,6 +1707,9 @@ function initLeafletMap(focusUnit) {
 }
 
 function closeMapPreview() {
+    mapEditMode = false;
+    if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
+    if (map) { map.off('click'); }
     document.getElementById('mapModal').style.display = 'none';
     document.getElementById('mapFrame').src = '';
     document.getElementById('nearestUnitResult').innerHTML = '';
@@ -1841,6 +1934,7 @@ async function loadAllData() {
         
         await loadPeakPlans();
         await loadAuditLog();
+        await loadUnitLocations(); // NEW: load unit locations from server
         
         // تحديث الإنجازات ولوحة الصدارة
         if (document.getElementById('achievementsModal').style.display === 'flex') {
@@ -1884,6 +1978,20 @@ function updateShiftStatus() {
     }
     
     updateShiftsHistoryWidget();
+}
+
+async function loadUnitLocations() {
+    try {
+        var res = await apiFetch('/api/unit-locations');
+        if (res.ok) {
+            var result = await res.json();
+            if (result.success && result.locations) {
+                unitLocations = result.locations;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load unit locations:', e);
+    }
 }
 
 function updateShiftsHistoryWidget() {

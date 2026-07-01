@@ -188,9 +188,15 @@
                     break;
                 case 'announcements_updated':
                 case 'announcement_deleted':
+                case 'announcement_added':
                     if (typeof renderAnnouncements === 'function') renderAnnouncements();
                     if (typeof loadAnnouncements === 'function') loadAnnouncements();
                     if (typeof loadData === 'function') loadData();
+                    break;
+                case 'unit_location_updated':
+                    if (typeof loadUnitLocations === 'function') loadUnitLocations();
+                    if (typeof loadData === 'function') loadData();
+                    if (typeof loadAllData === 'function') loadAllData();
                     break;
 
                 // ====== الأنواع الجديدة: app.js forms ======

@@ -102,6 +102,7 @@ const HOSPITALS_PATH = path.join(STORAGE_PATH, 'hospitals.json');
 const REFERENCES_PATH = path.join(STORAGE_PATH, 'references.json');
 const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
 const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
+const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
 
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
@@ -781,6 +782,39 @@ async function readAnnouncements() {
 
 async function writeAnnouncements(data) {
     await fs.writeFile(ANNOUNCEMENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readUnitLocations() {
+    try {
+        const data = await fs.readFile(UNIT_LOCATIONS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            // Default locations
+            return {
+                'جاكسو': { 'جنوب 12': [24.6234, 46.7256] },
+                'المنصورة': { 'جنوب 2': [24.6789, 46.7123], 'جنوب 16': [24.6812, 46.7198], 'سريع 4': [24.6756, 46.7089] },
+                'الشيخ زايد': { 'جنوب 3': [24.7234, 46.6845], 'جنوب 19': [24.7289, 46.6912] },
+                'حي الواحات': { 'جنوب 11': [24.7123, 46.7567] },
+                'المناخ': { 'جنوب 10': [24.6987, 46.7321] },
+                'المريوطية': { 'جنوب 8': [24.6543, 46.6789] },
+                'طرة': { 'جنوب 7': [24.6678, 46.7234] },
+                'مطرية': { 'جنوب 14': [24.6890, 46.7456] },
+                'البساتين': { 'جنوب 5': [24.7345, 46.7234] },
+                'الخليفة': { 'جنوب 13': [24.6456, 46.7123] },
+                'الشفاء': { 'جنوب 6': [24.7456, 46.6890], 'جنوب 17': [24.7512, 46.6945], 'سريع 2': [24.7398, 46.6834], 'سريع 3': [24.7489, 46.6876] },
+                'عكاظ': { 'جنوب 9': [24.6890, 46.7678] },
+                'الدار البيضاء': { 'جنوب 4': [24.7567, 46.7123], 'جنوب 15': [24.7623, 46.7189] },
+                'طريق الملك فهد': { 'جنوب 1': [24.7890, 46.6890], 'جنوب 18': [24.7956, 46.6956] },
+                'مستشفى الملك خالد': { 'سريع 1': [24.7345, 46.7012] }
+            };
+        }
+        return {};
+    }
+}
+
+async function writeUnitLocations(data) {
+    await fs.writeFile(UNIT_LOCATIONS_PATH, JSON.stringify(data, null, 2));
 }
 
 // ============================================
@@ -2159,6 +2193,38 @@ app.post('/api/announcements/add', authenticate, authorize(['admin']), async (re
         res.json({ success: true, announcement: newAnnouncement });
     } catch (error) {
         res.status(500).json({ error: 'فشل في إضافة الإعلان' });
+    }
+});
+
+// Unit Locations API
+app.get('/api/unit-locations', authenticate, async (req, res) => {
+    try {
+        const locations = await readUnitLocations();
+        res.json({ success: true, locations });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب مواقع الفرق' });
+    }
+});
+
+app.post('/api/unit-locations', authenticate, async (req, res) => {
+    try {
+        const { center, unit, lat, lng } = req.body;
+        if (!center || !unit || lat === undefined || lng === undefined) {
+            return res.status(400).json({ error: 'بيانات ناقصة: center, unit, lat, lng مطلوبة' });
+        }
+        const locations = await readUnitLocations();
+        if (!locations[center]) locations[center] = {};
+        locations[center][unit] = [parseFloat(lat), parseFloat(lng)];
+        await writeUnitLocations(locations);
+        broadcast({
+            type: 'unit_location_updated',
+            message: 'تم تحديث موقع ' + unit + ' في ' + center,
+            center, unit, lat, lng
+        });
+        res.json({ success: true, locations });
+    } catch (error) {
+        console.error('Unit location update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الموقع' });
     }
 });
 
