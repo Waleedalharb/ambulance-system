@@ -2133,6 +2133,35 @@ app.delete('/api/announcements/:id', authenticate, authorize(['admin']), async (
     }
 });
 
+// Add single announcement (for EOCC UI)
+app.post('/api/announcements/add', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { title, body, date, pinned, urgent } = req.body;
+        if (!title || !body) {
+            return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
+        }
+        const data = await readAnnouncements();
+        const newAnnouncement = {
+            id: Date.now().toString(),
+            title,
+            body,
+            date: date || new Date().toISOString().split('T')[0],
+            pinned: !!pinned,
+            urgent: !!urgent
+        };
+        data.unshift(newAnnouncement);
+        await writeAnnouncements(data);
+        broadcast({
+            type: 'announcement_added',
+            message: 'تم إضافة إعلان جديد: ' + title,
+            announcement: newAnnouncement
+        });
+        res.json({ success: true, announcement: newAnnouncement });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إضافة الإعلان' });
+    }
+});
+
 // ============================================
 // API: البيانات الجغرافية للمراكز
 // ============================================
@@ -2464,9 +2493,96 @@ app.get('/api/operational-files', authenticate, async (req, res) => {
 app.get('/api/ops-files', authenticate, async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
-        res.json({ success: true, files: metadata });
+        const typeMap = {
+            'application/pdf': 'pdf',
+            'image/jpeg': 'img', 'image/png': 'img', 'image/gif': 'img', 'image/webp': 'img',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'word',
+            'application/msword': 'word',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'excel',
+            'application/vnd.ms-excel': 'excel',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'ppt',
+            'application/vnd.ms-powerpoint': 'ppt'
+        };
+        const files = metadata.map(f => ({
+            id: f.id,
+            name: f.filename,
+            type: typeMap[f.mimeType] || 'pdf',
+            size: f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB',
+            date: f.uploadDate ? f.uploadDate.split('T')[0] : '',
+            url: '/api/download-operational/' + f.id
+        }));
+        res.json({ success: true, files });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+// POST /api/ops-files - alias for upload (multipart form-data)
+app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
+    try {
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'لا يوجد ملفات' });
+        }
+        const metadata = await readOpsMetadata();
+        const results = [];
+        for (const file of files) {
+            const ext = path.extname(file.originalname);
+            const newFilename = `${Date.now()}-${file.originalname}`;
+            const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
+            await fs.rename(file.path, newPath);
+            const entry = {
+                id: Date.now() + Math.random().toString(36).substr(2, 4),
+                filename: file.originalname,
+                storedName: newFilename,
+                size: file.size,
+                mimeType: file.mimetype,
+                uploadDate: new Date().toISOString(),
+                uploader: req.body.uploader || 'مستخدم',
+                category: req.body.category || 'عام',
+                note: req.body.note || '',
+                icon: file.mimetype.startsWith('image/') ? '🖼️' :
+                      file.mimetype === 'application/pdf' ? '📄' :
+                      file.mimetype.includes('word') ? '📝' :
+                      file.mimetype.includes('excel') ? '📊' : '📎'
+            };
+            metadata.unshift(entry);
+            results.push(entry);
+        }
+        await writeOpsMetadata(metadata);
+        broadcast({
+            type: 'ops_files_uploaded',
+            message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+            count: results.length
+        });
+        res.json({ success: true, count: results.length, files: results });
+    } catch (error) {
+        console.error('خطأ في رفع الملفات:', error);
+        res.status(500).json({ error: 'فشل في رفع الملفات' });
+    }
+});
+
+// DELETE /api/ops-files/:id - alias for delete
+app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
+        try { await fs.unlink(filePath); } catch (e) {}
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        broadcast({
+            type: 'ops_files_deleted',
+            message: 'تم حذف ملف: ' + entry.filename,
+            id: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الملف' });
     }
 });
 

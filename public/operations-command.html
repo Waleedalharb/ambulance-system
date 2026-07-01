@@ -1565,9 +1565,27 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
         <h2><i class="fas fa-bullhorn"></i> الإعلانات العاجلة</h2>
         <p>إعلانات وتعاميم وقرارات عاجلة وإدارية</p>
       </div>
+      <button class="btn btn-neon" onclick="showAnnouncementModal()"><i class="fas fa-plus"></i> إضافة إعلان</button>
     </div>
     <div id="announcementsContainer"></div>
   </section>
+
+  <!-- نافذة إضافة إعلان -->
+  <div id="announcementModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:500px;">
+      <h3><i class="fas fa-bullhorn icon-primary"></i> إضافة إعلان جديد</h3>
+      <div class="form-row"><label>العنوان:</label><input type="text" id="announceTitle" placeholder="عنوان الإعلان"></div>
+      <div class="form-row"><label>النص:</label><textarea id="announceBody" rows="4" placeholder="محتوى الإعلان..."></textarea></div>
+      <div class="form-row">
+        <label><input type="checkbox" id="announcePinned"> تثبيت الإعلان</label>
+        <label style="margin-right:16px;"><input type="checkbox" id="announceUrgent"> عاجل</label>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-teal" onclick="submitAnnouncement()"><i class="fas fa-check"></i> نشر</button>
+        <button class="btn" onclick="closeAnnouncementModal()"><i class="fas fa-times"></i> إلغاء</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        G. الخريطة التفاعلية (Interactive Map)
@@ -2106,31 +2124,31 @@ fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
 async function handleFiles(fileList) {
-  const typeMap = {
-    pdf:'pdf', doc:'word', docx:'word', xls:'excel', xlsx:'excel',
-    ppt:'ppt', pptx:'ppt', jpg:'img', jpeg:'img', png:'img'
-  };
   let count = 0;
-  const uploadedFiles = [];
   for (const file of Array.from(fileList)) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const type = typeMap[ext] || 'pdf';
-    const size = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
-    const url = URL.createObjectURL(file);
-    const fileObj = { id:Date.now()+Math.random(), name:file.name, type, size, date:new Date().toISOString().split('T')[0], url };
-    uploadedFiles.push(fileObj);
-    // Send to server
+    const formData = new FormData();
+    formData.append('files', file);
+    formData.append('uploader', (currentUser && currentUser.name) || 'مستخدم');
     try {
-      await apiFetch('/api/ops-files', {
+      const res = await fetch('/api/ops-files', {
         method: 'POST',
-        body: JSON.stringify(fileObj)
+        headers: { 'Authorization': 'Bearer ' + authToken },
+        body: formData
       });
-    } catch (e) { console.error('Failed to upload file to server:', e); }
-    count++;
+      if (!res.ok) {
+        console.error('Upload failed:', res.status, await res.text());
+        showToast('error','فشل الرفع','فشل رفع: ' + file.name);
+        continue;
+      }
+      count++;
+    } catch (e) { 
+      console.error('Failed to upload file to server:', e); 
+      showToast('error','فشل الرفع','فشل رفع: ' + file.name);
+    }
   }
-  filesData = uploadedFiles.concat(filesData);
-  renderFiles();
-  if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف بنجاح');
+  // Reload files from server to get correct URLs
+  await loadFilesData();
+  if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف/ملفات بنجاح');
 }
 
 /**
@@ -2195,6 +2213,45 @@ function renderAnnounceCard(a, delay) {
       </div>
     </div>
   `;
+}
+
+/** نافذة إضافة إعلان - دوال **/
+function showAnnouncementModal() {
+  document.getElementById('announcementModal').style.display = 'flex';
+}
+function closeAnnouncementModal() {
+  document.getElementById('announcementModal').style.display = 'none';
+  document.getElementById('announceTitle').value = '';
+  document.getElementById('announceBody').value = '';
+  document.getElementById('announcePinned').checked = false;
+  document.getElementById('announceUrgent').checked = false;
+}
+async function submitAnnouncement() {
+  const title = document.getElementById('announceTitle').value.trim();
+  const body = document.getElementById('announceBody').value.trim();
+  const pinned = document.getElementById('announcePinned').checked;
+  const urgent = document.getElementById('announceUrgent').checked;
+  if (!title || !body) {
+    showToast('warning', 'بيانات ناقصة', 'الرجاء إدخال العنوان والنص');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/announcements/add', {
+      method: 'POST',
+      body: JSON.stringify({ title, body, pinned, urgent })
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast('success', 'تم النشر', 'تم إضافة الإعلان بنجاح');
+      closeAnnouncementModal();
+      await loadAnnouncementsData();
+    } else {
+      showToast('error', 'فشل النشر', result.error || 'تعذر إضافة الإعلان');
+    }
+  } catch (e) {
+    console.error('Failed to add announcement:', e);
+    showToast('error', 'فشل النشر', 'خطأ في الاتصال بالسيرفر');
+  }
 }
 
 /**
