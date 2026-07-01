@@ -5073,24 +5073,23 @@ async function addShiftEvent(type, text, source) {
     if (!currentShiftId) return;
     var evt = {
         time: getSaudiTime(),
-        type: type,      // 'complete', 'incomplete', 'note', 'report'
+        type: type,
         text: text,
-        source: source || 'auto'  // 'auto' or 'manual'
+        source: source || 'auto'
     };
     shiftEventLog.push(evt);
     try {
         await apiFetch('/api/shift-events/' + currentShiftId, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ events: shiftEventLog })
+            body: JSON.stringify({ type: type, description: text, timestamp: new Date().toISOString() })
         });
-    } catch (e) { console.error('Failed to save shift events:', e); }
+    } catch (e) { console.error('Failed to save shift event:', e); }
 
     var section = document.getElementById('shiftEventLogSection');
     if (section) section.style.display = 'block';
     renderEventItem(evt);
 
-    // scroll to bottom
     var container = document.getElementById('shiftEventLog');
     if (container) container.scrollTop = container.scrollHeight;
 }
