@@ -108,6 +108,87 @@ let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
 // ============================================
+// نظام النوبة التلقائي (Auto-Shift System)
+// ============================================
+function getSaudiDateTime() {
+    const now = new Date();
+    const offset = 3; // Saudi Arabia UTC+3
+    return new Date(now.getTime() + (offset * 60 * 60 * 1000));
+}
+
+function getCurrentShiftType() {
+    const saudiTime = getSaudiDateTime();
+    const hour = saudiTime.getHours();
+    // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
+    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+}
+
+function getCurrentShiftDate() {
+    return getSaudiDateTime().toLocaleDateString('ar-SA');
+}
+
+function getShiftKey() {
+    return getCurrentShiftDate() + ' ' + getCurrentShiftType();
+}
+
+async function autoArchiveIfShiftChanged() {
+    try {
+        const currentReports = await readData();
+        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
+        if (total === 0) return false; // No data to archive
+        
+        const shifts = await readShifts();
+        const currentShiftType = getCurrentShiftType();
+        const currentShiftDate = getCurrentShiftDate();
+        const shiftKey = getShiftKey();
+        
+        // Check if this shift is already archived
+        const existingShift = shifts.find(s => s.shiftDate === currentShiftDate && s.shiftType === currentShiftType);
+        if (existingShift) return false; // Already archived for this shift
+        
+        // Archive current data
+        const saudiTime = getSaudiDateTime();
+        const newShift = {
+            id: Date.now(),
+            shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
+            shiftDate: currentShiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: currentShiftType,
+            startTime: saudiTime.toISOString(),
+            savedReports: JSON.parse(JSON.stringify(currentReports)),
+            totalReports: total,
+            rapidLocations: {},
+            centersData: {},
+            vehicleData: {},
+            fuelData: {},
+            generalNotes: "",
+            lastUpdate: saudiTime.toISOString(),
+            autoArchived: true
+        };
+        
+        shifts.unshift(newShift);
+        if (shifts.length > 50) shifts.pop();
+        await writeShifts(shifts);
+        
+        // Clear current reports for new shift
+        await writeData({});
+        currentShiftId = newShift.id;
+        
+        broadcast({
+            type: 'shift_auto_archived',
+            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً',
+            shiftId: newShift.id,
+            shiftType: currentShiftType
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('Auto-archive error:', error);
+        return false;
+    }
+}
+
+// ============================================
 // التأكد من وجود مجلدات البيانات
 // ============================================
 async function initDefaultUsers() {
@@ -876,13 +957,40 @@ async function writeUnitLocationAddresses(data) {
 app.get('/api/data', authenticate, async (req, res) => {
     try {
         const data = await readData();
+        const shiftType = getCurrentShiftType();
+        const shiftDate = getCurrentShiftDate();
         res.json({
             data,
             centers: centersData,
-            currentShiftId: currentShiftId
+            currentShiftId: currentShiftId,
+            currentShift: {
+                type: shiftType,
+                date: shiftDate,
+                key: shiftDate + ' ' + shiftType
+            }
         });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب البيانات' });
+    }
+});
+
+app.get('/api/current-shift', authenticate, async (req, res) => {
+    try {
+        const shiftType = getCurrentShiftType();
+        const shiftDate = getCurrentShiftDate();
+        const data = await readData();
+        const total = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
+        res.json({
+            success: true,
+            shift: {
+                type: shiftType,
+                date: shiftDate,
+                key: shiftDate + ' ' + shiftType,
+                totalReports: total
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب النوبة الحالية' });
     }
 });
 
@@ -921,58 +1029,16 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
 });
 
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
-    try {
-        const { shiftType } = req.body;
-        if (!shiftType) {
-            return res.status(400).json({ error: 'نوع المناوبة مطلوب' });
+    // Shifts are now automatic - manual start is disabled
+    res.json({ 
+        success: false, 
+        message: 'النظام يدير النوبات تلقائياً. لا حاجة لبدء مناوبة يدوياً.',
+        currentShift: {
+            type: getCurrentShiftType(),
+            date: getCurrentShiftDate(),
+            key: getShiftKey()
         }
-
-        const currentReports = await readData();
-        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-
-        const now = new Date();
-        const offset = 3;
-        const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-        const shiftDate = saudiTime.toLocaleDateString('ar-SA');
-        const shiftTime = saudiTime.toLocaleTimeString('ar-SA');
-
-        const newShift = {
-            id: Date.now(),
-            shiftName: `${shiftType} - ${shiftDate} ${shiftTime}`,
-            shiftDate: shiftDate,
-            shiftTime: shiftTime,
-            shiftType: shiftType,
-            startTime: saudiTime.toISOString(),
-            savedReports: JSON.parse(JSON.stringify(currentReports)),
-            totalReports: total,
-            rapidLocations: {},
-            centersData: {},
-            vehicleData: {},
-            fuelData: {},
-            generalNotes: "",
-            lastUpdate: saudiTime.toISOString()
-        };
-
-        const shifts = await readShifts();
-        shifts.unshift(newShift);
-        if (shifts.length > 50) shifts.pop();
-        await writeShifts(shifts);
-
-        await writeData({});
-        currentShiftId = newShift.id;
-
-        broadcast({
-            type: 'shift_started',
-            message: 'تم بدء مناوبة جديدة: ' + newShift.shiftName,
-            shiftId: newShift.id,
-            shiftType: shiftType
-        });
-
-        res.json({ success: true, shiftId: newShift.id, shift: newShift });
-    } catch (error) {
-        console.error("خطأ في بدء المناوبة:", error);
-        res.status(500).json({ error: 'فشل في بدء المناوبة: ' + error.message });
-    }
+    });
 });
 
 app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
@@ -1052,6 +1118,9 @@ app.post('/api/report', authenticate, async (req, res) => {
     const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
     try {
+        // Auto-archive if shift changed
+        await autoArchiveIfShiftChanged();
+        
         const allData = await readData();
         if (!allData[key]) allData[key] = { count: 0, times: [] };
         allData[key].count++;

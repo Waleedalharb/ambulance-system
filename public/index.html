@@ -92,9 +92,9 @@
         </div>
         <div class="topbar-center">
             <div class="quick-actions">
-                <button class="qa-btn" title="مناوبة جديدة" onclick="startNewShift()">
-                    <i class="fas fa-rotate-right"></i>
-                    <span>مناوبة</span>
+                <button class="qa-btn" title="النوبة الحالية" id="currentShiftBtn" disabled style="opacity:1; cursor:default;">
+                    <i class="fas fa-clock"></i>
+                    <span id="currentShiftDisplay">جاري التحميل...</span>
                 </button>
                 <button class="qa-btn" title="تكميل النوبة" onclick="openShiftModal();">
                     <i class="fas fa-clipboard-list"></i>
@@ -196,9 +196,9 @@
         </div>
         <div class="toolbar">
             <!-- ===== المجموعة الأولى: من اليمين ===== -->
-            <button id="newShiftBtn" class="btn btn-shift-status" onclick="startNewShift()">
-                <span class="shift-btn-dot" id="newShiftDot"></span>
-                <span class="shift-btn-text" id="newShiftText">مناوبة جديدة</span>
+            <button id="newShiftBtn" class="btn btn-shift-status on" disabled style="opacity:1; cursor:default;">
+                <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
+                <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>
             <button id="shiftBtn" class="btn btn-secondary"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
@@ -1706,7 +1706,7 @@
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); startNewShift();"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openShiftModal();"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openShiftModal();"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html?v=10';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>

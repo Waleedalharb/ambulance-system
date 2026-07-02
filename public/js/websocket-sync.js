@@ -198,6 +198,11 @@
                     if (typeof loadData === 'function') loadData();
                     if (typeof loadAllData === 'function') loadAllData();
                     break;
+                case 'shift_auto_archived':
+                    if (typeof loadAllData === 'function') loadAllData();
+                    if (typeof loadShifts === 'function') loadShifts();
+                    showNotification('نظام النوبات', data.message, 'info', 5000);
+                    break;
 
                 // ====== الأنواع الجديدة: app.js forms ======
                 case 'incident_added':

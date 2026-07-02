@@ -188,6 +188,22 @@ function getSaudiMonthYear() {
 }
 
 // ============================================
+// نظام النوبة التلقائي (Auto-Shift)
+// ============================================
+function getCurrentShiftType() {
+    const now = new Date();
+    const offset = 3; // Saudi Arabia UTC+3
+    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    const hour = saudiTime.getHours();
+    // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
+    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+}
+
+function getCurrentShiftDate() {
+    return getSaudiDate();
+}
+
+// ============================================
 // نظام الأصوات التفاعلية
 // ============================================
 
@@ -1951,6 +1967,13 @@ async function loadAllData() {
         }
         currentShiftId = result.currentShiftId || null;
         updateShiftStatus();
+        
+        // Update current shift display in UI
+        var shiftDisplay = document.getElementById('currentShiftDisplay');
+        if (shiftDisplay && result.currentShift) {
+            shiftDisplay.textContent = result.currentShift.type + ' ' + result.currentShift.date;
+        }
+        
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
         
         await loadPeakPlans();
@@ -1980,23 +2003,12 @@ function updateShiftStatus() {
     var btnText = document.getElementById('newShiftText');
     
     if (status) status.style.display = 'none';
-    
     if (!btn || !btnDot || !btnText) return;
     
-    if (currentShiftId) {
-        var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
-        btn.className = 'btn btn-shift-status on';
-        btnDot.style.display = 'inline-block';
-        if (shift) {
-            btnText.textContent = '✅ ' + (shift.shiftType || 'مناوبة') + ' نشطة';
-        } else {
-            btnText.textContent = '✅ مناوبة نشطة';
-        }
-    } else {
-        btn.className = 'btn btn-shift-status off';
-        btnDot.style.display = 'inline-block';
-        btnText.textContent = 'مناوبة جديدة';
-    }
+    // Always show current automatic shift
+    btn.className = 'btn btn-shift-status on';
+    btnDot.style.display = 'inline-block';
+    btnText.textContent = '✅ ' + (getCurrentShiftType ? getCurrentShiftType() : 'صباح') + ' ' + (getCurrentShiftDate ? getCurrentShiftDate() : '');
     
     updateShiftsHistoryWidget();
 }
@@ -2595,29 +2607,7 @@ function showShiftTypeDialog() {
 }
 
 async function startNewShift() {
-    var shiftType = await showShiftTypeDialog();
-    if (!shiftType) return;
-    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (shiftType === 'صباحية' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
-    try {
-        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftType: shiftType }) });
-        var result = await response.json();
-        if (result.success) {
-            currentShiftId = result.shiftId;
-            alert('✅ تم بدء المناوبة ' + shiftType + ' بنجاح');
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            // إذا كان مربع التكميل مفتوح، حدثه تلقائياً بالمناوبة الجديدة
-            var shiftModal = document.getElementById('shiftModal');
-            if (shiftModal && shiftModal.style.display === 'flex') {
-                openShiftModal();
-            } else if (shiftModal) {
-                shiftModal.style.display = 'none';
-            }
-        } else { alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+    showNotification('نظام النوبات', 'النظام يدير النوبات تلقائياً. لا حاجة لبدء مناوبة يدوياً.', 'info', 5000);
 }
 
 // ============================================
@@ -2626,10 +2616,6 @@ async function startNewShift() {
 async function addReportToServer(center, unit) {
     if (isViewingArchiveShift) {
         alert("⚠️ أنت تستعرض مناوبة سابقة. الرجاء العودة للمناوبة الحالية لتسجيل بلاغات جديدة.");
-        return;
-    }
-    if (!currentShiftId) {
-        alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
         return;
     }
     if (!center || !unit) {
