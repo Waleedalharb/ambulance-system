@@ -1634,13 +1634,27 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             ORDER BY e.name
         `, [isoDate, teamName, isoDate]);
         
+        const shiftType = shift.shiftType || 'صباحية';
+        const isNightShift = shiftType === 'ليلية' || shiftType === 'night';
+        
+        // Define valid shift codes for each shift type
+        const dayShiftCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'M', 'CPD', 'CP8', 'CP24', 'C', 'O12', 'O10', 'O6', 'F', 'ME'];
+        const nightShiftCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN', 'CP24', 'C', 'O12', 'O10', 'O6', 'ME', 'F'];
+        const validCodes = isNightShift ? nightShiftCodes : dayShiftCodes;
+        
+        // Filter paramedics: only show those whose shift code matches current shift type
+        const filteredParamedics = paramedics.filter(p => {
+            if (!p.shift_code) return false;
+            return validCodes.includes(p.shift_code.toUpperCase());
+        });
+        
         const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
-        const paramedicsWithStatus = paramedics.map(p => ({
+        const paramedicsWithStatus = filteredParamedics.map(p => ({
             ...p,
             status: p.shift_code && absentCodes.includes(p.shift_code.toUpperCase()) ? 'غائب' : 'حاضر'
         }));
         
-        res.json({ paramedics: paramedicsWithStatus, shiftDate, teamName });
+        res.json({ paramedics: paramedicsWithStatus, shiftDate, teamName, shiftType });
     } catch (error) {
         console.error('[API] Error in shift-completion:', error);
         res.json({ paramedics: [], source: 'fallback', error: error.message });
