@@ -1473,31 +1473,7 @@ function renderAdvancedDistribution() {
 // دوال الخريطة
 // ============================================
 // عناوين الفرق (للعرض النصي)
-var unitLocationAddresses = {
-    "جنوب 1": "طريق الملك فهد، الرياض",
-    "جنوب 2": "حي المنصورة، الرياض",
-    "جنوب 3": "الخالدية، الرياض",
-    "جنوب 4": "الدار البيضاء، الرياض",
-    "جنوب 5": "البساتين، الرياض",
-    "جنوب 6": "الشفاء، الرياض",
-    "جنوب 7": "طرة، الرياض",
-    "جنوب 8": "المريوطية، الرياض",
-    "جنوب 9": "عكاظ، الرياض",
-    "جنوب 10": "المناخ، الرياض",
-    "جنوب 11": "حي الواحات، الرياض",
-    "جنوب 12": "جاكسو، الرياض",
-    "جنوب 13": "الخليفة، الرياض",
-    "جنوب 14": "المطرية، الرياض",
-    "جنوب 15": "الدار البيضاء، الرياض",
-    "جنوب 16": "المنصورة، الرياض",
-    "جنوب 17": "الشفاء، الرياض",
-    "جنوب 18": "طريق الملك فهد، الرياض",
-    "جنوب 19": "الخالدية، الرياض",
-    "سريع 1": "مستشفى الملك خالد، الرياض",
-    "سريع 2": "الشفاء، الرياض",
-    "سريع 3": "الدار البيضاء، الرياض",
-    "سريع 4": "المنصورة، الرياض"
-};
+var unitLocationAddresses = {}; // loaded from server
 
 // إحداثيات الفرق حسب المركز [lat, lng]
 var unitLocations = {
@@ -1595,6 +1571,11 @@ function openMapPreview(unit, center, location) {
     var hint = document.getElementById('mapEditHint');
     if (hint) hint.style.display = 'none';
 
+    var addressEdit = document.getElementById('mapAddressEdit');
+    var addressInput = document.getElementById('mapAddressInput');
+    if (addressEdit) addressEdit.style.display = 'none';
+    if (addressInput) addressInput.value = unitLocationAddresses[unit] || location || '';
+
     setTimeout(function() {
         initLeafletMap(unit);
     }, 200);
@@ -1604,6 +1585,7 @@ function toggleMapEditMode() {
     mapEditMode = !mapEditMode;
     var editBtn = document.getElementById('mapEditBtn');
     var hint = document.getElementById('mapEditHint');
+    var addressEdit = document.getElementById('mapAddressEdit');
 
     if (mapEditMode) {
         // Clear old temp marker if any
@@ -1614,6 +1596,7 @@ function toggleMapEditMode() {
             editBtn.style.color = '#fff';
         }
         if (hint) hint.style.display = 'block';
+        if (addressEdit) addressEdit.style.display = 'block';
         showNotification('وضع التعديل', 'انقر على الخريطة لتحديد موقع جديد', 'info', 3000);
 
         // Click handler on map
@@ -1636,8 +1619,10 @@ function toggleMapEditMode() {
                 }).addTo(map);
                 tempMarker.bindPopup('<b>' + currentMapUnit + '</b><br>موقع جديد محدد').openPopup();
 
-                // Save automatically
-                saveUnitLocation(currentMapCenter, currentMapUnit, lat, lng);
+                // Save automatically with address
+                var addressInput = document.getElementById('mapAddressInput');
+                var address = addressInput ? addressInput.value : '';
+                saveUnitLocation(currentMapCenter, currentMapUnit, lat, lng, address);
             });
         }
     } else {
@@ -1647,28 +1632,31 @@ function toggleMapEditMode() {
             editBtn.style.color = '#333';
         }
         if (hint) hint.style.display = 'none';
+        if (addressEdit) addressEdit.style.display = 'none';
         if (map) { map.off('click'); }
     }
 }
 
-async function saveUnitLocation(center, unit, lat, lng) {
-    console.log('saveUnitLocation called:', { center, unit, lat, lng });
+async function saveUnitLocation(center, unit, lat, lng, address) {
+    console.log('saveUnitLocation called:', { center, unit, lat, lng, address });
     try {
         var res = await apiFetch('/api/unit-locations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ center, unit, lat, lng })
+            body: JSON.stringify({ center, unit, lat, lng, address })
         });
         var result = await res.json();
         if (result.success) {
             unitLocations = result.locations;
+            if (result.addresses) unitLocationAddresses = result.addresses;
             // Remove temp marker
             if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
             showNotification('تم الحفظ', 'تم تحديث موقع ' + unit + ' بنجاح', 'success', 3000);
             // Refresh map — show only the new location
             initLeafletMap(unit);
             // Update location text
-            document.getElementById('mapLocationText').innerText = '📍 الموقع: lat ' + lat.toFixed(5) + ', lng ' + lng.toFixed(5);
+            var newAddress = address || unitLocationAddresses[unit] || '';
+            document.getElementById('mapLocationText').innerText = '📍 الموقع: ' + newAddress;
         } else {
             showNotification('فشل الحفظ', result.error || 'تعذر حفظ الموقع', 'error', 3000);
         }
@@ -2006,6 +1994,9 @@ async function loadUnitLocations() {
             var result = await res.json();
             if (result.success && result.locations) {
                 unitLocations = result.locations;
+            }
+            if (result.success && result.addresses) {
+                unitLocationAddresses = result.addresses;
             }
         }
     } catch (e) {

@@ -101,7 +101,7 @@ const DASHBOARD_PATH = path.join(STORAGE_PATH, 'dashboard.json');
 const HOSPITALS_PATH = path.join(STORAGE_PATH, 'hospitals.json');
 const REFERENCES_PATH = path.join(STORAGE_PATH, 'references.json');
 const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
-const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
+const UNIT_LOCATION_ADDRESSES_PATH = path.join(STORAGE_PATH, 'unit-location-addresses.json');
 const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
 
 let lastUpdateTime = Date.now();
@@ -815,6 +815,46 @@ async function readUnitLocations() {
 
 async function writeUnitLocations(data) {
     await fs.writeFile(UNIT_LOCATIONS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readUnitLocationAddresses() {
+    try {
+        const data = await fs.readFile(UNIT_LOCATION_ADDRESSES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return {
+                'جنوب 1': 'طريق الملك فهد، الرياض',
+                'جنوب 2': 'حي المنصورة، الرياض',
+                'جنوب 3': 'الخالدية، الرياض',
+                'جنوب 4': 'الدار البيضاء، الرياض',
+                'جنوب 5': 'البساتين، الرياض',
+                'جنوب 6': 'الشفاء، الرياض',
+                'جنوب 7': 'طرة، الرياض',
+                'جنوب 8': 'المريوطية، الرياض',
+                'جنوب 9': 'عكاظ، الرياض',
+                'جنوب 10': 'المناخ، الرياض',
+                'جنوب 11': 'حي الواحات، الرياض',
+                'جنوب 12': 'جاكسو، الرياض',
+                'جنوب 13': 'الخليفة، الرياض',
+                'جنوب 14': 'المطرية، الرياض',
+                'جنوب 15': 'الدار البيضاء، الرياض',
+                'جنوب 16': 'المنصورة، الرياض',
+                'جنوب 17': 'الشفاء، الرياض',
+                'جنوب 18': 'طريق الملك فهد، الرياض',
+                'جنوب 19': 'الخالدية، الرياض',
+                'سريع 1': 'مستشفى الملك خالد، الرياض',
+                'سريع 2': 'الشفاء، الرياض',
+                'سريع 3': 'الدار البيضاء، الرياض',
+                'سريع 4': 'المنصورة، الرياض'
+            };
+        }
+        return {};
+    }
+}
+
+async function writeUnitLocationAddresses(data) {
+    await fs.writeFile(UNIT_LOCATION_ADDRESSES_PATH, JSON.stringify(data, null, 2));
 }
 
 // ============================================
@@ -2200,7 +2240,8 @@ app.post('/api/announcements/add', authenticate, authorize(['admin']), async (re
 app.get('/api/unit-locations', authenticate, async (req, res) => {
     try {
         const locations = await readUnitLocations();
-        res.json({ success: true, locations });
+        const addresses = await readUnitLocationAddresses();
+        res.json({ success: true, locations, addresses });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب مواقع الفرق' });
     }
@@ -2208,7 +2249,7 @@ app.get('/api/unit-locations', authenticate, async (req, res) => {
 
 app.post('/api/unit-locations', authenticate, async (req, res) => {
     try {
-        const { center, unit, lat, lng } = req.body;
+        const { center, unit, lat, lng, address } = req.body;
         if (!center || !unit || lat === undefined || lng === undefined) {
             return res.status(400).json({ error: 'بيانات ناقصة: center, unit, lat, lng مطلوبة' });
         }
@@ -2222,15 +2263,45 @@ app.post('/api/unit-locations', authenticate, async (req, res) => {
         if (!locations[center]) locations[center] = {};
         locations[center][unit] = [parseFloat(lat), parseFloat(lng)];
         await writeUnitLocations(locations);
+
+        // Save address if provided
+        if (address) {
+            const addresses = await readUnitLocationAddresses();
+            addresses[unit] = address;
+            await writeUnitLocationAddresses(addresses);
+        }
+
+        const addresses = await readUnitLocationAddresses();
         broadcast({
             type: 'unit_location_updated',
             message: 'تم تحديث موقع ' + unit + ' في ' + center,
             center, unit, lat, lng
         });
-        res.json({ success: true, locations });
+        res.json({ success: true, locations, addresses });
     } catch (error) {
         console.error('Unit location update error:', error);
         res.status(500).json({ error: 'فشل في تحديث الموقع' });
+    }
+});
+
+app.post('/api/unit-location-addresses', authenticate, async (req, res) => {
+    try {
+        const { unit, address } = req.body;
+        if (!unit || !address) {
+            return res.status(400).json({ error: 'بيانات ناقصة: unit و address مطلوبان' });
+        }
+        const addresses = await readUnitLocationAddresses();
+        addresses[unit] = address;
+        await writeUnitLocationAddresses(addresses);
+        broadcast({
+            type: 'unit_location_updated',
+            message: 'تم تحديث عنوان ' + unit,
+            unit, address
+        });
+        res.json({ success: true, addresses });
+    } catch (error) {
+        console.error('Unit location address update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث العنوان' });
     }
 });
 
