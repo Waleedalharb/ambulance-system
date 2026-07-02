@@ -2213,6 +2213,12 @@ app.post('/api/unit-locations', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'بيانات ناقصة: center, unit, lat, lng مطلوبة' });
         }
         const locations = await readUnitLocations();
+        // Remove unit from any other center first (to avoid duplicates)
+        for (const c in locations) {
+            if (c !== center && locations[c][unit]) {
+                delete locations[c][unit];
+            }
+        }
         if (!locations[center]) locations[center] = {};
         locations[center][unit] = [parseFloat(lat), parseFloat(lng)];
         await writeUnitLocations(locations);

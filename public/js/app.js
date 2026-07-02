@@ -1564,12 +1564,20 @@ var mapEditMode = false;
 var tempMarker = null;
 
 function openMapPreview(unit, center, location) {
+    // Find the ACTUAL center for this unit in unitLocations
+    var actualCenter = center;
+    for (var c in unitLocations) {
+        if (unitLocations[c][unit]) {
+            actualCenter = c;
+            break;
+        }
+    }
     currentMapUnit = unit;
-    currentMapCenter = center;
+    currentMapCenter = actualCenter;
     mapEditMode = false;
     if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
 
-    console.log('openMapPreview called:', { unit, center, location });
+    console.log('openMapPreview called:', { unit, center: actualCenter, location });
 
     var modal = document.getElementById('mapModal');
     document.getElementById('mapModalTitle').innerText = '📍 معاينة موقع ' + unit;
