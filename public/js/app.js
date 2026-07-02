@@ -1598,6 +1598,8 @@ function toggleMapEditMode() {
     var hint = document.getElementById('mapEditHint');
 
     if (mapEditMode) {
+        // Clear old temp marker if any
+        if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
         if (editBtn) {
             editBtn.innerHTML = '<i class="fas fa-save"></i> حفظ الموقع';
             editBtn.style.background = 'var(--neon-green)';
@@ -1652,9 +1654,13 @@ async function saveUnitLocation(center, unit, lat, lng) {
         var result = await res.json();
         if (result.success) {
             unitLocations = result.locations;
+            // Remove temp marker
+            if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
             showNotification('تم الحفظ', 'تم تحديث موقع ' + unit + ' بنجاح', 'success', 3000);
-            // Refresh map markers
+            // Refresh map — show only the new location
             initLeafletMap(unit);
+            // Update location text
+            document.getElementById('mapLocationText').innerText = '📍 الموقع: lat ' + lat.toFixed(5) + ', lng ' + lng.toFixed(5);
         } else {
             showNotification('فشل الحفظ', result.error || 'تعذر حفظ الموقع', 'error', 3000);
         }
@@ -1680,9 +1686,10 @@ function initLeafletMap(focusUnit) {
         }).addTo(map);
     }
 
-    // مسح العلامات القديمة
+    // مسح العلامات القديمة (بما فيها العلامة المؤقتة)
     mapMarkers.forEach(function(m) { map.removeLayer(m); });
     mapMarkers = [];
+    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
 
     // إضافة علامات لكل الفرق
     var bounds = [];
