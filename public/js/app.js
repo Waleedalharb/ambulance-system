@@ -5364,7 +5364,7 @@ function safeTeamId(teamName) {
 }
 
 function isParamedicPresent(shiftCode) {
-    if (!shiftCode) return true;
+    if (!shiftCode || shiftCode === '-' || shiftCode === '') return false;
     var absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
     return absentCodes.indexOf(shiftCode.toString().toUpperCase()) === -1;
 }
