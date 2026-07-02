@@ -1043,33 +1043,65 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
 
 app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
-        const { shiftId, shiftData } = req.body;
-        if (!shiftId) {
-            return res.status(400).json({ error: 'معرف المناوبة مطلوب' });
-        }
-
+        const { shiftId, shiftData, shiftDate, shiftType } = req.body;
         const shifts = await readShifts();
-        const index = shifts.findIndex(s => s.id === shiftId);
-        if (index === -1) {
-            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        
+        let targetShift = null;
+        let index = -1;
+        
+        if (shiftId) {
+            // Find by ID (legacy/manual mode)
+            index = shifts.findIndex(s => s.id === shiftId);
+        } else if (shiftDate && shiftType) {
+            // Find by date + type (auto-shift mode)
+            index = shifts.findIndex(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
         }
-
-        shifts[index].rapidLocations = shiftData.rapidLocations || {};
-        shifts[index].centersData = shiftData.centersData || {};
-        shifts[index].generalNotes = shiftData.generalNotes || "";
-        shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
-        shifts[index].lastUpdate = new Date().toISOString();
-
+        
+        if (index !== -1) {
+            // Update existing shift
+            shifts[index].rapidLocations = shiftData.rapidLocations || {};
+            shifts[index].centersData = shiftData.centersData || {};
+            shifts[index].generalNotes = shiftData.generalNotes || "";
+            shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
+            shifts[index].lastUpdate = new Date().toISOString();
+            targetShift = shifts[index];
+        } else {
+            // Create new auto-shift record
+            const now = new Date();
+            const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+            const newShift = {
+                id: Date.now(),
+                shiftName: `${shiftData.shiftType || 'صباح'} - ${shiftDate || saudiTime.toLocaleDateString('ar-SA')}`,
+                shiftDate: shiftDate || saudiTime.toLocaleDateString('ar-SA'),
+                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+                shiftType: shiftData.shiftType || 'صباح',
+                startTime: saudiTime.toISOString(),
+                savedReports: {},
+                totalReports: 0,
+                rapidLocations: shiftData.rapidLocations || {},
+                centersData: shiftData.centersData || {},
+                vehicleData: {},
+                fuelData: {},
+                generalNotes: shiftData.generalNotes || "",
+                lastUpdate: saudiTime.toISOString(),
+                autoArchived: false
+            };
+            shifts.unshift(newShift);
+            if (shifts.length > 50) shifts.pop();
+            targetShift = newShift;
+            index = 0;
+        }
+        
         await writeShifts(shifts);
-        currentShiftId = shiftId;
+        if (targetShift) currentShiftId = targetShift.id;
 
         broadcast({
             type: 'shift_updated',
             message: 'تم تحديث بيانات المناوبة',
-            shiftId: shiftId
+            shiftId: targetShift ? targetShift.id : null
         });
 
-        res.json({ success: true });
+        res.json({ success: true, shiftId: targetShift ? targetShift.id : null });
     } catch (error) {
         console.error("خطأ في تحديث بيانات المناوبة:", error);
         res.status(500).json({ error: 'فشل في تحديث بيانات المناوبة' });

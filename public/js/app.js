@@ -2771,11 +2771,16 @@ async function saveShiftData(silent) {
     var shiftData = getShiftFromForm();
     if (!shiftData.shiftType) { if (!silent) alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return false; }
     var targetId = viewingShiftId || currentShiftId;
-    if (!targetId) { if (!silent) alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return false; }
+    var shiftDate = getSaudiDate();
+    var shiftType = getCurrentShiftType ? getCurrentShiftType() : shiftData.shiftType;
     try {
-        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
+        var body = { shiftData: shiftData };
+        if (targetId) body.shiftId = targetId;
+        else { body.shiftDate = shiftDate; body.shiftType = shiftType; }
+        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(body) });
         var result = await response.json();
         if (result.success) {
+            if (result.shiftId) currentShiftId = result.shiftId;
             if (!silent) alert("✅ تم حفظ بيانات التكميل بنجاح");
             await loadShifts();
             await loadAllData();
