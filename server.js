@@ -112,8 +112,9 @@ let currentShiftId = null;
 // ============================================
 function getSaudiDateTime() {
     const now = new Date();
-    const offset = 3; // Saudi Arabia UTC+3
-    return new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    // Get UTC time first, then add Saudi offset (+3)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    return new Date(utc + (3 * 60 * 60 * 1000));
 }
 
 function getCurrentShiftType() {

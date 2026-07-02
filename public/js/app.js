@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v10-2026-07-01';
+    var APP_VERSION = 'v11-2026-07-02';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -192,15 +192,22 @@ function getSaudiMonthYear() {
 // ============================================
 function getCurrentShiftType() {
     const now = new Date();
-    const offset = 3; // Saudi Arabia UTC+3
-    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    // Get UTC time first, then add Saudi offset (+3)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
     const hour = saudiTime.getHours();
     // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
     return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
 }
 
 function getCurrentShiftDate() {
-    return getSaudiDate();
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
+    const year = saudiTime.getFullYear();
+    const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+    const day = saudiTime.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // ============================================
@@ -2071,6 +2078,44 @@ function viewSelectedArchiveShift() {
     selectShiftFromHistory(select.value);
 }
 
+function editSelectedArchiveShift() {
+    var select = document.getElementById('archiveModalSelect');
+    if (!select || !select.value) {
+        alert('الرجاء اختيار مناوبة من القائمة');
+        return;
+    }
+    document.getElementById('shiftArchiveModal').style.display = 'none';
+    
+    // Open shift modal for editing the completion data
+    var shiftIdNum = parseInt(select.value);
+    var shift = allShifts.find(function(s) { return s.id === shiftIdNum; });
+    if (!shift) {
+        alert('المناوبة غير موجودة');
+        return;
+    }
+    
+    // Set viewing mode but open for editing
+    viewingShiftId = shiftIdNum;
+    isViewingArchiveShift = true;
+    
+    // Open the shift modal
+    openShiftModal();
+    
+    // Load the shift data into the form
+    loadShiftToForm(shift);
+    
+    // Show editing badge
+    var badge = document.getElementById('viewingBadge');
+    if (badge) {
+        badge.style.display = 'inline-block';
+        badge.textContent = '✏️ تعديل: ' + (shift.shiftType || 'مناوبة') + ' - ' + (shift.shiftDate || '');
+    }
+    var returnBtn = document.getElementById('returnToCurrentBtn');
+    if (returnBtn) returnBtn.style.display = 'inline-block';
+    
+    showNotification('تعديل', 'يمكنك الآن تعديل بيانات تكميل المناوبة', 'info', 5000);
+}
+
 function selectShiftFromHistory(shiftId) {
     if (!shiftId) {
         // Return to current shift view
@@ -2862,7 +2907,20 @@ function loadShiftToForm(shift) {
         var date = shift.shiftDate || getSaudiDate();
         typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + type + '</span> ' + date + ' — تسجيل بيانات تكميل النوبة';
     }
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
+    
+    // Load rapid response teams data
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var data = (shift.centersData && shift.centersData[rapid.name]) || { staffCount: '', carsCount: '', notes: '' };
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        updateRapidStatusIcon(r);
+    }
+    
     for (var i = 0; i < centerList.length; i++) {
         var center = centerList[i];
         var data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '', vehicleStatus: '', fuelLevel: '' };
@@ -2893,9 +2951,39 @@ function loadShiftToForm(shift) {
 function getShiftFromForm() {
     var shiftTypeEl = document.querySelector('input[name="shiftType"]:checked');
     var shiftType = shiftTypeEl ? shiftTypeEl.value : (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
-    var rapidLocations = {};
-    document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
+    
+    // Read rapid response teams data
+    var rapidData = {};
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        rapidData[rapid.name] = {
+            staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
+            carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
+            notes: (notesInput && notesInput.value) ? notesInput.value : '',
+            isRapid: true
+        };
+    }
+    
     var centersDataForm = {};
+    // Add rapid response data to centersData
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        centersDataForm[rapid.name] = {
+            staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
+            carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
+            notes: (notesInput && notesInput.value) ? notesInput.value : '',
+            vehicleStatus: '',
+            fuelLevel: '',
+            isRapid: true
+        };
+    }
+    
     for (var i = 0; i < centerList.length; i++) {
         var center = centerList[i];
         var staffInput = document.getElementById('staff_' + i);
@@ -2908,10 +2996,11 @@ function getShiftFromForm() {
             carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
             notes: (notesInput && notesInput.value) ? notesInput.value : '',
             vehicleStatus: (vehicleSel && vehicleSel.value) ? vehicleSel.value : '',
-            fuelLevel: (fuelSel && fuelSel.value) ? fuelSel.value : ''
+            fuelLevel: (fuelSel && fuelSel.value) ? fuelSel.value : '',
+            isRapid: false
         };
     }
-    return { shiftType: shiftType, rapidLocations: rapidLocations, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
+    return { shiftType: shiftType, rapidLocations: {}, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
 }
 
 function clearShiftForm() {
@@ -2925,7 +3014,16 @@ function clearShiftForm() {
         var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
         typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
     }
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
+    // Clear rapid response teams
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        if (staffInput) staffInput.value = '';
+        if (carsInput) carsInput.value = '';
+        if (notesInput) notesInput.value = '';
+        updateRapidStatusIcon(r);
+    }
     for (var i = 0; i < centerList.length; i++) {
         var staffInput = document.getElementById('staff_' + i);
         var carsInput = document.getElementById('cars_' + i);
@@ -5019,19 +5117,84 @@ async function deleteDoc(docId) {
 // ============================================
 // وظائف بناء الجدول
 // ============================================
+var rapidTeams = [
+    { id: 'rapid_0', name: 'سريع 1', displayName: '⚡ سريع 1' },
+    { id: 'rapid_1', name: 'سريع 2', displayName: '⚡ سريع 2' },
+    { id: 'rapid_2', name: 'سريع 3', displayName: '⚡ سريع 3' },
+    { id: 'rapid_3', name: 'سريع 4', displayName: '⚡ سريع 4' }
+];
+
 function buildCentersTable() {
     var tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
     
+    // Add Rapid Response Teams first
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var tr = document.createElement('tr');
+        tr.id = 'rapid-row-' + r;
+        tr.className = 'rapid-team-row';
+        tr.style.background = 'rgba(255, 193, 7, 0.05)';
+        
+        var statusHtml = '<span id="rapid_status_' + r + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
+        
+        var actionHtml = `
+            <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                <button onclick="setRapidComplete(${r})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ✅ مكتمل
+                </button>
+                <button onclick="setRapidIncomplete(${r})" class="btn btn-danger" style="padding:2px 10px; font-size:0.6rem; background:#c0392b; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ❌ ناقص
+                </button>
+            </div>
+        `;
+        
+        tr.innerHTML = `
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--gold);">⚡ تدخل سريع</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${rapid.displayName}</td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td><input type="number" id="rapid_staff_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1"></td>
+            <td><input type="number" id="rapid_cars_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1"></td>
+            <td style="text-align:center;">${actionHtml}</td>
+            <td><input type="text" id="rapid_notes_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+        `;
+        
+        var staffInput = tr.querySelector('#rapid_staff_' + r);
+        var carsInput = tr.querySelector('#rapid_cars_' + r);
+        
+        staffInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateRapidStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+                updateShiftKPIs();
+            };
+        }(r));
+        
+        carsInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateRapidStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+            };
+        }(r));
+        
+        tbody.appendChild(tr);
+    }
+    
+    // Add separator row
+    var sepTr = document.createElement('tr');
+    sepTr.innerHTML = '<td colspan="9" style="background:var(--gray-100); height:8px; padding:0;"></td>';
+    tbody.appendChild(sepTr);
+    
+    // Add Regular Centers
     for (var i = 0; i < centerList.length; i++) {
         var tr = document.createElement('tr');
         tr.id = 'center-row-' + i;
         
-        // أيقونة الحالة
         var statusHtml = '<span id="status_' + i + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
         
-        // أزرار الإجراء السريع
         var actionHtml = `
             <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
                 <button onclick="setCenterComplete(${i})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
@@ -5044,10 +5207,11 @@ function buildCentersTable() {
         `;
         
         tr.innerHTML = `
-            <td style="font-weight:bold; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--primary);">🏥 مركز</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
             <td style="text-align:center;">${statusHtml}</td>
-            <td><input type="number" id="staff_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value=""></td>
-            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value=""></td>
+            <td><input type="number" id="staff_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value="" placeholder="2+"></td>
+            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value="" placeholder="1+"></td>
             <td style="text-align:center;">${actionHtml}</td>
             <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
             <td><select id="vehicle_${i}" style="width:80px; font-size:0.7rem; padding:3px; border:1px solid var(--gray-200); border-radius:4px;">
@@ -5076,7 +5240,6 @@ function buildCentersTable() {
             };
         }(i));
         
-        
         var vehicleSelect = tr.querySelector('#vehicle_' + i);
         var fuelSelect = tr.querySelector('#fuel_' + i);
 
@@ -5087,6 +5250,43 @@ function buildCentersTable() {
         }
         tbody.appendChild(tr);
     }
+}
+
+function updateRapidStatusIcon(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    var iconSpan = document.getElementById('rapid_status_' + index);
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if (staffCount >= 1 && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
+    }
+}
+
+function setRapidComplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 1;
+    if (carsInput) carsInput.value = 1;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+}
+
+function setRapidIncomplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 0;
+    if (carsInput) carsInput.value = 0;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
 }
 
 function updateStatusIcon(index) {
@@ -5111,15 +5311,20 @@ function calculateWorkforceStatsLocally() {
     var totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
     var distribution = {}, carDistribution = {};
     centerRows.forEach(function(tr) {
-        var centerName = tr.querySelector('td:first-child')?.innerText || '';
-        var staffInput = tr.querySelector('input[id^="staff_"]');
-        var carsInput = tr.querySelector('input[id^="cars_"]');
+        var centerName = tr.querySelector('td:nth-child(2)')?.innerText || '';
+        var isRapid = tr.classList.contains('rapid-team-row');
+        var staffInput = tr.querySelector('input[id^="staff_"], input[id^="rapid_staff_"]');
+        var carsInput = tr.querySelector('input[id^="cars_"], input[id^="rapid_cars_"]');
         if (staffInput && carsInput) {
             var staffCount = parseInt(staffInput.value) || 0;
             var carsCount = parseInt(carsInput.value) || 0;
             totalStaff += staffCount; totalCars += carsCount; centerCount++;
             distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
-            if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+            if (isRapid) {
+                if (staffCount >= 1 && carsCount >= 1) readyCenters++; else missingCenters++;
+            } else {
+                if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+            }
         }
     });
     var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
@@ -5127,10 +5332,10 @@ function calculateWorkforceStatsLocally() {
     document.getElementById('totalStaffDisplay').innerText = totalStaff;
     document.getElementById('totalCarsDisplay').innerText = totalCars;
     document.getElementById('missingCentersDisplay').innerText = missingCenters;
-    document.getElementById('staffSubText').innerText = 'موزعين على ' + centerCount + ' مركز';
+    document.getElementById('staffSubText').innerText = 'موزعين على ' + centerCount + ' فريق';
     document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-    document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-    document.getElementById('readinessSubText').innerText = readyCenters + ' / ' + centerCount + ' مركز جاهز';
+    document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'فريق ناقص' : missingCenters + ' فرق ناقصة';
+    document.getElementById('readinessSubText').innerText = readyCenters + ' / ' + centerCount + ' فريق جاهز';
     var circumference = 2 * Math.PI * 42;
     var offset = circumference - (readinessRate / 100) * circumference;
     var circle = document.getElementById('readinessCircle');
@@ -5147,7 +5352,8 @@ function calculateWorkforceStatsLocally() {
     for (var center in distribution) {
         var count = distribution[center];
         var barWidth = Math.round((count / total) * 100);
-        var isReady = count >= 2;
+        var isRapidTeam = center.includes('سريع');
+        var isReady = isRapidTeam ? (count >= 1) : (count >= 2);
         var div = document.createElement('div');
         div.className = 'distribution-bar';
         div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
@@ -5159,10 +5365,11 @@ function calculateWorkforceStatsLocally() {
     for (var center2 in carDistribution) {
         var count2 = carDistribution[center2];
         var barWidth2 = Math.round((count2 / totalCarsValue) * 100);
-        var hasCar = count2 >= 1;
+        var isRapidTeam2 = center2.includes('سريع');
+        var hasCar = isRapidTeam2 ? (count2 >= 1) : (count2 >= 1);
         var div2 = document.createElement('div');
         div2.className = 'distribution-bar';
-        div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
+        div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
         carDistList.appendChild(div2);
     }
     if (totalStaff > 0 || totalCars > 0) {
@@ -5584,7 +5791,34 @@ function updateVehicleStatusIcon(index) {
 
 // ===== 5. Presets السريعة =====
 function applyPreset(preset) {
-    if (preset !== 'start' && !confirm('\u26a0\ufe0f سيتم تطبيق "' + getPresetLabel(preset) + '" على جميع المراكز. هل أنت متأكد؟')) return;
+    if (preset !== 'start' && !confirm('\u26a0\ufe0f سيتم تطبيق "' + getPresetLabel(preset) + '" على جميع الفرق. هل أنت متأكد؟')) return;
+
+    // Apply to rapid response teams first
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+
+        switch (preset) {
+            case 'full':
+            case 'emergency':
+                if (staffInput) staffInput.value = 1;
+                if (carsInput) carsInput.value = 1;
+                if (notesInput) notesInput.value = notesInput.value || '\u2705 جاهز (سريع)';
+                break;
+            case 'maintenance':
+                if (staffInput) staffInput.value = 0;
+                if (carsInput) carsInput.value = 0;
+                if (notesInput) notesInput.value = notesInput.value || '\ud83d\udd27 صيانة - غير جاهز';
+                break;
+            case 'start':
+                if (staffInput) staffInput.value = '';
+                if (carsInput) carsInput.value = '';
+                if (notesInput) notesInput.value = '';
+                break;
+        }
+        updateRapidStatusIcon(r);
+    }
 
     for (var i = 0; i < centerList.length; i++) {
         var staffInput = document.getElementById('staff_' + i);
@@ -6074,15 +6308,22 @@ function printShift() {
 
     // 3. فرق التدخل السريع
     var rapidHtml = '';
-    var rapidInputs = document.querySelectorAll('.rapid-location');
-    for (var j = 0; j < rapidInputs.length; j++) {
-        if (rapidInputs[j] && rapidInputs[j].value) {
-            var unitName = rapidInputs[j].dataset.unit || ('سريع ' + (j+1));
-            rapidHtml += '<tr>' +
-                '<td style="border:1px solid #000;padding:5px;font-weight:bold;text-align:center;">' + unitName + '</td>' +
-                '<td style="border:1px solid #000;padding:5px;text-align:center;">' + rapidInputs[j].value + '</td>' +
-                '</tr>';
-        }
+    for (var j = 0; j < rapidTeams.length; j++) {
+        var rapid = rapidTeams[j];
+        var staffInput = document.getElementById('rapid_staff_' + j);
+        var carsInput = document.getElementById('rapid_cars_' + j);
+        var notesInput = document.getElementById('rapid_notes_' + j);
+        var staffVal = staffInput ? (staffInput.value || '0') : '0';
+        var carsVal = carsInput ? (carsInput.value || '0') : '0';
+        var notesVal = notesInput ? (notesInput.value || '-') : '-';
+        var status = (parseInt(staffVal) >= 1 && parseInt(carsVal) >= 1) ? '✅ مكتمل' : '❌ ناقص';
+        rapidHtml += '<tr>' +
+            '<td style="border:1px solid #000;padding:5px;font-weight:bold;text-align:center;">' + rapid.displayName + '</td>' +
+            '<td style="border:1px solid #000;padding:5px;text-align:center;">' + staffVal + ' اختصاصي</td>' +
+            '<td style="border:1px solid #000;padding:5px;text-align:center;">' + carsVal + ' سيارة</td>' +
+            '<td style="border:1px solid #000;padding:5px;text-align:center;">' + status + '</td>' +
+            '<td style="border:1px solid #000;padding:5px;text-align:center;">' + notesVal + '</td>' +
+            '</tr>';
     }
 
     // 4. الملاحظات العامة
@@ -6255,10 +6496,14 @@ function exportShiftPDF() {
 
     // Rapid teams rows
     var rapidRows = '';
-    var rapidUnits = ['سريع 1', 'سريع 2', 'سريع 3', 'سريع 4'];
-    for (var i = 0; i < rapidUnits.length; i++) {
-        var loc = shiftData.rapidLocations[rapidUnits[i]] || '-';
-        rapidRows += '<tr><td>' + rapidUnits[i] + '</td><td>' + loc + '</td></tr>';
+    for (var i = 0; i < rapidTeams.length; i++) {
+        var rapid = rapidTeams[i];
+        var rData = shiftData.centersData && shiftData.centersData[rapid.name] || {};
+        var staff = rData.staffCount || '0';
+        var cars = rData.carsCount || '0';
+        var notes = rData.notes || '-';
+        var status = (parseInt(staff) >= 1 && parseInt(cars) >= 1) ? '✅ مكتمل' : '❌ ناقص';
+        rapidRows += '<tr><td>' + rapid.displayName + '</td><td>' + staff + ' اختصاصي</td><td>' + cars + ' سيارة</td><td>' + status + '</td><td>' + notes + '</td></tr>';
     }
 
     // Centers rows

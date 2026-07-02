@@ -1064,62 +1064,47 @@
             </div>
         </div>
 
-        <!-- Rapid Response Teams -->
+        <!-- Combined Teams Section -->
         <div class="section-card">
-            <h3 class="shift-section-title section-title"><i class="fas fa-bolt"></i> تحضير فرق التدخل السريع</h3>
+            <h3 class="shift-section-title section-title"><i class="fas fa-ambulance"></i> فرق التكميل</h3>
+
+            <!-- Presets Bar -->
+            <div class="shift-presets-bar presets-bar">
+                <span class="shift-presets-label"><i class="fas fa-bolt"></i> إجراءات سريعة:</span>
+                <button onclick="applyPreset('full')" class="shift-preset-btn preset-btn preset-full">
+                    <i class="fas fa-check-double"></i> تكميل كامل
+                </button>
+                <button onclick="applyPreset('emergency')" class="shift-preset-btn preset-btn preset-emergency">
+                    <i class="fas fa-exclamation-triangle"></i> حالة طوارئ
+                </button>
+                <button onclick="applyPreset('maintenance')" class="shift-preset-btn preset-btn preset-maintenance">
+                    <i class="fas fa-wrench"></i> صيانة دورية
+                </button>
+                <button onclick="applyPreset('start')" class="shift-preset-btn preset-btn preset-start">
+                    <i class="fas fa-redo"></i> بداية مناوبة
+                </button>
+                <span class="shift-presets-hint"><i class="fas fa-lightbulb"></i> يمكنك تعديل أي فريق يدوياً بعد تطبيق الإجراء</span>
+            </div>
+
+            <!-- Combined Table -->
             <div class="shift-table-wrapper">
-            <table id="rapidTable" class="shift-table shift-table-rapid">
-                <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
-                <tbody>
-                    <tr><td>سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
-                    <tr><td>سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
-                    <tr><td>سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
-                    <tr><td>سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
-                </tbody>
-            </table>
-        </div>
-        </div>
-
-        <!-- Centers Section -->
-        <div class="section-card">
-            <h3 class="shift-section-title section-title"><i class="fas fa-hospital"></i> المراكز الإسعافية</h3>
-
-        <!-- Presets Bar -->
-        <div class="shift-presets-bar presets-bar">
-            <span class="shift-presets-label"><i class="fas fa-bolt"></i> إجراءات سريعة:</span>
-            <button onclick="applyPreset('full')" class="shift-preset-btn preset-btn preset-full">
-                <i class="fas fa-check-double"></i> تكميل كامل
-            </button>
-            <button onclick="applyPreset('emergency')" class="shift-preset-btn preset-btn preset-emergency">
-                <i class="fas fa-exclamation-triangle"></i> حالة طوارئ
-            </button>
-            <button onclick="applyPreset('maintenance')" class="shift-preset-btn preset-btn preset-maintenance">
-                <i class="fas fa-wrench"></i> صيانة دورية
-            </button>
-            <button onclick="applyPreset('start')" class="shift-preset-btn preset-btn preset-start">
-                <i class="fas fa-redo"></i> بداية مناوبة
-            </button>
-            <span class="shift-presets-hint"><i class="fas fa-lightbulb"></i> يمكنك تعديل أي مركز يدوياً بعد تطبيق الإجراء</span>
-        </div>
-
-        <!-- Centers Table -->
-        <div class="shift-table-wrapper">
-            <table id="centersTable" class="shift-table shift-table-centers">
-                <thead>
-                    <tr>
-                        <th>المركز</th>
-                        <th>الحالة</th>
-                        <th>المسعفين</th>
-                        <th>السيارات</th>
-                        <th>إجراء سريع</th>
-                        <th>ملاحظات</th>
-                        <th>الحالة</th>
-                        <th>الوقود</th>
-                    </tr>
-                </thead>
-                <tbody id="centersTableBody"></tbody>
-            </table>
-        </div>
+                <table id="centersTable" class="shift-table shift-table-centers">
+                    <thead>
+                        <tr>
+                            <th>النوع</th>
+                            <th>الفرقة</th>
+                            <th>الحالة</th>
+                            <th>الكادر</th>
+                            <th>السيارات</th>
+                            <th>إجراء سريع</th>
+                            <th>ملاحظات</th>
+                            <th>المركبة</th>
+                            <th>الوقود</th>
+                        </tr>
+                    </thead>
+                    <tbody id="centersTableBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Workforce Stats -->
@@ -1537,8 +1522,9 @@
                 <option value="">-- اختر التاريخ --</option>
             </select>
         </div>
-        <div class="modal-buttons" style="justify-content:center;">
+        <div class="modal-buttons" style="justify-content:center; gap:12px;">
             <button onclick="viewSelectedArchiveShift()" class="btn btn-primary" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-eye"></i> استعراض البيانات</button>
+            <button onclick="editSelectedArchiveShift()" class="btn btn-success" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-edit"></i> تعديل التكميل</button>
         </div>
     </div>
 </div>
