@@ -5423,16 +5423,13 @@ function renderTeamParamedics(teamName, type, index, paramedics) {
 
 async function fetchTeamParamedics(shiftId, teamName, type, index) {
     var cacheKey = shiftId + '_' + teamName;
-    if (teamParamedicData[cacheKey]) {
-        renderTeamParamedics(teamName, type, index, teamParamedicData[cacheKey]);
-        return;
-    }
-    
+    // Always fetch fresh data (cache-busting)
     try {
-        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName), {
+        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now(), {
             headers: { 'Authorization': 'Bearer ' + authToken }
         });
         var data = await response.json();
+        console.log('[PARAMEDICS] Team:', teamName, 'ShiftType:', data.shiftType, 'Count:', data.paramedics.length, 'Codes:', data.paramedics.map(p => p.shift_code));
         var paramedics = data.paramedics || [];
         teamParamedicData[cacheKey] = paramedics;
         renderTeamParamedics(teamName, type, index, paramedics);
