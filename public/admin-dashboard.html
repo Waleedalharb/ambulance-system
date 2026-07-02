@@ -84,8 +84,18 @@
             document.getElementById('error').style.display = 'none';
             document.getElementById('dashboard').style.display = 'none';
 
+            if (!authToken) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = '❌ يجب تسجيل الدخول أولاً<br><a href="index.html?v=10" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
+                return;
+            }
+
             try {
                 var res = await fetch('/api/admin/stats', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                if (res.status === 401 || res.status === 403) {
+                    throw new Error('يجب تسجيل الدخول كمشرف للوصول للوحة التحكم');
+                }
                 var result = await res.json();
                 if (!result.success) throw new Error(result.error || 'فشل في تحميل البيانات');
 
@@ -103,7 +113,7 @@
             } catch (e) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = '❌ ' + e.message;
+                document.getElementById('error').innerHTML = '❌ ' + e.message + '<br><a href="index.html?v=10" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
             }
         }
 
