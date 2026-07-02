@@ -288,8 +288,21 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.get('/api/auth/me', authenticate, (req, res) => {
-    res.json({ success: true, user: req.user });
+app.get('/api/auth/me', authenticate, async (req, res) => {
+    try {
+        // If JWT doesn't have name (old token), get it from users.json
+        let user = req.user;
+        if (!user.name) {
+            const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            const fullUser = users.find(u => u.id === user.id || u.username === user.username);
+            if (fullUser) {
+                user = { ...user, name: fullUser.name };
+            }
+        }
+        res.json({ success: true, user });
+    } catch (error) {
+        res.json({ success: true, user: req.user });
+    }
 });
 
 app.post('/api/auth/logout', authenticate, (req, res) => {

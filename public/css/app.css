@@ -2500,7 +2500,7 @@ input[type="search"], textarea, select {
 /* ===== Toast Notifications ===== */
 .toast-container {
     position: fixed;
-    top: 80px;
+    bottom: 24px;
     left: 24px;
     z-index: 3000;
     display: flex;

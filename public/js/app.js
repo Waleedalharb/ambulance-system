@@ -43,6 +43,18 @@ async function apiFetch(url, options) {
 function showNotification(title, message, type, duration) {
     var container = document.getElementById('toastContainer');
     if (!container) { console.log('[' + type + '] ' + title + ': ' + message); return; }
+    
+    // Dedup: skip if same notification appeared in last 5 seconds
+    var now = Date.now();
+    var key = (title + '|' + message).substring(0, 50);
+    if (showNotification._lastKeys[key] && (now - showNotification._lastKeys[key]) < 5000) return;
+    showNotification._lastKeys[key] = now;
+    
+    // Rate limit: max 3 notifications in 10 seconds
+    showNotification._times = (showNotification._times || []).filter(function(t) { return now - t < 10000; });
+    if (showNotification._times.length >= 3) return;
+    showNotification._times.push(now);
+    
     var toast = document.createElement('div');
     toast.className = 'toast-notification ' + (type || 'info');
     var iconMap = { success: '\u2713', error: '\u2715', warning: '\u26a0', info: '\u2139' };
@@ -54,6 +66,8 @@ function showNotification(title, message, type, duration) {
     else if (type === 'error' && typeof playErrorSound === 'function') playErrorSound();
     else if (typeof playAlertSound === 'function') playAlertSound();
 }
+showNotification._lastKeys = {};
+showNotification._times = [];
 
 // ============================================
 // نظام تسجيل الدخول (من inline.js)
