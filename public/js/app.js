@@ -1646,6 +1646,7 @@ async function saveUnitLocation(center, unit, lat, lng) {
     try {
         var res = await apiFetch('/api/unit-locations', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ center, unit, lat, lng })
         });
         var result = await res.json();
