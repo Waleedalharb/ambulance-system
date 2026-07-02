@@ -2081,8 +2081,22 @@ function selectShiftFromHistory(shiftId) {
         .then(function(r) { return r.json(); })
         .then(function(result) {
             if (result.shift) {
-                // Update global data
-                reports = result.reports || {};
+                // Filter reports by user's centers — only show current user's data
+                var userCenters = Object.keys(centersData || {});
+                var filteredReports = {};
+                if (userCenters.length === 0) {
+                    filteredReports = result.reports || {};
+                } else {
+                    for (var key in (result.reports || {})) {
+                        for (var i = 0; i < userCenters.length; i++) {
+                            if (key.startsWith(userCenters[i] + '|')) {
+                                filteredReports[key] = result.reports[key];
+                                break;
+                            }
+                        }
+                    }
+                }
+                reports = filteredReports;
                 // Don't overwrite centersData with shift form data (different structure)
                 // centersData from /api/data is the unit mapping {center: [units]}
                 // shift.centersData is form data {center: {staffCount, carsCount, ...}}
@@ -2687,14 +2701,29 @@ async function viewShiftReports() {
             currentViewingShift = result.shift;
             isViewingArchiveShift = true;
             viewingShiftId = shiftId;
-            reports = result.reports || {};
+            // Filter reports by user's centers — only show current user's data
+            var userCenters2 = Object.keys(centersData || {});
+            var filteredReports2 = {};
+            if (userCenters2.length === 0) {
+                filteredReports2 = result.reports || {};
+            } else {
+                for (var key2 in (result.reports || {})) {
+                    for (var j = 0; j < userCenters2.length; j++) {
+                        if (key2.startsWith(userCenters2[j] + '|')) {
+                            filteredReports2[key2] = result.reports[key2];
+                            break;
+                        }
+                    }
+                }
+            }
+            reports = filteredReports2;
             updateTotal();
             loadShiftToForm(result.shift);
-            displayShiftReportStats(result.reports);
+            displayShiftReportStats(reports);
             calculateLiveReportStats();
             updateWorkforceStats();
             updateDistributionIndicator();
-            var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
+            var totalReports = Object.keys(reports).reduce(function(sum, key) { return sum + (reports[key]?.count || 0); }, 0);
             document.getElementById('viewingBadge').style.display = 'inline-block';
             document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
             document.getElementById('viewingBadge').innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
