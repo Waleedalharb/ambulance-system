@@ -2483,8 +2483,9 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         
         // Center performance
         const centerStats = {};
-        for (let i = 0; i < centerList.length; i++) {
-            const center = centerList[i];
+        const centerListFromServer = Object.keys(centerGeoData);
+        for (let i = 0; i < centerListFromServer.length; i++) {
+            const center = centerListFromServer[i];
             let centerReports = 0;
             for (let key in safeData) {
                 if (key.startsWith(center + '|')) centerReports += (safeData[key] && safeData[key].count ? safeData[key].count : 0);
