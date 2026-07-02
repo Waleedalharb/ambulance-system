@@ -2200,24 +2200,69 @@ function openDocViewer(title, url, type) {
   const placeholder = document.getElementById('docViewerPlaceholder');
   window.currentDocUrl = url;
   window.currentDocTitle = title;
-  if (type === 'pdf' && url && url !== '#') {
-    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
-  } else if (type === 'img' && url && url !== '#') {
-    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
+  window.currentDocType = type;
+  
+  // For PDF/img, fetch with auth token and create blob URL
+  if ((type === 'pdf' || type === 'img') && url && url !== '#') {
+    fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        frame.src = blobUrl;
+        frame.style.display = 'block';
+        placeholder.style.display = 'none';
+        // Store blob URL for cleanup
+        window.currentDocBlobUrl = blobUrl;
+      })
+      .catch(err => {
+        console.error('Failed to load document:', err);
+        frame.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--coral)"></i><p>فشل تحميل الملف</p><span style="font-size:11px;">تأكد من تسجيل الدخول</span>`;
+      });
   } else {
-    frame.style.display = 'none'; placeholder.style.display = 'flex';
+    frame.style.display = 'none';
+    placeholder.style.display = 'flex';
     placeholder.innerHTML = `<i class="fas fa-file-alt"></i><p>معاينة الملف "${title}"</p><span style="font-size:11px;">سيتم فتح الملف في التطبيق المناسب</span>`;
   }
 }
 function closeDocViewer() {
   document.getElementById('docViewerOverlay').classList.remove('active');
-  document.getElementById('docViewerFrame').src = '';
+  const frame = document.getElementById('docViewerFrame');
+  // Revoke blob URL to prevent memory leak
+  if (window.currentDocBlobUrl) {
+    URL.revokeObjectURL(window.currentDocBlobUrl);
+    window.currentDocBlobUrl = null;
+  }
+  frame.src = '';
 }
 function downloadCurrentDoc() {
   if (window.currentDocUrl && window.currentDocUrl !== '#') {
-    const a = document.createElement('a'); a.href = window.currentDocUrl; a.download = window.currentDocTitle || 'download'; a.click();
-    showToast('success','تحميل','جارٍ تحميل الملف...');
-  } else { showToast('error','تعذر التحميل','الملف غير متوفر للتحميل'); }
+    // Fetch with auth token, then download as blob
+    fetch(window.currentDocUrl, { headers: { 'Authorization': 'Bearer ' + authToken } })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = window.currentDocTitle || 'download';
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        showToast('success', 'تحميل', 'جارٍ تحميل الملف...');
+      })
+      .catch(err => {
+        console.error('Download failed:', err);
+        showToast('error', 'فشل التحميل', 'لا يمكن تحميل الملف: ' + err.message);
+      });
+  } else {
+    showToast('error', 'تعذر التحميل', 'الملف غير متوفر للتحميل');
+  }
 }
 function printCurrentDoc() {
   const frame = document.getElementById('docViewerFrame');

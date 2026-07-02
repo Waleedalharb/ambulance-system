@@ -10,11 +10,74 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
+
+// ============================================
+// Logger (بسيط — يعمل حتى بدون winston)
+// ============================================
+const logger = {
+  info: (...args) => console.log(`[${new Date().toISOString()}] [INFO]`, ...args),
+  error: (...args) => console.error(`[${new Date().toISOString()}] [ERROR]`, ...args),
+  warn: (...args) => console.warn(`[${new Date().toISOString()}] [WARN]`, ...args),
+  debug: (...args) => process.env.DEBUG === '1' && console.log(`[${new Date().toISOString()}] [DEBUG]`, ...args)
+};
 const securityConfig = require('./config/security');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
+
+// ============================================
+// Validation Helper (بدون Zod — خفيف وفعال)
+// ============================================
+function validateBody(schema) {
+    return (req, res, next) => {
+        const errors = [];
+        for (const [field, rules] of Object.entries(schema)) {
+            const value = req.body[field];
+            // Required check
+            if (rules.required && (value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))) {
+                errors.push(`الحقل "${field}" مطلوب`);
+                continue;
+            }
+            if (value === undefined || value === null) continue;
+            // Type check
+            if (rules.type === 'string' && typeof value !== 'string') {
+                errors.push(`الحقل "${field}" يجب أن يكون نصاً`);
+            }
+            if (rules.type === 'number' && (typeof value !== 'number' || isNaN(value))) {
+                errors.push(`الحقل "${field}" يجب أن يكون رقماً`);
+            }
+            if (rules.type === 'boolean' && typeof value !== 'boolean') {
+                errors.push(`الحقل "${field}" يجب أن يكون boolean`);
+            }
+            if (rules.type === 'array' && !Array.isArray(value)) {
+                errors.push(`الحقل "${field}" يجب أن يكون مصفوفة`);
+            }
+            // Min/Max for strings
+            if (rules.type === 'string' && rules.minLength && value.length < rules.minLength) {
+                errors.push(`الحقل "${field}" يجب أن يكون ${rules.minLength} أحرف على الأقل`);
+            }
+            if (rules.type === 'string' && rules.maxLength && value.length > rules.maxLength) {
+                errors.push(`الحقل "${field}" يجب أن لا يتجاوز ${rules.maxLength} حرف`);
+            }
+            // Range for numbers
+            if (rules.type === 'number' && rules.min !== undefined && value < rules.min) {
+                errors.push(`الحقل "${field}" يجب أن يكون ${rules.min} على الأقل`);
+            }
+            if (rules.type === 'number' && rules.max !== undefined && value > rules.max) {
+                errors.push(`الحقل "${field}" يجب أن لا يتجاوز ${rules.max}`);
+            }
+            // Pattern (regex)
+            if (rules.pattern && !rules.pattern.test(value)) {
+                errors.push(`الحقل "${field}" غير صالح`);
+            }
+        }
+        if (errors.length > 0) {
+            return res.status(400).json({ error: 'بيانات غير صالحة', details: errors });
+        }
+        next();
+    };
+}
 
 // ============================================
 // WebSocket Server - تحديث فوري (uses same HTTP server for Render compatibility)
@@ -53,10 +116,17 @@ function initWebSocket(server) {
 // دالة لبث الرسائل لجميع المتصلين
 function broadcast(data) {
     var message = JSON.stringify(data);
-    clients.forEach(function(client) {
+    clients = clients.filter(function(client) {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
+            try {
+                client.send(message);
+                return true;
+            } catch (e) {
+                console.error('Broadcast send error:', e.message);
+                return false;
+            }
         }
+        return false;
     });
 }
 
@@ -330,9 +400,8 @@ app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
     maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
 }));
 // ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
-app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads'), {
-    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
-}));
+// REMOVED: Static /uploads route — files must be downloaded via authenticated /api/download-operational/:id only
+// app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads'), { maxAge: ONE_YEAR }));
 
 // 5. Body Parser (reduced limits)
 app.use(express.json({ limit: JSON_LIMIT }));
@@ -398,9 +467,36 @@ function authorize(roles) {
 }
 
 // ============================================
+// Health Check (للـ Render Monitoring + Uptime)
+// ============================================
+app.get('/health', (req, res) => {
+    const mem = process.memoryUsage();
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+        version: '2.0.0',
+        env: process.env.NODE_ENV || 'development',
+        memory: {
+            rss: Math.round(mem.rss / 1024 / 1024) + ' MB',
+            heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + ' MB',
+            external: Math.round(mem.external / 1024 / 1024) + ' MB'
+        },
+        checks: {
+            storage: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH,
+            jwt: !!process.env.JWT_SECRET,
+            websocket: !!wss
+        }
+    });
+});
+
+// ============================================
 // API: المصادقة (JWT)
 // ============================================
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', validateBody({
+    username: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    password: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبة' });
@@ -1197,7 +1293,10 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
 // ============================================
 // API: البلاغات
 // ============================================
-app.post('/api/report', authenticate, async (req, res) => {
+app.post('/api/report', authenticate, validateBody({
+    center: { required: true, type: 'string', minLength: 1, maxLength: 100 },
+    unit: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
@@ -2386,7 +2485,12 @@ app.delete('/api/announcements/:id', authenticate, authorize(['admin']), async (
 });
 
 // Add single announcement (for EOCC UI)
-app.post('/api/announcements/add', authenticate, authorize(['admin']), async (req, res) => {
+app.post('/api/announcements/add', authenticate, authorize(['admin']), validateBody({
+    title: { required: true, type: 'string', minLength: 1, maxLength: 500 },
+    body: { required: true, type: 'string', minLength: 1, maxLength: 5000 },
+    pinned: { type: 'boolean' },
+    urgent: { type: 'boolean' }
+}), async (req, res) => {
     try {
         const { title, body, date, pinned, urgent } = req.body;
         if (!title || !body) {
@@ -2716,15 +2820,15 @@ const centerGeoData = {
     }
 };
 
-app.get('/api/center-geo', (req, res) => {
+app.get('/api/center-geo', authenticate, (req, res) => {
     res.json({ success: true, data: centerGeoData });
 });
 
-app.post('/api/locate-report', (req, res) => {
+app.post('/api/locate-report', authenticate, validateBody({
+    lat: { required: true, type: 'number', min: -90, max: 90 },
+    lng: { required: true, type: 'number', min: -180, max: 180 }
+}), (req, res) => {
     const { lat, lng } = req.body;
-    if (!lat || !lng) {
-        return res.status(400).json({ error: 'إحداثيات غير صالحة' });
-    }
 
     let foundCenter = null;
     let minDistance = Infinity;
@@ -2902,8 +3006,28 @@ async function writeOpsMetadata(data) {
     await fs.writeFile(OPS_METADATA_PATH, JSON.stringify(data, null, 2));
 }
 
-// رفع الملفات
-const opsUpload = multer({ dest: OPS_UPLOAD_DIR, limits: { fileSize: OPS_MAX_FILE_SIZE } });
+// رفع الملفات — مع فلترة الأنواع وحدود
+const opsUpload = multer({
+    dest: OPS_UPLOAD_DIR,
+    limits: { fileSize: OPS_MAX_FILE_SIZE, files: 10 },
+    fileFilter: function (req, file, cb) {
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.ms-powerpoint'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype), false);
+        }
+    }
+});
 
 app.post('/api/upload-operational', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
     try {
@@ -3073,14 +3197,65 @@ app.get('/api/download-operational/:id', authenticate, async (req, res) => {
         if (!entry) {
             return res.status(404).json({ error: 'الملف غير موجود' });
         }
-        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
-        res.download(filePath, entry.filename);
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        // Path traversal check
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        // Check file exists before download
+        try {
+            await fs.access(filePath);
+        } catch {
+            return res.status(404).json({ error: 'الملف غير موجود على القرص' });
+        }
+        const safeFilename = path.basename(entry.filename).replace(/[^\w\.\-]/g, '_');
+        res.download(filePath, safeFilename);
     } catch (error) {
+        console.error('Download error:', error);
         res.status(500).json({ error: 'فشل في تحميل الملف' });
     }
 });
 
-// حذف ملف
+// Alias: DELETE /api/ops-files/:id → same as /api/delete-operational/:id
+app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        try {
+            await fs.unlink(filePath);
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                console.error('Failed to delete file:', e);
+                return res.status(500).json({ error: 'فشل في حذف الملف من القرص' });
+            }
+        }
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_file_deleted',
+            message: 'تم حذف ملف تشغيلي',
+            id: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف الملف' });
+    }
+});
+
+// حذف ملف (legacy endpoint — kept for backward compatibility)
 app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
@@ -3089,19 +3264,31 @@ app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'الملف غير موجود' });
         }
         const entry = metadata[index];
-        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
-        try { await fs.unlink(filePath); } catch (e) {}
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        try {
+            await fs.unlink(filePath);
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                console.error('Failed to delete file:', e);
+                return res.status(500).json({ error: 'فشل في حذف الملف من القرص' });
+            }
+        }
         metadata.splice(index, 1);
         await writeOpsMetadata(metadata);
         
         broadcast({
             type: 'ops_file_deleted',
             message: 'تم حذف ملف تشغيلي',
-            fileId: req.params.id
+            id: req.params.id
         });
         
         res.json({ success: true });
     } catch (error) {
+        console.error('Delete error:', error);
         res.status(500).json({ error: 'فشل في حذف الملف' });
     }
 });
