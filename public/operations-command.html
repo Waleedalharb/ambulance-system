@@ -1742,10 +1742,32 @@ async function loadDashboardData() {
     if (res.ok) {
       const raw = await res.json();
       const payload = (raw && (raw.data || raw.dashboard)) || (Array.isArray(raw) ? {} : raw);
-      if (payload && payload.stats) dashboardData = payload;
+      if (payload && payload.stats) {
+        dashboardData = payload;
+      } else {
+        showToast('warning', 'بيانات ناقصة', 'رد السيرفر لا يحتوي على إحصائيات');
+      }
+    } else {
+      const errorText = await res.text().catch(() => 'خطأ غير معروف');
+      console.error('Dashboard load failed:', res.status, errorText);
+      showToast('error', 'فشل التحميل', 'تعذر جلب بيانات لوحة القيادة: ' + res.status);
     }
-  } catch (e) { console.error('Failed to load dashboard:', e); }
+  } catch (e) { 
+    console.error('Failed to load dashboard:', e); 
+    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر: ' + e.message);
+  }
   renderDashboard();
+}
+
+/** Utility: escape HTML to prevent XSS */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** بيانات المرجعيات التشغيلية **/
@@ -1865,14 +1887,14 @@ function renderDashboard() {
   // ── 1. بطاقات الإحصائيات ──
   const statsEl = document.getElementById('dashboardStats');
   statsEl.innerHTML = dashboardData.stats.map((s, i) => `
-    <div class="stat-card ${s.color}" style="animation-delay:${i*0.1}s">
-      <div class="stat-icon"><i class="fas ${s.icon}"></i></div>
-      <div class="stat-value">${s.value}</div>
-      <div class="stat-label">${s.label}</div>
+    <div class="stat-card ${escapeHtml(s.color)}" style="animation-delay:${i*0.1}s">
+      <div class="stat-icon"><i class="fas ${escapeHtml(s.icon)}"></i></div>
+      <div class="stat-value">${escapeHtml(s.value)}</div>
+      <div class="stat-label">${escapeHtml(s.label)}</div>
       <div class="stat-change ${s.change >= 0 ? 'up' : 'down'}">
-        <i class="fas fa-arrow-${s.change >= 0 ? 'up' : 'down'}"></i> ${s.changeLabel}
+        <i class="fas fa-arrow-${s.change >= 0 ? 'up' : 'down'}"></i> ${escapeHtml(s.changeLabel)}
       </div>
-      ${s.action ? `<div class="stat-action"><a href="${s.link || '#'}" class="btn-sm btn-${s.color === 'coral' ? 'coral' : s.color === 'neon' ? 'neon' : s.color === 'neon-g' ? 'green' : 'neon'}"><i class="fas fa-plus"></i> ${s.action}</a></div>` : ''}
+      ${s.action ? `<div class="stat-action"><a href="${escapeHtml(s.link || '#')}" class="btn-sm btn-${s.color === 'coral' ? 'coral' : s.color === 'neon' ? 'neon' : s.color === 'neon-g' ? 'green' : 'neon'}"><i class="fas fa-plus"></i> ${escapeHtml(s.action)}</a></div>` : ''}
     </div>
   `).join('');
 
@@ -1881,28 +1903,32 @@ function renderDashboard() {
   document.getElementById('dirCount').textContent = dashboardData.directives.length;
   dirEl.innerHTML = dashboardData.directives.map(d => `
     <div class="directive-item">
-      <div class="directive-pin ${d.pinned ? 'pinned' : ''}" onclick="togglePin(${d.id})" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
+      <div class="directive-pin ${d.pinned ? 'pinned' : ''}" data-id="${escapeHtml(d.id)}" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
         <i class="fas fa-thumbtack ${d.pinned ? '' : 'fa-rotate-45'}"></i>
       </div>
       <div class="directive-body">
-        <div class="directive-title">${d.title}</div>
-        <div class="directive-meta"><span><i class="fas fa-building"></i> ${d.dept}</span><span><i class="far fa-calendar"></i> ${d.date}</span>${d.pinned ? '<span style="color:var(--gold)"><i class="fas fa-star"></i> مثبت</span>' : ''}</div>
+        <div class="directive-title">${escapeHtml(d.title)}</div>
+        <div class="directive-meta"><span><i class="fas fa-building"></i> ${escapeHtml(d.dept)}</span><span><i class="far fa-calendar"></i> ${escapeHtml(d.date)}</span>${d.pinned ? '<span style="color:var(--gold)"><i class="fas fa-star"></i> مثبت</span>' : ''}</div>
       </div>
     </div>
   `).join('');
+  // Attach click handlers for directive pins (replaces inline onclick)
+  dirEl.querySelectorAll('.directive-pin').forEach(pin => {
+    pin.onclick = () => togglePin(Number(pin.dataset.id));
+  });
 
   // ── 3. قائمة التنبيهات الفورية ──
   const alertEl = document.getElementById('alertsList');
   document.getElementById('alertCount').textContent = dashboardData.alerts.length;
   alertEl.innerHTML = dashboardData.alerts.map(a => `
-    <div class="alert-item ${a.level}">
+    <div class="alert-item ${escapeHtml(a.level)}">
       <div class="alert-icon"><i class="fas ${a.level === 'high' ? 'fa-exclamation-triangle' : a.level === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i></div>
       <div class="alert-body">
-        <div class="alert-title">${a.title}</div>
-        <div class="alert-desc">${a.desc}</div>
+        <div class="alert-title">${escapeHtml(a.title)}</div>
+        <div class="alert-desc">${escapeHtml(a.desc)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <span class="alert-time">${a.time}</span>
+        <span class="alert-time">${escapeHtml(a.time)}</span>
         <span class="alert-badge">${a.level === 'high' ? 'عاجل' : a.level === 'medium' ? 'متوسط' : 'عادي'}</span>
       </div>
     </div>
@@ -1915,16 +1941,16 @@ function renderDashboard() {
     const offset = circ - (ind.value / 100) * circ;
     return `
     <div class="circular-progress">
-      <svg width="130" height="130" class="circle-svg" style="--circ-color:${ind.color};">
+      <svg width="130" height="130" class="circle-svg" style="--circ-color:${escapeHtml(ind.color)};">
         <circle cx="65" cy="65" r="${r}" class="circle-bg"/>
         <circle cx="65" cy="65" r="${r}" class="circle-fill"
-          stroke="${ind.color}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
-          data-offset="${offset}"/>
+          stroke="${escapeHtml(ind.color)}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
+          data-offset="${escapeHtml(offset)}"/>
       </svg>
       <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
-        <span class="circle-pct" style="color:${ind.color};">${ind.value}%</span>
+        <span class="circle-pct" style="color:${escapeHtml(ind.color)};">${escapeHtml(ind.value)}%</span>
       </div>
-      <div class="circle-label">${ind.label}</div>
+      <div class="circle-label">${escapeHtml(ind.label)}</div>
     </div>`;
   }).join('');
   // تفعيل animation لتحريك الدوائر
@@ -1938,12 +1964,12 @@ function renderDashboard() {
   const actEl = document.getElementById('activityList');
   actEl.innerHTML = dashboardData.activities.map(a => `
     <div class="directive-item" style="animation-delay:${a.id * 0.06}s">
-      <div class="directive-pin" style="color:${a.color}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
-        <i class="fas ${a.icon}"></i>
+      <div class="directive-pin" style="color:${escapeHtml(a.color)}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
+        <i class="fas ${escapeHtml(a.icon)}"></i>
       </div>
       <div class="directive-body">
-        <div class="directive-title">${a.title}</div>
-        <div class="directive-meta"><span><i class="fas fa-user"></i> ${a.user}</span><span><i class="far fa-clock"></i> ${a.time}</span></div>
+        <div class="directive-title">${escapeHtml(a.title)}</div>
+        <div class="directive-meta"><span><i class="fas fa-user"></i> ${escapeHtml(a.user)}</span><span><i class="far fa-clock"></i> ${escapeHtml(a.time)}</span></div>
       </div>
     </div>
   `).join('');
@@ -1978,20 +2004,20 @@ function renderReferences() {
 
   document.getElementById('refTotalCount').textContent = filtered.length + ' مرجعية';
   document.getElementById('referencesGrid').innerHTML = filtered.map(r => `
-    <div class="ref-card" onclick="showToast('info','فتح المرجعية','جارٍ فتح: ${r.title}')">
+    <div class="ref-card" data-title="${escapeHtml(r.title)}">
       <div class="ref-header">
-        <div class="ref-icon ${r.type}"><i class="fas ${typeIcons[r.type] || 'fa-file'}"></i></div>
+        <div class="ref-icon ${escapeHtml(r.type)}"><i class="fas ${escapeHtml(typeIcons[r.type] || 'fa-file')}"></i></div>
         <div>
-          <div class="ref-title">${r.title}</div>
+          <div class="ref-title">${escapeHtml(r.title)}</div>
           <div class="mt-8">
-            <span class="badge badge-${r.type === 'protocol' ? 'danger' : r.type === 'sop' ? 'success' : r.type === 'form' ? 'warning' : 'primary'}">${typeLabels[r.type]}</span>
-            <span class="badge badge-info" style="margin-right:4px;">${r.dept}</span>
-            <span class="badge badge-${statusBadges[r.status]}" style="margin-right:4px;">${statusLabels[r.status]}</span>
+            <span class="badge badge-${r.type === 'protocol' ? 'danger' : r.type === 'sop' ? 'success' : r.type === 'form' ? 'warning' : 'primary'}">${escapeHtml(typeLabels[r.type])}</span>
+            <span class="badge badge-info" style="margin-right:4px;">${escapeHtml(r.dept)}</span>
+            <span class="badge badge-${escapeHtml(statusBadges[r.status])}" style="margin-right:4px;">${escapeHtml(statusLabels[r.status])}</span>
           </div>
         </div>
       </div>
-      <div class="ref-desc">${r.desc}</div>
-      <div class="ref-meta"><span><i class="far fa-calendar"></i> ${r.date}</span><span><i class="fas fa-file"></i> ${r.type.toUpperCase()}</span></div>
+      <div class="ref-desc">${escapeHtml(r.desc)}</div>
+      <div class="ref-meta"><span><i class="far fa-calendar"></i> ${escapeHtml(r.date)}</span><span><i class="fas fa-file"></i> ${escapeHtml(r.type.toUpperCase())}</span></div>
       <div class="ref-actions">
         <button class="btn-sm btn-neon" onclick="event.stopPropagation(); showToast('info','عرض الملف','جارٍ فتح الملف...')"><i class="fas fa-eye"></i> عرض</button>
         <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="event.stopPropagation(); showToast('success','تم النسخ','تم نسخ المعلومات للحافظة')"><i class="fas fa-copy"></i> نسخ</button>
@@ -1999,6 +2025,14 @@ function renderReferences() {
       </div>
     </div>
   `).join('');
+
+  // Attach click handlers via data-* attributes instead of inline onclick
+  document.querySelectorAll('#referencesGrid .ref-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const title = card.getAttribute('data-title');
+      showToast('info', 'فتح المرجعية', 'جارٍ فتح: ' + title);
+    });
+  });
 }
 
 /**
@@ -2014,29 +2048,49 @@ function renderHospitals() {
   });
 
   document.getElementById('hospTotalCount').textContent = filtered.length + ' مستشفى';
-  document.getElementById('hospitalsGrid').innerHTML = filtered.map(h => `
+  const grid = document.getElementById('hospitalsGrid');
+  grid.innerHTML = filtered.map(h => `
     <div class="hosp-card">
       <div class="hosp-header">
         <div class="hosp-icon"><i class="fas fa-hospital"></i></div>
         <div style="flex:1;">
-          <div class="hosp-name">${h.name}</div>
-          <div class="hosp-type">${h.type === 'عام' ? 'مستشفى عام' : h.type === 'متخصص' ? 'مركز متخصص' : h.type === 'مجمع' ? 'مجمع طبي' : 'مركز طوارئ'} · ${h.specialty}</div>
+          <div class="hosp-name">${escapeHtml(h.name)}</div>
+          <div class="hosp-type">${h.type === 'عام' ? 'مستشفى عام' : h.type === 'متخصص' ? 'مركز متخصص' : h.type === 'مجمع' ? 'مجمع طبي' : 'مركز طوارئ'} · ${escapeHtml(h.specialty)}</div>
         </div>
-        <span class="badge badge-${h.hours === '24 ساعة' ? 'success' : 'warning'}">${h.hours}</span>
+        <span class="badge badge-${h.hours === '24 ساعة' ? 'success' : 'warning'}">${escapeHtml(h.hours)}</span>
       </div>
       <div class="hosp-body">
-        <div class="hosp-detail"><i class="fas fa-map-marker-alt"></i> ${h.address}</div>
-        <div class="hosp-detail phone"><i class="fas fa-phone"></i> ${h.phone}</div>
-        <div class="hosp-detail emergency"><i class="fas fa-ambulance"></i> طوارئ: ${h.emergency}</div>
+        <div class="hosp-detail"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(h.address)}</div>
+        <div class="hosp-detail phone"><i class="fas fa-phone"></i> ${escapeHtml(h.phone)}</div>
+        <div class="hosp-detail emergency"><i class="fas fa-ambulance"></i> طوارئ: ${escapeHtml(h.emergency)}</div>
       </div>
       <div class="hosp-actions">
-        <button class="btn-sm btn-neon" onclick="showToast('info','الاتصال','جارٍ الاتصال: ${h.emergency}')"><i class="fas fa-phone"></i> اتصال</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="navigator.clipboard.writeText('${h.emergency}'); showToast('success','تم النسخ','تم نسخ رقم الطوارئ')"><i class="fas fa-copy"></i> نسخ</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('info','مشاركة','تم فتح خيارات المشاركة')"><i class="fas fa-share-alt"></i> مشاركة</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('warning','ملاحظة','فتح نافذة إضافة ملاحظة')"><i class="fas fa-sticky-note"></i> ملاحظة</button>
+        <button class="btn-sm btn-neon" data-action="call" data-emergency="${escapeHtml(h.emergency)}"><i class="fas fa-phone"></i> اتصال</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="copy" data-emergency="${escapeHtml(h.emergency)}"><i class="fas fa-copy"></i> نسخ</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="share"><i class="fas fa-share-alt"></i> مشاركة</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="note"><i class="fas fa-sticky-note"></i> ملاحظة</button>
       </div>
     </div>
   `).join('');
+
+  grid.querySelectorAll('.hosp-actions button').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const action = this.dataset.action;
+      const emergency = this.dataset.emergency;
+      if (action === 'call') {
+        showToast('info', 'الاتصال', 'جارٍ الاتصال: ' + (emergency || ''));
+      } else if (action === 'copy') {
+        if (emergency) {
+          navigator.clipboard.writeText(emergency);
+          showToast('success', 'تم النسخ', 'تم نسخ رقم الطوارئ');
+        }
+      } else if (action === 'share') {
+        showToast('info', 'مشاركة', 'تم فتح خيارات المشاركة');
+      } else if (action === 'note') {
+        showToast('warning', 'ملاحظة', 'فتح نافذة إضافة ملاحظة');
+      }
+    });
+  });
 }
 
 /**
@@ -2056,20 +2110,44 @@ function renderFiles() {
     return;
   }
   document.getElementById('filesList').innerHTML = filesData.map((f, i) => `
-    <div class="file-list-item" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" style="animation-delay:${i*0.06}s">
-      <div class="file-icon ${f.type}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
+    <div class="file-list-item" data-action="view" data-name="${escapeHtml(f.name)}" data-url="${encodeURIComponent(f.url)}" data-type="${escapeHtml(f.type)}" style="animation-delay:${i*0.06}s">
+      <div class="file-icon ${escapeHtml(f.type)}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
       <div class="file-info">
-        <div class="file-name">${f.name}</div>
-        <div class="file-meta">${f.size} · ${f.date}</div>
+        <div class="file-name">${escapeHtml(f.name)}</div>
+        <div class="file-meta">${escapeHtml(f.size)} · ${escapeHtml(f.date)}</div>
       </div>
-      <div class="file-actions" onclick="event.stopPropagation();">
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" title="عرض"><i class="fas fa-eye"></i></button>
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="navigator.clipboard.writeText('${f.name}'); showToast('success','تم النسخ','تم نسخ اسم الملف')" title="نسخ"><i class="fas fa-copy"></i></button>
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;color:var(--coral);" onclick="deleteFile(${f.id})" title="حذف"><i class="fas fa-trash"></i></button>
+      <div class="file-actions">
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" data-action="view" data-name="${escapeHtml(f.name)}" data-url="${encodeURIComponent(f.url)}" data-type="${escapeHtml(f.type)}" title="عرض"><i class="fas fa-eye"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" data-action="copy" data-copy="${escapeHtml(f.name)}" title="نسخ"><i class="fas fa-copy"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;color:var(--coral);" data-action="delete" data-id="${escapeHtml(f.id)}" title="حذف"><i class="fas fa-trash"></i></button>
       </div>
       <i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:11px;margin-right:4px;"></i>
     </div>
   `).join('');
+
+  const filesList = document.getElementById('filesList');
+  if (!filesList._renderFilesDelegated) {
+    filesList._renderFilesDelegated = true;
+    filesList.addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-action]');
+      if (btn) {
+        const action = btn.dataset.action;
+        if (action === 'view') {
+          openDocViewer(btn.dataset.name, decodeURIComponent(btn.dataset.url), btn.dataset.type);
+        } else if (action === 'copy') {
+          navigator.clipboard.writeText(btn.dataset.copy);
+          showToast('success', 'تم النسخ', 'تم نسخ اسم الملف');
+        } else if (action === 'delete') {
+          deleteFile(parseInt(btn.dataset.id, 10));
+        }
+        return;
+      }
+      const item = e.target.closest('.file-list-item[data-action]');
+      if (item && !e.target.closest('.file-actions')) {
+        openDocViewer(item.dataset.name, decodeURIComponent(item.dataset.url), item.dataset.type);
+      }
+    });
+  }
 }
 
 /** حذف ملف من القائمة **/
@@ -2126,14 +2204,11 @@ function downloadCurrentDoc() {
 }
 function printCurrentDoc() {
   const frame = document.getElementById('docViewerFrame');
-  if (frame.style.display !== 'none') { frame.contentWindow.print(); }
-  else { showToast('info','طباعة','فتح نافذة الطباعة...'); }
+  if (frame && frame.style.display !== 'none') {
+    try { frame.contentWindow.print(); } catch(e) { showToast('error','فشل الطباعة','لا يمكن طباعة هذا الملف'); }
+  } else { showToast('info','طباعة','فتح نافذة الطباعة...'); }
 }
-// إغلاق بالنقر خارج النافذة
-document.getElementById('docViewerOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('docViewerOverlay')) closeDocViewer();
-});
-
+// إغلاق بالنقر خارج النافذة (مُعالج داخل DOMContentLoaded)
 /**
  * Drag & Drop - السحب والإفلات لرفع الملفات
  */
@@ -2236,13 +2311,13 @@ function renderTimeline() {
 
   document.getElementById('timelineContainer').innerHTML = filtered.map(t => `
     <div class="timeline-item">
-      <div class="timeline-dot ${t.type}"></div>
+      <div class="timeline-dot ${escapeHtml(t.type)}"></div>
       <div class="timeline-card">
-        <div class="timeline-title">${t.title}</div>
-        <div class="timeline-desc">${t.desc}</div>
+        <div class="timeline-title">${escapeHtml(t.title)}</div>
+        <div class="timeline-desc">${escapeHtml(t.desc)}</div>
         <div class="timeline-meta">
-          <span><i class="far fa-calendar"></i> ${t.date}</span>
-          <span><i class="far fa-clock"></i> ${t.time}</span>
+          <span><i class="far fa-calendar"></i> ${escapeHtml(t.date)}</span>
+          <span><i class="far fa-clock"></i> ${escapeHtml(t.time)}</span>
           <span style="color:${t.type === 'directive' ? 'var(--coral)' : t.type === 'file' ? 'var(--neon)' : t.type === 'protocol' ? 'var(--neon-green)' : 'var(--gold)'}"><i class="fas fa-tag"></i> ${t.type === 'directive' ? 'تعميم' : t.type === 'file' ? 'ملف' : t.type === 'protocol' ? 'بروتوكول' : 'حدث'}</span>
         </div>
       </div>
@@ -2277,12 +2352,12 @@ function renderAnnounceCard(a, delay) {
       <div class="announce-header">
         ${a.pinned ? '<i class="fas fa-thumbtack announce-pin-icon"></i>' : ''}
         ${a.urgent ? '<i class="fas fa-bell announce-urgent-icon"></i>' : ''}
-        <span class="announce-title">${a.title}</span>
+        <span class="announce-title">${escapeHtml(a.title)}</span>
         ${a.urgent ? '<span class="badge badge-danger">عاجل</span>' : ''}
       </div>
-      <div class="announce-body">${a.body}</div>
+      <div class="announce-body">${escapeHtml(a.body)}</div>
       <div class="announce-footer">
-        <span class="announce-date"><i class="far fa-calendar"></i> ${a.date}</span>
+        <span class="announce-date"><i class="far fa-calendar"></i> ${escapeHtml(a.date)}</span>
         <button class="btn-sm btn-neon" onclick="showToast('info','مشاركة','تم نسخ رابط الإعلان')"><i class="fas fa-share-alt"></i> مشاركة</button>
       </div>
     </div>
@@ -2299,33 +2374,6 @@ function closeAnnouncementModal() {
   document.getElementById('announceBody').value = '';
   document.getElementById('announcePinned').checked = false;
   document.getElementById('announceUrgent').checked = false;
-}
-async function submitAnnouncement() {
-  const title = document.getElementById('announceTitle').value.trim();
-  const body = document.getElementById('announceBody').value.trim();
-  const pinned = document.getElementById('announcePinned').checked;
-  const urgent = document.getElementById('announceUrgent').checked;
-  if (!title || !body) {
-    showToast('warning', 'بيانات ناقصة', 'الرجاء إدخال العنوان والنص');
-    return;
-  }
-  try {
-    const res = await apiFetch('/api/announcements/add', {
-      method: 'POST',
-      body: JSON.stringify({ title, body, pinned, urgent })
-    });
-    const result = await res.json();
-    if (result.success) {
-      showToast('success', 'تم النشر', 'تم إضافة الإعلان بنجاح');
-      closeAnnouncementModal();
-      await loadAnnouncementsData();
-    } else {
-      showToast('error', 'فشل النشر', result.error || 'تعذر إضافة الإعلان');
-    }
-  } catch (e) {
-    console.error('Failed to add announcement:', e);
-    showToast('error', 'فشل النشر', 'خطأ في الاتصال بالسيرفر');
-  }
 }
 
 /**
@@ -2490,7 +2538,8 @@ document.addEventListener('keydown', e => {
   else if (key === 'd' || key === 'D') { e.preventDefault(); document.getElementById('darkModeToggle').click(); }
   else if (key === '?' || key === '؟') { e.preventDefault(); toggleShortcutsModal(); }
   else if (key === 'Escape') {
-    closeDocViewer(); toggleShortcutsModal(false);
+    closeDocViewer();
+    document.getElementById('shortcutsModal').classList.remove('active');
     if (chatOpen) toggleChat();
   }
 });
@@ -2520,51 +2569,104 @@ updateClock();
 //  Dark Mode Toggle - تبديل الوضع الداكن/الفاتح
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-document.getElementById('darkModeToggle').addEventListener('click', function() {
-  document.body.classList.toggle('dark-mode');
-  const icon = this.querySelector('i');
-  const isDark = document.body.classList.contains('dark-mode');
-  icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-  // إعادة تهيئة الخريطة إذا كانت ظاهرة
-  if (mapInstance && document.getElementById('section-map').classList.contains('active')) {
-    setTimeout(() => mapInstance.invalidateSize(), 300);
-  }
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  القائمة الجانبية (Mobile Sidebar Toggle)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('menuToggle')?.addEventListener('click', () => {
-  document.getElementById('sidebar').classList.toggle('open');
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  البحث الموحد (Global Search)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('globalSearch').addEventListener('input', e => {
-  const v = e.target.value.trim().toLowerCase();
-  if (!v || v.length < 2) return;
-  // البحث في المستشفيات
-  const foundHosp = hospitalsData.some(h => h.name.toLowerCase().includes(v) || h.specialty.toLowerCase().includes(v));
-  if (foundHosp) { switchSection('hospitals'); document.getElementById('hospSearch').value = e.target.value; renderHospitals(); return; }
-  // البحث في المرجعيات
-  const foundRef = referencesData.some(r => r.title.toLowerCase().includes(v) || r.desc.toLowerCase().includes(v));
-  if (foundRef) { switchSection('references'); document.getElementById('refSearch').value = e.target.value; renderReferences(); return; }
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Shortcuts Button
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('kbdShortcuts').addEventListener('click', toggleShortcutsModal);
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  تهيئة الصفحة عند التحميل (Page Initialization)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Auth check
+  if (!authToken) {
+    showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
+    setTimeout(() => {
+      if (!authToken) window.location.href = 'index.html';
+    }, 3000);
+    return;
+  }
+  loadCurrentUser().then(() => {
+    loadDashboardData();
+    loadReferencesData();
+    loadHospitalsData();
+    loadFilesData();
+    loadTimelineData();
+    loadAnnouncementsData();
+  });
+
+  // Toast ترحيبي
+  setTimeout(() => {
+    showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
+  }, 800);
+
+  // ── Dark Mode Toggle ──
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener('click', function() {
+      document.body.classList.toggle('dark-mode');
+      const icon = this.querySelector('i');
+      const isDark = document.body.classList.contains('dark-mode');
+      icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+      // Save preference
+      localStorage.setItem('eocc_darkMode', isDark ? '1' : '0');
+      // Re-initialize map if visible
+      if (mapInstance && document.getElementById('section-map')?.classList.contains('active')) {
+        setTimeout(() => mapInstance.invalidateSize(), 300);
+      }
+    });
+    // Load saved preference
+    if (localStorage.getItem('eocc_darkMode') === '1') {
+      document.body.classList.add('dark-mode');
+      const icon = darkModeToggle.querySelector('i');
+      if (icon) icon.className = 'fas fa-sun';
+    }
+  }
+
+  // ── Mobile Sidebar Toggle ──
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebar = document.getElementById('sidebar');
+  if (menuToggle && sidebar) {
+    menuToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
+  }
+
+  // ── Shortcuts Modal Click-to-Close ──
+  const shortcutsModal = document.getElementById('shortcutsModal');
+  if (shortcutsModal) {
+    shortcutsModal.addEventListener('click', e => {
+      if (e.target === shortcutsModal) toggleShortcutsModal();
+    });
+  }
+
+  // ── Shortcuts Button ──
+  const kbdShortcuts = document.getElementById('kbdShortcuts');
+  if (kbdShortcuts) {
+    kbdShortcuts.addEventListener('click', toggleShortcutsModal);
+  }
+
+  // ── Global Search ──
+  const globalSearch = document.getElementById('globalSearch');
+  if (globalSearch) {
+    globalSearch.addEventListener('input', e => {
+      const v = e.target.value.trim().toLowerCase();
+      if (!v || v.length < 2) return;
+      // Search in hospitals with optional chaining
+      const foundHosp = hospitalsData.some(h => h?.name?.toLowerCase().includes(v) || h?.specialty?.toLowerCase().includes(v));
+      if (foundHosp) { switchSection('hospitals'); document.getElementById('hospSearch').value = e.target.value; renderHospitals(); return; }
+      // Search in references
+      const foundRef = referencesData.some(r => r?.title?.toLowerCase().includes(v) || r?.desc?.toLowerCase().includes(v));
+      if (foundRef) { switchSection('references'); document.getElementById('refSearch').value = e.target.value; renderReferences(); return; }
+      // No results
+      showToast('info', 'لا توجد نتائج', 'جرب كلمات بحث مختلفة');
+    });
+  }
+
+  // ── Doc Viewer Overlay ──
+  const docViewerOverlay = document.getElementById('docViewerOverlay');
+  if (docViewerOverlay) {
+    docViewerOverlay.addEventListener('click', e => {
+      if (e.target === docViewerOverlay) closeDocViewer();
+    });
+  }
+});
   // Auth check
   if (!authToken) {
     showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');

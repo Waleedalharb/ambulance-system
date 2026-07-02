@@ -2511,8 +2511,35 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         // Hourly distribution
         const hourlyDistribution = {};
         for (let i = 0; i < 24; i++) hourlyDistribution[i] = 0;
+        // Fill from report timestamps
+        for (let key in safeData) {
+            const report = safeData[key];
+            if (report && report.times && Array.isArray(report.times)) {
+                for (const timeStr of report.times) {
+                    try {
+                        const hour = parseInt(timeStr.split(' ')[1].split(':')[0]);
+                        if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                            hourlyDistribution[hour] += 1;
+                        }
+                    } catch (e) { /* ignore malformed timestamps */ }
+                }
+            }
+        }
         
-        // Last 7 days stats
+        // Center performance - use actual center names from centersData
+        const centerStats = {};
+        const centerNames = Object.keys(centersData);
+        for (let i = 0; i < centerNames.length; i++) {
+            const center = centerNames[i];
+            let centerReports = 0;
+            for (let key in safeData) {
+                const parts = key.split('|');
+                if (parts.length === 2 && parts[0] === center) {
+                    centerReports += (safeData[key] && safeData[key].count ? safeData[key].count : 0);
+                }
+            }
+            centerStats[center] = centerReports;
+        }
         const last7Days = [];
         const now = new Date();
         for (let i = 6; i >= 0; i--) {
@@ -2855,6 +2882,7 @@ app.get('/api/export', authenticate, async (req, res) => {
 
 const OPS_UPLOAD_DIR = path.join(STORAGE_PATH, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
+const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
 
 // التأكد من وجود المجلد والملف
 async function ensureOpsDir() {
@@ -2898,8 +2926,9 @@ app.post('/api/upload-operational', authenticate, opsUpload.array('files'), hand
         const results = [];
         
         for (const file of files) {
-            const ext = path.extname(file.originalname);
-            const newFilename = `${Date.now()}-${file.originalname}`;
+            const safeOriginalName = path.basename(file.originalname);
+            const ext = path.extname(safeOriginalName);
+            const newFilename = `${Date.now()}-${safeOriginalName}`;
             const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
             await fs.rename(file.path, newPath);
             
@@ -2986,8 +3015,9 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
         const metadata = await readOpsMetadata();
         const results = [];
         for (const file of files) {
-            const ext = path.extname(file.originalname);
-            const newFilename = `${Date.now()}-${file.originalname}`;
+            const safeOriginalName = path.basename(file.originalname);
+            const ext = path.extname(safeOriginalName);
+            const newFilename = `${Date.now()}-${safeOriginalName}`;
             const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
             await fs.rename(file.path, newPath);
             const entry = {
