@@ -10,7 +10,7 @@
     const NANO_CONFIG = {
         name: 'نــانــو',
         role: 'المساعد الذكي',
-        avatar: '/images/nano_animated.webp',
+        avatar: '/images/nano_animated_v3.webp',
         greetingDelay: 2000,
         tipInterval: 300000, // 5 minutes
         wsReconnectInterval: 5000
