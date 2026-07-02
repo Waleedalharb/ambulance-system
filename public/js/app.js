@@ -1569,6 +1569,8 @@ function openMapPreview(unit, center, location) {
     mapEditMode = false;
     if (tempMarker) { map && map.removeLayer(tempMarker); tempMarker = null; }
 
+    console.log('openMapPreview called:', { unit, center, location });
+
     var modal = document.getElementById('mapModal');
     document.getElementById('mapModalTitle').innerText = '📍 معاينة موقع ' + unit;
     document.getElementById('mapLocationText').innerText = '📍 الموقع: ' + location;
@@ -1640,6 +1642,7 @@ function toggleMapEditMode() {
 }
 
 async function saveUnitLocation(center, unit, lat, lng) {
+    console.log('saveUnitLocation called:', { center, unit, lat, lng });
     try {
         var res = await apiFetch('/api/unit-locations', {
             method: 'POST',
