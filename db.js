@@ -68,6 +68,21 @@ async function exec(sql) {
 }
 
 // ============================================
+// TRANSACTION WRAPPERS
+// ============================================
+function beginTransaction() {
+  db.exec('BEGIN TRANSACTION');
+}
+
+function commitTransaction() {
+  db.exec('COMMIT');
+}
+
+function rollbackTransaction() {
+  db.exec('ROLLBACK');
+}
+
+// ============================================
 // TABLE SCHEMAS
 // ============================================
 const TABLE_SCHEMAS = [
@@ -975,6 +990,9 @@ module.exports = {
   get,
   all,
   exec,
+  beginTransaction,
+  commitTransaction,
+  rollbackTransaction,
   // CRUD namespaces
   Reports,
   Shifts,
