@@ -1708,6 +1708,20 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const authToken = localStorage.getItem('authToken');
+let currentUser = null;
+
+// Load current user info
+async function loadCurrentUser() {
+  try {
+    const res = await apiFetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        currentUser = data.user;
+      }
+    }
+  } catch (e) { console.error('Failed to load user:', e); }
+}
 
 function apiFetch(url, options) {
   options = options || {};
@@ -2060,12 +2074,25 @@ function renderFiles() {
 
 /** حذف ملف من القائمة **/
 async function deleteFile(id) {
+  if (!authToken) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول');
+    return;
+  }
   try {
-    await apiFetch('/api/ops-files/' + id, { method: 'DELETE' });
-  } catch (e) { console.error('Failed to delete file from server:', e); }
-  filesData = filesData.filter(f => f.id !== id);
-  renderFiles();
-  showToast('success','تم الحذف','تم حذف الملف بنجاح');
+    const res = await apiFetch('/api/ops-files/' + id, { method: 'DELETE' });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Delete failed:', res.status, errorText);
+      showToast('error', 'فشل الحذف', 'خطأ: ' + res.status);
+      return;
+    }
+    filesData = filesData.filter(f => f.id !== id);
+    renderFiles();
+    showToast('success', 'تم الحذف', 'تم حذف الملف بنجاح');
+  } catch (e) { 
+    console.error('Failed to delete file from server:', e); 
+    showToast('error', 'فشل الحذف', 'خطأ في الاتصال');
+  }
 }
 
 /**
@@ -2124,6 +2151,10 @@ fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
 async function handleFiles(fileList) {
+  if (!authToken) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
+    return;
+  }
   let count = 0;
   for (const file of Array.from(fileList)) {
     const formData = new FormData();
@@ -2136,19 +2167,62 @@ async function handleFiles(fileList) {
         body: formData
       });
       if (!res.ok) {
-        console.error('Upload failed:', res.status, await res.text());
-        showToast('error','فشل الرفع','فشل رفع: ' + file.name);
+        const errorText = await res.text();
+        console.error('Upload failed:', res.status, errorText);
+        showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' (HTTP ' + res.status + ')');
+        continue;
+      }
+      const result = await res.json();
+      if (!result.success) {
+        showToast('error', 'فشل الرفع', result.error || 'فشل رفع: ' + file.name);
         continue;
       }
       count++;
     } catch (e) { 
       console.error('Failed to upload file to server:', e); 
-      showToast('error','فشل الرفع','فشل رفع: ' + file.name);
+      showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' - ' + e.message);
     }
   }
-  // Reload files from server to get correct URLs
   await loadFilesData();
-  if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف/ملفات بنجاح');
+  if (count > 0) showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح');
+}
+
+async function submitAnnouncement() {
+  if (!authToken) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
+    return;
+  }
+  const title = document.getElementById('announceTitle').value.trim();
+  const body = document.getElementById('announceBody').value.trim();
+  const pinned = document.getElementById('announcePinned').checked;
+  const urgent = document.getElementById('announceUrgent').checked;
+  if (!title || !body) {
+    showToast('warning', 'بيانات ناقصة', 'الرجاء إدخال العنوان والنص');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/announcements/add', {
+      method: 'POST',
+      body: JSON.stringify({ title, body, pinned, urgent })
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Announcement failed:', res.status, errorText);
+      showToast('error', 'فشل النشر', 'خطأ: ' + res.status + ' - ' + errorText);
+      return;
+    }
+    const result = await res.json();
+    if (result.success) {
+      showToast('success', 'تم النشر', 'تم إضافة الإعلان بنجاح');
+      closeAnnouncementModal();
+      await loadAnnouncementsData();
+    } else {
+      showToast('error', 'فشل النشر', result.error || 'تعذر إضافة الإعلان');
+    }
+  } catch (e) {
+    console.error('Failed to add announcement:', e);
+    showToast('error', 'فشل النشر', 'خطأ في الاتصال بالسيرفر: ' + e.message);
+  }
 }
 
 /**
@@ -2491,12 +2565,22 @@ document.getElementById('kbdShortcuts').addEventListener('click', toggleShortcut
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadDashboardData();
-  loadReferencesData();
-  loadHospitalsData();
-  loadFilesData();
-  loadTimelineData();
-  loadAnnouncementsData();
+  // Auth check
+  if (!authToken) {
+    showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
+    setTimeout(() => {
+      if (!authToken) window.location.href = 'index.html';
+    }, 3000);
+    return;
+  }
+  loadCurrentUser().then(() => {
+    loadDashboardData();
+    loadReferencesData();
+    loadHospitalsData();
+    loadFilesData();
+    loadTimelineData();
+    loadAnnouncementsData();
+  });
 
   // Toast ترحيبي
   setTimeout(() => {
