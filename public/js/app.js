@@ -2538,20 +2538,33 @@ function openShiftModal() {
     }
     loadShifts().then(function() {
         // Auto-load current shift data if available
+        var currentShift = null;
+        
+        // Try by ID first
         if (currentShiftId && allShifts && allShifts.length > 0) {
-            var currentShift = null;
             for (var i = 0; i < allShifts.length; i++) {
                 if (allShifts[i].id === currentShiftId) {
                     currentShift = allShifts[i];
                     break;
                 }
             }
-            if (currentShift) {
-                loadShiftToForm(currentShift);
-            } else {
-                clearShiftForm();
-                document.getElementById('shiftDate').innerText = getSaudiDate();
+        }
+        
+        // If not found by ID, try by date + type
+        if (!currentShift && allShifts && allShifts.length > 0) {
+            var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+            var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+            for (var i = 0; i < allShifts.length; i++) {
+                if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
+                    currentShift = allShifts[i];
+                    currentShiftId = allShifts[i].id; // Update client variable
+                    break;
+                }
             }
+        }
+        
+        if (currentShift) {
+            loadShiftToForm(currentShift);
         } else {
             clearShiftForm();
             document.getElementById('shiftDate').innerText = getSaudiDate();

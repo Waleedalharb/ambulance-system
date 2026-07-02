@@ -245,6 +245,17 @@ async function ensureDataDir() {
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads'), { recursive: true });
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
         await initDefaultUsers();
+        // Restore currentShiftId from shifts list on startup
+        try {
+            const shifts = await readShifts();
+            const shiftType = getCurrentShiftType();
+            const shiftDate = getCurrentShiftDate();
+            const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            if (currentShift) {
+                currentShiftId = currentShift.id;
+                console.log('✅ تم استعادة المناوبة الحالية: ' + currentShift.shiftName);
+            }
+        } catch (e) { /* ignore */ }
         console.log('✅ تم التأكد من وجود مجلدات البيانات');
     } catch (e) {
         console.error('❌ خطأ في إنشاء مجلدات البيانات:', e.message);
@@ -959,6 +970,16 @@ app.get('/api/data', authenticate, async (req, res) => {
         const data = await readData();
         const shiftType = getCurrentShiftType();
         const shiftDate = getCurrentShiftDate();
+        
+        // Find current shift ID from shifts list if not set in memory
+        if (!currentShiftId) {
+            try {
+                const shifts = await readShifts();
+                const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+                if (currentShift) currentShiftId = currentShift.id;
+            } catch (e) { /* ignore */ }
+        }
+        
         res.json({
             data,
             centers: centersData,
