@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v12-2026-07-02';
+    var APP_VERSION = 'v13-2026-07-02';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -5405,8 +5405,9 @@ function initShiftProgressBar() {
 function updateShiftProgress() {
     // Calculate based on automatic shift schedule
     var now = new Date();
-    var offset = 3;
-    var saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    // Get UTC first, then add Saudi offset (+3)
+    var utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    var saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
     var hour = saudiTime.getHours();
     var minutes = saudiTime.getMinutes();
     
