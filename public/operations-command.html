@@ -2243,7 +2243,7 @@ function closeDocViewer() {
 function downloadCurrentDoc() {
   if (window.currentDocUrl && window.currentDocUrl !== '#') {
     // Fetch with auth token, then download as blob
-    fetch(window.currentDocUrl, { headers: { 'Authorization': 'Bearer ' + authToken } })
+    fetch(window.currentDocUrl, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } })
       .then(res => {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.blob();
@@ -2304,7 +2304,7 @@ async function handleFiles(fileList) {
     try {
       const res = await fetch('/api/ops-files', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + authToken },
+        headers: { 'Authorization': 'Bearer ' + getAuthToken() },
         body: formData
       });
       if (!res.ok) {
@@ -2644,7 +2644,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!getAuthToken()) {
     showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
     setTimeout(() => {
-      if (!authToken) window.location.href = 'index.html';
+      if (!getAuthToken()) window.location.href = 'index.html';
     }, 3000);
     return;
   }
