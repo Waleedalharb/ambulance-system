@@ -205,6 +205,63 @@ const TABLE_SCHEMAS = [
     id INTEGER PRIMARY KEY,
     password TEXT,
     updated_at TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    date TEXT,
+    pinned INTEGER DEFAULT 0,
+    urgent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS ops_files (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER DEFAULT 0,
+    mime_type TEXT,
+    upload_date TEXT,
+    uploader TEXT,
+    category TEXT DEFAULT 'عام',
+    note TEXT,
+    icon TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS hospitals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT,
+    specialty TEXT,
+    address TEXT,
+    phone TEXT,
+    emergency TEXT,
+    hours TEXT,
+    lat REAL,
+    lng REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS references_table (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT,
+    dept TEXT,
+    status TEXT,
+    desc TEXT,
+    date TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS timeline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    desc TEXT,
+    type TEXT,
+    date TEXT,
+    time TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 

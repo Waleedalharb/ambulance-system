@@ -11,6 +11,9 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
 
+// SQLite Database Module (للتخلص من Race Conditions في JSON files)
+const db = require('./db.js');
+
 // ============================================
 // Logger (بسيط — يعمل حتى بدون winston)
 // ============================================
@@ -3810,7 +3813,19 @@ const server = require('http').createServer(app);
 // Initialize WebSocket on same HTTP server
 initWebSocket(server);
 
-server.listen(PORT, () => {
+// Initialize SQLite Database + Migrate JSON data
+async function initDatabase() {
+    try {
+        console.log('🗄️ Initializing SQLite database...');
+        await db.init(true); // init + migrate
+        console.log('✅ SQLite database ready');
+    } catch (err) {
+        console.error('❌ Failed to initialize database:', err.message);
+        console.log('⚠️ Falling back to JSON file mode');
+    }
+}
+
+server.listen(PORT, async () => {
     console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
     console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
     console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
@@ -3824,6 +3839,9 @@ server.listen(PORT, () => {
     console.log(`📸 مجلد رفع الثيمات: ${path.join(STORAGE_PATH, 'uploads')}`);
     console.log(`🔒 Security: Helmet, Rate Limiting, CORS enabled`);
     console.log(`📡 WebSocket attached on path /ws`);
+    
+    // Initialize DB after server starts
+    await initDatabase();
 });
 
 // Graceful shutdown
