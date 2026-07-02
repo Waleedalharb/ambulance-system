@@ -1724,7 +1724,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 //  البيانات من الخادم (Server Data)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const authToken = localStorage.getItem('authToken');
+function getAuthToken() { return localStorage.getItem('authToken'); }
 let currentUser = null;
 
 // Load current user info
@@ -1743,7 +1743,8 @@ async function loadCurrentUser() {
 function apiFetch(url, options) {
   options = options || {};
   options.headers = options.headers || {};
-  options.headers['Authorization'] = 'Bearer ' + authToken;
+  const token = getAuthToken();
+  options.headers['Authorization'] = 'Bearer ' + token;
   if (!options.headers['Content-Type'] && options.method && options.method !== 'GET') {
     options.headers['Content-Type'] = 'application/json';
   }
@@ -2169,7 +2170,7 @@ function renderFiles() {
 
 /** حذف ملف من القائمة **/
 async function deleteFile(id) {
-  if (!authToken) {
+  if (!getAuthToken()) {
     showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول');
     return;
   }
@@ -2204,7 +2205,7 @@ function openDocViewer(title, url, type) {
   
   // For PDF/img, fetch with auth token and create blob URL
   if ((type === 'pdf' || type === 'img') && url && url !== '#') {
-    fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } })
+    fetch(url, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } })
       .then(res => {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.blob();
@@ -2288,7 +2289,7 @@ fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
 async function handleFiles(fileList) {
-  if (!authToken) {
+  if (!getAuthToken()) {
     showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
     return;
   }
@@ -2328,7 +2329,7 @@ async function handleFiles(fileList) {
 }
 
 async function submitAnnouncement() {
-  if (!authToken) {
+  if (!getAuthToken()) {
     showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
     return;
   }
@@ -2640,7 +2641,7 @@ updateClock();
 
 document.addEventListener('DOMContentLoaded', () => {
   // Auth check
-  if (!authToken) {
+  if (!getAuthToken()) {
     showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
     setTimeout(() => {
       if (!authToken) window.location.href = 'index.html';
