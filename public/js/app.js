@@ -2769,7 +2769,6 @@ function debounce(func, wait) {
 
 async function saveShiftData(silent) {
     var shiftData = getShiftFromForm();
-    if (!shiftData.shiftType) { if (!silent) alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return false; }
     var targetId = viewingShiftId || currentShiftId;
     var shiftDate = getSaudiDate();
     var shiftType = getCurrentShiftType ? getCurrentShiftType() : shiftData.shiftType;
@@ -2866,7 +2865,7 @@ function loadShiftToForm(shift) {
 
 function getShiftFromForm() {
     var shiftTypeEl = document.querySelector('input[name="shiftType"]:checked');
-    var shiftType = shiftTypeEl ? shiftTypeEl.value : '';
+    var shiftType = shiftTypeEl ? shiftTypeEl.value : (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
     var rapidLocations = {};
     document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
     var centersDataForm = {};
@@ -5674,7 +5673,7 @@ function initAutoSave() {
     // create debounced auto-save once
     if (!window._debouncedAutoSave) {
         window._debouncedAutoSave = debounce(function() {
-            if (currentShiftId) autoSaveShift();
+            autoSaveShift();
         }, 500);
     }
 
@@ -5690,10 +5689,8 @@ function initAutoSave() {
 }
 
 async function autoSaveShift() {
-    if (!currentShiftId) return;
     try {
         var shiftData = getShiftFromForm();
-        if (!shiftData.shiftType) return;
         showAutoSaveIndicator('saving');
         var success = await saveShiftData(true);
         if (success) {
