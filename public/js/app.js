@@ -2793,16 +2793,30 @@ async function saveShiftData(silent) {
         var result = await response.json();
         if (result.success) {
             if (result.shiftId) currentShiftId = result.shiftId;
-            if (!silent) alert("✅ تم حفظ بيانات التكميل بنجاح");
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            if (viewingShiftId) {
-                var viewResponse = await fetch('/api/shifts/' + viewingShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                var viewResult = await viewResponse.json();
-                if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
+            
+            if (!silent) {
+                // Manual save: reload UI and show confirmation
+                alert("✅ تم حفظ بيانات التكميل بنجاح");
+                await loadShifts();
+                await loadAllData();
+                calculateLiveReportStats();
+                updateWorkforceStats();
+                updateDistributionIndicator();
+                if (viewingShiftId) {
+                    var viewResponse = await fetch('/api/shifts/' + viewingShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                    var viewResult = await viewResponse.json();
+                    if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
+                }
+                // Add audit log for manual save
+                try {
+                    if (typeof addAuditEntry === 'function') {
+                        await addAuditEntry('shift', 'حفظ تكميل النوبة', 'تم حفظ بيانات تكميل النوبة يدوياً', currentUser && currentUser.name);
+                    }
+                } catch(e) {}
+            } else {
+                // Auto-save: don't reload form to avoid race condition
+                // The WebSocket broadcast will update other UI elements
+                // Form inputs keep their current values (user is still typing)
             }
             return true;
         } else { if (!silent) alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); return false; }
@@ -2901,6 +2915,7 @@ function getShiftFromForm() {
 }
 
 function clearShiftForm() {
+    viewingShiftId = null; // Reset to prevent saving to wrong shift
     document.getElementById('shiftDate').innerText = getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
     // Update badge to current automatic shift
@@ -5687,7 +5702,7 @@ function initAutoSave() {
     if (!window._debouncedAutoSave) {
         window._debouncedAutoSave = debounce(function() {
             autoSaveShift();
-        }, 500);
+        }, 1500);
     }
 
     // add listeners to all inputs once
@@ -5742,7 +5757,7 @@ function showAutoSaveIndicator(state) {
 
 // تحذير عند الإغلاق مع تغييرات
 window.addEventListener('beforeunload', function(e) {
-    if (_pendingChanges && currentShiftId) {
+    if (_pendingChanges) {
         e.preventDefault();
         e.returnValue = '';
     }
