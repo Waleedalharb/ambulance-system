@@ -1508,6 +1508,23 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
         <p>رفع، إدارة، وعرض المستندات والملفات بأنواعها المختلفة</p>
       </div>
     </div>
+    <!-- اختيار نوع الملف -->
+    <div class="glass-card" style="margin-bottom:16px; padding:12px 16px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label style="font-weight:600; color:var(--text); font-size:0.85rem;"><i class="fas fa-tag"></i> نوع الملف:</label>
+        <select id="fileCategorySelect" style="padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); font-size:0.85rem; min-width:180px;">
+          <option value="عام">📁 عام</option>
+          <option value="تعميم">📋 تعميم</option>
+          <option value="بروتوكول">📖 بروتوكول</option>
+          <option value="نموذج">📝 نموذج</option>
+          <option value="تقرير">📊 تقرير</option>
+          <option value="إجراء">⚡ إجراء طوارئ</option>
+          <option value="صور">🖼️ صور</option>
+          <option value="أخرى">📎 أخرى</option>
+        </select>
+        <span style="color:var(--text-muted); font-size:0.75rem;">اختر نوع الملف قبل الرفع</span>
+      </div>
+    </div>
     <!-- منطقة الرفع بالسحب والإفلات -->
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" style="display:none;">
@@ -2114,7 +2131,7 @@ function renderFiles() {
       <div class="file-icon ${escapeHtml(f.type)}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
       <div class="file-info">
         <div class="file-name">${escapeHtml(f.name)}</div>
-        <div class="file-meta">${escapeHtml(f.size)} · ${escapeHtml(f.date)}</div>
+        <div class="file-meta">${escapeHtml(f.size)} · ${escapeHtml(f.date)} ${f.category ? '· <span class="badge badge-info" style="font-size:0.65rem;padding:2px 6px;">' + escapeHtml(f.category) + '</span>' : ''}</div>
       </div>
       <div class="file-actions">
         <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" data-action="view" data-name="${escapeHtml(f.name)}" data-url="${encodeURIComponent(f.url)}" data-type="${escapeHtml(f.type)}" title="عرض"><i class="fas fa-eye"></i></button>
@@ -2230,11 +2247,14 @@ async function handleFiles(fileList) {
     showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
     return;
   }
+  const categorySelect = document.getElementById('fileCategorySelect');
+  const category = categorySelect ? categorySelect.value : 'عام';
   let count = 0;
   for (const file of Array.from(fileList)) {
     const formData = new FormData();
     formData.append('files', file);
     formData.append('uploader', (currentUser && currentUser.name) || 'مستخدم');
+    formData.append('category', category);
     try {
       const res = await fetch('/api/ops-files', {
         method: 'POST',
@@ -2259,7 +2279,7 @@ async function handleFiles(fileList) {
     }
   }
   await loadFilesData();
-  if (count > 0) showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح');
+  if (count > 0) showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح (' + category + ')');
 }
 
 async function submitAnnouncement() {
