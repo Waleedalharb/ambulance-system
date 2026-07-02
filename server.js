@@ -1592,7 +1592,13 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             ORDER BY e.name
         `, [shiftDate, teamName, shiftDate]);
         
-        res.json({ paramedics, shiftDate, teamName });
+        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+        const paramedicsWithStatus = paramedics.map(p => ({
+            ...p,
+            status: p.shift_code && absentCodes.includes(p.shift_code.toUpperCase()) ? 'غائب' : 'حاضر'
+        }));
+        
+        res.json({ paramedics: paramedicsWithStatus, shiftDate, teamName });
     } catch (error) {
         console.error('[API] Error in shift-completion:', error);
         res.json({ paramedics: [], source: 'fallback', error: error.message });
@@ -4341,45 +4347,6 @@ app.delete('/api/team-assignments/:id', authenticate, authorize(['admin']), asyn
     } catch (error) {
         console.error('TeamAssignments DELETE error:', error);
         res.status(500).json({ error: 'فشل في حذف التعيين' });
-    }
-});
-
-// ============================================
-// API: Shift Completion — Get Paramedics for a Team
-// ============================================
-app.get('/api/shift-completion/:shiftId/:teamId', authenticate, async (req, res) => {
-    try {
-        const shiftId = parseInt(req.params.shiftId);
-        const teamId = parseInt(req.params.teamId);
-        const shifts = await readShifts();
-        const shift = shifts.find(s => s.id === shiftId);
-        if (!shift) {
-            return res.status(404).json({ error: 'المناوبة غير موجودة' });
-        }
-
-        // First try to get from shift.centersData (already enriched by update-shift-data)
-        const team = await db.Teams.getById(teamId);
-        if (!team) {
-            return res.status(404).json({ error: 'الفريق غير موجود' });
-        }
-
-        const shiftDate = shift.shiftDate;
-        const roster = await db.ShiftRoster.getByDateAndTeam(shiftDate, teamId);
-        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
-        const paramedics = roster.map(entry => ({
-            id: entry.employee_id,
-            name: entry.employee_name,
-            employeeCode: entry.employee_code,
-            jobTitle: entry.job_title,
-            shiftCode: entry.shift_code,
-            status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
-        }));
-
-        const presentCount = paramedics.filter(p => p.status === 'حاضر').length;
-        res.json({ success: true, paramedics, presentCount, totalCount: paramedics.length });
-    } catch (error) {
-        console.error('ShiftCompletion GET error:', error);
-        res.status(500).json({ error: 'فشل في جلب بيانات المسعفين' });
     }
 });
 

@@ -25,6 +25,13 @@ var authToken = localStorage.getItem('authToken') || null;
 var _rateLimitBackoff = false;
 async function apiFetch(url, options) {
     try {
+        options = options || {};
+        options.headers = options.headers || {};
+        var token = typeof getAuthToken === 'function' ? getAuthToken() : (window.authToken || '');
+        if (token) options.headers['Authorization'] = 'Bearer ' + token;
+        if (!options.headers['Content-Type'] && options.method && options.method !== 'GET') {
+            options.headers['Content-Type'] = 'application/json';
+        }
         var response = await fetch(url, options);
         if (response.status === 429) {
             if (!_rateLimitBackoff) {
@@ -5148,12 +5155,29 @@ function openUrgentUploadModal() {
     alert('🚨 سيتم فتح نافذة رفع تحديث عاجل');
 }
 
-async function downloadDoc(docId) { try { window.open('/api/download-doc/' + docId, '_blank'); } catch (error) { alert('❌ فشل في تحميل التحديث'); } }
+async function downloadDoc(docId) {
+    try {
+        var token = typeof getAuthToken === 'function' ? getAuthToken() : (window.authToken || '');
+        var response = await fetch('/api/download-doc/' + docId, {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        var blob = await response.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+    } catch (error) { alert('❌ فشل في تحميل التحديث'); }
+}
 
 async function deleteDoc(docId) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا التحديث؟')) return;
     try {
-        var response = await fetch('/api/delete-doc/' + docId, { method: 'DELETE' });
+        var response = await apiFetch('/api/delete-doc/' + docId, { method: 'DELETE' });
         var result = await response.json();
         if (result.success) { await loadDocsData(); } else { alert('❌ فشل في حذف التحديث'); }
     } catch (error) { alert('❌ خطأ في الاتصال'); }
@@ -6013,6 +6037,11 @@ function applyPreset(preset) {
                 break;
         }
         updateRapidStatusIcon(r);
+        var rapidCountDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[r].name));
+        if (rapidCountDisplay) {
+            var rVal = document.getElementById('rapid_staff_' + r);
+            rapidCountDisplay.textContent = (rVal && rVal.value !== '') ? (rVal.value + ' حاضر') : '-';
+        }
     }
 
     for (var i = 0; i < centerList.length; i++) {
@@ -6049,6 +6078,11 @@ function applyPreset(preset) {
         }
         updateStatusIcon(i);
         if (vehicleSelect) updateVehicleStatusIcon(i);
+        var centerCountDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(centerList[i]));
+        if (centerCountDisplay) {
+            var cVal = document.getElementById('staff_' + i);
+            centerCountDisplay.textContent = (cVal && cVal.value !== '') ? (cVal.value + ' حاضر') : '-';
+        }
     }
 
     calculateWorkforceStatsLocally();
@@ -6361,6 +6395,8 @@ function setCenterComplete(index) {
     
     onCenterStatusChanged(centerName, true);
     showToast('✅ ' + centerName + ' تم التكميل بنجاح', 'success');
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(centerName));
+    if (countDisplay) countDisplay.textContent = '2 حاضر';
 }
 
 // تعيين المركز كناقص (فارغ)
@@ -6392,6 +6428,8 @@ function setCenterIncomplete(index) {
     
     onCenterStatusChanged(centerName, false);
     showToast('⚠️ ' + centerName + ' بحاجة إلى تكميل', 'alert');
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(centerName));
+    if (countDisplay) countDisplay.textContent = '0 حاضر';
 }
 
 // تعيين جميع المراكز كمكتملة
@@ -6411,6 +6449,8 @@ function setAllCentersComplete() {
             }
         }
         updateStatusIcon(i);
+        var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(centerList[i]));
+        if (countDisplay) countDisplay.textContent = '2 حاضر';
     }
     calculateWorkforceStatsLocally();
     addShiftEvent('complete', 'تم تكميل جميع المراكز تلقائياً', 'auto');
@@ -6434,6 +6474,8 @@ function setAllCentersIncomplete() {
             }
         }
         updateStatusIcon(i);
+        var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(centerList[i]));
+        if (countDisplay) countDisplay.textContent = '0 حاضر';
     }
     calculateWorkforceStatsLocally();
     showToast('⚠️ تم تعيين جميع المراكز كناقصة', 'alert');
@@ -7598,16 +7640,37 @@ async function opsUploadFiles() {
     }
 }
 
-// تحميل ملف
-function opsDownloadFile(id) {
-    window.open(`/api/download-operational/${id}`, '_blank');
+// تحميل ملف (مع JWT token)
+async function opsDownloadFile(id) {
+    try {
+        var token = typeof getAuthToken === 'function' ? getAuthToken() : (window.authToken || '');
+        var response = await fetch('/api/download-operational/' + id, {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        if (!response.ok) {
+            showNotification('خطأ', 'تعذر تحميل الملف', 'error', 4000);
+            return;
+        }
+        var blob = await response.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+    } catch (e) {
+        console.error('Download error:', e);
+        showNotification('خطأ', 'فشل في تحميل الملف', 'error', 4000);
+    }
 }
 
 // حذف ملف
 async function opsDeleteFile(id) {
     if (!confirm('⚠️ هل أنت متأكد من حذف هذا الملف؟')) return;
     try {
-        var res = await fetch(`/api/delete-operational/${id}`, { method: 'DELETE' });
+        var res = await apiFetch(`/api/delete-operational/${id}`, { method: 'DELETE' });
         var result = await res.json();
         if (result.success) {
             await opsLoadData();
@@ -7709,7 +7772,10 @@ async function opsPreviewFile(id, filename) {
     var officeTypes = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
 
     try {
-        var response = await fetch('/api/download-operational/' + id);
+        var token = typeof getAuthToken === 'function' ? getAuthToken() : (window.authToken || '');
+        var response = await fetch('/api/download-operational/' + id, {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
 
         if (!response.ok) {
             body.innerHTML = '<div class="unsupported-preview"><i class="fas fa-exclamation-circle"></i><div class="msg">❌ تعذر تحميل الملف</div></div>';
@@ -7756,11 +7822,11 @@ async function opsPreviewFile(id, filename) {
 
         } else if (officeTypes.indexOf(ext) !== -1) {
             // ملفات Office
-            body.innerHTML = '<div class="unsupported-preview"><i class="fas fa-file-word"></i><div class="msg">📄 ملف Office - غير قابل للمعاينة المباشرة</div><a href="/api/download-operational/' + id + '" target="_blank" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 24px; text-decoration:none; display:inline-block; margin-top:10px;"><i class="fas fa-download"></i> تحميل الملف</a></div>';
+            body.innerHTML = '<div class="unsupported-preview"><i class="fas fa-file-word"></i><div class="msg">📄 ملف Office - غير قابل للمعاينة المباشرة</div><a href="javascript:void(0)" data-id="' + id + '" onclick="opsDownloadFile(this.dataset.id)" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 24px; text-decoration:none; display:inline-block; margin-top:10px;"><i class="fas fa-download"></i> تحميل الملف</a></div>';
 
         } else {
             // غير معروف
-            body.innerHTML = '<div class="unsupported-preview"><i class="fas fa-file"></i><div class="msg">❓ الملف غير قابل للمعاينة</div><a href="/api/download-operational/' + id + '" target="_blank" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 24px; text-decoration:none; display:inline-block; margin-top:10px;"><i class="fas fa-download"></i> تحميل الملف</a></div>';
+            body.innerHTML = '<div class="unsupported-preview"><i class="fas fa-file"></i><div class="msg">❓ الملف غير قابل للمعاينة</div><a href="javascript:void(0)" data-id="' + id + '" onclick="opsDownloadFile(this.dataset.id)" class="btn" style="background:rgba(0,212,255,0.15); color:#00D4FF; border:1px solid rgba(0,212,255,0.15); padding:10px 24px; text-decoration:none; display:inline-block; margin-top:10px;"><i class="fas fa-download"></i> تحميل الملف</a></div>';
         }
 
     } catch (e) {

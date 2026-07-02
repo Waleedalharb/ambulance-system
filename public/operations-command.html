@@ -2155,7 +2155,7 @@ function renderFiles() {
           navigator.clipboard.writeText(btn.dataset.copy);
           showToast('success', 'تم النسخ', 'تم نسخ اسم الملف');
         } else if (action === 'delete') {
-          deleteFile(parseInt(btn.dataset.id, 10));
+          deleteFile(btn.dataset.id);
         }
         return;
       }
