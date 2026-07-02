@@ -1039,6 +1039,9 @@
             <div class="shift-form-row form-row">
                 <label><i class="fas fa-archive"></i> المناوبات السابقة:</label>
                 <select id="shiftArchiveSelect"><option value="">-- مناوبة جديدة --</option></select>
+                <button id="returnToCurrentBtnInModal" class="btn" style="display:none; color:var(--primary); background:transparent; border:1px solid var(--primary); padding:4px 12px; font-size:0.75rem; margin-right:8px;" onclick="selectShiftFromHistory(null);">
+                    <i class="fas fa-arrow-right"></i> العودة للحالية
+                </button>
                 <button id="deleteShiftBtn" class="shift-btn shift-btn-danger btn-incomplete" onclick="deleteShift()"><i class="fas fa-trash"></i> حذف المناوبة</button>
             </div>
             <div class="shift-form-row form-row">
@@ -1525,6 +1528,11 @@
         <div class="modal-buttons" style="justify-content:center; gap:12px;">
             <button onclick="viewSelectedArchiveShift()" class="btn btn-primary" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-eye"></i> استعراض البيانات</button>
             <button onclick="editSelectedArchiveShift()" class="btn btn-success" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-edit"></i> تعديل التكميل</button>
+        </div>
+        <div style="margin-top:16px; text-align:center; border-top:1px solid var(--gray-200); padding-top:16px;">
+            <button onclick="selectShiftFromHistory(null); document.getElementById('shiftArchiveModal').style.display='none';" class="btn" style="color:var(--primary); background:transparent; border:1px solid var(--primary);">
+                <i class="fas fa-arrow-right"></i> العودة للمناوبة الحالية
+            </button>
         </div>
     </div>
 </div>

@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v11-2026-07-02';
+    var APP_VERSION = 'v12-2026-07-02';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -2112,6 +2112,8 @@ function editSelectedArchiveShift() {
     }
     var returnBtn = document.getElementById('returnToCurrentBtn');
     if (returnBtn) returnBtn.style.display = 'inline-block';
+    var returnBtnInModal = document.getElementById('returnToCurrentBtnInModal');
+    if (returnBtnInModal) returnBtnInModal.style.display = 'inline-block';
     
     showNotification('تعديل', 'يمكنك الآن تعديل بيانات تكميل المناوبة', 'info', 5000);
 }
@@ -2125,6 +2127,8 @@ function selectShiftFromHistory(shiftId) {
         if (badge) badge.style.display = 'none';
         var returnBtn = document.getElementById('returnToCurrentBtn');
         if (returnBtn) returnBtn.style.display = 'none';
+        var returnBtnInModal = document.getElementById('returnToCurrentBtnInModal');
+        if (returnBtnInModal) returnBtnInModal.style.display = 'none';
         loadAllData();
         updateShiftStatus();
         return;
@@ -2146,6 +2150,8 @@ function selectShiftFromHistory(shiftId) {
     }
     var returnBtn = document.getElementById('returnToCurrentBtn');
     if (returnBtn) returnBtn.style.display = 'inline-block';
+    var returnBtnInModal = document.getElementById('returnToCurrentBtnInModal');
+    if (returnBtnInModal) returnBtnInModal.style.display = 'inline-block';
     
     // Load shift data including reports from server
     fetch('/api/shifts/' + shiftIdNum, { headers: { 'Authorization': 'Bearer ' + authToken } })
