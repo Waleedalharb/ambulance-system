@@ -2444,15 +2444,26 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
     try {
         const data = await readData();
         const shifts = await readShifts();
-        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-        const auditLog = await readAuditLog();
-        const reports = await readReportEntry();
+        let users = [];
+        try {
+            users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            if (!Array.isArray(users)) users = [];
+        } catch (e) { users = []; }
+        let auditLog = [];
+        try { auditLog = await readAuditLog(); } catch (e) { auditLog = []; }
+        let reports = [];
+        try { reports = await readReportEntry(); } catch (e) { reports = []; }
+        
+        // Ensure data is object
+        const safeData = data || {};
+        const safeShifts = Array.isArray(shifts) ? shifts : [];
+        const safeUsers = Array.isArray(users) ? users : [];
         
         // Calculate stats
-        const totalReports = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
-        const activeCenters = Object.keys(data).filter(k => data[k].count > 0).length;
-        const totalShifts = shifts.length;
-        const totalUsers = users.filter(u => u.isActive).length;
+        const totalReports = Object.values(safeData).reduce((sum, r) => sum + (r && r.count ? r.count : 0), 0);
+        const activeCenters = Object.keys(safeData).filter(k => safeData[k] && safeData[k].count > 0).length;
+        const totalShifts = safeShifts.length;
+        const totalUsers = safeUsers.filter(u => u && u.isActive).length;
         
         // Hourly distribution
         const hourlyDistribution = {};
@@ -2465,8 +2476,8 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
             const d = new Date(now);
             d.setDate(d.getDate() - i);
             const dateStr = d.toLocaleDateString('ar-SA');
-            const dayShifts = shifts.filter(s => s.shiftDate === dateStr);
-            const dayReports = dayShifts.reduce((sum, s) => sum + (s.totalReports || 0), 0);
+            const dayShifts = safeShifts.filter(s => s && s.shiftDate === dateStr);
+            const dayReports = dayShifts.reduce((sum, s) => sum + (s && s.totalReports ? s.totalReports : 0), 0);
             last7Days.push({ date: dateStr, reports: dayReports });
         }
         
@@ -2475,17 +2486,17 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         for (let i = 0; i < centerList.length; i++) {
             const center = centerList[i];
             let centerReports = 0;
-            for (let key in data) {
-                if (key.startsWith(center + '|')) centerReports += (data[key].count || 0);
+            for (let key in safeData) {
+                if (key.startsWith(center + '|')) centerReports += (safeData[key] && safeData[key].count ? safeData[key].count : 0);
             }
             centerStats[center] = centerReports;
         }
         
-        // Top 5 units
+        // Top 10 units
         const unitStats = [];
-        for (let key in data) {
-            if (data[key].count > 0) {
-                unitStats.push({ key, count: data[key].count });
+        for (let key in safeData) {
+            if (safeData[key] && safeData[key].count > 0) {
+                unitStats.push({ key, count: safeData[key].count });
             }
         }
         unitStats.sort((a, b) => b.count - a.count);
@@ -2505,7 +2516,7 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         });
     } catch (error) {
         console.error('Admin stats error:', error);
-        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات: ' + error.message });
     }
 });
 
