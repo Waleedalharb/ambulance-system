@@ -4245,8 +4245,22 @@ app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (r
 app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (req, res) => {
     try {
         const { employees, roster, month, year } = req.body;
+        console.log('[IMPORT DEBUG] Request body keys:', Object.keys(req.body || {}));
+        console.log('[IMPORT DEBUG] employees type:', typeof employees, 'isArray:', Array.isArray(employees), 'length:', employees ? employees.length : 'null');
+        console.log('[IMPORT DEBUG] roster type:', typeof roster, 'isArray:', Array.isArray(roster), 'length:', roster ? roster.length : 'null');
+        console.log('[IMPORT DEBUG] month:', month, 'year:', year);
         if (!employees || !Array.isArray(employees) || !roster || !Array.isArray(roster)) {
-            return res.status(400).json({ error: 'بيانات الاستيراد غير صالحة' });
+            return res.status(400).json({ 
+                error: 'بيانات الاستيراد غير صالحة',
+                details: {
+                    hasEmployees: !!employees,
+                    employeesIsArray: Array.isArray(employees),
+                    hasRoster: !!roster,
+                    rosterIsArray: Array.isArray(roster),
+                    month: month,
+                    year: year
+                }
+            });
         }
 
         await db.beginTransaction();
