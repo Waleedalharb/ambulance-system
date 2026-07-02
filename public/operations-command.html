@@ -2604,8 +2604,93 @@ window.syncUpdate = function() {
 
     <script src="js/websocket-sync.js"></script>
 
-<!-- NANO AI Bot Assistant -->
-<link rel="stylesheet" href="/css/nano-bot.css">
-<script src="/js/nano-bot.js"></script>
+<!-- NANO AI Bot Assistant - disabled, replaced with simple help button -->
+<script>
+  // Hide nano-bot auto-popup after it loads
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var nanoBot = document.getElementById('nano-bot-widget') || document.querySelector('.nano-bot-container');
+      if (nanoBot) nanoBot.style.display = 'none';
+    }, 1000);
+  });
+</script>
+
+<!-- Simple Help Button -->
+<style>
+  .help-fab {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--neon), #1d4ed8);
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+    cursor: pointer;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .help-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(37,99,235,0.45); }
+  .help-fab:active { transform: scale(0.95); }
+  .help-tooltip {
+    position: fixed;
+    bottom: 90px;
+    left: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    width: 280px;
+    box-shadow: var(--shadow);
+    z-index: 9998;
+    display: none;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .help-tooltip.show { display: block; animation: slideUp 0.3s ease; }
+  .help-tooltip h4 { margin: 0 0 8px; color: var(--neon); font-size: 14px; }
+  .help-tooltip ul { margin: 0; padding-right: 16px; }
+  .help-tooltip li { margin-bottom: 4px; }
+  @keyframes slideUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+</style>
+
+<button class="help-fab" id="helpFab" onclick="toggleHelp()" title="مساعدة">
+  <i class="fas fa-question"></i>
+</button>
+
+<div class="help-tooltip" id="helpTooltip">
+  <h4><i class="fas fa-lightbulb" style="color:var(--gold);"></i> دليل الاستخدام</h4>
+  <ul>
+    <li><strong>لوحة القيادة:</strong> إحصائيات وبلاغات ومؤشرات لحظية</li>
+    <li><strong>البلاغات:</strong> إدخال وتوزيع ومراقبة حالة البلاغات</li>
+    <li><strong>المرفقات:</strong> رفع وتحميل الملفات التشغيلية</li>
+    <li><strong>الإعلانات:</strong> نشر تعاميم وإعلانات عاجلة</li>
+    <li><strong>الخريطة:</strong> مواقع المستشفيات والمراكز</li>
+    <li><strong>الاختصارات:</strong> Ctrl+1 لوحة القيادة، Ctrl+2 بلاغات، Ctrl+3 مرفقات</li>
+  </ul>
+  <p style="margin-top:8px; color:var(--text-muted); font-size:11px;">اضغط <kbd>?</kbd> لعرض جميع الاختصارات</p>
+</div>
+
+<script>
+  function toggleHelp() {
+    var tooltip = document.getElementById('helpTooltip');
+    tooltip.classList.toggle('show');
+  }
+  // Close help when clicking outside
+  document.addEventListener('click', function(e) {
+    var fab = document.getElementById('helpFab');
+    var tooltip = document.getElementById('helpTooltip');
+    if (tooltip.classList.contains('show') && !fab.contains(e.target) && !tooltip.contains(e.target)) {
+      tooltip.classList.remove('show');
+    }
+  });
+</script>
+
 </body>
 </html>
