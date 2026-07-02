@@ -1538,145 +1538,286 @@
         // المناوبات: D12=دوام 12ص, N12=دوام 12ل, V=إجازة, M=صباح, C=تدريب, R=راحة
         // ============================================
         function extractEmployees(workbook) {
-            console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
+            console.log('🔍 extractEmployees (monthly format) called, sheets:', workbook.SheetNames.length);
             var allEmployees = [];
-            var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
-            var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
-            var sheetNames = workbook.SheetNames;
             
-            for (var s = 0; s < sheetNames.length; s++) {
-                console.log('📄 Processing sheet:', sheetNames[s]);
-                var sheetName = sheetNames[s];
-                var sheet = workbook.Sheets[sheetName];
-                var jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-                if (jsonData.length < 10) continue;
-                
-                // استخراج الشهر والسنة من الصفوف الأولى
-                var monthNum = 0, yearNum = 2026;
-                for (var i = 0; i < 5 && i < jsonData.length; i++) {
-                    var r0 = jsonData[i][0];
-                    var r1 = jsonData[i][1];
-                    // Row 0: 'الشهر', 'السنة' → skip, Row 1: 5, 2026 → extract
-                    if (r0 === 'الشهر') continue; // skip header row
-                    if (typeof r0 === 'number' && r0 > 0 && r0 < 13) {
-                        monthNum = r0;
-                    }
-                    if (typeof r1 === 'number' && r1 > 2000) {
-                        yearNum = r1;
-                    }
+            // Complete shift codes map with all 28+ codes from the system
+            var shiftMap = {
+                'D12': 'دوام 12 صباحاً',
+                'N12': 'دوام 12 ليلاً',
+                'M': 'مهمة',
+                'O12': 'أوفرلاب 12',
+                'V': 'إجازة',
+                'WO': 'Weekend Off',
+                'VC': 'إجازة مرضية',
+                'C': 'تدريب',
+                'ME': 'مكلف',
+                'N8': 'دوام 8 ليلاً',
+                'CP8': 'تكميلية 8',
+                'CP24': 'تكميلية 24',
+                'CPD': 'تكميلية صباحية',
+                'CPN': 'تكميلية ليلية',
+                'E': 'إجازة',
+                'EV': 'إجازة استثنائية',
+                'F': 'مكلف',
+                'LN8': 'ليلية 8',
+                'LN10': 'ليلية 10',
+                'D10': 'دوام 10 صباحاً',
+                'D11': 'دوام 11 صباحاً',
+                'D8': 'دوام 8 صباحاً',
+                'D6': 'دوام 6 صباحاً',
+                'N10': 'دوام 10 ليلاً',
+                'N11': 'دوام 11 ليلاً',
+                'N6': 'دوام 6 ليلاً',
+                'O10': 'أوفرلاب 10',
+                'O6': 'أوفرلاب 6'
+            };
+            
+            var shiftTimeMap = {
+                'D12': '05:00-17:00',
+                'N12': '17:00-05:00',
+                'M': '08:00-14:00',
+                'O12': '05:00-17:00',
+                'V': '-',
+                'WO': '-',
+                'VC': '-',
+                'C': '08:00-14:00',
+                'ME': '14:00-22:00',
+                'N8': '17:00-01:00',
+                'CP8': 'تكميلية',
+                'CP24': 'تكميلية',
+                'CPD': 'تكميلية صباحية',
+                'CPN': 'تكميلية ليلية',
+                'E': '-',
+                'EV': '-',
+                'F': '14:00-22:00',
+                'LN8': '17:00-01:00',
+                'LN10': '17:00-03:00',
+                'D10': '05:00-15:00',
+                'D11': '05:00-16:00',
+                'D8': '05:00-13:00',
+                'D6': '05:00-11:00',
+                'N10': '17:00-03:00',
+                'N11': '17:00-04:00',
+                'N6': '17:00-23:00',
+                'O10': '05:00-15:00',
+                'O6': '05:00-11:00'
+            };
+            
+            var shiftStatusMap = {
+                'D12': 'دوام', 'N12': 'دوام', 'M': 'دوام', 'O12': 'دوام',
+                'V': 'إجازة', 'WO': 'راحة', 'VC': 'إجازة', 'C': 'تدريب',
+                'ME': 'دوام', 'N8': 'دوام', 'CP8': 'تكميل', 'CP24': 'تكميل',
+                'CPD': 'تكميل', 'CPN': 'تكميل', 'E': 'إجازة', 'EV': 'إجازة',
+                'F': 'دوام', 'LN8': 'دوام', 'LN10': 'دوام', 'D10': 'دوام',
+                'D11': 'دوام', 'D8': 'دوام', 'D6': 'دوام', 'N10': 'دوام',
+                'N11': 'دوام', 'N6': 'دوام', 'O10': 'دوام', 'O6': 'دوام'
+            };
+            
+            // Read first sheet only (monthly format)
+            if (workbook.SheetNames.length === 0) {
+                console.warn('⚠️ No sheets in workbook');
+                return allEmployees.length > 0 ? allEmployees : generateDemoData();
+            }
+            
+            var sheetName = workbook.SheetNames[0];
+            var sheet = workbook.Sheets[sheetName];
+            var jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            
+            console.log('📄 Processing monthly sheet:', sheetName, 'rows:', jsonData.length);
+            if (jsonData.length < 5) {
+                console.warn('⚠️ Sheet too short for monthly format');
+                return allEmployees.length > 0 ? allEmployees : generateDemoData();
+            }
+            
+            // Extract month and year from row 2 (index 1)
+            var monthNum = 0, yearNum = new Date().getFullYear();
+            if (jsonData[1] && jsonData[1].length >= 2) {
+                var r0 = jsonData[1][0];
+                var r1 = jsonData[1][1];
+                if (typeof r0 === 'number' && r0 > 0 && r0 < 13) {
+                    monthNum = r0;
+                } else if (typeof r0 === 'string') {
+                    var parsedMonth = parseInt(r0);
+                    if (!isNaN(parsedMonth) && parsedMonth > 0 && parsedMonth < 13) monthNum = parsedMonth;
                 }
-                // Fallback: try row 1 directly
-                if (monthNum === 0 && jsonData[1]) {
-                    if (typeof jsonData[1][0] === 'number' && jsonData[1][0] > 0 && jsonData[1][0] < 13) {
-                        monthNum = jsonData[1][0];
-                    }
-                    if (typeof jsonData[1][1] === 'number' && jsonData[1][1] > 2000) {
-                        yearNum = jsonData[1][1];
-                    }
+                if (typeof r1 === 'number' && r1 > 2000) {
+                    yearNum = r1;
+                } else if (typeof r1 === 'string') {
+                    var parsedYear = parseInt(r1);
+                    if (!isNaN(parsedYear) && parsedYear > 2000) yearNum = parsedYear;
                 }
-                
-                // تمرير الصفوف والبحث عن الفرق
-                var currentTeam = '';
-                var currentTeamNote = '';
-                var dayNames = [];
-                var dayNumbers = [];
-                
-                for (var i = 5; i < jsonData.length; i++) {
+            }
+            
+            // Fallback: try to extract from any header text in first 5 rows
+            if (monthNum === 0) {
+                for (var i = 0; i < Math.min(5, jsonData.length); i++) {
                     var row = jsonData[i];
-                    if (!row || row.length === 0) continue;
-                    var colA = row[0];
-                    
-                    // اكتشاف هيدر الفرقة أو القسم ("تدخل سريع 1", "جنوب 1", "القائد الميداني", "التحكم والتنسيق", "الدعم اللوجستي", "مناوبو باص الاستجابة", "المنتدبين", "إجازة")
-                    if (colA && typeof colA === 'string' && (
-                        (colA.match(/^(تدخل\s+سريع|جنوب)\s*\d+$/) && colA.length < 30) ||
-                        colA === 'القائد الميداني' ||
-                        colA === 'التحكم والتنسيق' ||
-                        colA === 'الدعم اللوجستي' ||
-                        colA === 'مناوبو باص الاستجابة' ||
-                        colA === 'المنتدبين' ||
-                        colA === 'إجازة'
-                    )) {
-                        currentTeam = colA;
-                        currentTeamNote = row[4] || '';
-                        dayNames = [];
+                    if (!row) continue;
+                    for (var c = 0; c < row.length; c++) {
+                        var cell = String(row[c] || '');
+                        var monthMatch = cell.match(/(?:شهر\s*)?(\d{1,2})\s*[-/]\s*(\d{4})/);
+                        if (!monthMatch) {
+                            monthMatch = cell.match(/(\d{4})\s*[-/]\s*(\d{1,2})/);
+                            if (monthMatch) {
+                                monthNum = parseInt(monthMatch[2]);
+                                yearNum = parseInt(monthMatch[1]);
+                                break;
+                            }
+                        } else {
+                            monthNum = parseInt(monthMatch[1]);
+                            yearNum = parseInt(monthMatch[2]);
+                            break;
+                        }
+                    }
+                    if (monthNum > 0) break;
+                }
+            }
+            
+            // Default fallback to current month/year
+            if (monthNum === 0) {
+                var now = new Date();
+                monthNum = now.getMonth() + 1;
+                yearNum = now.getFullYear();
+                console.log('⚠️ Using current month/year as fallback:', monthNum, yearNum);
+            }
+            
+            console.log('📅 Month:', monthNum, 'Year:', yearNum);
+            
+            // Scan for team headers and employee data
+            var currentTeam = '';
+            var dayNumbers = [];
+            var inEmployeeSection = false;
+            var teamCount = 0;
+            
+            for (var i = 0; i < jsonData.length; i++) {
+                var row = jsonData[i];
+                if (!row || row.length === 0) continue;
+                
+                var colA = row[0];
+                var colAStr = String(colA || '').trim();
+                
+                // Detect team header: "القائد الميداني 1", "جنوب 1", "تدخل سريع 1", etc.
+                var teamMatch = colAStr.match(/^(القائد\s+الميداني|جنوب|تدخل\s+سريع|التحكم\s+والتنسيق|الدعم\s+اللوجستي|مناوبو\s+باص\s+الاستجابة|المنتدبين|إجازة)\s*\d*$/i);
+                if (!teamMatch) {
+                    // Also check for simple "جنوب" or "سريع" without numbers
+                    if (colAStr === 'جنوب' || colAStr === 'سريع' || colAStr === 'القائد الميداني') {
+                        teamMatch = true;
+                    }
+                }
+                
+                if (teamMatch && colAStr.length < 50 && colAStr.length > 1) {
+                    currentTeam = colAStr;
+                    inEmployeeSection = true;
+                    dayNumbers = [];
+                    teamCount++;
+                    console.log('🏥 Team found:', currentTeam);
+                    continue;
+                }
+                
+                // Also check if colA is empty but colB has team header
+                if ((!colA || String(colA).trim() === '') && row[1]) {
+                    var colBStr = String(row[1] || '').trim();
+                    var teamMatch2 = colBStr.match(/^(القائد\s+الميداني|جنوب|تدخل\s+سريع|التحكم\s+والتنسيق|الدعم\s+اللوجستي|مناوبو\s+باص\s+الاستجابة|المنتدبين|إجازة)\s*\d*$/i);
+                    if (!teamMatch2) {
+                        if (colBStr === 'جنوب' || colBStr === 'سريع' || colBStr === 'القائد الميداني') {
+                            teamMatch2 = true;
+                        }
+                    }
+                    if (teamMatch2 && colBStr.length < 50 && colBStr.length > 1) {
+                        currentTeam = colBStr;
+                        inEmployeeSection = true;
                         dayNumbers = [];
+                        teamCount++;
+                        console.log('🏥 Team found (col B):', currentTeam);
                         continue;
                     }
-                    
-                    // اكتشاف صف أيام الأسبوع
-                    if (colA === null && row[4] && typeof row[4] === 'string' && 
-                        (row[4].indexOf('الأحد') !== -1 || row[4].indexOf('الاثنين') !== -1 || row[4].indexOf('الثلاثاء') !== -1)) {
-                        for (var c = 4; c < row.length && c < 36; c++) {
-                            if (row[c]) {
-                                dayNames[c] = String(row[c]);
-                            }
+                }
+                
+                // Detect header row with day numbers (1-31)
+                if (inEmployeeSection && (colAStr.indexOf('كود') !== -1 || colAStr.indexOf('الكود') !== -1 || colAStr.indexOf('الرقم') !== -1)) {
+                    dayNumbers = [];
+                    for (var c = 4; c < row.length && c < 40; c++) {
+                        var dayVal = parseInt(row[c]);
+                        if (!isNaN(dayVal) && dayVal >= 1 && dayVal <= 31) {
+                            dayNumbers[c] = dayVal;
                         }
-                        continue;
+                    }
+                    continue;
+                }
+                
+                // Detect employee row: has numeric code in first column and name in second
+                var empCode = null;
+                if (typeof colA === 'number' && colA > 100 && colA < 999999) {
+                    empCode = String(parseInt(colA));
+                } else if (typeof colA === 'string' && /^\d{3,6}$/.test(colA.trim())) {
+                    empCode = colA.trim();
+                }
+                
+                if (empCode && row[1] && typeof row[1] === 'string' && String(row[1]).trim().length > 2) {
+                    var empName = String(row[1]).trim();
+                    var empPhone = row[2] ? String(row[2]).trim() : '';
+                    var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
+                    
+                    if (!empName || empName.length < 3) continue;
+                    
+                    // Extract shift schedule for up to 31 days
+                    var schedule = [];
+                    var dayCols = Object.keys(dayNumbers).map(Number).sort(function(a, b) { return a - b; });
+                    
+                    for (var d = 0; d < dayCols.length; d++) {
+                        var c = dayCols[d];
+                        var shiftCode = String(row[c] || '').trim();
+                        if (!shiftCode) continue;
+                        
+                        var dayNum = dayNumbers[c];
+                        if (!dayNum || dayNum < 1 || dayNum > 31) continue;
+                        
+                        var dateStr = yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum);
+                        // Calculate day name using UTC to avoid timezone issues
+                        var dayDate = new Date(Date.UTC(yearNum, monthNum - 1, dayNum));
+                        var dayName = ARABIC_DAYS[dayDate.getUTCDay()] || '';
+                        
+                        var shiftName = shiftMap[shiftCode] || shiftCode;
+                        var shiftTime = shiftTimeMap[shiftCode] || '';
+                        var status = shiftStatusMap[shiftCode] || 'دوام';
+                        
+                        schedule.push({
+                            day: dayName,
+                            date: dateStr,
+                            shift: shiftName,
+                            shiftCode: shiftCode,
+                            time: shiftTime,
+                            location: currentTeam || 'غير محدد',
+                            status: status
+                        });
                     }
                     
-                    // اكتشاف صف أرقام الأيام
-                    if (colA && String(colA).indexOf('كود') !== -1 && row[1] && String(row[1]).indexOf('الاسم') !== -1) {
-                        for (var c = 4; c < row.length && c < 36; c++) {
-                            if (row[c] && !isNaN(parseInt(row[c]))) {
-                                dayNumbers[c] = parseInt(row[c]);
-                            }
-                        }
-                        continue;
-                    }
-                    
-                    // اكتشاف صف موظف (عنده كود رقمي + اسم)
-                    if (colA && (typeof colA === 'number' || !isNaN(parseInt(colA))) && 
-                        row[1] && typeof row[1] === 'string' && row[1].length > 5) {
-                        
-                        var empCode = String(parseInt(colA));
-                        var empName = String(row[1]).trim();
-                        var empPhone = row[2] ? String(row[2]).trim() : '';
-                        var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
-                        
-                        if (!empName || empName.length < 3) continue;
-                        
-                        // استخراج المناوبات
-                        var schedule = [];
-                        for (var c = 4; c < row.length && c < 36; c++) {
-                            var shiftCode = row[c];
-                            if (!shiftCode || String(shiftCode).trim() === '') continue;
-                            shiftCode = String(shiftCode).trim();
-                            
-                            var dayNum = dayNumbers[c] || (c - 3);
-                            var dayName = dayNames[c] || ARABIC_DAYS[(dayNum - 1) % 7];
-                            var dateStr = yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum);
-                            
-                            var shiftName = shiftMap[shiftCode] || shiftCode;
-                            var shiftTime = shiftTimeMap[shiftCode] || '';
-                            var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
-                            
-                            schedule.push({
-                                day: dayName,
-                                date: dateStr,
-                                shift: shiftName,
-                                shiftCode: shiftCode,
-                                time: shiftTime,
-                                location: currentTeam || 'غير محدد',
-                                status: status
-                            });
-                        }
-                        
-                        if (schedule.length > 0) {
-                            allEmployees.push({
-                                id: empCode,
-                                name: empName,
-                                jobTitle: empJob,
-                                employeeNumber: empCode,
-                                phone: empPhone,
-                                team: currentTeam,
-                                schedule: schedule
-                            });
-                        }
+                    if (schedule.length > 0) {
+                        allEmployees.push({
+                            id: empCode,
+                            name: empName,
+                            jobTitle: empJob,
+                            employeeNumber: empCode,
+                            phone: empPhone,
+                            team: currentTeam,
+                            schedule: schedule
+                        });
                     }
                 }
             }
             
-            console.log('✅ extractEmployees done, total:', allEmployees.length);
+            console.log('✅ extractEmployees (monthly) done, total employees:', allEmployees.length, 'teams:', teamCount);
+            
+            // Store import stats for UI feedback
+            window._lastImportedStats = {
+                employees: allEmployees.length,
+                month: monthNum,
+                year: yearNum,
+                teams: teamCount,
+                teamNames: [...new Set(allEmployees.map(function(e) { return e.team; }))].filter(Boolean)
+            };
+            
             return allEmployees.length > 0 ? allEmployees : generateDemoData();
         }
 
@@ -1919,8 +2060,22 @@
             document.getElementById('uploadProgress').classList.remove('active');
             document.getElementById('analysisStatus').classList.add('hidden');
             document.getElementById('analysisResult').classList.remove('hidden');
-            document.getElementById('analysisText').textContent = 'تم استخراج ' + count + ' موظف من الملف';
-            document.getElementById('analysisDetails').textContent = 'سيتم حفظ البيانات تلقائياً على السيرفر...';
+            
+            var stats = window._lastImportedStats || {};
+            var monthName = stats.month ? (ARABIC_MONTHS[stats.month - 1] || stats.month) : '';
+            
+            document.getElementById('analysisText').textContent = 'تم استيراد ' + count + ' مسعف';
+            
+            var detailsText = '';
+            if (stats.month && stats.year) {
+                detailsText += 'جدول شهر ' + monthName + ' ' + stats.year + ' — ';
+            }
+            if (stats.teams) {
+                detailsText += stats.teams + ' فرقة — ';
+            }
+            detailsText += 'سيتم حفظ البيانات في قاعدة البيانات...';
+            document.getElementById('analysisDetails').textContent = detailsText;
+            
             document.getElementById('extractedTableContainer').classList.remove('hidden');
             var saveArea = document.getElementById('saveActionArea');
             if (saveArea) saveArea.classList.remove('hidden');
@@ -1929,7 +2084,7 @@
         function showExtractedTable(data) {
             var thead = document.querySelector('#extractedTable thead tr');
             var tbody = document.querySelector('#extractedTable tbody');
-            thead.innerHTML = '<th>الرقم</th><th>الاسم</th><th>المسمى الوظيفي</th><th>رقم الجوال</th><th>عدد المناوبات</th>';
+            thead.innerHTML = '<th>الرقم</th><th>الاسم</th><th>المسمى الوظيفي</th><th>الفرقة</th><th>رقم الجوال</th><th>عدد المناوبات</th>';
             tbody.innerHTML = '';
             for (var i = 0; i < Math.min(data.length, 20); i++) {
                 var emp = data[i];
@@ -1937,9 +2092,15 @@
                 row.innerHTML = '<td>' + emp.id + '</td>' +
                     '<td><strong>' + emp.name + '</strong></td>' +
                     '<td>' + emp.jobTitle + '</td>' +
+                    '<td>' + (emp.team || '-') + '</td>' +
                     '<td>' + emp.phone + '</td>' +
                     '<td><span class="badge badge-status-work">' + emp.schedule.length + ' مناوبة</span></td>';
                 tbody.appendChild(row);
+            }
+            if (data.length > 20) {
+                var infoRow = document.createElement('tr');
+                infoRow.innerHTML = '<td colspan="6" style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.85rem;">... و ' + (data.length - 20) + ' مسعف إضافي</td>';
+                tbody.appendChild(infoRow);
             }
         }
 
@@ -1975,18 +2136,48 @@
                     return false;
                 }
                 var btn = document.getElementById('saveBtn');
-                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...'; }
-                var res = await fetch('/api/schedule/employees', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify(employees)
-                });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                var result = await res.json();
-                showToast('تم حفظ البيانات تلقائياً على الخادم', 'success');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الاستيراد...'; }
+                
+                // Build structured import payload for the new API
+                var importPayload = buildImportPayload();
+                
+                // Try new API first: POST /api/shift-roster/import
+                var newApiSuccess = false;
+                try {
+                    var res = await fetch('/api/shift-roster/import', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify(importPayload)
+                    });
+                    if (res.ok) {
+                        var result = await res.json();
+                        showToast('تم استيراد ' + importPayload.employees.length + ' مسعف و ' + importPayload.totalShifts + ' مناوبة إلى قاعدة البيانات', 'success');
+                        newApiSuccess = true;
+                    } else if (res.status !== 404) {
+                        console.warn('New API returned error:', res.status);
+                    }
+                } catch(e) {
+                    console.log('New API not available (expected during transition), falling back to legacy API');
+                }
+                
+                // Fallback to legacy API if new API not available
+                if (!newApiSuccess) {
+                    var res = await fetch('/api/schedule/employees', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify(employees)
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    var result = await res.json();
+                    showToast('تم حفظ البيانات على السيرفر (وضع التوافق)', 'success');
+                }
+                
                 var saveArea = document.getElementById('saveActionArea');
                 if (saveArea) saveArea.classList.add('hidden');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات على السيرفر'; }
@@ -1998,6 +2189,48 @@
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات على السيرفر'; }
                 return false;
             }
+        }
+        
+        // Build structured payload for the new shift-roster/import API
+        function buildImportPayload() {
+            var stats = window._lastImportedStats || {};
+            var month = stats.month || new Date().getMonth() + 1;
+            var year = stats.year || new Date().getFullYear();
+            
+            var payloadEmployees = [];
+            var totalShifts = 0;
+            
+            for (var i = 0; i < employees.length; i++) {
+                var emp = employees[i];
+                var shifts = [];
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    var sch = emp.schedule[s];
+                    shifts.push({
+                        day: parseInt(sch.date.split('-')[2]) || 0,
+                        date: sch.date,
+                        shift_code: sch.shiftCode,
+                        shift_name: sch.shift,
+                        status: sch.status
+                    });
+                    totalShifts++;
+                }
+                
+                payloadEmployees.push({
+                    employee_code: emp.id,
+                    name: emp.name,
+                    phone: emp.phone || '',
+                    job_title: emp.jobTitle || 'مسعف',
+                    team: emp.team || 'غير محدد',
+                    shifts: shifts
+                });
+            }
+            
+            return {
+                month: month,
+                year: year,
+                employees: payloadEmployees,
+                totalShifts: totalShifts
+            };
         }
 
         async function loadFromServer() {

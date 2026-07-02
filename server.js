@@ -1395,10 +1395,22 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
         const fuelStatus = {};
 
         for (let center in centersData) {
-            const staffCount = parseInt(centersData[center]?.staffCount) || 0;
-            const carsCount = parseInt(centersData[center]?.carsCount) || 0;
-            const vehStatus = centersData[center]?.vehicleStatus || '';
-            const fuelLvl = centersData[center]?.fuelLevel || '';
+            const cData = centersData[center];
+            let staffCount = parseInt(cData?.staffCount) || 0;
+            
+            // If assignedParamedics exists, calculate present count from actual roster
+            const assignedParamedics = cData?.assignedParamedics;
+            if (Array.isArray(assignedParamedics) && assignedParamedics.length > 0) {
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                staffCount = assignedParamedics.filter(p => {
+                    const code = p.shift_code ? p.shift_code.toString().toUpperCase() : '';
+                    return code && !absentCodes.includes(code);
+                }).length;
+            }
+            
+            const carsCount = parseInt(cData?.carsCount) || 0;
+            const vehStatus = cData?.vehicleStatus || '';
+            const fuelLvl = cData?.fuelLevel || '';
             totalStaff += staffCount;
             totalCars += carsCount;
             centerCount++;
@@ -1437,6 +1449,88 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' });
+    }
+});
+
+// ============================================
+// API: Paramedic display for shift completion
+// ============================================
+
+/**
+ * Check if a database table exists in SQLite.
+ */
+async function tableExists(tableName) {
+    try {
+        const row = await db.get(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name=?;`,
+            [tableName]
+        );
+        return !!row;
+    } catch (err) {
+        return false;
+    }
+}
+
+app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const teamName = decodeURIComponent(req.params.teamName);
+        
+        // Get shift data to find the date
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        
+        const shiftDate = shift.shiftDate;
+        if (!shiftDate) {
+            return res.json({ paramedics: [], shiftDate: null, teamName });
+        }
+        
+        // Check if new employee tables exist (created by backend worker)
+        const hasTeams = await tableExists('teams');
+        const hasEmployees = await tableExists('employees');
+        const hasShiftRoster = await tableExists('shift_roster');
+        const hasTeamAssignments = await tableExists('team_assignments');
+        
+        if (!hasTeams || !hasEmployees || !hasShiftRoster || !hasTeamAssignments) {
+            return res.json({ 
+                paramedics: [], 
+                source: 'legacy', 
+                shiftDate, 
+                teamName,
+                message: 'جداول المسعفين غير موجودة' 
+            });
+        }
+        
+        // Query paramedics for this team and date
+        const paramedics = await db.all(`
+            SELECT 
+                e.employee_code,
+                e.name,
+                e.phone,
+                e.job_title,
+                sr.shift_code,
+                sc.name as shift_name,
+                sc.status as shift_status
+            FROM employees e
+            JOIN team_assignments ta ON e.id = ta.employee_id
+            JOIN teams t ON t.id = ta.team_id
+            LEFT JOIN shift_roster sr ON sr.employee_id = e.id 
+                AND sr.shift_date = ? 
+                AND sr.team_id = t.id
+            LEFT JOIN shift_codes sc ON sc.code = sr.shift_code
+            WHERE t.name = ? 
+              AND e.is_active = 1
+              AND (ta.end_date IS NULL OR ta.end_date >= ?)
+            ORDER BY e.name
+        `, [shiftDate, teamName, shiftDate]);
+        
+        res.json({ paramedics, shiftDate, teamName });
+    } catch (error) {
+        console.error('[API] Error in shift-completion:', error);
+        res.json({ paramedics: [], source: 'fallback', error: error.message });
     }
 });
 

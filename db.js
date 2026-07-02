@@ -299,6 +299,66 @@ const TABLE_SCHEMAS = [
     time TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // --- Employees ---
+  `CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    job_title TEXT DEFAULT 'مسعف',
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // --- Teams ---
+  `CREATE TABLE IF NOT EXISTS teams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    center TEXT NOT NULL,
+    team_type TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1
+  );`,
+
+  // --- Shift Codes ---
+  `CREATE TABLE IF NOT EXISTS shift_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    time_start TEXT,
+    time_end TEXT,
+    color TEXT DEFAULT '#2563EB',
+    status TEXT DEFAULT 'دوام',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // --- Shift Roster ---
+  `CREATE TABLE IF NOT EXISTS shift_roster (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    shift_code TEXT NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  );`,
+
+  // --- Team Assignments ---
+  `CREATE TABLE IF NOT EXISTS team_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    assigned_date TEXT,
+    end_date TEXT,
+    is_primary INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
   );`
 ];
 
@@ -331,6 +391,62 @@ async function addColumnIfNotExists(tableName, columnDef) {
   });
 }
 
+// Default shift codes from the PDF analysis
+const DEFAULT_SHIFT_CODES = [
+  { code: 'D12', name: 'دوام 12 صباحاً', time_start: '05:00', time_end: '17:00', color: '#2563EB', status: 'دوام' },
+  { code: 'N12', name: 'دوام 12 ليلاً', time_start: '17:00', time_end: '05:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'M', name: 'مهمة', time_start: '00:00', time_end: '23:59', color: '#F59E0B', status: 'دوام' },
+  { code: 'O12', name: 'أوفرلاب 12', time_start: '05:00', time_end: '17:00', color: '#10B981', status: 'دوام' },
+  { code: 'V', name: 'إجازة', time_start: null, time_end: null, color: '#EF4444', status: 'إجازة' },
+  { code: 'WO', name: 'Weekend Off', time_start: null, time_end: null, color: '#F97316', status: 'راحة' },
+  { code: 'VC', name: 'إجازة مرضية', time_start: null, time_end: null, color: '#EC4899', status: 'إجازة' },
+  { code: 'C', name: 'تدريب', time_start: null, time_end: null, color: '#8B5CF6', status: 'تدريب' },
+  { code: 'ME', name: 'مكلف', time_start: null, time_end: null, color: '#06B6D4', status: 'دوام' },
+  { code: 'N8', name: 'دوام 8 ليلاً', time_start: '22:00', time_end: '06:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'CP8', name: 'تكميلية 8', time_start: null, time_end: null, color: '#84CC16', status: 'تكميل' },
+  { code: 'CP24', name: 'تكميلية 24', time_start: null, time_end: null, color: '#84CC16', status: 'تكميل' },
+  { code: 'CPD', name: 'تكميلية صباحية', time_start: '05:00', time_end: '17:00', color: '#84CC16', status: 'تكميل' },
+  { code: 'CPN', name: 'تكميلية ليلية', time_start: '17:00', time_end: '05:00', color: '#84CC16', status: 'تكميل' },
+  { code: 'E', name: 'إجازة', time_start: null, time_end: null, color: '#EF4444', status: 'إجازة' },
+  { code: 'EV', name: 'إجازة استثنائية', time_start: null, time_end: null, color: '#F43F5E', status: 'إجازة' },
+  { code: 'F', name: 'مكلف', time_start: null, time_end: null, color: '#06B6D4', status: 'دوام' },
+  { code: 'LN8', name: 'ليلية 8', time_start: '22:00', time_end: '06:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'LN10', name: 'ليلية 10', time_start: '20:00', time_end: '06:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'D10', name: 'دوام 10 صباحاً', time_start: '07:00', time_end: '17:00', color: '#2563EB', status: 'دوام' },
+  { code: 'D11', name: 'دوام 11 صباحاً', time_start: '06:00', time_end: '17:00', color: '#2563EB', status: 'دوام' },
+  { code: 'D8', name: 'دوام 8 صباحاً', time_start: '07:00', time_end: '15:00', color: '#2563EB', status: 'دوام' },
+  { code: 'D6', name: 'دوام 6 صباحاً', time_start: '05:00', time_end: '11:00', color: '#2563EB', status: 'دوام' },
+  { code: 'N10', name: 'دوام 10 ليلاً', time_start: '19:00', time_end: '05:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'N11', name: 'دوام 11 ليلاً', time_start: '18:00', time_end: '05:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'N6', name: 'دوام 6 ليلاً', time_start: '17:00', time_end: '23:00', color: '#7C3AED', status: 'دوام' },
+  { code: 'O10', name: 'أوفرلاب 10', time_start: '07:00', time_end: '17:00', color: '#10B981', status: 'دوام' },
+  { code: 'O6', name: 'أوفرلاب 6', time_start: '05:00', time_end: '11:00', color: '#10B981', status: 'دوام' }
+];
+
+async function seedShiftCodes() {
+  const hasData = await tableHasData('shift_codes');
+  if (hasData) {
+    logger.info('Shift codes already seeded. Skipping.');
+    return;
+  }
+  logger.info('Seeding default shift codes...');
+  await beginTransaction();
+  try {
+    for (const sc of DEFAULT_SHIFT_CODES) {
+      await run(
+        `INSERT INTO shift_codes (code, name, time_start, time_end, color, status) VALUES (?, ?, ?, ?, ?, ?);`,
+        [sc.code, sc.name, sc.time_start, sc.time_end, sc.color, sc.status]
+      );
+    }
+    await commitTransaction();
+    logger.info(`Seeded ${DEFAULT_SHIFT_CODES.length} shift codes`);
+  } catch (err) {
+    await rollbackTransaction();
+    logger.error('Shift codes seeding failed', err);
+    throw err;
+  }
+}
+
 /**
  * Initialize all tables. Safe to call multiple times (CREATE TABLE IF NOT EXISTS).
  * Also adds missing columns to existing tables.
@@ -345,6 +461,20 @@ async function initTables() {
   await addColumnIfNotExists('shifts', 'shift_day TEXT');
   await addColumnIfNotExists('shifts', 'vehicle_data TEXT');
   await addColumnIfNotExists('shifts', 'fuel_data TEXT');
+
+  // Create indexes for new tables
+  try {
+    await run(`CREATE INDEX IF NOT EXISTS idx_shift_roster_date_team ON shift_roster(shift_date, team_id);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_shift_roster_employee ON shift_roster(employee_id);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_team_assignments_employee ON team_assignments(employee_id);`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_team_assignments_team ON team_assignments(team_id);`);
+    logger.info('Indexes created successfully');
+  } catch (idxErr) {
+    logger.warn('Some indexes may already exist: ' + idxErr.message);
+  }
+
+  // Seed default shift codes
+  await seedShiftCodes();
 
   logger.info('All tables initialized successfully');
 }
@@ -923,6 +1053,266 @@ const Timeline = {
 };
 
 // ============================================
+// EMPLOYEES CRUD
+// ============================================
+
+const Employees = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO employees (employee_code, name, phone, job_title, is_active) VALUES (?, ?, ?, ?, ?);`,
+      [data.employee_code, data.name, data.phone || null, data.job_title || 'مسعف', data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1]
+    );
+    return result.lastID;
+  },
+
+  async getById(id) {
+    return get(`SELECT * FROM employees WHERE id = ?;`, [id]);
+  },
+
+  async getByCode(code) {
+    return get(`SELECT * FROM employees WHERE employee_code = ?;`, [code]);
+  },
+
+  async getAll() {
+    return all(`SELECT * FROM employees ORDER BY name;`);
+  },
+
+  async getActive() {
+    return all(`SELECT * FROM employees WHERE is_active = 1 ORDER BY name;`);
+  },
+
+  async update(id, data) {
+    const emp = await this.getById(id);
+    if (!emp) return null;
+    return run(
+      `UPDATE employees SET employee_code = ?, name = ?, phone = ?, job_title = ?, is_active = ? WHERE id = ?;`,
+      [data.employee_code ?? emp.employee_code, data.name ?? emp.name, data.phone ?? emp.phone, data.job_title ?? emp.job_title, data.is_active !== undefined ? (data.is_active ? 1 : 0) : emp.is_active, id]
+    );
+  },
+
+  async setActive(id, isActive) {
+    return run(`UPDATE employees SET is_active = ? WHERE id = ?;`, [isActive ? 1 : 0, id]);
+  },
+
+  async delete(id) {
+    return run(`DELETE FROM employees WHERE id = ?;`, [id]);
+  },
+
+  async deleteAll() {
+    return run(`DELETE FROM employees;`);
+  }
+};
+
+// ============================================
+// TEAMS CRUD
+// ============================================
+
+const Teams = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO teams (name, center, team_type, sort_order, is_active) VALUES (?, ?, ?, ?, ?);`,
+      [data.name, data.center, data.team_type || null, data.sort_order || 0, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1]
+    );
+    return result.lastID;
+  },
+
+  async getById(id) {
+    return get(`SELECT * FROM teams WHERE id = ?;`, [id]);
+  },
+
+  async getByName(name) {
+    return get(`SELECT * FROM teams WHERE name = ?;`, [name]);
+  },
+
+  async getAll() {
+    return all(`SELECT * FROM teams ORDER BY sort_order, name;`);
+  },
+
+  async getActive() {
+    return all(`SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name;`);
+  },
+
+  async getByCenter(center) {
+    return all(`SELECT * FROM teams WHERE center = ? ORDER BY sort_order, name;`, [center]);
+  },
+
+  async update(id, data) {
+    const t = await this.getById(id);
+    if (!t) return null;
+    return run(
+      `UPDATE teams SET name = ?, center = ?, team_type = ?, sort_order = ?, is_active = ? WHERE id = ?;`,
+      [data.name ?? t.name, data.center ?? t.center, data.team_type ?? t.team_type, data.sort_order ?? t.sort_order, data.is_active !== undefined ? (data.is_active ? 1 : 0) : t.is_active, id]
+    );
+  },
+
+  async delete(id) {
+    return run(`DELETE FROM teams WHERE id = ?;`, [id]);
+  },
+
+  async deleteAll() {
+    return run(`DELETE FROM teams;`);
+  }
+};
+
+// ============================================
+// SHIFT CODES CRUD
+// ============================================
+
+const ShiftCodes = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO shift_codes (code, name, time_start, time_end, color, status) VALUES (?, ?, ?, ?, ?, ?);`,
+      [data.code, data.name, data.time_start || null, data.time_end || null, data.color || '#2563EB', data.status || 'دوام']
+    );
+    return result.lastID;
+  },
+
+  async getById(id) {
+    return get(`SELECT * FROM shift_codes WHERE id = ?;`, [id]);
+  },
+
+  async getByCode(code) {
+    return get(`SELECT * FROM shift_codes WHERE code = ?;`, [code]);
+  },
+
+  async getAll() {
+    return all(`SELECT * FROM shift_codes ORDER BY code;`);
+  },
+
+  async update(id, data) {
+    const sc = await this.getById(id);
+    if (!sc) return null;
+    return run(
+      `UPDATE shift_codes SET code = ?, name = ?, time_start = ?, time_end = ?, color = ?, status = ? WHERE id = ?;`,
+      [data.code ?? sc.code, data.name ?? sc.name, data.time_start ?? sc.time_start, data.time_end ?? sc.time_end, data.color ?? sc.color, data.status ?? sc.status, id]
+    );
+  },
+
+  async delete(id) {
+    return run(`DELETE FROM shift_codes WHERE id = ?;`, [id]);
+  },
+
+  async deleteAll() {
+    return run(`DELETE FROM shift_codes;`);
+  }
+};
+
+// ============================================
+// SHIFT ROSTER CRUD
+// ============================================
+
+const ShiftRoster = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO shift_roster (employee_id, team_id, shift_date, shift_code, month, year) VALUES (?, ?, ?, ?, ?, ?);`,
+      [data.employee_id, data.team_id || null, data.shift_date, data.shift_code, data.month, data.year]
+    );
+    return result.lastID;
+  },
+
+  async getById(id) {
+    return get(`SELECT * FROM shift_roster WHERE id = ?;`, [id]);
+  },
+
+  async getAll() {
+    return all(`SELECT * FROM shift_roster ORDER BY shift_date DESC;`);
+  },
+
+  async getByDateAndTeam(shift_date, team_id) {
+    return all(
+      `SELECT sr.*, e.name as employee_name, e.employee_code, e.job_title FROM shift_roster sr JOIN employees e ON sr.employee_id = e.id WHERE sr.shift_date = ? AND sr.team_id = ? ORDER BY e.name;`,
+      [shift_date, team_id]
+    );
+  },
+
+  async getByMonthYear(month, year) {
+    return all(
+      `SELECT sr.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_roster sr JOIN employees e ON sr.employee_id = e.id LEFT JOIN teams t ON sr.team_id = t.id WHERE sr.month = ? AND sr.year = ? ORDER BY sr.shift_date, t.name, e.name;`,
+      [month, year]
+    );
+  },
+
+  async getByEmployeeAndDate(employee_id, shift_date) {
+    return get(`SELECT * FROM shift_roster WHERE employee_id = ? AND shift_date = ?;`, [employee_id, shift_date]);
+  },
+
+  async update(id, data) {
+    const sr = await this.getById(id);
+    if (!sr) return null;
+    return run(
+      `UPDATE shift_roster SET employee_id = ?, team_id = ?, shift_date = ?, shift_code = ?, month = ?, year = ? WHERE id = ?;`,
+      [data.employee_id ?? sr.employee_id, data.team_id ?? sr.team_id, data.shift_date ?? sr.shift_date, data.shift_code ?? sr.shift_code, data.month ?? sr.month, data.year ?? sr.year, id]
+    );
+  },
+
+  async delete(id) {
+    return run(`DELETE FROM shift_roster WHERE id = ?;`, [id]);
+  },
+
+  async deleteByMonthYear(month, year) {
+    return run(`DELETE FROM shift_roster WHERE month = ? AND year = ?;`, [month, year]);
+  },
+
+  async deleteAll() {
+    return run(`DELETE FROM shift_roster;`);
+  }
+};
+
+// ============================================
+// TEAM ASSIGNMENTS CRUD
+// ============================================
+
+const TeamAssignments = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO team_assignments (employee_id, team_id, assigned_date, end_date, is_primary) VALUES (?, ?, ?, ?, ?);`,
+      [data.employee_id, data.team_id, data.assigned_date || null, data.end_date || null, data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : 1]
+    );
+    return result.lastID;
+  },
+
+  async getById(id) {
+    return get(`SELECT * FROM team_assignments WHERE id = ?;`, [id]);
+  },
+
+  async getAll() {
+    return all(`SELECT * FROM team_assignments ORDER BY id DESC;`);
+  },
+
+  async getByEmployee(employee_id) {
+    return all(`SELECT * FROM team_assignments WHERE employee_id = ?;`, [employee_id]);
+  },
+
+  async getByTeam(team_id) {
+    return all(`SELECT * FROM team_assignments WHERE team_id = ?;`, [team_id]);
+  },
+
+  async getActiveByTeam(team_id) {
+    return all(
+      `SELECT ta.*, e.name as employee_name, e.employee_code, e.phone, e.job_title FROM team_assignments ta JOIN employees e ON ta.employee_id = e.id WHERE ta.team_id = ? AND (ta.end_date IS NULL OR ta.end_date >= date('now')) ORDER BY e.name;`,
+      [team_id]
+    );
+  },
+
+  async update(id, data) {
+    const ta = await this.getById(id);
+    if (!ta) return null;
+    return run(
+      `UPDATE team_assignments SET employee_id = ?, team_id = ?, assigned_date = ?, end_date = ?, is_primary = ? WHERE id = ?;`,
+      [data.employee_id ?? ta.employee_id, data.team_id ?? ta.team_id, data.assigned_date ?? ta.assigned_date, data.end_date ?? ta.end_date, data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : ta.is_primary, id]
+    );
+  },
+
+  async delete(id) {
+    return run(`DELETE FROM team_assignments WHERE id = ?;`, [id]);
+  },
+
+  async deleteAll() {
+    return run(`DELETE FROM team_assignments;`);
+  }
+};
+
+// ============================================
 // MIGRATION HELPERS
 // ============================================
 
@@ -1425,6 +1815,11 @@ module.exports = {
   Hospitals,
   References,
   Timeline,
+  Employees,
+  Teams,
+  ShiftCodes,
+  ShiftRoster,
+  TeamAssignments,
 
   // Migration
   migrateReports,
