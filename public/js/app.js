@@ -2529,6 +2529,13 @@ function openShiftModal() {
     if (modalContent) {
         modalContent.scrollTop = 0;
     }
+    // Update shift type badge in header
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+    }
     loadShifts().then(function() {
         // Auto-load current shift data if available
         if (currentShiftId && allShifts && allShifts.length > 0) {
@@ -2817,6 +2824,13 @@ function loadShiftToForm(shift) {
     viewingShiftId = shift.id;
     document.getElementById('shiftDate').innerText = shift.shiftDate || getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
+    // Update shift type badge in header
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var type = shift.shiftType || (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
+        var date = shift.shiftDate || getSaudiDate();
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + type + '</span> ' + date + ' — تسجيل بيانات تكميل النوبة';
+    }
     document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
     for (var i = 0; i < centerList.length; i++) {
         var center = centerList[i];
@@ -2872,6 +2886,13 @@ function getShiftFromForm() {
 function clearShiftForm() {
     document.getElementById('shiftDate').innerText = getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
+    // Update badge to current automatic shift
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+    }
     document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
     for (var i = 0; i < centerList.length; i++) {
         var staffInput = document.getElementById('staff_' + i);
@@ -5137,27 +5158,32 @@ function initShiftProgressBar() {
 }
 
 function updateShiftProgress() {
-    if (!currentShiftId) return;
-
-    // جلب وقت بداية المناوبة من allShifts
-    var shift = null;
-    for (var i = 0; i < allShifts.length; i++) {
-        if (allShifts[i].id === currentShiftId) {
-            shift = allShifts[i];
-            break;
-        }
-    }
-    if (!shift || !shift.startTime) return;
-
-    var start = new Date(shift.startTime);
+    // Calculate based on automatic shift schedule
     var now = new Date();
-    var elapsedMs = now - start;
-    var elapsedMinutes = Math.floor(elapsedMs / 60000);
+    var offset = 3;
+    var saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    var hour = saudiTime.getHours();
+    var minutes = saudiTime.getMinutes();
+    
+    // Determine shift start time (05:00 or 17:00 Saudi)
+    var shiftStartHour = (hour >= 5 && hour < 17) ? 5 : 17;
+    var shiftStart = new Date(saudiTime);
+    shiftStart.setHours(shiftStartHour, 0, 0, 0);
+    
+    // If we're in night shift (17:00-05:00), adjust for the previous day if needed
+    if (shiftStartHour === 17 && hour < 5) {
+        shiftStart.setDate(shiftStart.getDate() - 1);
+    }
+    
+    var shiftDurationMinutes = 720; // 12 hours
+    var elapsedMinutes = ((hour - shiftStartHour) * 60) + minutes;
+    if (elapsedMinutes < 0) elapsedMinutes += 24 * 60; // Handle night shift crossing midnight
+    
     var percent = Math.min((elapsedMinutes / shiftDurationMinutes) * 100, 100);
-
+    var remainingMinutes = Math.max(shiftDurationMinutes - elapsedMinutes, 0);
+    
     var elapsedHours = Math.floor(elapsedMinutes / 60);
     var elapsedMins = elapsedMinutes % 60;
-    var remainingMinutes = Math.max(shiftDurationMinutes - elapsedMinutes, 0);
     var remainingHours = Math.floor(remainingMinutes / 60);
     var remainingMins = remainingMinutes % 60;
 
