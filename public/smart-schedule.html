@@ -2198,37 +2198,37 @@
             var year = stats.year || new Date().getFullYear();
             
             var payloadEmployees = [];
+            var roster = [];
             var totalShifts = 0;
             
             for (var i = 0; i < employees.length; i++) {
                 var emp = employees[i];
-                var shifts = [];
-                for (var s = 0; s < emp.schedule.length; s++) {
-                    var sch = emp.schedule[s];
-                    shifts.push({
-                        day: parseInt(sch.date.split('-')[2]) || 0,
-                        date: sch.date,
-                        shift_code: sch.shiftCode,
-                        shift_name: sch.shift,
-                        status: sch.status
-                    });
-                    totalShifts++;
-                }
                 
                 payloadEmployees.push({
                     employee_code: emp.id,
                     name: emp.name,
                     phone: emp.phone || '',
                     job_title: emp.jobTitle || 'مسعف',
-                    team: emp.team || 'غير محدد',
-                    shifts: shifts
+                    team_name: emp.team || 'غير محدد'
                 });
+                
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    var sch = emp.schedule[s];
+                    roster.push({
+                        employee_code: emp.id,
+                        shift_date: sch.date,
+                        shift_code: sch.shiftCode,
+                        team_name: emp.team || 'غير محدد'
+                    });
+                    totalShifts++;
+                }
             }
             
             return {
                 month: month,
                 year: year,
                 employees: payloadEmployees,
+                roster: roster,
                 totalShifts: totalShifts
             };
         }
