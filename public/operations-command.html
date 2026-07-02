@@ -2687,28 +2687,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-  // Auth check
-  if (!authToken) {
-    showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
-    setTimeout(() => {
-      if (!authToken) window.location.href = 'index.html';
-    }, 3000);
-    return;
-  }
-  loadCurrentUser().then(() => {
-    loadDashboardData();
-    loadReferencesData();
-    loadHospitalsData();
-    loadFilesData();
-    loadTimelineData();
-    loadAnnouncementsData();
-  });
-
-  // Toast ترحيبي
-  setTimeout(() => {
-    showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
-  }, 800);
-});
 
 // ==========================================
 // syncUpdate — لـ websocket-sync.js
