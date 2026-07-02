@@ -2440,6 +2440,126 @@ app.post('/api/unit-location-addresses', authenticate, async (req, res) => {
     }
 });
 
+app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const data = await readData();
+        const shifts = await readShifts();
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const auditLog = await readAuditLog();
+        const reports = await readReportEntry();
+        
+        // Calculate stats
+        const totalReports = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
+        const activeCenters = Object.keys(data).filter(k => data[k].count > 0).length;
+        const totalShifts = shifts.length;
+        const totalUsers = users.filter(u => u.isActive).length;
+        
+        // Hourly distribution
+        const hourlyDistribution = {};
+        for (let i = 0; i < 24; i++) hourlyDistribution[i] = 0;
+        
+        // Last 7 days stats
+        const last7Days = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toLocaleDateString('ar-SA');
+            const dayShifts = shifts.filter(s => s.shiftDate === dateStr);
+            const dayReports = dayShifts.reduce((sum, s) => sum + (s.totalReports || 0), 0);
+            last7Days.push({ date: dateStr, reports: dayReports });
+        }
+        
+        // Center performance
+        const centerStats = {};
+        for (let i = 0; i < centerList.length; i++) {
+            const center = centerList[i];
+            let centerReports = 0;
+            for (let key in data) {
+                if (key.startsWith(center + '|')) centerReports += (data[key].count || 0);
+            }
+            centerStats[center] = centerReports;
+        }
+        
+        // Top 5 units
+        const unitStats = [];
+        for (let key in data) {
+            if (data[key].count > 0) {
+                unitStats.push({ key, count: data[key].count });
+            }
+        }
+        unitStats.sort((a, b) => b.count - a.count);
+        
+        res.json({
+            success: true,
+            stats: {
+                totalReports,
+                activeCenters,
+                totalShifts,
+                totalUsers,
+                hourlyDistribution,
+                last7Days,
+                centerStats,
+                topUnits: unitStats.slice(0, 10)
+            }
+        });
+    } catch (error) {
+        console.error('Admin stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+app.get('/api/admin/daily-report', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const saudiTime = getSaudiDateTime();
+        const today = saudiTime.toLocaleDateString('ar-SA');
+        const shiftType = getCurrentShiftType();
+        
+        const data = await readData();
+        const shifts = await readShifts();
+        const auditLog = await readAuditLog();
+        
+        // Today's shift
+        const todayShift = shifts.find(s => s.shiftDate === today && s.shiftType === shiftType);
+        
+        // Calculate metrics
+        const totalReports = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
+        const activeUnits = Object.keys(data).filter(k => data[k].count > 0).length;
+        const totalUnits = Object.keys(data).length;
+        
+        // Center breakdown
+        const centerBreakdown = {};
+        for (let key in data) {
+            const parts = key.split('|');
+            if (parts.length === 2) {
+                const center = parts[0];
+                if (!centerBreakdown[center]) centerBreakdown[center] = 0;
+                centerBreakdown[center] += data[key].count;
+            }
+        }
+        
+        // Recent audit entries (last 20)
+        const recentAudit = auditLog.slice(0, 20);
+        
+        res.json({
+            success: true,
+            report: {
+                date: today,
+                shiftType,
+                totalReports,
+                activeUnits,
+                totalUnits,
+                centerBreakdown,
+                recentAudit,
+                shiftData: todayShift || null
+            }
+        });
+    } catch (error) {
+        console.error('Daily report error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير' });
+    }
+});
+
 // ============================================
 // API: البيانات الجغرافية للمراكز
 // ============================================

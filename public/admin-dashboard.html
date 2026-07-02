@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم المشرف — منصة الجنوب</title>
+    <link rel="stylesheet" href="css/app.css?v=10">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); border-right: 4px solid var(--primary); }
+        .stat-card h3 { font-size: 0.85rem; color: var(--gray-500); margin: 0 0 8px; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--gray-900); }
+        .stat-change { font-size: 0.75rem; color: var(--teal); margin-top: 4px; }
+        .chart-container { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); margin-bottom: 24px; }
+        .chart-container h3 { margin: 0 0 16px; font-size: 1rem; color: var(--gray-900); }
+        .two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+        .top-list { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); }
+        .top-list h3 { margin: 0 0 16px; font-size: 1rem; }
+        .top-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-200); }
+        .top-item:last-child { border-bottom: none; }
+        .top-bar { height: 6px; background: var(--gray-200); border-radius: 3px; margin-top: 4px; }
+        .top-bar-fill { height: 100%; background: var(--primary); border-radius: 3px; }
+        .audit-log { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); max-height: 400px; overflow-y: auto; }
+        .audit-item { padding: 8px 0; border-bottom: 1px solid var(--gray-200); font-size: 0.85rem; }
+        .audit-item:last-child { border-bottom: none; }
+        .audit-time { color: var(--gray-400); font-size: 0.75rem; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header-bar h1 { font-size: 1.4rem; margin: 0; }
+        .btn-refresh { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+        .btn-refresh:hover { background: var(--primary-700); }
+        .loading { text-align: center; padding: 40px; color: var(--gray-400); }
+        .error { text-align: center; padding: 40px; color: var(--coral); }
+        @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="header-bar">
+            <h1><i class="fas fa-chart-line"></i> لوحة تحكم المشرف</h1>
+            <button class="btn-refresh" onclick="loadDashboard()"><i class="fas fa-sync-alt"></i> تحديث</button>
+        </div>
+
+        <div id="loading" class="loading">جاري تحميل البيانات...</div>
+        <div id="error" class="error" style="display:none;"></div>
+        <div id="dashboard" style="display:none;">
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <!-- Charts -->
+            <div class="two-col">
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-bar"></i> البلاغات حسب الساعة</h3>
+                    <canvas id="hourlyChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-line"></i> آخر 7 أيام</h3>
+                    <canvas id="weeklyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Centers & Audit Log -->
+            <div class="two-col">
+                <div class="top-list">
+                    <h3><i class="fas fa-trophy"></i> المراكز الأكثر نشاطاً</h3>
+                    <div id="topCenters"></div>
+                </div>
+                <div class="audit-log">
+                    <h3><i class="fas fa-history"></i> آخر الأنشطة</h3>
+                    <div id="auditLog"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var authToken = localStorage.getItem('authToken');
+        var hourlyChart, weeklyChart;
+
+        async function loadDashboard() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'none';
+
+            try {
+                var res = await fetch('/api/admin/stats', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                var result = await res.json();
+                if (!result.success) throw new Error(result.error || 'فشل في تحميل البيانات');
+
+                renderStats(result.stats);
+                renderCharts(result.stats);
+                renderTopCenters(result.stats.centerStats);
+
+                // Load audit log
+                var auditRes = await fetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                var auditResult = await auditRes.json();
+                if (auditResult.success) renderAuditLog(auditResult.logs || []);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+            } catch (e) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = '❌ ' + e.message;
+            }
+        }
+
+        function renderStats(stats) {
+            var grid = document.getElementById('statsGrid');
+            grid.innerHTML = `
+                <div class="stat-card" style="border-color:var(--primary)">
+                    <h3>إجمالي البلاغات</h3>
+                    <div class="stat-value">${stats.totalReports}</div>
+                    <div class="stat-change">📊 البلاغات المسجلة</div>
+                </div>
+                <div class="stat-card" style="border-color:var(--teal)">
+                    <h3>المراكز النشطة</h3>
+                    <div class="stat-value">${stats.activeCenters}</div>
+                    <div class="stat-change">🏥 مراكز ببلاغات</div>
+                </div>
+                <div class="stat-card" style="border-color:var(--gold)">
+                    <h3>المناوبات</h3>
+                    <div class="stat-value">${stats.totalShifts}</div>
+                    <div class="stat-change">📋 في الأرشيف</div>
+                </div>
+                <div class="stat-card" style="border-color:var(--coral)">
+                    <h3>المستخدمين</h3>
+                    <div class="stat-value">${stats.totalUsers}</div>
+                    <div class="stat-change">👥 نشطين</div>
+                </div>
+            `;
+        }
+
+        function renderCharts(stats) {
+            // Hourly chart
+            var hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+            if (hourlyChart) hourlyChart.destroy();
+            hourlyChart = new Chart(hourlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(stats.hourlyDistribution).map(h => h + ':00'),
+                    datasets: [{
+                        label: 'البلاغات',
+                        data: Object.values(stats.hourlyDistribution),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+
+            // Weekly chart
+            var weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+            if (weeklyChart) weeklyChart.destroy();
+            weeklyChart = new Chart(weeklyCtx, {
+                type: 'line',
+                data: {
+                    labels: stats.last7Days.map(d => d.date),
+                    datasets: [{
+                        label: 'البلاغات',
+                        data: stats.last7Days.map(d => d.reports),
+                        borderColor: 'var(--primary)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderTopCenters(centerStats) {
+            var container = document.getElementById('topCenters');
+            var sorted = Object.entries(centerStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            var max = sorted[0] ? sorted[0][1] : 1;
+            container.innerHTML = sorted.map(([center, count]) => `
+                <div class="top-item">
+                    <span>${center}</span>
+                    <span><strong>${count}</strong> بلاغ</span>
+                </div>
+                <div class="top-bar">
+                    <div class="top-bar-fill" style="width: ${(count / max) * 100}%"></div>
+                </div>
+            `).join('');
+        }
+
+        function renderAuditLog(logs) {
+            var container = document.getElementById('auditLog');
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<p style="color:var(--gray-400)">لا توجد أنشطة حديثة</p>';
+                return;
+            }
+            container.innerHTML = logs.slice(0, 15).map(entry => `
+                <div class="audit-item">
+                    <div><strong>${entry.action}</strong> — ${entry.user}</div>
+                    <div class="audit-time">${new Date(entry.timestamp).toLocaleString('ar-SA')}</div>
+                </div>
+            `).join('');
+        }
+
+        // Load on page load
+        loadDashboard();
+    </script>
+</body>
+</html>
