@@ -1553,7 +1553,30 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             return res.json({ paramedics: [], shiftDate: null, teamName });
         }
         
-        // Check if new employee tables exist (created by backend worker)
+        // Convert Arabic date to ISO format (e.g., "١/٧/٢٠٢٦" → "2026-07-01")
+        let isoDate = shiftDate;
+        if (shiftDate && typeof shiftDate === 'string') {
+            // Try to parse Arabic date format
+            const arabicNumerals = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+            let normalized = shiftDate;
+            for (let i = 0; i < 10; i++) {
+                normalized = normalized.split(arabicNumerals[i]).join(String(i));
+            }
+            // Try parsing DD/MM/YYYY or D/M/YYYY
+            const match = normalized.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                const year = match[3];
+                isoDate = `${year}-${month}-${day}`;
+            } else {
+                // Try YYYY-MM-DD
+                const isoMatch = normalized.match(/(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) isoDate = normalized;
+            }
+        }
+        
+        // Check if new employee tables exist
         const hasTeams = await tableExists('teams');
         const hasEmployees = await tableExists('employees');
         const hasShiftRoster = await tableExists('shift_roster');
@@ -1569,7 +1592,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             });
         }
         
-        // Query paramedics for this team and date
+        // Query paramedics for this team and date using ISO date
         const paramedics = await db.all(`
             SELECT 
                 e.employee_code,
@@ -1590,7 +1613,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
               AND e.is_active = 1
               AND (ta.end_date IS NULL OR ta.end_date >= ?)
             ORDER BY e.name
-        `, [shiftDate, teamName, shiftDate]);
+        `, [isoDate, teamName, isoDate]);
         
         const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
         const paramedicsWithStatus = paramedics.map(p => ({
