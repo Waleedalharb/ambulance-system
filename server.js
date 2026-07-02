@@ -2540,6 +2540,8 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
             }
             centerStats[center] = centerReports;
         }
+        
+        // Last 7 days stats
         const last7Days = [];
         const now = new Date();
         for (let i = 6; i >= 0; i--) {
@@ -2552,18 +2554,6 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
             const dayShifts = safeShifts.filter(s => s && s.shiftDate === dateStr);
             const dayReports = dayShifts.reduce((sum, s) => sum + (s && s.totalReports ? s.totalReports : 0), 0);
             last7Days.push({ date: dateStr, reports: dayReports });
-        }
-        
-        // Center performance
-        const centerStats = {};
-        const centerListFromServer = Object.keys(centerGeoData);
-        for (let i = 0; i < centerListFromServer.length; i++) {
-            const center = centerListFromServer[i];
-            let centerReports = 0;
-            for (let key in safeData) {
-                if (key.startsWith(center + '|')) centerReports += (safeData[key] && safeData[key].count ? safeData[key].count : 0);
-            }
-            centerStats[center] = centerReports;
         }
         
         // Top 10 units
