@@ -22,6 +22,25 @@ try {
     db = null;
 }
 
+// Helper: check if DB is available
+function dbAvailable() {
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments;
+}
+
+// Helper: safe DB response
+function dbResponse(res, promise, fallback) {
+    if (!dbAvailable()) {
+        return res.status(503).json({ 
+            error: 'قاعدة البيانات غير متوفرة', 
+            fallback: fallback !== undefined ? fallback : null 
+        });
+    }
+    promise.then(data => res.json(data)).catch(err => {
+        console.error('DB error:', err);
+        res.status(500).json({ error: 'خطأ في قاعدة البيانات' });
+    });
+}
+
 // ============================================
 // Logger (بسيط — يعمل حتى بدون winston)
 // ============================================
