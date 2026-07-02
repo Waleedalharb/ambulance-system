@@ -65,7 +65,7 @@ function broadcast(data) {
 // ============================================
 // في Render: عيّن متغير البيئة RENDER_DISK_PATH = /data
 // أو استخدم المسار الافتراضي داخل المشروع (للتطوير المحلي)
-const STORAGE_PATH = process.env.RENDER_DISK_PATH || path.join(__dirname, 'data');
+const STORAGE_PATH = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data');
 
 console.log('📂 مسار التخزين الرئيسي:', STORAGE_PATH);
 
