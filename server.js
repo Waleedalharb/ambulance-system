@@ -124,7 +124,11 @@ function getCurrentShiftType() {
 }
 
 function getCurrentShiftDate() {
-    return getSaudiDateTime().toLocaleDateString('ar-SA');
+    const saudiTime = getSaudiDateTime();
+    const year = saudiTime.getFullYear();
+    const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+    const day = saudiTime.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function getShiftKey() {
@@ -146,7 +150,41 @@ async function autoArchiveIfShiftChanged() {
         const existingShift = shifts.find(s => s.shiftDate === currentShiftDate && s.shiftType === currentShiftType);
         if (existingShift) return false; // Already archived for this shift
         
-        // Archive current data
+        // FIX: Check if data has timestamps from the CURRENT shift
+        // If so, don't archive - just create a shift record for tracking
+        const hasCurrentShiftData = Object.values(currentReports).some(r => {
+            if (!r.times || r.times.length === 0) return false;
+            return r.times.some(t => t.startsWith(currentShiftDate));
+        });
+        
+        if (hasCurrentShiftData) {
+            // Data is from current shift, create record without archiving/clearing
+            const saudiTime = getSaudiDateTime();
+            const newShift = {
+                id: Date.now(),
+                shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
+                shiftDate: currentShiftDate,
+                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+                shiftType: currentShiftType,
+                startTime: saudiTime.toISOString(),
+                savedReports: {},
+                totalReports: 0,
+                rapidLocations: {},
+                centersData: {},
+                vehicleData: {},
+                fuelData: {},
+                generalNotes: "",
+                lastUpdate: saudiTime.toISOString(),
+                autoArchived: false
+            };
+            shifts.unshift(newShift);
+            if (shifts.length > 50) shifts.pop();
+            await writeShifts(shifts);
+            currentShiftId = newShift.id;
+            return false;
+        }
+        
+        // Data is from previous shift, archive it properly
         const saudiTime = getSaudiDateTime();
         const newShift = {
             id: Date.now(),
@@ -1090,10 +1128,14 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             // Create new auto-shift record
             const now = new Date();
             const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+            const year = saudiTime.getFullYear();
+            const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+            const day = saudiTime.getDate().toString().padStart(2, '0');
+            const isoDate = `${year}-${month}-${day}`;
             const newShift = {
                 id: Date.now(),
-                shiftName: `${shiftData.shiftType || 'صباح'} - ${shiftDate || saudiTime.toLocaleDateString('ar-SA')}`,
-                shiftDate: shiftDate || saudiTime.toLocaleDateString('ar-SA'),
+                shiftName: `${shiftData.shiftType || 'صباح'} - ${shiftDate || isoDate}`,
+                shiftDate: shiftDate || isoDate,
                 shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
                 shiftType: shiftData.shiftType || 'صباح',
                 startTime: saudiTime.toISOString(),
@@ -2475,7 +2517,10 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
         for (let i = 6; i >= 0; i--) {
             const d = new Date(now);
             d.setDate(d.getDate() - i);
-            const dateStr = d.toLocaleDateString('ar-SA');
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             const dayShifts = safeShifts.filter(s => s && s.shiftDate === dateStr);
             const dayReports = dayShifts.reduce((sum, s) => sum + (s && s.totalReports ? s.totalReports : 0), 0);
             last7Days.push({ date: dateStr, reports: dayReports });
@@ -2524,7 +2569,10 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
 app.get('/api/admin/daily-report', authenticate, authorize(['admin']), async (req, res) => {
     try {
         const saudiTime = getSaudiDateTime();
-        const today = saudiTime.toLocaleDateString('ar-SA');
+        const year = saudiTime.getFullYear();
+        const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+        const day = saudiTime.getDate().toString().padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
         const shiftType = getCurrentShiftType();
         
         const data = await readData();
