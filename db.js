@@ -476,6 +476,9 @@ async function initTables() {
   // Seed default shift codes
   await seedShiftCodes();
 
+  // Seed default teams from hardcoded data
+  await seedDefaultTeams();
+
   logger.info('All tables initialized successfully');
 }
 

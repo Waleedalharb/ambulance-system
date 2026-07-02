@@ -11,8 +11,16 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
 
-// SQLite Database Module (للتخلص من Race Conditions في JSON files)
-const db = require('./db.js');
+// SQLite Database Module (optional — falls back to JSON if unavailable)
+let db = null;
+try {
+    db = require('./db.js');
+    console.log('✅ SQLite module loaded successfully');
+} catch (err) {
+    console.error('⚠️ SQLite module failed to load:', err.message);
+    console.log('📁 Falling back to JSON file mode');
+    db = null;
+}
 
 // ============================================
 // Logger (بسيط — يعمل حتى بدون winston)
@@ -1255,6 +1263,35 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             index = 0;
         }
         
+        // Enrich centersData with assignedParamedics from database if available
+        try {
+            const shiftDateToUse = targetShift ? targetShift.shiftDate : (shiftDate || isoDate);
+            const teams = await db.Teams.getAll();
+            const centerParamedics = {};
+            for (const team of teams) {
+                if (!centerParamedics[team.center]) centerParamedics[team.center] = [];
+                const roster = await db.ShiftRoster.getByDateAndTeam(shiftDateToUse, team.id);
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                for (const entry of roster) {
+                    centerParamedics[team.center].push({
+                        name: entry.employee_name,
+                        employeeCode: entry.employee_code,
+                        team: team.name,
+                        shiftCode: entry.shift_code,
+                        status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
+                    });
+                }
+            }
+            for (const center in targetShift.centersData) {
+                if (centerParamedics[center] && centerParamedics[center].length > 0) {
+                    targetShift.centersData[center].assignedParamedics = centerParamedics[center];
+                    targetShift.centersData[center].staffCount = centerParamedics[center].filter(p => p.status === 'حاضر').length;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not enrich centersData with paramedics:', e.message);
+        }
+        
         await writeShifts(shifts);
         if (targetShift) currentShiftId = targetShift.id;
 
@@ -1393,19 +1430,46 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
         const carDistribution = {};
         const vehicleStatus = {};
         const fuelStatus = {};
+        const paramedicDistribution = {};
+
+        // Pre-fetch paramedics from database for this shift date
+        const shiftDate = shift.shiftDate;
+        let dbParamedics = {};
+        try {
+            const teams = await db.Teams.getAll();
+            for (const team of teams) {
+                if (!dbParamedics[team.center]) dbParamedics[team.center] = [];
+                const roster = await db.ShiftRoster.getByDateAndTeam(shiftDate, team.id);
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                for (const entry of roster) {
+                    dbParamedics[team.center].push({
+                        name: entry.employee_name,
+                        shiftCode: entry.shift_code,
+                        status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch paramedics from DB for stats:', e.message);
+        }
 
         for (let center in centersData) {
             const cData = centersData[center];
             let staffCount = parseInt(cData?.staffCount) || 0;
             
-            // If assignedParamedics exists, calculate present count from actual roster
+            // If assignedParamedics exists in JSON, calculate present count from actual roster
             const assignedParamedics = cData?.assignedParamedics;
             if (Array.isArray(assignedParamedics) && assignedParamedics.length > 0) {
                 const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
                 staffCount = assignedParamedics.filter(p => {
-                    const code = p.shift_code ? p.shift_code.toString().toUpperCase() : '';
+                    const code = p.shiftCode ? p.shiftCode.toString().toUpperCase() : (p.shift_code ? p.shift_code.toString().toUpperCase() : '');
                     return code && !absentCodes.includes(code);
                 }).length;
+                paramedicDistribution[center] = assignedParamedics;
+            } else if (dbParamedics[center] && dbParamedics[center].length > 0) {
+                // Fallback to database paramedics
+                staffCount = dbParamedics[center].filter(p => p.status === 'حاضر').length;
+                paramedicDistribution[center] = dbParamedics[center];
             }
             
             const carsCount = parseInt(cData?.carsCount) || 0;
@@ -1444,7 +1508,8 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
             distribution,
             carDistribution,
             vehicleStatus,
-            fuelStatus
+            fuelStatus,
+            paramedicDistribution
         });
     } catch (error) {
         console.error(error);
@@ -3885,6 +3950,439 @@ app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, 
     }
 });
 
+// ============================================
+// API: Employees
+// ============================================
+app.get('/api/employees', authenticate, async (req, res) => {
+    try {
+        const employees = await db.Employees.getAll();
+        res.json({ success: true, employees });
+    } catch (error) {
+        console.error('Employees GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسعفين' });
+    }
+});
+
+app.get('/api/employees/:id', authenticate, async (req, res) => {
+    try {
+        const employee = await db.Employees.getById(req.params.id);
+        if (!employee) return res.status(404).json({ error: 'المسعف غير موجود' });
+        res.json({ success: true, employee });
+    } catch (error) {
+        console.error('Employee GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسعف' });
+    }
+});
+
+app.post('/api/employees', authenticate, authorize(['admin']), validateBody({
+    employee_code: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 1, maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const id = await db.Employees.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Employee POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة المسعف' });
+    }
+});
+
+app.put('/api/employees/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.Employees.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'المسعف غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Employee PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث المسعف' });
+    }
+});
+
+app.delete('/api/employees/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.Employees.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Employee DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف المسعف' });
+    }
+});
+
+// ============================================
+// API: Teams
+// ============================================
+app.get('/api/teams', authenticate, async (req, res) => {
+    try {
+        const teams = await db.Teams.getAll();
+        res.json({ success: true, teams });
+    } catch (error) {
+        console.error('Teams GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الفرق' });
+    }
+});
+
+app.get('/api/teams/:id', authenticate, async (req, res) => {
+    try {
+        const team = await db.Teams.getById(req.params.id);
+        if (!team) return res.status(404).json({ error: 'الفريق غير موجود' });
+        res.json({ success: true, team });
+    } catch (error) {
+        console.error('Team GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الفريق' });
+    }
+});
+
+app.post('/api/teams', authenticate, authorize(['admin']), validateBody({
+    name: { required: true, type: 'string', minLength: 1, maxLength: 100 },
+    center: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
+    try {
+        const id = await db.Teams.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Team POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة الفريق' });
+    }
+});
+
+app.put('/api/teams/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.Teams.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'الفريق غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Team PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الفريق' });
+    }
+});
+
+app.delete('/api/teams/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.Teams.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Team DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف الفريق' });
+    }
+});
+
+// ============================================
+// API: Shift Codes
+// ============================================
+app.get('/api/shift-codes', authenticate, async (req, res) => {
+    try {
+        const codes = await db.ShiftCodes.getAll();
+        res.json({ success: true, codes });
+    } catch (error) {
+        console.error('ShiftCodes GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب رموز المناوبات' });
+    }
+});
+
+app.get('/api/shift-codes/:id', authenticate, async (req, res) => {
+    try {
+        const code = await db.ShiftCodes.getById(req.params.id);
+        if (!code) return res.status(404).json({ error: 'الرمز غير موجود' });
+        res.json({ success: true, code });
+    } catch (error) {
+        console.error('ShiftCode GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الرمز' });
+    }
+});
+
+app.post('/api/shift-codes', authenticate, authorize(['admin']), validateBody({
+    code: { required: true, type: 'string', minLength: 1, maxLength: 20 },
+    name: { required: true, type: 'string', minLength: 1, maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const id = await db.ShiftCodes.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('ShiftCode POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة رمز المناوبة' });
+    }
+});
+
+app.put('/api/shift-codes/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.ShiftCodes.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'الرمز غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftCode PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث رمز المناوبة' });
+    }
+});
+
+app.delete('/api/shift-codes/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftCodes.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftCode DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف رمز المناوبة' });
+    }
+});
+
+// ============================================
+// API: Shift Roster
+// ============================================
+app.get('/api/shift-roster', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (month && year) {
+            const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+            res.json({ success: true, roster });
+        } else {
+            const roster = await db.ShiftRoster.getAll();
+            res.json({ success: true, roster });
+        }
+    } catch (error) {
+        console.error('ShiftRoster GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب جدول المناوبات' });
+    }
+});
+
+app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
+    try {
+        const entry = await db.ShiftRoster.getById(req.params.id);
+        if (!entry) return res.status(404).json({ error: 'السجل غير موجود' });
+        res.json({ success: true, entry });
+    } catch (error) {
+        console.error('ShiftRoster GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل' });
+    }
+});
+
+app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
+    employee_id: { required: true, type: 'number' },
+    shift_date: { required: true, type: 'string', minLength: 1 },
+    shift_code: { required: true, type: 'string', minLength: 1 },
+    month: { required: true, type: 'number' },
+    year: { required: true, type: 'number' }
+}), async (req, res) => {
+    try {
+        const id = await db.ShiftRoster.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('ShiftRoster POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل المناوبة' });
+    }
+});
+
+app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.ShiftRoster.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'السجل غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftRoster PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث سجل المناوبة' });
+    }
+});
+
+app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftRoster.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftRoster DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف سجل المناوبة' });
+    }
+});
+
+// ============================================
+// API: Bulk Import Shift Roster from Excel
+// ============================================
+app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { employees, roster, month, year } = req.body;
+        if (!employees || !Array.isArray(employees) || !roster || !Array.isArray(roster)) {
+            return res.status(400).json({ error: 'بيانات الاستيراد غير صالحة' });
+        }
+
+        await db.beginTransaction();
+        let empCount = 0;
+        let rosterCount = 0;
+        let teamCount = 0;
+        let assignmentCount = 0;
+
+        try {
+            // Ensure teams exist (insert if not present, using existing logic)
+            const allTeams = await db.Teams.getAll();
+            const teamMap = {};
+            for (const t of allTeams) { teamMap[t.name] = t.id; }
+
+            // Process employees: create or update
+            const employeeIdMap = {};
+            for (const emp of employees) {
+                const existing = await db.Employees.getByCode(emp.employee_code);
+                let empId;
+                if (existing) {
+                    await db.Employees.update(existing.id, emp);
+                    empId = existing.id;
+                } else {
+                    empId = await db.Employees.create(emp);
+                    empCount++;
+                }
+                employeeIdMap[emp.employee_code] = empId;
+
+                // Create team assignments if team provided
+                if (emp.team_name && teamMap[emp.team_name]) {
+                    const existingAssignments = await db.TeamAssignments.getByEmployee(empId);
+                    const alreadyAssigned = existingAssignments.find(a => a.team_id === teamMap[emp.team_name]);
+                    if (!alreadyAssigned) {
+                        await db.TeamAssignments.create({
+                            employee_id: empId,
+                            team_id: teamMap[emp.team_name],
+                            assigned_date: new Date().toISOString().split('T')[0],
+                            is_primary: 1
+                        });
+                        assignmentCount++;
+                    }
+                }
+            }
+
+            // Delete existing roster for same month/year to avoid duplicates
+            await db.ShiftRoster.deleteByMonthYear(month, year);
+
+            // Insert roster entries
+            for (const entry of roster) {
+                const empId = employeeIdMap[entry.employee_code];
+                if (!empId) continue;
+                let teamId = null;
+                if (entry.team_name && teamMap[entry.team_name]) {
+                    teamId = teamMap[entry.team_name];
+                }
+                await db.ShiftRoster.create({
+                    employee_id: empId,
+                    team_id: teamId,
+                    shift_date: entry.shift_date,
+                    shift_code: entry.shift_code,
+                    month: month,
+                    year: year
+                });
+                rosterCount++;
+            }
+
+            await db.commitTransaction();
+            res.json({ success: true, empCount, rosterCount, assignmentCount, teamCount });
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+    } catch (error) {
+        console.error('ShiftRoster import error:', error);
+        res.status(500).json({ error: 'فشل في استيراد جدول المناوبات' });
+    }
+});
+
+// ============================================
+// API: Team Assignments
+// ============================================
+app.get('/api/team-assignments', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getAll();
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.get('/api/team-assignments/employee/:employeeId', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getByEmployee(req.params.employeeId);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.get('/api/team-assignments/team/:teamId', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getActiveByTeam(req.params.teamId);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.post('/api/team-assignments', authenticate, authorize(['admin']), validateBody({
+    employee_id: { required: true, type: 'number' },
+    team_id: { required: true, type: 'number' }
+}), async (req, res) => {
+    try {
+        const id = await db.TeamAssignments.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('TeamAssignments POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة التعيين' });
+    }
+});
+
+app.put('/api/team-assignments/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.TeamAssignments.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'التعيين غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('TeamAssignments PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث التعيين' });
+    }
+});
+
+app.delete('/api/team-assignments/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.TeamAssignments.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('TeamAssignments DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف التعيين' });
+    }
+});
+
+// ============================================
+// API: Shift Completion — Get Paramedics for a Team
+// ============================================
+app.get('/api/shift-completion/:shiftId/:teamId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const teamId = parseInt(req.params.teamId);
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+
+        // First try to get from shift.centersData (already enriched by update-shift-data)
+        const team = await db.Teams.getById(teamId);
+        if (!team) {
+            return res.status(404).json({ error: 'الفريق غير موجود' });
+        }
+
+        const shiftDate = shift.shiftDate;
+        const roster = await db.ShiftRoster.getByDateAndTeam(shiftDate, teamId);
+        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+        const paramedics = roster.map(entry => ({
+            id: entry.employee_id,
+            name: entry.employee_name,
+            employeeCode: entry.employee_code,
+            jobTitle: entry.job_title,
+            shiftCode: entry.shift_code,
+            status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
+        }));
+
+        const presentCount = paramedics.filter(p => p.status === 'حاضر').length;
+        res.json({ success: true, paramedics, presentCount, totalCount: paramedics.length });
+    } catch (error) {
+        console.error('ShiftCompletion GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب بيانات المسعفين' });
+    }
+});
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'المسار غير موجود' });
@@ -3909,6 +4407,10 @@ initWebSocket(server);
 
 // Initialize SQLite Database + Migrate JSON data
 async function initDatabase() {
+    if (!db) {
+        console.log('📁 SQLite not available — using JSON file mode');
+        return;
+    }
     try {
         console.log('🗄️ Initializing SQLite database...');
         await db.init(true); // init + migrate
