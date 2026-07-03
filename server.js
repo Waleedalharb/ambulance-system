@@ -1674,8 +1674,6 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             ORDER BY e.name
         `, [isoDate, teamName, isoDate]);
         
-        const shiftType = shift.shiftType || 'صباحية';
-        const isNightShift = shiftType === 'ليلية' || shiftType === 'night';
         
         // Define valid shift codes for each shift type
         const dayShiftCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'M', 'CPD', 'CP8', 'CP24', 'C', 'O12', 'O10', 'O6', 'F', 'ME'];
