@@ -2656,31 +2656,33 @@ function updateWorkforceFromShiftData(shiftData) {
 }
 
 function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
-    animateValue('wfTotalStaff', totalStaff);
-    animateValue('wfTotalCars', totalCars);
-    document.getElementById('wfReadiness').innerText = readiness + '%';
-    document.getElementById('wfMissingCenters').innerText = missingCenters;
+    var staffEl = document.getElementById('wfTotalStaff');
+    var carsEl = document.getElementById('wfTotalCars');
+    var readinessEl = document.getElementById('wfReadiness');
+    var missingEl = document.getElementById('wfMissingCenters');
+    var staffProg = document.getElementById('wfStaffProgress');
+    var carsProg = document.getElementById('wfCarsProgress');
+    var missingProg = document.getElementById('wfMissingProgress');
+    var staffCircle = document.getElementById('wfStaffCircle');
+    var carsCircle = document.getElementById('wfCarsCircle');
+    var missingCircle = document.getElementById('wfMissingCircle');
+    
+    if (staffEl) animateValue('wfTotalStaff', totalStaff);
+    if (carsEl) animateValue('wfTotalCars', totalCars);
+    if (readinessEl) readinessEl.innerText = readiness + '%';
+    if (missingEl) missingEl.innerText = missingCenters;
     
     var staffPct = Math.min((totalStaff / 30) * 100, 100);
     var carsPct = Math.min((totalCars / 20) * 100, 100);
     var missingPct = Math.min((missingCenters / 10) * 100, 100);
     
-    document.getElementById('wfStaffProgress').style.width = staffPct + '%';
-    document.getElementById('wfCarsProgress').style.width = carsPct + '%';
-    document.getElementById('wfReadinessProgress').style.width = readiness + '%';
-    document.getElementById('wfMissingProgress').style.width = missingPct + '%';
+    if (staffProg) staffProg.style.width = staffPct + '%';
+    if (carsProg) carsProg.style.width = carsPct + '%';
+    if (missingProg) missingProg.style.width = missingPct + '%';
     
-    document.getElementById('wfStaffProgressText').innerText = totalStaff + ' / 30 هدف';
-    document.getElementById('wfCarsProgressText').innerText = totalCars + ' / 20 هدف';
-    document.getElementById('wfReadinessProgressText').innerText = readiness + '% جاهز';
-    document.getElementById('wfMissingProgressText').innerText = missingCenters + ' / 10 مركز';
-    
-    updateTrend('wfStaffTrend', totalStaff, 20);
-    updateTrend('wfCarsTrend', totalCars, 15);
-    updateTrend('wfReadinessTrend', readiness, 70);
-    updateTrend('wfMissingTrend', missingCenters, 3);
-    
-    document.getElementById('wfLastUpdate').innerText = getSaudiTime();
+    if (staffCircle) staffCircle.style.strokeDasharray = (staffPct / 100) * 283 + ' 283';
+    if (carsCircle) carsCircle.style.strokeDasharray = (carsPct / 100) * 283 + ' 283';
+    if (missingCircle) missingCircle.style.strokeDasharray = (missingPct / 100) * 283 + ' 283';
 }
 
 function animateValue(elementId, value) {
