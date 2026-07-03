@@ -387,6 +387,12 @@
                 <button class="btn btn-outline" onclick="document.getElementById('excelImport').click()">
                     <i class="fas fa-file-excel"></i> استيراد Excel
                 </button>
+                <button class="btn btn-outline" onclick="syncImportedToServer()" id="syncBtn" style="display:none;">
+                    <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
+                </button>
+                <button class="btn btn-outline btn-danger" onclick="clearServerRoster()" style="border-color:var(--danger);color:var(--danger);">
+                    <i class="fas fa-trash-alt"></i> حذف بيانات السيرفر
+                </button>
                 <input type="file" id="excelImport" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
             </div>
         </div>
@@ -1289,6 +1295,12 @@
         var container = document.getElementById('importedScheduleContainer');
         if (!container) return;
         
+        // Show/hide sync button
+        var syncBtn = document.getElementById('syncBtn');
+        if (syncBtn) {
+            syncBtn.style.display = (importedEmployees && importedEmployees.length > 0) ? 'inline-flex' : 'none';
+        }
+        
         if (importedEmployees.length === 0) {
             container.innerHTML = '<div class="empty-state"><i class="fas fa-file-excel"></i><h3>لا توجد بيانات مستوردة</h3><p>استورد ملف Excel لعرض الجدول هنا</p></div>';
             return;
@@ -1373,6 +1385,133 @@
     }
 
     // ============================================
+    // مزامنة مع السيرفر
+    // ============================================
+    async function syncImportedToServer() {
+        if (!importedEmployees || importedEmployees.length === 0) {
+            showToast('لا توجد بيانات مستوردة للمزامنة', 'warning');
+            return;
+        }
+        
+        var token = localStorage.getItem('authToken');
+        if (!token) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+        
+        // Convert importedEmployees to server format
+        var employees = [];
+        var roster = [];
+        var month = 0;
+        var year = 0;
+        
+        for (var i = 0; i < importedEmployees.length; i++) {
+            var emp = importedEmployees[i];
+            // Use first schedule entry's location as team_name
+            var teamName = '';
+            if (emp.schedule && emp.schedule.length > 0) {
+                teamName = emp.schedule[0].location || '';
+                // Extract month/year from first date
+                if (month === 0 && emp.schedule[0].date) {
+                    var parts = emp.schedule[0].date.split('-');
+                    if (parts.length === 3) {
+                        year = parseInt(parts[0]);
+                        month = parseInt(parts[1]);
+                    }
+                }
+            }
+            
+            employees.push({
+                employee_code: emp.empCode || '',
+                name: emp.empName || '',
+                phone: emp.empPhone || '',
+                job_title: emp.empJob || 'مسعف',
+                team_name: teamName
+            });
+            
+            // Build roster entries
+            if (emp.schedule && emp.schedule.length > 0) {
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    var entry = emp.schedule[s];
+                    if (entry.date && entry.shiftCode) {
+                        roster.push({
+                            employee_code: emp.empCode || '',
+                            team_name: entry.location || teamName,
+                            shift_date: entry.date,
+                            shift_code: entry.shiftCode,
+                            month: month,
+                            year: year
+                        });
+                    }
+                }
+            }
+        }
+        
+        if (month === 0 || year === 0) {
+            showToast('لم يتم التعرف على الشهر/السنة من البيانات', 'error');
+            return;
+        }
+        
+        showToast('جاري المزامنة مع السيرفر...', 'info');
+        
+        try {
+            var response = await fetch('/api/shift-roster/import', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    employees: employees,
+                    roster: roster,
+                    month: month,
+                    year: year
+                })
+            });
+            
+            var data = await response.json();
+            if (data.success) {
+                showToast('✅ تم المزامنة بنجاح! ' + (data.rosterCount || roster.length) + ' سجل محفوظ', 'success');
+            } else {
+                showToast('❌ فشل في المزامنة: ' + (data.error || 'خطأ غير معروف'), 'error');
+            }
+        } catch (err) {
+            console.error('Sync error:', err);
+            showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+        }
+    }
+
+    async function clearServerRoster() {
+        if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر!\n\nهل أنت متأكد؟')) return;
+        
+        var token = localStorage.getItem('authToken');
+        if (!token) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+        
+        try {
+            var response = await fetch('/api/shift-roster/clear-all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+            
+            var data = await response.json();
+            if (data.success) {
+                showToast('✅ ' + (data.message || 'تم حذف بيانات السيرفر'), 'success');
+            } else {
+                showToast('❌ فشل في الحذف: ' + (data.error || 'خطأ غير معروف'), 'error');
+            }
+        } catch (err) {
+            console.error('Clear error:', err);
+            showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+        }
+    }
+
+    // ============================================
     // حفظ البيانات
     // ============================================
     function saveTeamMembers() { localStorage.setItem('teamMembers', JSON.stringify(teamMembers)); }
@@ -1400,6 +1539,8 @@
     window.handleExcelImport = handleExcelImport;
     window.renderImportedSchedule = renderImportedSchedule;
     window.clearImportedData = clearImportedData;
+    window.syncImportedToServer = syncImportedToServer;
+    window.clearServerRoster = clearServerRoster;
     </script>
 </body>
 </html>

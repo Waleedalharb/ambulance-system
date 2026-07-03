@@ -2791,6 +2791,110 @@ async function deleteCurrentShift() {
     } catch (error) { alert("❌ خطأ في الاتصال"); }
 }
 
+function safeTeamId(teamName) {
+    return teamName.replace(/\s+/g, '_');
+}
+
+function isParamedicPresent(shiftCode) {
+    if (!shiftCode || shiftCode === '-' || shiftCode === '') return false;
+    var absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+    return absentCodes.indexOf(shiftCode.toString().toUpperCase()) === -1;
+}
+
+function renderTeamParamedics(teamName, type, index, paramedics) {
+    var safeName = safeTeamId(teamName);
+    var container = document.getElementById('paramedics_' + safeName);
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
+    var staffInputId = type === 'rapid' ? 'rapid_staff_' + index : 'staff_' + index;
+    var staffInput = document.getElementById(staffInputId);
+    var fallbackDiv = document.getElementById('fallback_' + staffInputId);
+    
+    if (!container) return;
+    
+    var presentCount = 0;
+    var html = '';
+    
+    if (paramedics.length === 0) {
+        html = '<div class="paramedic-no-data">لا يوجد مسعفين مسندين</div>';
+        if (fallbackDiv) fallbackDiv.style.display = 'block';
+    } else {
+        if (fallbackDiv) fallbackDiv.style.display = 'none';
+        for (var i = 0; i < paramedics.length; i++) {
+            var p = paramedics[i];
+            var isPresent = isParamedicPresent(p.shift_code);
+            if (isPresent) presentCount++;
+            var dotClass = isPresent ? 'present' : 'absent';
+            var statusText = isPresent ? 'حاضر' : 'غائب';
+            var code = p.shift_code || '-';
+            html += '<div class="paramedic-item" title="' + (p.name || '') + ' — ' + statusText + '">';
+            html += '<span class="paramedic-dot ' + dotClass + '"></span>';
+            html += '<span class="paramedic-name">' + (p.name || 'غير معروف') + '</span>';
+            html += '<span class="paramedic-code">' + code + '</span>';
+            html += '</div>';
+        }
+    }
+    
+    container.innerHTML = html;
+    
+    if (countDisplay) {
+        countDisplay.textContent = presentCount + ' حاضر';
+    }
+    
+    if (staffInput) {
+        staffInput.value = presentCount;
+    }
+    
+    if (type === 'rapid') {
+        updateRapidStatusIcon(index);
+    } else {
+        updateStatusIcon(index);
+    }
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+}
+
+async function fetchTeamParamedics(shiftId, teamName, type, index) {
+    var cacheKey = shiftId + '_' + teamName;
+    // Always fetch fresh data (cache-busting)
+    try {
+        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now(), {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+        var data = await response.json();
+        console.log('[PARAMEDICS] Team:', teamName, 'ShiftType:', data.shiftType, 'Count:', data.paramedics.length, 'Codes:', data.paramedics.map(p => p.shift_code));
+        var paramedics = data.paramedics || [];
+        teamParamedicData[cacheKey] = paramedics;
+        renderTeamParamedics(teamName, type, index, paramedics);
+    } catch (error) {
+        console.error('Failed to fetch paramedics for', teamName, error);
+        renderTeamParamedics(teamName, type, index, []);
+    }
+}
+
+async function loadTeamParamedics(shiftId) {
+    if (!shiftId) return;
+    
+    var teams = [];
+    for (var r = 0; r < rapidTeams.length; r++) {
+        teams.push({ name: rapidTeams[r].name, type: 'rapid', index: r });
+    }
+    for (var i = 0; i < centerList.length; i++) {
+        teams.push({ name: centerList[i], type: 'center', index: i });
+    }
+    
+    teams.forEach(function(t) {
+        var safeName = safeTeamId(t.name);
+        var container = document.getElementById('paramedics_' + safeName);
+        if (container) {
+            container.innerHTML = '<div class="paramedic-no-data"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div>';
+        }
+    });
+    
+    await Promise.all(teams.map(function(team) {
+        return fetchTeamParamedics(shiftId, team.name, team.type, team.index);
+    }));
+}
+
 function loadShiftToForm(shift) {
     if (!shift) return;
     viewingShiftId = shift.id;

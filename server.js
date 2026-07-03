@@ -1776,7 +1776,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
                 const startDate = new Date(shift.startTime);
                 const utcHour = startDate.getUTCHours();
                 const saudiHour = (utcHour + 3) % 24;
-                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليلية' : 'صباحية';
+                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليل' : 'صباح';
                 console.log('[SHIFT-TYPE] startTime:', shift.startTime, 'UTC hour:', utcHour, 'Saudi hour:', saudiHour, '→', derived);
                 return derived;
             }
@@ -1785,11 +1785,11 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             if (shift.shiftName) {
                 if (shift.shiftName.includes('ليل')) {
                     console.log('[SHIFT-TYPE] Derived from shiftName (night):', shift.shiftName);
-                    return 'ليلية';
+                    return 'ليل';
                 }
                 if (shift.shiftName.includes('صباح')) {
                     console.log('[SHIFT-TYPE] Derived from shiftName (day):', shift.shiftName);
-                    return 'صباحية';
+                    return 'صباح';
                 }
             }
             
@@ -1797,7 +1797,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             const now = new Date();
             const nowUtcHour = now.getUTCHours();
             const nowSaudiHour = (nowUtcHour + 3) % 24;
-            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليلية' : 'صباحية';
+            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليل' : 'صباح';
             console.log('[SHIFT-TYPE] Fallback current UTC:', nowUtcHour, 'Saudi:', nowSaudiHour, '→', fallback);
             return fallback;
         }
@@ -1873,22 +1873,36 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
         `, [isoDate, teamName, isoDate]);
         
         
-        // Define valid shift codes for each shift type
-        const dayShiftCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'M', 'CPD', 'CP8', 'CP24', 'C', 'O12', 'O10', 'O6', 'F', 'ME'];
-        const nightShiftCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN', 'CP24', 'C', 'O12', 'O10', 'O6', 'ME', 'F'];
-        const validCodes = isNightShift ? nightShiftCodes : dayShiftCodes;
+        // Define shift code categories for proper filtering
+        const dayOnlyCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'CPD', 'CP8'];
+        const nightOnlyCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
+        const sharedCodes = ['CP24', 'M', 'ME', 'F', 'O12', 'O10', 'O6'];
+        const offCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
         
-        // Filter paramedics: only show those whose shift code matches current shift type
+        const validCodes = isNightShift 
+            ? [...nightOnlyCodes, ...sharedCodes] 
+            : [...dayOnlyCodes, ...sharedCodes];
+        
+        // Filter paramedics: show working codes for this shift + all off codes (to show as absent)
         const filteredParamedics = paramedics.filter(p => {
             if (!p.shift_code) return false;
-            return validCodes.includes(p.shift_code.toUpperCase());
+            const codeUpper = p.shift_code.toUpperCase();
+            return validCodes.includes(codeUpper) || offCodes.includes(codeUpper);
         });
         
-        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
-        const paramedicsWithStatus = filteredParamedics.map(p => ({
-            ...p,
-            status: p.shift_code && absentCodes.includes(p.shift_code.toUpperCase()) ? 'غائب' : 'حاضر'
-        }));
+        // Map paramedics with accurate status using database shift_status
+        const paramedicsWithStatus = filteredParamedics.map(p => {
+            const codeUpper = p.shift_code ? p.shift_code.toUpperCase() : '';
+            const isOff = offCodes.includes(codeUpper);
+            // Use actual shift_status from database for accurate display
+            const actualStatus = p.shift_status || '';
+            const displayStatus = isOff ? 'غائب' : 'حاضر';
+            return {
+                ...p,
+                status: displayStatus,
+                actualStatus: actualStatus
+            };
+        });
         
         res.json({ paramedics: paramedicsWithStatus, shiftDate, teamName, shiftType });
     } catch (error) {
@@ -4703,6 +4717,39 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
     } catch (error) {
         console.error('ShiftRoster import error:', error);
         res.status(500).json({ error: 'فشل في استيراد جدول المناوبات' });
+    }
+});
+
+// ============================================
+// API: Clear All Shift Roster Data
+// ============================================
+app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftRoster.deleteAll();
+        res.json({ success: true, message: 'تم حذف جميع بيانات الجدول بنجاح' });
+    } catch (error) {
+        console.error('ShiftRoster clear-all error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
+// API: Clear Shift Roster by Date Range
+// ============================================
+app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'تاريخ البداية والنهاية مطلوب' });
+        }
+        const result = await db.run(
+            'DELETE FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+            [startDate, endDate]
+        );
+        res.json({ success: true, deleted: result.changes, message: `تم حذف ${result.changes} سجل من الجدول` });
+    } catch (error) {
+        console.error('ShiftRoster clear error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
     }
 });
 
