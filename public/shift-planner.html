@@ -386,7 +386,7 @@
     function editCell(dateKey, shiftKey) { var available = teamMembers.filter(function(m) { return !leaveRequests.some(function(l) { return l.memberId === m.id && l.status === 'approved' && isDateInRange(dateKey, l.from, l.to); }); }); if (available.length === 0) { showToast('لا يوجد أعضاء متاحين', 'error'); return; } var selected = prompt('اختر الأعضاء (افصل بينهم بفاصلة):\n\nمتاحون:\n' + available.map(function(m) { return m.name; }).join('\n')); if (selected === null) return; var selectedNames = selected.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }); if (!scheduleData[dateKey]) scheduleData[dateKey] = {}; scheduleData[dateKey][shiftKey] = selectedNames; saveSchedule(); renderSchedule(); showToast('تم تحديث الجدول', 'success'); }
     function isDateInRange(dateStr, from, to) { var d = new Date(dateStr); return d >= new Date(from) && d <= new Date(to); }
 
-    function renderTeamList() { var container = document.getElementById('teamList'); if (teamMembers.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد أعضاء</h3></div>'; return; } var html = ''; teamMembers.forEach(function(m) { var statusClass = m.status === 'online' ? 'status-online' : m.status === 'busy' ? 'status-busy' : 'status-offline'; var roleLabels = { paramedic: 'مسعف', driver: 'سائق', nurse: 'ممرض', supervisor: 'مشرف', doctor: 'طبيب' }; html += '<div class="team-member"><div class="avatar">' + (m.name ? m.name.charAt(0) : '?') + '</div><div class="info"><div class="name">' + (m.name || '—') + '</div><div class="role">' + (roleLabels[m.role] || m.role) + ' • ' + (m.center || '—') + '</div></div><div class="status ' + statusClass + '"></div><button class="btn btn-sm btn-outline" onclick="toggleStatus(\'' + m.id + '\')">تغيير</button></div>'; }); container.innerHTML = html; }
+    function renderTeamList() { var container = document.getElementById('teamList'); if (teamMembers.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد أعضاء</h3></div>'; return; } var html = ''; teamMembers.forEach(function(m) { var statusClass = m.status === 'online' ? 'status-online' : m.status === 'busy' ? 'status-busy' : 'status-offline'; var roleLabels = { paramedic: 'مسعف', driver: 'سائق', nurse: 'ممرض', supervisor: 'مشرف', doctor: 'طبيب' }; html += '<div class="team-member"><div class="avatar">' + (m.name ? String(m.name).charAt(0) : '?') + '</div><div class="info"><div class="name">' + (m.name || '—') + '</div><div class="role">' + (roleLabels[m.role] || m.role) + ' • ' + (m.center || '—') + '</div></div><div class="status ' + statusClass + '"></div><button class="btn btn-sm btn-outline" onclick="toggleStatus(\'' + m.id + '\')">تغيير</button></div>'; }); container.innerHTML = html; }
     function toggleStatus(id) { var m = teamMembers.find(function(x) { return x.id === id; }); if (!m) return; var statuses = ['online','busy','offline']; m.status = statuses[(statuses.indexOf(m.status) + 1) % statuses.length]; saveTeamMembers(); renderTeamList(); updateStats(); }
     function saveTeamMembers() { localStorage.setItem('teamMembers', JSON.stringify(teamMembers)); }
     function saveSchedule() { localStorage.setItem('scheduleData', JSON.stringify(scheduleData)); }
@@ -428,12 +428,12 @@
                     db.close();
                     smartScheduleData = employees.map(function(emp) {
                         return {
-                            name: emp.name || '',
-                            team: emp.team || '',
-                            jobTitle: emp.jobTitle || emp.jobCode || '',
-                            phone: emp.phone || '',
+                            name: String(emp.name || ''),
+                            team: String(emp.team || ''),
+                            jobTitle: String(emp.jobTitle || emp.jobCode || ''),
+                            phone: String(emp.phone || ''),
                             schedule: (emp.schedule || []).map(function(s) {
-                                return { day: s.day || '', date: s.date || '', shiftCode: s.shiftCode || s.shift || '' };
+                                return { day: String(s.day || ''), date: String(s.date || ''), shiftCode: String(s.shiftCode || s.shift || '') };
                             })
                         };
                     });
