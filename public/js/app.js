@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v14-2026-07-03';
+    var APP_VERSION = 'v15-2026-07-04';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -2944,6 +2944,8 @@ function loadShiftToForm(shift) {
         if (staffInput) staffInput.value = data.staffCount || '';
         if (carsInput) carsInput.value = data.carsCount || '';
         if (notesInput) notesInput.value = data.notes || '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
         // Restore cached paramedic data if available
         if (shift.id && data.assignedParamedics && data.assignedParamedics.length > 0) {
             teamParamedicData[shift.id + '_' + rapid.name] = data.assignedParamedics;
@@ -2965,6 +2967,8 @@ function loadShiftToForm(shift) {
         if (notesInput) notesInput.value = data.notes || '';
         if (vehicleSel) vehicleSel.value = data.vehicleStatus || '';
         if (fuelSel) fuelSel.value = data.fuelLevel || '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
         // Restore cached paramedic data if available
         if (shift.id && data.assignedParamedics && data.assignedParamedics.length > 0) {
             teamParamedicData[shift.id + '_' + center] = data.assignedParamedics;
@@ -3014,6 +3018,7 @@ function getShiftFromForm() {
         var carsInput = document.getElementById('rapid_cars_' + r);
         var notesInput = document.getElementById('rapid_notes_' + r);
         var assignedParamedics = teamParamedicData[viewingShiftId + '_' + rapid.name] || [];
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
         centersDataForm[rapid.name] = {
             staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
             carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
@@ -3021,7 +3026,8 @@ function getShiftFromForm() {
             vehicleStatus: '',
             fuelLevel: '',
             isRapid: true,
-            assignedParamedics: assignedParamedics
+            assignedParamedics: assignedParamedics,
+            backupParamedic: (backupParamedicInput && backupParamedicInput.value) ? backupParamedicInput.value : ''
         };
     }
     
@@ -3033,6 +3039,7 @@ function getShiftFromForm() {
         var vehicleSel = document.getElementById('vehicle_' + i);
         var fuelSel = document.getElementById('fuel_' + i);
         var assignedParamedics = teamParamedicData[viewingShiftId + '_' + center] || [];
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
         centersDataForm[center] = {
             staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
             carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
@@ -3040,7 +3047,8 @@ function getShiftFromForm() {
             vehicleStatus: (vehicleSel && vehicleSel.value) ? vehicleSel.value : '',
             fuelLevel: (fuelSel && fuelSel.value) ? fuelSel.value : '',
             isRapid: false,
-            assignedParamedics: assignedParamedics
+            assignedParamedics: assignedParamedics,
+            backupParamedic: (backupParamedicInput && backupParamedicInput.value) ? backupParamedicInput.value : ''
         };
     }
     return { shiftType: shiftType, rapidLocations: {}, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
@@ -3065,7 +3073,8 @@ function clearShiftForm() {
         if (staffInput) staffInput.value = '';
         if (carsInput) carsInput.value = '';
         if (notesInput) notesInput.value = '';
-        var safeName = safeTeamId(rapidTeams[r].name);
+        var backupParamedicInputRapid = document.getElementById('backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) backupParamedicInputRapid.value = '';
         var container = document.getElementById('paramedics_' + safeName);
         var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
         var fallbackDiv = document.getElementById('fallback_rapid_staff_' + r);
@@ -3084,7 +3093,8 @@ function clearShiftForm() {
         if (carsInput) carsInput.value = '';
         if (notesInput) notesInput.value = '';
         if (vehicleSel) vehicleSel.value = '';
-        if (fuelSel) fuelSel.value = '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (backupParamedicInput) backupParamedicInput.value = '';
         var safeName = safeTeamId(centerList[i]);
         var container = document.getElementById('paramedics_' + safeName);
         var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
@@ -5248,6 +5258,9 @@ function buildCentersTable() {
                 <div class="fallback-staff-input" id="fallback_rapid_staff_${r}" style="display:none;">
                     <input type="number" id="fallback_rapid_staff_input_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1">
                 </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_rapid_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
             </td>
             <td><input type="number" id="rapid_cars_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1"></td>
             <td style="text-align:center;">${actionHtml}</td>
@@ -5264,6 +5277,26 @@ function buildCentersTable() {
                 return function() { 
                     var hidden = document.getElementById('rapid_staff_' + idx);
                     if (hidden) hidden.value = fallbackStaffInput.value;
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        // Backup paramedic input for rapid teams
+        var backupParamedicInputRapid = tr.querySelector('#backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) {
+            backupParamedicInputRapid.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    var backupValue = backupParamedicInputRapid.value.trim();
+                    if (backupValue) {
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
                     updateRapidStatusIcon(idx); 
                     calculateWorkforceStatsLocally(); 
                     updateShiftKPIs();
@@ -5320,6 +5353,9 @@ function buildCentersTable() {
                 <div class="fallback-staff-input" id="fallback_staff_${i}" style="display:none;">
                     <input type="number" id="fallback_staff_input_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value="" placeholder="2+">
                 </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
             </td>
             <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value="" placeholder="1+"></td>
             <td style="text-align:center;">${actionHtml}</td>
@@ -5340,6 +5376,27 @@ function buildCentersTable() {
                 return function() { 
                     var hidden = document.getElementById('staff_' + idx);
                     if (hidden) hidden.value = fallbackStaffInput.value;
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
+        
+        // Backup paramedic input for manual coverage
+        var backupParamedicInput = tr.querySelector('#backup_paramedic_' + i);
+        if (backupParamedicInput) {
+            backupParamedicInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    var backupValue = backupParamedicInput.value.trim();
+                    if (backupValue) {
+                        // If backup paramedic entered, set staff to at least 1 (or current + 1)
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
                     updateStatusIcon(idx); 
                     calculateWorkforceStatsLocally(); 
                     updateShiftKPIs();
@@ -5480,10 +5537,12 @@ function updateRapidStatusIcon(index) {
     var staffInput = document.getElementById('rapid_staff_' + index);
     var carsInput = document.getElementById('rapid_cars_' + index);
     var iconSpan = document.getElementById('rapid_status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
     if (staffInput && carsInput && iconSpan) {
         var staffCount = parseInt(staffInput.value) || 0;
         var carsCount = parseInt(carsInput.value) || 0;
-        if (staffCount >= 1 && carsCount >= 1) { 
+        if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) { 
             iconSpan.innerHTML = '✅'; 
             iconSpan.className = 'status-icon status-ok'; 
         } else { 
@@ -5521,10 +5580,12 @@ function updateStatusIcon(index) {
     var staffInput = document.getElementById('staff_' + index);
     var carsInput = document.getElementById('cars_' + index);
     var iconSpan = document.getElementById('status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
     if (staffInput && carsInput && iconSpan) {
         var staffCount = parseInt(staffInput.value) || 0;
         var carsCount = parseInt(carsInput.value) || 0;
-        if (staffCount >= 2 && carsCount >= 1) { 
+        if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) { 
             iconSpan.innerHTML = '✅'; 
             iconSpan.className = 'status-icon status-ok'; 
         } else { 
@@ -5546,12 +5607,18 @@ function calculateWorkforceStatsLocally() {
         if (staffInput && carsInput) {
             var staffCount = parseInt(staffInput.value) || 0;
             var carsCount = parseInt(carsInput.value) || 0;
+            // Check for backup paramedic
+            var backupParamedicInput = isRapid ? tr.querySelector('input[id^="backup_paramedic_rapid_"]') : tr.querySelector('input[id^="backup_paramedic_"]');
+            var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+            if (hasBackupParamedic) {
+                staffCount = Math.max(staffCount, 1); // At least 1 if backup paramedic exists
+            }
             totalStaff += staffCount; totalCars += carsCount; centerCount++;
             distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
             if (isRapid) {
-                if (staffCount >= 1 && carsCount >= 1) readyCenters++; else missingCenters++;
+                if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
             } else {
-                if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+                if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
             }
         }
     });
