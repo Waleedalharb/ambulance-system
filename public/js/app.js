@@ -14,7 +14,7 @@ try {
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v15-2026-07-04';
+    var APP_VERSION = 'v16-2026-07-05';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -2816,12 +2816,10 @@ function openShiftModal() {
         buildCentersTable();
     }
     document.getElementById('shiftModal').style.display = 'flex';
-    // Scroll to top of modal content
     var modalContent = document.querySelector('#shiftModal .modal-content');
     if (modalContent) {
         modalContent.scrollTop = 0;
     }
-    // Update shift type badge in header
     var typeBadge = document.getElementById('shiftModalTypeBadge');
     if (typeBadge) {
         var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
@@ -2829,27 +2827,30 @@ function openShiftModal() {
         typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
     }
     loadShifts().then(function() {
-        // Auto-load current shift data if available
         var currentShift = null;
+        var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
         
-        // Try by ID first
         if (currentShiftId && allShifts && allShifts.length > 0) {
             for (var i = 0; i < allShifts.length; i++) {
                 if (allShifts[i].id === currentShiftId) {
-                    currentShift = allShifts[i];
+                    if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
+                        currentShift = allShifts[i];
+                    } else {
+                        currentShiftId = null;
+                        viewingShiftId = null;
+                        isViewingArchiveShift = false;
+                    }
                     break;
                 }
             }
         }
         
-        // If not found by ID, try by date + type
         if (!currentShift && allShifts && allShifts.length > 0) {
-            var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
-            var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
             for (var i = 0; i < allShifts.length; i++) {
                 if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
                     currentShift = allShifts[i];
-                    currentShiftId = allShifts[i].id; // Update client variable
+                    currentShiftId = allShifts[i].id;
                     break;
                 }
             }
@@ -2862,6 +2863,61 @@ function openShiftModal() {
             document.getElementById('shiftDate').innerText = getSaudiDate();
         }
     });
+    
+    // Start periodic check for shift boundary crossing
+    startShiftBoundaryCheck();
+}
+
+var shiftBoundaryCheckInterval = null;
+var lastShiftType = null;
+
+function startShiftBoundaryCheck() {
+    if (shiftBoundaryCheckInterval) clearInterval(shiftBoundaryCheckInterval);
+    lastShiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    shiftBoundaryCheckInterval = setInterval(function() {
+        var modal = document.getElementById('shiftModal');
+        if (!modal || modal.style.display === 'none') {
+            clearInterval(shiftBoundaryCheckInterval);
+            shiftBoundaryCheckInterval = null;
+            return;
+        }
+        var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        if (currentType !== lastShiftType) {
+            console.log('[SHIFT-BOUNDARY] Shift changed from', lastShiftType, 'to', currentType, '- refreshing modal');
+            lastShiftType = currentType;
+            // Refresh the modal with new shift
+            var typeBadge = document.getElementById('shiftModalTypeBadge');
+            if (typeBadge) {
+                var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+                typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + currentType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+            }
+            // Reload shifts and switch to correct shift
+            currentShiftId = null;
+            viewingShiftId = null;
+            isViewingArchiveShift = false;
+            loadShifts().then(function() {
+                var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+                var currentShift = null;
+                if (allShifts && allShifts.length > 0) {
+                    for (var i = 0; i < allShifts.length; i++) {
+                        if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
+                            currentShift = allShifts[i];
+                            currentShiftId = allShifts[i].id;
+                            break;
+                        }
+                    }
+                }
+                if (currentShift) {
+                    loadShiftToForm(currentShift);
+                    showToast('🔄 تم تغيير المناوبة تلقائياً إلى ' + currentType, 'info');
+                } else {
+                    clearShiftForm();
+                    document.getElementById('shiftDate').innerText = getSaudiDate();
+                    showToast('🔄 تم تغيير نوع المناوبة إلى ' + currentType + ' - ابدأ تكميل جديد', 'info');
+                }
+            });
+        }
+    }, 30000); // Check every 30 seconds
 }
 
 async function loadShifts() {
@@ -3058,6 +3114,10 @@ async function returnToCurrentShift() {
     document.getElementById('archiveSelect').value = '';
     document.getElementById('updateStatus').innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
     document.getElementById('shiftModal').style.display = 'none';
+    if (shiftBoundaryCheckInterval) {
+        clearInterval(shiftBoundaryCheckInterval);
+        shiftBoundaryCheckInterval = null;
+    }
 }
 
 // debounce helper for auto-save
@@ -3148,6 +3208,10 @@ async function deleteCurrentShift() {
             updateWorkforceStats();
             updateDistributionIndicator();
             document.getElementById('shiftModal').style.display = 'none';
+            if (shiftBoundaryCheckInterval) {
+                clearInterval(shiftBoundaryCheckInterval);
+                shiftBoundaryCheckInterval = null;
+            }
             // Audit log
             try { if (typeof addAuditEntry === 'function') { addAuditEntry('shift', 'حذف مناوبة', 'تم حذف المناوبة رقم ' + targetId, currentUser && currentUser.name); } } catch(e) {}
         } else { alert("❌ فشل في الحذف"); }
@@ -7482,7 +7546,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
     btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = openShiftModal;
-    btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
+    btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() {
+        document.getElementById('shiftModal').style.display = 'none';
+        if (shiftBoundaryCheckInterval) {
+            clearInterval(shiftBoundaryCheckInterval);
+            shiftBoundaryCheckInterval = null;
+        }
+    };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
     btn = document.getElementById("controlBtn"); if (btn) btn.onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
