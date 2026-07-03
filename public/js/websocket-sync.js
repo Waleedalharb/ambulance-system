@@ -10,22 +10,37 @@
     }
 
     // =====================
-    // إشعارات بسيطة تعمل في جميع الصفحات
+    // إشعارات — أضف للجرس إذا كان متوفر، وإلا Toast fallback
     // =====================
-    function showSyncToast(message) {
-        // try showNotification first (app.js has this)
+    function showSyncToast(message, type) {
+        var catMap = {
+            'new_report': 'report', 'shift_started': 'shift', 'shift_updated': 'shift',
+            'shift_deleted': 'shift', 'ops_file_deleted': 'file', 'ops_files_uploaded': 'file',
+            'audit_log_added': 'system', 'file_deleted': 'file', 'file_uploaded': 'file',
+            'peak_mission': 'peak', 'peak_resolve': 'peak', 'control_notes_updated': 'system',
+            'vacations_updated': 'system', 'theme_uploaded': 'theme', 'user_login': 'user'
+        };
+        var titleMap = {
+            'new_report': 'بلاغ جديد', 'shift_started': 'مناوبة جديدة', 'shift_updated': 'تحديث مناوبة',
+            'shift_deleted': 'حذف مناوبة', 'ops_file_deleted': 'حذف ملف', 'ops_files_uploaded': 'رفع ملف',
+            'audit_log_added': 'سجل عمليات', 'peak_mission': 'مهمة ذروة', 'peak_resolve': 'إنجاز مهمة',
+            'control_notes_updated': 'تحديث ملاحظات', 'vacations_updated': 'تحديث إجازات',
+            'theme_uploaded': 'تحديث ثيم', 'user_login': 'دخول مستخدم'
+        };
+        var cat = catMap[type] || 'system';
+        var title = titleMap[type] || (type ? type.replace(/_/g, ' ') : 'إشعار');
+        // إذا كان addNotification متوفر (index.html مع app.js) → استخدم الجرس فقط
+        if (typeof addNotification === 'function') {
+            addNotification(title, message, cat);
+            return;
+        }
+        // صفحات أخرى (report-entry, operations-command) → استخدم Toast
         if (typeof showNotification === 'function') {
             showNotification('تحديث', message, 'info', 3000);
             return;
         }
-        // try showToast next (report-entry.html has showToast(message, type))
         if (typeof showToast === 'function') {
-            try {
-                showToast(message, 'info');
-                return;
-            } catch(e) {
-                // showToast may have different signature, fallback
-            }
+            try { showToast(message, 'info'); return; } catch(e) {}
         }
         // fallback DOM toast
         var toast = document.createElement('div');
@@ -61,33 +76,9 @@
                 return;
             }
 
-            // عرض إشعار + إضافة للجرس
+            // عرض إشعار (showSyncToast يتحقق من addNotification أولاً)
             if (data.message) {
-                showSyncToast(data.message);
-                // إضافة للجرس إذا كان addNotification متوفر
-                if (typeof addNotification === 'function') {
-                    var catMap = {
-                        'new_report': 'report', 'shift_started': 'shift', 'shift_updated': 'shift',
-                        'shift_deleted': 'shift', 'ops_file_deleted': 'file', 'ops_files_uploaded': 'file',
-                        'audit_log_added': 'system', 'file_deleted': 'file', 'file_uploaded': 'file',
-                        'peak_mission': 'peak', 'peak_resolve': 'peak', 'control_notes_updated': 'system',
-                        'vacations_updated': 'system', 'theme_uploaded': 'theme', 'user_login': 'user'
-                    };
-                    var titleMap = {
-                        'new_report': 'بلاغ جديد', 'shift_started': 'مناوبة جديدة', 'shift_updated': 'تحديث مناوبة',
-                        'shift_deleted': 'حذف مناوبة', 'ops_file_deleted': 'حذف ملف', 'ops_files_uploaded': 'رفع ملف',
-                        'audit_log_added': 'سجل عمليات', 'peak_mission': 'مهمة ذروة', 'peak_resolve': 'إنجاز مهمة',
-                        'control_notes_updated': 'تحديث ملاحظات', 'vacations_updated': 'تحديث إجازات',
-                        'theme_uploaded': 'تحديث ثيم', 'user_login': 'دخول مستخدم'
-                    };
-                    var cat = catMap[data.type] || 'system';
-                    var title = titleMap[data.type] || (data.type ? data.type.replace(/_/g, ' ') : 'إشعار');
-                    addNotification(title, data.message, cat);
-                } else {
-                    // queue for later when app.js loads
-                    window._pendingNotifications = window._pendingNotifications || [];
-                    window._pendingNotifications.push({ type: data.type, message: data.message });
-                }
+                showSyncToast(data.message, data.type);
             }
 
             // ✅ الطريقة الجديدة: syncUpdate() في كل صفحة
