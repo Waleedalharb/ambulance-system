@@ -2291,19 +2291,6 @@ async function loadShifts() {
         updateShiftStatus();
     }
 }
-        if (shiftArchiveSelect) {
-            shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-            allShifts.forEach(function(shift) {
-                var option = document.createElement('option');
-                option.value = shift.id;
-                var date = shift.shiftDate || getSaudiDate();
-                option.textContent = (shift.shiftType || 'مناوبة') + ' - ' + date;
-                shiftArchiveSelect.appendChild(option);
-            });
-        }
-        updateShiftStatus();
-    } catch (error) {}
-}
 
 function showShiftTypeDialog() {
     return new Promise(function(resolve) {
