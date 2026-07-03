@@ -267,6 +267,126 @@ async function migrateShifts() {
   return count;
 }
 
+/* ============================================================
+   Team 3: Migration for announcements, ops_files, hospitals,
+           references, and timeline
+   ============================================================ */
+
+async function migrateAnnouncements() {
+  const data = readJsonFile('announcements.json');
+  if (!data || !Array.isArray(data)) return 0;
+  let count = 0;
+  for (const a of data) {
+    await run(
+      `INSERT INTO announcements (id, title, body, date, pinned, urgent)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         title=excluded.title, body=excluded.body, date=excluded.date,
+         pinned=excluded.pinned, urgent=excluded.urgent`,
+      [
+        a.id || (Date.now().toString() + count),
+        a.title,
+        a.body,
+        a.date || new Date().toISOString().split('T')[0],
+        a.pinned ? 1 : 0,
+        a.urgent ? 1 : 0
+      ]
+    );
+    count++;
+  }
+  console.log(`✅ تم ترحيل ${count} إعلان`);
+  return count;
+}
+
+async function migrateOpsFiles() {
+  const data = readJsonFile('uploads/operational/metadata.json');
+  if (!data || !Array.isArray(data)) return 0;
+  let count = 0;
+  for (const f of data) {
+    await run(
+      `INSERT INTO ops_files (id, filename, stored_name, size, mime_type, upload_date, uploader, category, note, icon)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         filename=excluded.filename, stored_name=excluded.stored_name, size=excluded.size,
+         mime_type=excluded.mime_type, upload_date=excluded.upload_date, uploader=excluded.uploader,
+         category=excluded.category, note=excluded.note, icon=excluded.icon`,
+      [
+        f.id,
+        f.filename,
+        f.storedName || f.stored_name,
+        f.size || 0,
+        f.mimeType || f.mime_type,
+        f.uploadDate || f.upload_date,
+        f.uploader,
+        f.category || 'عام',
+        f.note || '',
+        f.icon || ''
+      ]
+    );
+    count++;
+  }
+  console.log(`✅ تم ترحيل ${count} ملف تشغيلي`);
+  return count;
+}
+
+async function migrateHospitals() {
+  const data = readJsonFile('hospitals.json');
+  if (!data || !Array.isArray(data)) return 0;
+  let count = 0;
+  for (const h of data) {
+    await run(
+      `INSERT INTO hospitals (name, type, specialty, address, phone, emergency, hours, lat, lng)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        h.name,
+        h.type,
+        h.specialty,
+        h.address,
+        h.phone,
+        h.emergency,
+        h.hours,
+        h.lat ? parseFloat(h.lat) : null,
+        h.lng ? parseFloat(h.lng) : null
+      ]
+    );
+    count++;
+  }
+  console.log(`✅ تم ترحيل ${count} مستشفى`);
+  return count;
+}
+
+async function migrateReferences() {
+  const data = readJsonFile('references.json');
+  if (!data || !Array.isArray(data)) return 0;
+  let count = 0;
+  for (const r of data) {
+    await run(
+      `INSERT INTO references_table (title, type, dept, status, desc, date)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [r.title, r.type, r.dept, r.status, r.desc, r.date]
+    );
+    count++;
+  }
+  console.log(`✅ تم ترحيل ${count} مرجعية`);
+  return count;
+}
+
+async function migrateTimeline() {
+  const data = readJsonFile('timeline.json');
+  if (!data || !Array.isArray(data)) return 0;
+  let count = 0;
+  for (const t of data) {
+    await run(
+      `INSERT INTO timeline (title, desc, type, date, time)
+       VALUES (?, ?, ?, ?, ?)`,
+      [t.title, t.desc, t.type, t.date, t.time]
+    );
+    count++;
+  }
+  console.log(`✅ تم ترحيل ${count} حدث زمني`);
+  return count;
+}
+
 async function main() {
   console.log('🚀 بدء ترحيل البيانات إلى SQLite...\n');
 
@@ -309,6 +429,21 @@ async function main() {
 
     console.log('📦 جارٍ ترحيل إعدادات كلمة المرور...');
     await migratePasswordSettings();
+
+    console.log('📦 جارٍ ترحيل الإعلانات...');
+    await migrateAnnouncements();
+
+    console.log('📦 جارٍ ترحيل ملفات العمليات...');
+    await migrateOpsFiles();
+
+    console.log('📦 جارٍ ترحيل المستشفيات...');
+    await migrateHospitals();
+
+    console.log('📦 جارٍ ترحيل المراجع...');
+    await migrateReferences();
+
+    console.log('📦 جارٍ ترحيل الخط الزمني...');
+    await migrateTimeline();
 
     console.log('\n🎉 اكتمل الترحيل بنجاح!');
     console.log(`📁 قاعدة البيانات: ${DB_PATH}`);

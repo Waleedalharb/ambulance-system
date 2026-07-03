@@ -2500,7 +2500,7 @@ input[type="search"], textarea, select {
 /* ===== Toast Notifications ===== */
 .toast-container {
     position: fixed;
-    top: 80px;
+    bottom: 24px;
     left: 24px;
     z-index: 3000;
     display: flex;
@@ -4617,8 +4617,372 @@ input[type="search"], textarea, select {
     }
 }
 
-@media (max-width: 480px) {
-    .achievements-grid {
-        grid-template-columns: 1fr;
+/* ============================================
+   MOBILE RESPONSIVE FIXES - منصة الجنوب
+   Comprehensive mobile layout improvements
+   ============================================ */
+
+/* --- Header Brand on Mobile --- */
+@media (max-width: 768px) {
+    .header {
+        padding: 12px 16px !important;
+        border-radius: var(--radius-md) !important;
+    }
+    
+    .header-brand .icon {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .header-brand .text h1 {
+        font-size: 1rem !important;
+    }
+    
+    .header-brand .text .sub {
+        font-size: 0.7rem !important;
+    }
+    
+    .header-date {
+        display: none !important;
     }
 }
+
+/* --- Info Bar / Toolbar on Mobile --- */
+@media (max-width: 768px) {
+    .info-bar {
+        padding: 10px 12px !important;
+    }
+    
+    .toolbar {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 6px;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    
+    .toolbar::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .toolbar .btn {
+        flex-shrink: 0;
+        padding: 6px 10px !important;
+        font-size: 0.75rem !important;
+        white-space: nowrap;
+    }
+    
+    .toolbar .btn i {
+        margin-left: 4px !important;
+    }
+    
+    .total-box {
+        font-size: 0.8rem !important;
+    }
+    
+    .archive-row {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+    
+    .archive-row select,
+    .archive-row button {
+        width: 100%;
+    }
+}
+
+/* --- Smart Topbar on Mobile --- */
+@media (max-width: 768px) {
+    .smart-topbar {
+        padding: 0 12px;
+    }
+    
+    .topbar-center {
+        display: none; /* Hide quick actions on mobile - use sidebar instead */
+    }
+    
+    .topbar-left .brand span {
+        display: none; /* Hide brand text, show only logo */
+    }
+    
+    .topbar-left .brand img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .topbar-right .topbar-info {
+        display: none;
+    }
+    
+    .topbar-right .operations-room-btn span {
+        display: none;
+    }
+    
+    .topbar-right .operations-room-btn {
+        padding: 6px 10px;
+    }
+    
+    .topbar-right .operations-room-btn i {
+        margin: 0;
+    }
+}
+
+/* --- Workforce Dashboard on Mobile --- */
+@media (max-width: 768px) {
+    .workforce-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+    
+    .wf-card {
+        padding: 12px !important;
+    }
+    
+    .wf-card-value {
+        font-size: 1.4rem !important;
+    }
+    
+    .wf-card-label {
+        font-size: 0.7rem !important;
+    }
+    
+    .wf-card-icon-wrap {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .workforce-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* --- Distribution Card on Mobile --- */
+@media (max-width: 768px) {
+    .distribution-card {
+        padding: 12px !important;
+    }
+    
+    .distribution-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .distribution-header-title {
+        font-size: 0.85rem !important;
+    }
+    
+    .distribution-header-subtitle {
+        font-size: 0.75rem !important;
+    }
+    
+    .distribution-expand-btn span {
+        display: none;
+    }
+}
+
+/* --- Live Report Stats on Mobile --- */
+@media (max-width: 768px) {
+    .live-report-stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .live-report-card {
+        padding: 12px !important;
+    }
+}
+
+/* --- Modals on Mobile --- */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95% !important;
+        max-width: 100% !important;
+        padding: 16px !important;
+        margin: 10px !important;
+        border-radius: var(--radius-lg) !important;
+    }
+    
+    .modal {
+        padding: 10px !important;
+    }
+    
+    .shift-modal-content,
+    .peak-modal-content {
+        width: 95% !important;
+    }
+    
+    .peak-form-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .peak-kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .peak-kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* --- Alert Bar on Mobile --- */
+@media (max-width: 768px) {
+    .alert-bar-content {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+    
+    .alert-bar-btn {
+        padding: 4px 10px !important;
+        font-size: 0.75rem !important;
+    }
+}
+
+/* --- Sidebar on Mobile (v3c) --- */
+@media (max-width: 768px) {
+    .smart-sidebar {
+        width: 85vw !important;
+        max-width: 320px !important;
+    }
+    
+    .sidebar-brand span {
+        font-size: 0.9rem !important;
+    }
+    
+    .sidebar-item {
+        padding: 10px 14px !important;
+        font-size: 0.85rem !important;
+    }
+}
+
+/* --- Update Status on Mobile --- */
+@media (max-width: 768px) {
+    .update-status {
+        font-size: 0.7rem !important;
+        padding: 6px 10px !important;
+    }
+}
+
+/* --- Footer on Mobile --- */
+@media (max-width: 768px) {
+    footer {
+        font-size: 0.7rem !important;
+        padding: 10px !important;
+        text-align: center;
+    }
+}
+
+/* --- Container on Mobile --- */
+@media (max-width: 768px) {
+    .container {
+        padding: 8px !important;
+    }
+}
+
+/* --- Cards General on Mobile --- */
+@media (max-width: 768px) {
+    .card {
+        padding: 12px !important;
+    }
+    
+    .card-title {
+        font-size: 0.95rem !important;
+    }
+    
+    .card-icon {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* --- Login Screen on Mobile --- */
+@media (max-width: 768px) {
+    #loginScreen > div {
+        width: 95% !important;
+        padding: 20px !important;
+    }
+    
+    #loginScreen img {
+        width: 60px !important;
+        height: 60px !important;
+    }
+    
+    #loginScreen h1 {
+        font-size: 1.4rem !important;
+    }
+}
+
+/* --- Tables on Mobile --- */
+@media (max-width: 768px) {
+    table, .leaderboard-table, .wf-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* --- Form Elements on Mobile --- */
+@media (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+    }
+}
+
+/* --- Very Small Screens (480px and below) --- */
+@media (max-width: 480px) {
+    .header-brand .text .sub {
+        display: none !important;
+    }
+    
+    .header-brand {
+        gap: 8px !important;
+    }
+    
+    .toolbar .btn {
+        padding: 5px 8px !important;
+        font-size: 0.7rem !important;
+    }
+    
+    .toolbar .btn i {
+        font-size: 0.8rem !important;
+    }
+    
+    .smart-topbar {
+        height: 52px !important;
+    }
+    
+    .menu-toggle {
+        width: 36px !important;
+        height: 36px !important;
+    }
+}
+
+/* --- Touch Target Improvements --- */
+@media (max-width: 768px) {
+    .btn,
+    .sidebar-item,
+    .menu-toggle,
+    .alert-bar-btn,
+    .operations-room-btn,
+    .qa-btn {
+        min-height: 40px;
+        min-width: 40px;
+    }
+}
+
+/* --- Viewport Meta Fix for iOS --- */
+@supports (-webkit-touch-callout: none) {
+    body {
+        -webkit-text-size-adjust: 100%;
+    }
+}
+

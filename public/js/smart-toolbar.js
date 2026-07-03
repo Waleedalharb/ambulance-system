@@ -127,13 +127,27 @@
     window.downloadOpsFile = function(id) {
         if (!id) return;
         var token = getAuthToken();
-        var link = document.createElement('a');
-        link.href = '/api/download-operational/' + id;
-        if (token) link.setAttribute('data-token', token);
-        link.download = '';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        fetch('/api/download-operational/' + id, {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        })
+        .then(function(res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.blob();
+        })
+        .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = '';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+        })
+        .catch(function(e) {
+            console.error('Download error:', e);
+            alert('❌ فشل في تحميل الملف');
+        });
     };
 
     function renderDocsList(docs, containerId, showPriority) {

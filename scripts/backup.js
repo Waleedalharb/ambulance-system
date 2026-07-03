@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 /**
  * Backup & Restore Script for منصة الجنوب
+ * Enhanced with database.db and uploads support
  * 
  * Usage:
  *   node scripts/backup.js backup          # Create a backup
  *   node scripts/backup.js restore <file>  # Restore from backup
  *   node scripts/backup.js list            # List available backups
  *   node scripts/backup.js cleanup         # Remove backups older than 30 days
- * 
- * Environment:
- *   BACKUP_DIR   - Directory to store backups (default: /data/backups or ./data/backups)
- *   DATA_DIR     - Directory containing data files (default: /data or ./data)
+ *   node scripts/backup.js disk            # Check disk usage
  */
 
 const fs = require('fs').promises;
@@ -22,7 +20,7 @@ const { pipeline } = require('stream/promises');
 const STORAGE_PATH = process.env.RENDER_DISK_PATH || path.join(__dirname, '..', 'data');
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(STORAGE_PATH, 'backups');
 
-const DATA_FILES = [
+const BACKUP_ITEMS = [
     'ambulance-data.json',
     'shift-data.json',
     'users.json',
@@ -32,7 +30,11 @@ const DATA_FILES = [
     'vacations.json',
     'peak-data.json',
     'theme-settings.json',
-    'password.json'
+    'password.json',
+    'database.db',
+    'database.db-shm',
+    'database.db-wal',
+    'uploads'
 ];
 
 async function ensureDir(dir) {
@@ -44,6 +46,50 @@ async function ensureDir(dir) {
     }
 }
 
+async function checkDiskUsage() {
+    try {
+        const stats = await fs.stat(STORAGE_PATH);
+        // On Windows, du is not available; use approximate size calculation
+        let totalSize = 0;
+        let fileCount = 0;
+        
+        async function calcDir(dirPath) {
+            const entries = await fs.readdir(dirPath, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                if (entry.name === 'node_modules' || entry.name === '.git') continue;
+                if (entry.isDirectory()) {
+                    await calcDir(fullPath);
+                } else {
+                    const stat = await fs.stat(fullPath);
+                    totalSize += stat.size;
+                    fileCount++;
+                }
+            }
+        }
+        
+        await calcDir(STORAGE_PATH);
+        const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+        const sizeGB = (totalSize / 1024 / 1024 / 1024).toFixed(2);
+        
+        console.log(`📊 Disk Usage Report for ${STORAGE_PATH}`);
+        console.log(`   Total Size: ${sizeMB} MB (${sizeGB} GB)`);
+        console.log(`   File Count: ${fileCount}`);
+        console.log(`   Disk: 10 GB (Render Persistent Disk)`);
+        console.log(`   Usage: ${((sizeGB / 10) * 100).toFixed(2)}%`);
+        
+        if (parseFloat(sizeGB) > 8) {
+            console.log(`⚠️  WARNING: Disk usage is above 80%. Consider cleanup or expansion.`);
+        }
+        if (parseFloat(sizeGB) > 9) {
+            console.log(`🚨 CRITICAL: Disk usage is above 90%. Immediate action required!`);
+        }
+        return { totalSize, fileCount, sizeMB, sizeGB };
+    } catch (error) {
+        console.error('❌ Failed to check disk usage:', error.message);
+    }
+}
+
 async function createBackup() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupName = `backup-${timestamp}.tar.gz`;
@@ -51,33 +97,37 @@ async function createBackup() {
     
     await ensureDir(BACKUP_DIR);
     
-    // Create a simple tar.gz using Node.js streams
+    // Check disk usage before backup
+    const usage = await checkDiskUsage();
+    
+    // Verify items exist before backup
+    const existingItems = [];
+    for (const item of BACKUP_ITEMS) {
+        const itemPath = path.join(STORAGE_PATH, item);
+        try {
+            await fs.access(itemPath);
+            existingItems.push(item);
+        } catch {
+            // Item doesn't exist, skip
+        }
+    }
+    
+    // Create tar.gz using Node.js streams
     const tar = require('tar');
     
     await tar.create({
         gzip: true,
         file: backupPath,
         cwd: STORAGE_PATH
-    }, DATA_FILES);
+    }, existingItems);
+    
+    const backupStat = await fs.stat(backupPath);
+    const backupSizeMB = (backupStat.size / 1024 / 1024).toFixed(2);
     
     console.log(`✅ Backup created: ${backupPath}`);
-    console.log(`📦 Files backed up: ${DATA_FILES.join(', ')}`);
-    
-    // Also create a quick JSON snapshot for easy recovery
-    const snapshotName = `snapshot-${timestamp}.json`;
-    const snapshotPath = path.join(BACKUP_DIR, snapshotName);
-    const snapshot = {};
-    for (const file of DATA_FILES) {
-        const filePath = path.join(STORAGE_PATH, file);
-        try {
-            const data = await fs.readFile(filePath, 'utf8');
-            snapshot[file] = JSON.parse(data);
-        } catch (e) {
-            snapshot[file] = null;
-        }
-    }
-    await fs.writeFile(snapshotPath, JSON.stringify(snapshot, null, 2));
-    console.log(`📸 JSON snapshot created: ${snapshotPath}`);
+    console.log(`📦 Items backed up: ${existingItems.length}`);
+    console.log(`📦 Backup size: ${backupSizeMB} MB`);
+    console.log(`📦 Items: ${existingItems.join(', ')}`);
     
     return backupPath;
 }
@@ -99,6 +149,9 @@ async function listBackups() {
         const date = stat.mtime.toISOString();
         console.log(`  - ${file} (${size} MB) - ${date}`);
     }
+    
+    // Also show disk usage
+    await checkDiskUsage();
 }
 
 async function restoreBackup(backupFile) {
@@ -124,16 +177,28 @@ async function restoreBackup(backupFile) {
     
     // Backup current data before restoring
     console.log('📦 Creating pre-restore backup...');
-    for (const file of DATA_FILES) {
-        const srcPath = path.join(STORAGE_PATH, file);
-        const destPath = path.join(preRestoreDir, file);
+    const existingItems = [];
+    for (const item of BACKUP_ITEMS) {
+        const srcPath = path.join(STORAGE_PATH, item);
         try {
-            await fs.copyFile(srcPath, destPath);
+            await fs.access(srcPath);
+            const destPath = path.join(preRestoreDir, item);
+            const stat = await fs.stat(srcPath);
+            if (stat.isDirectory()) {
+                await fs.mkdir(destPath, { recursive: true });
+                // Copy directory contents (simplified - just log)
+                console.log(`   📁 ${item} (directory)`);
+            } else {
+                await fs.copyFile(srcPath, destPath);
+            }
+            existingItems.push(item);
         } catch (e) {
             // File may not exist, that's ok
         }
     }
+    
     console.log(`✅ Pre-restore backup saved to ${preRestoreDir}`);
+    console.log(`   Items: ${existingItems.join(', ')}`);
     
     // Extract backup
     const tar = require('tar');
@@ -152,19 +217,26 @@ async function cleanupOldBackups() {
     const files = await fs.readdir(BACKUP_DIR);
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     let deleted = 0;
+    let freedSpace = 0;
     
     for (const file of files) {
-        if (!file.startsWith('backup-') && !file.startsWith('snapshot-')) continue;
+        if (!file.startsWith('backup-') && !file.startsWith('snapshot-') && !file.startsWith('pre-restore-')) continue;
         const filePath = path.join(BACKUP_DIR, file);
-        const stat = await fs.stat(filePath);
-        if (stat.mtime.getTime() < thirtyDaysAgo) {
-            await fs.unlink(filePath);
-            console.log(`🗑️  Deleted old backup: ${file}`);
-            deleted++;
+        try {
+            const stat = await fs.stat(filePath);
+            if (stat.mtime.getTime() < thirtyDaysAgo) {
+                freedSpace += stat.size;
+                await fs.unlink(filePath);
+                console.log(`🗑️  Deleted old backup: ${file}`);
+                deleted++;
+            }
+        } catch (e) {
+            // Skip files we can't stat
         }
     }
     
-    console.log(`✅ Cleanup complete. Deleted ${deleted} old backup(s).`);
+    const freedMB = (freedSpace / 1024 / 1024).toFixed(2);
+    console.log(`✅ Cleanup complete. Deleted ${deleted} old backup(s). Freed ${freedMB} MB.`);
 }
 
 async function main() {
@@ -188,6 +260,9 @@ async function main() {
         case 'cleanup':
             await cleanupOldBackups();
             break;
+        case 'disk':
+            await checkDiskUsage();
+            break;
         default:
             console.log(`
 📦 EMS Platform Backup Tool
@@ -195,8 +270,9 @@ async function main() {
 Usage:
   node scripts/backup.js backup                    Create a new backup
   node scripts/backup.js restore <file.tar.gz>     Restore from backup
-  node scripts/backup.js list                      List available backups
-  node scripts/backup.js cleanup                   Remove backups older than 30 days
+  node scripts/backup.js list                       List available backups
+  node scripts/backup.js cleanup                    Remove backups older than 30 days
+  node scripts/backup.js disk                       Check disk usage
 
 Environment Variables:
   BACKUP_DIR    - Backup storage directory

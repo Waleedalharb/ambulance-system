@@ -205,6 +205,113 @@ const TABLE_SCHEMAS = [
     id INTEGER PRIMARY KEY,
     password TEXT,
     updated_at TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    date TEXT,
+    pinned INTEGER DEFAULT 0,
+    urgent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS ops_files (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER DEFAULT 0,
+    mime_type TEXT,
+    upload_date TEXT,
+    uploader TEXT,
+    category TEXT DEFAULT 'عام',
+    note TEXT,
+    icon TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS hospitals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT,
+    specialty TEXT,
+    address TEXT,
+    phone TEXT,
+    emergency TEXT,
+    hours TEXT,
+    lat REAL,
+    lng REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS references_table (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT,
+    dept TEXT,
+    status TEXT,
+    desc TEXT,
+    date TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS timeline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    desc TEXT,
+    type TEXT,
+    date TEXT,
+    time TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    job_title TEXT DEFAULT 'مسعف',
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS teams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    center TEXT NOT NULL,
+    team_type TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    time_start TEXT,
+    time_end TEXT,
+    color TEXT DEFAULT '#2563EB',
+    status TEXT DEFAULT 'دوام',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_roster (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    shift_code TEXT NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS team_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    assigned_date TEXT,
+    end_date TEXT,
+    is_primary INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
   );`
 ];
 

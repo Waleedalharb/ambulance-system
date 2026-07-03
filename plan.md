@@ -1,142 +1,133 @@
-# خطة إعادة تصميم شريط الأدوات (Smart Toolbar Redesign)
+# Smart Shift Management System — Plan
 
-## المشكلة الحالية
-- 18 زر مكدس في صف واحد داخل `<div class="toolbar">`
-- كل زر بلون مختلف (تدرجات، ألوان ثابتة، إلخ)
-- تشتيت ذهني وشذوذ بصري
-- لا يوجد تجميع أو تنظيم منطقي
-- صعوبة في الوصول للمستخدم
+## Overview
+Build an intelligent shift scheduling engine for EMS operations that auto-generates schedules, detects shortages, and proposes alternative coverage. Integrates with existing `shift_roster`, `employees`, `teams`, `shift_codes` tables.
 
-## الحل المطلوب: Smart Toolbar System
+## Architecture
 
-### 1. الشريط العلوي (Top Bar) - مبسط
-- أزرار الوصول السريع (Quick Actions) فقط
-- شريط البحث السريع
-- معلومات المستخدم + الوقت
-- أيقونة القائمة (☰) لفتح/إغلاق Sidebar
+### Database Schema Additions
 
-### 2. الشريط الجانبي (Sidebar) - قابل للطي
-- **قسم العمليات الرئيسية**:
-  - مناوبة جديدة
-  - تكميل النوبة
-  - توزيع البلاغات
-  - الجدول
-  - كبار المسعفين
-  - تنسيق الإجازة
-  - النماذج
-  - وقت الذروة
-  - إحصائيات
-  - لوحة التحكم
-  - الإنجازات
-- **قسم الإعدادات والأدوات**:
-  - السجل
-  - الثيمات
-  - الوضع الليلي
-  - وضع الثيم
-  - إعدادات الصوت
-  - إشعارات
-- **قسم غرفة العمليات** (مكان مميز):
-  - نظام العمل والبروتوكولات
-  - التحديثات التشغيلية
-  - لوحة التحكم التشغيلية
+1. **`leave_requests` table** — Employee leave requests
+2. **`shift_schedule_auto` table** — Auto-generated schedule entries with metadata
+3. **`staffing_alerts` table** — Shortage alerts and recommendations
 
-### 3. نظام التجميع المنطقي (Categorized Groups)
-- كل مجموعة لها عنوان + أيقونة
-- قابلة للتوسيع/الطي (Accordion)
-- ترتيب حسب التكرار الاستخدام
+### Core Algorithm (Smart Scheduler)
 
-### 4. نظام الألوان الموحد
-- نظام ألوان متناسق (Primary: #0B1E33, Secondary: #1A3A5C, Accent: #E8C84A)
-- تدرجات خفيفة للـ hover/focus
-- لا يوجد ألوان متضاربة
+**Normal Mode (12h shifts):**
+- 10 employees, pattern: 2 days + 2 nights + 4 off (8-day cycle)
+- Each shift: 2 employees minimum
+- 2 shifts/day (day + night) = 4 employees per day
+- 2 employees on leave max at any time
+- Leaves reduce to minimum 8 operational staff
 
-### 5. غرفة العمليات (Operations Room)
-- صفحة/قسم مستقل مميز
-- لوحة التحكم التشغيلية
-- البروتوكولات الطبية
-- التحديثات التشغيلية
-- المؤشرات الحية
+**Alternative Mode (8h shifts):**
+- Trigger: < 8 operational staff available
+- 3 employees per 8h shift = 3 shifts/day = 9 slots total
+- May assign individual coverage per shift
+- Re-balance across all slots
 
-## توزيع المهام على المعاونين
+**Ambulance Team Rules:**
+- Team = 2 paramedics minimum (cannot operate with 1)
+- If a team has < 2 staff → station closed, recommend transfer
+- Extra paramedic → assign to Rapid Response / Quick Intervention
+- Visual: Red = closed, Yellow = under-staffed, Green = fully staffed
 
-### المعاون 1: UI_Architect
-**المهمة:** تصميم هيكل HTML الجديد
-**الملفات:** `index.html`
-**الأعمال:**
-- إنشاء `<nav class="smart-sidebar">` مع هيكل التجميعات
-- إنشاء `<header class="smart-topbar">` مع Quick Actions
-- إنشاء `<div class="operations-room">` (modal/page)
-- إعادة ترتيب 18 زر في التجميعات المنطقية
-- إضافة زر toggle للـ Sidebar
-- إنشاء الـ overlay للـ mobile
+### API Endpoints
 
-### المعاون 2: CSS_Designer
-**المهمة:** نظام الألوان + التجانس البصري + Animations
-**الملفات:** `app.css`
-**الأعمال:**
-- إنشاء متغيرات CSS للألوان (CSS Variables)
-- تصميم Smart Sidebar (تصميم RTL)
-- تصميم Top Bar (مبسط، شفاف)
-- نظام hover/focus متناسق
-- Animations (slide-in, fade)
-- Responsive design (mobile sidebar)
-- نظام dark mode للـ sidebar
-- نظام تبويبات (tabs) للـ operations room
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/shift-schedule/generate` | POST | Generate monthly schedule |
+| `/api/shift-schedule/month` | GET | Get schedule for month/year |
+| `/api/shift-schedule/update` | POST | Update single assignment |
+| `/api/shift-schedule/staffing` | GET | Staffing levels with indicators |
+| `/api/leave-requests` | GET/POST | List / submit leave requests |
+| `/api/leave-requests/:id` | PUT/DELETE | Update / cancel |
+| `/api/leave-requests/:id/approve` | POST | Approve/Deny |
+| `/api/staffing-alerts` | GET | Active shortage alerts |
+| `/api/staffing-recommendations` | GET | Auto-suggested coverage plans |
 
-### المعاون 3: Room_Designer
-**المهمة:** تصميم غرفة العمليات بالكامل
-**الملفات:** `index.html` (إضافة modal) + `app.css` (أنماط) + `app.js` (منطق)
-**الأعمال:**
-- تصميم modal غرفة العمليات (Operations Room Modal)
-- تبويبات: البروتوكولات | التحديثات | المؤشرات | التقارير
-- لوحة مؤشرات حية (KPIs)
-- قائمة البروتوكولات
-- نظام التحديثات التشغيلية
-- نظام الألوان المميز (أزرق-سماوي)
+### Frontend (smart-schedule.html)
 
-### المعاون 4: Integration_Engineer
-**المهمة:** دمج JavaScript + ربط الأحداث
-**الملفات:** `app.js`
-**الأعمال:**
-- دالة `toggleSidebar()`
-- دالة `openOperationsRoom()`
-- تحديث ربط الأزرار للـ Sidebar الجديد
-- إضافة listeners للـ mobile
-- إدارة حالة Sidebar (open/closed)
-- تحديث دالة `checkPermissions()` للأزرار الجديدة
-- إضافة دالة `closeSidebarOnMobile()`
-- تحديث `init()` لتهيئة الـ Smart Toolbar
+1. **Dashboard Widgets** (top of page):
+   - Available employees count
+   - On leave count
+   - Current shortage status (green/yellow/red badge)
+   - Upcoming risks (next 3 days)
 
-## التنفيذ المرحلي
+2. **Schedule Grid** (main):
+   - Calendar-style month view
+   - Each cell: employees assigned per shift
+   - Color coding by shift type
+   - Click to edit
 
-**المرحلة 1:** المعاون 1 + 2 + 3 بالتوازي (HTML, CSS, Operations Room)
-**المرحلة 2:** المعاون 4 (Integration) بعد انتهاء المرحلة 1
-**المرحلة 3:** المراجعة والاختبار
+3. **Staffing Panel** (sidebar):
+   - Visual indicators per day: green/yellow/red
+   - Detailed breakdown per shift
+   - Recommended actions
 
-## ملاحظات تقنية
+4. **Leave Management Tab**:
+   - Submit request form
+   - Pending requests list (admin view)
+   - Approval actions
 
-- المشروع يستخدم Vanilla HTML/CSS/JS (لا يوجد framework)
-- RTL (Right-to-Left) - العربية
-- الهيكل الحالي: index.html + app.css + app.js
-- يجب الحفاظ على جميع الأزرار الحالية (18 زر)
-- لا يجب إزالة أي modal موجود
-- يجب الحفاظ على التوافقية مع الوضع الليلي (dark mode)
-- يجب أن يكون التصميم Responsive (يعمل على mobile)
-- يجب الحفاظ على جميع الـ event listeners الموجودة
+5. **Alternative Mode Toggle**:
+   - Auto-detect shortage → suggest alternative
+   - One-click apply recommended coverage
 
-## الخرج المتوقع
+## Implementation Stages
 
-1. `index.html` - محدث مع هيكل Smart Toolbar الجديد
-2. `app.css` - محدث مع نظام الألوان والأنماط الجديدة
-3. `app.js` - محدث مع منطق الـ Sidebar والأحداث الجديدة
-4. غرفة العمليات - modal/page جديدة متكاملة
+### Stage 1: Database Schema + API (server.js + db.js)
+- Add tables, seed data
+- Build scheduling engine algorithm
+- Implement all endpoints
+- Add WebSocket broadcasts
 
-## معايير الجودة
+### Stage 2: Frontend Dashboard (smart-schedule.html)
+- Dashboard widgets
+- Schedule grid with drag/drop
+- Staffing indicators
+- Leave request form
+- Alternative mode UI
 
-- التصميم متناسق وموحد (لا ألوان متضاربة)
-- الوصول السريع للأدوات المستخدمة بكثرة
-- Sidebar يعمل بسلاسة (animations smooth)
-- غرفة العمليات مميزة بصرياً
-- التصميم Responsive على mobile
-- لا يوجد أخطاء في Console
-- جميع الأزرار تعمل كما كانت
+### Stage 3: Integration + Testing
+- Wire frontend to backend
+- Test edge cases
+- Deploy
+
+## Skills Needed
+- `vibecoding-webapp-swarm` (not installed) → Orchestrator designs
+- No report-writing needed — this is a feature implementation
+- No docx needed — deliverable is code
+
+## Sub-agent Assignments
+
+### Worker 1: Database + API Backend
+- Add schema to db.js (leave_requests, shift_schedule_auto, staffing_alerts)
+- Add CRUD endpoints to server.js
+- Build scheduling algorithm
+- Leave request workflow
+- Staffing analysis engine
+
+### Worker 2: Frontend Dashboard + Schedule Grid
+- smart-schedule.html enhancements
+- Dashboard widgets (available, on-leave, shortage indicators)
+- Month-view calendar grid with employees
+- Color coding, drag/drop, click-to-edit
+- Leave request tab
+- Alternative mode UI
+
+### Worker 3: Smart Scheduling Engine (algorithm-only)
+- Pure scheduling algorithm
+- Normal mode: 12h cycle generator
+- Alternative mode: 8h rebalancer
+- Ambulance team constraint solver
+- Conflict detection
+- Recommendations engine
+- Returns JSON schedule + recommendations
+
+## File Outputs
+- `db.js` — updated with new tables
+- `server.js` — updated with new endpoints
+- `public/smart-schedule.html` — updated/enhanced
+- `public/js/smart-schedule.js` — new file (schedule logic)
+- `public/css/smart-schedule.css` — new file (styles)

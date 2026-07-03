@@ -1308,7 +1308,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 
   <!-- أزرار الإجراءات -->
   <div class="topbar-actions">
-    <button class="btn-back" onclick="window.location.href='index.html'" data-tooltip="العودة للصفحة الرئيسية">
+    <button class="btn-back" onclick="window.location.href='index.html?v=10'" data-tooltip="العودة للصفحة الرئيسية">
       <i class="fas fa-arrow-right"></i>
       <span>الرجوع للرئيسية</span>
     </button>
@@ -1508,6 +1508,23 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
         <p>رفع، إدارة، وعرض المستندات والملفات بأنواعها المختلفة</p>
       </div>
     </div>
+    <!-- اختيار نوع الملف -->
+    <div class="glass-card" style="margin-bottom:16px; padding:12px 16px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label style="font-weight:600; color:var(--text); font-size:0.85rem;"><i class="fas fa-tag"></i> نوع الملف:</label>
+        <select id="fileCategorySelect" style="padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); font-size:0.85rem; min-width:180px;">
+          <option value="عام">📁 عام</option>
+          <option value="تعميم">📋 تعميم</option>
+          <option value="بروتوكول">📖 بروتوكول</option>
+          <option value="نموذج">📝 نموذج</option>
+          <option value="تقرير">📊 تقرير</option>
+          <option value="إجراء">⚡ إجراء طوارئ</option>
+          <option value="صور">🖼️ صور</option>
+          <option value="أخرى">📎 أخرى</option>
+        </select>
+        <span style="color:var(--text-muted); font-size:0.75rem;">اختر نوع الملف قبل الرفع</span>
+      </div>
+    </div>
     <!-- منطقة الرفع بالسحب والإفلات -->
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" style="display:none;">
@@ -1565,9 +1582,27 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
         <h2><i class="fas fa-bullhorn"></i> الإعلانات العاجلة</h2>
         <p>إعلانات وتعاميم وقرارات عاجلة وإدارية</p>
       </div>
+      <button class="btn btn-neon" onclick="showAnnouncementModal()"><i class="fas fa-plus"></i> إضافة إعلان</button>
     </div>
     <div id="announcementsContainer"></div>
   </section>
+
+  <!-- نافذة إضافة إعلان -->
+  <div id="announcementModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:500px;">
+      <h3><i class="fas fa-bullhorn icon-primary"></i> إضافة إعلان جديد</h3>
+      <div class="form-row"><label>العنوان:</label><input type="text" id="announceTitle" placeholder="عنوان الإعلان"></div>
+      <div class="form-row"><label>النص:</label><textarea id="announceBody" rows="4" placeholder="محتوى الإعلان..."></textarea></div>
+      <div class="form-row">
+        <label><input type="checkbox" id="announcePinned"> تثبيت الإعلان</label>
+        <label style="margin-right:16px;"><input type="checkbox" id="announceUrgent"> عاجل</label>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-teal" onclick="submitAnnouncement()"><i class="fas fa-check"></i> نشر</button>
+        <button class="btn" onclick="closeAnnouncementModal()"><i class="fas fa-times"></i> إلغاء</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        G. الخريطة التفاعلية (Interactive Map)
@@ -1686,105 +1721,142 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 // ═══════════════════════════════════════════════════════════════
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  البيانات التجريبية (Demo Data)
+//  البيانات من الخادم (Server Data)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+function getAuthToken() { return localStorage.getItem('authToken'); }
+let currentUser = null;
+
+// Load current user info
+async function loadCurrentUser() {
+  try {
+    const res = await apiFetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        currentUser = data.user;
+      }
+    }
+  } catch (e) { console.error('Failed to load user:', e); }
+}
+
+function apiFetch(url, options) {
+  options = options || {};
+  options.headers = options.headers || {};
+  const token = getAuthToken();
+  options.headers['Authorization'] = 'Bearer ' + token;
+  if (!options.headers['Content-Type'] && options.method && options.method !== 'GET') {
+    options.headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, options);
+}
+
 /** بيانات لوحة القيادة الرئيسية **/
-const dashboardData = {
-  stats: [
-    { label:'البلاغات اليوم',      value:127, change:+12, changeLabel:'+12% عن الأمس', color:'coral',  icon:'fa-exclamation-circle', action:'إدخال بلاغات', link:'report-entry.html' },
-    { label:'المناوبات النشطة',    value:18,  change:+3,  changeLabel:'3 جديدة',       color:'neon-g', icon:'fa-user-shield' },
-    { label:'الفرق العاملة',       value:34,  change:-2,  changeLabel:'2 مغادرة',      color:'neon',   icon:'fa-users' },
-    { label:'نسبة الجاهزية',       value:'94%',change:+2, changeLabel:'+2% هذا الأسبوع',color:'gold',  icon:'fa-chart-line' }
-  ],
-  directives: [
-    { id:1, title:'تعميم رقم 44/2025: تحديث بروتوكول الاستجابة السريعة',            dept:'العمليات', date:'2025-01-15', pinned:true },
-    { id:2, title:'قرار إداري: تعديل جدول المناوبات الشتوية',                        dept:'الإداري',  date:'2025-01-14', pinned:false },
-    { id:3, title:'تعميم عاجل: إجراءات الوقاية من فيروسات التنفس الموسمية',       dept:'الجودة',   date:'2025-01-13', pinned:true },
-    { id:4, title:'توجيه: تفعيل غرفة العمليات على مدار 24 ساعة',                    dept:'الطوارئ',  date:'2025-01-12', pinned:false },
-    { id:5, title:'تعميم: تحديث دليل المستشفيات الشريكة وإضافة 3 مستشفيات جديدة',  dept:'العمليات', date:'2025-01-10', pinned:false },
-    { id:6, title:'قرار: تعيين رئيس جديد لقسم العمليات الميدانية',                  dept:'الإداري',  date:'2025-01-08', pinned:false },
-  ],
-  alerts: [
-    { id:1, title:'حادث مروري متعدد على طريق الملك فهد',                    desc:'تمركز 4 فرق إسعافية - 12 مصاب بحالات متفاوتة',            level:'high',   time:'منذ 5 دقائق' },
-    { id:2, title:'انقطاع كهرباء جزئي في مستشفى الصحة الوطنية',            desc:'الطاقة الاحتياطية تعمل حالياً - فريق الصيانة في الطريق',    level:'medium', time:'منذ 18 دقيقة' },
-    { id:3, title:'تأخر وصول 2 فرقة إسعاف عن الجدول المحدد',              desc:'السبب: ازدحام مروري شديد - تم إعادة التوجيه لمسارات بديلة', level:'low',    time:'منذ 32 دقيقة' },
-    { id:4, title:'تقرير يومي: اكتمال 98% من المهام المجدولة',              desc:'معدل الاستجابة ممتاز - لم يتم تسجيل أي شكاوى',             level:'low',    time:'منذ ساعة' },
-    { id:5, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',       desc:'من الساعة 4 عصراً حتى 10 مساءً - أخذ الحيطة والحذر',       level:'medium', time:'منذ ساعتين' },
-  ],
-  indicators: [
-    { label:'توفر الفرق',     value:94, color:'#06D6A0' },
-    { label:'معدل الاستجابة', value:87, color:'#00D4FF' },
-    { label:'الموارد',        value:78, color:'#FFD166' },
-    { label:'الجاهزية',       value:96, color:'#EF476F' },
-  ],
-  activities: [
-    { id:1, title:'تسجيل بلاغ جديد - حادث مروري',                    user:'أحمد الخالد',  time:'منذ 5 دق',    icon:'fa-plus-circle', color:'var(--coral)' },
-    { id:2, title:'تحديث بروتوكول الاستجابة السريعة',                user:'سارة المنيف', time:'منذ 15 دق',   icon:'fa-edit',        color:'var(--neon)' },
-    { id:3, title:'تمركز فرقة إسعاف في موقع الحادث',                user:'فهد العتيبي',  time:'منذ 20 دق',   icon:'fa-ambulance',   color:'var(--neon-green)' },
-    { id:4, title:'رفع ملف: تقرير البلاغات اليومية',                 user:'نورة السالم',  time:'منذ 35 دق',   icon:'fa-upload',      color:'var(--gold)' },
-    { id:5, title:'إضافة ملاحظة على مستشفى الملك فهد',              user:'خالد الزهراني',time:'منذ ساعة',    icon:'fa-sticky-note', color:'var(--purple)' },
-    { id:6, title:'إغلاق بلاغ - حريق محدود في مستودع الأدوية',      user:'محمد القحطاني',time:'منذ ساعتين',  icon:'fa-check-circle',color:'var(--neon-green)' },
-    { id:7, title:'تحديث حالة فرقة الإسعاف رقم 12',                  user:'عبدالله الشمري',time:'منذ 3 ساعات', icon:'fa-sync',        color:'var(--neon)' },
-  ]
-};
+let dashboardData = { stats: [], directives: [], alerts: [], indicators: [], activities: [] };
+
+async function loadDashboardData() {
+  try {
+    const res = await apiFetch('/api/dashboard');
+    if (res.ok) {
+      const raw = await res.json();
+      const payload = (raw && (raw.data || raw.dashboard)) || (Array.isArray(raw) ? {} : raw);
+      if (payload && payload.stats) {
+        dashboardData = payload;
+      } else {
+        showToast('warning', 'بيانات ناقصة', 'رد السيرفر لا يحتوي على إحصائيات');
+      }
+    } else {
+      const errorText = await res.text().catch(() => 'خطأ غير معروف');
+      console.error('Dashboard load failed:', res.status, errorText);
+      showToast('error', 'فشل التحميل', 'تعذر جلب بيانات لوحة القيادة: ' + res.status);
+    }
+  } catch (e) { 
+    console.error('Failed to load dashboard:', e); 
+    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر: ' + e.message);
+  }
+  renderDashboard();
+}
+
+/** Utility: escape HTML to prevent XSS */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /** بيانات المرجعيات التشغيلية **/
-const referencesData = [
-  { id:1, title:'بروتوكول الاستجابة السريعة',            type:'protocol', dept:'طوارئ',  status:'active', desc:'الإجراءات المعتمدة للاستجابة السريعة في حالات الطوارئ والكوارث، يشمل جميع المراحل من الاستلام حتى الإغلاق.', date:'2025-01-10' },
-  { id:2, title:'دليل الإجراءات التشغيلية - الطوارئ',    type:'sop',      dept:'طوارئ',  status:'active', desc:'دليل شامل يوضح الإجراءات التشغيلية المعتمدة في قسم الطوارئ مع الرسوم البيانية والخرائط الذهنية.', date:'2025-01-08' },
-  { id:3, title:'نموذج تقرير البلاغ اليومي',             type:'form',     dept:'عمليات', status:'active', desc:'نموذج موحد لتسجيل وتوثيق البلاغات الواردة على مدار اليوم مع تصنيفاتها وأولوياتها.', date:'2025-01-05' },
-  { id:4, title:'دليل التواصل مع المستشفيات الشريكة',    type:'guide',    dept:'عمليات', status:'active', desc:'دليل يحتوي على أرقام الطوارئ والتواصل لجميع المستشفيات الشريكة مع بيانات التحديث.', date:'2024-12-28' },
-  { id:5, title:'بروتوكول التعامل مع الحوادث الجماعية',   type:'protocol', dept:'طوارئ',  status:'review', desc:'إجراءات التعامل مع الحوادث التي تتضمن 5 مصابين فأكثر، تشمل التصنيف والتوجيه.', date:'2024-12-20' },
-  { id:6, title:'دليل ضمان الجودة - غرف العمليات',       type:'sop',      dept:'جودة',   status:'active', desc:'معايير وإجراءات ضمان الجودة لعمليات غرفة القيادة والتحكم والتقييم الدوري.', date:'2024-12-15' },
-  { id:7, title:'نموذج طلب إجازة / منحة للعاملين',       type:'form',     dept:'إداري',  status:'active', desc:'النموذج المعتمد لطلبات الإجازات والمنح للعاملين في غرفة العمليات.', date:'2024-12-10' },
-  { id:8, title:'الإجراءات الإدارية في حالات الطوارئ',   type:'sop',      dept:'إداري',  status:'archived', desc:'الإجراءات الإدارية المتبعة أثناء حالات الطوارئ والأزمات وآلية التوثيق.', date:'2024-12-01' },
-];
+let referencesData = [];
+
+async function loadReferencesData() {
+  try {
+    const res = await apiFetch('/api/references');
+    if (res.ok) {
+      const raw = await res.json();
+      referencesData = (raw && (raw.data || raw.records || raw.references)) || (Array.isArray(raw) ? raw : []);
+    }
+  } catch (e) { console.error('Failed to load references:', e); referencesData = []; }
+  renderReferences();
+}
 
 /** بيانات المستشفيات الشريكة **/
-const hospitalsData = [
-  { id:1, name:'مستشفى الملك فهد التخصصي',    type:'عام',   specialty:'جراحة - طوارئ - عناية مركزة',         address:'الرياض - حي العليا - شارع الملك فهد',       phone:'011-275-0000', emergency:'011-275-1111', hours:'24 ساعة' },
-  { id:2, name:'مستشفى الملك فيصل التخصصي',   type:'متخصص', specialty:'أورام - علاج كيميائي - إشعاعي',        address:'الرياض - حي الملز - شارع مكة',              phone:'011-464-7272', emergency:'011-464-7000', hours:'24 ساعة' },
-  { id:3, name:'مستشفى الصحة الوطنية',         type:'عام',   specialty:'طوارئ - باطنية - جراحة عامة',         address:'الرياض - شمال الرياض - طريق الملك سلمان',   phone:'011-275-8000', emergency:'011-275-8111', hours:'24 ساعة' },
-  { id:4, name:'مستشفى د. سليمان الحبيب',     type:'مجمع',  specialty:'جميع التخصصات الطبية والجراحية',        address:'الرياض - طريق الخرج - حي الروضة',           phone:'011-525-0000', emergency:'011-525-0001', hours:'24 ساعة' },
-  { id:5, name:'مستشفى الإيمان العام',        type:'عام',   specialty:'طوارئ - نساء وولادة - أطفال',          address:'الرياض - حي الروضة - شارع الإمام البخاري',  phone:'011-208-0000', emergency:'011-208-1111', hours:'24 ساعة' },
-  { id:6, name:'مركز طوارئ الغدير',           type:'طوارئ', specialty:'طوارئ فقط - استقبال 24 ساعة',          address:'الرياض - حي الغدير - طريق الدائري الشرقي',  phone:'011-477-0000', emergency:'011-477-0000', hours:'24 ساعة' },
-  { id:7, name:'مستشفى المواساة',             type:'مجمع',  specialty:'قلب - عظام - جلدية - باطنية',          address:'الرياض - حي الروابي - طريق الأمير محمد',    phone:'011-454-3333', emergency:'011-454-3000', hours:'16 ساعة' },
-  { id:8, name:'مستشفى الحرس الوطني',         type:'عام',   specialty:'طوارئ - جراحة - عناية مركزة',          address:'الرياض - حي الروضة - شارع عسير',            phone:'011-252-0088', emergency:'011-252-0000', hours:'24 ساعة' },
-  { id:9, name:'مستشفى عين التخصصي',          type:'متخصص', specialty:'عيون - تجميل - ليزر - جراحة',          address:'الرياض - حي العليا - طريق العروبة',         phone:'011-460-9000', emergency:'011-460-9111', hours:'12 ساعة' },
-  { id:10, name:'مستشفى الأندلسية',           type:'مجمع',  specialty:'جميع التخصصات والفحوصات المتقدمة',      address:'الرياض - طريق الملك سلمان - حي الملقا',     phone:'920-007-997',  emergency:'920-007-998',  hours:'24 ساعة' },
-  { id:11, name:'مستشفى السعودي الألماني',    type:'عام',   specialty:'قلب - أعصاب - عمود فقري - طوارئ',      address:'الرياض - حي الملقا - طريق الأمير تركي',     phone:'011-275-0001', emergency:'011-275-0111', hours:'24 ساعة' },
-  { id:12, name:'مركز طب الأسرة - العليا',    type:'طوارئ', specialty:'أسرة - طوارئ خفيفة - فحوصات',          address:'الرياض - حي العليا - شارع العليا العام',    phone:'011-462-0000', emergency:'011-462-0000', hours:'18 ساعة' },
-];
+let hospitalsData = [];
+
+async function loadHospitalsData() {
+  try {
+    const res = await apiFetch('/api/hospitals');
+    if (res.ok) {
+      const raw = await res.json();
+      hospitalsData = (raw && (raw.data || raw.records || raw.hospitals)) || (Array.isArray(raw) ? raw : []);
+    }
+  } catch (e) { console.error('Failed to load hospitals:', e); hospitalsData = []; }
+  renderHospitals();
+}
 
 /** بيانات الملفات المرفوعة **/
-let filesData = [
-  { id:1, name:'تقرير البلاغات - يناير 2025.pdf',         type:'pdf',  size:'2.4 MB', date:'2025-01-15', url:'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { id:2, name:'جدول المناوبات الشتوية.docx',             type:'word', size:'156 KB', date:'2025-01-14', url:'#' },
-  { id:3, name:'إحصائيات الاستجابة - الربع الرابع 2024.xlsx', type:'excel', size:'890 KB', date:'2025-01-10', url:'#' },
-  { id:4, name:'عرض الجاهزية التشغيلية.pptx',             type:'ppt',  size:'3.1 MB', date:'2025-01-08', url:'#' },
-  { id:5, name:'خريطة توزيع الفرق الميدانية.jpg',         type:'img',  size:'1.2 MB', date:'2025-01-05', url:'#' },
-];
+let filesData = [];
+
+async function loadFilesData() {
+  try {
+    const res = await apiFetch('/api/ops-files');
+    if (res.ok) {
+      const raw = await res.json();
+      filesData = (raw && (raw.data || raw.records || raw.files)) || (Array.isArray(raw) ? raw : []);
+    }
+  } catch (e) { console.error('Failed to load files:', e); filesData = []; }
+  renderFiles();
+}
 
 /** بيانات الخط الزمني **/
-const timelineData = [
-  { id:1, title:'إصدار تعميم 44/2025: تحديث بروتوكول الاستجابة',    type:'directive', desc:'تحديث شامل لبروتوكول الاستجابة السريعة بما يتوافق مع المعايير الدولية الجديدة', date:'2025-01-15', time:'10:30 ص' },
-  { id:2, title:'رفع ملف: تقرير البلاغات الشهري',                   type:'file',      desc:'تم رفع التقرير الشهري للبلاغات الواردة خلال شهر يناير', date:'2025-01-15', time:'09:15 ص' },
-  { id:3, title:'تحديث بروتوكول التعامل مع الحوادث الكيميائية',     type:'protocol',  desc:'إضافة إجراءات جديدة وتحديثات على البروتوكول الحالي', date:'2025-01-14', time:'14:45 م' },
-  { id:4, title:'تدريب الفرق الميدانية على الإسعاف المتقدم',        type:'event',     desc:'ورشة تدريبية شملت 25 فرد من الفرق الميدانية على تقنيات الإسعاف المتقدم', date:'2025-01-13', time:'08:00 ص' },
-  { id:5, title:'إضافة مستشفى السعودي الألماني للدليل',             type:'event',     desc:'تم إضافة المستشفى وتحديث بيانات الاتصال لدليل المستشفيات', date:'2025-01-12', time:'11:20 ص' },
-  { id:6, title:'تعميم عاجل: إجراءات وقائية من الفيروسات التنفسية', type:'directive', desc:'تفعيل إجراءات الوقاية من فيروسات التنفسية الموسمية في جميع المرافق', date:'2025-01-10', time:'16:00 م' },
-  { id:7, title:'صيانة دورية لأنظمة غرفة العمليات',                type:'event',     desc:'إجراء صيانة دورية شاملة لجميع أنظمة غرفة العمليات والاتصالات', date:'2025-01-08', time:'02:00 ص' },
-  { id:8, title:'تحديث دليل المستشفيات الشريكة',                    type:'file',      desc:'تحديث الأرقام والعناوين والتخصصات لـ 12 مستشفى شريك', date:'2025-01-05', time:'10:00 ص' },
-];
+let timelineData = [];
+
+async function loadTimelineData() {
+  try {
+    const res = await apiFetch('/api/timeline');
+    if (res.ok) {
+      const raw = await res.json();
+      timelineData = (raw && (raw.data || raw.records || raw.timeline)) || (Array.isArray(raw) ? raw : []);
+    }
+  } catch (e) { console.error('Failed to load timeline:', e); timelineData = []; }
+  renderTimeline();
+}
 
 /** بيانات الإعلانات العاجلة **/
-const announcementsData = [
-  { id:1, title:'إجازة يوم التأسيس',                                body:'تعلن غرفة العمليات عن إجازة يوم التأسيس يوم الخميس 2025/02/20. سيتم تشغيل غرفة الطوارئ بحد أدنى من الكادر. نأمل من جميع المناوبين تسوية أوضاعهم قبل الإجازة والتأكد من تسليم المهام للمناوبين القادمين.', date:'2025-01-15', pinned:true,  urgent:false },
-  { id:2, title:'تحديث عاجل: بروتوكول الاستجابة السريعة',           body:'تم تحديث بروتوكول الاستجابة السريعة بإجراءات جديدة للحوادث الكيميائية والبيولوجية. يرجى من جميع المناوبين الاطلاع على النسخة الجديدة فوراً وطباعتها للمرجع السريع.', date:'2025-01-14', pinned:true,  urgent:true },
-  { id:3, title:'ورشة تدريبية: إدارة الأزمات والكوارث',              body:'تعلن إدارة التدريب عن إقامة ورشة تدريبية متخصصة في إدارة الأزمات والكوارث يوم الأحد القادم الموافق 2025/01/19 الساعة 9 صباحاً في القاعة الرئيسية بالدور الثاني. حضوركم إلزامي.', date:'2025-01-13', pinned:false, urgent:false },
-  { id:4, title:'تنبيه جوي: أمطار رعدية متوقعة على منطقة الرياض',  body:'تنبيه من المركز الوطني للأرصاد: أمطار رعدية غزيرة متوقعة على منطقة الرياض اليوم من الساعة 4 عصراً حتى 10 مساءً. يرجى أخذ الحيطة والحذر وتأمين المعدات الميدانية.', date:'2025-01-12', pinned:false, urgent:true },
-];
+let announcementsData = [];
+
+async function loadAnnouncementsData() {
+  try {
+    const res = await apiFetch('/api/announcements');
+    if (res.ok) {
+      const raw = await res.json();
+      announcementsData = (raw && (raw.data || raw.records || raw.announcements)) || (Array.isArray(raw) ? raw : []);
+    }
+  } catch (e) { console.error('Failed to load announcements:', e); announcementsData = []; }
+  renderAnnouncements();
+}
 
 /** بيانات المساعد الذكي - الأسئلة والأجوبة **/
 const chatResponses = [
@@ -1827,17 +1899,20 @@ function switchSection(sectionName) {
  * تشمل: الإحصائيات، التوجيهات، التنبيهات، المؤشرات، النشاطات
  */
 function renderDashboard() {
+  if (!dashboardData || typeof dashboardData !== 'object' || Array.isArray(dashboardData)) {
+    dashboardData = { stats: [], directives: [], alerts: [], indicators: [], activities: [] };
+  }
   // ── 1. بطاقات الإحصائيات ──
   const statsEl = document.getElementById('dashboardStats');
   statsEl.innerHTML = dashboardData.stats.map((s, i) => `
-    <div class="stat-card ${s.color}" style="animation-delay:${i*0.1}s">
-      <div class="stat-icon"><i class="fas ${s.icon}"></i></div>
-      <div class="stat-value">${s.value}</div>
-      <div class="stat-label">${s.label}</div>
+    <div class="stat-card ${escapeHtml(s.color)}" style="animation-delay:${i*0.1}s">
+      <div class="stat-icon"><i class="fas ${escapeHtml(s.icon)}"></i></div>
+      <div class="stat-value">${escapeHtml(s.value)}</div>
+      <div class="stat-label">${escapeHtml(s.label)}</div>
       <div class="stat-change ${s.change >= 0 ? 'up' : 'down'}">
-        <i class="fas fa-arrow-${s.change >= 0 ? 'up' : 'down'}"></i> ${s.changeLabel}
+        <i class="fas fa-arrow-${s.change >= 0 ? 'up' : 'down'}"></i> ${escapeHtml(s.changeLabel)}
       </div>
-      ${s.action ? `<div class="stat-action"><a href="${s.link || '#'}" class="btn-sm btn-${s.color === 'coral' ? 'coral' : s.color === 'neon' ? 'neon' : s.color === 'neon-g' ? 'green' : 'neon'}"><i class="fas fa-plus"></i> ${s.action}</a></div>` : ''}
+      ${s.action ? `<div class="stat-action"><a href="${escapeHtml(s.link || '#')}" class="btn-sm btn-${s.color === 'coral' ? 'coral' : s.color === 'neon' ? 'neon' : s.color === 'neon-g' ? 'green' : 'neon'}"><i class="fas fa-plus"></i> ${escapeHtml(s.action)}</a></div>` : ''}
     </div>
   `).join('');
 
@@ -1846,28 +1921,32 @@ function renderDashboard() {
   document.getElementById('dirCount').textContent = dashboardData.directives.length;
   dirEl.innerHTML = dashboardData.directives.map(d => `
     <div class="directive-item">
-      <div class="directive-pin ${d.pinned ? 'pinned' : ''}" onclick="togglePin(${d.id})" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
+      <div class="directive-pin ${d.pinned ? 'pinned' : ''}" data-id="${escapeHtml(d.id)}" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
         <i class="fas fa-thumbtack ${d.pinned ? '' : 'fa-rotate-45'}"></i>
       </div>
       <div class="directive-body">
-        <div class="directive-title">${d.title}</div>
-        <div class="directive-meta"><span><i class="fas fa-building"></i> ${d.dept}</span><span><i class="far fa-calendar"></i> ${d.date}</span>${d.pinned ? '<span style="color:var(--gold)"><i class="fas fa-star"></i> مثبت</span>' : ''}</div>
+        <div class="directive-title">${escapeHtml(d.title)}</div>
+        <div class="directive-meta"><span><i class="fas fa-building"></i> ${escapeHtml(d.dept)}</span><span><i class="far fa-calendar"></i> ${escapeHtml(d.date)}</span>${d.pinned ? '<span style="color:var(--gold)"><i class="fas fa-star"></i> مثبت</span>' : ''}</div>
       </div>
     </div>
   `).join('');
+  // Attach click handlers for directive pins (replaces inline onclick)
+  dirEl.querySelectorAll('.directive-pin').forEach(pin => {
+    pin.onclick = () => togglePin(Number(pin.dataset.id));
+  });
 
   // ── 3. قائمة التنبيهات الفورية ──
   const alertEl = document.getElementById('alertsList');
   document.getElementById('alertCount').textContent = dashboardData.alerts.length;
   alertEl.innerHTML = dashboardData.alerts.map(a => `
-    <div class="alert-item ${a.level}">
+    <div class="alert-item ${escapeHtml(a.level)}">
       <div class="alert-icon"><i class="fas ${a.level === 'high' ? 'fa-exclamation-triangle' : a.level === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i></div>
       <div class="alert-body">
-        <div class="alert-title">${a.title}</div>
-        <div class="alert-desc">${a.desc}</div>
+        <div class="alert-title">${escapeHtml(a.title)}</div>
+        <div class="alert-desc">${escapeHtml(a.desc)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <span class="alert-time">${a.time}</span>
+        <span class="alert-time">${escapeHtml(a.time)}</span>
         <span class="alert-badge">${a.level === 'high' ? 'عاجل' : a.level === 'medium' ? 'متوسط' : 'عادي'}</span>
       </div>
     </div>
@@ -1880,16 +1959,16 @@ function renderDashboard() {
     const offset = circ - (ind.value / 100) * circ;
     return `
     <div class="circular-progress">
-      <svg width="130" height="130" class="circle-svg" style="--circ-color:${ind.color};">
+      <svg width="130" height="130" class="circle-svg" style="--circ-color:${escapeHtml(ind.color)};">
         <circle cx="65" cy="65" r="${r}" class="circle-bg"/>
         <circle cx="65" cy="65" r="${r}" class="circle-fill"
-          stroke="${ind.color}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
-          data-offset="${offset}"/>
+          stroke="${escapeHtml(ind.color)}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
+          data-offset="${escapeHtml(offset)}"/>
       </svg>
       <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
-        <span class="circle-pct" style="color:${ind.color};">${ind.value}%</span>
+        <span class="circle-pct" style="color:${escapeHtml(ind.color)};">${escapeHtml(ind.value)}%</span>
       </div>
-      <div class="circle-label">${ind.label}</div>
+      <div class="circle-label">${escapeHtml(ind.label)}</div>
     </div>`;
   }).join('');
   // تفعيل animation لتحريك الدوائر
@@ -1903,12 +1982,12 @@ function renderDashboard() {
   const actEl = document.getElementById('activityList');
   actEl.innerHTML = dashboardData.activities.map(a => `
     <div class="directive-item" style="animation-delay:${a.id * 0.06}s">
-      <div class="directive-pin" style="color:${a.color}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
-        <i class="fas ${a.icon}"></i>
+      <div class="directive-pin" style="color:${escapeHtml(a.color)}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
+        <i class="fas ${escapeHtml(a.icon)}"></i>
       </div>
       <div class="directive-body">
-        <div class="directive-title">${a.title}</div>
-        <div class="directive-meta"><span><i class="fas fa-user"></i> ${a.user}</span><span><i class="far fa-clock"></i> ${a.time}</span></div>
+        <div class="directive-title">${escapeHtml(a.title)}</div>
+        <div class="directive-meta"><span><i class="fas fa-user"></i> ${escapeHtml(a.user)}</span><span><i class="far fa-clock"></i> ${escapeHtml(a.time)}</span></div>
       </div>
     </div>
   `).join('');
@@ -1925,6 +2004,7 @@ function togglePin(id) {
  * يدعم الفلترة حسب النوع والقسم والحالة والبحث النصي
  */
 function renderReferences() {
+  if (!Array.isArray(referencesData)) referencesData = [];
   const typeF  = document.getElementById('refFilterType').value;
   const deptF  = document.getElementById('refFilterDept').value;
   const statF  = document.getElementById('refFilterStatus').value;
@@ -1942,20 +2022,20 @@ function renderReferences() {
 
   document.getElementById('refTotalCount').textContent = filtered.length + ' مرجعية';
   document.getElementById('referencesGrid').innerHTML = filtered.map(r => `
-    <div class="ref-card" onclick="showToast('info','فتح المرجعية','جارٍ فتح: ${r.title}')">
+    <div class="ref-card" data-title="${escapeHtml(r.title)}">
       <div class="ref-header">
-        <div class="ref-icon ${r.type}"><i class="fas ${typeIcons[r.type] || 'fa-file'}"></i></div>
+        <div class="ref-icon ${escapeHtml(r.type)}"><i class="fas ${escapeHtml(typeIcons[r.type] || 'fa-file')}"></i></div>
         <div>
-          <div class="ref-title">${r.title}</div>
+          <div class="ref-title">${escapeHtml(r.title)}</div>
           <div class="mt-8">
-            <span class="badge badge-${r.type === 'protocol' ? 'danger' : r.type === 'sop' ? 'success' : r.type === 'form' ? 'warning' : 'primary'}">${typeLabels[r.type]}</span>
-            <span class="badge badge-info" style="margin-right:4px;">${r.dept}</span>
-            <span class="badge badge-${statusBadges[r.status]}" style="margin-right:4px;">${statusLabels[r.status]}</span>
+            <span class="badge badge-${r.type === 'protocol' ? 'danger' : r.type === 'sop' ? 'success' : r.type === 'form' ? 'warning' : 'primary'}">${escapeHtml(typeLabels[r.type])}</span>
+            <span class="badge badge-info" style="margin-right:4px;">${escapeHtml(r.dept)}</span>
+            <span class="badge badge-${escapeHtml(statusBadges[r.status])}" style="margin-right:4px;">${escapeHtml(statusLabels[r.status])}</span>
           </div>
         </div>
       </div>
-      <div class="ref-desc">${r.desc}</div>
-      <div class="ref-meta"><span><i class="far fa-calendar"></i> ${r.date}</span><span><i class="fas fa-file"></i> ${r.type.toUpperCase()}</span></div>
+      <div class="ref-desc">${escapeHtml(r.desc)}</div>
+      <div class="ref-meta"><span><i class="far fa-calendar"></i> ${escapeHtml(r.date)}</span><span><i class="fas fa-file"></i> ${escapeHtml(r.type.toUpperCase())}</span></div>
       <div class="ref-actions">
         <button class="btn-sm btn-neon" onclick="event.stopPropagation(); showToast('info','عرض الملف','جارٍ فتح الملف...')"><i class="fas fa-eye"></i> عرض</button>
         <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="event.stopPropagation(); showToast('success','تم النسخ','تم نسخ المعلومات للحافظة')"><i class="fas fa-copy"></i> نسخ</button>
@@ -1963,12 +2043,21 @@ function renderReferences() {
       </div>
     </div>
   `).join('');
+
+  // Attach click handlers via data-* attributes instead of inline onclick
+  document.querySelectorAll('#referencesGrid .ref-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const title = card.getAttribute('data-title');
+      showToast('info', 'فتح المرجعية', 'جارٍ فتح: ' + title);
+    });
+  });
 }
 
 /**
  * renderHospitals() - رسم دليل المستشفيات مع البحث والفلترة
  */
 function renderHospitals() {
+  if (!Array.isArray(hospitalsData)) hospitalsData = [];
   const srch    = document.getElementById('hospSearch').value.toLowerCase();
   const typeF   = document.getElementById('hospFilterType').value;
   const filtered = hospitalsData.filter(h => {
@@ -1977,35 +2066,56 @@ function renderHospitals() {
   });
 
   document.getElementById('hospTotalCount').textContent = filtered.length + ' مستشفى';
-  document.getElementById('hospitalsGrid').innerHTML = filtered.map(h => `
+  const grid = document.getElementById('hospitalsGrid');
+  grid.innerHTML = filtered.map(h => `
     <div class="hosp-card">
       <div class="hosp-header">
         <div class="hosp-icon"><i class="fas fa-hospital"></i></div>
         <div style="flex:1;">
-          <div class="hosp-name">${h.name}</div>
-          <div class="hosp-type">${h.type === 'عام' ? 'مستشفى عام' : h.type === 'متخصص' ? 'مركز متخصص' : h.type === 'مجمع' ? 'مجمع طبي' : 'مركز طوارئ'} · ${h.specialty}</div>
+          <div class="hosp-name">${escapeHtml(h.name)}</div>
+          <div class="hosp-type">${h.type === 'عام' ? 'مستشفى عام' : h.type === 'متخصص' ? 'مركز متخصص' : h.type === 'مجمع' ? 'مجمع طبي' : 'مركز طوارئ'} · ${escapeHtml(h.specialty)}</div>
         </div>
-        <span class="badge badge-${h.hours === '24 ساعة' ? 'success' : 'warning'}">${h.hours}</span>
+        <span class="badge badge-${h.hours === '24 ساعة' ? 'success' : 'warning'}">${escapeHtml(h.hours)}</span>
       </div>
       <div class="hosp-body">
-        <div class="hosp-detail"><i class="fas fa-map-marker-alt"></i> ${h.address}</div>
-        <div class="hosp-detail phone"><i class="fas fa-phone"></i> ${h.phone}</div>
-        <div class="hosp-detail emergency"><i class="fas fa-ambulance"></i> طوارئ: ${h.emergency}</div>
+        <div class="hosp-detail"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(h.address)}</div>
+        <div class="hosp-detail phone"><i class="fas fa-phone"></i> ${escapeHtml(h.phone)}</div>
+        <div class="hosp-detail emergency"><i class="fas fa-ambulance"></i> طوارئ: ${escapeHtml(h.emergency)}</div>
       </div>
       <div class="hosp-actions">
-        <button class="btn-sm btn-neon" onclick="showToast('info','الاتصال','جارٍ الاتصال: ${h.emergency}')"><i class="fas fa-phone"></i> اتصال</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="navigator.clipboard.writeText('${h.emergency}'); showToast('success','تم النسخ','تم نسخ رقم الطوارئ')"><i class="fas fa-copy"></i> نسخ</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('info','مشاركة','تم فتح خيارات المشاركة')"><i class="fas fa-share-alt"></i> مشاركة</button>
-        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" onclick="showToast('warning','ملاحظة','فتح نافذة إضافة ملاحظة')"><i class="fas fa-sticky-note"></i> ملاحظة</button>
+        <button class="btn-sm btn-neon" data-action="call" data-emergency="${escapeHtml(h.emergency)}"><i class="fas fa-phone"></i> اتصال</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="copy" data-emergency="${escapeHtml(h.emergency)}"><i class="fas fa-copy"></i> نسخ</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="share"><i class="fas fa-share-alt"></i> مشاركة</button>
+        <button class="btn-sm" style="background:var(--bg-glass);color:var(--text-muted);border:1px solid var(--border);" data-action="note"><i class="fas fa-sticky-note"></i> ملاحظة</button>
       </div>
     </div>
   `).join('');
+
+  grid.querySelectorAll('.hosp-actions button').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const action = this.dataset.action;
+      const emergency = this.dataset.emergency;
+      if (action === 'call') {
+        showToast('info', 'الاتصال', 'جارٍ الاتصال: ' + (emergency || ''));
+      } else if (action === 'copy') {
+        if (emergency) {
+          navigator.clipboard.writeText(emergency);
+          showToast('success', 'تم النسخ', 'تم نسخ رقم الطوارئ');
+        }
+      } else if (action === 'share') {
+        showToast('info', 'مشاركة', 'تم فتح خيارات المشاركة');
+      } else if (action === 'note') {
+        showToast('warning', 'ملاحظة', 'فتح نافذة إضافة ملاحظة');
+      }
+    });
+  });
 }
 
 /**
  * renderFiles() - رسم قائمة الملفات المرفوعة
  */
 function renderFiles() {
+  if (!Array.isArray(filesData)) filesData = [];
   const iconMap = { pdf:'fa-file-pdf', word:'fa-file-word', excel:'fa-file-excel', ppt:'fa-file-powerpoint', img:'fa-file-image' };
   document.getElementById('fileCount').textContent = filesData.length + ' ملف';
   if (!filesData.length) {
@@ -2018,27 +2128,67 @@ function renderFiles() {
     return;
   }
   document.getElementById('filesList').innerHTML = filesData.map((f, i) => `
-    <div class="file-list-item" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" style="animation-delay:${i*0.06}s">
-      <div class="file-icon ${f.type}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
+    <div class="file-list-item" data-action="view" data-name="${escapeHtml(f.name)}" data-url="${encodeURIComponent(f.url)}" data-type="${escapeHtml(f.type)}" style="animation-delay:${i*0.06}s">
+      <div class="file-icon ${escapeHtml(f.type)}"><i class="fas ${iconMap[f.type] || 'fa-file'}"></i></div>
       <div class="file-info">
-        <div class="file-name">${f.name}</div>
-        <div class="file-meta">${f.size} · ${f.date}</div>
+        <div class="file-name">${escapeHtml(f.name)}</div>
+        <div class="file-meta">${escapeHtml(f.size)} · ${escapeHtml(f.date)} ${f.category ? '· <span class="badge badge-info" style="font-size:0.65rem;padding:2px 6px;">' + escapeHtml(f.category) + '</span>' : ''}</div>
       </div>
-      <div class="file-actions" onclick="event.stopPropagation();">
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="openDocViewer('${f.name}', '${f.url}', '${f.type}')" title="عرض"><i class="fas fa-eye"></i></button>
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" onclick="navigator.clipboard.writeText('${f.name}'); showToast('success','تم النسخ','تم نسخ اسم الملف')" title="نسخ"><i class="fas fa-copy"></i></button>
-        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;color:var(--coral);" onclick="deleteFile(${f.id})" title="حذف"><i class="fas fa-trash"></i></button>
+      <div class="file-actions">
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" data-action="view" data-name="${escapeHtml(f.name)}" data-url="${encodeURIComponent(f.url)}" data-type="${escapeHtml(f.type)}" title="عرض"><i class="fas fa-eye"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;" data-action="copy" data-copy="${escapeHtml(f.name)}" title="نسخ"><i class="fas fa-copy"></i></button>
+        <button class="btn-icon" style="width:30px;height:30px;font-size:11px;color:var(--coral);" data-action="delete" data-id="${escapeHtml(f.id)}" title="حذف"><i class="fas fa-trash"></i></button>
       </div>
       <i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:11px;margin-right:4px;"></i>
     </div>
   `).join('');
+
+  const filesList = document.getElementById('filesList');
+  if (!filesList._renderFilesDelegated) {
+    filesList._renderFilesDelegated = true;
+    filesList.addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-action]');
+      if (btn) {
+        const action = btn.dataset.action;
+        if (action === 'view') {
+          openDocViewer(btn.dataset.name, decodeURIComponent(btn.dataset.url), btn.dataset.type);
+        } else if (action === 'copy') {
+          navigator.clipboard.writeText(btn.dataset.copy);
+          showToast('success', 'تم النسخ', 'تم نسخ اسم الملف');
+        } else if (action === 'delete') {
+          deleteFile(btn.dataset.id);
+        }
+        return;
+      }
+      const item = e.target.closest('.file-list-item[data-action]');
+      if (item && !e.target.closest('.file-actions')) {
+        openDocViewer(item.dataset.name, decodeURIComponent(item.dataset.url), item.dataset.type);
+      }
+    });
+  }
 }
 
 /** حذف ملف من القائمة **/
-function deleteFile(id) {
-  filesData = filesData.filter(f => f.id !== id);
-  renderFiles();
-  showToast('success','تم الحذف','تم حذف الملف بنجاح');
+async function deleteFile(id) {
+  if (!getAuthToken()) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/ops-files/' + id, { method: 'DELETE' });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Delete failed:', res.status, errorText);
+      showToast('error', 'فشل الحذف', 'خطأ: ' + res.status);
+      return;
+    }
+    filesData = filesData.filter(f => f.id !== id);
+    renderFiles();
+    showToast('success', 'تم الحذف', 'تم حذف الملف بنجاح');
+  } catch (e) { 
+    console.error('Failed to delete file from server:', e); 
+    showToast('error', 'فشل الحذف', 'خطأ في الاتصال');
+  }
 }
 
 /**
@@ -2051,35 +2201,77 @@ function openDocViewer(title, url, type) {
   const placeholder = document.getElementById('docViewerPlaceholder');
   window.currentDocUrl = url;
   window.currentDocTitle = title;
-  if (type === 'pdf' && url && url !== '#') {
-    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
-  } else if (type === 'img' && url && url !== '#') {
-    frame.src = url; frame.style.display = 'block'; placeholder.style.display = 'none';
+  window.currentDocType = type;
+  
+  // For PDF/img, fetch with auth token and create blob URL
+  if ((type === 'pdf' || type === 'img') && url && url !== '#') {
+    fetch(url, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        frame.src = blobUrl;
+        frame.style.display = 'block';
+        placeholder.style.display = 'none';
+        // Store blob URL for cleanup
+        window.currentDocBlobUrl = blobUrl;
+      })
+      .catch(err => {
+        console.error('Failed to load document:', err);
+        frame.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--coral)"></i><p>فشل تحميل الملف</p><span style="font-size:11px;">تأكد من تسجيل الدخول</span>`;
+      });
   } else {
-    frame.style.display = 'none'; placeholder.style.display = 'flex';
+    frame.style.display = 'none';
+    placeholder.style.display = 'flex';
     placeholder.innerHTML = `<i class="fas fa-file-alt"></i><p>معاينة الملف "${title}"</p><span style="font-size:11px;">سيتم فتح الملف في التطبيق المناسب</span>`;
   }
 }
 function closeDocViewer() {
   document.getElementById('docViewerOverlay').classList.remove('active');
-  document.getElementById('docViewerFrame').src = '';
+  const frame = document.getElementById('docViewerFrame');
+  // Revoke blob URL to prevent memory leak
+  if (window.currentDocBlobUrl) {
+    URL.revokeObjectURL(window.currentDocBlobUrl);
+    window.currentDocBlobUrl = null;
+  }
+  frame.src = '';
 }
 function downloadCurrentDoc() {
   if (window.currentDocUrl && window.currentDocUrl !== '#') {
-    const a = document.createElement('a'); a.href = window.currentDocUrl; a.download = window.currentDocTitle || 'download'; a.click();
-    showToast('success','تحميل','جارٍ تحميل الملف...');
-  } else { showToast('error','تعذر التحميل','الملف غير متوفر للتحميل'); }
+    // Fetch with auth token, then download as blob
+    fetch(window.currentDocUrl, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = window.currentDocTitle || 'download';
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        showToast('success', 'تحميل', 'جارٍ تحميل الملف...');
+      })
+      .catch(err => {
+        console.error('Download failed:', err);
+        showToast('error', 'فشل التحميل', 'لا يمكن تحميل الملف: ' + err.message);
+      });
+  } else {
+    showToast('error', 'تعذر التحميل', 'الملف غير متوفر للتحميل');
+  }
 }
 function printCurrentDoc() {
   const frame = document.getElementById('docViewerFrame');
-  if (frame.style.display !== 'none') { frame.contentWindow.print(); }
-  else { showToast('info','طباعة','فتح نافذة الطباعة...'); }
+  if (frame && frame.style.display !== 'none') {
+    try { frame.contentWindow.print(); } catch(e) { showToast('error','فشل الطباعة','لا يمكن طباعة هذا الملف'); }
+  } else { showToast('info','طباعة','فتح نافذة الطباعة...'); }
 }
-// إغلاق بالنقر خارج النافذة
-document.getElementById('docViewerOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('docViewerOverlay')) closeDocViewer();
-});
-
+// إغلاق بالنقر خارج النافذة (مُعالج داخل DOMContentLoaded)
 /**
  * Drag & Drop - السحب والإفلات لرفع الملفات
  */
@@ -2096,41 +2288,102 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
-function handleFiles(fileList) {
-  const typeMap = {
-    pdf:'pdf', doc:'word', docx:'word', xls:'excel', xlsx:'excel',
-    ppt:'ppt', pptx:'ppt', jpg:'img', jpeg:'img', png:'img'
-  };
+async function handleFiles(fileList) {
+  if (!getAuthToken()) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
+    return;
+  }
+  const categorySelect = document.getElementById('fileCategorySelect');
+  const category = categorySelect ? categorySelect.value : 'عام';
   let count = 0;
-  Array.from(fileList).forEach(file => {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const type = typeMap[ext] || 'pdf';
-    const size = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
-    const url = URL.createObjectURL(file);
-    filesData.unshift({ id:Date.now()+Math.random(), name:file.name, type, size, date:new Date().toISOString().split('T')[0], url });
-    count++;
-  });
-  renderFiles();
-  if (count > 0) showToast('success','تم الرفع','تم رفع ' + count + ' ملف بنجاح');
+  for (const file of Array.from(fileList)) {
+    const formData = new FormData();
+    formData.append('files', file);
+    formData.append('uploader', (currentUser && currentUser.name) || 'مستخدم');
+    formData.append('category', category);
+    try {
+      const res = await fetch('/api/ops-files', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getAuthToken() },
+        body: formData
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Upload failed:', res.status, errorText);
+        showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' (HTTP ' + res.status + ')');
+        continue;
+      }
+      const result = await res.json();
+      if (!result.success) {
+        showToast('error', 'فشل الرفع', result.error || 'فشل رفع: ' + file.name);
+        continue;
+      }
+      count++;
+    } catch (e) { 
+      console.error('Failed to upload file to server:', e); 
+      showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' - ' + e.message);
+    }
+  }
+  await loadFilesData();
+  if (count > 0) showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح (' + category + ')');
+}
+
+async function submitAnnouncement() {
+  if (!getAuthToken()) {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
+    return;
+  }
+  const title = document.getElementById('announceTitle').value.trim();
+  const body = document.getElementById('announceBody').value.trim();
+  const pinned = document.getElementById('announcePinned').checked;
+  const urgent = document.getElementById('announceUrgent').checked;
+  if (!title || !body) {
+    showToast('warning', 'بيانات ناقصة', 'الرجاء إدخال العنوان والنص');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/announcements/add', {
+      method: 'POST',
+      body: JSON.stringify({ title, body, pinned, urgent })
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Announcement failed:', res.status, errorText);
+      showToast('error', 'فشل النشر', 'خطأ: ' + res.status + ' - ' + errorText);
+      return;
+    }
+    const result = await res.json();
+    if (result.success) {
+      showToast('success', 'تم النشر', 'تم إضافة الإعلان بنجاح');
+      closeAnnouncementModal();
+      await loadAnnouncementsData();
+    } else {
+      showToast('error', 'فشل النشر', result.error || 'تعذر إضافة الإعلان');
+    }
+  } catch (e) {
+    console.error('Failed to add announcement:', e);
+    showToast('error', 'فشل النشر', 'خطأ في الاتصال بالسيرفر: ' + e.message);
+  }
 }
 
 /**
  * renderTimeline() - رسم الخط الزمني
  */
 function renderTimeline() {
+  if (!Array.isArray(timelineData)) timelineData = [];
   const filter = document.getElementById('timelineFilter').value;
   let filtered = timelineData;
   if (filter) filtered = timelineData.filter(t => t.type === filter);
 
   document.getElementById('timelineContainer').innerHTML = filtered.map(t => `
     <div class="timeline-item">
-      <div class="timeline-dot ${t.type}"></div>
+      <div class="timeline-dot ${escapeHtml(t.type)}"></div>
       <div class="timeline-card">
-        <div class="timeline-title">${t.title}</div>
-        <div class="timeline-desc">${t.desc}</div>
+        <div class="timeline-title">${escapeHtml(t.title)}</div>
+        <div class="timeline-desc">${escapeHtml(t.desc)}</div>
         <div class="timeline-meta">
-          <span><i class="far fa-calendar"></i> ${t.date}</span>
-          <span><i class="far fa-clock"></i> ${t.time}</span>
+          <span><i class="far fa-calendar"></i> ${escapeHtml(t.date)}</span>
+          <span><i class="far fa-clock"></i> ${escapeHtml(t.time)}</span>
           <span style="color:${t.type === 'directive' ? 'var(--coral)' : t.type === 'file' ? 'var(--neon)' : t.type === 'protocol' ? 'var(--neon-green)' : 'var(--gold)'}"><i class="fas fa-tag"></i> ${t.type === 'directive' ? 'تعميم' : t.type === 'file' ? 'ملف' : t.type === 'protocol' ? 'بروتوكول' : 'حدث'}</span>
         </div>
       </div>
@@ -2142,6 +2395,7 @@ function renderTimeline() {
  * renderAnnouncements() - رسم الإعلانات العاجلة
  */
 function renderAnnouncements() {
+  if (!Array.isArray(announcementsData)) announcementsData = [];
   const container = document.getElementById('announcementsContainer');
   const pinned = announcementsData.filter(a => a.pinned);
   const normal = announcementsData.filter(a => !a.pinned);
@@ -2164,16 +2418,28 @@ function renderAnnounceCard(a, delay) {
       <div class="announce-header">
         ${a.pinned ? '<i class="fas fa-thumbtack announce-pin-icon"></i>' : ''}
         ${a.urgent ? '<i class="fas fa-bell announce-urgent-icon"></i>' : ''}
-        <span class="announce-title">${a.title}</span>
+        <span class="announce-title">${escapeHtml(a.title)}</span>
         ${a.urgent ? '<span class="badge badge-danger">عاجل</span>' : ''}
       </div>
-      <div class="announce-body">${a.body}</div>
+      <div class="announce-body">${escapeHtml(a.body)}</div>
       <div class="announce-footer">
-        <span class="announce-date"><i class="far fa-calendar"></i> ${a.date}</span>
+        <span class="announce-date"><i class="far fa-calendar"></i> ${escapeHtml(a.date)}</span>
         <button class="btn-sm btn-neon" onclick="showToast('info','مشاركة','تم نسخ رابط الإعلان')"><i class="fas fa-share-alt"></i> مشاركة</button>
       </div>
     </div>
   `;
+}
+
+/** نافذة إضافة إعلان - دوال **/
+function showAnnouncementModal() {
+  document.getElementById('announcementModal').style.display = 'flex';
+}
+function closeAnnouncementModal() {
+  document.getElementById('announcementModal').style.display = 'none';
+  document.getElementById('announceTitle').value = '';
+  document.getElementById('announceBody').value = '';
+  document.getElementById('announcePinned').checked = false;
+  document.getElementById('announceUrgent').checked = false;
 }
 
 /**
@@ -2338,7 +2604,8 @@ document.addEventListener('keydown', e => {
   else if (key === 'd' || key === 'D') { e.preventDefault(); document.getElementById('darkModeToggle').click(); }
   else if (key === '?' || key === '؟') { e.preventDefault(); toggleShortcutsModal(); }
   else if (key === 'Escape') {
-    closeDocViewer(); toggleShortcutsModal(false);
+    closeDocViewer();
+    document.getElementById('shortcutsModal').classList.remove('active');
     if (chatOpen) toggleChat();
   }
 });
@@ -2368,63 +2635,207 @@ updateClock();
 //  Dark Mode Toggle - تبديل الوضع الداكن/الفاتح
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-document.getElementById('darkModeToggle').addEventListener('click', function() {
-  document.body.classList.toggle('dark-mode');
-  const icon = this.querySelector('i');
-  const isDark = document.body.classList.contains('dark-mode');
-  icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-  // إعادة تهيئة الخريطة إذا كانت ظاهرة
-  if (mapInstance && document.getElementById('section-map').classList.contains('active')) {
-    setTimeout(() => mapInstance.invalidateSize(), 300);
-  }
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  القائمة الجانبية (Mobile Sidebar Toggle)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('menuToggle')?.addEventListener('click', () => {
-  document.getElementById('sidebar').classList.toggle('open');
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  البحث الموحد (Global Search)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('globalSearch').addEventListener('input', e => {
-  const v = e.target.value.trim().toLowerCase();
-  if (!v || v.length < 2) return;
-  // البحث في المستشفيات
-  const foundHosp = hospitalsData.some(h => h.name.toLowerCase().includes(v) || h.specialty.toLowerCase().includes(v));
-  if (foundHosp) { switchSection('hospitals'); document.getElementById('hospSearch').value = e.target.value; renderHospitals(); return; }
-  // البحث في المرجعيات
-  const foundRef = referencesData.some(r => r.title.toLowerCase().includes(v) || r.desc.toLowerCase().includes(v));
-  if (foundRef) { switchSection('references'); document.getElementById('refSearch').value = e.target.value; renderReferences(); return; }
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Shortcuts Button
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-document.getElementById('kbdShortcuts').addEventListener('click', toggleShortcutsModal);
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  تهيئة الصفحة عند التحميل (Page Initialization)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 document.addEventListener('DOMContentLoaded', () => {
-  renderDashboard();
-  renderReferences();
-  renderHospitals();
-  renderFiles();
-  renderTimeline();
-  renderAnnouncements();
+  // Auth check
+  if (!getAuthToken()) {
+    showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');
+    setTimeout(() => {
+      if (!getAuthToken()) window.location.href = 'index.html';
+    }, 3000);
+    return;
+  }
+  loadCurrentUser().then(() => {
+    loadDashboardData();
+    loadReferencesData();
+    loadHospitalsData();
+    loadFilesData();
+    loadTimelineData();
+    loadAnnouncementsData();
+  });
 
   // Toast ترحيبي
   setTimeout(() => {
     showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
   }, 800);
+
+  // ── Dark Mode Toggle ──
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener('click', function() {
+      document.body.classList.toggle('dark-mode');
+      const icon = this.querySelector('i');
+      const isDark = document.body.classList.contains('dark-mode');
+      icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+      // Save preference
+      localStorage.setItem('eocc_darkMode', isDark ? '1' : '0');
+      // Re-initialize map if visible
+      if (mapInstance && document.getElementById('section-map')?.classList.contains('active')) {
+        setTimeout(() => mapInstance.invalidateSize(), 300);
+      }
+    });
+    // Load saved preference
+    if (localStorage.getItem('eocc_darkMode') === '1') {
+      document.body.classList.add('dark-mode');
+      const icon = darkModeToggle.querySelector('i');
+      if (icon) icon.className = 'fas fa-sun';
+    }
+  }
+
+  // ── Mobile Sidebar Toggle ──
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebar = document.getElementById('sidebar');
+  if (menuToggle && sidebar) {
+    menuToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
+  }
+
+  // ── Shortcuts Modal Click-to-Close ──
+  const shortcutsModal = document.getElementById('shortcutsModal');
+  if (shortcutsModal) {
+    shortcutsModal.addEventListener('click', e => {
+      if (e.target === shortcutsModal) toggleShortcutsModal();
+    });
+  }
+
+  // ── Shortcuts Button ──
+  const kbdShortcuts = document.getElementById('kbdShortcuts');
+  if (kbdShortcuts) {
+    kbdShortcuts.addEventListener('click', toggleShortcutsModal);
+  }
+
+  // ── Global Search ──
+  const globalSearch = document.getElementById('globalSearch');
+  if (globalSearch) {
+    globalSearch.addEventListener('input', e => {
+      const v = e.target.value.trim().toLowerCase();
+      if (!v || v.length < 2) return;
+      // Search in hospitals with optional chaining
+      const foundHosp = hospitalsData.some(h => h?.name?.toLowerCase().includes(v) || h?.specialty?.toLowerCase().includes(v));
+      if (foundHosp) { switchSection('hospitals'); document.getElementById('hospSearch').value = e.target.value; renderHospitals(); return; }
+      // Search in references
+      const foundRef = referencesData.some(r => r?.title?.toLowerCase().includes(v) || r?.desc?.toLowerCase().includes(v));
+      if (foundRef) { switchSection('references'); document.getElementById('refSearch').value = e.target.value; renderReferences(); return; }
+      // No results
+      showToast('info', 'لا توجد نتائج', 'جرب كلمات بحث مختلفة');
+    });
+  }
+
+  // ── Doc Viewer Overlay ──
+  const docViewerOverlay = document.getElementById('docViewerOverlay');
+  if (docViewerOverlay) {
+    docViewerOverlay.addEventListener('click', e => {
+      if (e.target === docViewerOverlay) closeDocViewer();
+    });
+  }
 });
+
+// ==========================================
+// syncUpdate — لـ websocket-sync.js
+// ==========================================
+window.syncUpdate = function() {
+  console.log('🔄 syncUpdate called in operations-command.html');
+  loadDashboardData();
+  loadReferencesData();
+  loadHospitalsData();
+  loadFilesData();
+  loadTimelineData();
+  loadAnnouncementsData();
+};
+</script>
+
+    <script src="js/websocket-sync.js"></script>
+
+<!-- NANO AI Bot Assistant - disabled, replaced with simple help button -->
+<script>
+  // Hide nano-bot auto-popup after it loads
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var nanoBot = document.getElementById('nano-bot-widget') || document.querySelector('.nano-bot-container');
+      if (nanoBot) nanoBot.style.display = 'none';
+    }, 1000);
+  });
+</script>
+
+<!-- Simple Help Button -->
+<style>
+  .help-fab {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--neon), #1d4ed8);
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+    cursor: pointer;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .help-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(37,99,235,0.45); }
+  .help-fab:active { transform: scale(0.95); }
+  .help-tooltip {
+    position: fixed;
+    bottom: 90px;
+    left: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    width: 280px;
+    box-shadow: var(--shadow);
+    z-index: 9998;
+    display: none;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .help-tooltip.show { display: block; animation: slideUp 0.3s ease; }
+  .help-tooltip h4 { margin: 0 0 8px; color: var(--neon); font-size: 14px; }
+  .help-tooltip ul { margin: 0; padding-right: 16px; }
+  .help-tooltip li { margin-bottom: 4px; }
+  @keyframes slideUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+</style>
+
+<button class="help-fab" id="helpFab" onclick="toggleHelp()" title="مساعدة">
+  <i class="fas fa-question"></i>
+</button>
+
+<div class="help-tooltip" id="helpTooltip">
+  <h4><i class="fas fa-lightbulb" style="color:var(--gold);"></i> دليل الاستخدام</h4>
+  <ul>
+    <li><strong>لوحة القيادة:</strong> إحصائيات وبلاغات ومؤشرات لحظية</li>
+    <li><strong>البلاغات:</strong> إدخال وتوزيع ومراقبة حالة البلاغات</li>
+    <li><strong>المرفقات:</strong> رفع وتحميل الملفات التشغيلية</li>
+    <li><strong>الإعلانات:</strong> نشر تعاميم وإعلانات عاجلة</li>
+    <li><strong>الخريطة:</strong> مواقع المستشفيات والمراكز</li>
+    <li><strong>الاختصارات:</strong> Ctrl+1 لوحة القيادة، Ctrl+2 بلاغات، Ctrl+3 مرفقات</li>
+  </ul>
+  <p style="margin-top:8px; color:var(--text-muted); font-size:11px;">اضغط <kbd>?</kbd> لعرض جميع الاختصارات</p>
+</div>
+
+<script>
+  function toggleHelp() {
+    var tooltip = document.getElementById('helpTooltip');
+    tooltip.classList.toggle('show');
+  }
+  // Close help when clicking outside
+  document.addEventListener('click', function(e) {
+    var fab = document.getElementById('helpFab');
+    var tooltip = document.getElementById('helpTooltip');
+    if (tooltip.classList.contains('show') && !fab.contains(e.target) && !tooltip.contains(e.target)) {
+      tooltip.classList.remove('show');
+    }
+  });
 </script>
 
 </body>

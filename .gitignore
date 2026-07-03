@@ -1,15 +1,73 @@
-/data/ 
-/data-backup/ 
-/backup/ 
-node_modules/ 
-database.db 
-package-lock.json 
-*.log 
-.DS_Store 
-Thumbs.db 
-.env 
-.vscode/ 
-.idea/ 
-/temp/ 
-/tmp/ 
-/data/ 
+# EMS Platform - Git Ignore
+
+# Data & backups (contains sensitive data)
+/data/
+/data-backup/
+/backup/
+/backups/
+
+# Database files (should NEVER be committed)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Environment files (secrets)
+.env
+.env.local
+.env.production
+.env.development
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+/temp/
+/tmp/
+*.tmp
+*.temp
+
+# Uploads (operational data - should be on persistent disk, not in git)
+/uploads/
+/public/uploads/
+
+# Certificates (if any)
+*.pem
+*.key
+*.crt
+
+# Render specific
+.render/
