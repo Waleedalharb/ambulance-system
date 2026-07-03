@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="التقرير اليومي لعمليات الإسعاف — قطاع جنوب الرياض">
+<title>التقرير اليومي | منصة إدارة العمليات الإسعافية — قطاع جنوب الرياض</title>
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1E3A5F">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --p900: #1E293B;
+    --p700: #1E3A5F;
+    --p500: #2563EB;
+    --p100: #EFF6FF;
+    --teal: #10B981;
+    --teal-light: #ECFDF5;
+    --coral: #EF4444;
+    --coral-light: #FEF2F2;
+    --gold: #F59E0B;
+    --gold-light: #FFFBEB;
+    --white: #FFFFFF;
+    --g50: #F8FAFC;
+    --g100: #F1F5F9;
+    --g200: #E2E8F0;
+    --g400: #94A3B8;
+    --g600: #64748B;
+    --g700: #475569;
+    --g800: #1E293B;
+    --shadow-sm: 0 1px 3px rgba(148, 163, 184, 0.08);
+    --shadow-md: 0 4px 12px rgba(148, 163, 184, 0.12);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    background: #F8FAFC;
+    color: var(--g800);
+    direction: rtl;
+    text-align: right;
+    min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
+}
+
+/* Dark mode */
+body.dark-mode {
+    background: #0F172A;
+    color: #E2E8F0;
+}
+body.dark-mode .topbar { background: #1E293B; }
+body.dark-mode .stat-card,
+body.dark-mode .report-card,
+body.dark-mode .table-wrap {
+    background: #1E293B;
+    border-color: #334155;
+}
+body.dark-mode .stat-value,
+body.dark-mode .card-title,
+body.dark-mode table th,
+body.dark-mode table td { color: #E2E8F0; }
+body.dark-mode table th { background: #334155; }
+body.dark-mode table tbody tr:nth-child(even) { background: #1E293B; }
+body.dark-mode table tbody tr:hover { background: #334155; }
+body.dark-mode .btn-back-main,
+body.dark-mode .btn-action { border-color: #475569; color: #E2E8F0; }
+body.dark-mode .btn-action:hover { background: #334155; }
+body.dark-mode .section-badge { background: #334155; color: #94A3B8; }
+body.dark-mode .empty-state { color: #64748B; }
+body.dark-mode .comparison-up { color: #34D399; }
+body.dark-mode .comparison-down { color: #F87171; }
+body.dark-mode select { background: #1E293B; color: #E2E8F0; border-color: #334155; }
+body.dark-mode .loader { color: #E2E8F0; }
+body.dark-mode .print-section { border-color: #334155; }
+
+/* Topbar */
+.topbar {
+    position: sticky; top: 0; z-index: 1000;
+    background: #2563EB; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: var(--shadow-md); flex-wrap: wrap; gap: 10px;
+}
+.topbar .brand { display: flex; align-items: center; gap: 12px; color: #fff; }
+.topbar .brand i { font-size: 26px; color: rgba(255,255,255,0.85); }
+.topbar .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.topbar .brand .sub { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.7); margin-top: 2px; }
+.btn-back-main {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 18px; background: rgba(255,255,255,0.15);
+    color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px; font-size: 14px; font-weight: 500;
+    cursor: pointer; text-decoration: none; transition: all 0.2s;
+}
+.btn-back-main:hover { background: rgba(255,255,255,0.25); }
+.topbar .actions { display: flex; align-items: center; gap: 10px; }
+
+/* Container */
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+/* Section badges */
+.section-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--g600);
+    background: var(--g100); padding: 4px 12px; border-radius: 20px;
+    margin-bottom: 12px;
+}
+
+/* Report header */
+.report-header {
+    background: linear-gradient(135deg, #1E3A5F, #2563EB);
+    color: #fff; border-radius: var(--radius-lg); padding: 24px;
+    margin-bottom: 24px; box-shadow: var(--shadow-md);
+}
+.report-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.report-header .meta { font-size: 13px; color: rgba(255,255,255,0.8); display: flex; gap: 20px; flex-wrap: wrap; }
+
+/* Stats grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+}
+.stat-card {
+    background: #FFFFFF; border-radius: var(--radius-lg); padding: 20px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--g200);
+    transition: all 0.2s; border-right: 4px solid var(--teal);
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card:nth-child(2) { border-right-color: var(--p500); }
+.stat-card:nth-child(3) { border-right-color: var(--gold); }
+.stat-card:nth-child(4) { border-right-color: var(--coral); }
+.stat-card .stat-label { font-size: 12px; color: var(--g600); font-weight: 500; margin-bottom: 6px; }
+.stat-card .stat-value { font-size: 28px; font-weight: 800; color: var(--p900); }
+.stat-card .stat-sub { font-size: 12px; color: var(--g400); margin-top: 4px; }
+
+/* Comparison */
+.comparison-up { color: #059669; font-weight: 600; }
+.comparison-down { color: #DC2626; font-weight: 600; }
+.comparison-neutral { color: var(--g600); font-weight: 600; }
+
+/* Cards */
+.report-card {
+    background: #FFFFFF; border-radius: var(--radius-lg); padding: 24px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--g200);
+    margin-bottom: 24px;
+}
+.card-title { font-size: 16px; font-weight: 700; color: var(--g800); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card-title i { color: var(--p500); font-size: 18px; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--g200); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead { background: var(--p100); }
+th { padding: 12px 16px; text-align: right; font-weight: 600; color: var(--g700); font-size: 13px; border-bottom: 1px solid var(--g200); white-space: nowrap; }
+tbody td { padding: 12px 16px; border-bottom: 1px solid var(--g100); color: var(--g800); }
+tbody tr:nth-child(even) { background: var(--g50); }
+tbody tr:hover { background: var(--g100); }
+.badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-gold { background: #FFFBEB; color: #B45309; }
+.badge-teal { background: #ECFDF5; color: #047857; }
+.badge-coral { background: #FEF2F2; color: #B91C1C; }
+.badge-blue { background: #EFF6FF; color: #1D4ED8; }
+
+/* Rank medals */
+.rank-medal { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
+.rank-1 { background: linear-gradient(135deg, #FFD700, #F59E0B); }
+.rank-2 { background: linear-gradient(135deg, #C0C0C0, #9CA3AF); }
+.rank-3 { background: linear-gradient(135deg, #CD7F32, #B45309); }
+.rank-other { background: var(--g200); color: var(--g600); }
+
+/* Progress bar */
+.progress-bar { height: 6px; border-radius: 3px; background: var(--g200); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #2563EB, #10B981); }
+
+/* Actions */
+.actions-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+.btn-action {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; background: #fff; color: var(--g700);
+    border: 1px solid var(--g200); border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    transition: all 0.2s;
+}
+.btn-action:hover { background: var(--g50); border-color: var(--g400); }
+.btn-action.primary { background: var(--p500); color: #fff; border-color: var(--p500); }
+.btn-action.primary:hover { background: #1D4ED8; }
+.btn-action.teal { background: var(--teal); color: #fff; border-color: var(--teal); }
+.btn-action.teal:hover { background: #059669; }
+
+/* Shift selector */
+.shift-selector { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.shift-selector label { font-size: 14px; font-weight: 600; color: var(--g700); }
+.shift-selector select {
+    padding: 10px 14px; border: 1px solid var(--g200); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    background: #fff; color: var(--g800); min-width: 260px; cursor: pointer;
+}
+
+/* Loader */
+.loader { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px; color: var(--g600); font-size: 15px; }
+.loader i { font-size: 20px; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 40px; color: var(--g400); font-size: 14px; }
+.empty-state i { font-size: 32px; margin-bottom: 10px; display: block; }
+
+/* Print */
+@media print {
+    .topbar .actions, .btn-action, .shift-selector { display: none !important; }
+    .topbar { background: #1E3A5F !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .report-card, .stat-card { box-shadow: none; border: 1px solid #ddd; }
+    body { background: #fff; color: #000; }
+    .container { max-width: 100%; padding: 10px; }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .topbar { padding: 10px 16px; }
+    .topbar .brand h1 { font-size: 16px; }
+    .container { padding: 16px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .report-header { padding: 16px; }
+    .report-header h2 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== الشريط العلوي ===== -->
+<header class="topbar">
+    <div class="brand">
+        <i class="fas fa-file-medical-alt"></i>
+        <div>
+            <h1>التقرير اليومي</h1>
+            <div class="sub">قطاع جنوب الرياض — الإسعاف الطوارئ</div>
+        </div>
+    </div>
+    <div class="actions">
+        <a href="index.html?v=10" class="btn-back-main">
+            <i class="fas fa-arrow-right"></i> العودة للرئيسية
+        </a>
+        <button class="btn-back-main" onclick="toggleDarkMode()" style="padding: 8px 12px;">
+            <i class="fas fa-moon" id="darkModeIcon"></i>
+        </button>
+    </div>
+</header>
+
+<!-- ===== المحتوى ===== -->
+<div class="container">
+
+    <!-- Loader -->
+    <div id="loader" class="loader">
+        <i class="fas fa-spinner fa-spin"></i> جاري تحميل بيانات التقرير...
+    </div>
+
+    <!-- Error -->
+    <div id="errorState" class="empty-state" style="display:none;">
+        <i class="fas fa-exclamation-circle" style="color: var(--coral);"></i>
+        <p id="errorText">حدث خطأ في تحميل البيانات</p>
+    </div>
+
+    <!-- Report Content -->
+    <div id="reportContent" style="display:none;">
+
+        <!-- Shift Selector -->
+        <div class="shift-selector" id="shiftSelectorWrap">
+            <label for="shiftSelect"><i class="fas fa-clock"></i> اختيار النوبة:</label>
+            <select id="shiftSelect" onchange="loadDailyReport(this.value)">
+                <option value="">آخر نوبة</option>
+            </select>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-bar">
+            <button class="btn-action primary" onclick="printReport()">
+                <i class="fas fa-print"></i> طباعة
+            </button>
+            <button class="btn-action teal" onclick="exportPDF()">
+                <i class="fas fa-file-pdf"></i> تصدير PDF
+            </button>
+        </div>
+
+        <!-- Report Header -->
+        <div class="report-header" id="reportHeader">
+            <h2><i class="fas fa-clipboard-list"></i> <span id="headerTitle">تقرير العمليات اليومي</span></h2>
+            <div class="meta">
+                <span><i class="fas fa-calendar-alt"></i> <span id="headerDate">—</span></span>
+                <span><i class="fas fa-clock"></i> <span id="headerShift">—</span></span>
+                <span><i class="fas fa-hashtag"></i> النوبة رقم <span id="headerId">—</span></span>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">إجمالي البلاغات</div>
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-sub" id="statTotalSub">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">المراكز النشطة</div>
+                <div class="stat-value" id="statCenters">0</div>
+                <div class="stat-sub">مركز إسعاف</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">الفرق المناوبة</div>
+                <div class="stat-value" id="statUnits">0</div>
+                <div class="stat-sub">فرقة إسعافية</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">المقارنة مع النوبة السابقة</div>
+                <div class="stat-value" id="statCompare">0</div>
+                <div class="stat-sub" id="statCompareSub">—</div>
+            </div>
+        </div>
+
+        <!-- Center Breakdown -->
+        <div class="report-card" id="centerSection">
+            <div class="card-title"><i class="fas fa-hospital"></i> تفصيل البلاغات حسب المركز</div>
+            <div class="table-wrap">
+                <table id="centerTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>المركز</th>
+                            <th>إجمالي البلاغات</th>
+                            <th>النسبة</th>
+                            <th>التوزيع</th>
+                        </tr>
+                    </thead>
+                    <tbody id="centerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Top Units -->
+        <div class="report-card" id="unitsSection">
+            <div class="card-title"><i class="fas fa-trophy"></i> أفضل الفرق المناوبة</div>
+            <div class="table-wrap">
+                <table id="unitsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>المركز</th>
+                            <th>الفرقة</th>
+                            <th>البلاغات</th>
+                            <th>نسبة المركز</th>
+                            <th>التقييم</th>
+                        </tr>
+                    </thead>
+                    <tbody id="unitsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Comparison -->
+        <div class="report-card" id="comparisonSection">
+            <div class="card-title"><i class="fas fa-chart-bar"></i> مقارنة النوبة</div>
+            <div class="table-wrap">
+                <table id="comparisonTable">
+                    <thead>
+                        <tr>
+                            <th>المؤشر</th>
+                            <th>النوبة الحالية</th>
+                            <th>النوبة السابقة</th>
+                            <th>الفرق</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="report-card" id="recSection">
+            <div class="card-title"><i class="fas fa-lightbulb"></i> توصيات التحسين</div>
+            <div style="padding: 16px; background: var(--g50); border-radius: var(--radius-md); border-right: 3px solid var(--gold); line-height: 1.8; color: var(--g700); font-size: 14px;">
+                <p><strong>🔴 تعزيز مركز الخالدية:</strong> يُنصح بمراجعة تخصيص الفرق في المراكز ذات الضغط العالي (أعلى من ٤٠ بلاغ). يُفضل إضافة فرقة احتياطية أو تفعيل نقاط احتجاز سريع.</p>
+                <p style="margin-top:12px;"><strong>🟡 مراجعة توزيع الفرق:</strong> في حال وجود فارق كبير بين فرق نفس المركز (مثل فرقة بـ ٢٦ بلاغ وأخرى بـ ١٢)، يُرجى مراجعة نقاط الانطلاق وتوزيع الأحمال.</p>
+                <p style="margin-top:12px;"><strong>🟢 صيانة الاستعداد:</strong> التأكد من صيانة السيارات بعد النوبات عالية الكثافة، ومراجعة مخزون الأدوية والأكسجين.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ===== Auth =====
+const authToken = localStorage.getItem('authToken');
+if (!authToken) { window.location.href = 'index.html?v=10'; }
+const API_BASE = '';
+
+// ===== Dark Mode =====
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const icon = document.getElementById('darkModeIcon');
+    if (document.body.classList.contains('dark-mode')) {
+        icon.classList.replace('fa-moon', 'fa-sun');
+        localStorage.setItem('emsDarkMode', 'true');
+    } else {
+        icon.classList.replace('fa-sun', 'fa-moon');
+        localStorage.setItem('emsDarkMode', 'false');
+    }
+}
+(function initDarkMode() {
+    if (localStorage.getItem('emsDarkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        const icon = document.getElementById('darkModeIcon');
+        if (icon) icon.classList.replace('fa-moon', 'fa-sun');
+    }
+})();
+
+// ===== Format Arabic numbers =====
+function toAr(n) { return n.toLocaleString('ar-SA'); }
+function toArPct(n) { return (n * 100).toFixed(1) + '%'; }
+
+// ===== Load shift list =====
+async function loadShiftList() {
+    try {
+        const res = await fetch('/api/shifts', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        if (!res.ok) return;
+        const shifts = await res.json();
+        const select = document.getElementById('shiftSelect');
+        // Clear except first option
+        while (select.options.length > 1) select.remove(1);
+        shifts.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.text = (s.shift_name || s.shift_type || 'نوبة') + ' — ' + (s.total_reports || 0) + ' بلاغ';
+            select.appendChild(opt);
+        });
+    } catch (e) { console.error('Shift list error:', e); }
+}
+
+// ===== Load daily report =====
+async function loadDailyReport(shiftId) {
+    const loader = document.getElementById('loader');
+    const errorState = document.getElementById('errorState');
+    const reportContent = document.getElementById('reportContent');
+
+    loader.style.display = 'flex';
+    errorState.style.display = 'none';
+    reportContent.style.display = 'none';
+
+    try {
+        const url = shiftId ? '/api/daily-report?shiftId=' + shiftId : '/api/daily-report';
+        const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        if (!data.shift) { throw new Error('لا توجد بيانات'); }
+
+        renderReport(data);
+
+        loader.style.display = 'none';
+        reportContent.style.display = 'block';
+    } catch (err) {
+        loader.style.display = 'none';
+        errorState.style.display = 'block';
+        document.getElementById('errorText').textContent = 'فشل في تحميل البيانات: ' + err.message;
+    }
+}
+
+// ===== Render report =====
+function renderReport(data) {
+    const shift = data.shift;
+    const centers = data.centerBreakdown || {};
+    const topUnits = data.topUnits || [];
+    const comp = data.comparison || {};
+
+    // Header
+    document.getElementById('headerTitle').textContent = 'تقرير العمليات اليومي — ' + (shift.type || 'نوبة');
+    document.getElementById('headerDate').textContent = shift.date || '—';
+    document.getElementById('headerShift').textContent = shift.name || '—';
+    document.getElementById('headerId').textContent = '#' + shift.id;
+
+    // Stats
+    const total = shift.totalReports || 0;
+    const centerNames = Object.keys(centers);
+    document.getElementById('statTotal').textContent = toAr(total);
+    document.getElementById('statTotalSub').textContent = total > 0 ? 'بلاغ إسعافي' : 'لا توجد بلاغات';
+    document.getElementById('statCenters').textContent = toAr(centerNames.length);
+    document.getElementById('statUnits').textContent = toAr(topUnits.length);
+
+    // Comparison
+    const diff = comp.difference || 0;
+    const pct = comp.percentChange;
+    let compareText = '—', compareClass = 'comparison-neutral', compareSub = 'لا توجد نوبة سابقة';
+    if (comp.previous !== undefined && comp.previous !== null) {
+        if (diff > 0) { compareText = '+' + toAr(diff); compareClass = 'comparison-up'; compareSub = '⬆️ زيادة ' + (pct ? pct + '%' : ''); }
+        else if (diff < 0) { compareText = toAr(diff); compareClass = 'comparison-down'; compareSub = '⬇️ انخفاض ' + (pct ? Math.abs(pct) + '%' : ''); }
+        else { compareText = '0'; compareClass = 'comparison-neutral'; compareSub = '➡️ لا تغير'; }
+    }
+    const statCompare = document.getElementById('statCompare');
+    statCompare.textContent = compareText;
+    statCompare.className = 'stat-value ' + compareClass;
+    document.getElementById('statCompareSub').textContent = compareSub;
+
+    // Center table
+    const centerBody = document.getElementById('centerTableBody');
+    centerBody.innerHTML = '';
+    if (centerNames.length === 0) {
+        centerBody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i> لا توجد بيانات</td></tr>';
+    } else {
+        centerNames.sort((a, b) => centers[b] - centers[a]);
+        centerNames.forEach((center, i) => {
+            const count = centers[center];
+            const pct = total > 0 ? (count / total) : 0;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${toAr(i + 1)}</td>
+                <td><strong>${center}</strong></td>
+                <td>${toAr(count)}</td>
+                <td>${toArPct(pct)}</td>
+                <td>
+                    <div class="progress-bar" style="width:120px; display:inline-block; vertical-align:middle;">
+                        <div class="progress-fill" style="width:${(pct * 100).toFixed(0)}%;"></div>
+                    </div>
+                </td>
+            `;
+            centerBody.appendChild(row);
+        });
+    }
+
+    // Units table
+    const unitsBody = document.getElementById('unitsTableBody');
+    unitsBody.innerHTML = '';
+    if (topUnits.length === 0) {
+        unitsBody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i> لا توجد بيانات</td></tr>';
+    } else {
+        topUnits.forEach((u, i) => {
+            const centerTotal = centers[u.center] || 1;
+            const unitPct = centerTotal > 0 ? (u.count / centerTotal) : 0;
+            let rankClass = 'rank-other'; let rankText = toAr(i + 1);
+            if (i === 0) { rankClass = 'rank-1'; rankText = '1'; }
+            else if (i === 1) { rankClass = 'rank-2'; rankText = '2'; }
+            else if (i === 2) { rankClass = 'rank-3'; rankText = '3'; }
+
+            let evalBadge = '⭐⭐⭐⭐☆ جيد جدًا';
+            if (i === 0) evalBadge = '⭐⭐⭐⭐⭐ ممتاز';
+            else if (i === 1) evalBadge = '⭐⭐⭐⭐⭐ ممتاز';
+            else if (i === 2) evalBadge = '⭐⭐⭐⭐☆ جيد جدًا';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span class="rank-medal ${rankClass}">${rankText}</span></td>
+                <td>${u.center}</td>
+                <td><strong>${u.unit}</strong></td>
+                <td>${toAr(u.count)}</td>
+                <td>${toArPct(unitPct)}</td>
+                <td><span class="badge badge-teal">${evalBadge}</span></td>
+            `;
+            unitsBody.appendChild(row);
+        });
+    }
+
+    // Comparison table
+    const compBody = document.getElementById('comparisonTableBody');
+    compBody.innerHTML = '';
+    const prev = data.previousShift;
+    if (!prev) {
+        compBody.innerHTML = '<tr><td colspan="4" class="empty-state"><i class="fas fa-inbox"></i> لا توجد نوبة سابقة للمقارنة</td></tr>';
+    } else {
+        const diffClass = diff > 0 ? 'comparison-up' : diff < 0 ? 'comparison-down' : 'comparison-neutral';
+        const diffIcon = diff > 0 ? '⬆️' : diff < 0 ? '⬇️' : '➡️';
+        const diffText = diff > 0 ? '+' + toAr(diff) : toAr(diff);
+
+        const rows = [
+            ['إجمالي البلاغات', toAr(comp.current || 0), toAr(comp.previous || 0), `<span class="${diffClass}">${diffIcon} ${diffText}</span>`],
+            ['المراكز النشطة', toAr(centerNames.length), toAr(centerNames.length), '—'],
+            ['الفرق المناوبة', toAr(topUnits.length), '—', '—']
+        ];
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td>`;
+            compBody.appendChild(tr);
+        });
+    }
+}
+
+// ===== Print =====
+function printReport() {
+    window.print();
+}
+
+// ===== Export PDF =====
+function exportPDF() {
+    const element = document.getElementById('reportContent');
+    const opt = {
+        margin: 10,
+        filename: 'تقرير_يومي_' + (new Date().toISOString().split('T')[0]) + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+
+// ===== Init =====
+loadShiftList();
+loadDailyReport();
+</script>
+
+</body>
+</html>

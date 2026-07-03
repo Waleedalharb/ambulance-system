@@ -1375,6 +1375,105 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
 });
 
 // ============================================
+// API: التقرير اليومي
+// ============================================
+app.get('/api/daily-report', authenticate, async (req, res) => {
+    try {
+        const shiftId = req.query.shiftId ? parseInt(req.query.shiftId) : null;
+        let shift, shiftReports = [];
+        let allShifts = [];
+
+        if (db && db.Shifts) {
+            // SQLite mode
+            if (shiftId) {
+                shift = await db.Shifts.getById(shiftId);
+                shiftReports = shift ? await db.Shifts.getShiftReports(shiftId) : [];
+            } else {
+                allShifts = await db.Shifts.getAll();
+                shift = allShifts[0] || null;
+                shiftReports = shift ? await db.Shifts.getShiftReports(shift.id) : [];
+            }
+        } else {
+            // JSON fallback mode
+            allShifts = await readShifts();
+            shift = shiftId ? allShifts.find(s => s.id === shiftId) : allShifts[allShifts.length - 1];
+            if (shift && shift.savedReports) {
+                for (let key in shift.savedReports) {
+                    const parts = key.split('|');
+                    if (parts.length === 2) {
+                        const count = shift.savedReports[key].count || 0;
+                        shiftReports.push({ center: parts[0], unit: parts[1], count: count });
+                    }
+                }
+            }
+        }
+
+        if (!shift) {
+            return res.status(404).json({ error: 'لا توجد مناوبات متاحة' });
+        }
+
+        // Calculate center totals and unit ranking
+        const centerBreakdown = {};
+        const unitRanking = [];
+        let totalReports = 0;
+
+        shiftReports.forEach(r => {
+            const count = r.count || 0;
+            totalReports += count;
+            centerBreakdown[r.center] = (centerBreakdown[r.center] || 0) + count;
+            unitRanking.push({ center: r.center, unit: r.unit, count: count });
+        });
+
+        unitRanking.sort((a, b) => b.count - a.count);
+
+        // Get previous shift for comparison
+        if (allShifts.length === 0) {
+            allShifts = (db && db.Shifts) ? await db.Shifts.getAll() : await readShifts();
+        }
+        const currentIndex = allShifts.findIndex(s => s.id === shift.id);
+        const prevShift = currentIndex >= 0 && allShifts.length > currentIndex + 1 ? allShifts[currentIndex + 1] : null;
+        let prevTotal = 0;
+        if (prevShift) {
+            if (db && db.Shifts) {
+                const prevReports = await db.Shifts.getShiftReports(prevShift.id);
+                prevTotal = prevReports.reduce((sum, r) => sum + (r.count || 0), 0);
+            } else if (prevShift.savedReports) {
+                for (let key in prevShift.savedReports) {
+                    prevTotal += (prevShift.savedReports[key].count || 0);
+                }
+            }
+        }
+
+        res.json({
+            shift: {
+                id: shift.id,
+                name: shift.shift_name || shift.name || 'نوبة',
+                type: shift.shift_type || shift.type || '—',
+                date: shift.shift_date || shift.date || '—',
+                totalReports: totalReports
+            },
+            centerBreakdown: centerBreakdown,
+            topUnits: unitRanking.slice(0, 10),
+            previousShift: prevShift ? {
+                id: prevShift.id,
+                name: prevShift.shift_name || prevShift.name || 'نوبة',
+                type: prevShift.shift_type || prevShift.type || '—',
+                totalReports: prevTotal
+            } : null,
+            comparison: {
+                current: totalReports,
+                previous: prevTotal,
+                difference: totalReports - prevTotal,
+                percentChange: prevTotal > 0 ? ((totalReports - prevTotal) / prevTotal * 100).toFixed(1) : null
+            }
+        });
+    } catch (error) {
+        console.error('Daily report error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير اليومي' });
+    }
+});
+
+// ============================================
 // API: البلاغات
 // ============================================
 app.post('/api/report', authenticate, validateBody({
