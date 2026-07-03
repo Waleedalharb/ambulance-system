@@ -4721,6 +4721,39 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
 });
 
 // ============================================
+// API: Clear All Shift Roster Data
+// ============================================
+app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftRoster.deleteAll();
+        res.json({ success: true, message: 'تم حذف جميع بيانات الجدول بنجاح' });
+    } catch (error) {
+        console.error('ShiftRoster clear-all error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
+// API: Clear Shift Roster by Date Range
+// ============================================
+app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'تاريخ البداية والنهاية مطلوب' });
+        }
+        const result = await db.run(
+            'DELETE FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+            [startDate, endDate]
+        );
+        res.json({ success: true, deleted: result.changes, message: `تم حذف ${result.changes} سجل من الجدول` });
+    } catch (error) {
+        console.error('ShiftRoster clear error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
 // API: Team Assignments
 // ============================================
 app.get('/api/team-assignments', authenticate, async (req, res) => {
