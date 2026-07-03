@@ -1749,7 +1749,7 @@ function updateShiftsHistoryWidget() {
     // Clear and add default option
     select.innerHTML = '<option value="">-- اختر التاريخ --</option>';
     
-    if (!allShifts || allShifts.length === 0) {
+    if (!Array.isArray(allShifts) || allShifts.length === 0) {
         return;
     }
     
@@ -2253,20 +2253,44 @@ function openShiftModal() {
 async function loadShifts() {
     try {
         var response = await fetch('/api/shifts', { headers: { 'Authorization': 'Bearer ' + authToken } });
-        allShifts = await response.json();
+        var data = await response.json();
+        if (Array.isArray(data)) {
+            allShifts = data;
+        } else {
+            allShifts = [];
+            console.log('⚠️ /api/shifts returned non-array:', data);
+        }
         var archiveSelect = document.getElementById('archiveSelect');
-        archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
-        allShifts.forEach(function(shift) {
-            var option = document.createElement('option');
-            option.value = shift.id;
-            var date = shift.shiftDate || getSaudiDate();
-            var total = shift.totalReports || 0;
-            var type = shift.shiftType || 'مناوبة';
-            option.textContent = type + ' - ' + date + ' (' + total + ' بلاغ)';
-            if (shift.id === currentShiftId) { option.textContent += ' ⬅️ الحالية'; }
-            archiveSelect.appendChild(option);
-        });
+        if (archiveSelect) {
+            archiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
+            allShifts.forEach(function(shift) {
+                var option = document.createElement('option');
+                option.value = shift.id;
+                var date = shift.shiftDate || getSaudiDate();
+                var total = shift.totalReports || 0;
+                var type = shift.shiftType || 'مناوبة';
+                option.textContent = type + ' - ' + date + ' (' + total + ' بلاغ)';
+                if (shift.id === currentShiftId) { option.textContent += ' ⬅️ الحالية'; }
+                archiveSelect.appendChild(option);
+            });
+        }
         var shiftArchiveSelect = document.getElementById('shiftArchiveSelect');
+        if (shiftArchiveSelect) {
+            shiftArchiveSelect.innerHTML = '<option value="">-- اختر المناوبة --</option>';
+            allShifts.forEach(function(shift) {
+                var option = document.createElement('option');
+                option.value = shift.id;
+                option.textContent = (shift.shiftType || 'مناوبة') + ' - ' + (shift.shiftDate || '') + ' (' + (shift.totalReports || 0) + ' بلاغ)';
+                shiftArchiveSelect.appendChild(option);
+            });
+        }
+        updateShiftStatus();
+    } catch (err) {
+        console.error('⚠️ loadShifts error:', err);
+        allShifts = [];
+        updateShiftStatus();
+    }
+}
         if (shiftArchiveSelect) {
             shiftArchiveSelect.innerHTML = '<option value="">-- مناوبة جديدة --</option>';
             allShifts.forEach(function(shift) {
