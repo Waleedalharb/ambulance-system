@@ -212,9 +212,22 @@ function getCurrentShiftDate() {
     const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
     const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
     const year = saudiTime.getFullYear();
-    const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
-    const day = saudiTime.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const month = saudiTime.getMonth();
+    const day = saudiTime.getDate();
+    const hour = saudiTime.getHours();
+    
+    let shiftDate = new Date(year, month, day);
+    
+    // Night shift runs from 17:00 to 05:00 next day
+    // If time is between 00:00 and 05:00, we are in the night shift that started yesterday
+    if (hour >= 0 && hour < 5) {
+        shiftDate.setDate(shiftDate.getDate() - 1);
+    }
+    
+    const shiftYear = shiftDate.getFullYear();
+    const shiftMonth = (shiftDate.getMonth() + 1).toString().padStart(2, '0');
+    const shiftDay = shiftDate.getDate().toString().padStart(2, '0');
+    return `${shiftYear}-${shiftMonth}-${shiftDay}`;
 }
 
 // ============================================

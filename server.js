@@ -227,9 +227,22 @@ function getCurrentShiftType() {
 function getCurrentShiftDate() {
     const saudiTime = getSaudiDateTime();
     const year = saudiTime.getFullYear();
-    const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
-    const day = saudiTime.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const month = saudiTime.getMonth();
+    const day = saudiTime.getDate();
+    const hour = saudiTime.getHours();
+    
+    let shiftDate = new Date(year, month, day);
+    
+    // Night shift runs from 17:00 to 05:00 next day
+    // If time is between 00:00 and 05:00, we are in the night shift that started yesterday
+    if (hour >= 0 && hour < 5) {
+        shiftDate.setDate(shiftDate.getDate() - 1);
+    }
+    
+    const shiftYear = shiftDate.getFullYear();
+    const shiftMonth = (shiftDate.getMonth() + 1).toString().padStart(2, '0');
+    const shiftDay = shiftDate.getDate().toString().padStart(2, '0');
+    return `${shiftYear}-${shiftMonth}-${shiftDay}`;
 }
 
 function getShiftKey() {
@@ -253,9 +266,21 @@ async function autoArchiveIfShiftChanged() {
         
         // FIX: Check if data has timestamps from the CURRENT shift
         // If so, don't archive - just create a shift record for tracking
+        // Night shift spans two calendar days (e.g., starts 1st July 20:00, ends 2nd July 05:00)
         const hasCurrentShiftData = Object.values(currentReports).some(r => {
             if (!r.times || r.times.length === 0) return false;
-            return r.times.some(t => t.startsWith(currentShiftDate));
+            return r.times.some(t => {
+                const reportDate = t.substring(0, 10);
+                if (currentShiftType === 'ليل') {
+                    // Night shift: data from shiftDate OR shiftDate+1
+                    const shiftDateObj = new Date(currentShiftDate + 'T00:00:00');
+                    const nextDayObj = new Date(shiftDateObj);
+                    nextDayObj.setDate(nextDayObj.getDate() + 1);
+                    const nextDayStr = `${nextDayObj.getFullYear()}-${String(nextDayObj.getMonth()+1).padStart(2,'0')}-${String(nextDayObj.getDate()).padStart(2,'0')}`;
+                    return reportDate === currentShiftDate || reportDate === nextDayStr;
+                }
+                return reportDate === currentShiftDate;
+            });
         });
         
         if (hasCurrentShiftData) {
