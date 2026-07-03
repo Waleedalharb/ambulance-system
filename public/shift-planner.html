@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="description" content="مخطط المناوبات الذكي – نظام إدارة القوى العاملة – قطاع جنوب الرياض">
+    <title>مخطط المناوبات الذكي | نظام إدارة القوى العاملة – قطاع جنوب الرياض</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* ==========================================
+           CSS Variables
+           ========================================== */
+        :root {
+            --bg: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-glass: #F8FAFC;
+            --border: #E2E8F0;
+            --primary: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --purple: #8B5CF6;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --font: 'Inter', sans-serif;
+            --shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+            --shadow-lg: 0 12px 32px rgba(148, 163, 184, 0.16);
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+        /* Top Bar */
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #FFFFFF;
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+        }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+        .logo img { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; }
+        .top-bar-center { display: flex; align-items: center; gap: 20px; }
+        .live-clock {
+            font-family: 'Courier New', monospace; font-size: 1.1rem; font-weight: 600;
+            color: var(--success); background: #ECFDF5; padding: 6px 16px;
+            border-radius: 8px; border: 1px solid #A7F3D0;
+        }
+        .top-bar-actions { display: flex; gap: 10px; align-items: center; }
+
+        .btn {
+            padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+            background: #FFFFFF; color: var(--text); font-family: var(--font);
+            font-size: 0.9rem; cursor: pointer; transition: all 0.2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn:hover { background: #F8FAFC; border-color: var(--primary); transform: translateY(-1px); }
+        .btn-primary { background: var(--primary); border: none; color: #fff; font-weight: 600; }
+        .btn-primary:hover { background: #1D4ED8; }
+        .btn-coral { background: var(--danger); border: none; color: #fff; }
+        .btn-coral:hover { background: #DC2626; }
+        .btn-gold { background: var(--warning); border: none; color: #1E293B; font-weight: 600; }
+        .btn-gold:hover { background: #D97706; }
+        .btn-green { background: var(--success); border: none; color: #fff; }
+        .btn-green:hover { background: #059669; }
+        .btn-purple { background: var(--purple); border: none; color: #fff; }
+        .btn-purple:hover { background: #7C3AED; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-icon {
+            width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
+            background: #FFFFFF; color: var(--text); cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: all 0.2s; font-size: 0.8rem;
+        }
+        .btn-icon:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-icon.danger:hover { background: var(--danger); border-color: var(--danger); }
+
+        /* Container */
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; position: relative; z-index: 1; }
+        .section {
+            background: var(--bg-card); backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: var(--radius-xl);
+            padding: 24px; margin-bottom: 24px; transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+        .section:hover { border-color: #CBD5E1; }
+        .section-title {
+            font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 10px; color: var(--text);
+        }
+        .section-title i { font-size: 1.2rem; color: var(--primary); }
+
+        /* ==========================================
+           Dashboard Widgets
+           ========================================== */
+        .dashboard-widgets {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .dash-widget {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 20px;
+            transition: all 0.2s ease; box-shadow: var(--shadow);
+            position: relative; overflow: hidden;
+        }
+        .dash-widget:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: #CBD5E1; }
+        .dash-widget-top {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .dash-widget-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+        }
+        .dash-widget-icon.blue { background: #DBEAFE; color: #2563EB; }
+        .dash-widget-icon.green { background: #D1FAE5; color: #059669; }
+        .dash-widget-icon.gold { background: #FEF3C7; color: #D97706; }
+        .dash-widget-icon.coral { background: #FEE2E2; color: #DC2626; }
+        .dash-widget-icon.purple { background: #E9D5FF; color: #7C3AED; }
+        .dash-widget-value {
+            font-size: 1.7rem; font-weight: 800; color: var(--text);
+            line-height: 1; letter-spacing: -0.5px;
+        }
+        .dash-widget-label {
+            font-size: 0.82rem; color: var(--text-muted); font-weight: 500;
+        }
+        .dash-widget-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+            margin-top: 8px;
+        }
+        .badge-green { background: #D1FAE5; color: #059669; }
+        .badge-yellow { background: #FEF3C7; color: #D97706; }
+        .badge-red { background: #FEE2E2; color: #DC2626; }
+        .badge-gray { background: #F1F5F9; color: #64748B; }
+        .avatar-group { display: flex; margin-top: 8px; }
+        .avatar-group img, .avatar-group .avatar {
+            width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff;
+            margin-left: -8px; object-fit: cover; background: #CBD5E1;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.65rem; color: #fff; font-weight: 700;
+        }
+        .avatar-group img:first-child, .avatar-group .avatar:first-child { margin-left: 0; }
+
+        /* ==========================================
+           Tabs
+           ========================================== */
+        .tabs-nav {
+            display: flex; gap: 8px; border-bottom: 1px solid var(--border);
+            margin-bottom: 20px; padding-bottom: 0;
+        }
+        .tab-btn {
+            padding: 12px 20px; border: none; background: transparent;
+            color: var(--text-muted); font-family: var(--font); font-size: 0.9rem;
+            font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+            border-bottom: 2px solid transparent; margin-bottom: -1px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active {
+            color: var(--primary); border-bottom-color: var(--primary);
+            background: #EFF6FF;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ==========================================
+           Schedule Grid (Main Calendar)
+           ========================================== */
+        .schedule-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        @media (max-width: 1024px) {
+            .schedule-layout { grid-template-columns: 1fr; }
+        }
+
+        .month-nav {
+            display: flex; align-items: center; justify-content: center;
+            gap: 16px; margin-bottom: 16px;
+        }
+        .month-nav-btn {
+            width: 36px; height: 36px; border-radius: 8px;
+            border: 1px solid var(--border); background: #FFFFFF; color: var(--text);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .month-nav-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .month-nav-title { font-size: 1.2rem; font-weight: 700; color: var(--text); min-width: 150px; text-align: center; }
+
+        .calendar-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+        }
+        .calendar-header-day {
+            text-align: center; padding: 10px; font-weight: 700; color: var(--text);
+            font-size: 0.85rem; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;
+        }
+        .calendar-day {
+            min-height: 100px; background: #FFFFFF; border: 1px solid var(--border);
+            border-radius: 10px; padding: 8px; cursor: pointer; transition: all 0.2s;
+            position: relative;
+        }
+        .calendar-day:hover { border-color: var(--primary); background: #F8FAFC; transform: translateY(-1px); box-shadow: var(--shadow); }
+        .calendar-day.other-month { opacity: 0.3; background: #F8FAFC; }
+        .calendar-day.today { border-color: var(--primary); background: #EFF6FF; }
+        .calendar-day.drag-over { border-color: var(--primary); background: #DBEAFE; border-style: dashed; }
+        .calendar-day-number { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+        .calendar-day-weekend { color: var(--danger); }
+        .calendar-staffing-dot {
+            width: 8px; height: 8px; border-radius: 50%; position: absolute;
+            top: 8px; left: 8px;
+        }
+        .dot-staffing-green { background: var(--success); box-shadow: 0 0 4px var(--success); }
+        .dot-staffing-yellow { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
+        .dot-staffing-red { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+
+        .calendar-shifts { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+        .calendar-shift-chip {
+            font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;
+            display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden;
+        }
+        .chip-day { background: #DBEAFE; color: #1D4ED8; }
+        .chip-night { background: #E9D5FF; color: #7C3AED; }
+        .chip-off { background: #F1F5F9; color: #64748B; }
+        .chip-leave { background: #FEE2E2; color: #DC2626; }
+        .chip-alt { background: #FEF3C7; color: #B45309; }
+        .chip-count {
+            font-size: 0.65rem; font-weight: 700; background: rgba(255,255,255,0.6);
+            padding: 1px 4px; border-radius: 3px;
+        }
+
+        /* ==========================================
+           Staffing Panel (Sidebar)
+           ========================================== */
+        .staffing-panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 16px;
+            box-shadow: var(--shadow); height: fit-content; position: sticky; top: 80px;
+        }
+        .staffing-panel-title {
+            font-size: 1rem; font-weight: 700; margin-bottom: 14px;
+            display: flex; align-items: center; gap: 8px; padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .staffing-day-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; border-radius: 8px; margin-bottom: 6px;
+            transition: all 0.2s; cursor: pointer;
+        }
+        .staffing-day-row:hover { background: #F8FAFC; }
+        .staffing-day-row.active { background: #EFF6FF; border: 1px solid #BFDBFE; }
+        .staffing-day-info { display: flex; align-items: center; gap: 8px; }
+        .staffing-indicator {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+        .staffing-day-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+        .staffing-day-detail {
+            font-size: 0.75rem; color: var(--text-muted); direction: ltr; text-align: left;
+        }
+        .staffing-breakdown {
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+        }
+        .breakdown-title { font-size: 0.8rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        .breakdown-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.8rem; padding: 4px 0; color: var(--text-muted);
+        }
+        .breakdown-row .ok { color: var(--success); font-weight: 700; }
+        .breakdown-row .warn { color: var(--warning); font-weight: 700; }
+        .breakdown-row .err { color: var(--danger); font-weight: 700; }
+
+        .recommendations {
+            margin-top: 14px; padding: 12px; background: #FEF3C7;
+            border-radius: var(--radius-md); border: 1px solid #FDE68A;
+        }
+        .recommendations-title {
+            font-size: 0.8rem; font-weight: 700; color: #92400E; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .rec-action {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; background: #FFFBEB; border-radius: 6px;
+            margin-bottom: 6px; font-size: 0.78rem; color: #78350F;
+            border: 1px solid #FDE68A; cursor: pointer; transition: all 0.2s;
+        }
+        .rec-action:hover { background: #FEF3C7; transform: translateX(-2px); }
+        .rec-action-btn {
+            padding: 3px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+            border: none; cursor: pointer; background: var(--warning); color: #1E293B;
+        }
+        .rec-action-btn:hover { background: #D97706; color: #fff; }
+
+        .alt-mode-toggle {
+            margin-top: 14px; padding: 12px; background: #F8FAFC;
+            border-radius: var(--radius-md); border: 1px solid var(--border);
+        }
+        .alt-mode-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .alt-mode-title { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+        .alt-mode-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative; width: 44px; height: 24px; display: inline-block;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: #CBD5E1; border-radius: 24px; transition: 0.2s;
+        }
+        .toggle-slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px;
+            right: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(-20px); }
+
+        /* ==========================================
+           Leave Management
+           ========================================== */
+        .leave-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) { .leave-layout { grid-template-columns: 1fr; } }
+
+        .leave-form-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow);
+        }
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .form-control {
+            width: 100%; padding: 10px 12px; border-radius: var(--radius-md);
+            border: 1.5px solid var(--border); background: #FFFFFF; color: var(--text);
+            font-family: var(--font); font-size: 0.85rem; transition: all 0.2s;
+        }
+        .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
+        textarea.form-control { min-height: 80px; resize: vertical; }
+
+        .leave-requests-list { margin-top: 10px; }
+        .leave-request-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px; background: #F8FAFC; border: 1px solid var(--border);
+            border-radius: 10px; margin-bottom: 8px; transition: all 0.2s;
+        }
+        .leave-request-item:hover { border-color: #CBD5E1; background: #FFFFFF; }
+        .leave-request-info { flex: 1; }
+        .leave-request-name { font-weight: 600; font-size: 0.88rem; color: var(--text); }
+        .leave-request-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+        .leave-request-status {
+            padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        }
+        .status-pending { background: #FEF3C7; color: #92400E; }
+        .status-approved { background: #D1FAE5; color: #065F46; }
+        .status-rejected { background: #FEE2E2; color: #991B1B; }
+        .leave-request-actions { display: flex; gap: 6px; margin-right: 10px; }
+
+        .leave-calendar {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+        }
+        .leave-cal-day {
+            aspect-ratio: 1; border: 1px solid var(--border); border-radius: 6px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 0.75rem; position: relative; background: #FFFFFF;
+        }
+        .leave-cal-day.has-leave { background: #FEE2E2; border-color: #FCA5A5; }
+        .leave-cal-day-number { font-weight: 600; }
+        .leave-cal-dot {
+            width: 5px; height: 5px; border-radius: 50%; background: var(--danger); margin-top: 2px;
+        }
+
+        /* ==========================================
+           Team Status Cards
+           ========================================== */
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .team-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow);
+            transition: all 0.2s ease; position: relative; overflow: hidden;
+        }
+        .team-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: #CBD5E1; }
+        .team-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+        .team-card.status-green::before { background: linear-gradient(90deg, #10B981, #34D399); }
+        .team-card.status-yellow::before { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+        .team-card.status-red::before { background: linear-gradient(90deg, #EF4444, #FCA5A5); }
+        .team-card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+        }
+        .team-card-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+        .team-card-status {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        }
+        .team-staff-count { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+        .team-staff-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .team-staff-chip {
+            padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+            background: #F1F5F9; color: var(--text-muted); border: 1px solid #E2E8F0;
+        }
+        .team-staff-chip.paramedic { background: #DBEAFE; color: #1D4ED8; border-color: #BFDBFE; }
+        .team-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ==========================================
+           Modals
+           ========================================== */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000;
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px; opacity: 0; visibility: hidden; transition: all 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-xl); width: 100%; max-width: 500px;
+            max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;
+            transform: scale(0.95); transition: transform 0.3s; box-shadow: var(--shadow-lg);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border); background: #F8FAFC;
+        }
+        .modal-title { font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .modal-body { flex: 1; overflow: auto; padding: 20px; }
+        .modal-footer {
+            display: flex; justify-content: flex-end; gap: 10px;
+            padding: 14px 20px; border-top: 1px solid var(--border); background: #F8FAFC;
+        }
+        .modal-close {
+            width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
+            background: #FFFFFF; color: var(--text); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .modal-close:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+        /* Edit Assignment Modal */
+        .assignment-preview {
+            background: #F8FAFC; border-radius: 8px; padding: 12px; margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        .assignment-preview-row {
+            display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0;
+        }
+        .assignment-preview-label { color: var(--text-muted); }
+        .assignment-preview-value { font-weight: 600; color: var(--text); }
+
+        /* ==========================================
+           Toast Container
+           ========================================== */
+        .toast-container {
+            position: fixed; top: 80px; right: 24px; z-index: 3000;
+            display: flex; flex-direction: column; gap: 8px;
+            max-height: calc(100vh - 100px); overflow-y: auto;
+        }
+        .toast {
+            padding: 14px 20px; border-radius: 10px; background: #FFFFFF;
+            border: 1px solid var(--border); color: var(--text); font-size: 0.9rem;
+            display: flex; align-items: center; gap: 10px;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+            box-shadow: var(--shadow); max-width: 320px;
+        }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+        .toast.info { border-color: var(--primary); }
+        .toast.warning { border-color: var(--warning); }
+
+        /* ==========================================
+           Utilities
+           ========================================== */
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .text-center { text-align: center; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 12px; }
+        .mb-3 { margin-bottom: 12px; }
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .w-full { width: 100%; }
+
+        /* Spinner */
+        .spinner {
+            width: 24px; height: 24px; border: 3px solid var(--border);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-bar { flex-wrap: wrap; gap: 10px; padding: 10px 16px; }
+            .logo { font-size: 1rem; }
+            .container { padding: 16px; }
+            .dashboard-widgets { grid-template-columns: repeat(2, 1fr); }
+            .calendar-grid { grid-template-columns: repeat(2, 1fr); }
+            .tabs-nav { overflow-x: auto; }
+            .tab-btn { padding: 10px 14px; font-size: 0.8rem; white-space: nowrap; }
+        }
+        @media (max-width: 480px) {
+            .dashboard-widgets { grid-template-columns: 1fr; }
+            .calendar-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Dark mode helpers */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0F172A; --bg-card: #1E293B; --bg-glass: #1E293B;
+                --border: #334155; --text: #F1F5F9; --text-muted: #94A3B8;
+            }
+            body { background: var(--bg); color: var(--text); }
+            .top-bar { background: #1E293B; border-color: #334155; }
+            .calendar-day { background: #1E293B; border-color: #334155; }
+            .calendar-day:hover { background: #334155; }
+            .calendar-header-day { background: #1E293B; border-color: #334155; color: #F1F5F9; }
+            .calendar-day.other-month { background: #0F172A; }
+            .form-control { background: #1E293B; border-color: #334155; color: #F1F5F9; }
+            .staffing-panel, .leave-form-card, .team-card, .dash-widget { background: #1E293B; border-color: #334155; }
+            .modal-content, .modal-header { background: #1E293B; border-color: #334155; }
+            .btn { background: #1E293B; border-color: #334155; color: #F1F5F9; }
+            .rec-action { background: #451a03; }
+            .leave-request-item { background: #1E293B; }
+            .leave-cal-day { background: #1E293B; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <nav class="top-bar">
+        <div class="logo">
+            <img src="logo.png" alt="South Sector Emergency Operations Platform">
+            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;">
+                <span style="font-size:1.2rem;font-weight:700;">نظام الجداول الذكي</span>
+                <span style="font-size:0.7rem;color:#64748B;">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
+            </div>
+        </div>
+        <div class="top-bar-center">
+            <div class="live-clock" id="liveClock">--:--:--</div>
+        </div>
+        <div class="top-bar-actions">
+            <button class="btn" onclick="window.location.href='smart-schedule.html?v=10'">
+                <i class="fas fa-calendar-alt"></i> <span>نظام الجداول</span>
+            </button>
+            <button class="btn" onclick="window.location.href='index.html'">
+                <i class="fas fa-home"></i> <span>الرجوع للرئيسية</span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- ==========================================
+             A. Dashboard Widgets
+             ========================================== -->
+        <div class="dashboard-widgets fade-in" id="dashboardWidgets">
+            <div class="dash-widget">
+                <div class="dash-widget-top">
+                    <div class="dash-widget-icon blue"><i class="fas fa-users"></i></div>
+                    <div class="dash-widget-value" id="dashAvailableCount">--</div>
+                </div>
+                <div class="dash-widget-label">الموظفين المتاحين</div>
+                <div class="avatar-group" id="dashAvailableAvatars"></div>
+            </div>
+            <div class="dash-widget">
+                <div class="dash-widget-top">
+                    <div class="dash-widget-icon gold"><i class="fas fa-user-clock"></i></div>
+                    <div class="dash-widget-value" id="dashOnLeaveCount">--</div>
+                </div>
+                <div class="dash-widget-label">في إجازة / راحة</div>
+                <div class="dash-widget-badge badge-gray" id="dashLeaveDates">--</div>
+            </div>
+            <div class="dash-widget">
+                <div class="dash-widget-top">
+                    <div class="dash-widget-icon green" id="dashShortageIcon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="dash-widget-value" id="dashShortageStatus">--</div>
+                </div>
+                <div class="dash-widget-label">حالة التغطية</div>
+                <div class="dash-widget-badge badge-green" id="dashShortageBadge">جيدة</div>
+            </div>
+            <div class="dash-widget">
+                <div class="dash-widget-top">
+                    <div class="dash-widget-icon coral"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="dash-widget-value" id="dashRiskCount">--</div>
+                </div>
+                <div class="dash-widget-label">مخاطر قادمة (3 أيام)</div>
+                <div class="dash-widget-badge badge-gray" id="dashRiskDates">--</div>
+            </div>
+            <div class="dash-widget">
+                <div class="dash-widget-top">
+                    <div class="dash-widget-icon purple"><i class="fas fa-magic"></i></div>
+                    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+                        <div style="display:flex;gap:6px;">
+                            <select id="genMonth" class="form-control" style="width:90px;padding:4px 8px;font-size:0.78rem;">
+                                <option value="1">يناير</option><option value="2">فبراير</option><option value="3">مارس</option>
+                                <option value="4">أبريل</option><option value="5">مايو</option><option value="6">يونيو</option>
+                                <option value="7">يوليو</option><option value="8">أغسطس</option><option value="9">سبتمبر</option>
+                                <option value="10">أكتوبر</option><option value="11">نوفمبر</option><option value="12">ديسمبر</option>
+                            </select>
+                            <select id="genYear" class="form-control" style="width:80px;padding:4px 8px;font-size:0.78rem;">
+                                <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="generateSchedule()" id="genBtn">
+                            <i class="fas fa-play"></i> توليد
+                        </button>
+                    </div>
+                </div>
+                <div class="dash-widget-label">توليد جدول شهري</div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             Tabs Navigation
+             ========================================== -->
+        <div class="tabs-nav" id="mainTabs">
+            <button class="tab-btn active" data-tab="schedule" onclick="switchTab('schedule')">
+                <i class="fas fa-calendar-alt"></i> الجدول الذكي
+            </button>
+            <button class="tab-btn" data-tab="leave" onclick="switchTab('leave')">
+                <i class="fas fa-clipboard-list"></i> الإجازات
+            </button>
+            <button class="tab-btn" data-tab="teams" onclick="switchTab('teams')">
+                <i class="fas fa-ambulance"></i> حالة الفرق
+            </button>
+            <button class="tab-btn" data-tab="import" onclick="switchTab('import')">
+                <i class="fas fa-file-import"></i> استيراد
+            </button>
+        </div>
+
+        <!-- ==========================================
+             Tab: Smart Schedule
+             ========================================== -->
+        <div class="tab-content active" id="tab-schedule">
+            <div class="schedule-layout">
+                <div>
+                    <!-- Month Navigation -->
+                    <div class="month-nav">
+                        <button class="month-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-right"></i></button>
+                        <div class="month-nav-title" id="monthTitle">--</div>
+                        <button class="month-nav-btn" onclick="changeMonth(1)"><i class="fas fa-chevron-left"></i></button>
+                    </div>
+                    <!-- Calendar Grid -->
+                    <div class="calendar-grid" id="scheduleCalendar">
+                        <!-- rendered dynamically -->
+                    </div>
+                </div>
+                <!-- Staffing Panel -->
+                <div class="staffing-panel" id="staffingPanel">
+                    <div class="staffing-panel-title">
+                        <i class="fas fa-chart-pie" style="color:var(--primary);"></i>
+                        مؤشرات التغطية
+                    </div>
+                    <div id="staffingDaysList">
+                        <div style="text-align:center;color:var(--text-muted);padding:20px 0;">
+                            <div class="spinner" style="margin:0 auto 10px;"></div>
+                            جاري تحميل البيانات...
+                        </div>
+                    </div>
+                    <div class="staffing-breakdown" id="staffingBreakdown" style="display:none;">
+                        <div class="breakdown-title">تفاصيل اليوم المختار</div>
+                        <div id="breakdownContent"></div>
+                    </div>
+                    <div class="recommendations" id="recommendationsPanel" style="display:none;">
+                        <div class="recommendations-title"><i class="fas fa-lightbulb"></i> توصيات</div>
+                        <div id="recommendationsList"></div>
+                    </div>
+                    <div class="alt-mode-toggle">
+                        <div class="alt-mode-header">
+                            <span class="alt-mode-title"><i class="fas fa-random"></i> الوضع البديل</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="altModeToggle" onchange="toggleAlternativeMode()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="alt-mode-desc">
+                            عند تفعيل الوضع البديل، يتم تقسيم المناوبات إلى 8 ساعات بدلاً من 12 ساعة
+                            لزيادة عدد الفرق المغطاة في حالات النقص.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             Tab: Leave Management
+             ========================================== -->
+        <div class="tab-content" id="tab-leave">
+            <div class="leave-layout">
+                <div class="leave-form-card">
+                    <div class="section-title" style="margin-bottom:14px;">
+                        <i class="fas fa-paper-plane"></i> تقديم طلب إجازة
+                    </div>
+                    <div class="form-group">
+                        <label>الموظف</label>
+                        <select class="form-control" id="leaveEmployeeSelect"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>من تاريخ</label>
+                        <input type="date" class="form-control" id="leaveStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label>إلى تاريخ</label>
+                        <input type="date" class="form-control" id="leaveEndDate">
+                    </div>
+                    <div class="form-group">
+                        <label>نوع الإجازة</label>
+                        <select class="form-control" id="leaveType">
+                            <option value="إجازة">إجازة اعتيادية</option>
+                            <option value="مرضية">إجازة مرضية</option>
+                            <option value="استثنائية">إجازة استثنائية</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>السبب / الملاحظات</label>
+                        <textarea class="form-control" id="leaveReason" placeholder="سبب الإجازة (اختياري)"></textarea>
+                    </div>
+                    <button class="btn btn-primary w-full" onclick="submitLeaveRequest()">
+                        <i class="fas fa-paper-plane"></i> إرسال الطلب
+                    </button>
+                    <div id="leaveFormStatus" style="margin-top:10px;font-size:0.82rem;"></div>
+                </div>
+                <div>
+                    <div class="section-title" style="margin-bottom:14px;">
+                        <i class="fas fa-hourglass-half"></i> طلبات قيد الانتظار
+                    </div>
+                    <div class="leave-requests-list" id="pendingLeaveRequests">
+                        <div style="text-align:center;color:var(--text-muted);padding:20px;">جاري التحميل...</div>
+                    </div>
+                    <div class="section-title" style="margin:20px 0 14px;">
+                        <i class="fas fa-calendar-check"></i> الإجازات المعتمدة
+                    </div>
+                    <div class="leave-calendar" id="leaveCalendarGrid">
+                        <!-- rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             Tab: Team Status
+             ========================================== -->
+        <div class="tab-content" id="tab-teams">
+            <div class="teams-grid" id="teamsGrid">
+                <div style="text-align:center;color:var(--text-muted);padding:40px;grid-column:1/-1;">
+                    <div class="spinner" style="margin:0 auto 10px;"></div>
+                    جاري تحميل بيانات الفرق...
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             Tab: Import (Legacy)
+             ========================================== -->
+        <div class="tab-content" id="tab-import">
+            <div class="section fade-in">
+                <div class="section-title"><i class="fas fa-cloud-upload-alt"></i> رفع ملف الجدول</div>
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf">
+                    <i class="fas fa-file-import"></i>
+                    <div class="drop-zone-text">اسحب ملف Excel أو PDF هنا</div>
+                    <div class="drop-zone-hint">أو اضغط لاختيار الملف (.xlsx, .xls, .pdf)</div>
+                    <div class="upload-progress" id="uploadProgress" style="display:none;">
+                        <div class="progress-bar" style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;margin-top:8px;">
+                            <div class="progress-fill" id="progressFill" style="height:100%;background:var(--primary);border-radius:4px;transition:width 0.3s;width:0%;"></div>
+                        </div>
+                        <div class="progress-text" id="progressText" style="font-size:0.85rem;color:var(--text-muted);text-align:center;margin-top:4px;">0%</div>
+                    </div>
+                </div>
+                <div class="saved-files-list" id="savedFilesList"></div>
+            </div>
+            <div class="section fade-in">
+                <div class="section-title"><i class="fas fa-download"></i> التصدير</div>
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-green" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> تصدير Excel</button>
+                    <button class="btn btn-coral" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> تصدير PDF</button>
+                    <button class="btn btn-purple" onclick="printSchedule()"><i class="fas fa-print"></i> طباعة</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         Edit Assignment Modal
+         ========================================== -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-edit"></i> تعديل المناوبة</div>
+                <button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="assignment-preview">
+                    <div class="assignment-preview-row">
+                        <span class="assignment-preview-label">التاريخ</span>
+                        <span class="assignment-preview-value" id="editDateDisplay">--</span>
+                    </div>
+                    <div class="assignment-preview-row">
+                        <span class="assignment-preview-label">اليوم</span>
+                        <span class="assignment-preview-value" id="editDayDisplay">--</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>الموظف</label>
+                    <select class="form-control" id="editEmployeeSelect"></select>
+                </div>
+                <div class="form-group">
+                    <label>نوع المناوبة</label>
+                    <select class="form-control" id="editShiftCode">
+                        <option value="D12">دوام 12 صباحاً (05:00-17:00)</option>
+                        <option value="N12">دوام 12 ليلاً (17:00-05:00)</option>
+                        <option value="D8">دوام 8 صباحاً (05:00-13:00)</option>
+                        <option value="N8">دوام 8 ليلاً (17:00-01:00)</option>
+                        <option value="V">إجازة</option>
+                        <option value="R">راحة</option>
+                        <option value="C">تدريب</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>الفريق</label>
+                    <select class="form-control" id="editTeamSelect"></select>
+                </div>
+                <div class="form-group">
+                    <label>الملاحظات</label>
+                    <input type="text" class="form-control" id="editNotes" placeholder="ملاحظات (اختياري)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">إلغاء</button>
+                <button class="btn btn-primary" onclick="saveAssignment()"><i class="fas fa-save"></i> حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/app.js"></script>
+    <script>
+    // ==========================================
+    // Global Variables
+    // ==========================================
+    var currentMonth = new Date();
+    var scheduleData = [];
+    var employeesList = [];
+    var teamsList = [];
+    var leaveRequests = [];
+    var staffingData = [];
+    var alertsData = [];
+    var recommendationsData = [];
+    var isAlternativeMode = false;
+    var selectedDate = null;
+    var draggedEmployee = null;
+    var ARABIC_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    var ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+    // ==========================================
+    // Initialization
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        try { initClock(); } catch(e) { console.error('initClock failed:', e); }
+        try { initTabs(); } catch(e) { console.error('initTabs failed:', e); }
+        try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
+        try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
+        try { setupModals(); } catch(e) { console.error('setupModals failed:', e); }
+        // Load data
+        setTimeout(function() {
+            loadAllData();
+        }, 300);
+    });
+
+    function initClock() {
+        var clockEl = document.getElementById('liveClock');
+        if (!clockEl) return;
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function update() {
+            var now = new Date();
+            clockEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+        }
+        update(); setInterval(update, 1000);
+    }
+
+    function initTabs() {
+        // Default tab is already active in HTML
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        });
+        document.querySelectorAll('.tab-content').forEach(function(content) {
+            content.classList.toggle('active', content.id === 'tab-' + tabName);
+        });
+        // Refresh data when switching to specific tabs
+        if (tabName === 'leave') { loadLeaveRequests(); renderLeaveCalendar(); }
+        if (tabName === 'teams') { loadTeamsStatus(); }
+        if (tabName === 'schedule') { renderScheduleCalendar(); renderStaffingPanel(); }
+    }
+
+    // ==========================================
+    // Data Loading
+    // ==========================================
+    async function loadAllData() {
+        try {
+            await Promise.all([
+                loadEmployees(),
+                loadTeams(),
+                loadSchedule(),
+                loadStaffingLevels(),
+                loadLeaveRequests()
+            ]);
+            updateDashboard();
+            renderScheduleCalendar();
+            renderStaffingPanel();
+            populateSelects();
+        } catch(e) {
+            console.error('loadAllData error:', e);
+            showToast('تعذر تحميل بعض البيانات', 'warning');
+        }
+    }
+
+    async function loadEmployees() {
+        try {
+            var res = await apiFetch('/api/employees');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            employeesList = Array.isArray(data) ? data : (data.employees || []);
+        } catch(e) {
+            console.error('loadEmployees error:', e);
+            employeesList = [];
+        }
+    }
+
+    async function loadTeams() {
+        try {
+            var res = await apiFetch('/api/teams');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            teamsList = Array.isArray(data) ? data : (data.teams || []);
+        } catch(e) {
+            console.error('loadTeams error:', e);
+            teamsList = [];
+        }
+    }
+
+    async function loadSchedule() {
+        try {
+            var year = currentMonth.getFullYear();
+            var month = currentMonth.getMonth() + 1;
+            var res = await apiFetch('/api/shift-schedule/month?year=' + year + '&month=' + month);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            scheduleData = Array.isArray(data) ? data : (data.schedule || []);
+        } catch(e) {
+            console.error('loadSchedule error:', e);
+            scheduleData = generateDemoSchedule();
+        }
+    }
+
+    async function loadStaffingLevels() {
+        try {
+            var res = await apiFetch('/api/staffing-levels');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            staffingData = Array.isArray(data) ? data : (data.levels || []);
+            alertsData = data.alerts || [];
+            recommendationsData = data.recommendations || [];
+        } catch(e) {
+            console.error('loadStaffingLevels error:', e);
+            staffingData = [];
+            alertsData = [];
+            recommendationsData = [];
+        }
+    }
+
+    async function loadLeaveRequests() {
+        try {
+            var res = await apiFetch('/api/leave-requests');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            leaveRequests = Array.isArray(data) ? data : (data.requests || []);
+            renderPendingLeaveRequests();
+            renderLeaveCalendar();
+        } catch(e) {
+            console.error('loadLeaveRequests error:', e);
+            leaveRequests = [];
+        }
+    }
+
+    async function loadTeamsStatus() {
+        try {
+            var res = await apiFetch('/api/teams');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            teamsList = Array.isArray(data) ? data : (data.teams || []);
+            renderTeamsStatus();
+        } catch(e) {
+            console.error('loadTeamsStatus error:', e);
+            renderTeamsStatus();
+        }
+    }
+
+    // ==========================================
+    // Dashboard Widgets
+    // ==========================================
+    function updateDashboard() {
+        var today = new Date().toISOString().split('T')[0];
+        var available = employeesList.filter(function(e) {
+            return !leaveRequests.some(function(l) {
+                return l.employee_id === e.id && l.status === 'approved' && l.start_date <= today && l.end_date >= today;
+            });
+        });
+        var onLeave = leaveRequests.filter(function(l) { return l.status === 'approved' && l.start_date <= today && l.end_date >= today; });
+
+        document.getElementById('dashAvailableCount').textContent = available.length;
+        document.getElementById('dashOnLeaveCount').textContent = onLeave.length;
+
+        // Avatars
+        var avatarsEl = document.getElementById('dashAvailableAvatars');
+        avatarsEl.innerHTML = '';
+        available.slice(0, 5).forEach(function(e) {
+            var el = document.createElement('div');
+            el.className = 'avatar';
+            el.textContent = (e.name || '؟').charAt(0);
+            el.title = e.name || '';
+            avatarsEl.appendChild(el);
+        });
+        if (available.length > 5) {
+            var more = document.createElement('div');
+            more.className = 'avatar';
+            more.style.background = '#94A3B8';
+            more.textContent = '+' + (available.length - 5);
+            avatarsEl.appendChild(more);
+        }
+
+        // Leave dates
+        document.getElementById('dashLeaveDates').textContent = onLeave.length > 0 ? onLeave.length + ' موظف' : 'لا يوجد';
+
+        // Shortage status
+        var shortageStatus = 'جيدة';
+        var shortageBadge = 'badge-green';
+        var shortageIcon = 'fa-shield-alt';
+        var shortageIconColor = 'green';
+
+        var todayStaffing = staffingData.find(function(s) { return s.date === today; });
+        if (todayStaffing) {
+            var dayNeeded = todayStaffing.day_needed || 2;
+            var dayActual = todayStaffing.day_actual || 0;
+            var nightNeeded = todayStaffing.night_needed || 2;
+            var nightActual = todayStaffing.night_actual || 0;
+            if (dayActual < dayNeeded || nightActual < nightNeeded) {
+                shortageStatus = 'نقص';
+                shortageBadge = 'badge-red';
+                shortageIcon = 'fa-exclamation-circle';
+                shortageIconColor = 'coral';
+            } else if (dayActual === dayNeeded || nightActual === nightNeeded) {
+                shortageStatus = 'حد أدنى';
+                shortageBadge = 'badge-yellow';
+                shortageIcon = 'fa-exclamation-triangle';
+                shortageIconColor = 'gold';
+            }
+        }
+        document.getElementById('dashShortageStatus').textContent = shortageStatus;
+        var badgeEl = document.getElementById('dashShortageBadge');
+        badgeEl.className = 'dash-widget-badge ' + shortageBadge;
+        badgeEl.textContent = shortageStatus;
+        var iconEl = document.getElementById('dashShortageIcon');
+        iconEl.className = 'dash-widget-icon ' + shortageIconColor;
+        iconEl.innerHTML = '<i class="fas ' + shortageIcon + '"></i>';
+
+        // Upcoming risks (next 3 days)
+        var risks = 0;
+        var riskDates = [];
+        for (var i = 1; i <= 3; i++) {
+            var d = new Date(); d.setDate(d.getDate() + i);
+            var ds = d.toISOString().split('T')[0];
+            var s = staffingData.find(function(x) { return x.date === ds; });
+            if (s && (s.day_actual < (s.day_needed || 2) || s.night_actual < (s.night_needed || 2))) {
+                risks++;
+                riskDates.push(d.getDate() + '/' + (d.getMonth() + 1));
+            }
+        }
+        document.getElementById('dashRiskCount').textContent = risks;
+        document.getElementById('dashRiskDates').textContent = riskDates.length > 0 ? riskDates.join('، ') : 'لا يوجد';
+
+        // Set default generate month/year to current
+        var now = new Date();
+        var genMonth = document.getElementById('genMonth');
+        var genYear = document.getElementById('genYear');
+        if (genMonth) genMonth.value = now.getMonth() + 1;
+        if (genYear) genYear.value = now.getFullYear();
+    }
+
+    // ==========================================
+    // Schedule Calendar
+    // ==========================================
+    function renderScheduleCalendar() {
+        var container = document.getElementById('scheduleCalendar');
+        if (!container) return;
+        var year = currentMonth.getFullYear();
+        var month = currentMonth.getMonth();
+        var firstDay = new Date(year, month, 1);
+        var lastDay = new Date(year, month + 1, 0);
+        var startDayOfWeek = firstDay.getDay();
+        var daysInMonth = lastDay.getDate();
+
+        document.getElementById('monthTitle').textContent = ARABIC_MONTHS[month] + ' ' + year;
+
+        var html = '';
+        for (var h = 0; h < 7; h++) {
+            html += '<div class="calendar-header-day">' + ARABIC_DAYS[h] + '</div>';
+        }
+        for (var empty = 0; empty < startDayOfWeek; empty++) {
+            html += '<div class="calendar-day other-month"></div>';
+        }
+        for (var day = 1; day <= daysInMonth; day++) {
+            var dateStr = year + '-' + pad2(month + 1) + '-' + pad2(day);
+            var isToday = dateStr === new Date().toISOString().split('T')[0];
+            var dayOfWeek = new Date(year, month, day).getDay();
+            var isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+            var daySchedule = scheduleData.filter(function(s) { return s.shift_date === dateStr; });
+
+            var dayShifts = { day: [], night: [], off: [], leave: [], alt: [] };
+            daySchedule.forEach(function(s) {
+                var code = s.shift_code || '';
+                if (code === 'D12' || code === 'D8' || code === 'D10' || code === 'D11' || code === 'D6') {
+                    dayShifts.day.push(s);
+                } else if (code === 'N12' || code === 'N8' || code === 'N10' || code === 'N11' || code === 'N6') {
+                    dayShifts.night.push(s);
+                } else if (code === 'V' || code === 'VC' || code === 'EV' || code === 'E') {
+                    dayShifts.leave.push(s);
+                } else if (code === 'R' || code === 'WO') {
+                    dayShifts.off.push(s);
+                } else {
+                    dayShifts.alt.push(s);
+                }
+            });
+
+            // Staffing indicator
+            var staffing = staffingData.find(function(s) { return s.date === dateStr; });
+            var staffingClass = '';
+            if (staffing) {
+                if (staffing.day_actual < (staffing.day_needed || 2) || staffing.night_actual < (staffing.night_needed || 2)) {
+                    staffingClass = 'dot-staffing-red';
+                } else if (staffing.day_actual === staffing.day_needed || staffing.night_actual === staffing.night_needed) {
+                    staffingClass = 'dot-staffing-yellow';
+                } else {
+                    staffingClass = 'dot-staffing-green';
+                }
+            }
+
+            var dayClass = 'calendar-day' + (isToday ? ' today' : '');
+            html += '<div class="' + dayClass + '" data-date="' + dateStr + '" onclick="openEditModal(\'' + dateStr + '\')" ' +
+                'ondragover="handleDragOver(event)" ondrop="handleDrop(event, \'' + dateStr + '\')" ' +
+                'ondragleave="handleDragLeave(event)">';
+            if (staffingClass) html += '<div class="calendar-staffing-dot ' + staffingClass + '"></div>';
+            html += '<div class="calendar-day-number' + (isWeekend ? ' calendar-day-weekend' : '') + '">' + day + '</div>';
+            html += '<div class="calendar-shifts">';
+            if (dayShifts.day.length > 0) {
+                html += '<div class="calendar-shift-chip chip-day"><i class="fas fa-sun" style="font-size:0.55rem;"></i> صباحية <span class="chip-count">' + dayShifts.day.length + '</span></div>';
+            }
+            if (dayShifts.night.length > 0) {
+                html += '<div class="calendar-shift-chip chip-night"><i class="fas fa-moon" style="font-size:0.55rem;"></i> ليلية <span class="chip-count">' + dayShifts.night.length + '</span></div>';
+            }
+            if (dayShifts.leave.length > 0) {
+                html += '<div class="calendar-shift-chip chip-leave"><i class="fas fa-user-slash" style="font-size:0.55rem;"></i> إجازة <span class="chip-count">' + dayShifts.leave.length + '</span></div>';
+            }
+            if (dayShifts.off.length > 0) {
+                html += '<div class="calendar-shift-chip chip-off"><i class="fas fa-bed" style="font-size:0.55rem;"></i> راحة <span class="chip-count">' + dayShifts.off.length + '</span></div>';
+            }
+            if (isAlternativeMode && dayShifts.alt.length > 0) {
+                html += '<div class="calendar-shift-chip chip-alt"><i class="fas fa-random" style="font-size:0.55rem;"></i> بديل <span class="chip-count">' + dayShifts.alt.length + '</span></div>';
+            }
+            html += '</div></div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function changeMonth(delta) {
+        currentMonth.setMonth(currentMonth.getMonth() + delta);
+        loadSchedule().then(function() {
+            renderScheduleCalendar();
+            renderStaffingPanel();
+            updateDashboard();
+        });
+    }
+
+    // Drag and Drop for employees between dates
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+    }
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+    function handleDrop(e, dateStr) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        if (draggedEmployee) {
+            moveEmployeeToDate(draggedEmployee, dateStr);
+            draggedEmployee = null;
+        }
+    }
+
+    async function moveEmployeeToDate(assignment, newDate) {
+        try {
+            var res = await apiFetch('/api/shift-schedule/update', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: assignment.id,
+                    employee_id: assignment.employee_id,
+                    shift_date: newDate,
+                    shift_code: assignment.shift_code,
+                    team_id: assignment.team_id
+                })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم نقل المناوبة بنجاح', 'success');
+            await loadSchedule();
+            renderScheduleCalendar();
+            renderStaffingPanel();
+        } catch(e) {
+            console.error('moveEmployeeToDate error:', e);
+            showToast('خطأ في نقل المناوبة', 'error');
+        }
+    }
+
+    // ==========================================
+    // Staffing Panel
+    // ==========================================
+    function renderStaffingPanel() {
+        var listEl = document.getElementById('staffingDaysList');
+        var breakdownEl = document.getElementById('staffingBreakdown');
+        var recEl = document.getElementById('recommendationsPanel');
+        var recListEl = document.getElementById('recommendationsList');
+
+        if (!staffingData || staffingData.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px 0;">لا توجد بيانات تغطية</div>';
+            breakdownEl.style.display = 'none';
+            recEl.style.display = 'none';
+            return;
+        }
+
+        var html = '';
+        var today = new Date().toISOString().split('T')[0];
+        staffingData.forEach(function(s) {
+            var isActive = s.date === selectedDate;
+            var isToday = s.date === today;
+            var indicatorClass = 'dot-staffing-green';
+            if (s.day_actual < (s.day_needed || 2) || s.night_actual < (s.night_needed || 2)) {
+                indicatorClass = 'dot-staffing-red';
+            } else if (s.day_actual === s.day_needed || s.night_actual === s.night_needed) {
+                indicatorClass = 'dot-staffing-yellow';
+            }
+            var dayName = '';
+            try { dayName = ARABIC_DAYS[new Date(s.date + 'T00:00:00').getDay()] || ''; } catch(e) {}
+            html += '<div class="staffing-day-row' + (isActive ? ' active' : '') + '" onclick="selectStaffingDay(\'' + s.date + '\')">' +
+                '<div class="staffing-day-info">' +
+                '<div class="staffing-indicator ' + indicatorClass + '"></div>' +
+                '<div>' +
+                '<div class="staffing-day-name">' + (isToday ? 'اليوم' : dayName) + ' ' + s.date.slice(8) + '/' + s.date.slice(5, 7) + '</div>' +
+                '</div></div>' +
+                '<div class="staffing-day-detail">ص:' + (s.day_actual || 0) + '/' + (s.day_needed || 2) + ' | ل:' + (s.night_actual || 0) + '/' + (s.night_needed || 2) + '</div>' +
+                '</div>';
+        });
+        listEl.innerHTML = html;
+
+        // Recommendations
+        if (recommendationsData && recommendationsData.length > 0) {
+            recEl.style.display = 'block';
+            recListEl.innerHTML = recommendationsData.slice(0, 3).map(function(r) {
+                return '<div class="rec-action" onclick="applyRecommendation(' + (r.id || 0) + ')">' +
+                    '<span>' + (r.message || r.recommendation || '') + '</span>' +
+                    '<button class="rec-action-btn">تطبيق</button></div>';
+            }).join('');
+        } else {
+            recEl.style.display = 'none';
+        }
+    }
+
+    function selectStaffingDay(dateStr) {
+        selectedDate = dateStr;
+        renderStaffingPanel(); // re-render to update active state
+        var breakdownEl = document.getElementById('staffingBreakdown');
+        var contentEl = document.getElementById('breakdownContent');
+        var s = staffingData.find(function(x) { return x.date === dateStr; });
+        if (!s) { breakdownEl.style.display = 'none'; return; }
+
+        breakdownEl.style.display = 'block';
+        var dayOk = (s.day_actual || 0) >= (s.day_needed || 2);
+        var nightOk = (s.night_actual || 0) >= (s.night_needed || 2);
+        contentEl.innerHTML =
+            '<div class="breakdown-row">' +
+            '<span>مناوبة صباحية</span>' +
+            '<span class="' + (dayOk ? 'ok' : 'err') + '">' + (s.day_actual || 0) + '/' + (s.day_needed || 2) + ' ' + (dayOk ? '✓' : '⚠️') + '</span>' +
+            '</div>' +
+            '<div class="breakdown-row">' +
+            '<span>مناوبة ليلية</span>' +
+            '<span class="' + (nightOk ? 'ok' : 'err') + '">' + (s.night_actual || 0) + '/' + (s.night_needed || 2) + ' ' + (nightOk ? '✓' : '⚠️') + '</span>' +
+            '</div>' +
+            '<div class="breakdown-row">' +
+            '<span>الإجمالي</span>' +
+            '<span>' + ((s.day_actual || 0) + (s.night_actual || 0)) + ' موظف</span>' +
+            '</div>';
+    }
+
+    async function applyRecommendation(recId) {
+        try {
+            var res = await apiFetch('/api/staffing-recommendations/' + recId + '/apply', { method: 'POST' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم تطبيق التوصية بنجاح', 'success');
+            await loadAllData();
+        } catch(e) {
+            console.error('applyRecommendation error:', e);
+            showToast('خطأ في تطبيق التوصية', 'error');
+        }
+    }
+
+    function toggleAlternativeMode() {
+        isAlternativeMode = document.getElementById('altModeToggle').checked;
+        renderScheduleCalendar();
+        showToast(isAlternativeMode ? 'تم تفعيل الوضع البديل (8 ساعات)' : 'تم إلغاء الوضع البديل', 'info');
+    }
+
+    // ==========================================
+    // Edit Assignment Modal
+    // ==========================================
+    function openEditModal(dateStr) {
+        selectedDate = dateStr;
+        var modal = document.getElementById('editModal');
+        var dateDisplay = document.getElementById('editDateDisplay');
+        var dayDisplay = document.getElementById('editDayDisplay');
+        var empSelect = document.getElementById('editEmployeeSelect');
+        var teamSelect = document.getElementById('editTeamSelect');
+
+        dateDisplay.textContent = dateStr;
+        var dayName = '';
+        try { dayName = ARABIC_DAYS[new Date(dateStr + 'T00:00:00').getDay()] || ''; } catch(e) {}
+        dayDisplay.textContent = dayName;
+
+        // Populate employees
+        empSelect.innerHTML = '<option value="">اختر موظف...</option>' +
+            employeesList.map(function(e) {
+                return '<option value="' + e.id + '">' + (e.name || e.employee_code || e.id) + ' - ' + (e.job_title || 'مسعف') + '</option>';
+            }).join('');
+
+        // Populate teams
+        teamSelect.innerHTML = '<option value="">اختر فريق...</option>' +
+            teamsList.map(function(t) {
+                return '<option value="' + t.id + '">' + (t.name || t.team_name || 'فريق ' + t.id) + '</option>';
+            }).join('');
+
+        modal.classList.add('active');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.remove('active');
+    }
+
+    async function saveAssignment() {
+        var empId = document.getElementById('editEmployeeSelect').value;
+        var shiftCode = document.getElementById('editShiftCode').value;
+        var teamId = document.getElementById('editTeamSelect').value;
+        if (!empId || !selectedDate) {
+            showToast('الرجاء اختيار موظف وتاريخ', 'warning');
+            return;
+        }
+        try {
+            var res = await apiFetch('/api/shift-schedule/update', {
+                method: 'POST',
+                body: JSON.stringify({
+                    employee_id: empId,
+                    shift_date: selectedDate,
+                    shift_code: shiftCode,
+                    team_id: teamId || null,
+                    is_override: true
+                })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم حفظ المناوبة بنجاح', 'success');
+            closeEditModal();
+            await loadSchedule();
+            renderScheduleCalendar();
+            renderStaffingPanel();
+        } catch(e) {
+            console.error('saveAssignment error:', e);
+            showToast('خطأ في حفظ المناوبة', 'error');
+        }
+    }
+
+    function setupModals() {
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditModal();
+        });
+    }
+
+    // ==========================================
+    // Generate Schedule
+    // ==========================================
+    async function generateSchedule() {
+        var month = document.getElementById('genMonth').value;
+        var year = document.getElementById('genYear').value;
+        var btn = document.getElementById('genBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التوليد...';
+        try {
+            var res = await apiFetch('/api/shift-schedule/generate', {
+                method: 'POST',
+                body: JSON.stringify({ year: parseInt(year), month: parseInt(month), mode: isAlternativeMode ? 'alternative' : 'normal' })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم توليد الجدول الشهري بنجاح', 'success');
+            currentMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
+            await loadAllData();
+        } catch(e) {
+            console.error('generateSchedule error:', e);
+            showToast('خطأ في توليد الجدول: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play"></i> توليد';
+        }
+    }
+
+    // ==========================================
+    // Leave Management
+    // ==========================================
+    function populateSelects() {
+        var leaveEmpSelect = document.getElementById('leaveEmployeeSelect');
+        if (leaveEmpSelect) {
+            leaveEmpSelect.innerHTML = '<option value="">اختر موظف...</option>' +
+                employeesList.map(function(e) {
+                    return '<option value="' + e.id + '">' + (e.name || e.employee_code || e.id) + '</option>';
+                }).join('');
+        }
+    }
+
+    async function submitLeaveRequest() {
+        var employeeId = document.getElementById('leaveEmployeeSelect').value;
+        var startDate = document.getElementById('leaveStartDate').value;
+        var endDate = document.getElementById('leaveEndDate').value;
+        var type = document.getElementById('leaveType').value;
+        var reason = document.getElementById('leaveReason').value;
+        if (!employeeId || !startDate || !endDate) {
+            showToast('الرجاء ملء جميع الحقول المطلوبة', 'warning');
+            return;
+        }
+        if (endDate < startDate) {
+            showToast('تاريخ النهاية يجب أن يكون بعد تاريخ البداية', 'warning');
+            return;
+        }
+        try {
+            var res = await apiFetch('/api/leave-requests', {
+                method: 'POST',
+                body: JSON.stringify({ employee_id: employeeId, start_date: startDate, end_date: endDate, type: type, reason: reason })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم إرسال طلب الإجازة بنجاح', 'success');
+            document.getElementById('leaveStartDate').value = '';
+            document.getElementById('leaveEndDate').value = '';
+            document.getElementById('leaveReason').value = '';
+            await loadLeaveRequests();
+            updateDashboard();
+        } catch(e) {
+            console.error('submitLeaveRequest error:', e);
+            showToast('خطأ في إرسال الطلب', 'error');
+        }
+    }
+
+    function renderPendingLeaveRequests() {
+        var container = document.getElementById('pendingLeaveRequests');
+        var pending = leaveRequests.filter(function(l) { return l.status === 'pending'; });
+        if (pending.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">لا توجد طلبات قيد الانتظار</div>';
+            return;
+        }
+        container.innerHTML = pending.map(function(l) {
+            var emp = employeesList.find(function(e) { return e.id === l.employee_id; });
+            var empName = emp ? (emp.name || emp.employee_code) : ('موظف #' + l.employee_id);
+            return '<div class="leave-request-item">' +
+                '<div class="leave-request-info">' +
+                '<div class="leave-request-name">' + empName + '</div>' +
+                '<div class="leave-request-meta">' + (l.type || 'إجازة') + ' | ' + l.start_date + ' → ' + l.end_date + '</div>' +
+                '</div>' +
+                '<div class="leave-request-actions">' +
+                '<button class="btn btn-green btn-sm" onclick="approveLeave(' + l.id + ', true)"><i class="fas fa-check"></i></button>' +
+                '<button class="btn btn-coral btn-sm" onclick="approveLeave(' + l.id + ', false)"><i class="fas fa-times"></i></button>' +
+                '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    async function approveLeave(id, approved) {
+        try {
+            var res = await apiFetch('/api/leave-requests/' + id + '/approve', {
+                method: 'POST',
+                body: JSON.stringify({ approved: approved })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast(approved ? 'تم اعتماد الإجازة' : 'تم رفض الإجازة', 'success');
+            await loadLeaveRequests();
+            updateDashboard();
+        } catch(e) {
+            console.error('approveLeave error:', e);
+            showToast('خطأ في تحديث الطلب', 'error');
+        }
+    }
+
+    function renderLeaveCalendar() {
+        var container = document.getElementById('leaveCalendarGrid');
+        if (!container) return;
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = now.getMonth();
+        var firstDay = new Date(year, month, 1);
+        var startDay = firstDay.getDay();
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        var html = '';
+        for (var h = 0; h < 7; h++) {
+            html += '<div class="leave-cal-day" style="background:#F8FAFC;font-weight:700;">' + ARABIC_DAYS[h].slice(0, 2) + '</div>';
+        }
+        for (var empty = 0; empty < startDay; empty++) {
+            html += '<div class="leave-cal-day"></div>';
+        }
+        for (var day = 1; day <= daysInMonth; day++) {
+            var dateStr = year + '-' + pad2(month + 1) + '-' + pad2(day);
+            var hasLeave = leaveRequests.some(function(l) {
+                return l.status === 'approved' && l.start_date <= dateStr && l.end_date >= dateStr;
+            });
+            html += '<div class="leave-cal-day' + (hasLeave ? ' has-leave' : '') + '">' +
+                '<span class="leave-cal-day-number">' + day + '</span>' +
+                (hasLeave ? '<span class="leave-cal-dot"></span>' : '') +
+                '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    // ==========================================
+    // Team Status
+    // ==========================================
+    function renderTeamsStatus() {
+        var container = document.getElementById('teamsGrid');
+        if (!teamsList || teamsList.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;grid-column:1/-1;">لا توجد بيانات فرق</div>';
+            return;
+        }
+        container.innerHTML = teamsList.map(function(t) {
+            var teamEmployees = employeesList.filter(function(e) { return (e.team_id || e.team) === (t.id || t.name); });
+            var paramedics = teamEmployees.filter(function(e) { return (e.job_title || '').indexOf('مسعف') !== -1 || (e.job_title || '').indexOf('Paramedic') !== -1; });
+            var paramedicCount = paramedics.length;
+            var statusClass = paramedicCount >= 2 ? 'status-green' : paramedicCount === 1 ? 'status-yellow' : 'status-red';
+            var statusText = paramedicCount >= 2 ? 'مكتملة' : paramedicCount === 1 ? 'ناقصة' : 'مغلقة';
+            var statusBadge = paramedicCount >= 2 ? 'badge-green' : paramedicCount === 1 ? 'badge-yellow' : 'badge-red';
+
+            return '<div class="team-card ' + statusClass + '">' +
+                '<div class="team-card-header">' +
+                '<div class="team-card-name"><i class="fas fa-ambulance" style="margin-left:6px;color:var(--primary);"></i> ' + (t.name || t.team_name || 'فريق') + '</div>' +
+                '<span class="team-card-status ' + statusBadge + '">' + statusText + '</span>' +
+                '</div>' +
+                '<div class="team-staff-count">مسعفين: ' + paramedicCount + ' | إجمالي: ' + teamEmployees.length + '</div>' +
+                '<div class="team-staff-list">' +
+                teamEmployees.slice(0, 6).map(function(e) {
+                    var isParamedic = (e.job_title || '').indexOf('مسعف') !== -1 || (e.job_title || '').indexOf('Paramedic') !== -1;
+                    return '<span class="team-staff-chip' + (isParamedic ? ' paramedic' : '') + '">' + (e.name || e.employee_code || '؟') + '</span>';
+                }).join('') +
+                (teamEmployees.length > 6 ? '<span class="team-staff-chip">+' + (teamEmployees.length - 6) + '</span>' : '') +
+                '</div>' +
+                '<div class="team-actions">' +
+                (paramedicCount < 2 ? '<button class="btn btn-gold btn-sm" onclick="suggestTransfer(' + (t.id || 0) + ')"><i class="fas fa-exchange-alt"></i> اقتراح نقل</button>' : '') +
+                (paramedicCount > 2 ? '<button class="btn btn-primary btn-sm" onclick="assignRapidResponse(' + (t.id || 0) + ')"><i class="fas fa-bolt"></i> تدخل سريع</button>' : '') +
+                '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function suggestTransfer(teamId) {
+        showToast('جاري البحث عن مسعف متاح للنقل...', 'info');
+        // In real implementation, this would call an API
+    }
+    function assignRapidResponse(teamId) {
+        showToast('تم تعيين المسعف الزائد للتدخل السريع', 'success');
+    }
+
+    // ==========================================
+    // WebSocket Handlers
+    // ==========================================
+    var originalHandleWebSocketMessage = window.handleWebSocketMessage;
+    window.handleWebSocketMessage = function(data) {
+        if (data.type === 'schedule_updated' || data.type === 'shift_updated' || data.type === 'leave_updated') {
+            showToast('تم تحديث الجدول', 'info', 2000);
+            loadAllData();
+        } else if (data.type === 'staffing_alert') {
+            showToast('تنبيه تغطية: ' + (data.message || ''), 'warning', 5000);
+            loadStaffingLevels();
+        } else if (originalHandleWebSocketMessage) {
+            originalHandleWebSocketMessage(data);
+        }
+    };
+
+    // ==========================================
+    // Export (Legacy)
+    // ==========================================
+    function exportToExcel() {
+        try {
+            var wb = XLSX.utils.book_new();
+            var shiftData = [['الموظف','التاريخ','المناوبة','الفريق']];
+            scheduleData.forEach(function(s) {
+                var emp = employeesList.find(function(e) { return e.id === s.employee_id; });
+                shiftData.push([
+                    emp ? (emp.name || emp.employee_code) : s.employee_id,
+                    s.shift_date,
+                    s.shift_code,
+                    s.team_id || ''
+                ]);
+            });
+            var ws = XLSX.utils.aoa_to_sheet(shiftData);
+            XLSX.utils.book_append_sheet(wb, ws, 'الجدول الذكي');
+            XLSX.writeFile(wb, 'الجدول_الذكي.xlsx');
+            showToast('تم تصدير Excel بنجاح', 'success');
+        } catch(e) {
+            console.error('exportToExcel error:', e);
+            showToast('خطأ في التصدير', 'error');
+        }
+    }
+
+    function exportToPDF() {
+        try {
+            var element = document.getElementById('tab-schedule');
+            if (!element) return;
+            var opt = { margin: 10, filename: 'الجدول_الذكي.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
+            html2pdf().set(opt).from(element).save().then(function() {
+                showToast('تم تصدير PDF بنجاح', 'success');
+            });
+        } catch(e) {
+            console.error('exportToPDF error:', e);
+            showToast('خطأ في تصدير PDF', 'error');
+        }
+    }
+
+    function printSchedule() {
+        try {
+            var content = document.getElementById('tab-schedule').innerHTML;
+            var w = window.open('', '_blank');
+            w.document.write('<html dir="rtl"><head><title>طباعة الجدول</title><style>' +
+                'body{font-family:Arial; padding:20px;} table{border-collapse:collapse; width:100%;} ' +
+                'th,td{border:1px solid #333; padding:8px; text-align:right;} th{background:#f0f0f0;}</style></head><body>' + content + '</body></html>');
+            w.document.close(); w.focus(); setTimeout(function() { w.print(); }, 500);
+        } catch(e) { showToast('خطأ في الطباعة', 'error'); }
+    }
+
+    // ==========================================
+    // File Upload (Legacy)
+    // ==========================================
+    function setupDragAndDrop() {
+        var dz = document.getElementById('dropZone');
+        if (!dz) return;
+        dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
+        dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
+        dz.addEventListener('drop', function(e) {
+            e.preventDefault(); dz.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+        });
+    }
+
+    function setupFileInput() {
+        var fi = document.getElementById('fileInput');
+        if (!fi) return;
+        fi.addEventListener('change', function(e) { if (e.target.files.length > 0) handleFileUpload(e.target.files[0]); });
+    }
+
+    function handleFileUpload(file) {
+        showToast('رفع الملف: ' + file.name, 'info');
+        // Legacy import handler - simplified for new architecture
+    }
+
+    // ==========================================
+    // Toast Notifications
+    // ==========================================
+    function showToast(message, type, duration) {
+        if (typeof showNotification === 'function') {
+            showNotification(type === 'error' ? 'خطأ' : type === 'warning' ? 'تنبيه' : 'تم', message, type, duration || 3000);
+            return;
+        }
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + (type || 'info');
+        var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+        toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
+        container.appendChild(toast);
+        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, duration || 3000);
+    }
+
+    // ==========================================
+    // Demo Data Generator
+    // ==========================================
+    function generateDemoSchedule() {
+        var demo = [];
+        var year = currentMonth.getFullYear();
+        var month = currentMonth.getMonth();
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        var empCount = 10;
+        for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = year + '-' + pad2(month + 1) + '-' + pad2(d);
+            // Simple pattern: 2 day, 2 night, 4 off rotating
+            for (var e = 0; e < empCount; e++) {
+                var cyclePos = (d + e * 2) % 8;
+                var code = '';
+                if (cyclePos < 2) code = 'D12';
+                else if (cyclePos < 4) code = 'N12';
+                else code = 'R';
+                if (code !== 'R') {
+                    demo.push({
+                        id: d * 100 + e,
+                        employee_id: e + 1,
+                        shift_date: dateStr,
+                        shift_code: code,
+                        team_id: 1,
+                        shift_hours: 12,
+                        mode: 'normal'
+                    });
+                }
+            }
+        }
+        return demo;
+    }
+
+    function pad2(n) { n = parseInt(n); return n < 10 ? '0' + n : '' + n; }
+
+    // ==========================================
+    // Expose to window
+    // ==========================================
+    window.switchTab = switchTab;
+    window.changeMonth = changeMonth;
+    window.openEditModal = openEditModal;
+    window.closeEditModal = closeEditModal;
+    window.saveAssignment = saveAssignment;
+    window.generateSchedule = generateSchedule;
+    window.submitLeaveRequest = submitLeaveRequest;
+    window.approveLeave = approveLeave;
+    window.toggleAlternativeMode = toggleAlternativeMode;
+    window.selectStaffingDay = selectStaffingDay;
+    window.applyRecommendation = applyRecommendation;
+    window.suggestTransfer = suggestTransfer;
+    window.assignRapidResponse = assignRapidResponse;
+    window.exportToExcel = exportToExcel;
+    window.exportToPDF = exportToPDF;
+    window.printSchedule = printSchedule;
+    </script>
+    <script src="js/websocket-sync.js"></script>
+    <link rel="stylesheet" href="/css/nano-bot.css">
+    <script src="/js/nano-bot.js"></script>
+</body>
+</html>
