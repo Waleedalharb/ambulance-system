@@ -202,11 +202,11 @@
                     <i class="fas fa-file-medical-alt"></i>
                     <span>تقرير يومي</span>
                 </button>
-                <button class="qa-btn" title="نظام الجداول" onclick="window.location.href='smart-schedule.html?v=10';">
+                <button class="qa-btn" title="نظام الجداول" onclick="window.location.href='smart-schedule.html?v=12';">
                     <i class="fas fa-calendar-alt"></i>
                     <span>الجداول</span>
                 </button>
-                <button class="qa-btn" title="مخطط المناوبات" onclick="window.location.href='shift-planner.html?v=11';">
+                <button class="qa-btn" title="مخطط المناوبات" onclick="window.location.href='shift-planner.html?v=12';">
                     <i class="fas fa-users-cog"></i>
                     <span>مخطط المناوبات</span>
                 </button>
@@ -300,8 +300,8 @@
             </button>
             <button id="shiftBtn" class="btn btn-secondary"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
-            <button class="btn btn-info" onclick="window.location.href='smart-schedule.html?v=10'"><i class="fas fa-calendar-alt"></i> الجداول</button>
-            <button class="btn btn-info" onclick="window.location.href='shift-planner.html?v=11'" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
+            <button class="btn btn-info" onclick="window.location.href='smart-schedule.html?v=12'"><i class="fas fa-calendar-alt"></i> الجداول</button>
+            <button class="btn btn-info" onclick="window.location.href='shift-planner.html?v=12'" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
             <button class="btn btn-daily-report" onclick="window.location.href='daily-report.html?v=10'"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
             <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="controlBtn" class="btn btn-control"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
@@ -1825,8 +1825,8 @@
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html?v=10';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='daily-report.html?v=10';"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html?v=10';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='shift-planner.html?v=11';"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html?v=12';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='shift-planner.html?v=12';"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('controlModal').style.display='flex'; loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>

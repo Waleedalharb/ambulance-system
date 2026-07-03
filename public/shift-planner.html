@@ -384,16 +384,9 @@
                 <button class="btn btn-primary" onclick="openModal('addMemberModal')">
                     <i class="fas fa-plus"></i> إضافة عضو
                 </button>
-                <button class="btn btn-outline" onclick="document.getElementById('excelImport').click()">
-                    <i class="fas fa-file-excel"></i> استيراد Excel
+                <button class="btn btn-outline" onclick="loadFromSmartSchedule()" id="refreshScheduleBtn">
+                    <i class="fas fa-sync-alt"></i> تحديث من نظام الجداول
                 </button>
-                <button class="btn btn-outline" onclick="syncImportedToServer()" id="syncBtn" style="display:none;">
-                    <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
-                </button>
-                <button class="btn btn-outline btn-danger" onclick="clearServerRoster()" style="border-color:var(--danger);color:var(--danger);">
-                    <i class="fas fa-trash-alt"></i> مسح كل البيانات
-                </button>
-                <input type="file" id="excelImport" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
             </div>
         </div>
 
@@ -426,7 +419,7 @@
             <button class="tab active" onclick="switchTab('scheduleTab', this)">الجدول الأسبوعي</button>
             <button class="tab" onclick="switchTab('teamTab', this)">حالة الفرق</button>
             <button class="tab" onclick="switchTab('leaveTab', this)">طلبات الإجازة</button>
-            <button class="tab" onclick="switchTab('importedTab', this)">📋 المستورد</button>
+            <button class="tab" onclick="switchTab('importedTab', this)">📋 الجدول</button>
             <button class="tab" onclick="switchTab('settingsTab', this)">الإعدادات</button>
         </div>
 
@@ -485,15 +478,12 @@
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">📋 بيانات الجدول المستورد</div>
-                        <div class="card-subtitle">عرض الموظفين والمناوبات المستوردة من Excel</div>
+                        <div class="card-title">📋 بيانات الجدول</div>
+                        <div class="card-subtitle">عرض الموظفين والمناوبات من نظام الجداول الذكي</div>
                     </div>
                     <div style="display:flex;gap:0.5rem;">
-                        <button class="btn btn-sm btn-outline" onclick="renderImportedSchedule()">
+                        <button class="btn btn-sm btn-outline" onclick="loadFromSmartSchedule()">
                             <i class="fas fa-sync-alt"></i> تحديث
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="clearImportedData()">
-                            <i class="fas fa-trash"></i> مسح
                         </button>
                     </div>
                 </div>
@@ -701,7 +691,7 @@
     var teamMembers = JSON.parse(localStorage.getItem('teamMembers') || '[]');
     var leaveRequests = JSON.parse(localStorage.getItem('leaveRequests') || '[]');
     var scheduleData = JSON.parse(localStorage.getItem('scheduleData') || '{}');
-    var importedEmployees = JSON.parse(localStorage.getItem('importedEmployees') || '[]');
+    var smartScheduleData = [];
     var settings = JSON.parse(localStorage.getItem('shiftSettings') || '{"morning":"07:00 - 15:00","evening":"15:00 - 23:00","night":"23:00 - 07:00","maxLeaves":2,"minPerShift":3}');
     var currentWeekOffset = 0;
 
@@ -723,7 +713,7 @@
         renderSchedule();
         renderTeamList();
         renderLeaveRequests();
-        renderImportedSchedule();
+        loadFromSmartSchedule();
         updateStats();
         populateLeaveMembers();
         loadSettings();
@@ -1096,220 +1086,18 @@
     }
 
     // ============================================
-    // استيراد Excel - نفس نظام الجداول
-    // ============================================
-    function handleExcelImport(event) {
-        var file = event.target.files[0];
-        if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                var data = new Uint8Array(e.target.result);
-                var workbook = XLSX.read(data, { type: 'array' });
-                console.log('📑 Workbook sheets:', workbook.SheetNames);
-                
-                var result = extractEmployeesFromWorkbook(workbook);
-                console.log('👥 Extracted employees:', result.length);
-                
-                if (result.length === 0) {
-                    showToast('لم يتم العثور على موظفين في الملف', 'warning');
-                    return;
-                }
-                
-                importedEmployees = result;
-                localStorage.setItem('importedEmployees', JSON.stringify(importedEmployees));
-                
-                // Also add to teamMembers if not already there
-                var added = 0;
-                result.forEach(function(emp) {
-                    var exists = teamMembers.some(function(m) { return m.name === emp.name; });
-                    if (!exists) {
-                        teamMembers.push({
-                            id: Date.now().toString() + '_' + added,
-                            name: emp.name,
-                            role: mapJobToRole(emp.jobTitle),
-                            phone: emp.phone || '',
-                            center: emp.team || '—',
-                            status: 'online'
-                        });
-                        added++;
-                    }
-                });
-                
-                saveTeamMembers();
-                renderTeamList();
-                renderImportedSchedule();
-                updateStats();
-                populateLeaveMembers();
-                showToast('تم استيراد ' + result.length + ' موظف من ملف Excel', 'success');
-                
-                // Switch to imported tab
-                var importedTab = document.querySelector('.tab:nth-child(4)');
-                if (importedTab) importedTab.click();
-            } catch (err) {
-                console.error('Excel error:', err);
-                showToast('خطأ في قراءة الملف: ' + err.message, 'error');
-            }
-        };
-        reader.readAsArrayBuffer(file);
-        event.target.value = '';
-    }
-
-    function mapJobToRole(jobTitle) {
-        var job = (jobTitle || '').toLowerCase();
-        if (job.indexOf('سائق') !== -1 || job.indexOf('driver') !== -1) return 'driver';
-        if (job.indexOf('ممرض') !== -1 || job.indexOf('nurse') !== -1) return 'nurse';
-        if (job.indexOf('مشرف') !== -1 || job.indexOf('supervisor') !== -1) return 'supervisor';
-        if (job.indexOf('طبيب') !== -1 || job.indexOf('doctor') !== -1) return 'doctor';
-        return 'paramedic';
-    }
-
-    function extractEmployeesFromWorkbook(workbook) {
-        var allEmployees = [];
-        var sheetNames = workbook.SheetNames;
-        
-        for (var s = 0; s < sheetNames.length; s++) {
-            var sheet = workbook.Sheets[sheetNames[s]];
-            var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            if (!json || json.length === 0) continue;
-            
-            var monthNum = 1, yearNum = new Date().getFullYear();
-            var currentTeam = '';
-            var currentTeamNote = '';
-            var dayNames = {};
-            var dayNumbers = {};
-            
-            // Try to detect month/year from first few rows
-            for (var i = 0; i < Math.min(6, json.length); i++) {
-                var row = json[i];
-                if (!row) continue;
-                var rowStr = row.join(' ');
-                var monthMatch = rowStr.match(/(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)/);
-                if (monthMatch) {
-                    var monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-                    monthNum = monthNames.indexOf(monthMatch[1]) + 1;
-                }
-                var yearMatch = rowStr.match(/\b(20\d{2})\b/);
-                if (yearMatch) yearNum = parseInt(yearMatch[1]);
-            }
-            
-            // Parse data rows
-            for (var i = 0; i < json.length; i++) {
-                var row = json[i];
-                if (!row) continue;
-                var colA = row[0];
-                
-                // Detect team/center
-                if (colA && typeof colA === 'string' && (
-                    (colA.match(/^(تدخل\s+سريع|جنوب)\s*\d+$/) && colA.length < 30) ||
-                    colA === 'القائد الميداني' ||
-                    colA === 'التحكم والتنسيق' ||
-                    colA === 'الدعم اللوجستي' ||
-                    colA === 'مناوبو باص الاستجابة' ||
-                    colA === 'المنتدبين' ||
-                    colA === 'إجازة'
-                )) {
-                    currentTeam = colA;
-                    currentTeamNote = row[4] || '';
-                    dayNames = {};
-                    dayNumbers = {};
-                    continue;
-                }
-                
-                // Detect day names row
-                if (colA === null && row[4] && typeof row[4] === 'string' &&
-                    (row[4].indexOf('الأحد') !== -1 || row[4].indexOf('الاثنين') !== -1 || row[4].indexOf('الثلاثاء') !== -1)) {
-                    for (var c = 4; c < row.length && c < 36; c++) {
-                        if (row[c]) dayNames[c] = String(row[c]);
-                    }
-                    continue;
-                }
-                
-                // Detect day numbers row
-                if (colA && String(colA).indexOf('كود') !== -1 && row[1] && String(row[1]).indexOf('الاسم') !== -1) {
-                    for (var c = 4; c < row.length && c < 36; c++) {
-                        if (row[c] && !isNaN(parseInt(row[c]))) dayNumbers[c] = parseInt(row[c]);
-                    }
-                    continue;
-                }
-                
-                // Detect employee row
-                if (colA && (typeof colA === 'number' || !isNaN(parseInt(colA))) &&
-                    row[1] && typeof row[1] === 'string' && row[1].length > 5) {
-                    
-                    var empCode = String(parseInt(colA));
-                    var empName = String(row[1]).trim();
-                    var empPhone = row[2] ? String(row[2]).trim() : '';
-                    var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
-                    if (!empName || empName.length < 3) continue;
-                    
-                    var schedule = [];
-                    for (var c = 4; c < row.length && c < 36; c++) {
-                        var shiftCode = row[c];
-                        if (!shiftCode || String(shiftCode).trim() === '') continue;
-                        shiftCode = String(shiftCode).trim().toUpperCase();
-                        
-                        var dayNum = dayNumbers[c] || (c - 3);
-                        var dayName = dayNames[c] || ARABIC_DAYS[(dayNum - 1) % 7];
-                        var dateStr = yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum);
-                        
-                        var shiftName = SHIFT_MAP[shiftCode] || shiftCode;
-                        var shiftTime = SHIFT_TIME_MAP[shiftCode] || '';
-                        var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
-                        
-                        schedule.push({
-                            day: dayName,
-                            date: dateStr,
-                            shift: shiftName,
-                            shiftCode: shiftCode,
-                            time: shiftTime,
-                            location: currentTeam || 'غير محدد',
-                            status: status
-                        });
-                    }
-                    
-                    allEmployees.push({
-                        id: empCode,
-                        name: empName,
-                        jobTitle: empJob,
-                        employeeNumber: empCode,
-                        phone: empPhone,
-                        team: currentTeam || 'غير محدد',
-                        schedule: schedule
-                    });
-                }
-            }
-        }
-        
-        return allEmployees;
-    }
-
-    function pad2(n) {
-        return n < 10 ? '0' + n : '' + n;
-    }
-
-    // ============================================
-    // عرض البيانات المستوردة
+    // قراءة من نظام الجداول الذكي (IndexedDB)
     // ============================================
     function renderImportedSchedule() {
         var container = document.getElementById('importedScheduleContainer');
         if (!container) return;
         
-        // Show/hide sync button
-        var syncBtn = document.getElementById('syncBtn');
-        if (syncBtn) {
-            syncBtn.style.display = (importedEmployees && importedEmployees.length > 0) ? 'inline-flex' : 'none';
-        }
-        
-        if (importedEmployees.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-file-excel"></i><h3>لا توجد بيانات مستوردة</h3><p>استورد ملف Excel لعرض الجدول هنا</p></div>';
-            return;
-        }
+        var data = smartScheduleData || [];
         
         // Collect all unique dates
         var allDates = [];
         var dateSet = {};
-        importedEmployees.forEach(function(emp) {
+        data.forEach(function(emp) {
             emp.schedule.forEach(function(s) {
                 if (!dateSet[s.date]) {
                     dateSet[s.date] = { day: s.day, date: s.date };
@@ -1322,10 +1110,10 @@
         // Show summary first
         var html = '<div style="margin-bottom:1rem;">';
         html += '<div class="stats-grid" style="margin-bottom:1rem;">';
-        html += '<div class="stat-card"><div class="value">' + importedEmployees.length + '</div><div class="label">إجمالي الموظفين</div></div>';
+        html += '<div class="stat-card"><div class="value">' + data.length + '</div><div class="label">إجمالي الموظفين</div></div>';
         
         var teamCounts = {};
-        importedEmployees.forEach(function(e) { teamCounts[e.team] = (teamCounts[e.team] || 0) + 1; });
+        data.forEach(function(e) { teamCounts[e.team] = (teamCounts[e.team] || 0) + 1; });
         var teamList = Object.keys(teamCounts).join('، ');
         html += '<div class="stat-card"><div class="value" style="font-size:1rem;">' + teamList + '</div><div class="label">الفرق / المراكز</div></div>';
         html += '</div>';
@@ -1338,7 +1126,7 @@
         });
         html += '</tr></thead><tbody>';
         
-        importedEmployees.forEach(function(emp) {
+        data.forEach(function(emp) {
             html += '<tr>';
             html += '<td class="emp-name">' + emp.name + '<div class="emp-team">' + emp.phone + '</div></td>';
             html += '<td>' + emp.team + '</td>';
@@ -1377,146 +1165,103 @@
     }
 
     function clearImportedData() {
-        if (!confirm('هل أنت متأكد من مسح البيانات المستوردة؟')) return;
-        importedEmployees = [];
-        localStorage.removeItem('importedEmployees');
+        if (!confirm('هل أنت متأكد من مسح البيانات المعروضة؟')) return;
+        smartScheduleData = [];
         renderImportedSchedule();
-        showToast('تم مسح البيانات المستوردة', 'success');
+        showToast('تم مسح البيانات المعروضة', 'success');
     }
 
+    
+    // ============================================
+    // قراءة من نظام الجداول الذكي (IndexedDB)
+    // ============================================
+    async function loadFromSmartSchedule() {
+        try {
+            var req = indexedDB.open('smartScheduleDB', 1);
+            req.onsuccess = function(e) {
+                var db = e.target.result;
+                if (!db.objectStoreNames.contains('employees')) {
+                    showToast('لا توجد بيانات في نظام الجداول', 'info');
+                    smartScheduleData = [];
+                    renderImportedSchedule();
+                    return;
+                }
+                var tx = db.transaction('employees', 'readonly');
+                var store = tx.objectStore('employees');
+                var getReq = store.getAll();
+                getReq.onsuccess = function(e) {
+                    var employees = e.target.result || [];
+                    db.close();
+                    
+                    // Convert smart-schedule format to shift-planner format
+                    smartScheduleData = employees.map(function(emp) {
+                        return {
+                            name: emp.name || '',
+                            team: emp.team || '',
+                            jobTitle: emp.jobTitle || emp.jobCode || '',
+                            phone: emp.phone || '',
+                            schedule: (emp.schedule || []).map(function(s) {
+                                return {
+                                    day: s.day || '',
+                                    date: s.date || '',
+                                    shiftCode: s.shiftCode || s.shift || ''
+                                };
+                            })
+                        };
+                    });
+                    
+                    showToast('تم تحديث ' + smartScheduleData.length + ' موظف من نظام الجداول', 'success');
+                    
+                    renderImportedSchedule();
+                    
+                    // Also add to teamMembers if not already there
+                    var added = 0;
+                    smartScheduleData.forEach(function(emp) {
+                        var exists = teamMembers.some(function(m) { return m.name === emp.name; });
+                        if (!exists && emp.name) {
+                            teamMembers.push({
+                                id: Date.now().toString() + '_' + added,
+                                name: emp.name,
+                                role: mapJobToRole(emp.jobTitle),
+                                phone: emp.phone || '',
+                                center: emp.team || '—',
+                                status: 'online'
+                            });
+                            added++;
+                        }
+                    });
+                    if (added > 0) {
+                        saveTeamMembers();
+                        renderTeamList();
+                        updateStats();
+                    }
+                    renderImportedSchedule();
+                };
+                getReq.onerror = function(e) {
+                    db.close();
+                    showToast('خطأ في قراءة البيانات', 'error');
+                };
+            };
+            req.onerror = function(e) {
+                showToast('لا يمكن الوصول إلى نظام الجداول', 'error');
+            };
+        } catch (err) {
+            showToast('خطأ: ' + err.message, 'error');
+        }
+    }
+    
+    function mapJobToRole(jobTitle) {
+        var job = (jobTitle || '').toLowerCase();
+        if (job.indexOf('سائق') !== -1 || job.indexOf('driver') !== -1) return 'driver';
+        if (job.indexOf('ممرض') !== -1 || job.indexOf('nurse') !== -1) return 'nurse';
+        if (job.indexOf('مشرف') !== -1 || job.indexOf('supervisor') !== -1) return 'supervisor';
+        if (job.indexOf('طبيب') !== -1 || job.indexOf('doctor') !== -1) return 'doctor';
+        return 'paramedic';
+    }
     // ============================================
     // مزامنة مع السيرفر
     // ============================================
-    async function syncImportedToServer() {
-        if (!importedEmployees || importedEmployees.length === 0) {
-            showToast('لا توجد بيانات مستوردة للمزامنة', 'warning');
-            return;
-        }
-        
-        var token = localStorage.getItem('authToken');
-        if (!token) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        
-        // Convert importedEmployees to server format
-        var employees = [];
-        var roster = [];
-        var month = 0;
-        var year = 0;
-        
-        for (var i = 0; i < importedEmployees.length; i++) {
-            var emp = importedEmployees[i];
-            // Use first schedule entry's location as team_name
-            var teamName = '';
-            if (emp.schedule && emp.schedule.length > 0) {
-                teamName = emp.schedule[0].location || '';
-                // Extract month/year from first date
-                if (month === 0 && emp.schedule[0].date) {
-                    var parts = emp.schedule[0].date.split('-');
-                    if (parts.length === 3) {
-                        year = parseInt(parts[0]);
-                        month = parseInt(parts[1]);
-                    }
-                }
-            }
-            
-            employees.push({
-                employee_code: emp.empCode || '',
-                name: emp.empName || '',
-                phone: emp.empPhone || '',
-                job_title: emp.empJob || 'مسعف',
-                team_name: teamName
-            });
-            
-            // Build roster entries
-            if (emp.schedule && emp.schedule.length > 0) {
-                for (var s = 0; s < emp.schedule.length; s++) {
-                    var entry = emp.schedule[s];
-                    if (entry.date && entry.shiftCode) {
-                        roster.push({
-                            employee_code: emp.empCode || '',
-                            team_name: entry.location || teamName,
-                            shift_date: entry.date,
-                            shift_code: entry.shiftCode,
-                            month: month,
-                            year: year
-                        });
-                    }
-                }
-            }
-        }
-        
-        if (month === 0 || year === 0) {
-            showToast('لم يتم التعرف على الشهر/السنة من البيانات', 'error');
-            return;
-        }
-        
-        showToast('جاري المزامنة مع السيرفر...', 'info');
-        
-        try {
-            var response = await fetch('/api/shift-roster/import', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify({
-                    employees: employees,
-                    roster: roster,
-                    month: month,
-                    year: year
-                })
-            });
-            
-            var data = await response.json();
-            if (data.success) {
-                showToast('✅ تم المزامنة بنجاح! ' + (data.rosterCount || roster.length) + ' سجل محفوظ', 'success');
-            } else {
-                showToast('❌ فشل في المزامنة: ' + (data.error || 'خطأ غير معروف'), 'error');
-            }
-        } catch (err) {
-            console.error('Sync error:', err);
-            showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
-        }
-    }
-
-    async function clearServerRoster() {
-        if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر ومن المتصفح!\n\nهل أنت متأكد؟')) return;
-        
-        // 1. Clear localStorage first
-        importedEmployees = [];
-        localStorage.removeItem('importedEmployees');
-        renderImportedSchedule();
-        
-        // 2. Clear server (if logged in)
-        var token = localStorage.getItem('authToken');
-        if (token) {
-            try {
-                var response = await fetch('/api/shift-roster/clear-all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    }
-                });
-                
-                var data = await response.json();
-                if (data.success) {
-                    showToast('✅ تم حذف جميع البيانات (سيرفر + متصفح)', 'success');
-                } else {
-                    showToast('⚠️ تم حذف بيانات المتصفح، فشل حذف السيرفر: ' + (data.error || ''), 'warning');
-                }
-            } catch (err) {
-                console.error('Clear error:', err);
-                showToast('⚠️ تم حذف بيانات المتصفح، السيرفر غير متاح', 'warning');
-            }
-        } else {
-            showToast('✅ تم حذف بيانات المتصفح', 'success');
-        }
-    }
-
-    // ============================================
+    async // ============================================
     // حفظ البيانات
     // ============================================
     function saveTeamMembers() { localStorage.setItem('teamMembers', JSON.stringify(teamMembers)); }
@@ -1541,11 +1286,9 @@
     window.editCell = editCell;
     window.toggleMemberStatus = toggleMemberStatus;
     window.refreshTeamStatus = refreshTeamStatus;
-    window.handleExcelImport = handleExcelImport;
     window.renderImportedSchedule = renderImportedSchedule;
     window.clearImportedData = clearImportedData;
-    window.syncImportedToServer = syncImportedToServer;
-    window.clearServerRoster = clearServerRoster;
+    window.loadFromSmartSchedule = loadFromSmartSchedule;
     </script>
 </body>
 </html>
