@@ -8,7 +8,7 @@ var authToken = localStorage.getItem('authToken') || null;
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v13-2026-07-02';
+    var APP_VERSION = 'v14-2026-07-03';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -5722,7 +5722,16 @@ async function loadShiftEventLog() {
         try {
             var res = await apiFetch('/api/shift-events/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
             var data = await res.json();
-            shiftEventLog = data && data.events ? data.events : (Array.isArray(data) ? data : []);
+            var rawEvents = data && data.events ? data.events : (Array.isArray(data) ? data : []);
+            // Map server properties (description, timestamp) to client properties (text, time)
+            shiftEventLog = rawEvents.map(function(e) {
+                return {
+                    time: e.time || (e.timestamp ? saudiTimeFormatter.format(new Date(e.timestamp)) : ''),
+                    type: e.type || 'note',
+                    text: e.text || e.description || '',
+                    source: e.source || 'auto'
+                };
+            });
         } catch (e) {
             shiftEventLog = [];
         }
@@ -5765,13 +5774,15 @@ function renderEventItem(evt) {
     var container = document.getElementById('shiftEventLog');
     if (!container) return;
     var div = document.createElement('div');
-    div.className = 'shift-event-item type-' + evt.type;
+    div.className = 'shift-event-item type-' + (evt.type || 'note');
     var typeLabels = { complete: '\u2705 تكميل', incomplete: '\u274c ناقص', note: '\ud83d\udcdd ملاحظة', report: '\ud83d\udcca بلاغ' };
     var badgeText = evt.source === 'auto' ? 'تلقائي' : 'يدوي';
+    var timeValue = evt.time || (evt.timestamp ? saudiTimeFormatter.format(new Date(evt.timestamp)) : '—');
+    var textValue = evt.text || evt.description || '';
     div.innerHTML =
-        '<span class="shift-event-time">' + evt.time + '</span>' +
-        '<span class="shift-event-text">' + escapeHtml(evt.text) + '</span>' +
-        '<span class="shift-event-badge ' + evt.source + '">' + badgeText + '</span>';
+        '<span class="shift-event-time">' + timeValue + '</span>' +
+        '<span class="shift-event-text">' + escapeHtml(textValue) + '</span>' +
+        '<span class="shift-event-badge ' + (evt.source || 'auto') + '">' + badgeText + '</span>';
     container.appendChild(div);
 }
 
