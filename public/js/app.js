@@ -4,6 +4,12 @@
 var currentUser = null;
 var authToken = localStorage.getItem('authToken') || null;
 
+// Restore currentUser from localStorage on page load
+try {
+    var savedUser = localStorage.getItem('currentUser');
+    if (savedUser) { currentUser = JSON.parse(savedUser); }
+} catch(e) { currentUser = null; }
+
 // ============================================
 // App Version Check — force refresh on update
 // ============================================
@@ -942,8 +948,8 @@ async function addAuditEntry(category, action, details, user) {
     try {
         await apiFetch('/api/audit-log', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ action: entry.action, details: entry.details, category: entry.category })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: entry.action, details: entry.details, category: entry.category, user: entry.user })
         });
     } catch (e) { console.error('Failed to save audit entry:', e); }
 }
@@ -957,38 +963,80 @@ function renderAuditLog() {
     });
 
     if (filtered.length === 0) {
-        container.innerHTML = '<div class="audit-empty">&#x1F4ED; لا توجد سجلات ' + (currentAuditFilter !== 'all' ? 'في هذا القسم' : 'بعد') + '</div>';
+        container.innerHTML = '<div class="audit-empty">📭 لا توجد سجلات ' + (currentAuditFilter !== 'all' ? 'في هذا القسم' : 'بعد') + '</div>';
         return;
     }
 
     var icons = {
-        report: '&#x1F4CA;',
-        shift: '&#x1F4CB;',
-        theme: '&#x1F3A8;',
-        file: '&#x1F4C1;',
-        alert: '&#x1F514;',
-        system: '&#x2699;&#xFE0F;'
+        report: '📊',
+        shift: '📋',
+        theme: '🎨',
+        file: '📁',
+        alert: '🔔',
+        system: '⚙️',
+        user: '👤',
+        peak: '⏰'
+    };
+    var colors = {
+        report: '#10b981',
+        shift: '#3b82f6',
+        theme: '#8b5cf6',
+        file: '#f59e0b',
+        alert: '#ef4444',
+        system: '#6b7280',
+        user: '#ec4899',
+        peak: '#f97316'
     };
 
     var html = '';
+    var lastDate = null;
+
     for (var i = 0; i < filtered.length; i++) {
         var entry = filtered[i];
-        var date = new Date(entry.timestamp);
-        var timeStr = saudiTimeFormatter.format(date);
+        var date = entry.timestamp ? new Date(entry.timestamp) : new Date();
+        var dateKey = date.toLocaleDateString('ar-SA', { year:'numeric', month:'2-digit', day:'2-digit' });
+        var timeStr = date.toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
+        var relativeTime = getRelativeTime(date);
+        var userName = escapeHtml(entry.user || 'غير معروف');
+        var initials = userName.split(' ').map(function(w){ return w[0] || ''; }).join('').substring(0,2);
+        var roleLabel = entry.role === 'admin' ? 'مدير' : entry.role === 'director' ? 'مدير عمليات' : 'مستخدم';
+        var catColor = colors[entry.category] || '#6b7280';
+        var catIcon = icons[entry.category] || '📝';
+
+        if (dateKey !== lastDate) {
+            html += '<div style="margin:12px 0 6px; padding:4px 8px; background:var(--gray-100); border-radius:6px; font-size:0.75rem; color:var(--gray-500); font-weight:600; text-align:center;">' + dateKey + '</div>';
+            lastDate = dateKey;
+        }
 
         html +=
-            '<div class="audit-entry">' +
-                '<span class="audit-time">' + timeStr + '</span>' +
-                '<span class="audit-icon ' + entry.category + '">' + (icons[entry.category] || '&#x2699;&#xFE0F;') + '</span>' +
-                '<div class="audit-content">' +
-                    '<div class="audit-action">' + entry.action + '</div>' +
-                    '<div class="audit-detail">' + entry.details + '</div>' +
+            '<div style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--gray-200); border-radius:10px; margin-bottom:6px; background:var(--white); transition:background 0.2s;" onmouseenter="this.style.background=\'var(--gray-50)\'" onmouseleave="this.style.background=\'var(--white)\'">' +
+                '<div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,' + catColor + '22,' + catColor + '44); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">' + catIcon + '</div>' +
+                '<div style="flex:1; min-width:0;">' +
+                    '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">' +
+                        '<span style="font-weight:600; font-size:0.82rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(entry.action || '-') + '</span>' +
+                        '<span style="font-size:0.65rem; color:var(--gray-400); white-space:nowrap;">' + relativeTime + '</span>' +
+                    '</div>' +
+                    '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">' + escapeHtml(entry.details || '') + '</div>' +
+                    '<div style="display:flex; align-items:center; gap:6px; margin-top:6px;">' +
+                        '<div style="width:18px; height:18px; border-radius:50%; background:var(--primary-700); color:white; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700;">' + initials + '</div>' +
+                        '<span style="font-size:0.7rem; color:var(--primary-700); font-weight:500;">' + userName + '</span>' +
+                        '<span style="font-size:0.6rem; color:var(--gray-400); background:var(--gray-100); padding:1px 6px; border-radius:10px;">' + roleLabel + '</span>' +
+                    '</div>' +
                 '</div>' +
-                '<span class="audit-user">' + entry.user + '</span>' +
             '</div>';
     }
 
     container.innerHTML = html;
+}
+
+function getRelativeTime(date) {
+    var now = new Date();
+    var diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'الآن';
+    if (diff < 3600) return 'منذ ' + Math.floor(diff / 60) + ' دقيقة';
+    if (diff < 86400) return 'منذ ' + Math.floor(diff / 3600) + ' ساعة';
+    if (diff < 172800) return 'أمس';
+    return date.toLocaleDateString('ar-SA', { month:'short', day:'numeric' });
 }
 
 function filterAuditLog(type, btn) {
@@ -2888,6 +2936,16 @@ async function saveShiftData(silent) {
                 // Auto-save: don't reload form to avoid race condition
                 // The WebSocket broadcast will update other UI elements
                 // Form inputs keep their current values (user is still typing)
+                // Add audit log for auto-save (throttled — only log every 5 minutes to avoid spam)
+                try {
+                    if (typeof addAuditEntry === 'function') {
+                        var now = Date.now();
+                        if (!window._lastAutoSaveAudit || (now - window._lastAutoSaveAudit) > 300000) {
+                            window._lastAutoSaveAudit = now;
+                            addAuditEntry('shift', 'حفظ تلقائي للتكميل', 'تم حفظ بيانات تكميل النوبة تلقائياً', currentUser && currentUser.name);
+                        }
+                    }
+                } catch(e) {}
             }
             return true;
         } else { if (!silent) alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); return false; }
@@ -2917,6 +2975,8 @@ async function deleteCurrentShift() {
             updateWorkforceStats();
             updateDistributionIndicator();
             document.getElementById('shiftModal').style.display = 'none';
+            // Audit log
+            try { if (typeof addAuditEntry === 'function') { addAuditEntry('shift', 'حذف مناوبة', 'تم حذف المناوبة رقم ' + targetId, currentUser && currentUser.name); } } catch(e) {}
         } else { alert("❌ فشل في الحذف"); }
     } catch (error) { alert("❌ خطأ في الاتصال"); }
 }
@@ -7671,7 +7731,7 @@ async function opsUploadFiles() {
     }
     formData.append('category', category);
     formData.append('note', note);
-    formData.append('uploader', 'المشرف');
+            formData.append('uploader', (currentUser && currentUser.name) || 'المشرف');
 
     var progressBar = document.getElementById('opsUploadProgress');
     var progressDiv = progressBar.querySelector('div');
@@ -7716,6 +7776,8 @@ async function opsUploadFiles() {
             await opsLoadData();
             opsRenderFiles();
             opsLoadDashboard();
+            // Audit log
+            try { if (typeof addAuditEntry === 'function') { addAuditEntry('file', 'رفع ملف تشغيلي', 'تم رفع ' + result.count + ' ملف/ملفات تشغيلية', currentUser && currentUser.name); } } catch(e) {}
         } else {
             statusEl.innerHTML = '<span style="color:#FF6B6B; font-weight:600; font-size:0.85rem;">❌ فشل في الرفع: ' + (result.error || 'خطأ غير معروف') + '</span>';
         }
@@ -7764,6 +7826,8 @@ async function opsDeleteFile(id) {
             await opsLoadData();
             opsRenderFiles();
             opsLoadDashboard();
+            // Audit log
+            try { if (typeof addAuditEntry === 'function') { addAuditEntry('file', 'حذف ملف تشغيلي', 'تم حذف الملف ' + id, currentUser && currentUser.name); } } catch(e) {}
         }
     } catch (e) {
         alert('❌ فشل في الحذف');
@@ -9818,26 +9882,54 @@ function renderAuditLogModal() {
         system: '⚙️',
         file: '📁',
         user: '👤',
-        peak: '⏰'
+        peak: '⏰',
+        alert: '🔔',
+        theme: '🎨'
+    };
+    var colors = {
+        report: '#10b981',
+        shift: '#3b82f6',
+        theme: '#8b5cf6',
+        file: '#f59e0b',
+        alert: '#ef4444',
+        system: '#6b7280',
+        user: '#ec4899',
+        peak: '#f97316'
     };
 
     var html = '';
+    var lastDate = null;
+
     for (var i = 0; i < filtered.length; i++) {
         var entry = filtered[i];
-        var icon = icons[entry.category] || '📝';
-        var date = entry.timestamp ? new Date(entry.timestamp).toLocaleString('ar-SA') : '-';
-        var userName = entry.user || 'غير معروف';
-        var roleLabel = entry.role === 'admin' ? '👑 مدير' : entry.role === 'director' ? '🎯 مدير عمليات' : '👤 مستخدم';
+        var date = entry.timestamp ? new Date(entry.timestamp) : new Date();
+        var dateKey = date.toLocaleDateString('ar-SA', { year:'numeric', month:'2-digit', day:'2-digit' });
+        var timeStr = date.toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
+        var relativeTime = typeof getRelativeTime === 'function' ? getRelativeTime(date) : timeStr;
+        var userName = escapeHtml(entry.user || 'غير معروف');
+        var initials = userName.split(' ').map(function(w){ return w[0] || ''; }).join('').substring(0,2);
+        var roleLabel = entry.role === 'admin' ? 'مدير' : entry.role === 'director' ? 'مدير عمليات' : 'مستخدم';
+        var catColor = colors[entry.category] || '#6b7280';
+        var catIcon = icons[entry.category] || '📝';
 
-        html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:10px 12px; border:1px solid var(--gray-200); border-radius:var(--radius-sm); margin-bottom:6px; background:var(--white);">';
-        html += '<div style="flex:1;">';
-        html += '<div style="font-weight:600; font-size:0.85rem; color:var(--text);">' + icon + ' ' + (entry.action || '-') + '</div>';
-        html += '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px;">' + (entry.details || '') + '</div>';
-        html += '<div style="font-size:0.7rem; color:var(--gray-400); margin-top:4px;">🕐 ' + date + '</div>';
+        if (dateKey !== lastDate) {
+            html += '<div style="margin:12px 0 6px; padding:4px 8px; background:var(--gray-100); border-radius:6px; font-size:0.75rem; color:var(--gray-500); font-weight:600; text-align:center;">' + dateKey + '</div>';
+            lastDate = dateKey;
+        }
+
+        html += '<div style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--gray-200); border-radius:10px; margin-bottom:6px; background:var(--white); transition:background 0.2s;" onmouseenter="this.style.background=\'var(--gray-50)\'" onmouseleave="this.style.background=\'var(--white)\'">';
+        html += '<div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,' + catColor + '22,' + catColor + '44); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">' + catIcon + '</div>';
+        html += '<div style="flex:1; min-width:0;">';
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">';
+        html += '<span style="font-weight:600; font-size:0.82rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(entry.action || '-') + '</span>';
+        html += '<span style="font-size:0.65rem; color:var(--gray-400); white-space:nowrap;">' + relativeTime + '</span>';
         html += '</div>';
-        html += '<div style="text-align:left; min-width:120px;">';
-        html += '<span style="font-size:0.75rem; color:var(--primary-700); font-weight:600;">' + userName + '</span>';
-        html += '<span style="font-size:0.65rem; color:var(--gray-400); display:block;">' + roleLabel + '</span>';
+        html += '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">' + escapeHtml(entry.details || '') + '</div>';
+        html += '<div style="display:flex; align-items:center; gap:6px; margin-top:6px;">';
+        html += '<div style="width:18px; height:18px; border-radius:50%; background:var(--primary-700); color:white; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700;">' + initials + '</div>';
+        html += '<span style="font-size:0.7rem; color:var(--primary-700); font-weight:500;">' + userName + '</span>';
+        html += '<span style="font-size:0.6rem; color:var(--gray-400); background:var(--gray-100); padding:1px 6px; border-radius:10px;">' + roleLabel + '</span>';
+        html += '</div>';
         html += '</div>';
         html += '</div>';
     }

@@ -3975,7 +3975,7 @@ app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
 // ============================================
 // API: سجل التدقيق
 // ============================================
-app.get('/api/audit-log', authenticate, authorize(['admin']), async (req, res) => {
+app.get('/api/audit-log', authenticate, async (req, res) => {
     try {
         const logs = await readAuditLog();
         res.json({ success: true, logs });
@@ -3986,18 +3986,21 @@ app.get('/api/audit-log', authenticate, authorize(['admin']), async (req, res) =
 
 app.post('/api/audit-log', authenticate, async (req, res) => {
     try {
-        const { action, details, category } = req.body;
+        const { action, details, category, user } = req.body;
         if (!action) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         const logs = await readAuditLog();
+        // Use client-provided user name as override if present, otherwise JWT
+        var displayUser = user || req.user.name || req.user.username || 'غير معروف';
         const newEntry = {
             id: Date.now().toString(),
             action,
             details: details || '',
             category: category || 'general',
-            user: req.user.name || req.user.username || 'unknown',
+            user: displayUser,
             role: req.user.role || 'unknown',
+            userId: req.user.id || req.user.userId || null,
             timestamp: new Date().toISOString()
         };
         logs.unshift(newEntry);
