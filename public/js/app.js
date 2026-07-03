@@ -14,7 +14,7 @@ try {
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v17-2026-07-06';
+    var APP_VERSION = 'v18-2026-07-06';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -3289,7 +3289,7 @@ function debounce(func, wait) {
 async function saveShiftData(silent) {
     var shiftData = getShiftFromForm();
     var targetId = viewingShiftId || currentShiftId;
-    var shiftDate = getSaudiDate();
+    var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
     var shiftType = getCurrentShiftType ? getCurrentShiftType() : shiftData.shiftType;
     try {
         var body = { shiftData: shiftData };
@@ -3544,8 +3544,8 @@ function clearShiftForm() {
         if (notesInput) notesInput.value = '';
         var backupParamedicInputRapid = document.getElementById('backup_paramedic_rapid_' + r);
         if (backupParamedicInputRapid) backupParamedicInputRapid.value = '';
-        var container = document.getElementById('paramedics_' + safeName);
-        var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
+        var container = document.getElementById('paramedics_' + safeTeamId(rapidTeams[r].name));
+        var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[r].name));
         var fallbackDiv = document.getElementById('fallback_rapid_staff_' + r);
         if (container) container.innerHTML = '<div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>';
         if (countDisplay) countDisplay.textContent = '-';
@@ -7716,6 +7716,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadShifts();
     loadAllData();
     setupAutoAuditLogging();
+    initShiftProgressBar(); // Start shift timer on main dashboard
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
