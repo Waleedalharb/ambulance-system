@@ -1578,10 +1578,13 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             }
             
             // Method 2: Derive from startTime (most reliable)
+            // Convert UTC to Saudi Arabia time (UTC+3) before checking hour
             if (shift.startTime) {
-                const startHour = new Date(shift.startTime).getHours();
-                const derived = (startHour >= 18 || startHour < 6) ? 'ليلية' : 'صباحية';
-                console.log('[SHIFT-TYPE] Derived from startTime:', shift.startTime, 'hour:', startHour, '→', derived);
+                const startDate = new Date(shift.startTime);
+                const utcHour = startDate.getUTCHours();
+                const saudiHour = (utcHour + 3) % 24;
+                const derived = (saudiHour >= 18 || saudiHour < 6) ? 'ليلية' : 'صباحية';
+                console.log('[SHIFT-TYPE] startTime:', shift.startTime, 'UTC hour:', utcHour, 'Saudi hour:', saudiHour, '→', derived);
                 return derived;
             }
             
@@ -1597,10 +1600,12 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
                 }
             }
             
-            // Method 4: Default to current time
-            const nowHour = new Date().getHours();
-            const fallback = (nowHour >= 18 || nowHour < 6) ? 'ليلية' : 'صباحية';
-            console.log('[SHIFT-TYPE] Fallback to current time:', nowHour, '→', fallback);
+            // Method 4: Fallback to current time (Saudi Arabia UTC+3)
+            const now = new Date();
+            const nowUtcHour = now.getUTCHours();
+            const nowSaudiHour = (nowUtcHour + 3) % 24;
+            const fallback = (nowSaudiHour >= 18 || nowSaudiHour < 6) ? 'ليلية' : 'صباحية';
+            console.log('[SHIFT-TYPE] Fallback current UTC:', nowUtcHour, 'Saudi:', nowSaudiHour, '→', fallback);
             return fallback;
         }
         
