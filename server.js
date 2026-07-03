@@ -1568,8 +1568,48 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
         }
         
         const shiftDate = shift.shiftDate;
+        
+        // Robust shift type detection: derive from startTime, not stored shiftType
+        function getShiftType(shift) {
+            // Method 1: Use explicit shiftType if it's valid
+            if (shift.shiftType && (shift.shiftType === 'صباحية' || shift.shiftType === 'ليلية')) {
+                console.log('[SHIFT-TYPE] Using stored shiftType:', shift.shiftType);
+                return shift.shiftType;
+            }
+            
+            // Method 2: Derive from startTime (most reliable)
+            if (shift.startTime) {
+                const startHour = new Date(shift.startTime).getHours();
+                const derived = (startHour >= 18 || startHour < 6) ? 'ليلية' : 'صباحية';
+                console.log('[SHIFT-TYPE] Derived from startTime:', shift.startTime, 'hour:', startHour, '→', derived);
+                return derived;
+            }
+            
+            // Method 3: Derive from shiftName
+            if (shift.shiftName) {
+                if (shift.shiftName.includes('ليل')) {
+                    console.log('[SHIFT-TYPE] Derived from shiftName (night):', shift.shiftName);
+                    return 'ليلية';
+                }
+                if (shift.shiftName.includes('صباح')) {
+                    console.log('[SHIFT-TYPE] Derived from shiftName (day):', shift.shiftName);
+                    return 'صباحية';
+                }
+            }
+            
+            // Method 4: Default to current time
+            const nowHour = new Date().getHours();
+            const fallback = (nowHour >= 18 || nowHour < 6) ? 'ليلية' : 'صباحية';
+            console.log('[SHIFT-TYPE] Fallback to current time:', nowHour, '→', fallback);
+            return fallback;
+        }
+        
+        const shiftType = getShiftType(shift);
+        const isNightShift = shiftType === 'ليلية';
+        console.log('[SHIFT-TYPE] Final:', shiftType, 'isNightShift:', isNightShift);
+        
         if (!shiftDate) {
-            return res.json({ paramedics: [], shiftDate: null, teamName });
+            return res.json({ paramedics: [], shiftDate: null, teamName, shiftType });
         }
         
         // Convert Arabic date to ISO format (e.g., "١/٧/٢٠٢٦" → "2026-07-01")
