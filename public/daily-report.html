@@ -385,11 +385,9 @@ tbody tr:hover { background: var(--g100); }
 
         <!-- Recommendations -->
         <div class="report-card" id="recSection">
-            <div class="card-title"><i class="fas fa-lightbulb"></i> توصيات التحسين</div>
-            <div style="padding: 16px; background: var(--g50); border-radius: var(--radius-md); border-right: 3px solid var(--gold); line-height: 1.8; color: var(--g700); font-size: 14px;">
-                <p><strong>🔴 تعزيز مركز الخالدية:</strong> يُنصح بمراجعة تخصيص الفرق في المراكز ذات الضغط العالي (أعلى من ٤٠ بلاغ). يُفضل إضافة فرقة احتياطية أو تفعيل نقاط احتجاز سريع.</p>
-                <p style="margin-top:12px;"><strong>🟡 مراجعة توزيع الفرق:</strong> في حال وجود فارق كبير بين فرق نفس المركز (مثل فرقة بـ ٢٦ بلاغ وأخرى بـ ١٢)، يُرجى مراجعة نقاط الانطلاق وتوزيع الأحمال.</p>
-                <p style="margin-top:12px;"><strong>🟢 صيانة الاستعداد:</strong> التأكد من صيانة السيارات بعد النوبات عالية الكثافة، ومراجعة مخزون الأدوية والأكسجين.</p>
+            <div class="card-title"><i class="fas fa-lightbulb"></i> توصيات التحسين الذكية</div>
+            <div id="recContent" style="padding: 16px; background: var(--g50); border-radius: var(--radius-md); border-right: 3px solid var(--gold); line-height: 1.8; color: var(--g700); font-size: 14px;">
+                <!-- Filled by JS -->
             </div>
         </div>
 
@@ -471,6 +469,208 @@ async function loadDailyReport(shiftId) {
         errorState.style.display = 'block';
         document.getElementById('errorText').textContent = 'فشل في تحميل البيانات: ' + err.message;
     }
+}
+
+// ===== Intelligent Recommendations Engine =====
+function generateRecommendations(data) {
+    const shift = data.shift;
+    const centers = data.centerBreakdown || {};
+    const topUnits = data.topUnits || [];
+    const comp = data.comparison || {};
+    const total = shift.totalReports || 0;
+    const centerNames = Object.keys(centers);
+    const recs = { immediate: [], shortTerm: [], admin: [] };
+
+    if (total === 0) {
+        recs.admin.push({ icon: 'ℹ️', text: 'لا توجد بلاغات مسجلة في هذه النوبة. يُرجى التأكد من تشغيل النظام بشكل صحيح.' });
+        return recs;
+    }
+
+    // --- 1. HIGH-LOAD CENTER ANALYSIS ---
+    centerNames.forEach(center => {
+        const count = centers[center];
+        const pct = count / total;
+        const unitsInCenter = topUnits.filter(u => u.center === center);
+        const maxUnit = unitsInCenter.length > 0 ? Math.max(...unitsInCenter.map(u => u.count)) : 0;
+        const minUnit = unitsInCenter.length > 0 ? Math.min(...unitsInCenter.map(u => u.count)) : 0;
+
+        // Center carrying >40% of total load
+        if (pct > 0.40) {
+            recs.immediate.push({
+                icon: '🔴',
+                text: `مركز <strong>${center}</strong> يستحوذ على <strong>${toArPct(pct)}</strong> من إجمالي البلاغات (${toAr(count)} بلاغ). هذا تركيز مفرط يتطلب <strong>إضافة فرقة احتياطية</strong> أو تفعيل نقاط احتجاز سريع في النوبات القادمة.`
+            });
+        }
+        // Center with only 1 active unit but high load
+        else if (unitsInCenter.length === 1 && count >= 40) {
+            recs.immediate.push({
+                icon: '🔴',
+                text: `فرقة <strong>${unitsInCenter[0].unit}</strong> في مركز <strong>${center}</strong> وحدها تتعامل مع <strong>${toAr(count)}</strong> بلاغ. يُنصح بـ <strong>تخصيص فرقة ثانية</strong> للمركز خلال النوبات الليلية لتخفيف الضغط.`
+            });
+        }
+        // High load center (20-40%)
+        else if (pct >= 0.25) {
+            recs.shortTerm.push({
+                icon: '🟡',
+                text: `مركز <strong>${center}</strong> يسجل حجمًا مرتفعًا (${toAr(count)} بلاغ، ${toArPct(pct)}). يُرجى مراجعة جدول التغطية الجغرافية لهذا المركز.`
+            });
+        }
+
+        // Unit imbalance within same center (ratio > 3:1)
+        if (unitsInCenter.length >= 2 && maxUnit > 0 && minUnit > 0) {
+            const ratio = maxUnit / minUnit;
+            if (ratio > 3) {
+                const maxU = unitsInCenter.find(u => u.count === maxUnit);
+                const minU = unitsInCenter.find(u => u.count === minUnit);
+                recs.immediate.push({
+                    icon: '🔴',
+                    text: `خلل توزيع في مركز <strong>${center}</strong>: فرقة <strong>${maxU.unit}</strong> (${toAr(maxUnit)} بلاغ) تتجاوز فرقة <strong>${minU.unit}</strong> (${toAr(minUnit)} بلاغ) بـ <strong>${ratio.toFixed(1)} أضعاف</strong>. يُرجى مراجعة نقاط الانطلاق وتوزيع الأحمال.`
+                });
+            } else if (ratio > 1.8) {
+                const maxU = unitsInCenter.find(u => u.count === maxUnit);
+                const minU = unitsInCenter.find(u => u.count === minUnit);
+                recs.shortTerm.push({
+                    icon: '🟡',
+                    text: `فارق توزيع في مركز <strong>${center}</strong>: فرقة <strong>${maxU.unit}</strong> (${toAr(maxUnit)} بلاغ) مقابل فرقة <strong>${minU.unit}</strong> (${toAr(minUnit)} بلاغ). ننصح بإعادة توزيع النقاط.`
+                });
+            }
+        }
+    });
+
+    // --- 2. EXTREME SINGLE-UNIT LOAD ---
+    topUnits.forEach((u, i) => {
+        if (u.count >= 60) {
+            recs.immediate.push({
+                icon: '🔴',
+                text: `فرقة <strong>${u.unit}</strong> (${u.center}) سجلت <strong>${toAr(u.count)}</strong> بلاغ — حجم يتجاوز القدرة التشغيلية المستدامة. <strong>تأكد من صيانة السيارة والمعدات</strong> قبل النوبة القادمة.`
+            });
+        } else if (u.count >= 40 && u.count < 60) {
+            recs.shortTerm.push({
+                icon: '🟡',
+                text: `فرقة <strong>${u.unit}</strong> (${u.center}) تعاملت مع <strong>${toAr(u.count)}</strong> بلاغ. يُنصح بمراجعة جاهزية الفرقة بعد هذه النوبة.`
+            });
+        }
+    });
+
+    // --- 3. TREND ANALYSIS ---
+    if (comp.previous !== undefined && comp.previous !== null) {
+        const diff = comp.difference || 0;
+        const pct = comp.percentChange;
+        if (diff > 0 && pct > 30) {
+            recs.immediate.push({
+                icon: '🔴',
+                text: `زيادة حادة بنسبة <strong>${pct}%</strong> مقارنة بالنوبة السابقة (+${toAr(diff)} بلاغ). هذا يستدعي <strong>مراجعة فورية لخطط التغطية</strong> وتحديد أسباب الارتفاع.`
+            });
+        } else if (diff > 0 && pct > 10) {
+            recs.shortTerm.push({
+                icon: '🟡',
+                text: `ارتفاع طفيف بنسبة <strong>${pct}%</strong> مقارنة بالنوبة السابقة (+${toAr(diff)} بلاغ). راقب الاتجاه في النوبات القادمة.`
+            });
+        } else if (diff < 0 && Math.abs(pct) > 30) {
+            recs.admin.push({
+                icon: '🔵',
+                text: `انخفاض ملحوظ بنسبة <strong>${Math.abs(pct)}%</strong> مقارنة بالنوبة السابقة. يُرجى التأكد من عدم وجود خلل في تسجيل البلاغات.`
+            });
+        } else if (diff < 0) {
+            recs.admin.push({
+                icon: '🔵',
+                text: `انخفاض طفيف في البلاغات مقارنة بالنوبة السابقة (${toAr(diff)} بلاغ). الأداء ضمن المعدل الطبيعي.`
+            });
+        }
+    }
+
+    // --- 4. SYSTEM LOAD THRESHOLDS ---
+    if (total >= 200) {
+        recs.immediate.push({
+            icon: '🔴',
+            text: `إجمالي البلاغات (${toAr(total)}) يتجاوز الحد العالي (٢٠٠). ننصح بـ <strong>تفعيل خطة الطوارئ</strong> وإضافة فرق سريعة في النوبة القادمة.`
+        });
+    } else if (total >= 100) {
+        recs.shortTerm.push({
+            icon: '🟡',
+            text: `حجم عمليات مرتفع (${toAr(total)} بلاغ). ننصح بمراجعة جاهزية الفرق والمعدات قبل النوبة القادمة.`
+        });
+    } else if (total <= 10) {
+        recs.admin.push({
+            icon: '🔵',
+            text: `حجم عمليات منخفض (${toAr(total)} بلاغ). فرصة مثالية لـ <strong>صيانة دورية</strong> و<strong>تدريب الفرق</strong>.`
+        });
+    }
+
+    // --- 5. ACTIVE CENTERS COUNT ---
+    if (centerNames.length === 1) {
+        recs.immediate.push({
+            icon: '🔴',
+            text: `مركز واحد فقط نشط (${centerNames[0]}). يُرجى التأكد من تفعيل بقية المراكز والتحقق من عدم وجود مشاكل تقنية.`
+        });
+    } else if (centerNames.length <= 2) {
+        recs.shortTerm.push({
+            icon: '🟡',
+            text: `عدد المراكز النشطة محدود (${toAr(centerNames.length)}). ننصح بمراجعة تغطية القطاع الجغرافية.`
+        });
+    }
+
+    // --- 6. UNIT COUNT VS LOAD ---
+    const avgLoadPerUnit = topUnits.length > 0 ? total / topUnits.length : 0;
+    if (avgLoadPerUnit > 40) {
+        recs.shortTerm.push({
+            icon: '🟡',
+            text: `متوسط البلاغات لكل فرقة مرتفع (<strong>${avgLoadPerUnit.toFixed(1)}</strong> بلاغ). ننصح بزيادة عدد الفرق المناوبة أو تفعيل فرق احتياطية.`
+        });
+    }
+
+    // --- 7. GENERAL MAINTENANCE (always show if high load) ---
+    if (total >= 50) {
+        recs.shortTerm.push({
+            icon: '🟡',
+            text: `<strong>صيانة استباقية:</strong> مراجعة مخزون الأدوية والأكسجين في جميع الناقلات، والتأكد من سلامة الإطارات والبطاريات بعد النوبة.`
+        });
+    }
+
+    // --- 8. DEFAULT IF EMPTY ---
+    if (recs.immediate.length === 0 && recs.shortTerm.length === 0) {
+        recs.admin.push({
+            icon: '🔵',
+            text: 'الأداء التشغيلي ضمن المعدلات الطبيعية. استمر في مراقبة الأداء وتوثيق أي ملاحظات استثنائية.'
+        });
+    }
+
+    return recs;
+}
+
+function renderRecommendations(data) {
+    const recs = generateRecommendations(data);
+    const container = document.getElementById('recContent');
+    let html = '';
+
+    // Immediate
+    if (recs.immediate.length > 0) {
+        html += '<div style="margin-bottom: 16px;"><div style="font-weight: 700; font-size: 13px; color: #B91C1C; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="fas fa-exclamation-circle"></i> إجراءات فورية</div>';
+        recs.immediate.forEach((r, i) => {
+            html += `<p style="margin-top: ${i > 0 ? '10px' : '0'};"><strong>${r.icon}</strong> ${r.text}</p>`;
+        });
+        html += '</div>';
+    }
+
+    // Short-term
+    if (recs.shortTerm.length > 0) {
+        html += '<div style="margin-bottom: 16px; padding-top: 12px; border-top: 1px solid var(--g200);"><div style="font-weight: 700; font-size: 13px; color: #B45309; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="fas fa-clock"></i> توصيات قصيرة المدى</div>';
+        recs.shortTerm.forEach((r, i) => {
+            html += `<p style="margin-top: ${i > 0 ? '10px' : '0'};"><strong>${r.icon}</strong> ${r.text}</p>`;
+        });
+        html += '</div>';
+    }
+
+    // Administrative
+    if (recs.admin.length > 0) {
+        html += '<div style="padding-top: 12px; border-top: 1px solid var(--g200);"><div style="font-weight: 700; font-size: 13px; color: #1D4ED8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="fas fa-info-circle"></i> ملاحظات إدارية</div>';
+        recs.admin.forEach((r, i) => {
+            html += `<p style="margin-top: ${i > 0 ? '10px' : '0'};"><strong>${r.icon}</strong> ${r.text}</p>`;
+        });
+        html += '</div>';
+    }
+
+    container.innerHTML = html || '<p class="empty-state">لا توجد توصيات متاحة</p>';
 }
 
 // ===== Render report =====
@@ -588,6 +788,9 @@ function renderReport(data) {
             compBody.appendChild(tr);
         });
     }
+
+    // Recommendations
+    renderRecommendations(data);
 }
 
 // ===== Print =====
