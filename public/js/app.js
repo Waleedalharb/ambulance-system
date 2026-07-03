@@ -14,7 +14,7 @@ try {
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v18-2026-07-06';
+    var APP_VERSION = 'v18-2026-07-06c';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -5745,6 +5745,39 @@ function buildCentersTable() {
             fallbackStaffInput.addEventListener('input', function(idx) { 
                 return function() { 
                     var hidden = document.getElementById('rapid_staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        // Backup paramedic input for rapid teams
+        var backupParamedicInputRapid = tr.querySelector('#backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) {
+            backupParamedicInputRapid.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        var fallbackStaffInput = tr.querySelector('#fallback_rapid_staff_input_' + r);
+        
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
                     if (hidden) hidden.value = fallbackStaffInput.value;
                     updateRapidStatusIcon(idx); 
                     calculateWorkforceStatsLocally(); 
@@ -5838,6 +5871,35 @@ function buildCentersTable() {
         `;
         
         var carsInput = tr.querySelector('#cars_' + i);
+        var fallbackStaffInput = tr.querySelector('#fallback_staff_input_' + i);
+        
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
+        
+        // Backup paramedic input for manual coverage
+        var backupParamedicInput = tr.querySelector('#backup_paramedic_' + i);
+        if (backupParamedicInput) {
+            backupParamedicInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        // If backup paramedic entered, set staff to at least 1 (or current + 1)
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateStatusIcon(idx);
         var fallbackStaffInput = tr.querySelector('#fallback_staff_input_' + i);
         
         if (fallbackStaffInput) {
