@@ -1614,8 +1614,14 @@
                     }
                     
                     // اكتشاف صف أيام الأسبوع
-                    if (colA === null && row[4] && typeof row[4] === 'string' && 
-                        (row[4].indexOf('الأحد') !== -1 || row[4].indexOf('الاثنين') !== -1 || row[4].indexOf('الثلاثاء') !== -1)) {
+                    var DAY_NAMES_AR = ['الأحد','الاحد','الاثنين','الثلاثاء','الاربعاء','الخميس','الجمعة','السبت'];
+                    var dayNameMatch = false;
+                    if (row[4] && typeof row[4] === 'string') {
+                        for (var dn = 0; dn < DAY_NAMES_AR.length; dn++) {
+                            if (row[4].indexOf(DAY_NAMES_AR[dn]) !== -1) { dayNameMatch = true; break; }
+                        }
+                    }
+                    if (colA === null && dayNameMatch) {
                         for (var c = 4; c < row.length && c < 36; c++) {
                             if (row[c]) {
                                 dayNames[c] = String(row[c]);
