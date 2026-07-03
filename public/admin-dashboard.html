@@ -124,6 +124,18 @@
                         <div id="monitorLogs" style="max-height:300px;overflow-y:auto;"></div>
                     </div>
                 </div>
+
+                <!-- Frontend Errors & Auto-Fix -->
+                <div class="monitor-panels" style="margin-top:16px;">
+                    <div class="chart-container">
+                        <h3><i class="fas fa-bug"></i> أخطاء المتصفح <span id="frontendErrorCount" style="font-size:0.8rem;color:var(--gray-400)"></span></h3>
+                        <div id="frontendErrors" style="max-height:300px;overflow-y:auto;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3><i class="fas fa-magic"></i> الإصلاحات التلقائية</h3>
+                        <div id="autoFixStats" style="max-height:300px;overflow-y:auto;"></div>
+                    </div>
+                </div>
             </div>
             <div class="two-col">
                 <div class="top-list">
@@ -461,6 +473,62 @@
 
         // Load on page load
         loadDashboard();
+
+        async function loadFrontendErrors() {
+            try {
+                var res = await fetch('/api/admin/frontend-errors?limit=20', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                var result = await res.json();
+                var container = document.getElementById('frontendErrors');
+                var countEl = document.getElementById('frontendErrorCount');
+                if (!result.success || !result.errors || result.errors.length === 0) {
+                    container.innerHTML = '<p style="color:var(--gray-400);padding:10px;">لا توجد أخطاء في المتصفح ✅</p>';
+                    countEl.textContent = '';
+                    return;
+                }
+                countEl.textContent = '(' + result.errors.length + '+)';
+                container.innerHTML = result.errors.map(e => `
+                    <div class="log-item">
+                        <span class="log-level error">${e.type}</span>
+                        <strong>${e.message ? e.message.substring(0, 80) : 'Error'}</strong>
+                        <div style="color:var(--gray-400);font-size:0.7rem;margin-top:2px;">
+                            ${e.page_path || ''} | ${new Date(e.timestamp).toLocaleTimeString('ar-SA')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Frontend errors load error:', e);
+            }
+        }
+
+        function renderAutoFixStats(stats) {
+            var container = document.getElementById('autoFixStats');
+            if (!stats) {
+                container.innerHTML = '<p style="color:var(--gray-400);padding:10px;">غير متوفر</p>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="log-item">
+                    <span class="log-level heal">✅</span>
+                    <strong>إصلاحات تلقائية</strong>: ${stats.autoFixesApplied || 0}
+                </div>
+                <div class="log-item">
+                    <span class="log-level info">📊</span>
+                    <strong>فحوصات</strong>: ${stats.checksPerformed || 0}
+                </div>
+                <div class="log-item">
+                    <span class="log-level warning">⚠️</span>
+                    <strong>تنبيهات نشطة</strong>: ${stats.activeAlerts || 0}
+                </div>
+                <div class="log-item">
+                    <span class="log-level info">📝</span>
+                    <strong>سجلات في الذاكرة</strong>: ${stats.logsInMemory || 0}
+                </div>
+                <div class="log-item">
+                    <span class="log-level info">⏱️</span>
+                    <strong>وقت التشغيل</strong>: ${Math.floor(stats.uptimeSec / 60)} دقيقة
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>

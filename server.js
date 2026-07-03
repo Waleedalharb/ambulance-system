@@ -3267,6 +3267,56 @@ app.post('/api/admin/monitor/force-check', authenticate, authorize(['admin']), a
 });
 
 // ============================================
+// API: Frontend Errors — أخطاء المتصفح
+// ============================================
+app.post('/api/frontend-errors', async (req, res) => {
+    try {
+        const { errors, sessionId } = req.body;
+        if (!errors || !Array.isArray(errors)) {
+            return res.status(400).json({ error: 'Invalid payload' });
+        }
+        for (const err of errors) {
+            await db.run(
+                `INSERT INTO frontend_errors (timestamp, type, message, file, line, column, stack, page_url, page_path, user_agent, screen, session_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    err.page ? err.page.timestamp : new Date().toISOString(),
+                    err.type,
+                    err.message ? err.message.substring(0, 1000) : '',
+                    err.file,
+                    err.line,
+                    err.column,
+                    err.stack ? err.stack.substring(0, 2000) : null,
+                    err.page ? err.page.url : null,
+                    err.page ? err.page.path : null,
+                    err.page ? err.page.userAgent : null,
+                    err.page ? err.page.screen : null,
+                    sessionId || null
+                ]
+            );
+        }
+        res.json({ success: true, count: errors.length });
+    } catch (error) {
+        console.error('Frontend error logging failed:', error.message);
+        res.status(500).json({ error: 'Failed to log errors' });
+    }
+});
+
+app.get('/api/admin/frontend-errors', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const rows = await db.all(
+            `SELECT * FROM frontend_errors ORDER BY timestamp DESC LIMIT ?`,
+            [limit]
+        );
+        res.json({ success: true, errors: rows || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب أخطاء المتصفح' });
+    }
+});
+
+
+// ============================================
 // API: البيانات الجغرافية للمراكز
 // ============================================
 const centerGeoData = {
@@ -5391,6 +5441,28 @@ async function initDatabase() {
         console.log('🗄️ Initializing SQLite database...');
         await db.init(true); // init + migrate
         console.log('✅ SQLite database ready');
+        
+        // Create frontend_errors table for Smart AI Monitor
+        try {
+            await db.run(`CREATE TABLE IF NOT EXISTS frontend_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                type TEXT,
+                message TEXT,
+                file TEXT,
+                line INTEGER,
+                column INTEGER,
+                stack TEXT,
+                page_url TEXT,
+                page_path TEXT,
+                user_agent TEXT,
+                screen TEXT,
+                session_id TEXT
+            )`);
+            console.log('✅ frontend_errors table ready');
+        } catch (e) {
+            console.error('❌ Failed to create frontend_errors table:', e.message);
+        }
     } catch (err) {
         console.error('❌ Failed to initialize database:', err.message);
         console.log('⚠️ Falling back to JSON file mode');

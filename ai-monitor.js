@@ -326,6 +326,8 @@ async function _performHealthCheck() {
   };
 
   // ── Auto-healing & alerting ──
+  await _autoFixData();
+  await _evaluateAndHeal(_currentHealth);
   await _evaluateAndHeal(_currentHealth);
 
   return _currentHealth;
@@ -452,6 +454,114 @@ async function _evaluateAndHeal(health) {
         _log('error', 'CACHE', 'reloadAllShifts() threw', { details: { error: e.message } });
       }
     }
+  }
+
+  // ────────────────────────────────
+  // Rules 8-15: Logic & Data Integrity Checks
+  // ────────────────────────────────
+  if (_db) {
+    try {
+      // Rule 8: Shifts with wrong date for shift type
+      const shiftTypeRows = await _dbGet(
+        "SELECT COUNT(*) as count FROM shifts WHERE type = 'ليل' AND CAST(substr(date, 12, 2) AS INTEGER) >= 5 AND CAST(substr(date, 12, 2) AS INTEGER) < 17"
+      );
+      if (shiftTypeRows && shiftTypeRows.count > 0) {
+        _raiseAlert('warning', 'SHIFT_LOGIC', `Found ${shiftTypeRows.count} night shifts with day-time dates`, {
+          details: { issue: 'Night shift should span previous day after midnight' },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 9: staffCount mismatch (0 staff but has cars or notes)
+      const staffMismatch = await _dbGet(
+        `SELECT COUNT(*) as count FROM shifts WHERE json_extract(centersData, '$') LIKE '%staffCount":"0"%' AND json_extract(centersData, '$') LIKE '%carsCount":"%[1-9]%"'`
+      );
+      if (staffMismatch && staffMismatch.count > 0) {
+        _raiseAlert('warning', 'DATA_INTEGRITY', `Found ${staffMismatch.count} centers with 0 staff but has cars`, {
+          details: { issue: 'staffCount does not match carsCount' },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 10: Hanging shifts (started > 24h ago without proper end)
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const hangingRows = await _dbGet(
+        "SELECT COUNT(*) as count FROM shifts WHERE startTime < ? AND (endTime IS NULL OR endTime = '')",
+        [dayAgo]
+      );
+      if (hangingRows && hangingRows.count > 0) {
+        _raiseAlert('warning', 'SHIFT_HANGING', `Found ${hangingRows.count} shifts hanging for >24h`, {
+          autoFixed: false,
+          requiresAttention: true,
+          details: { count: hangingRows.count },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 11: currentShiftId points to deleted shift
+      const badShiftId = await _dbGet(
+        "SELECT COUNT(*) as count FROM shifts WHERE currentShiftId IS NOT NULL AND currentShiftId NOT IN (SELECT id FROM shifts)"
+      );
+      if (badShiftId && badShiftId.count > 0) {
+        _stats.autoFixesApplied += 1;
+        await _dbRun("UPDATE shifts SET currentShiftId = NULL WHERE currentShiftId NOT IN (SELECT id FROM shifts)");
+        _log('heal', 'SHIFT', `Fixed ${badShiftId.count} currentShiftId pointing to deleted shifts`, {
+          autoFixed: true,
+          actionTaken: 'Reset invalid currentShiftId to NULL',
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 12: Reports without unit/team
+      const orphanReports = await _dbGet(
+        "SELECT COUNT(*) as count FROM reports WHERE unit IS NULL OR unit = '' OR team IS NULL OR team = ''"
+      );
+      if (orphanReports && orphanReports.count > 0) {
+        _raiseAlert('warning', 'DATA_INTEGRITY', `Found ${orphanReports.count} reports without unit/team`, {
+          details: { issue: 'Orphan reports missing unit or team' },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 13: Duplicate shifts (same date + same type)
+      const dupShifts = await _dbGet(
+        "SELECT COUNT(*) as count FROM (SELECT date, type, COUNT(*) as cnt FROM shifts GROUP BY date, type HAVING cnt > 1)"
+      );
+      if (dupShifts && dupShifts.count > 0) {
+        _raiseAlert('warning', 'DUPLICATE', `Found ${dupShifts.count} duplicate shift date+type combinations`, {
+          details: { issue: 'Multiple shifts for same date and type' },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 14: Database size check
+      const dbSizeRow = await _dbGet("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()");
+      if (dbSizeRow && dbSizeRow.size > 50 * 1024 * 1024) {
+        _raiseAlert('warning', 'DB_SIZE', `Database size is ${(dbSizeRow.size / 1024 / 1024).toFixed(1)} MB`, {
+          details: { thresholdMB: 50, actualMB: (dbSizeRow.size / 1024 / 1024).toFixed(1) },
+        });
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Rule 15: Old reports (>90 days) suggesting archive
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const oldReports = await _dbGet(
+        "SELECT COUNT(*) as count FROM reports WHERE createdAt < ?",
+        [ninetyDaysAgo]
+      );
+      if (oldReports && oldReports.count > 0) {
+        _log('info', 'MAINTENANCE', `Found ${oldReports.count} reports older than 90 days — consider archiving`, {
+          details: { count: oldReports.count },
+        });
+      }
+    } catch (e) { /* ignore */ }
   }
 }
 
