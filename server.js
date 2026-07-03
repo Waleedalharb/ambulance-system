@@ -22,6 +22,9 @@ try {
     db = null;
 }
 
+// AI Monitor Agent — System health, alerts & auto-healing
+const aiMonitor = require('./ai-monitor');
+
 // Helper: check if DB is available
 function dbAvailable() {
     return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts;
@@ -526,7 +529,7 @@ function authorize(roles) {
 // ============================================
 app.get('/health', (req, res) => {
     const mem = process.memoryUsage();
-    res.json({
+    const health = {
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
@@ -542,8 +545,57 @@ app.get('/health', (req, res) => {
             jwt: !!process.env.JWT_SECRET,
             websocket: !!wss
         }
-    });
+    };
+    if (aiMonitor) {
+        health.aiMonitor = {
+            stats: aiMonitor.getStats(),
+            health: aiMonitor.getHealth(),
+            alerts: aiMonitor.getAlerts()
+        };
+    }
+    res.json(health);
 });
+
+// ============================================
+// API: AI Monitor
+// ============================================
+if (aiMonitor) {
+    app.get('/api/monitor/health', authenticate, authorize(['admin']), (req, res) => {
+        res.json(aiMonitor.getHealth());
+    });
+
+    app.get('/api/monitor/logs', authenticate, authorize(['admin']), (req, res) => {
+        const { level, category, since, limit } = req.query;
+        res.json(aiMonitor.getLogs({
+            level,
+            category,
+            since,
+            limit: limit ? parseInt(limit) : undefined
+        }));
+    });
+
+    app.get('/api/monitor/alerts', authenticate, authorize(['admin']), (req, res) => {
+        const { level, category } = req.query;
+        res.json(aiMonitor.getAlerts({ level, category }));
+    });
+
+    app.post('/api/monitor/alerts/:id/resolve', authenticate, authorize(['admin']), (req, res) => {
+        const success = aiMonitor.resolveAlert(req.params.id);
+        res.json({
+            success,
+            message: success ? 'تم حل التنبيه' : 'التنبيه غير موجود أو تم حله مسبقاً'
+        });
+    });
+
+    app.get('/api/monitor/stats', authenticate, authorize(['admin']), (req, res) => {
+        res.json(aiMonitor.getStats());
+    });
+
+    app.post('/api/monitor/force-check', authenticate, authorize(['admin']), async (req, res) => {
+        const health = await aiMonitor.forceCheck();
+        res.json(health);
+    });
+}
 
 // ============================================
 // API: المصادقة (JWT)
@@ -3151,6 +3203,70 @@ app.get('/api/admin/daily-report', authenticate, authorize(['admin']), async (re
 });
 
 // ============================================
+// API: AI Monitor — System Health & Alerts
+// ============================================
+app.get('/api/admin/monitor/health', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        res.json({ success: true, health: aiMonitor.getHealth() });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب حالة النظام' });
+    }
+});
+
+app.get('/api/admin/monitor/stats', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        res.json({ success: true, stats: aiMonitor.getStats() });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+app.get('/api/admin/monitor/alerts', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.level) filter.level = req.query.level;
+        if (req.query.category) filter.category = req.query.category;
+        res.json({ success: true, alerts: aiMonitor.getAlerts(filter) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+app.post('/api/admin/monitor/alerts/:id/resolve', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const success = aiMonitor.resolveAlert(req.params.id);
+        if (success) {
+            res.json({ success: true, message: 'تم حل التنبيه' });
+        } else {
+            res.status(404).json({ error: 'التنبيه غير موجود أو تم حله مسبقاً' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حل التنبيه' });
+    }
+});
+
+app.get('/api/admin/monitor/logs', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.level) filter.level = req.query.level;
+        if (req.query.category) filter.category = req.query.category;
+        if (req.query.limit) filter.limit = parseInt(req.query.limit);
+        res.json({ success: true, logs: aiMonitor.getLogs(filter) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب السجلات' });
+    }
+});
+
+app.post('/api/admin/monitor/force-check', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const health = await aiMonitor.forceCheck();
+        res.json({ success: true, health });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تشغيل فحص النظام' });
+    }
+});
+
+// ============================================
 // API: البيانات الجغرافية للمراكز
 // ============================================
 const centerGeoData = {
@@ -5243,6 +5359,11 @@ app.use((req, res) => {
     res.status(404).json({ error: 'المسار غير موجود' });
 });
 
+// AI Monitor error tracking middleware
+if (aiMonitor) {
+    app.use(aiMonitor.errorTrackingMiddleware());
+}
+
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('❌ Error:', err.stack || err.message);
@@ -5293,6 +5414,12 @@ server.listen(PORT, async () => {
     
     // Initialize DB after server starts
     await initDatabase();
+    
+    // Initialize AI Monitor
+    if (aiMonitor) {
+        aiMonitor.init({ db, wss, app });
+        console.log('🤖 AI Monitor initialized');
+    }
 });
 
 // Graceful shutdown

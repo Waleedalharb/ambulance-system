@@ -34,6 +34,37 @@
         .loading { text-align: center; padding: 40px; color: var(--gray-400); }
         .error { text-align: center; padding: 40px; color: var(--coral); }
         @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+        /* System Monitor Styles */
+        .monitor-section { margin-top: 24px; }
+        .monitor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .monitor-header h2 { font-size: 1.1rem; margin: 0; color: var(--gray-900); }
+        .monitor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .monitor-card { background: var(--white); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow); border-right: 3px solid var(--gray-300); }
+        .monitor-card.ok { border-color: var(--teal); }
+        .monitor-card.warning { border-color: var(--gold); }
+        .monitor-card.critical { border-color: var(--coral); }
+        .monitor-card h4 { font-size: 0.8rem; color: var(--gray-500); margin: 0 0 6px; }
+        .monitor-value { font-size: 1.4rem; font-weight: 700; color: var(--gray-900); }
+        .monitor-detail { font-size: 0.75rem; color: var(--gray-400); margin-top: 4px; }
+        .alert-item { padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fff8f0; border-right: 3px solid var(--gold); }
+        .alert-item.critical { background: #fef2f2; border-color: var(--coral); }
+        .alert-item.warning { background: #fffbeb; border-color: var(--gold); }
+        .alert-item .alert-msg { font-size: 0.85rem; color: var(--gray-800); }
+        .alert-item .alert-meta { font-size: 0.7rem; color: var(--gray-400); margin-top: 4px; }
+        .btn-resolve { background: var(--teal); color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; margin-top: 6px; }
+        .btn-resolve:hover { background: #0d9488; }
+        .log-item { padding: 6px 0; border-bottom: 1px solid var(--gray-100); font-size: 0.8rem; }
+        .log-item:last-child { border-bottom: none; }
+        .log-level { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 6px; }
+        .log-level.info { background: #e0f2fe; color: #0369a1; }
+        .log-level.warning { background: #fef3c7; color: #92400e; }
+        .log-level.error { background: #fee2e2; color: #991b1b; }
+        .log-level.critical { background: #fecaca; color: #7f1d1d; }
+        .log-level.heal { background: #d1fae5; color: #065f46; }
+        .btn-force-check { background: var(--primary); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+        .btn-force-check:hover { background: var(--primary-700); }
+        .monitor-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .monitor-panels { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -62,6 +93,38 @@
             </div>
 
             <!-- Top Centers & Audit Log -->
+            <div class="two-col">
+                <div class="top-list">
+                    <h3><i class="fas fa-trophy"></i> المراكز الأكثر نشاطاً</h3>
+                    <div id="topCenters"></div>
+                </div>
+                <div class="audit-log">
+                    <h3><i class="fas fa-history"></i> آخر الأنشطة</h3>
+                    <div id="auditLog"></div>
+                </div>
+            </div>
+
+            <!-- System Monitor -->
+            <div class="monitor-section">
+                <div class="monitor-header">
+                    <h2><i class="fas fa-heartbeat"></i> مراقبة النظام (AI Monitor)</h2>
+                    <div>
+                        <button class="btn-force-check" onclick="forceHealthCheck()"><i class="fas fa-stethoscope"></i> فحص الآن</button>
+                        <button class="btn-refresh" onclick="loadMonitor()" style="margin-right:8px;"><i class="fas fa-sync-alt"></i> تحديث</button>
+                    </div>
+                </div>
+                <div class="monitor-grid" id="monitorHealthGrid"></div>
+                <div class="monitor-panels">
+                    <div class="chart-container">
+                        <h3><i class="fas fa-bell"></i> التنبيهات النشطة <span id="alertCount" style="font-size:0.8rem;color:var(--gray-400)"></span></h3>
+                        <div id="monitorAlerts" style="max-height:300px;overflow-y:auto;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3><i class="fas fa-file-alt"></i> آخر السجلات</h3>
+                        <div id="monitorLogs" style="max-height:300px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+            </div>
             <div class="two-col">
                 <div class="top-list">
                     <h3><i class="fas fa-trophy"></i> المراكز الأكثر نشاطاً</h3>
@@ -104,6 +167,14 @@
                 renderTopCenters(result.stats.centerStats);
 
                 // Load audit log
+                var auditRes = await fetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                var auditResult = await auditRes.json();
+                if (auditResult.success) renderAuditLog(auditResult.logs || []);
+
+                // Load AI Monitor data
+                loadMonitor();
+
+                document.getElementById('loading').style.display = 'none';
                 var auditRes = await fetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
                 var auditResult = await auditRes.json();
                 if (auditResult.success) renderAuditLog(auditResult.logs || []);
@@ -216,6 +287,176 @@
                     <div class="audit-time">${new Date(entry.timestamp).toLocaleString('ar-SA')}</div>
                 </div>
             `).join('');
+        }
+
+        function renderAuditLog(logs) {
+            var container = document.getElementById('auditLog');
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<p style="color:var(--gray-400)">لا توجد أنشطة حديثة</p>';
+                return;
+            }
+            container.innerHTML = logs.slice(0, 15).map(entry => `
+                <div class="audit-item">
+                    <div><strong>${entry.action}</strong> — ${entry.user}</div>
+                    <div class="audit-time">${new Date(entry.timestamp).toLocaleString('ar-SA')}</div>
+                </div>
+            `).join('');
+        }
+
+        // ─── AI Monitor Functions ───
+        async function loadMonitor() {
+            try {
+                var [healthRes, statsRes, alertsRes, logsRes] = await Promise.all([
+                    fetch('/api/admin/monitor/health', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                    fetch('/api/admin/monitor/stats', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                    fetch('/api/admin/monitor/alerts', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+                    fetch('/api/admin/monitor/logs?limit=30', { headers: { 'Authorization': 'Bearer ' + authToken } })
+                ]);
+
+                var health = healthRes.ok ? (await healthRes.json()).health : null;
+                var stats = statsRes.ok ? (await statsRes.json()).stats : null;
+                var alerts = alertsRes.ok ? (await alertsRes.json()).alerts : [];
+                var logs = logsRes.ok ? (await logsRes.json()).logs : [];
+
+                renderMonitorHealth(health, stats);
+                renderMonitorAlerts(alerts);
+                renderMonitorLogs(logs);
+            } catch (e) {
+                console.error('Monitor load error:', e);
+            }
+        }
+
+        function renderMonitorHealth(health, stats) {
+            var grid = document.getElementById('monitorHealthGrid');
+            if (!health) {
+                grid.innerHTML = '<p style="color:var(--gray-400)">غير متوفر</p>';
+                return;
+            }
+            var dbOk = health.dbPing && health.dbPing.ok;
+            var dbMs = health.dbPing ? health.dbPing.ms : 0;
+            var heapMB = Math.round(health.memory.heapUsed / 1024 / 1024);
+            var heapLimitMB = Math.round(health.memory.heapLimit / 1024 / 1024);
+            var leak = health.memoryLeak && health.memoryLeak.leakDetected;
+            var wsCount = health.wsConnections || 0;
+            var uptime = health.uptimeSec || 0;
+            var errRate = health.errorRatePerMinute || 0;
+
+            var dbClass = dbOk ? 'ok' : 'critical';
+            var memClass = heapMB > 400 ? (heapMB > 500 ? 'critical' : 'warning') : 'ok';
+            var leakClass = leak ? 'critical' : 'ok';
+            var errClass = errRate > 5 ? 'critical' : (errRate >= 3 ? 'warning' : 'ok');
+
+            grid.innerHTML = `
+                <div class="monitor-card ${dbClass}">
+                    <h4><i class="fas fa-database"></i> قاعدة البيانات</h4>
+                    <div class="monitor-value">${dbOk ? '✅ متصلة' : '❌ غير متصلة'}</div>
+                    <div class="monitor-detail">${dbMs} ملي ثانية | ${health.checkTime ? new Date(health.checkTime).toLocaleTimeString('ar-SA') : ''}</div>
+                </div>
+                <div class="monitor-card ${memClass}">
+                    <h4><i class="fas fa-memory"></i> الذاكرة (Heap)</h4>
+                    <div class="monitor-value">${heapMB} / ${heapLimitMB} MB</div>
+                    <div class="monitor-detail">RSS: ${Math.round(health.memory.rss / 1024 / 1024)} MB</div>
+                </div>
+                <div class="monitor-card ${leakClass}">
+                    <h4><i class="fas fa-vial"></i> تسرب الذاكرة</h4>
+                    <div class="monitor-value">${leak ? '⚠️ مكتشف' : '✅ لا يوجد'}</div>
+                    <div class="monitor-detail">${health.memoryLeak ? 'نمو: ' + (health.memoryLeak.growthRate * 100).toFixed(1) + '%' : ''}</div>
+                </div>
+                <div class="monitor-card ${errRate > 0 ? 'warning' : 'ok'}">
+                    <h4><i class="fas fa-bolt"></i> WebSocket</h4>
+                    <div class="monitor-value">${wsCount} متصل</div>
+                    <div class="monitor-detail">اتصالات فعالة</div>
+                </div>
+                <div class="monitor-card ${errClass}">
+                    <h4><i class="fas fa-exclamation-triangle"></i> أخطاء API</h4>
+                    <div class="monitor-value">${errRate}/دقيقة</div>
+                    <div class="monitor-detail">500 errors في آخر دقيقة</div>
+                </div>
+                <div class="monitor-card ok">
+                    <h4><i class="fas fa-clock"></i> وقت التشغيل</h4>
+                    <div class="monitor-value">${Math.floor(uptime / 60)} دقيقة</div>
+                    <div class="monitor-detail">منذ آخر إعادة تشغيل</div>
+                </div>
+            `;
+            if (stats) {
+                grid.innerHTML += `
+                    <div class="monitor-card ok">
+                        <h4><i class="fas fa-stethoscope"></i> فحوصات</h4>
+                        <div class="monitor-value">${stats.checksPerformed || 0}</div>
+                        <div class="monitor-detail">إصلاحات تلقائية: ${stats.autoFixesApplied || 0}</div>
+                    </div>
+                    <div class="monitor-card ok">
+                        <h4><i class="fas fa-bell"></i> التنبيهات</h4>
+                        <div class="monitor-value">${stats.activeAlerts || 0} نشطة</div>
+                        <div class="monitor-detail">إجمالي: ${stats.totalAlerts || 0} | محلولة: ${stats.alertsResolved || 0}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderMonitorAlerts(alerts) {
+            var container = document.getElementById('monitorAlerts');
+            document.getElementById('alertCount').textContent = alerts.length > 0 ? '(' + alerts.length + ')' : '';
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = '<p style="color:var(--gray-400);padding:10px;">لا توجد تنبيهات نشطة ✅</p>';
+                return;
+            }
+            container.innerHTML = alerts.map(a => `
+                <div class="alert-item ${a.level}">
+                    <div class="alert-msg">[${a.level.toUpperCase()}] ${a.category} — ${a.message}</div>
+                    <div class="alert-meta">#${a.id} | ${new Date(a.createdAt).toLocaleString('ar-SA')}</div>
+                    ${a.requiresAttention ? '<span style="color:var(--coral);font-size:0.75rem;">⚠️ يتطلب اهتمام</span>' : ''}
+                    <br>
+                    <button class="btn-resolve" onclick="resolveAlert(${a.id})"><i class="fas fa-check"></i> حل التنبيه</button>
+                </div>
+            `).join('');
+        }
+
+        function renderMonitorLogs(logs) {
+            var container = document.getElementById('monitorLogs');
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<p style="color:var(--gray-400);padding:10px;">لا توجد سجلات</p>';
+                return;
+            }
+            container.innerHTML = logs.slice().reverse().map(l => `
+                <div class="log-item">
+                    <span class="log-level ${l.level}">${l.level}</span>
+                    <strong>${l.category}</strong> — ${l.message}
+                    <div style="color:var(--gray-400);font-size:0.7rem;margin-top:2px;">${new Date(l.timestamp).toLocaleTimeString('ar-SA')}</div>
+                </div>
+            `).join('');
+        }
+
+        async function resolveAlert(id) {
+            try {
+                var res = await fetch('/api/admin/monitor/alerts/' + id + '/resolve', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                var result = await res.json();
+                if (result.success) {
+                    loadMonitor();
+                } else {
+                    alert(result.error || 'فشل في حل التنبيه');
+                }
+            } catch (e) {
+                alert('فشل في الاتصال');
+            }
+        }
+
+        async function forceHealthCheck() {
+            try {
+                var res = await fetch('/api/admin/monitor/force-check', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                var result = await res.json();
+                if (result.success) {
+                    loadMonitor();
+                }
+            } catch (e) {
+                alert('فشل في تشغيل الفحص');
+            }
         }
 
         // Load on page load
