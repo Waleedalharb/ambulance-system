@@ -1687,6 +1687,15 @@ var selectedFiles = [];
 var docsViewMode = 'list';
 var centerNumbers = Array.from({length: 19}, function(_, i) { return i + 1; });
 var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
+
+var rapidTeams = [
+    { name: 'سريع 1', displayName: 'سريع 1', code: 'R1' },
+    { name: 'سريع 2', displayName: 'سريع 2', code: 'R2' },
+    { name: 'سريع 3', displayName: 'سريع 3', code: 'R3' },
+    { name: 'سريع 4', displayName: 'سريع 4', code: 'R4' }
+];
+
+var currentSheetIndex = 0;
 var currentSheetIndex = 0;
 var workbookData = null;
 var controlData = [
@@ -4762,19 +4771,160 @@ async function deleteDoc(docId) {
 // ============================================
 // وظائف بناء الجدول
 // ============================================
+function updateRapidStatusIcon(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    var iconSpan = document.getElementById('rapid_status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
+    }
+}
+
+function setRapidComplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 1;
+    if (carsInput) carsInput.value = 1;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '1 حاضر';
+}
+
+function setRapidIncomplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 0;
+    if (carsInput) carsInput.value = 0;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '0 حاضر';
+}
+
+
 function buildCentersTable() {
     var tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
     
+    // Add Rapid Response Teams first
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var tr = document.createElement('tr');
+        tr.id = 'rapid-row-' + r;
+        tr.className = 'rapid-team-row';
+        tr.style.background = 'rgba(255, 193, 7, 0.05)';
+        
+        var statusHtml = '<span id="rapid_status_' + r + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
+        
+        var actionHtml = `
+            <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                <button onclick="setRapidComplete(${r})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ✅ مكتمل
+                </button>
+                <button onclick="setRapidIncomplete(${r})" class="btn btn-danger" style="padding:2px 10px; font-size:0.6rem; background:#c0392b; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ❌ ناقص
+                </button>
+            </div>
+        `;
+        
+        var safeName = rapid.name.replace(/\s+/g, '_');
+        tr.innerHTML = `
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--gold);">⚡ تدخل سريع</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${rapid.displayName}</td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td style="min-width:130px; padding:4px;">
+                <div class="paramedic-box" id="paramedic-box-rapid-${r}">
+                    <div class="paramedic-list" id="paramedics_${safeName}">
+                        <div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>
+                    </div>
+                    <div class="staff-count-display" id="staffCountDisplay_${safeName}">-</div>
+                </div>
+                <input type="hidden" id="rapid_staff_${r}" value="">
+                <div class="fallback-staff-input" id="fallback_rapid_staff_${r}" style="display:none;">
+                    <input type="number" id="fallback_rapid_staff_input_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1">
+                </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_rapid_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
+            </td>
+            <td><input type="number" id="rapid_cars_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1"></td>
+            <td style="text-align:center;">${actionHtml}</td>
+            <td><input type="text" id="rapid_notes_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+        `;
+        
+        var carsInput = tr.querySelector('#rapid_cars_' + r);
+        var fallbackStaffInput = tr.querySelector('#fallback_rapid_staff_input_' + r);
+        
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        // Backup paramedic input for rapid teams
+        var backupParamedicInputRapid = tr.querySelector('#backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) {
+            backupParamedicInputRapid.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        carsInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateRapidStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+            };
+        }(r));
+        
+        tbody.appendChild(tr);
+    }
+    
+    // Add separator row
+    var sepTr = document.createElement('tr');
+    sepTr.innerHTML = '<td colspan="9" style="background:var(--gray-100); height:8px; padding:0;"></td>';
+    tbody.appendChild(sepTr);
+    
+    // Add Regular Centers
     for (var i = 0; i < centerList.length; i++) {
         var tr = document.createElement('tr');
         tr.id = 'center-row-' + i;
         
-        // أيقونة الحالة
         var statusHtml = '<span id="status_' + i + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
         
-        // أزرار الإجراء السريع
         var actionHtml = `
             <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
                 <button onclick="setCenterComplete(${i})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
@@ -4786,11 +4936,27 @@ function buildCentersTable() {
             </div>
         `;
         
+        var safeName = centerList[i].replace(/\s+/g, '_');
         tr.innerHTML = `
-            <td style="font-weight:bold; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--primary);">🏥 مركز</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
             <td style="text-align:center;">${statusHtml}</td>
-            <td><input type="number" id="staff_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value=""></td>
-            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value=""></td>
+            <td style="min-width:130px; padding:4px;">
+                <div class="paramedic-box" id="paramedic-box-${i}">
+                    <div class="paramedic-list" id="paramedics_${safeName}">
+                        <div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>
+                    </div>
+                    <div class="staff-count-display" id="staffCountDisplay_${safeName}">-</div>
+                </div>
+                <input type="hidden" id="staff_${i}" value="">
+                <div class="fallback-staff-input" id="fallback_staff_${i}" style="display:none;">
+                    <input type="number" id="fallback_staff_input_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value="" placeholder="2+">
+                </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
+            </td>
+            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value="" placeholder="1+"></td>
             <td style="text-align:center;">${actionHtml}</td>
             <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
             <td><select id="vehicle_${i}" style="width:80px; font-size:0.7rem; padding:3px; border:1px solid var(--gray-200); border-radius:4px;">
@@ -4801,16 +4967,41 @@ function buildCentersTable() {
             </select></td>
         `;
         
-        var staffInput = tr.querySelector('#staff_' + i);
         var carsInput = tr.querySelector('#cars_' + i);
+        var fallbackStaffInput = tr.querySelector('#fallback_staff_input_' + i);
         
-        staffInput.addEventListener('input', function(idx) { 
-            return function() { 
-                updateStatusIcon(idx); 
-                calculateWorkforceStatsLocally(); 
-                updateShiftKPIs();
-            };
-        }(i));
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
+        
+        // Backup paramedic input for manual coverage
+        var backupParamedicInput = tr.querySelector('#backup_paramedic_' + i);
+        if (backupParamedicInput) {
+            backupParamedicInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        // If backup paramedic entered, set staff to at least 1 (or current + 1)
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
         
         carsInput.addEventListener('input', function(idx) { 
             return function() { 
@@ -4818,7 +5009,6 @@ function buildCentersTable() {
                 calculateWorkforceStatsLocally(); 
             };
         }(i));
-        
         
         var vehicleSelect = tr.querySelector('#vehicle_' + i);
         var fuelSelect = tr.querySelector('#fuel_' + i);
