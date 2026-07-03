@@ -2075,7 +2075,7 @@ function updateShiftsHistoryWidget() {
     previousShifts.forEach(function(shift) {
         var option = document.createElement('option');
         option.value = shift.id;
-        var typeLabel = (shift.shiftType === 'صباحية' || shift.shiftType === 'morning') ? 'صباحي' : 'ليلي';
+        var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'صباحية' || shift.shiftType === 'morning') ? 'صباحي' : 'ليلي';
         var date = shift.shiftDate || '';
         var total = shift.totalReports || 0;
         option.textContent = typeLabel + ' - ' + date + ' (' + total + ' بلاغ)';
@@ -5378,7 +5378,7 @@ function safeTeamId(teamName) {
 
 function isParamedicPresent(shiftCode) {
     if (!shiftCode || shiftCode === '-' || shiftCode === '') return false;
-    var absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+    var absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
     return absentCodes.indexOf(shiftCode.toString().toUpperCase()) === -1;
 }
 

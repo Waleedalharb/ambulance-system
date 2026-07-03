@@ -1315,7 +1315,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             for (const team of teams) {
                 if (!centerParamedics[team.center]) centerParamedics[team.center] = [];
                 const roster = await db.ShiftRoster.getByDateAndTeam(shiftDateToUse, team.id);
-                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
                 for (const entry of roster) {
                     centerParamedics[team.center].push({
                         name: entry.employee_name,
@@ -1484,7 +1484,7 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
             for (const team of teams) {
                 if (!dbParamedics[team.center]) dbParamedics[team.center] = [];
                 const roster = await db.ShiftRoster.getByDateAndTeam(shiftDate, team.id);
-                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
                 for (const entry of roster) {
                     dbParamedics[team.center].push({
                         name: entry.employee_name,
@@ -1504,7 +1504,7 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
             // If assignedParamedics exists in JSON, calculate present count from actual roster
             const assignedParamedics = cData?.assignedParamedics;
             if (Array.isArray(assignedParamedics) && assignedParamedics.length > 0) {
-                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
                 staffCount = assignedParamedics.filter(p => {
                     const code = p.shiftCode ? p.shiftCode.toString().toUpperCase() : (p.shift_code ? p.shift_code.toString().toUpperCase() : '');
                     return code && !absentCodes.includes(code);
@@ -1597,9 +1597,16 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
         // Robust shift type detection: derive from startTime, not stored shiftType
         function getShiftType(shift) {
             // Method 1: Use explicit shiftType if it's valid
-            if (shift.shiftType && (shift.shiftType === 'صباحية' || shift.shiftType === 'ليلية')) {
-                console.log('[SHIFT-TYPE] Using stored shiftType:', shift.shiftType);
-                return shift.shiftType;
+            if (shift.shiftType) {
+                const normalized = shift.shiftType.trim();
+                if (normalized === 'صباحية' || normalized === 'صباح' || normalized === 'morning' || normalized === 'day') {
+                    console.log('[SHIFT-TYPE] Using stored shiftType (day):', normalized);
+                    return 'صباح';
+                }
+                if (normalized === 'ليلية' || normalized === 'ليل' || normalized === 'night' || normalized === 'evening') {
+                    console.log('[SHIFT-TYPE] Using stored shiftType (night):', normalized);
+                    return 'ليل';
+                }
             }
             
             // Method 2: Derive from startTime (most reliable)
@@ -1635,7 +1642,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
         }
         
         const shiftType = getShiftType(shift);
-        const isNightShift = shiftType === 'ليلية';
+        const isNightShift = shiftType === 'ليل';
         console.log('[SHIFT-TYPE] Final:', shiftType, 'isNightShift:', isNightShift);
         
         if (!shiftDate) {
@@ -1716,7 +1723,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             return validCodes.includes(p.shift_code.toUpperCase());
         });
         
-        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+        const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
         const paramedicsWithStatus = filteredParamedics.map(p => ({
             ...p,
             status: p.shift_code && absentCodes.includes(p.shift_code.toUpperCase()) ? 'غائب' : 'حاضر'
