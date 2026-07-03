@@ -65,6 +65,15 @@
         .btn-force-check:hover { background: var(--primary-700); }
         .monitor-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 768px) { .monitor-panels { grid-template-columns: 1fr; } }
+        /* Admin Tools */
+        .admin-tools { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); margin-top: 16px; }
+        .admin-tools h3 { margin: 0 0 16px; font-size: 1rem; color: var(--gray-900); }
+        .btn-danger { background: var(--coral); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+        .clear-result { margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 0.85rem; display: none; }
+        .clear-result.success { background: #d1fae5; color: #065f46; display: block; }
+        .clear-result.error { background: #fee2e2; color: #991b1b; display: block; }
     </style>
 </head>
 <body>
@@ -137,15 +146,13 @@
                     </div>
                 </div>
             </div>
-            <div class="two-col">
-                <div class="top-list">
-                    <h3><i class="fas fa-trophy"></i> المراكز الأكثر نشاطاً</h3>
-                    <div id="topCenters"></div>
-                </div>
-                <div class="audit-log">
-                    <h3><i class="fas fa-history"></i> آخر الأنشطة</h3>
-                    <div id="auditLog"></div>
-                </div>
+            <!-- Admin Tools -->
+            <div class="admin-tools">
+                <h3><i class="fas fa-tools"></i> أدوات المشرف</h3>
+                <button id="clearAllBtn" class="btn-danger" onclick="clearAllScheduleData()">
+                    <i class="fas fa-trash-alt"></i> مسح كل بيانات الجداول (IndexedDB + Server)
+                </button>
+                <div id="clearResult" class="clear-result"></div>
             </div>
         </div>
     </div>
@@ -528,6 +535,57 @@
                     <strong>وقت التشغيل</strong>: ${Math.floor(stats.uptimeSec / 60)} دقيقة
                 </div>
             `;
+        }
+
+        async function clearAllScheduleData() {
+            var btn = document.getElementById('clearAllBtn');
+            var resultDiv = document.getElementById('clearResult');
+            if (!confirm('⚠️ تحذير: سيتم حذف ALL schedule data نهائياً!\n\nسيتم مسح:\n• بيانات IndexedDB (smart-schedule)\n• بيانات localStorage\n• بيانات السيرвер\n\nهل أنت متأكد؟')) return;
+            btn.disabled = true;
+            resultDiv.className = 'clear-result';
+            resultDiv.style.display = 'none';
+            resultDiv.textContent = '';
+            var cleared = [];
+            var errors = [];
+            // 1. Clear IndexedDB
+            try {
+                var req = indexedDB.open('smartScheduleDB', 1);
+                req.onsuccess = function(e) {
+                    var db = e.target.result;
+                    if (db.objectStoreNames.contains('employees')) {
+                        var tx = db.transaction('employees', 'readwrite');
+                        var store = tx.objectStore('employees');
+                        store.clear();
+                    }
+                    db.close();
+                };
+                cleared.push('IndexedDB (smartScheduleDB)');
+            } catch (e) { errors.push('IndexedDB: ' + e.message); }
+            // 2. Clear localStorage keys
+            var localKeys = ['ss_employees', 'importedEmployees', 'plannerEmployees', 'lastImportedFile', 'shift-planner-data'];
+            localKeys.forEach(function(key) {
+                try { localStorage.removeItem(key); cleared.push('localStorage: ' + key); }
+                catch (e) { errors.push('localStorage ' + key + ': ' + e.message); }
+            });
+            // 3. Clear server data
+            try {
+                var res = await fetch('/api/shift-roster/clear-all', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+                });
+                var result = await res.json();
+                if (result.success) cleared.push('Server (SQLite shift_roster)');
+                else errors.push('Server: ' + (result.error || 'unknown'));
+            } catch (e) { errors.push('Server: ' + e.message); }
+            // Show result
+            if (errors.length === 0) {
+                resultDiv.className = 'clear-result success';
+                resultDiv.innerHTML = '✅ تم المسح بنجاح:<br>• ' + cleared.join('<br>• ');
+            } else {
+                resultDiv.className = 'clear-result error';
+                resultDiv.innerHTML = '⚠️ تم المسح بجزئية:<br>• ' + cleared.join('<br>• ') + '<br><br>❌ أخطاء:<br>• ' + errors.join('<br>• ');
+            }
+            btn.disabled = false;
         }
     </script>
 </body>
