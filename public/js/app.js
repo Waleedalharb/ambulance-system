@@ -1039,6 +1039,179 @@ function getRelativeTime(date) {
     return date.toLocaleDateString('ar-SA', { month:'short', day:'numeric' });
 }
 
+// ============================================
+// Notification Bell Dropdown System
+// ============================================
+var _notifications = [];
+var NOTIFICATION_KEY = 'ems_notifications';
+var NOTIFICATION_MAX = 50;
+
+function _loadNotifications() {
+    try {
+        var raw = localStorage.getItem(NOTIFICATION_KEY);
+        if (raw) _notifications = JSON.parse(raw);
+    } catch(e) { _notifications = []; }
+}
+function _saveNotifications() {
+    try { localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(_notifications.slice(0, NOTIFICATION_MAX))); } catch(e) {}
+}
+function _unreadCount() {
+    return _notifications.filter(function(n){ return !n.read; }).length;
+}
+function _updateBadge() {
+    var badge = document.getElementById('notificationBadge');
+    var count = document.getElementById('notificationCount');
+    var icon = document.getElementById('notificationBellIcon');
+    var unread = _unreadCount();
+    if (badge) { badge.textContent = unread > 9 ? '9+' : (unread || '0'); badge.style.display = unread > 0 ? 'flex' : 'none'; }
+    if (count) { count.textContent = unread + ' غير مقروء'; }
+    if (icon && unread > 0) { icon.style.animation = 'bellShake 1.5s ease infinite'; }
+    else if (icon) { icon.style.animation = 'none'; }
+}
+
+function toggleNotificationPanel(e) {
+    if (e) e.stopPropagation();
+    var panel = document.getElementById('notificationPanel');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        renderNotificationList();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function renderNotificationList() {
+    var list = document.getElementById('notificationList');
+    if (!list) return;
+    if (_notifications.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:24px; font-size:0.85rem;">📭 لا توجد إشعارات</p>';
+        _updateBadge();
+        return;
+    }
+    var icons = {
+        report: 'fa-chart-bar', shift: 'fa-clipboard-list', file: 'fa-folder-open',
+        alert: 'fa-exclamation-circle', system: 'fa-cog', peak: 'fa-clock',
+        ops: 'fa-folder-open', theme: 'fa-paint-brush', user: 'fa-user'
+    };
+    var colors = {
+        report: 'var(--teal)', shift: 'var(--info)', file: 'var(--gold)',
+        alert: 'var(--coral)', system: 'var(--gray-500)', peak: 'var(--coral)',
+        ops: 'var(--gold)', theme: 'var(--purple)', user: 'var(--primary)'
+    };
+    var html = '';
+    var lastDate = null;
+    for (var i = 0; i < _notifications.length; i++) {
+        var n = _notifications[i];
+        var date = n.timestamp ? new Date(n.timestamp) : new Date();
+        var dateKey = date.toLocaleDateString('ar-SA', { year:'numeric', month:'2-digit', day:'2-digit' });
+        var timeStr = date.toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
+        var icon = icons[n.category] || 'fa-bell';
+        var color = colors[n.category] || 'var(--gray-500)';
+        var unreadStyle = !n.read ? 'border-right:3px solid ' + color + '; background:var(--gray-50);' : '';
+
+        if (dateKey !== lastDate) {
+            html += '<div style="padding:6px 16px; font-size:0.7rem; color:var(--gray-500); font-weight:600; background:var(--gray-100); border-bottom:1px solid var(--gray-200);">' + dateKey + '</div>';
+            lastDate = dateKey;
+        }
+        html += '<div onclick="markNotificationRead(' + i + ')" style="padding:10px 14px; border-bottom:1px solid var(--gray-200); cursor:pointer; display:flex; align-items:flex-start; gap:10px; transition:background 0.15s; ' + unreadStyle + '" onmouseenter="this.style.background=\'var(--gray-50)\'" onmouseleave="if(!' + (!n.read ? 'true' : 'false') + ') this.style.background=\'var(--white)\'; else this.style.background=\'var(--gray-50)\';">';
+        html += '<div style="width:28px; height:28px; border-radius:50%; background:' + color + '22; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:' + color + ';"><i class="fas ' + icon + '" style="font-size:0.7rem;"></i></div>';
+        html += '<div style="flex:1; min-width:0;">';
+        html += '<div style="font-size:0.8rem; font-weight:' + (!n.read ? '600' : '500') + '; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(n.title || 'إشعار') + '</div>';
+        html += '<div style="font-size:0.72rem; color:var(--gray-500); overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">' + escapeHtml(n.message || '') + '</div>';
+        html += '<div style="font-size:0.65rem; color:var(--gray-400); margin-top:3px; display:flex; justify-content:space-between;"><span>' + timeStr + '</span>' + (!n.read ? '<span style="color:' + color + '; font-weight:700;">● جديد</span>' : '') + '</div>';
+        html += '</div>';
+        html += '</div>';
+    }
+    list.innerHTML = html;
+    _updateBadge();
+}
+
+function addNotification(title, message, category) {
+    if (!title && !message) return;
+    var entry = {
+        id: Date.now().toString(),
+        title: title || 'إشعار',
+        message: message || '',
+        category: category || 'system',
+        read: false,
+        timestamp: new Date().toISOString()
+    };
+    _notifications.unshift(entry);
+    if (_notifications.length > NOTIFICATION_MAX) _notifications = _notifications.slice(0, NOTIFICATION_MAX);
+    _saveNotifications();
+    _updateBadge();
+    // Subtle badge flash
+    var badge = document.getElementById('notificationBadge');
+    if (badge) { badge.style.transform = 'scale(1.3)'; setTimeout(function(){badge.style.transform='scale(1)';}, 200); }
+}
+
+function markNotificationRead(index) {
+    if (_notifications[index] && !_notifications[index].read) {
+        _notifications[index].read = true;
+        _saveNotifications();
+        renderNotificationList();
+    }
+}
+function markAllNotificationsRead() {
+    _notifications.forEach(function(n){ n.read = true; });
+    _saveNotifications();
+    renderNotificationList();
+}
+function clearAllNotifications() {
+    if (!confirm('هل أنت متأكد من مسح جميع الإشعارات؟')) return;
+    _notifications = [];
+    _saveNotifications();
+    renderNotificationList();
+}
+
+// Close notification panel when clicking outside
+document.addEventListener('click', function(e) {
+    var panel = document.getElementById('notificationPanel');
+    var btn = document.getElementById('notificationBellBtn');
+    if (panel && panel.style.display === 'block') {
+        if (!panel.contains(e.target) && btn && !btn.contains(e.target)) {
+            panel.style.display = 'none';
+        }
+    }
+});
+
+// Initialize
+_loadNotifications();
+_updateBadge();
+
+// CSS animation for bell shake
+if (!document.getElementById('notification-style')) {
+    var ns = document.createElement('style');
+    ns.id = 'notification-style';
+    ns.textContent = '@keyframes bellShake { 0%, 100% { transform: rotate(0); } 10% { transform: rotate(8deg); } 20% { transform: rotate(-8deg); } 30% { transform: rotate(4deg); } 40% { transform: rotate(-4deg); } 50% { transform: rotate(2deg); } 60% { transform: rotate(-2deg); } 70% { transform: rotate(1deg); } 80% { transform: rotate(-1deg); } 90% { transform: rotate(0); } }';
+    document.head.appendChild(ns);
+}
+
+// Process any notifications that arrived before app.js loaded
+if (window._pendingNotifications && window._pendingNotifications.length > 0) {
+    var catMap = {
+        'new_report': 'report', 'shift_started': 'shift', 'shift_updated': 'shift',
+        'shift_deleted': 'shift', 'ops_file_deleted': 'file', 'ops_files_uploaded': 'file',
+        'audit_log_added': 'system', 'file_deleted': 'file', 'file_uploaded': 'file',
+        'peak_mission': 'peak', 'peak_resolve': 'peak', 'control_notes_updated': 'system',
+        'vacations_updated': 'system', 'theme_uploaded': 'theme', 'user_login': 'user'
+    };
+    var titleMap = {
+        'new_report': 'بلاغ جديد', 'shift_started': 'مناوبة جديدة', 'shift_updated': 'تحديث مناوبة',
+        'shift_deleted': 'حذف مناوبة', 'ops_file_deleted': 'حذف ملف', 'ops_files_uploaded': 'رفع ملف',
+        'audit_log_added': 'سجل عمليات', 'peak_mission': 'مهمة ذروة', 'peak_resolve': 'إنجاز مهمة',
+        'control_notes_updated': 'تحديث ملاحظات', 'vacations_updated': 'تحديث إجازات',
+        'theme_uploaded': 'تحديث ثيم', 'user_login': 'دخول مستخدم'
+    };
+    window._pendingNotifications.forEach(function(p) {
+        var cat = catMap[p.type] || 'system';
+        var title = titleMap[p.type] || (p.type ? p.type.replace(/_/g, ' ') : 'إشعار');
+        addNotification(title, p.message, cat);
+    });
+    window._pendingNotifications = [];
+}
+
 function filterAuditLog(type, btn) {
     currentAuditFilter = type;
     document.querySelectorAll('.audit-filter-btn').forEach(function(b) {
