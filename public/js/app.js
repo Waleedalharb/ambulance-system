@@ -7688,16 +7688,20 @@ function applyUserPermissions(user) {
 // ============================================
 // fetch interceptor: إضافة Bearer token تلقائياً (من inline.js)
 // ============================================
-var originalFetch = window.fetch;
-window.fetch = function(url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    var token = localStorage.getItem('authToken');
-    if (token && typeof url === 'string' && url.startsWith('/api/')) {
-        options.headers['Authorization'] = 'Bearer ' + token;
-    }
-    return originalFetch(url, options);
-};
+// ⚠️ حماية من التعديل المزدوج عند تحميل app.js عدة مرات
+if (!window.__fetchInterceptorInstalled) {
+    window.__fetchInterceptorInstalled = true;
+    var originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        var token = localStorage.getItem('authToken');
+        if (token && typeof url === 'string' && url.startsWith('/api/')) {
+            options.headers['Authorization'] = 'Bearer ' + token;
+        }
+        return originalFetch(url, options);
+    };
+}
 
 
 // ============================================
