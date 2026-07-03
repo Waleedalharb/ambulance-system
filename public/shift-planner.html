@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="مخطط المناوبات - قطاع جنوب الرياض | Shift Planner">
+    <title>مخطط المناوبات | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --border: #E2E8F0;
+            --primary: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --purple: #8B5CF6;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --font: 'Inter', sans-serif;
+            --shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            direction: rtl;
+            min-height: 100vh;
+        }
+        /* Top Bar */
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: var(--shadow);
+        }
+        .top-bar-brand { display: flex; align-items: center; gap: 0.75rem; }
+        .top-bar-brand .logo-icon {
+            width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), #3B82F6);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1.2rem;
+        }
+        .top-bar-brand h1 { font-size: 1rem; font-weight: 700; color: var(--text); }
+        .top-bar-brand span { font-size: 0.7rem; color: var(--text-muted); }
+        .top-bar-actions { display: flex; gap: 0.5rem; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer;
+            font-family: var(--font); font-size: 0.8rem; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: #1D4ED8; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-warning:hover { background: #D97706; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #DC2626; }
+        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { background: #F1F5F9; }
+        .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.75rem; }
+
+        /* Container */
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+        /* Page Title */
+        .page-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
+        }
+        .page-header h2 { font-size: 1.4rem; font-weight: 700; }
+        .page-header p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem; margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.25rem;
+            box-shadow: var(--shadow); transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card .icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; margin-bottom: 0.75rem;
+        }
+        .stat-card .icon.blue { background: #EFF6FF; color: var(--primary); }
+        .stat-card .icon.green { background: #ECFDF5; color: var(--success); }
+        .stat-card .icon.orange { background: #FFFBEB; color: var(--warning); }
+        .stat-card .icon.red { background: #FEF2F2; color: var(--danger); }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Tabs */
+        .tabs {
+            display: flex; gap: 0.25rem;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 0.35rem; margin-bottom: 1.5rem;
+            width: fit-content;
+        }
+        .tab {
+            padding: 0.5rem 1.25rem; border-radius: 8px; cursor: pointer;
+            font-size: 0.8rem; font-weight: 600; color: var(--text-muted);
+            border: none; background: transparent; font-family: var(--font);
+            transition: all 0.2s;
+        }
+        .tab.active { background: var(--primary); color: #fff; }
+        .tab:hover:not(.active) { background: #F1F5F9; color: var(--text); }
+
+        /* Panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .card-title { font-size: 1rem; font-weight: 700; }
+        .card-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+        /* Form Elements */
+        .form-group { margin-bottom: 1rem; }
+        .form-label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 0.6rem 0.85rem; border: 1px solid var(--border);
+            border-radius: 8px; font-family: var(--font); font-size: 0.85rem;
+            background: #fff; color: var(--text); transition: border-color 0.2s;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .form-textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+
+        /* Tables */
+        .data-table {
+            width: 100%; border-collapse: collapse; font-size: 0.85rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.75rem; text-align: right; border-bottom: 1px solid var(--border);
+        }
+        .data-table th {
+            background: #F8FAFC; font-weight: 700; font-size: 0.75rem;
+            text-transform: uppercase; color: var(--text-muted);
+        }
+        .data-table tr:hover { background: #F8FAFC; }
+        .data-table .badge {
+            display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px;
+            font-size: 0.7rem; font-weight: 600;
+        }
+        .badge-success { background: #ECFDF5; color: #059669; }
+        .badge-warning { background: #FFFBEB; color: #D97706; }
+        .badge-danger { background: #FEF2F2; color: #DC2626; }
+        .badge-info { background: #EFF6FF; color: #2563EB; }
+
+        /* Schedule Grid */
+        .schedule-grid {
+            display: grid; grid-template-columns: 120px repeat(7, 1fr); gap: 1px;
+            background: var(--border); border-radius: 10px; overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .schedule-grid .cell {
+            background: #fff; padding: 0.6rem; font-size: 0.75rem;
+            min-height: 60px; display: flex; flex-direction: column; justify-content: center;
+        }
+        .schedule-grid .cell.header {
+            background: #F8FAFC; font-weight: 700; text-align: center;
+        }
+        .schedule-grid .cell.time-label {
+            background: #F8FAFC; font-weight: 600; font-size: 0.7rem;
+            text-align: center; justify-content: center;
+        }
+        .schedule-grid .shift-morning { background: #FEF3C7; color: #92400E; }
+        .schedule-grid .shift-evening { background: #DBEAFE; color: #1E40AF; }
+        .schedule-grid .shift-night { background: #E0E7FF; color: #3730A3; }
+        .schedule-grid .shift-off { background: #F3F4F6; color: #6B7280; }
+
+        /* Team Status */
+        .team-list { display: grid; gap: 0.75rem; }
+        .team-member {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 0.85rem; border: 1px solid var(--border);
+            border-radius: 10px; background: #fff; transition: all 0.2s;
+        }
+        .team-member:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+        .team-member .avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #3B82F6);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
+        }
+        .team-member .info { flex: 1; }
+        .team-member .name { font-weight: 600; font-size: 0.9rem; }
+        .team-member .role { font-size: 0.75rem; color: var(--text-muted); }
+        .team-member .status {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+        .status-online { background: var(--success); box-shadow: 0 0 0 3px #ECFDF5; }
+        .status-offline { background: var(--text-muted); box-shadow: 0 0 0 3px #F3F4F6; }
+        .status-busy { background: var(--danger); box-shadow: 0 0 0 3px #FEF2F2; }
+
+        /* Leave Request Cards */
+        .leave-card {
+            border: 1px solid var(--border); border-radius: 10px; padding: 1rem;
+            background: #fff; margin-bottom: 0.75rem; transition: all 0.2s;
+        }
+        .leave-card:hover { box-shadow: var(--shadow); }
+        .leave-card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;
+        }
+        .leave-card .name { font-weight: 600; }
+        .leave-card .dates { font-size: 0.8rem; color: var(--text-muted); }
+        .leave-card .reason { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .leave-card-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 200; align-items: center; justify-content: center;
+            padding: 1rem;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #fff; border-radius: 16px; width: 100%; max-width: 500px;
+            max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1.25rem; border-bottom: 1px solid var(--border);
+        }
+        .modal-title { font-size: 1.1rem; font-weight: 700; }
+        .modal-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); }
+        .modal-body { padding: 1.25rem; }
+        .modal-footer {
+            display: flex; justify-content: flex-end; gap: 0.5rem;
+            padding: 1rem 1.25rem; border-top: 1px solid var(--border);
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed; top: 1rem; left: 1rem; z-index: 300;
+            display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .toast {
+            background: #1E293B; color: #fff; padding: 0.75rem 1rem;
+            border-radius: 8px; font-size: 0.85rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: toastIn 0.3s ease;
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-bar { padding: 0.5rem 1rem; }
+            .top-bar-brand h1 { font-size: 0.85rem; }
+            .container { padding: 1rem; }
+            .schedule-grid { grid-template-columns: 80px repeat(7, 1fr); font-size: 0.65rem; }
+            .schedule-grid .cell { padding: 0.3rem; min-height: 45px; }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center; padding: 3rem 1rem; color: var(--text-muted);
+        }
+        .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        .empty-state h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--text); }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* Loading */
+        .loading-spinner {
+            display: inline-block; width: 20px; height: 20px;
+            border: 2px solid var(--border); border-top-color: var(--primary);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Top Bar -->
+    <nav class="top-bar">
+        <div class="top-bar-brand">
+            <div class="logo-icon"><i class="fas fa-ambulance"></i></div>
+            <div>
+                <h1>مخطط المناوبات</h1>
+                <span>منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
+            </div>
+        </div>
+        <div class="top-bar-actions">
+            <button class="btn btn-outline" onclick="window.location.href='smart-schedule.html'">
+                <i class="fas fa-calendar-alt"></i>
+                <span>نظام الجداول</span>
+            </button>
+            <button class="btn btn-outline" onclick="window.location.href='index.html'">
+                <i class="fas fa-home"></i>
+                <span>الرئيسية</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h2>🗓️ مخطط المناوبات</h2>
+                <p>إدارة فِرق الإسعاف، طلبات الإجازات، وتوليد الجداول التلقائية</p>
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-success" onclick="openModal('generateScheduleModal')">
+                    <i class="fas fa-magic"></i> توليد جدول تلقائي
+                </button>
+                <button class="btn btn-primary" onclick="openModal('addMemberModal')">
+                    <i class="fas fa-plus"></i> إضافة عضو
+                </button>
+                <button class="btn btn-outline" onclick="document.getElementById('excelImport').click()">
+                    <i class="fas fa-file-excel"></i> استيراد Excel
+                </button>
+                <input type="file" id="excelImport" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="icon blue"><i class="fas fa-users"></i></div>
+                <div class="value" id="statTotalMembers">0</div>
+                <div class="label">إجمالي الفرق</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon green"><i class="fas fa-user-check"></i></div>
+                <div class="value" id="statAvailable">0</div>
+                <div class="label">متاحين الآن</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon orange"><i class="fas fa-calendar-times"></i></div>
+                <div class="value" id="statOnLeave">0</div>
+                <div class="label">في إجازة</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon red"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="value" id="statPendingRequests">0</div>
+                <div class="label">طلبات معلقة</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('scheduleTab', this)">الجدول الأسبوعي</button>
+            <button class="tab" onclick="switchTab('teamTab', this)">حالة الفرق</button>
+            <button class="tab" onclick="switchTab('leaveTab', this)">طلبات الإجازة</button>
+            <button class="tab" onclick="switchTab('settingsTab', this)">الإعدادات</button>
+        </div>
+
+        <!-- Schedule Tab -->
+        <div class="panel active" id="scheduleTab">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">الجدول الأسبوعي</div>
+                        <div class="card-subtitle">اضغط على خلية لتعديل المناوبة</div>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button class="btn btn-sm btn-outline" onclick="prevWeek()">← الأسبوع السابق</button>
+                        <button class="btn btn-sm btn-outline" onclick="currentWeek()">الأسبوع الحالي</button>
+                        <button class="btn btn-sm btn-outline" onclick="nextWeek()">الأسبوع التالي →</button>
+                    </div>
+                </div>
+                <div id="weeklySchedule"></div>
+            </div>
+        </div>
+
+        <!-- Team Tab -->
+        <div class="panel" id="teamTab">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">حالة فِرق الإسعاف</div>
+                        <div class="card-subtitle">الحالة الفورية لجميع أعضاء الفريق</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="refreshTeamStatus()">
+                        <i class="fas fa-sync-alt"></i> تحديث
+                    </button>
+                </div>
+                <div class="team-list" id="teamList"></div>
+            </div>
+        </div>
+
+        <!-- Leave Tab -->
+        <div class="panel" id="leaveTab">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">طلبات الإجازة</div>
+                        <div class="card-subtitle">إدارة طلبات الإجازات والموافقة عليها</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="openModal('addLeaveModal')">
+                        <i class="fas fa-plus"></i> طلب إجازة جديد
+                    </button>
+                </div>
+                <div id="leaveRequestsList"></div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="panel" id="settingsTab">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">إعدادات المناوبات</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">ساعات المناوبة الصباحية</label>
+                        <input type="text" class="form-input" id="morningHours" value="07:00 - 15:00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ساعات المناوبة المسائية</label>
+                        <input type="text" class="form-input" id="eveningHours" value="15:00 - 23:00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ساعات المناوبة الليلية</label>
+                        <input type="text" class="form-input" id="nightHours" value="23:00 - 07:00">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">الحد الأقصى للإجازات الشهرية</label>
+                        <input type="number" class="form-input" id="maxLeaves" value="2">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">الحد الأدنى من الفرق لكل مناوبة</label>
+                        <input type="number" class="form-input" id="minPerShift" value="3">
+                    </div>
+                </div>
+                <div style="margin-top:1rem;">
+                    <button class="btn btn-success" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> حفظ الإعدادات
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div class="modal-overlay" id="addMemberModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">إضافة عضو جديد</div>
+                <button class="modal-close" onclick="closeModal('addMemberModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">الاسم الكامل</label>
+                    <input type="text" class="form-input" id="memberName" placeholder="مثال: أحمد محمد">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">الرتبة / الدور</label>
+                        <select class="form-select" id="memberRole">
+                            <option value="paramedic">مسعف</option>
+                            <option value="driver">سائق</option>
+                            <option value="nurse">ممرض</option>
+                            <option value="supervisor">مشرف</option>
+                            <option value="doctor">طبيب</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">رقم الهاتف</label>
+                        <input type="tel" class="form-input" id="memberPhone" placeholder="05xxxxxxxx">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">المركز / الموقع</label>
+                    <input type="text" class="form-input" id="memberCenter" placeholder="مثال: مركز اليرموك">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('addMemberModal')">إلغاء</button>
+                <button class="btn btn-success" onclick="addMember()">إضافة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Leave Modal -->
+    <div class="modal-overlay" id="addLeaveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">طلب إجازة جديد</div>
+                <button class="modal-close" onclick="closeModal('addLeaveModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">العضو</label>
+                    <select class="form-select" id="leaveMember"></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">من تاريخ</label>
+                        <input type="date" class="form-input" id="leaveFrom">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">إلى تاريخ</label>
+                        <input type="date" class="form-input" id="leaveTo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">نوع الإجازة</label>
+                    <select class="form-select" id="leaveType">
+                        <option value="annual">سنوية</option>
+                        <option value="sick">مرضية</option>
+                        <option value="emergency">طارئة</option>
+                        <option value="other">أخرى</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">السبب / الملاحظات</label>
+                    <textarea class="form-textarea" id="leaveReason" placeholder="اكتب سبب الإجازة..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('addLeaveModal')">إلغاء</button>
+                <button class="btn btn-success" onclick="submitLeaveRequest()">تقديم الطلب</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate Schedule Modal -->
+    <div class="modal-overlay" id="generateScheduleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">توليد جدول تلقائي</div>
+                <button class="modal-close" onclick="closeModal('generateScheduleModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:1rem;color:var(--text-muted);">
+                    سيقوم النظام بتوزيع الفرق تلقائياً بناءً على:
+                </p>
+                <ul style="margin-bottom:1rem;padding-right:1.5rem;color:var(--text-muted);font-size:0.85rem;">
+                    <li>الأعضاء المتاحين (غير في إجازة)</li>
+                    <li>توازن عدد ساعات العمل</li>
+                    <li>تجنب تكرار نفس الفريق في مناوبتين متتاليتين</li>
+                </ul>
+                <div class="form-group">
+                    <label class="form-label">الأسبوع المستهدف</label>
+                    <input type="week" class="form-input" id="targetWeek">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="respectLeaveRequests" checked>
+                        احترم طلبات الإجازة المعتمدة
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('generateScheduleModal')">إلغاء</button>
+                <button class="btn btn-success" onclick="generateAutoSchedule()">
+                    <i class="fas fa-magic"></i> توليد الجدول
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ============================================
+    // البيانات
+    // ============================================
+    var teamMembers = JSON.parse(localStorage.getItem('teamMembers') || '[]');
+    var leaveRequests = JSON.parse(localStorage.getItem('leaveRequests') || '[]');
+    var scheduleData = JSON.parse(localStorage.getItem('scheduleData') || '{}');
+    var settings = JSON.parse(localStorage.getItem('shiftSettings') || '{"morning":"07:00 - 15:00","evening":"15:00 - 23:00","night":"23:00 - 07:00","maxLeaves":2,"minPerShift":3}');
+    var currentWeekOffset = 0;
+
+    // ============================================
+    // الأيام
+    // ============================================
+    var days = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    var shifts = [
+        { key: 'morning', label: 'صباحية', class: 'shift-morning' },
+        { key: 'evening', label: 'مسائية', class: 'shift-evening' },
+        { key: 'night', label: 'ليلية', class: 'shift-night' }
+    ];
+
+    // ============================================
+    // التهيئة
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        if (teamMembers.length === 0) seedDemoData();
+        renderSchedule();
+        renderTeamList();
+        renderLeaveRequests();
+        updateStats();
+        populateLeaveMembers();
+        loadSettings();
+    });
+
+    function seedDemoData() {
+        teamMembers = [
+            { id: '1', name: 'أحمد محمد', role: 'paramedic', phone: '0551234567', center: 'مركز اليرموك', status: 'online' },
+            { id: '2', name: 'خالد عبدالله', role: 'driver', phone: '0552345678', center: 'مركز السلام', status: 'online' },
+            { id: '3', name: 'سعد Ibrahim', role: 'nurse', phone: '0553456789', center: 'مركز اليرموك', status: 'busy' },
+            { id: '4', name: 'ناصر فهد', role: 'supervisor', phone: '0554567890', center: 'مركز الفيصلية', status: 'online' },
+            { id: '5', name: 'عبدالرحمن سالم', role: 'paramedic', phone: '0555678901', center: 'مركز السلام', status: 'offline' },
+            { id: '6', name: 'فهد محمد', role: 'driver', phone: '0556789012', center: 'مركز اليرموك', status: 'online' },
+            { id: '7', name: 'محمد علي', role: 'doctor', phone: '0557890123', center: 'مركز الفيصلية', status: 'online' },
+            { id: '8', name: 'يوسف أحمد', role: 'paramedic', phone: '0558901234', center: 'مركز السلام', status: 'offline' }
+        ];
+        saveTeamMembers();
+    }
+
+    // ============================================
+    // التبويبات
+    // ============================================
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // ============================================
+    // الإشعارات
+    // ============================================
+    function showToast(message, type) {
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + (type || '');
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3000);
+    }
+
+    // ============================================
+    // النوافذ المنبثقة
+    // ============================================
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+    }
+    document.querySelectorAll('.modal-overlay').forEach(function(m) {
+        m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+    });
+
+    // ============================================
+    // الإحصائيات
+    // ============================================
+    function updateStats() {
+        var total = teamMembers.length;
+        var available = teamMembers.filter(function(m) { return m.status === 'online'; }).length;
+        var onLeave = leaveRequests.filter(function(l) { return l.status === 'approved' && isCurrentlyOnLeave(l); }).length;
+        var pending = leaveRequests.filter(function(l) { return l.status === 'pending'; }).length;
+
+        document.getElementById('statTotalMembers').textContent = total;
+        document.getElementById('statAvailable').textContent = available;
+        document.getElementById('statOnLeave').textContent = onLeave;
+        document.getElementById('statPendingRequests').textContent = pending;
+    }
+
+    function isCurrentlyOnLeave(leave) {
+        var now = new Date();
+        var from = new Date(leave.from);
+        var to = new Date(leave.to);
+        return now >= from && now <= to;
+    }
+
+    // ============================================
+    // الجدول الأسبوعي
+    // ============================================
+    function renderSchedule() {
+        var container = document.getElementById('weeklySchedule');
+        var weekStart = getWeekStart(currentWeekOffset);
+        var html = '<div class="schedule-grid">';
+
+        // Header row
+        html += '<div class="cell header">المناوبة</div>';
+        for (var i = 0; i < 7; i++) {
+            var d = new Date(weekStart); d.setDate(d.getDate() + i);
+            html += '<div class="cell header">' + days[i] + '<br><small>' + formatDate(d) + '</small></div>';
+        }
+
+        // Shift rows
+        shifts.forEach(function(shift) {
+            html += '<div class="cell time-label">' + shift.label + '</div>';
+            for (var i = 0; i < 7; i++) {
+                var d = new Date(weekStart); d.setDate(d.getDate() + i);
+                var dateKey = d.toISOString().split('T')[0];
+                var cellData = (scheduleData[dateKey] && scheduleData[dateKey][shift.key]) || [];
+                var cellClass = cellData.length ? shift.class : 'shift-off';
+                var cellText = cellData.length ? cellData.join(', ') : '—';
+                html += '<div class="cell ' + cellClass + '" onclick="editCell(\'' + dateKey + '\', \'' + shift.key + '\')">' + cellText + '</div>';
+            }
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function getWeekStart(offset) {
+        var now = new Date();
+        var day = now.getDay();
+        var diff = now.getDate() - day + (offset * 7);
+        var d = new Date(now.setDate(diff));
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }
+
+    function formatDate(d) {
+        return d.getDate() + '/' + (d.getMonth() + 1);
+    }
+
+    function prevWeek() { currentWeekOffset--; renderSchedule(); }
+    function nextWeek() { currentWeekOffset++; renderSchedule(); }
+    function currentWeek() { currentWeekOffset = 0; renderSchedule(); }
+
+    function editCell(dateKey, shiftKey) {
+        var available = teamMembers.filter(function(m) {
+            return !leaveRequests.some(function(l) {
+                return l.memberId === m.id && l.status === 'approved' && isDateInRange(dateKey, l.from, l.to);
+            });
+        });
+        if (available.length === 0) { showToast('لا يوجد أعضاء متاحين لهذا اليوم', 'error'); return; }
+        var names = available.map(function(m) { return m.name; }).join('\n');
+        var selected = prompt('اختر الأعضاء (افصل بينهم بفاصلة):\n\nمتاحون:\n' + names);
+        if (selected === null) return;
+        var selectedNames = selected.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+        if (!scheduleData[dateKey]) scheduleData[dateKey] = {};
+        scheduleData[dateKey][shiftKey] = selectedNames;
+        saveSchedule();
+        renderSchedule();
+        showToast('تم تحديث الجدول', 'success');
+    }
+
+    function isDateInRange(dateStr, from, to) {
+        var d = new Date(dateStr);
+        var f = new Date(from);
+        var t = new Date(to);
+        return d >= f && d <= t;
+    }
+
+    // ============================================
+    // فِرق الإسعاف
+    // ============================================
+    function renderTeamList() {
+        var container = document.getElementById('teamList');
+        if (teamMembers.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد أعضاء</h3><p>أضف أعضاء الفريق لبدء العمل</p></div>';
+            return;
+        }
+        var html = '';
+        teamMembers.forEach(function(m) {
+            var statusClass = m.status === 'online' ? 'status-online' : m.status === 'busy' ? 'status-busy' : 'status-offline';
+            var roleLabels = { paramedic: 'مسعف', driver: 'سائق', nurse: 'ممرض', supervisor: 'مشرف', doctor: 'طبيب' };
+            html +=
+                '<div class="team-member">' +
+                    '<div class="avatar">' + m.name.charAt(0) + '</div>' +
+                    '<div class="info">' +
+                        '<div class="name">' + m.name + '</div>' +
+                        '<div class="role">' + (roleLabels[m.role] || m.role) + ' • ' + m.center + ' • ' + m.phone + '</div>' +
+                    '</div>' +
+                    '<div class="status ' + statusClass + '"></div>' +
+                    '<button class="btn btn-sm btn-outline" onclick="toggleMemberStatus(\'' + m.id + '\')">تغيير الحالة</button>' +
+                '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    function toggleMemberStatus(id) {
+        var m = teamMembers.find(function(x) { return x.id === id; });
+        if (!m) return;
+        var statuses = ['online', 'busy', 'offline'];
+        var idx = statuses.indexOf(m.status);
+        m.status = statuses[(idx + 1) % statuses.length];
+        saveTeamMembers();
+        renderTeamList();
+        updateStats();
+    }
+
+    function refreshTeamStatus() {
+        renderTeamList();
+        showToast('تم تحديث الحالة', 'success');
+    }
+
+    // ============================================
+    // طلبات الإجازة
+    // ============================================
+    function renderLeaveRequests() {
+        var container = document.getElementById('leaveRequestsList');
+        if (leaveRequests.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-calendar-check"></i><h3>لا توجد طلبات إجازة</h3></div>';
+            return;
+        }
+        var html = '';
+        leaveRequests.slice().reverse().forEach(function(l) {
+            var member = teamMembers.find(function(m) { return m.id === l.memberId; });
+            var name = member ? member.name : '—';
+            var statusBadge = l.status === 'approved' ? 'badge-success' : l.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+            var statusText = l.status === 'approved' ? 'معتمد' : l.status === 'rejected' ? 'مرفوض' : 'معلق';
+            var typeText = { annual: 'سنوية', sick: 'مرضية', emergency: 'طارئة', other: 'أخرى' }[l.type] || l.type;
+            html +=
+                '<div class="leave-card">' +
+                    '<div class="leave-card-header">' +
+                        '<div><span class="name">' + name + '</span> <span class="badge ' + statusBadge + '">' + statusText + '</span></div>' +
+                        '<span class="dates">' + l.from + ' → ' + l.to + '</span>' +
+                    '</div>' +
+                    '<div class="reason">نوع: ' + typeText + ' | ' + (l.reason || 'لا يوجد سبب') + '</div>' +
+                    (l.status === 'pending' ?
+                        '<div class="leave-card-actions">' +
+                            '<button class="btn btn-sm btn-success" onclick="approveLeave(\'' + l.id + '\')">موافقة</button>' +
+                            '<button class="btn btn-sm btn-danger" onclick="rejectLeave(\'' + l.id + '\')">رفض</button>' +
+                        '</div>' : '') +
+                '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    function populateLeaveMembers() {
+        var select = document.getElementById('leaveMember');
+        select.innerHTML = teamMembers.map(function(m) {
+            return '<option value="' + m.id + '">' + m.name + '</option>';
+        }).join('');
+    }
+
+    function submitLeaveRequest() {
+        var memberId = document.getElementById('leaveMember').value;
+        var from = document.getElementById('leaveFrom').value;
+        var to = document.getElementById('leaveTo').value;
+        var type = document.getElementById('leaveType').value;
+        var reason = document.getElementById('leaveReason').value;
+        if (!from || !to) { showToast('الرجاء تحديد التواريخ', 'error'); return; }
+        if (new Date(from) > new Date(to)) { showToast('تاريخ البداية يجب أن يكون قبل النهاية', 'error'); return; }
+
+        leaveRequests.push({
+            id: Date.now().toString(), memberId: memberId, from: from, to: to,
+            type: type, reason: reason, status: 'pending'
+        });
+        saveLeaveRequests();
+        renderLeaveRequests();
+        updateStats();
+        populateLeaveMembers();
+        closeModal('addLeaveModal');
+        showToast('تم تقديم طلب الإجازة', 'success');
+    }
+
+    function approveLeave(id) {
+        var l = leaveRequests.find(function(x) { return x.id === id; });
+        if (l) { l.status = 'approved'; saveLeaveRequests(); renderLeaveRequests(); updateStats(); showToast('تمت الموافقة على الإجازة', 'success'); }
+    }
+
+    function rejectLeave(id) {
+        var l = leaveRequests.find(function(x) { return x.id === id; });
+        if (l) { l.status = 'rejected'; saveLeaveRequests(); renderLeaveRequests(); updateStats(); showToast('تم رفض الإجازة', 'error'); }
+    }
+
+    // ============================================
+    // إضافة عضو
+    // ============================================
+    function addMember() {
+        var name = document.getElementById('memberName').value.trim();
+        var role = document.getElementById('memberRole').value;
+        var phone = document.getElementById('memberPhone').value.trim();
+        var center = document.getElementById('memberCenter').value.trim();
+        if (!name) { showToast('الرجاء إدخال الاسم', 'error'); return; }
+
+        teamMembers.push({
+            id: Date.now().toString(), name: name, role: role, phone: phone,
+            center: center || '—', status: 'online'
+        });
+        saveTeamMembers();
+        renderTeamList();
+        updateStats();
+        populateLeaveMembers();
+        closeModal('addMemberModal');
+        showToast('تم إضافة العضو بنجاح', 'success');
+        document.getElementById('memberName').value = '';
+        document.getElementById('memberPhone').value = '';
+        document.getElementById('memberCenter').value = '';
+    }
+
+    // ============================================
+    // توليد جدول تلقائي
+    // ============================================
+    function generateAutoSchedule() {
+        var weekInput = document.getElementById('targetWeek').value;
+        var respectLeave = document.getElementById('respectLeaveRequests').checked;
+        var weekStart = weekInput ? getWeekStartFromInput(weekInput) : getWeekStart(currentWeekOffset);
+
+        for (var i = 0; i < 7; i++) {
+            var d = new Date(weekStart); d.setDate(d.getDate() + i);
+            var dateKey = d.toISOString().split('T')[0];
+            if (!scheduleData[dateKey]) scheduleData[dateKey] = {};
+
+            shifts.forEach(function(shift) {
+                var available = teamMembers.filter(function(m) {
+                    if (respectLeave) {
+                        var onLeave = leaveRequests.some(function(l) {
+                            return l.memberId === m.id && l.status === 'approved' && isDateInRange(dateKey, l.from, l.to);
+                        });
+                        if (onLeave) return false;
+                    }
+                    return true;
+                });
+                // Pick random members for this shift
+                var count = Math.min(settings.minPerShift || 3, available.length);
+                var shuffled = available.sort(function() { return Math.random() - 0.5; });
+                scheduleData[dateKey][shift.key] = shuffled.slice(0, count).map(function(m) { return m.name; });
+            });
+        }
+
+        saveSchedule();
+        renderSchedule();
+        closeModal('generateScheduleModal');
+        showToast('تم توليد الجدول بنجاح', 'success');
+    }
+
+    function getWeekStartFromInput(weekValue) {
+        var parts = weekValue.split('-W');
+        var year = parseInt(parts[0]);
+        var week = parseInt(parts[1]);
+        var d = new Date(year, 0, 1);
+        var day = d.getDay();
+        var diff = d.getDate() - day + (week - 1) * 7;
+        d.setDate(diff);
+        return d;
+    }
+
+    // ============================================
+    // إعدادات
+    // ============================================
+    function loadSettings() {
+        document.getElementById('morningHours').value = settings.morning || '07:00 - 15:00';
+        document.getElementById('eveningHours').value = settings.evening || '15:00 - 23:00';
+        document.getElementById('nightHours').value = settings.night || '23:00 - 07:00';
+        document.getElementById('maxLeaves').value = settings.maxLeaves || 2;
+        document.getElementById('minPerShift').value = settings.minPerShift || 3;
+    }
+
+    function saveSettings() {
+        settings = {
+            morning: document.getElementById('morningHours').value,
+            evening: document.getElementById('eveningHours').value,
+            night: document.getElementById('nightHours').value,
+            maxLeaves: parseInt(document.getElementById('maxLeaves').value) || 2,
+            minPerShift: parseInt(document.getElementById('minPerShift').value) || 3
+        };
+        localStorage.setItem('shiftSettings', JSON.stringify(settings));
+        showToast('تم حفظ الإعدادات', 'success');
+    }
+
+    // ============================================
+    // استيراد Excel
+    // ============================================
+    function handleExcelImport(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+                var sheet = workbook.Sheets[workbook.SheetNames[0]];
+                var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                var imported = 0;
+                for (var i = 1; i < json.length; i++) {
+                    var row = json[i];
+                    if (!row[0]) continue;
+                    teamMembers.push({
+                        id: Date.now().toString() + '_' + i,
+                        name: row[0],
+                        role: row[1] || 'paramedic',
+                        phone: row[2] || '',
+                        center: row[3] || '—',
+                        status: 'online'
+                    });
+                    imported++;
+                }
+                saveTeamMembers();
+                renderTeamList();
+                updateStats();
+                populateLeaveMembers();
+                showToast('تم استيراد ' + imported + ' عضو من Excel', 'success');
+            } catch (err) {
+                showToast('خطأ في قراءة الملف: ' + err.message, 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        event.target.value = '';
+    }
+
+    // ============================================
+    // حفظ البيانات
+    // ============================================
+    function saveTeamMembers() { localStorage.setItem('teamMembers', JSON.stringify(teamMembers)); }
+    function saveLeaveRequests() { localStorage.setItem('leaveRequests', JSON.stringify(leaveRequests)); }
+    function saveSchedule() { localStorage.setItem('scheduleData', JSON.stringify(scheduleData)); }
+
+    // ============================================
+    // إتاحة الدوال للـ window
+    // ============================================
+    window.switchTab = switchTab;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.addMember = addMember;
+    window.submitLeaveRequest = submitLeaveRequest;
+    window.approveLeave = approveLeave;
+    window.rejectLeave = rejectLeave;
+    window.generateAutoSchedule = generateAutoSchedule;
+    window.saveSettings = saveSettings;
+    window.prevWeek = prevWeek;
+    window.nextWeek = nextWeek;
+    window.currentWeek = currentWeek;
+    window.editCell = editCell;
+    window.toggleMemberStatus = toggleMemberStatus;
+    window.refreshTeamStatus = refreshTeamStatus;
+    window.handleExcelImport = handleExcelImport;
+    </script>
+</body>
+</html>

@@ -552,7 +552,7 @@ function removeHeaderBg() {
         var video = header.querySelector('.header-bg-video');
         if (video) video.remove();
     }
-    document.getElementById('headerBgPreview').style.display = 'none';
+    var el_headerBgPreview_d1 = document.getElementById('headerBgPreview'); if (el_headerBgPreview_d1) el_headerBgPreview_d1.style.display = 'none';
     alert('✅ تم إزالة خلفية الشريط');
 }
 
@@ -611,7 +611,7 @@ async function removeSectorLogo() {
     // حذف من localStorage
     localStorage.removeItem('sectorLogo');
     applySectorLogo(null);
-    document.getElementById('sectorLogoPreview').style.display = 'none';
+    var el_sectorLogoPreview_d2 = document.getElementById('sectorLogoPreview'); if (el_sectorLogoPreview_d2) el_sectorLogoPreview_d2.style.display = 'none';
     alert('✅ تم إزالة شعار القطاع');
 }
 
@@ -623,7 +623,7 @@ async function removeSectorLogo() {
 // ============================================
 
 var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)el_analyticsBtn.addEventListener('click', function() {
-    document.getElementById('analyticsModal').style.display = 'flex';
+    var el_analyticsModal_d3 = document.getElementById('analyticsModal'); if (el_analyticsModal_d3) el_analyticsModal_d3.style.display = 'flex';
     renderAnalyticsDashboard();
 });
 
@@ -739,7 +739,7 @@ var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
-    document.getElementById('auditLogModal').style.display = 'flex';
+    var el_auditLogModal_d4 = document.getElementById('auditLogModal'); if (el_auditLogModal_d4) el_auditLogModal_d4.style.display = 'flex';
     renderAuditLog();
 });
 
@@ -891,12 +891,12 @@ function showMainAlert(title, message) {
 }
 
 function dismissAlert() {
-    document.getElementById('alertBar').style.display = 'none';
+    var el_alertBar_d5 = document.getElementById('alertBar'); if (el_alertBar_d5) el_alertBar_d5.style.display = 'none';
     localStorage.setItem('alertDismissed', 'true');
 }
 
 function goToPeakTime() {
-    document.getElementById('alertBar').style.display = 'none';
+    var el_alertBar_d6 = document.getElementById('alertBar'); if (el_alertBar_d6) el_alertBar_d6.style.display = 'none';
     openPeakTimeModal();
 }
 
@@ -944,12 +944,12 @@ function showPeakAlert(alertData) {
     currentPeakAlert = alertData;
     currentPeakAlertId = alertData.id;
 
-    document.getElementById('peakAlertUnit').innerText = alertData.unit || '-';
-    document.getElementById('peakAlertLocation').innerText = alertData.location || '-';
-    document.getElementById('peakAlertStart').innerText = alertData.startTime || '-';
-    document.getElementById('peakAlertEnd').innerText = alertData.endTime || '-';
-    document.getElementById('peakAlertNotes').innerText = alertData.notes || '\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0644\u0627\u062D\u0638\u0627\u062A';
-    document.getElementById('peakAlertTime').innerText = '\uD83D\uDD52 ' + getSaudiDateTime();
+    var el_peakAlertUnit = document.getElementById('peakAlertUnit'); if (el_peakAlertUnit) el_peakAlertUnit.innerText = alertData.unit || '-';
+    var el_peakAlertLocation = document.getElementById('peakAlertLocation'); if (el_peakAlertLocation) el_peakAlertLocation.innerText = alertData.location || '-';
+    var el_peakAlertStart = document.getElementById('peakAlertStart'); if (el_peakAlertStart) el_peakAlertStart.innerText = alertData.startTime || '-';
+    var el_peakAlertEnd = document.getElementById('peakAlertEnd'); if (el_peakAlertEnd) el_peakAlertEnd.innerText = alertData.endTime || '-';
+    var el_peakAlertNotes = document.getElementById('peakAlertNotes'); if (el_peakAlertNotes) el_peakAlertNotes.innerText = alertData.notes || '\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0644\u0627\u062D\u0638\u0627\u062A';
+    var el_peakAlertTime = document.getElementById('peakAlertTime'); if (el_peakAlertTime) el_peakAlertTime.innerText = '\uD83D\uDD52 ' + getSaudiDateTime();
 
     // Priority badge
     var priority = alertData.priority || '\u0639\u0627\u0644\u064A\u0629';
@@ -961,12 +961,12 @@ function showPeakAlert(alertData) {
     } else {
         badgeHTML = '<span class="priority-badge priority-low">\uD83D\uDD35 \u0639\u0627\u062F\u064A - \u062A\u0645\u0631\u0643\u0632 \u0631\u0648\u062A\u064A\u0646\u064A</span>';
     }
-    document.getElementById('peakAlertPriorityBadge').innerHTML = badgeHTML;
+    var el_peakAlertPriorityBadge_h1 = document.getElementById('peakAlertPriorityBadge'); if (el_peakAlertPriorityBadge_h1) el_peakAlertPriorityBadge_h1.innerHTML = badgeHTML;
 
     // Hide rating initially
-    document.getElementById('peakRatingSection').style.display = 'none';
+    var el_peakRatingSection_d7 = document.getElementById('peakRatingSection'); if (el_peakRatingSection_d7) el_peakRatingSection_d7.style.display = 'none';
 
-    document.getElementById('peakAlertModal').style.display = 'flex';
+    var el_peakAlertModal_d8 = document.getElementById('peakAlertModal'); if (el_peakAlertModal_d8) el_peakAlertModal_d8.style.display = 'flex';
 
     // Play alert sound and flash screen
     playPeakSound('alert');
@@ -1038,7 +1038,7 @@ function initPeakAlertMap(alertData) {
 }
 
 function closePeakAlert() {
-    document.getElementById('peakAlertModal').style.display = 'none';
+    var el_peakAlertModal_d9 = document.getElementById('peakAlertModal'); if (el_peakAlertModal_d9) el_peakAlertModal_d9.style.display = 'none';
     if (peakCountdownInterval) {
         clearInterval(peakCountdownInterval);
         peakCountdownInterval = null;
@@ -1082,12 +1082,12 @@ var peakMap = null;
 
 
 function openPeakMap() {
-    document.getElementById('peakMapModal').style.display = 'flex';
+    var el_peakMapModal_d10 = document.getElementById('peakMapModal'); if (el_peakMapModal_d10) el_peakMapModal_d10.style.display = 'flex';
     setTimeout(initPeakMap, 500);
 }
 
 function closePeakMap() {
-    document.getElementById('peakMapModal').style.display = 'none';
+    var el_peakMapModal_d11 = document.getElementById('peakMapModal'); if (el_peakMapModal_d11) el_peakMapModal_d11.style.display = 'none';
     if (peakMap) peakMap.invalidateSize();
 }
 
@@ -1105,7 +1105,7 @@ function initPeakMap() {
             var lng = e.latlng.lng;
             if (marker) peakMap.removeLayer(marker);
             marker = L.marker([lat, lng]).addTo(peakMap);
-            document.getElementById('peakSelectedLocation').innerHTML = '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
+            var el_peakSelectedLocation_h2 = document.getElementById('peakSelectedLocation'); if (el_peakSelectedLocation_h2) el_peakSelectedLocation_h2.innerHTML = '<strong>' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</strong>';
             selectedPeakLocation = { lat: lat, lng: lng };
         });
         setTimeout(function() { peakMap.invalidateSize(); }, 300);
@@ -1116,9 +1116,9 @@ function confirmPeakLocation() {
     if (!selectedPeakLocation) { alert('⚠️ الرجاء تحديد موقع على الخريطة'); return; }
     var lat = selectedPeakLocation.lat;
     var lng = selectedPeakLocation.lng;
-    document.getElementById('peakLocation').value = lat.toFixed(6) + ', ' + lng.toFixed(6);
-    document.getElementById('peakLat').value = lat;
-    document.getElementById('peakLng').value = lng;
+    var el_peakLocation_v1 = document.getElementById('peakLocation'); if (el_peakLocation_v1) el_peakLocation_v1.value = lat.toFixed(6) + ', ' + lng.toFixed(6);
+    var el_peakLat_v2 = document.getElementById('peakLat'); if (el_peakLat_v2) el_peakLat_v2.value = lat;
+    var el_peakLng_v3 = document.getElementById('peakLng'); if (el_peakLng_v3) el_peakLng_v3.value = lng;
     closePeakMap();
     alert('✅ تم تحديد الموقع بنجاح');
 }
@@ -1197,7 +1197,7 @@ function ratePeakResponse(rating) {
     localStorage.setItem('peakRatings', JSON.stringify(ratings));
 
     // Hide rating section
-    document.getElementById('peakRatingSection').style.display = 'none';
+    var el_peakRatingSection_d12 = document.getElementById('peakRatingSection'); if (el_peakRatingSection_d12) el_peakRatingSection_d12.style.display = 'none';
 
     var messages = {
         5: '\u2705 \u0645\u0645\u062A\u0627\u0632! \u0648\u0635\u0644 \u0641\u064A \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062D\u062F\u062F +10 \u0646\u0642\u0627\u0637',
@@ -1417,9 +1417,9 @@ var mapMarkers = [];
 
 function openMapPreview(unit, location) {
     var modal = document.getElementById('mapModal');
-    document.getElementById('mapModalTitle').innerText = '📍 معاينة موقع ' + unit;
-    document.getElementById('mapLocationText').innerText = '📍 الموقع: ' + location;
-    document.getElementById('nearestUnitResult').innerHTML = '';
+    var el_mapModalTitle = document.getElementById('mapModalTitle'); if (el_mapModalTitle) el_mapModalTitle.innerText = '📍 معاينة موقع ' + unit;
+    var el_mapLocationText = document.getElementById('mapLocationText'); if (el_mapLocationText) el_mapLocationText.innerText = '📍 الموقع: ' + location;
+    var el_nearestUnitResult_h3 = document.getElementById('nearestUnitResult'); if (el_nearestUnitResult_h3) el_nearestUnitResult_h3.innerHTML = '';
     modal.style.display = 'flex';
 
     setTimeout(function() {
@@ -1474,9 +1474,9 @@ function initLeafletMap(focusUnit) {
 }
 
 function closeMapPreview() {
-    document.getElementById('mapModal').style.display = 'none';
+    var el_mapModal_d13 = document.getElementById('mapModal'); if (el_mapModal_d13) el_mapModal_d13.style.display = 'none';
     document.getElementById('mapFrame').src = '';
-    document.getElementById('nearestUnitResult').innerHTML = '';
+    var el_nearestUnitResult_h4 = document.getElementById('nearestUnitResult'); if (el_nearestUnitResult_h4) el_nearestUnitResult_h4.innerHTML = '';
 }
 
 // ============================================
@@ -1627,7 +1627,7 @@ function drawCoverageCircles() {
 // ربط أزرار التوزيع
 // ============================================
 var el_distributionBtn=document.getElementById("distributionBtn");if(el_distributionBtn)el_distributionBtn.addEventListener('click', function() {
-    document.getElementById('distributionModal').style.display = 'flex';
+    var el_distributionModal_d14 = document.getElementById('distributionModal'); if (el_distributionModal_d14) el_distributionModal_d14.style.display = 'flex';
     renderAdvancedDistribution();
 });
 
@@ -1697,7 +1697,7 @@ async function loadAllData() {
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
         
         // تحديث الإنجازات ولوحة الصدارة
-        if (document.getElementById('achievementsModal').style.display === 'flex') {
+        if (var el_achievementsModal_d15 = document.getElementById('achievementsModal'); if (el_achievementsModal_d15) el_achievementsModal_d15.style.display = == 'flex') {
             renderAchievements();
             renderLeaderboard();
         }
@@ -1709,7 +1709,8 @@ async function loadAllData() {
 function updateTotal() {
     var total = 0;
     for (var key in reports) { if (reports[key] && reports[key].count) total += reports[key].count; }
-    document.getElementById("grandTotal").innerText = total;
+    var grandTotalEl = document.getElementById("grandTotal");
+    if (grandTotalEl) grandTotalEl.innerText = total;
 }
 
 function updateShiftStatus() {
@@ -1767,7 +1768,7 @@ function updateShiftsHistoryWidget() {
 }
 
 function openShiftArchiveModal() {
-    document.getElementById('shiftArchiveModal').style.display = 'flex';
+    var el_shiftArchiveModal_d16 = document.getElementById('shiftArchiveModal'); if (el_shiftArchiveModal_d16) el_shiftArchiveModal_d16.style.display = 'flex';
     updateShiftsHistoryWidget();
 }
 
@@ -1777,7 +1778,7 @@ function viewSelectedArchiveShift() {
         alert('الرجاء اختيار مناوبة من القائمة');
         return;
     }
-    document.getElementById('shiftArchiveModal').style.display = 'none';
+    var el_shiftArchiveModal_d17 = document.getElementById('shiftArchiveModal'); if (el_shiftArchiveModal_d17) el_shiftArchiveModal_d17.style.display = 'none';
     selectShiftFromHistory(select.value);
 }
 
@@ -1831,7 +1832,7 @@ function selectShiftFromHistory(shiftId) {
                 updateDistributionIndicator();
                 
                 // Open shift modal with the selected shift data
-                document.getElementById('shiftModal').style.display = 'flex';
+                var el_shiftModal_d18 = document.getElementById('shiftModal'); if (el_shiftModal_d18) el_shiftModal_d18.style.display = 'flex';
                 loadShiftToForm(result.shift);
                 
                 // Refresh distribution if open
@@ -1913,12 +1914,12 @@ function calculateLiveReportStats() {
     }
     if (total === 0) { container.style.display = 'none'; return; }
     container.style.display = 'block';
-    document.getElementById('liveTotalReports').innerText = total;
+    var el_liveTotalReports = document.getElementById('liveTotalReports'); if (el_liveTotalReports) el_liveTotalReports.innerText = total;
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-    document.getElementById('liveTopUnit').innerText = topUnit;
-    document.getElementById('liveTopUnitCount').innerText = topCount;
+    var el_liveTopUnit = document.getElementById('liveTopUnit'); if (el_liveTopUnit) el_liveTopUnit.innerText = topUnit;
+    var el_liveTopUnitCount = document.getElementById('liveTopUnitCount'); if (el_liveTopUnitCount) el_liveTopUnitCount.innerText = topCount;
     var listContainer = document.getElementById('liveUnitList');
     listContainer.innerHTML = '';
     if (sortedUnits.length === 0) {
@@ -2062,29 +2063,29 @@ function updateWorkforceFromShiftData(shiftData) {
 function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
     animateValue('wfTotalStaff', totalStaff);
     animateValue('wfTotalCars', totalCars);
-    document.getElementById('wfReadiness').innerText = readiness + '%';
-    document.getElementById('wfMissingCenters').innerText = missingCenters;
+    var el_wfReadiness = document.getElementById('wfReadiness'); if (el_wfReadiness) el_wfReadiness.innerText = readiness + '%';
+    var el_wfMissingCenters = document.getElementById('wfMissingCenters'); if (el_wfMissingCenters) el_wfMissingCenters.innerText = missingCenters;
     
     var staffPct = Math.min((totalStaff / 30) * 100, 100);
     var carsPct = Math.min((totalCars / 20) * 100, 100);
     var missingPct = Math.min((missingCenters / 10) * 100, 100);
     
-    document.getElementById('wfStaffProgress').style.width = staffPct + '%';
-    document.getElementById('wfCarsProgress').style.width = carsPct + '%';
-    document.getElementById('wfReadinessProgress').style.width = readiness + '%';
-    document.getElementById('wfMissingProgress').style.width = missingPct + '%';
+    var el_wfStaffProgress = document.getElementById('wfStaffProgress'); if (el_wfStaffProgress) el_wfStaffProgress.style.width = staffPct + '%';
+    var el_wfCarsProgress = document.getElementById('wfCarsProgress'); if (el_wfCarsProgress) el_wfCarsProgress.style.width = carsPct + '%';
+    var el_wfReadinessProgress = document.getElementById('wfReadinessProgress'); if (el_wfReadinessProgress) el_wfReadinessProgress.style.width = readiness + '%';
+    var el_wfMissingProgress = document.getElementById('wfMissingProgress'); if (el_wfMissingProgress) el_wfMissingProgress.style.width = missingPct + '%';
     
-    document.getElementById('wfStaffProgressText').innerText = totalStaff + ' / 30 هدف';
-    document.getElementById('wfCarsProgressText').innerText = totalCars + ' / 20 هدف';
-    document.getElementById('wfReadinessProgressText').innerText = readiness + '% جاهز';
-    document.getElementById('wfMissingProgressText').innerText = missingCenters + ' / 10 مركز';
+    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = totalStaff + ' / 30 هدف';
+    var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = totalCars + ' / 20 هدف';
+    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = readiness + '% جاهز';
+    var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = missingCenters + ' / 10 مركز';
     
     updateTrend('wfStaffTrend', totalStaff, 20);
     updateTrend('wfCarsTrend', totalCars, 15);
     updateTrend('wfReadinessTrend', readiness, 70);
     updateTrend('wfMissingTrend', missingCenters, 3);
     
-    document.getElementById('wfLastUpdate').innerText = getSaudiTime();
+    var el_wfLastUpdate = document.getElementById('wfLastUpdate'); if (el_wfLastUpdate) el_wfLastUpdate.innerText = getSaudiTime();
 }
 
 function animateValue(elementId, value) {
@@ -2146,7 +2147,7 @@ function updateDistributionIndicator() {
             }
         }
     }
-    document.getElementById('distTotal').innerText = total + ' بلاغ';
+    var el_distTotal = document.getElementById('distTotal'); if (el_distTotal) el_distTotal.innerText = total + ' بلاغ';
     var sorted = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     if (sorted.length === 0) {
         container.innerHTML = '<div class="distribution-empty"><i class="fas fa-inbox"></i><span>لا توجد بلاغات مسجلة</span></div>';
@@ -2219,7 +2220,7 @@ function openShiftModal() {
     if (tbody && tbody.children.length === 0) {
         buildCentersTable();
     }
-    document.getElementById('shiftModal').style.display = 'flex';
+    var el_shiftModal_d19 = document.getElementById('shiftModal'); if (el_shiftModal_d19) el_shiftModal_d19.style.display = 'flex';
     // Scroll to top of modal content
     var modalContent = document.querySelector('#shiftModal .modal-content');
     if (modalContent) {
@@ -2239,11 +2240,11 @@ function openShiftModal() {
                 loadShiftToForm(currentShift);
             } else {
                 clearShiftForm();
-                document.getElementById('shiftDate').innerText = getSaudiDate();
+                var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = getSaudiDate();
             }
         } else {
             clearShiftForm();
-            document.getElementById('shiftDate').innerText = getSaudiDate();
+            var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = getSaudiDate();
         }
     });
 }
@@ -2422,11 +2423,11 @@ async function viewShiftReports() {
             updateWorkforceStats();
             updateDistributionIndicator();
             var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
-            document.getElementById('viewingBadge').style.display = 'inline-block';
-            document.getElementById('returnToCurrentBtn').style.display = 'inline-block';
-            document.getElementById('viewingBadge').innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
-            document.getElementById('updateStatus').innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + getSaudiTime();
-            document.getElementById('shiftModal').style.display = 'flex';
+            var el_viewingBadge_d20 = document.getElementById('viewingBadge'); if (el_viewingBadge_d20) el_viewingBadge_d20.style.display = 'inline-block';
+            var el_returnToCurrentBtn_d21 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d21) el_returnToCurrentBtn_d21.style.display = 'inline-block';
+            var el_viewingBadge_h5 = document.getElementById('viewingBadge'); if (el_viewingBadge_h5) el_viewingBadge_h5.innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
+            var el_updateStatus_h6 = document.getElementById('updateStatus'); if (el_updateStatus_h6) el_updateStatus_h6.innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + getSaudiTime();
+            var el_shiftModal_d22 = document.getElementById('shiftModal'); if (el_shiftModal_d22) el_shiftModal_d22.style.display = 'flex';
         } else { alert("لا توجد بيانات في هذه المناوبة"); }
     } catch (error) { console.error(error); alert("❌ فشل في تحميل المناوبة"); }
 }
@@ -2439,11 +2440,11 @@ async function returnToCurrentShift() {
     calculateLiveReportStats();
     updateWorkforceStats();
     updateDistributionIndicator();
-    document.getElementById('viewingBadge').style.display = 'none';
-    document.getElementById('returnToCurrentBtn').style.display = 'none';
-    document.getElementById('archiveSelect').value = '';
-    document.getElementById('updateStatus').innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
-    document.getElementById('shiftModal').style.display = 'none';
+    var el_viewingBadge_d23 = document.getElementById('viewingBadge'); if (el_viewingBadge_d23) el_viewingBadge_d23.style.display = 'none';
+    var el_returnToCurrentBtn_d24 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d24) el_returnToCurrentBtn_d24.style.display = 'none';
+    var el_archiveSelect_v4 = document.getElementById('archiveSelect'); if (el_archiveSelect_v4) el_archiveSelect_v4.value = '';
+    var el_updateStatus_h7 = document.getElementById('updateStatus'); if (el_updateStatus_h7) el_updateStatus_h7.innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
+    var el_shiftModal_d25 = document.getElementById('shiftModal'); if (el_shiftModal_d25) el_shiftModal_d25.style.display = 'none';
 }
 
 async function saveShiftData() {
@@ -2483,8 +2484,8 @@ async function deleteCurrentShift() {
             if (targetId === viewingShiftId) {
                 viewingShiftId = null;
                 isViewingArchiveShift = false;
-                document.getElementById('viewingBadge').style.display = 'none';
-                document.getElementById('returnToCurrentBtn').style.display = 'none';
+                var el_viewingBadge_d26 = document.getElementById('viewingBadge'); if (el_viewingBadge_d26) el_viewingBadge_d26.style.display = 'none';
+                var el_returnToCurrentBtn_d27 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d27) el_returnToCurrentBtn_d27.style.display = 'none';
             }
             clearShiftForm();
             await loadShifts();
@@ -2492,7 +2493,7 @@ async function deleteCurrentShift() {
             calculateLiveReportStats();
             updateWorkforceStats();
             updateDistributionIndicator();
-            document.getElementById('shiftModal').style.display = 'none';
+            var el_shiftModal_d28 = document.getElementById('shiftModal'); if (el_shiftModal_d28) el_shiftModal_d28.style.display = 'none';
         } else { alert("❌ فشل في الحذف"); }
     } catch (error) { alert("❌ خطأ في الاتصال"); }
 }
@@ -2500,7 +2501,7 @@ async function deleteCurrentShift() {
 function loadShiftToForm(shift) {
     if (!shift) return;
     viewingShiftId = shift.id;
-    document.getElementById('shiftDate').innerText = shift.shiftDate || getSaudiDate();
+    var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = shift.shiftDate || getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
     document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
     for (var i = 0; i < centerList.length; i++) {
@@ -2518,7 +2519,7 @@ function loadShiftToForm(shift) {
         if (fuelSel) fuelSel.value = data.fuelLevel || '';
         updateStatusIcon(i);
     }
-    document.getElementById('generalNotes').value = shift.generalNotes || '';
+    var el_generalNotes_v5 = document.getElementById('generalNotes'); if (el_generalNotes_v5) el_generalNotes_v5.value = shift.generalNotes || '';
     initShiftProgressBar();
     loadShiftEventLog();
     loadAbsenceRecords();
@@ -2554,7 +2555,7 @@ function getShiftFromForm() {
 }
 
 function clearShiftForm() {
-    document.getElementById('shiftDate').innerText = getSaudiDate();
+    var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
     document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
     for (var i = 0; i < centerList.length; i++) {
@@ -2570,9 +2571,9 @@ function clearShiftForm() {
         if (fuelSel) fuelSel.value = '';
         updateStatusIcon(i);
     }
-    document.getElementById('generalNotes').value = '';
-    document.getElementById('workforceStats').style.display = 'none';
-    document.getElementById('shiftReportStats').style.display = 'none';
+    var el_generalNotes_v6 = document.getElementById('generalNotes'); if (el_generalNotes_v6) el_generalNotes_v6.value = '';
+    var el_workforceStats_d29 = document.getElementById('workforceStats'); if (el_workforceStats_d29) el_workforceStats_d29.style.display = 'none';
+    var el_shiftReportStats_d30 = document.getElementById('shiftReportStats'); if (el_shiftReportStats_d30) el_shiftReportStats_d30.style.display = 'none';
 }
 
 function displayShiftReportStats(reportsData) {
@@ -2594,12 +2595,12 @@ function displayShiftReportStats(reportsData) {
     }
     if (total === 0) { container.style.display = 'none'; return; }
     container.style.display = 'block';
-    document.getElementById('shiftTotalReports').innerText = total;
+    var el_shiftTotalReports = document.getElementById('shiftTotalReports'); if (el_shiftTotalReports) el_shiftTotalReports.innerText = total;
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var topUnit = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
-    document.getElementById('topUnit').innerText = topUnit;
-    document.getElementById('topUnitCount').innerText = topCount;
+    var el_topUnit = document.getElementById('topUnit'); if (el_topUnit) el_topUnit.innerText = topUnit;
+    var el_topUnitCount = document.getElementById('topUnitCount'); if (el_topUnitCount) el_topUnitCount.innerText = topCount;
     listContainer.innerHTML = '<div class="title">توزيع البلاغات على الفرق</div>';
     if (sortedUnits.length === 0) {
         listContainer.innerHTML += '<p style="text-align:center; color:var(--gray-400); font-size:0.7rem;">لا توجد بيانات كافية</p>';
@@ -2618,15 +2619,15 @@ async function loadWorkforceStats(shiftId) {
     try {
         var response = await fetch('/api/workforce-stats/' + shiftId);
         var stats = await response.json();
-        if (stats.error) { document.getElementById('workforceStats').style.display = 'none'; return; }
-        document.getElementById('workforceStats').style.display = 'block';
-        document.getElementById('totalStaffDisplay').innerText = stats.totalStaff;
-        document.getElementById('totalCarsDisplay').innerText = stats.totalCars;
-        document.getElementById('missingCentersDisplay').innerText = stats.missingCenters;
-        document.getElementById('staffSubText').innerText = 'موزعين على ' + stats.centerCount + ' مركز';
-        document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-        document.getElementById('missingSubText').innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-        document.getElementById('readinessSubText').innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
+        if (stats.error) { var el_workforceStats_d31 = document.getElementById('workforceStats'); if (el_workforceStats_d31) el_workforceStats_d31.style.display = 'none'; return; }
+        var el_workforceStats_d32 = document.getElementById('workforceStats'); if (el_workforceStats_d32) el_workforceStats_d32.style.display = 'block';
+        var el_totalStaffDisplay = document.getElementById('totalStaffDisplay'); if (el_totalStaffDisplay) el_totalStaffDisplay.innerText = stats.totalStaff;
+        var el_totalCarsDisplay = document.getElementById('totalCarsDisplay'); if (el_totalCarsDisplay) el_totalCarsDisplay.innerText = stats.totalCars;
+        var el_missingCentersDisplay = document.getElementById('missingCentersDisplay'); if (el_missingCentersDisplay) el_missingCentersDisplay.innerText = stats.missingCenters;
+        var el_staffSubText = document.getElementById('staffSubText'); if (el_staffSubText) el_staffSubText.innerText = 'موزعين على ' + stats.centerCount + ' مركز';
+        var el_carsSubText = document.getElementById('carsSubText'); if (el_carsSubText) el_carsSubText.innerText = 'إجمالي السيارات';
+        var el_missingSubText = document.getElementById('missingSubText'); if (el_missingSubText) el_missingSubText.innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
+        var el_readinessSubText = document.getElementById('readinessSubText'); if (el_readinessSubText) el_readinessSubText.innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
         var circumference = 2 * Math.PI * 42;
         var offset = circumference - (stats.readinessRate / 100) * circumference;
         var circle = document.getElementById('readinessCircle');
@@ -2661,7 +2662,7 @@ async function loadWorkforceStats(shiftId) {
             div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
             carDistList.appendChild(div2);
         }
-    } catch (error) { console.error(error); document.getElementById('workforceStats').style.display = 'none'; }
+    } catch (error) { console.error(error); var el_workforceStats_d33 = document.getElementById('workforceStats'); if (el_workforceStats_d33) el_workforceStats_d33.style.display = 'none'; }
 }
 
 // ============================================
@@ -2708,18 +2709,18 @@ function saveSeniorRecordToLocal(data) {
 }
 
 function clearSeniorShiftForm() {
-    document.getElementById('seniorActiveCars').value = 0;
-    document.getElementById('seniorBrokenCars').value = 0;
-    document.getElementById('seniorReserveCars').value = 0;
-    document.getElementById('seniorOverlapTeams').value = 0;
+    var el_seniorActiveCars_v7 = document.getElementById('seniorActiveCars'); if (el_seniorActiveCars_v7) el_seniorActiveCars_v7.value = 0;
+    var el_seniorBrokenCars_v8 = document.getElementById('seniorBrokenCars'); if (el_seniorBrokenCars_v8) el_seniorBrokenCars_v8.value = 0;
+    var el_seniorReserveCars_v9 = document.getElementById('seniorReserveCars'); if (el_seniorReserveCars_v9) el_seniorReserveCars_v9.value = 0;
+    var el_seniorOverlapTeams_v10 = document.getElementById('seniorOverlapTeams'); if (el_seniorOverlapTeams_v10) el_seniorOverlapTeams_v10.value = 0;
     document.querySelectorAll('.senior-location').forEach(function(cb) { cb.checked = false; });
-    document.getElementById('seniorNotes').value = '';
-    document.getElementById('seniorAssistantName').value = '';
-    document.getElementById('seniorAssistantSignature').value = '';
-    document.getElementById('seniorChiefName').value = '';
-    document.getElementById('seniorChiefSignature').value = '';
-    document.getElementById('seniorRegionLeaderName').value = '';
-    document.getElementById('seniorRegionLeaderSignature').value = '';
+    var el_seniorNotes_v11 = document.getElementById('seniorNotes'); if (el_seniorNotes_v11) el_seniorNotes_v11.value = '';
+    var el_seniorAssistantName_v12 = document.getElementById('seniorAssistantName'); if (el_seniorAssistantName_v12) el_seniorAssistantName_v12.value = '';
+    var el_seniorAssistantSignature_v13 = document.getElementById('seniorAssistantSignature'); if (el_seniorAssistantSignature_v13) el_seniorAssistantSignature_v13.value = '';
+    var el_seniorChiefName_v14 = document.getElementById('seniorChiefName'); if (el_seniorChiefName_v14) el_seniorChiefName_v14.value = '';
+    var el_seniorChiefSignature_v15 = document.getElementById('seniorChiefSignature'); if (el_seniorChiefSignature_v15) el_seniorChiefSignature_v15.value = '';
+    var el_seniorRegionLeaderName_v16 = document.getElementById('seniorRegionLeaderName'); if (el_seniorRegionLeaderName_v16) el_seniorRegionLeaderName_v16.value = '';
+    var el_seniorRegionLeaderSignature_v17 = document.getElementById('seniorRegionLeaderSignature'); if (el_seniorRegionLeaderSignature_v17) el_seniorRegionLeaderSignature_v17.value = '';
 }
 
 function deleteSeniorRecord(index) {
@@ -2763,15 +2764,15 @@ function sendWhatsAppMessage(message) {
 var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShiftBtn)el_seniorShiftBtn.addEventListener('click', function() {
     var now = new Date();
     var dateStr = getSaudiDate();
-    document.getElementById('seniorAssistantDate').innerText = dateStr;
-    document.getElementById('seniorChiefDate').innerText = dateStr;
-    document.getElementById('seniorRegionLeaderDate').innerText = dateStr;
-    document.getElementById('seniorPrintDate').innerText = dateStr + ' - ' + getSaudiTime();
-    document.getElementById('seniorShiftModal').style.display = 'flex';
+    var el_seniorAssistantDate = document.getElementById('seniorAssistantDate'); if (el_seniorAssistantDate) el_seniorAssistantDate.innerText = dateStr;
+    var el_seniorChiefDate = document.getElementById('seniorChiefDate'); if (el_seniorChiefDate) el_seniorChiefDate.innerText = dateStr;
+    var el_seniorRegionLeaderDate = document.getElementById('seniorRegionLeaderDate'); if (el_seniorRegionLeaderDate) el_seniorRegionLeaderDate.innerText = dateStr;
+    var el_seniorPrintDate = document.getElementById('seniorPrintDate'); if (el_seniorPrintDate) el_seniorPrintDate.innerText = dateStr + ' - ' + getSaudiTime();
+    var el_seniorShiftModal_d34 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d34) el_seniorShiftModal_d34.style.display = 'flex';
     renderSeniorRecords();
 });
 
-var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { document.getElementById('seniorShiftModal').style.display = 'none'; });
+var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { var el_seniorShiftModal_d35 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d35) el_seniorShiftModal_d35.style.display = 'none'; });
 var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
@@ -2880,8 +2881,8 @@ async function loadForm(formId) {
         return;
     }
 
-    document.getElementById('formLoading').style.display = 'block';
-    document.getElementById('formContent').innerHTML = '';
+    var el_formLoading_d36 = document.getElementById('formLoading'); if (el_formLoading_d36) el_formLoading_d36.style.display = 'block';
+    var el_formContent_h8 = document.getElementById('formContent'); if (el_formContent_h8) el_formContent_h8.innerHTML = '';
 
     try {
         var response = await fetch(`/forms/${formDef.file}`);
@@ -2895,7 +2896,7 @@ async function loadForm(formId) {
         console.error('خطأ في تحميل النموذج:', error);
         var loadingEl = document.getElementById('formLoading');
         if (loadingEl) loadingEl.style.display = 'none';
-        document.getElementById('formContent').innerHTML = `
+        var el_formContent_h9 = document.getElementById('formContent'); if (el_formContent_h9) el_formContent_h9.innerHTML = `
             <div style="text-align:center; padding:40px 0; color:var(--coral);">
                 <i class="fas fa-exclamation-triangle" style="font-size:2rem;"></i>
                 <p style="margin-top:10px;">❌ فشل في تحميل النموذج: ${error.message}</p>
@@ -2938,15 +2939,15 @@ function showFormContent(formId) {
 }
 
 function closeFormsModal() {
-    document.getElementById('formsModal').style.display = 'none';
+    var el_formsModal_d37 = document.getElementById('formsModal'); if (el_formsModal_d37) el_formsModal_d37.style.display = 'none';
 }
 
 function closeAnalyticsModal() {
-    document.getElementById('analyticsModal').style.display = 'none';
+    var el_analyticsModal_d38 = document.getElementById('analyticsModal'); if (el_analyticsModal_d38) el_analyticsModal_d38.style.display = 'none';
 }
 
 function closeChartsModal() {
-    document.getElementById('chartsModal').style.display = 'none';
+    var el_chartsModal_d39 = document.getElementById('chartsModal'); if (el_chartsModal_d39) el_chartsModal_d39.style.display = 'none';
 }
 
 function executeFormScripts(formId) {
@@ -3479,9 +3480,9 @@ function clearDailyForm() {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
-    document.getElementById('dailyResponseTeams').value = 0;
-    document.getElementById('dailyAir').value = 0;
-    document.getElementById('dailyDate').value = new Date().toISOString().split('T')[0];
+    var el_dailyResponseTeams_v18 = document.getElementById('dailyResponseTeams'); if (el_dailyResponseTeams_v18) el_dailyResponseTeams_v18.value = 0;
+    var el_dailyAir_v19 = document.getElementById('dailyAir'); if (el_dailyAir_v19) el_dailyAir_v19.value = 0;
+    var el_dailyDate_v20 = document.getElementById('dailyDate'); if (el_dailyDate_v20) el_dailyDate_v20.value = new Date().toISOString().split('T')[0];
     ['dailyPath1','dailyPath2','dailyPath3','dailyPath4','dailyPath5','dailyPath6','dailyPath7','dailyPath8'].forEach(function(id) {
         var cb = document.getElementById(id);
         if (cb) cb.checked = false;
@@ -3812,7 +3813,7 @@ async function loadSavedTable() {
                     currentSheetIndex = 0;
                     renderAllSheets(workbookData);
                     status.innerHTML = '✅ جاهز';
-                    document.getElementById('tableStatsBar').style.display = 'flex';
+                    var el_tableStatsBar_d40 = document.getElementById('tableStatsBar'); if (el_tableStatsBar_d40) el_tableStatsBar_d40.style.display = 'flex';
                     updateTableStats();
                 } catch (error) {
                     container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ: ' + error.message + '</p>';
@@ -3823,7 +3824,7 @@ async function loadSavedTable() {
         } else {
             container.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:30px 0;">📂 لا يوجد جدول محفوظ. يرجى رفع ملف Excel.</p>';
             status.innerHTML = '📂 لا يوجد جدول';
-            document.getElementById('tableStatsBar').style.display = 'none';
+            var el_tableStatsBar_d41 = document.getElementById('tableStatsBar'); if (el_tableStatsBar_d41) el_tableStatsBar_d41.style.display = 'none';
         }
     } catch (error) {
         container.innerHTML = '<p style="text-align:center; color:var(--coral); padding:30px 0;">❌ خطأ في الاتصال</p>';
@@ -3851,7 +3852,7 @@ function renderAllSheets(workbook) {
 
 function switchSheet(index) {
     currentSheetIndex = index;
-    document.getElementById('tableSearchInput').value = '';
+    var el_tableSearchInput_v21 = document.getElementById('tableSearchInput'); if (el_tableSearchInput_v21) el_tableSearchInput_v21.value = '';
     clearTableSearch();
     renderAllSheets(workbookData);
 }
@@ -3962,7 +3963,7 @@ function searchTable(query) {
         if (rowMatch) found++;
     });
     document.getElementById('statFound').textContent = found;
-    document.getElementById('clearSearchBtn').style.display = found > 0 ? 'block' : 'none';
+    var el_clearSearchBtn_d42 = document.getElementById('clearSearchBtn'); if (el_clearSearchBtn_d42) el_clearSearchBtn_d42.style.display = found > 0 ? 'block' : 'none';
 }
 
 function clearTableSearch() {
@@ -4075,8 +4076,8 @@ var el_excelFileInput=document.getElementById("excelFileInput");if(el_excelFileI
             var response = await fetch('/api/upload-monthly-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileData: base64 }) });
             var result = await response.json();
             if (result.success) {
-                document.getElementById('tableStatus').innerHTML = '✅ تم الحفظ';
-                document.getElementById('tableStatsBar').style.display = 'flex';
+                var el_tableStatus_h10 = document.getElementById('tableStatus'); if (el_tableStatus_h10) el_tableStatus_h10.innerHTML = '✅ تم الحفظ';
+                var el_tableStatsBar_d43 = document.getElementById('tableStatsBar'); if (el_tableStatsBar_d43) el_tableStatsBar_d43.style.display = 'flex';
                 updateTableStats();
                 showNotification('تم الرفع', 'تم رفع وحفظ الجدول بنجاح', 'success', 3000);
             } else {
@@ -4124,7 +4125,7 @@ function formatDate(dateString) {
     return parts[2] + '/' + parts[1] + '/' + parts[0];
 }
 
-var el_editVacationsBtn = document.getElementById("editVacationsBtn"); if(el_editVacationsBtn) el_editVacationsBtn.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'flex'; document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); });
+var el_editVacationsBtn = document.getElementById("editVacationsBtn"); if(el_editVacationsBtn) el_editVacationsBtn.addEventListener('click', function() { var el_passwordModal_d44 = document.getElementById('passwordModal'); if (el_passwordModal_d44) el_passwordModal_d44.style.display = 'flex'; var el_passwordInput_v22 = document.getElementById('passwordInput'); if (el_passwordInput_v22) el_passwordInput_v22.value = ''; document.getElementById('passwordInput').focus(); });
 var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_confirmPasswordBtn)el_confirmPasswordBtn.addEventListener('click', async function() {
     var password = document.getElementById('passwordInput').value;
     try {
@@ -4133,17 +4134,17 @@ var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_co
         var storedPassword = result.password || '1234';
         if (password === storedPassword) {
             isEditMode = true;
-            document.getElementById('passwordModal').style.display = 'none';
-            document.getElementById('passwordInput').value = '';
+            var el_passwordModal_d45 = document.getElementById('passwordModal'); if (el_passwordModal_d45) el_passwordModal_d45.style.display = 'none';
+            var el_passwordInput_v23 = document.getElementById('passwordInput'); if (el_passwordInput_v23) el_passwordInput_v23.value = '';
             renderControlList(true);
-            document.getElementById('saveVacationsBtn').style.display = 'inline-block';
-            document.getElementById('editVacationsBtn').style.display = 'none';
+            var el_saveVacationsBtn_d46 = document.getElementById('saveVacationsBtn'); if (el_saveVacationsBtn_d46) el_saveVacationsBtn_d46.style.display = 'inline-block';
+            var el_editVacationsBtn_d47 = document.getElementById('editVacationsBtn'); if (el_editVacationsBtn_d47) el_editVacationsBtn_d47.style.display = 'none';
             alert('✅ تم تفعيل وضع التعديل');
-        } else { alert('❌ الرقم السري غير صحيح'); document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); }
+        } else { alert('❌ الرقم السري غير صحيح'); var el_passwordInput_v24 = document.getElementById('passwordInput'); if (el_passwordInput_v24) el_passwordInput_v24.value = ''; document.getElementById('passwordInput').focus(); }
     } catch (error) { alert('❌ خطأ في التحقق من الرقم السري'); }
 });
 
-var el_cancelPasswordBtn = document.getElementById("cancelPasswordBtn"); if(el_cancelPasswordBtn) el_cancelPasswordBtn.addEventListener('click', function() { document.getElementById('passwordModal').style.display = 'none'; document.getElementById('passwordInput').value = ''; });
+var el_cancelPasswordBtn = document.getElementById("cancelPasswordBtn"); if(el_cancelPasswordBtn) el_cancelPasswordBtn.addEventListener('click', function() { var el_passwordModal_d48 = document.getElementById('passwordModal'); if (el_passwordModal_d48) el_passwordModal_d48.style.display = 'none'; var el_passwordInput_v25 = document.getElementById('passwordInput'); if (el_passwordInput_v25) el_passwordInput_v25.value = ''; });
 var el_saveVacationsBtn=document.getElementById("saveVacationsBtn");if(el_saveVacationsBtn)el_saveVacationsBtn.addEventListener('click', async function() {
     controlData.forEach(function(person, index) {
         var startInput = document.getElementById('start_' + index);
@@ -4157,8 +4158,8 @@ var el_saveVacationsBtn=document.getElementById("saveVacationsBtn");if(el_saveVa
             alert('✅ تم حفظ الإجازات بنجاح');
             isEditMode = false;
             renderControlList(false);
-            document.getElementById('saveVacationsBtn').style.display = 'none';
-            document.getElementById('editVacationsBtn').style.display = 'inline-block';
+            var el_saveVacationsBtn_d49 = document.getElementById('saveVacationsBtn'); if (el_saveVacationsBtn_d49) el_saveVacationsBtn_d49.style.display = 'none';
+            var el_editVacationsBtn_d50 = document.getElementById('editVacationsBtn'); if (el_editVacationsBtn_d50) el_editVacationsBtn_d50.style.display = 'inline-block';
         } else { alert('❌ فشل في حفظ الإجازات'); }
     } catch (error) { alert('❌ خطأ في الاتصال: ' + error.message); }
 });
@@ -4167,13 +4168,13 @@ var el_saveVacationsBtn=document.getElementById("saveVacationsBtn");if(el_saveVa
 // دوال التحديثات التشغيلية
 // ============================================
 function openDocsPage() {
-    document.getElementById('docsPage').style.display = 'block';
+    var el_docsPage_d51 = document.getElementById('docsPage'); if (el_docsPage_d51) el_docsPage_d51.style.display = 'block';
     document.body.style.overflow = 'hidden';
     loadDocsData();
 }
 
 function closeDocsPage() {
-    document.getElementById('docsPage').style.display = 'none';
+    var el_docsPage_d52 = document.getElementById('docsPage'); if (el_docsPage_d52) el_docsPage_d52.style.display = 'none';
     document.body.style.overflow = 'auto';
 }
 
@@ -4186,7 +4187,7 @@ async function loadDocsData() {
             filteredDocs = [].concat(uploadedDocs);
             renderDocsList();
             updateStats();
-            document.getElementById('docsTotalCount').innerText = uploadedDocs.length;
+            var el_docsTotalCount = document.getElementById('docsTotalCount'); if (el_docsTotalCount) el_docsTotalCount.innerText = uploadedDocs.length;
         }
     } catch (error) { console.error('خطأ في تحميل التحديثات:', error); }
 }
@@ -4199,8 +4200,8 @@ function renderDocsList() {
     var pageDocs = sortedDocs.slice(start, end);
     if (pageDocs.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:60px 20px; background:white; border-radius:var(--radius-lg); border:2px dashed var(--gray-200);"><i class="fas fa-inbox" style="font-size:4rem; display:block; margin-bottom:15px; color:var(--gray-400);"></i><h3 style="color:var(--gray-400);">📭 لا توجد تحديثات</h3><p style="color:var(--gray-400);">قم برفع أول تحديث باستخدام زر "تحديث جديد"</p><button onclick="openUploadModal()" class="btn btn-primary" style="margin-top:10px;"><i class="fas fa-plus"></i> رفع تحديث</button></div>';
-        document.getElementById('docsPagination').innerHTML = '';
-        document.getElementById('docsFilterCount').innerText = '0 تحديث';
+        var el_docsPagination_h11 = document.getElementById('docsPagination'); if (el_docsPagination_h11) el_docsPagination_h11.innerHTML = '';
+        var el_docsFilterCount = document.getElementById('docsFilterCount'); if (el_docsFilterCount) el_docsFilterCount.innerText = '0 تحديث';
         return;
     }
     var isGrid = docsViewMode === 'grid';
@@ -4243,7 +4244,7 @@ function renderDocsList() {
     });
     container.innerHTML = html;
     updatePagination(filteredDocs.length);
-    document.getElementById('docsFilterCount').innerText = filteredDocs.length + ' تحديث (من ' + uploadedDocs.length + ')';
+    var el_docsFilterCount = document.getElementById('docsFilterCount'); if (el_docsFilterCount) el_docsFilterCount.innerText = filteredDocs.length + ' تحديث (من ' + uploadedDocs.length + ')';
 }
 
 function updatePagination(total) {
@@ -4294,10 +4295,10 @@ function updateStats() {
     var instructions = uploadedDocs.filter(function(d) { return d.category === 'تعليمات'; }).length;
     var alerts = uploadedDocs.filter(function(d) { return d.category === 'تنبيه'; }).length;
     var notifications = uploadedDocs.filter(function(d) { return d.category === 'إشعار'; }).length;
-    document.getElementById('statTotal').innerText = total;
-    document.getElementById('statInstructions').innerText = instructions;
-    document.getElementById('statAlerts').innerText = alerts;
-    document.getElementById('statNotifications').innerText = notifications;
+    var el_statTotal = document.getElementById('statTotal'); if (el_statTotal) el_statTotal.innerText = total;
+    var el_statInstructions = document.getElementById('statInstructions'); if (el_statInstructions) el_statInstructions.innerText = instructions;
+    var el_statAlerts = document.getElementById('statAlerts'); if (el_statAlerts) el_statAlerts.innerText = alerts;
+    var el_statNotifications = document.getElementById('statNotifications'); if (el_statNotifications) el_statNotifications.innerText = notifications;
 }
 
 function getTimeAgo(dateString) {
@@ -4463,14 +4464,14 @@ function calculateWorkforceStatsLocally() {
         }
     });
     var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-    document.getElementById('workforceStats').style.display = 'block';
-    document.getElementById('totalStaffDisplay').innerText = totalStaff;
-    document.getElementById('totalCarsDisplay').innerText = totalCars;
-    document.getElementById('missingCentersDisplay').innerText = missingCenters;
-    document.getElementById('staffSubText').innerText = 'موزعين على ' + centerCount + ' مركز';
-    document.getElementById('carsSubText').innerText = 'إجمالي السيارات';
-    document.getElementById('missingSubText').innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-    document.getElementById('readinessSubText').innerText = readyCenters + ' / ' + centerCount + ' مركز جاهز';
+    var el_workforceStats_d53 = document.getElementById('workforceStats'); if (el_workforceStats_d53) el_workforceStats_d53.style.display = 'block';
+    var el_totalStaffDisplay = document.getElementById('totalStaffDisplay'); if (el_totalStaffDisplay) el_totalStaffDisplay.innerText = totalStaff;
+    var el_totalCarsDisplay = document.getElementById('totalCarsDisplay'); if (el_totalCarsDisplay) el_totalCarsDisplay.innerText = totalCars;
+    var el_missingCentersDisplay = document.getElementById('missingCentersDisplay'); if (el_missingCentersDisplay) el_missingCentersDisplay.innerText = missingCenters;
+    var el_staffSubText = document.getElementById('staffSubText'); if (el_staffSubText) el_staffSubText.innerText = 'موزعين على ' + centerCount + ' مركز';
+    var el_carsSubText = document.getElementById('carsSubText'); if (el_carsSubText) el_carsSubText.innerText = 'إجمالي السيارات';
+    var el_missingSubText = document.getElementById('missingSubText'); if (el_missingSubText) el_missingSubText.innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
+    var el_readinessSubText = document.getElementById('readinessSubText'); if (el_readinessSubText) el_readinessSubText.innerText = readyCenters + ' / ' + centerCount + ' مركز جاهز';
     var circumference = 2 * Math.PI * 42;
     var offset = circumference - (readinessRate / 100) * circumference;
     var circle = document.getElementById('readinessCircle');
@@ -5739,7 +5740,7 @@ var gamificationStats = JSON.parse(localStorage.getItem('gamificationStats') || 
 var unlockedAchievements = JSON.parse(localStorage.getItem('unlockedAchievements') || '[]');
 
 var el_achievementsBtn=document.getElementById("achievementsBtn");if(el_achievementsBtn)el_achievementsBtn.addEventListener('click', function() {
-    document.getElementById('achievementsModal').style.display = 'flex';
+    var el_achievementsModal_d54 = document.getElementById('achievementsModal'); if (el_achievementsModal_d54) el_achievementsModal_d54.style.display = 'flex';
     renderAchievements();
     renderLeaderboard();
 });
@@ -5935,7 +5936,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     initWebSocket();
     loadBrandLogo();
     initSoundSettings();
-    document.getElementById("currentDate").innerText = getSaudiDate();
+    var currentDateEl = document.getElementById("currentDate");
+    if (currentDateEl) currentDateEl.innerText = getSaudiDate();
     buildCentersTable();
     loadShifts();
     loadAllData();
@@ -5944,15 +5946,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
     btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = openShiftModal;
-    btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { document.getElementById('shiftModal').style.display = 'none'; };
-    btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
-    btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { document.getElementById('monthlyTableModal').style.display = 'none'; };
-    btn = document.getElementById("controlBtn"); if (btn) btn.onclick = function() { document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
+    btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
+    btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
+    btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
+    btn = document.getElementById("controlBtn"); if (btn) btn.onclick = function() { var el_controlModal_d58 = document.getElementById('controlModal'); if (el_controlModal_d58) el_controlModal_d58.style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
     btn = document.getElementById("closeControlBtn"); if (btn) btn.onclick = function() {
-        document.getElementById('controlModal').style.display = 'none';
+        var el_controlModal_d59 = document.getElementById('controlModal'); if (el_controlModal_d59) el_controlModal_d59.style.display = 'none';
         isEditMode = false;
-        document.getElementById('saveVacationsBtn').style.display = 'none';
-        document.getElementById('editVacationsBtn').style.display = 'inline-block';
+        var el_saveVacationsBtn_d60 = document.getElementById('saveVacationsBtn'); if (el_saveVacationsBtn_d60) el_saveVacationsBtn_d60.style.display = 'none';
+        var el_editVacationsBtn_d61 = document.getElementById('editVacationsBtn'); if (el_editVacationsBtn_d61) el_editVacationsBtn_d61.style.display = 'inline-block';
     };
     btn = document.getElementById("saveShiftBtn"); if (btn) btn.onclick = saveShiftData;
     btn = document.getElementById("deleteShiftBtn"); if (btn) btn.onclick = deleteCurrentShift;
@@ -5967,7 +5969,7 @@ setInterval(checkForAlerts, 10000);
 // تغيير الرقم السري
 // ============================================
 var el_changePasswordBtn=document.getElementById("changePasswordBtn");if(el_changePasswordBtn)el_changePasswordBtn.addEventListener('click', function() {
-    document.getElementById('changePasswordModal').style.display = 'flex';
+    var el_changePasswordModal_d62 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d62) el_changePasswordModal_d62.style.display = 'flex';
 });
 
 var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBtn");if(el_confirmChangePasswordBtn)el_confirmChangePasswordBtn.addEventListener('click', async function() {
@@ -5999,10 +6001,10 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
         var result = await response.json();
         if (result.success) {
             alert('✅ تم تغيير الرقم السري بنجاح');
-            document.getElementById('changePasswordModal').style.display = 'none';
-            document.getElementById('oldPasswordInput').value = '';
-            document.getElementById('newPasswordInput').value = '';
-            document.getElementById('confirmNewPasswordInput').value = '';
+            var el_changePasswordModal_d63 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d63) el_changePasswordModal_d63.style.display = 'none';
+            var el_oldPasswordInput_v26 = document.getElementById('oldPasswordInput'); if (el_oldPasswordInput_v26) el_oldPasswordInput_v26.value = '';
+            var el_newPasswordInput_v27 = document.getElementById('newPasswordInput'); if (el_newPasswordInput_v27) el_newPasswordInput_v27.value = '';
+            var el_confirmNewPasswordInput_v28 = document.getElementById('confirmNewPasswordInput'); if (el_confirmNewPasswordInput_v28) el_confirmNewPasswordInput_v28.value = '';
         } else {
             alert('❌ ' + (result.error || 'فشل في تغيير الرقم السري'));
         }
@@ -6012,10 +6014,10 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
 });
 
 var el_cancelChangePasswordBtn=document.getElementById("cancelChangePasswordBtn");if(el_cancelChangePasswordBtn)el_cancelChangePasswordBtn.addEventListener('click', function() {
-    document.getElementById('changePasswordModal').style.display = 'none';
-    document.getElementById('oldPasswordInput').value = '';
-    document.getElementById('newPasswordInput').value = '';
-    document.getElementById('confirmNewPasswordInput').value = '';
+    var el_changePasswordModal_d64 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d64) el_changePasswordModal_d64.style.display = 'none';
+    var el_oldPasswordInput_v29 = document.getElementById('oldPasswordInput'); if (el_oldPasswordInput_v29) el_oldPasswordInput_v29.value = '';
+    var el_newPasswordInput_v30 = document.getElementById('newPasswordInput'); if (el_newPasswordInput_v30) el_newPasswordInput_v30.value = '';
+    var el_confirmNewPasswordInput_v31 = document.getElementById('confirmNewPasswordInput'); if (el_confirmNewPasswordInput_v31) el_confirmNewPasswordInput_v31.value = '';
 });
 
 // ============================================
@@ -6023,7 +6025,7 @@ var el_cancelChangePasswordBtn=document.getElementById("cancelChangePasswordBtn"
 // ============================================
 
 var el_qrCodesBtn=document.getElementById("qrCodesBtn");if(el_qrCodesBtn)el_qrCodesBtn.addEventListener('click', function() {
-    document.getElementById('qrModal').style.display = 'flex';
+    var el_qrModal_d65 = document.getElementById('qrModal'); if (el_qrModal_d65) el_qrModal_d65.style.display = 'flex';
     generateAllQRCodes();
 });
 
@@ -6396,7 +6398,7 @@ async function opsUploadFiles() {
         if (result.success) {
             statusEl.innerHTML = '<span style="color:#00D4AA; font-weight:700; font-size:0.9rem; text-shadow:0 0 10px rgba(0,212,170,0.3);">✅ تم رفع ' + result.count + ' ملف/ملفات بنجاح</span>';
             input.value = '';
-            document.getElementById('opsFileNote').value = '';
+            var el_opsFileNote_v32 = document.getElementById('opsFileNote'); if (el_opsFileNote_v32) el_opsFileNote_v32.value = '';
             var previewContainer = document.getElementById('opsFilePreview');
             if (previewContainer) {
                 previewContainer.innerHTML = '';
@@ -6799,7 +6801,7 @@ async function removeGlobalTheme() {
             var video = header.querySelector('.header-bg-video');
             if (video) video.remove();
             // إخفاء المعاينة
-            document.getElementById('headerBgPreview').style.display = 'none';
+            var el_headerBgPreview_d66 = document.getElementById('headerBgPreview'); if (el_headerBgPreview_d66) el_headerBgPreview_d66.style.display = 'none';
             // حذف من localStorage أيضاً
             localStorage.removeItem('headerBackground');
             localStorage.removeItem('headerBgType');
@@ -6878,7 +6880,7 @@ async function uploadSectorLogo() {
 var chartInstances = {};
 
 var el_chartsBtn=document.getElementById("chartsBtn");if(el_chartsBtn)el_chartsBtn.addEventListener('click', function() {
-    document.getElementById('chartsModal').style.display = 'flex';
+    var el_chartsModal_d67 = document.getElementById('chartsModal'); if (el_chartsModal_d67) el_chartsModal_d67.style.display = 'flex';
     setTimeout(renderAllCharts, 300);
 });
 
@@ -7114,7 +7116,7 @@ function exportChartData() {
 // ============================================
 
 var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)el_analyticsBtn.addEventListener('click', function() {
-    document.getElementById('analyticsModal').style.display = 'flex';
+    var el_analyticsModal_d68 = document.getElementById('analyticsModal'); if (el_analyticsModal_d68) el_analyticsModal_d68.style.display = 'flex';
     renderAnalyticsDashboard();
 });
 
@@ -7131,7 +7133,7 @@ var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
-    document.getElementById('auditLogModal').style.display = 'flex';
+    var el_auditLogModal_d69 = document.getElementById('auditLogModal'); if (el_auditLogModal_d69) el_auditLogModal_d69.style.display = 'flex';
     renderAuditLog();
 });
 
@@ -7448,13 +7450,13 @@ function initSmartToolbar() {
     if (qaShift) qaShift.onclick = openShiftModal;
     
     var qaDistribution = document.getElementById('qaDistribution');
-    if (qaDistribution) qaDistribution.onclick = function() { document.getElementById('distributionModal').style.display = 'flex'; };
+    if (qaDistribution) qaDistribution.onclick = function() { var el_distributionModal_d70 = document.getElementById('distributionModal'); if (el_distributionModal_d70) el_distributionModal_d70.style.display = 'flex'; };
     
     var qaForms = document.getElementById('qaForms');
-    if (qaForms) qaForms.onclick = function() { document.getElementById('formsModal').style.display = 'flex'; };
+    if (qaForms) qaForms.onclick = function() { var el_formsModal_d71 = document.getElementById('formsModal'); if (el_formsModal_d71) el_formsModal_d71.style.display = 'flex'; };
     
     var qaStats = document.getElementById('qaStats');
-    if (qaStats) qaStats.onclick = function() { document.getElementById('chartsModal').style.display = 'flex'; setTimeout(renderAllCharts, 300); };
+    if (qaStats) qaStats.onclick = function() { var el_chartsModal_d72 = document.getElementById('chartsModal'); if (el_chartsModal_d72) el_chartsModal_d72.style.display = 'flex'; setTimeout(renderAllCharts, 300); };
     
     var sidebarNewShift = document.getElementById('sidebarNewShift');
     if (sidebarNewShift) sidebarNewShift.onclick = function() { toggleSidebar(); startNewShift(); };
@@ -7463,44 +7465,44 @@ function initSmartToolbar() {
     if (sidebarShift) sidebarShift.onclick = function() { toggleSidebar(); openShiftModal(); };
     
     var sidebarDistribution = document.getElementById('sidebarDistribution');
-    if (sidebarDistribution) sidebarDistribution.onclick = function() { toggleSidebar(); document.getElementById('distributionModal').style.display = 'flex'; };
+    if (sidebarDistribution) sidebarDistribution.onclick = function() { toggleSidebar(); var el_distributionModal_d73 = document.getElementById('distributionModal'); if (el_distributionModal_d73) el_distributionModal_d73.style.display = 'flex'; };
     
     var sidebarTable = document.getElementById('sidebarTable');
-    if (sidebarTable) sidebarTable.onclick = function() { toggleSidebar(); document.getElementById('monthlyTableModal').style.display = 'flex'; loadSavedTable(); };
+    if (sidebarTable) sidebarTable.onclick = function() { toggleSidebar(); var el_monthlyTableModal_d74 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d74) el_monthlyTableModal_d74.style.display = 'flex'; loadSavedTable(); };
     
     var sidebarSenior = document.getElementById('sidebarSenior');
-    if (sidebarSenior) sidebarSenior.onclick = function() { toggleSidebar(); document.getElementById('seniorShiftModal').style.display = 'flex'; };
+    if (sidebarSenior) sidebarSenior.onclick = function() { toggleSidebar(); var el_seniorShiftModal_d75 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d75) el_seniorShiftModal_d75.style.display = 'flex'; };
     
     var sidebarControl = document.getElementById('sidebarControl');
-    if (sidebarControl) sidebarControl.onclick = function() { toggleSidebar(); document.getElementById('controlModal').style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
+    if (sidebarControl) sidebarControl.onclick = function() { toggleSidebar(); var el_controlModal_d76 = document.getElementById('controlModal'); if (el_controlModal_d76) el_controlModal_d76.style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
     
     var sidebarForms = document.getElementById('sidebarForms');
-    if (sidebarForms) sidebarForms.onclick = function() { toggleSidebar(); document.getElementById('formsModal').style.display = 'flex'; };
+    if (sidebarForms) sidebarForms.onclick = function() { toggleSidebar(); var el_formsModal_d77 = document.getElementById('formsModal'); if (el_formsModal_d77) el_formsModal_d77.style.display = 'flex'; };
     
     var sidebarPeak = document.getElementById('sidebarPeak');
-    if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); document.getElementById('peakTimeModal').style.display = 'flex'; };
+    if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); var el_peakTimeModal_d78 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d78) el_peakTimeModal_d78.style.display = 'flex'; };
     
     var sidebarCharts = document.getElementById('sidebarCharts');
-    if (sidebarCharts) sidebarCharts.onclick = function() { toggleSidebar(); document.getElementById('chartsModal').style.display = 'flex'; setTimeout(renderAllCharts, 300); };
+    if (sidebarCharts) sidebarCharts.onclick = function() { toggleSidebar(); var el_chartsModal_d79 = document.getElementById('chartsModal'); if (el_chartsModal_d79) el_chartsModal_d79.style.display = 'flex'; setTimeout(renderAllCharts, 300); };
     
     var sidebarAnalytics = document.getElementById('sidebarAnalytics');
-    if (sidebarAnalytics) sidebarAnalytics.onclick = function() { toggleSidebar(); document.getElementById('analyticsModal').style.display = 'flex'; };
+    if (sidebarAnalytics) sidebarAnalytics.onclick = function() { toggleSidebar(); var el_analyticsModal_d80 = document.getElementById('analyticsModal'); if (el_analyticsModal_d80) el_analyticsModal_d80.style.display = 'flex'; };
     
     var sidebarAchievements = document.getElementById('sidebarAchievements');
-    if (sidebarAchievements) sidebarAchievements.onclick = function() { toggleSidebar(); document.getElementById('achievementsModal').style.display = 'flex'; };
+    if (sidebarAchievements) sidebarAchievements.onclick = function() { toggleSidebar(); var el_achievementsModal_d81 = document.getElementById('achievementsModal'); if (el_achievementsModal_d81) el_achievementsModal_d81.style.display = 'flex'; };
     
     var sidebarAudit = document.getElementById('sidebarAudit');
-    if (sidebarAudit) sidebarAudit.onclick = function() { toggleSidebar(); document.getElementById('auditLogModal').style.display = 'flex'; };
+    if (sidebarAudit) sidebarAudit.onclick = function() { toggleSidebar(); var el_auditLogModal_d82 = document.getElementById('auditLogModal'); if (el_auditLogModal_d82) el_auditLogModal_d82.style.display = 'flex'; };
     
     var sidebarTheme = document.getElementById('sidebarTheme');
-    if (sidebarTheme) sidebarTheme.onclick = function() { toggleSidebar(); document.getElementById('themeModal').style.display = 'flex'; };
+    if (sidebarTheme) sidebarTheme.onclick = function() { toggleSidebar(); var el_themeModal_d83 = document.getElementById('themeModal'); if (el_themeModal_d83) el_themeModal_d83.style.display = 'flex'; };
     
     var sidebarDarkMode = document.getElementById('sidebarDarkMode');
     
     var sidebarThemeMode = document.getElementById('sidebarThemeMode');
     
     var sidebarSound = document.getElementById('sidebarSound');
-    if (sidebarSound) sidebarSound.onclick = function() { toggleSidebar(); document.getElementById('soundSettingsModal').style.display = 'flex'; };
+    if (sidebarSound) sidebarSound.onclick = function() { toggleSidebar(); var el_soundSettingsModal_d84 = document.getElementById('soundSettingsModal'); if (el_soundSettingsModal_d84) el_soundSettingsModal_d84.style.display = 'flex'; };
     
     var sidebarNotifications = document.getElementById('sidebarNotifications');
     if (sidebarNotifications) sidebarNotifications.onclick = function() { toggleSidebar(); requestPushNotification(); };
@@ -7726,14 +7728,14 @@ var PEAK_UNITS = ['سريع 1','سريع 2','سريع 3','سريع 4','جنوب 
 
 // ----- Modal Open/Close -----
 function openPeakTimeModal() {
-    document.getElementById('peakTimeModal').style.display = 'flex';
+    var el_peakTimeModal_d85 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d85) el_peakTimeModal_d85.style.display = 'flex';
     switchPeakTab('dashboard');
     refreshPeakDashboard();
     initPeakFormDefaults();
 }
 
 function closePeakTimeModal() {
-    document.getElementById('peakTimeModal').style.display = 'none';
+    var el_peakTimeModal_d86 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d86) el_peakTimeModal_d86.style.display = 'none';
 }
 
 // Replace the old event listener

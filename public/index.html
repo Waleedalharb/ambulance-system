@@ -112,6 +112,10 @@
                     <i class="fas fa-calendar-alt"></i>
                     <span>الجداول</span>
                 </button>
+                <button class="qa-btn" title="مخطط المناوبات" onclick="window.location.href='shift-planner.html';">
+                    <i class="fas fa-users-cog"></i>
+                    <span>مناوبات</span>
+                </button>
                 <button class="qa-btn" title="النماذج" onclick="document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && typeof FORM_DEFINITIONS !== 'undefined' && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);">
                     <i class="fas fa-file-alt"></i>
                     <span>نماذج</span>
@@ -1696,6 +1700,7 @@
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='shift-planner.html';"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('controlModal').style.display='flex'; loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
@@ -1726,7 +1731,7 @@
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<script src="js/app.js?v=7" defer></script>
+<script src="js/app.js?v=11" defer></script>
 <script src="js/smart-toolbar.js?v=2" defer></script>
 </body>
 </html>
