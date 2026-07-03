@@ -1308,6 +1308,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         }
         
         // Enrich centersData with assignedParamedics from database if available
+        // BUT do NOT overwrite user-entered staffCount - preserve manual input
         try {
             const shiftDateToUse = targetShift ? targetShift.shiftDate : (shiftDate || isoDate);
             const teams = await db.Teams.getAll();
@@ -1328,8 +1329,17 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             }
             for (const center in targetShift.centersData) {
                 if (centerParamedics[center] && centerParamedics[center].length > 0) {
-                    targetShift.centersData[center].assignedParamedics = centerParamedics[center];
-                    targetShift.centersData[center].staffCount = centerParamedics[center].filter(p => p.status === 'حاضر').length;
+                    // Only add assignedParamedics if not already present
+                    if (!targetShift.centersData[center].assignedParamedics || targetShift.centersData[center].assignedParamedics.length === 0) {
+                        targetShift.centersData[center].assignedParamedics = centerParamedics[center];
+                    }
+                    // Only update staffCount if user hasn't manually entered a value
+                    // If staffCount is empty or 0, use the database count
+                    const currentStaffCount = parseInt(targetShift.centersData[center].staffCount);
+                    if (isNaN(currentStaffCount) || currentStaffCount === 0) {
+                        targetShift.centersData[center].staffCount = centerParamedics[center].filter(p => p.status === 'حاضر').length;
+                    }
+                    // Otherwise, keep the user's manual input (staffCount already set by user)
                 }
             }
         } catch (e) {

@@ -10376,13 +10376,13 @@ window.syncUpdate = async function() {
     console.log('🔄 syncUpdate called in index.html (app.js)');
     await loadAllData();
     // جلب بيانات الأنظمة الأخرى
-    try { await syncReportEntryData(); } catch(e) { console.log('syncReportEntryData skipped:', e.message); }
-    try { await loadIncidentRecords(); } catch(e) { console.log('loadIncidentRecords skipped:', e.message); }
-    try { await loadSeniorRecords(); } catch(e) { console.log('loadSeniorRecords skipped:', e.message); }
-    try { await loadERecords(); } catch(e) { console.log('loadERecords skipped:', e.message); }
-    try { await loadEscalationRecords(); } catch(e) { console.log('loadEscalationRecords skipped:', e.message); }
-    try { await loadDailyReports(); } catch(e) { console.log('loadDailyReports skipped:', e.message); }
-    try { await loadAirRecordsFromServer(); } catch(e) { console.log('loadAirRecords skipped:', e.message); }
+    try { if (typeof syncReportEntryData === 'function') await syncReportEntryData(); } catch(e) { console.log('syncReportEntryData skipped:', e.message); }
+    try { if (typeof loadIncidentRecords === 'function') await loadIncidentRecords(); } catch(e) { console.log('loadIncidentRecords skipped:', e.message); }
+    try { if (typeof loadSeniorRecords === 'function') await loadSeniorRecords(); } catch(e) { console.log('loadSeniorRecords skipped:', e.message); }
+    try { if (typeof loadERecords === 'function') await loadERecords(); } catch(e) { console.log('loadERecords skipped:', e.message); }
+    try { if (typeof loadEscalationRecords === 'function') await loadEscalationRecords(); } catch(e) { console.log('loadEscalationRecords skipped:', e.message); }
+    try { if (typeof loadDailyReports === 'function') await loadDailyReports(); } catch(e) { console.log('loadDailyReports skipped:', e.message); }
+    try { if (typeof loadAirRecordsFromServer === 'function') await loadAirRecordsFromServer(); } catch(e) { console.log('loadAirRecords skipped:', e.message); }
     calculateLiveReportStats();
     updateWorkforceStats();
     updateDistributionIndicator();
