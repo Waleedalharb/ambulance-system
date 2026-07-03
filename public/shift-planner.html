@@ -749,7 +749,7 @@
             });
         });
         if (available.length === 0) { showToast('لا يوجد أعضاء متاحين لهذا اليوم', 'error'); return; }
-        var names = available.map(function(m) { return m.name; }).join('\n');
+        var names = available.map(function(m) { return m.name || '—'; }).join('\n');
         var selected = prompt('اختر الأعضاء (افصل بينهم بفاصلة):\n\nمتاحون:\n' + names);
         if (selected === null) return;
         var selectedNames = selected.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
@@ -782,9 +782,9 @@
             var roleLabels = { paramedic: 'مسعف', driver: 'سائق', nurse: 'ممرض', supervisor: 'مشرف', doctor: 'طبيب' };
             html +=
                 '<div class="team-member">' +
-                    '<div class="avatar">' + m.name.charAt(0) + '</div>' +
+                    '<div class="avatar">' + (m.name ? String(m.name).charAt(0) : '?') + '</div>' +
                     '<div class="info">' +
-                        '<div class="name">' + m.name + '</div>' +
+                        '<div class="name">' + (m.name || '—') + '</div>' +
                         '<div class="role">' + (roleLabels[m.role] || m.role) + ' • ' + m.center + ' • ' + m.phone + '</div>' +
                     '</div>' +
                     '<div class="status ' + statusClass + '"></div>' +
@@ -846,7 +846,7 @@
     function populateLeaveMembers() {
         var select = document.getElementById('leaveMember');
         select.innerHTML = teamMembers.map(function(m) {
-            return '<option value="' + m.id + '">' + m.name + '</option>';
+            return '<option value="' + m.id + '">' + (m.name || '—') + '</option>';
         }).join('');
     }
 
@@ -932,7 +932,7 @@
                 // Pick random members for this shift
                 var count = Math.min(settings.minPerShift || 3, available.length);
                 var shuffled = available.sort(function() { return Math.random() - 0.5; });
-                scheduleData[dateKey][shift.key] = shuffled.slice(0, count).map(function(m) { return m.name; });
+                scheduleData[dateKey][shift.key] = shuffled.slice(0, count).map(function(m) { return m.name || '—'; });
             });
         }
 
@@ -996,7 +996,7 @@
                     if (!row[0]) continue;
                     teamMembers.push({
                         id: Date.now().toString() + '_' + i,
-                        name: row[0],
+                        name: String(row[0]).trim(),
                         role: row[1] || 'paramedic',
                         phone: row[2] || '',
                         center: row[3] || '—',
