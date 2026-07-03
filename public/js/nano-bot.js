@@ -445,7 +445,7 @@
         }
 
         connectWebSocket() {
-            const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
+            const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws';
             
             try {
                 this.ws = new WebSocket(wsUrl);
