@@ -14,7 +14,7 @@ try {
 // App Version Check — force refresh on update
 // ============================================
 (function() {
-    var APP_VERSION = 'v16-2026-07-05';
+    var APP_VERSION = 'v17-2026-07-06';
     var storedVersion = localStorage.getItem('appVersion');
     if (storedVersion && storedVersion !== APP_VERSION) {
         console.log('🔄 App updated. Forcing refresh...');
@@ -2831,6 +2831,15 @@ function openShiftModal() {
         var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
         var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
         
+        // Restore currentShiftId from localStorage if lost (after page refresh)
+        if (!currentShiftId) {
+            try {
+                var savedId = localStorage.getItem('currentShiftId');
+                if (savedId) currentShiftId = parseInt(savedId);
+            } catch(e) {}
+        }
+        
+        // Try to find by ID first, verify it matches current date/type
         if (currentShiftId && allShifts && allShifts.length > 0) {
             for (var i = 0; i < allShifts.length; i++) {
                 if (allShifts[i].id === currentShiftId) {
@@ -2846,6 +2855,7 @@ function openShiftModal() {
             }
         }
         
+        // If not found by ID, try by date + type
         if (!currentShift && allShifts && allShifts.length > 0) {
             for (var i = 0; i < allShifts.length; i++) {
                 if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
@@ -2859,8 +2869,17 @@ function openShiftModal() {
         if (currentShift) {
             loadShiftToForm(currentShift);
         } else {
-            clearShiftForm();
-            document.getElementById('shiftDate').innerText = getSaudiDate();
+            // No saved shift found - check for draft in localStorage
+            var draft = loadShiftDraft();
+            if (draft && draft.centersData && Object.keys(draft.centersData).length > 0) {
+                console.log('[DRAFT] Found draft data, loading into form');
+                clearShiftForm(); // Reset form first
+                loadDraftToForm(draft);
+                showNotification('📝 استعادة', 'تم استعادة البيانات المحفوظة مؤقتاً. اضغط حفظ لتأكيدها.', 'info', 5000);
+            } else {
+                clearShiftForm();
+                document.getElementById('shiftDate').innerText = getSaudiDate();
+            }
         }
     });
     
@@ -3055,6 +3074,135 @@ async function undoLastReport(center, unit) {
     }
 }
 
+
+// ============================================
+// نظام الحفظ المؤقت (Draft) - لمنع فقدان البيانات
+// ============================================
+function getShiftDraftKey() {
+    var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+    var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    return 'shiftDraft_' + shiftDate + '_' + shiftType;
+}
+
+function getShiftDraftKeyFor(date, type) {
+    return 'shiftDraft_' + date + '_' + type;
+}
+
+function saveShiftDraft() {
+    try {
+        var shiftData = getShiftFromForm();
+        var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        var draft = {
+            shiftDate: shiftDate,
+            shiftType: shiftType,
+            timestamp: Date.now(),
+            data: shiftData
+        };
+        localStorage.setItem(getShiftDraftKey(), JSON.stringify(draft));
+        console.log('[DRAFT] Saved draft for', shiftDate, shiftType);
+    } catch(e) { console.error('[DRAFT] Failed to save draft:', e); }
+}
+
+function loadShiftDraft() {
+    try {
+        var key = getShiftDraftKey();
+        var draftJson = localStorage.getItem(key);
+        if (!draftJson) return null;
+        var draft = JSON.parse(draftJson);
+        // Only use draft if it's from the same shift (same date & type)
+        var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        if (draft.shiftDate !== currentDate || draft.shiftType !== currentType) {
+            console.log('[DRAFT] Draft expired (different shift), ignoring');
+            return null;
+        }
+        console.log('[DRAFT] Loaded draft for', currentDate, currentType);
+        return draft.data;
+    } catch(e) { console.error('[DRAFT] Failed to load draft:', e); return null; }
+}
+
+function loadShiftDraftFor(date, type) {
+    try {
+        var key = getShiftDraftKeyFor(date, type);
+        var draftJson = localStorage.getItem(key);
+        if (!draftJson) return null;
+        var draft = JSON.parse(draftJson);
+        return draft.data;
+    } catch(e) { return null; }
+}
+
+function clearShiftDraft() {
+    try {
+        localStorage.removeItem(getShiftDraftKey());
+        console.log('[DRAFT] Cleared draft');
+    } catch(e) {}
+}
+
+function clearShiftDraftFor(date, type) {
+    try {
+        localStorage.removeItem(getShiftDraftKeyFor(date, type));
+    } catch(e) {}
+}
+
+function hasShiftDraft() {
+    return loadShiftDraft() !== null;
+}
+
+function loadDraftToForm(draftData) {
+    if (!draftData || !draftData.centersData) return;
+    console.log('[DRAFT] Loading draft data into form');
+    
+    // Load shift type
+    if (draftData.shiftType) {
+        document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) {
+            radio.checked = (radio.value === draftData.shiftType);
+        });
+    }
+    
+    // Load rapid response teams
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var data = draftData.centersData[rapid.name] || {};
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        updateRapidStatusIcon(r);
+    }
+    
+    // Load centers
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var data = draftData.centersData[center] || {};
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        var vehicleSel = document.getElementById('vehicle_' + i);
+        var fuelSel = document.getElementById('fuel_' + i);
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        if (vehicleSel) vehicleSel.value = data.vehicleStatus || '';
+        if (fuelSel) fuelSel.value = data.fuelLevel || '';
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        updateStatusIcon(i);
+    }
+    
+    // Load general notes
+    if (draftData.generalNotes) {
+        document.getElementById('generalNotes').value = draftData.generalNotes;
+    }
+    
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+}
+
 // ============================================
 // دوال المناوبة (view, return, save, delete)
 // ============================================
@@ -3144,7 +3292,25 @@ async function saveShiftData(silent) {
         var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(body) });
         var result = await response.json();
         if (result.success) {
-            if (result.shiftId) currentShiftId = result.shiftId;
+            if (result.shiftId) {
+                currentShiftId = result.shiftId;
+                // Persist currentShiftId to localStorage to survive page refreshes
+                try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
+            }
+            
+            // Save a copy to localStorage as lastSavedShift (for recovery after refresh)
+            try {
+                var savedData = {
+                    shiftId: currentShiftId,
+                    shiftDate: shiftDate,
+                    shiftType: shiftType,
+                    data: shiftData,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('lastSavedShift_' + shiftDate + '_' + shiftType, JSON.stringify(savedData));
+                // Clear draft since we have a saved version
+                clearShiftDraft();
+            } catch(e) {}
             
             if (!silent) {
                 // Manual save: reload UI and show confirmation
@@ -6567,6 +6733,8 @@ function initAutoSave() {
 async function autoSaveShift() {
     try {
         var shiftData = getShiftFromForm();
+        // Always save draft to localStorage first (survives page refresh)
+        saveShiftDraft();
         showAutoSaveIndicator('saving');
         var success = await saveShiftData(true);
         if (success) {
@@ -7566,6 +7734,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     btn = document.getElementById("deleteShiftBtn"); if (btn) btn.onclick = deleteCurrentShift;
     btn = document.getElementById("viewShiftBtn"); if (btn) btn.onclick = viewShiftReports;
     btn = document.getElementById("returnToCurrentBtn"); if (btn) btn.onclick = returnToCurrentShift;
+    
+    // Restore currentShiftId from localStorage after page refresh
+    if (!currentShiftId) {
+        try {
+            var savedId = localStorage.getItem('currentShiftId');
+            if (savedId) currentShiftId = parseInt(savedId);
+        } catch(e) {}
+    }
+    
+    // Save draft before page unload (browser close/refresh)
+    window.addEventListener('beforeunload', function(e) {
+        var modal = document.getElementById('shiftModal');
+        if (modal && modal.style.display !== 'none' && _pendingChanges) {
+            saveShiftDraft();
+        }
+    });
 });
 
 // فحص التنبيهات كل 30 ثانية (بدلاً من 10 ثواني لتقليل الضغط)
