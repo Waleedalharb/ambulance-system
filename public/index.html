@@ -47,8 +47,98 @@
     <!-- html2pdf.js لتصدير PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <link rel="stylesheet" href="css/smart-toolbar.css?v=2">
-    <link rel="stylesheet" href="css/app.css?v=9">
+    <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
+    <link rel="stylesheet" href="css/app.css?v=10">
+<script src="js/shift-codes-config.js"></script>
+    <style>
+    /* Paramedic display in shift completion */
+    .paramedic-box {
+        min-width: 140px;
+        max-width: 200px;
+    }
+    .paramedic-list {
+        max-height: 90px;
+        overflow-y: auto;
+        padding: 2px 4px;
+    }
+    .paramedic-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 0;
+        font-size: 0.7rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .paramedic-item:last-child {
+        border-bottom: none;
+    }
+    .paramedic-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .paramedic-dot.present {
+        background: #06D6A0;
+        box-shadow: 0 0 4px rgba(6,214,160,0.4);
+    }
+    .paramedic-dot.absent {
+        background: #EF476F;
+        box-shadow: 0 0 4px rgba(239,71,111,0.4);
+    }
+    .paramedic-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gray-800);
+    }
+    .paramedic-code {
+        color: var(--gray-500);
+        font-size: 0.6rem;
+        background: var(--gray-100);
+        padding: 1px 4px;
+        border-radius: 4px;
+    }
+    .staff-count-display {
+        text-align: center;
+        margin-top: 4px;
+        font-weight: 600;
+        color: var(--primary-700);
+        font-size: 0.75rem;
+    }
+    .fallback-staff-input {
+        text-align: center;
+        margin-top: 4px;
+    }
+    .fallback-staff-input input {
+        width: 50px;
+        text-align: center;
+        padding: 4px;
+        border: 1px solid var(--gray-200);
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+    .paramedic-toggle-manual {
+        font-size: 0.6rem;
+        color: var(--primary-500);
+        cursor: pointer;
+        text-decoration: underline;
+        text-align: center;
+        display: block;
+        margin-top: 2px;
+    }
+    .paramedic-toggle-manual:hover {
+        color: var(--primary-700);
+    }
+    .paramedic-no-data {
+        color: var(--gray-400);
+        font-size: 0.65rem;
+        text-align: center;
+        padding: 4px 0;
+    }
+    </style>
 </head>
 <body>
 <!-- ===== شاشة تسجيل الدخول ===== -->
@@ -92,9 +182,9 @@
         </div>
         <div class="topbar-center">
             <div class="quick-actions">
-                <button class="qa-btn" title="مناوبة جديدة" onclick="startNewShift()">
-                    <i class="fas fa-rotate-right"></i>
-                    <span>مناوبة</span>
+                <button class="qa-btn" title="النوبة الحالية" id="currentShiftBtn" disabled style="opacity:1; cursor:default;">
+                    <i class="fas fa-clock"></i>
+                    <span id="currentShiftDisplay">جاري التحميل...</span>
                 </button>
                 <button class="qa-btn" title="تكميل النوبة" onclick="openShiftModal();">
                     <i class="fas fa-clipboard-list"></i>
@@ -104,17 +194,21 @@
                     <i class="fas fa-ambulance"></i>
                     <span>توزيع</span>
                 </button>
-                <button class="qa-btn" title="إدخال بلاغات الفرق" onclick="window.location.href='report-entry.html';">
+                <button class="qa-btn" title="إدخال بلاغات الفرق" onclick="window.location.href='report-entry.html?v=10';">
                     <i class="fas fa-clipboard-check"></i>
                     <span>إدخال بلاغات</span>
                 </button>
-                <button class="qa-btn" title="نظام الجداول" onclick="window.location.href='smart-schedule.html';">
+                <button class="qa-btn" title="التقرير اليومي" onclick="window.location.href='daily-report.html?v=10';">
+                    <i class="fas fa-file-medical-alt"></i>
+                    <span>تقرير يومي</span>
+                </button>
+                <button class="qa-btn" title="نظام الجداول" onclick="window.location.href='smart-schedule.html?v=10';">
                     <i class="fas fa-calendar-alt"></i>
                     <span>الجداول</span>
                 </button>
-                <button class="qa-btn" title="مخطط المناوبات" onclick="window.location.href='shift-planner.html';">
+                <button class="qa-btn" title="مخطط المناوبات" onclick="window.location.href='shift-planner.html?v=10';">
                     <i class="fas fa-users-cog"></i>
-                    <span>مناوبات</span>
+                    <span>مخطط المناوبات</span>
                 </button>
                 <button class="qa-btn" title="النماذج" onclick="document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && typeof FORM_DEFINITIONS !== 'undefined' && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);">
                     <i class="fas fa-file-alt"></i>
@@ -129,10 +223,13 @@
         <div class="topbar-right">
             <div class="topbar-info">
                 <span id="currentDateTopbar">الأحد 15 ديسمبر 2024</span>
-                <span id="userDisplay" style="color:#FFD166; font-weight:600; margin-left:8px;"></span>
+                <span id="userDisplay" style="color:#FFD166; font-weight:600; margin-left:8px; cursor:pointer;" title="إعدادات المستخدم" onclick="showChangePasswordModal();"></span>
                 <span class="status-indicator">🟢</span>
             </div>
-            <button class="operations-room-btn" id="opsRoomBtn" title="غرفة العمليات الذكية" onclick="window.location.href='operations-command.html';" style="background: linear-gradient(135deg, #1E3A5F, #10B981);">
+            <button class="operations-room-btn" id="changePasswordBtn" title="تغيير الرقم السري" onclick="showChangePasswordModal();" style="background: linear-gradient(135deg, #3B82F6, #1D4ED8); margin-right: 4px;">
+                <i class="fas fa-key"></i>
+            </button>
+            <button class="operations-room-btn" id="opsRoomBtn" title="غرفة العمليات الذكية" onclick="window.location.href='operations-command.html?v=10';" style="background: linear-gradient(135deg, #1E3A5F, #10B981);">
                 <i class="fas fa-rocket"></i>
                 <span>EOCC</span>
             </button>
@@ -197,13 +294,15 @@
         </div>
         <div class="toolbar">
             <!-- ===== المجموعة الأولى: من اليمين ===== -->
-            <button id="newShiftBtn" class="btn btn-shift-status" onclick="startNewShift()">
-                <span class="shift-btn-dot" id="newShiftDot"></span>
-                <span class="shift-btn-text" id="newShiftText">مناوبة جديدة</span>
+            <button id="newShiftBtn" class="btn btn-shift-status on" disabled style="opacity:1; cursor:default;">
+                <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
+                <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>
             <button id="shiftBtn" class="btn btn-secondary"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
-            <button class="btn btn-info" onclick="window.location.href='smart-schedule.html'"><i class="fas fa-calendar-alt"></i> الجداول</button>
+            <button class="btn btn-info" onclick="window.location.href='smart-schedule.html?v=10'"><i class="fas fa-calendar-alt"></i> الجداول</button>
+            <button class="btn btn-info" onclick="window.location.href='shift-planner.html?v=10'" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
+            <button class="btn btn-daily-report" onclick="window.location.href='daily-report.html?v=10'"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
             <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="controlBtn" class="btn btn-control"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
             <button id="formsBtn" class="btn btn-forms"><i class="fas fa-file-alt"></i> النماذج</button>
@@ -211,6 +310,9 @@
             <button id="chartsBtn" class="btn btn-charts"><i class="fas fa-chart-line"></i> إحصائيات</button>
             <button id="analyticsBtn" class="btn" style="background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; font-weight:700;">
                 <i class="fas fa-tachometer-alt"></i> لوحة التحكم
+            </button>
+            <button class="btn" onclick="window.location.href='admin-dashboard.html?v=10'" style="background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; font-weight:700;">
+                <i class="fas fa-heartbeat"></i> مراقب النظام
             </button>
             <button id="achievementsBtn" class="btn" style="background:linear-gradient(135deg, #FFD700, #FFA500); color:#0F172A; border:none; font-weight:700;" title="الإنجازات">
                 <i class="fas fa-trophy"></i> الإنجازات
@@ -223,11 +325,29 @@
             <button id="operationsRoomBtn" class="btn" onclick="openOperationsRoom()" style="background:linear-gradient(135deg, #00D4FF, #007BFF); color:white; border-color:#00D4FF;">
     <i class="fas fa-rocket"></i> غرفة العمليات
 </button>
+            <!-- ===== Notification Bell Dropdown ===== -->
+            <div style="position:relative; z-index:5000;">
+                <button id="notificationBellBtn" class="btn" style="background:linear-gradient(135deg, #EF4444, #DC2626); color:white; border:none; font-weight:700; position:relative;" title="الإشعارات" onclick="toggleNotificationPanel(event)">
+                    <i class="fas fa-bell" id="notificationBellIcon"></i>
+                    <span id="notificationBadge" style="position:absolute; top:-6px; right:-6px; background:#FFD700; color:#1E3A5F; font-size:0.65rem; font-weight:800; width:18px; height:18px; border-radius:50%; display:none; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);">0</span>
+                </button>
+                <div id="notificationPanel" style="display:none; position:fixed; top:70px; right:20px; min-width:360px; max-width:400px; max-height:500px; background:var(--white); border:1px solid var(--gray-200); border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.15); z-index:9999; overflow:hidden; direction:rtl;" onclick="event.stopPropagation()">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--gray-200); background:var(--gray-50);">
+                        <span style="font-weight:700; font-size:0.9rem; color:var(--text);"><i class="fas fa-bell" style="margin-left:8px; color:var(--coral);"></i> الإشعارات</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span id="notificationCount" style="font-size:0.75rem; color:var(--gray-500);">0</span>
+                            <button onclick="markAllNotificationsRead()" style="background:none; border:none; color:var(--primary-700); font-size:0.7rem; cursor:pointer; padding:2px 6px; border-radius:4px;" title="تحديد الكل كمقروء">تحديد الكل</button>
+                            <button onclick="clearAllNotifications()" style="background:none; border:none; color:var(--coral); font-size:0.7rem; cursor:pointer; padding:2px 6px; border-radius:4px;" title="مسح الكل"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                    <div id="notificationList" style="max-height:400px; overflow-y:auto; padding:0;">
+                        <p style="text-align:center; color:var(--gray-400); padding:24px; font-size:0.85rem;">📭 لا توجد إشعارات</p>
+                    </div>
+                </div>
+            </div>
+
             <button id="soundSettingsBtn" class="btn" style="background:linear-gradient(135deg, #E040FB, #7C4DFF); color:white; border:none; font-weight:700;" title="إعدادات الصوت">
                 <i class="fas fa-volume-up" id="soundIcon"></i>
-            </button>
-            <button onclick="requestPushNotification()" class="btn" style="background:linear-gradient(135deg, #EF4444, #DC2626); color:white; border:none; font-weight:700;" title="إشعارات">
-                <i class="fas fa-bell"></i>
             </button>
         </div>
     </div>
@@ -411,7 +531,7 @@
     </div>
 
 
-    <footer>جميع الحقوق محفوظة © 2026 | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض | South Sector Emergency Operations Platform</footer>
+    <footer style="font-size:0.7rem;text-align:center;margin-top:auto;padding:12px 0;color:var(--gray-500);">جميع الحقوق محفوظة © 2026 | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</footer>
 </div>
 
 <!-- ============================================================ -->
@@ -534,14 +654,24 @@
                 <button onclick="drawCoverageCircles()" class="btn" style="font-size:0.75rem;">
                     <i class="fas fa-bullseye"></i> مناطق التغطية
                 </button>
+                <button onclick="toggleMapEditMode()" id="mapEditBtn" class="btn" style="font-size:0.75rem; background:var(--gold); color:#333;">
+                    <i class="fas fa-map-marker-alt"></i> تعديل الموقع
+                </button>
                 <button onclick="closeMapPreview()" class="btn"><i class="fas fa-times"></i></button>
             </div>
         </div>
-        <div class="map-frame">
+        <div class="map-frame" id="mapFrameContainer">
+            <div id="mapEditHint" style="display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(239,71,111,0.95); color:#fff; padding:6px 14px; border-radius:20px; font-size:12px; z-index:1000; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                <i class="fas fa-hand-pointer"></i> انقر على الخريطة لتحديد موقع جديد
+            </div>
             <iframe id="mapFrame" loading="lazy" style="width:100%; height:350px; border:0;"></iframe>
             <div id="mapLeaflet" style="display:none;"></div>
         </div>
         <div id="mapLocationText" class="map-location-text"></div>
+        <div id="mapAddressEdit" style="margin-top:8px; display:none;">
+            <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">اسم الموقع:</label>
+            <input type="text" id="mapAddressInput" placeholder="مثال: طريق الملك فهد، الرياض" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; background:var(--bg-glass); color:var(--text);">
+        </div>
         <div id="nearestUnitResult"></div>
         <div class="modal-buttons">
             <button onclick="closeMapPreview()" class="btn"><i class="fas fa-times"></i> إغلاق</button>
@@ -614,6 +744,7 @@
                     <!-- Left: Form -->
                     <div class="peak-form-card">
                         <h3><i class="fas fa-plus-circle" style="color:var(--primary-700);"></i> إنشاء خطة تمركز جديدة</h3>
+                        <form id="peakPlanForm" onsubmit="event.preventDefault();">
                         <div class="form-row-grid">
                             <div class="form-group">
                                 <label>عنوان الخطة</label>
@@ -702,10 +833,11 @@
                             <textarea id="peakNotes" rows="2" placeholder="أي ملاحظات..."></textarea>
                         </div>
                         <div class="form-actions">
-                            <button onclick="clearPeakForm()" class="btn btn-danger"><i class="fas fa-eraser"></i> مسح</button>
-                            <button onclick="savePeakPlan()" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الخطة</button>
-                            <button onclick="sendPeakAlert()" class="btn btn-success"><i class="fas fa-bell"></i> إرسال تنبيه</button>
+                            <button type="button" onclick="clearPeakForm()" class="btn btn-danger"><i class="fas fa-eraser"></i> مسح</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ الخطة</button>
+                            <button type="button" onclick="sendPeakAlert()" class="btn btn-success"><i class="fas fa-bell"></i> إرسال تنبيه</button>
                         </div>
+                        </form>
                     </div>
                     <!-- Right: AI Suggestions -->
                     <div class="peak-form-card" style="background:var(--gray-50);">
@@ -951,7 +1083,7 @@
                 </div>
                 <div class="shift-header-text">
                     <h2>تكميل النوبة</h2>
-                    <p>تسجيل بيانات تكميل النوبة</p>
+                    <p id="shiftModalTypeBadge">جاري التحميل...</p>
                 </div>
             </div>
             <button class="shift-close-btn close-btn" onclick="document.getElementById('shiftModal').style.display = 'none'" aria-label="إغلاق">
@@ -1028,23 +1160,26 @@
             <div class="shift-form-row form-row">
                 <label><i class="fas fa-archive"></i> المناوبات السابقة:</label>
                 <select id="shiftArchiveSelect"><option value="">-- مناوبة جديدة --</option></select>
+                <button id="returnToCurrentBtnInModal" class="btn" style="display:none; color:var(--primary); background:transparent; border:1px solid var(--primary); padding:4px 12px; font-size:0.75rem; margin-right:8px;" onclick="selectShiftFromHistory(null);">
+                    <i class="fas fa-arrow-right"></i> العودة للحالية
+                </button>
                 <button id="deleteShiftBtn" class="shift-btn shift-btn-danger btn-incomplete" onclick="deleteShift()"><i class="fas fa-trash"></i> حذف المناوبة</button>
             </div>
             <div class="shift-form-row form-row">
                 <label><i class="fas fa-calendar-day"></i> اليوم والتاريخ:</label>
                 <span id="shiftDate" class="shift-date-display"></span>
             </div>
-            <div class="shift-form-row form-row">
+            <div class="shift-form-row form-row" style="display:none;">
                 <label><i class="fas fa-clock"></i> توقيت المناوبة:</label>
                 <div class="shift-type-selector">
                     <label class="shift-type-option">
-                        <input type="radio" name="shiftType" value="صباحية">
+                        <input type="radio" name="shiftType" value="صباح">
                         <span class="shift-type-label">
                             <i class="fas fa-sun"></i> صباحي
                         </span>
                     </label>
                     <label class="shift-type-option">
-                        <input type="radio" name="shiftType" value="ليلية">
+                        <input type="radio" name="shiftType" value="ليل">
                         <span class="shift-type-label">
                             <i class="fas fa-moon"></i> ليلي
                         </span>
@@ -1053,62 +1188,47 @@
             </div>
         </div>
 
-        <!-- Rapid Response Teams -->
+        <!-- Combined Teams Section -->
         <div class="section-card">
-            <h3 class="shift-section-title section-title"><i class="fas fa-bolt"></i> تحضير فرق التدخل السريع</h3>
+            <h3 class="shift-section-title section-title"><i class="fas fa-ambulance"></i> فرق التكميل</h3>
+
+            <!-- Presets Bar -->
+            <div class="shift-presets-bar presets-bar">
+                <span class="shift-presets-label"><i class="fas fa-bolt"></i> إجراءات سريعة:</span>
+                <button onclick="applyPreset('full')" class="shift-preset-btn preset-btn preset-full">
+                    <i class="fas fa-check-double"></i> تكميل كامل
+                </button>
+                <button onclick="applyPreset('emergency')" class="shift-preset-btn preset-btn preset-emergency">
+                    <i class="fas fa-exclamation-triangle"></i> حالة طوارئ
+                </button>
+                <button onclick="applyPreset('maintenance')" class="shift-preset-btn preset-btn preset-maintenance">
+                    <i class="fas fa-wrench"></i> صيانة دورية
+                </button>
+                <button onclick="applyPreset('start')" class="shift-preset-btn preset-btn preset-start">
+                    <i class="fas fa-redo"></i> بداية مناوبة
+                </button>
+                <span class="shift-presets-hint"><i class="fas fa-lightbulb"></i> يمكنك تعديل أي فريق يدوياً بعد تطبيق الإجراء</span>
+            </div>
+
+            <!-- Combined Table -->
             <div class="shift-table-wrapper">
-            <table id="rapidTable" class="shift-table shift-table-rapid">
-                <thead><tr><th>النداء</th><th>التمركز</th></tr></thead>
-                <tbody>
-                    <tr><td>سريع 1</td><td><input type="text" class="rapid-location" data-unit="سريع 1"></td></tr>
-                    <tr><td>سريع 2</td><td><input type="text" class="rapid-location" data-unit="سريع 2"></td></tr>
-                    <tr><td>سريع 3</td><td><input type="text" class="rapid-location" data-unit="سريع 3"></td></tr>
-                    <tr><td>سريع 4</td><td><input type="text" class="rapid-location" data-unit="سريع 4"></td></tr>
-                </tbody>
-            </table>
-        </div>
-        </div>
-
-        <!-- Centers Section -->
-        <div class="section-card">
-            <h3 class="shift-section-title section-title"><i class="fas fa-hospital"></i> المراكز الإسعافية</h3>
-
-        <!-- Presets Bar -->
-        <div class="shift-presets-bar presets-bar">
-            <span class="shift-presets-label"><i class="fas fa-bolt"></i> إجراءات سريعة:</span>
-            <button onclick="applyPreset('full')" class="shift-preset-btn preset-btn preset-full">
-                <i class="fas fa-check-double"></i> تكميل كامل
-            </button>
-            <button onclick="applyPreset('emergency')" class="shift-preset-btn preset-btn preset-emergency">
-                <i class="fas fa-exclamation-triangle"></i> حالة طوارئ
-            </button>
-            <button onclick="applyPreset('maintenance')" class="shift-preset-btn preset-btn preset-maintenance">
-                <i class="fas fa-wrench"></i> صيانة دورية
-            </button>
-            <button onclick="applyPreset('start')" class="shift-preset-btn preset-btn preset-start">
-                <i class="fas fa-redo"></i> بداية مناوبة
-            </button>
-            <span class="shift-presets-hint"><i class="fas fa-lightbulb"></i> يمكنك تعديل أي مركز يدوياً بعد تطبيق الإجراء</span>
-        </div>
-
-        <!-- Centers Table -->
-        <div class="shift-table-wrapper">
-            <table id="centersTable" class="shift-table shift-table-centers">
-                <thead>
-                    <tr>
-                        <th>المركز</th>
-                        <th>الحالة</th>
-                        <th>المسعفين</th>
-                        <th>السيارات</th>
-                        <th>إجراء سريع</th>
-                        <th>ملاحظات</th>
-                        <th>الحالة</th>
-                        <th>الوقود</th>
-                    </tr>
-                </thead>
-                <tbody id="centersTableBody"></tbody>
-            </table>
-        </div>
+                <table id="centersTable" class="shift-table shift-table-centers">
+                    <thead>
+                        <tr>
+                            <th>النوع</th>
+                            <th>الفرقة</th>
+                            <th>الحالة</th>
+                            <th>الكادر</th>
+                            <th>السيارات</th>
+                            <th>إجراء سريع</th>
+                            <th>ملاحظات</th>
+                            <th>المركبة</th>
+                            <th>الوقود</th>
+                        </tr>
+                    </thead>
+                    <tbody id="centersTableBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Workforce Stats -->
@@ -1526,8 +1646,14 @@
                 <option value="">-- اختر التاريخ --</option>
             </select>
         </div>
-        <div class="modal-buttons" style="justify-content:center;">
+        <div class="modal-buttons" style="justify-content:center; gap:12px;">
             <button onclick="viewSelectedArchiveShift()" class="btn btn-primary" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-eye"></i> استعراض البيانات</button>
+            <button onclick="editSelectedArchiveShift()" class="btn btn-success" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-edit"></i> تعديل التكميل</button>
+        </div>
+        <div style="margin-top:16px; text-align:center; border-top:1px solid var(--gray-200); padding-top:16px;">
+            <button onclick="selectShiftFromHistory(null); document.getElementById('shiftArchiveModal').style.display='none';" class="btn" style="color:var(--primary); background:transparent; border:1px solid var(--primary);">
+                <i class="fas fa-arrow-right"></i> العودة للمناوبة الحالية
+            </button>
         </div>
     </div>
 </div>
@@ -1695,18 +1821,20 @@
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); startNewShift();"><i class="fas fa-rotate-right"></i> مناوبة جديدة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openShiftModal();"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='shift-planner.html';"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html?v=10';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='daily-report.html?v=10';"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html?v=10';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='shift-planner.html?v=10';"><i class="fas fa-users-cog"></i> مخطط المناوبات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('controlModal').style.display='flex'; loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('chartsModal').style.display='flex'; renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('analyticsModal').style.display='flex'; renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='admin-dashboard.html?v=10';"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('achievementsModal').style.display='flex'; renderAchievements();"><i class="fas fa-trophy"></i> الإنجازات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openShiftArchiveModal();"><i class="fas fa-archive"></i> أرشيف البلاغات</button>
             </div>
         </div>
@@ -1719,7 +1847,7 @@
             </div>
             <div class="group-items">
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('soundSettingsPanel').style.display='flex';"><i class="fas fa-volume-up"></i> إعدادات الصوت</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); requestPushNotification();"><i class="fas fa-bell"></i> إشعارات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); toggleNotificationPanel();"><i class="fas fa-bell"></i> الإشعارات</button>
             </div>
         </div>
     </nav>
@@ -1734,9 +1862,32 @@
 <script src="js/websocket-sync.js"></script>
 <script src="js/frontend-monitor.js?v=1"></script>
 <script src="js/app.js?v=12" defer></script>
-<script src="js/smart-toolbar.js?v=2" defer></script>
+<script src="js/smart-toolbar.js?v=3" defer></script>
+<!-- NANO AI Bot Assistant -->
+<link rel="stylesheet" href="/css/nano-bot.css">
+<script src="/js/nano-bot.js"></script>
 <!-- NANO AI Bot Assistant -->
 <link rel="stylesheet" href="/css/nano-bot.css">
 <script src="/js/nano-bot.js"></script>
 </body>
-</html>
+</html><!-- ===== نافذة سجل العمليات ===== -->
+<div id="auditLogModal" class="modal" style="display:none; z-index:9999;">
+    <div class="modal-content" style="max-width:900px; width:95%; max-height:85vh; display:flex; flex-direction:column; padding:0;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--gray-200); display:flex; justify-content:space-between; align-items:center; background:var(--white); flex-shrink:0; border-radius:16px 16px 0 0;">
+            <h3 style="margin:0; font-size:1.1rem; color:var(--primary-700);"><i class="fas fa-history" style="margin-left:8px;"></i> سجل العمليات</h3>
+            <button onclick="closeAuditLogModal()" class="peak-close-btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:20px; flex:1; overflow-y:auto; min-height:0; background:var(--white);">
+            <div style="margin-bottom:15px; display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-sm" onclick="filterAuditLog('all')" style="background:var(--primary-700); color:#fff;">الكل</button>
+                <button class="btn btn-sm" onclick="filterAuditLog('report')">بلاغات</button>
+                <button class="btn btn-sm" onclick="filterAuditLog('shift')">مناوبات</button>
+                <button class="btn btn-sm" onclick="filterAuditLog('system')">نظام</button>
+                <button class="btn btn-sm" onclick="filterAuditLog('file')">ملفات</button>
+            </div>
+            <div id="auditLogContainer" style="display:flex; flex-direction:column; gap:8px;">
+                <p style="text-align:center; color:var(--gray-400); padding:20px;">جاري تحميل السجل...</p>
+            </div>
+        </div>
+    </div>
+</div>
