@@ -1245,7 +1245,7 @@
                     <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
                 </button>
                 <button class="btn btn-danger" onclick="clearServerRoster()">
-                    <i class="fas fa-trash-alt"></i> حذف بيانات السيرفر
+                    <i class="fas fa-trash-alt"></i> مسح كل البيانات
                 </button>
             </div>
         </div>
@@ -1950,6 +1950,7 @@
             if (!database) return;
             var tx = database.transaction('employees', 'readwrite');
             var store = tx.objectStore('employees');
+            store.clear(); // 🧹 امسح القديم قبل إضافة الجديد!
             for (var i = 0; i < employees.length; i++) {
                 store.put(employees[i]);
             }
@@ -2734,29 +2735,53 @@
         }
 
         async function clearServerRoster() {
-            if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر!\n\nهل أنت متأكد؟')) return;
-            var token = localStorage.getItem('authToken');
-            if (!token) {
-                showToast('يجب تسجيل الدخول أولاً', 'error');
-                return;
-            }
+            if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر ومن المتصفح!\n\nهل أنت متأكد؟')) return;
+            
+            // 1. Clear IndexedDB
             try {
-                var response = await fetch('/api/shift-roster/clear-all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    }
-                });
-                var data = await response.json();
-                if (data.success) {
-                    showToast('✅ ' + (data.message || 'تم حذف بيانات السيرفر'), 'success');
-                } else {
-                    showToast('❌ فشل في الحذف: ' + (data.error || 'خطأ غير معروف'), 'error');
+                var database = await openDB();
+                if (database) {
+                    var tx = database.transaction('employees', 'readwrite');
+                    var store = tx.objectStore('employees');
+                    store.clear();
                 }
-            } catch (err) {
-                console.error('Clear error:', err);
-                showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+            } catch(e) { console.error('IndexedDB clear error:', e); }
+            
+            // 2. Clear localStorage
+            localStorage.removeItem('ss_employees');
+            
+            // 3. Clear in-memory array
+            employees = [];
+            
+            // 4. Update UI
+            updateStats();
+            renderCurrentView();
+            showExtractedTable([]);
+            document.getElementById('analysisSection').classList.add('hidden');
+            
+            // 5. Clear server (if logged in)
+            var token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    var response = await fetch('/api/shift-roster/clear-all', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        }
+                    });
+                    var data = await response.json();
+                    if (data.success) {
+                        showToast('✅ تم حذف جميع البيانات (سيرفر + متصفح)', 'success');
+                    } else {
+                        showToast('⚠️ تم حذف بيانات المتصفح، فشل حذف السيرفر: ' + (data.error || ''), 'warning');
+                    }
+                } catch (err) {
+                    console.error('Server clear error:', err);
+                    showToast('⚠️ تم حذف بيانات المتصفح، السيرفر غير متاح', 'warning');
+                }
+            } else {
+                showToast('✅ تم حذف بيانات المتصفح', 'success');
             }
         }
 

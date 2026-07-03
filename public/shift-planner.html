@@ -391,7 +391,7 @@
                     <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
                 </button>
                 <button class="btn btn-outline btn-danger" onclick="clearServerRoster()" style="border-color:var(--danger);color:var(--danger);">
-                    <i class="fas fa-trash-alt"></i> حذف بيانات السيرفر
+                    <i class="fas fa-trash-alt"></i> مسح كل البيانات
                 </button>
                 <input type="file" id="excelImport" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
             </div>
@@ -1482,32 +1482,37 @@
     }
 
     async function clearServerRoster() {
-        if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر!\n\nهل أنت متأكد؟')) return;
+        if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر ومن المتصفح!\n\nهل أنت متأكد؟')) return;
         
+        // 1. Clear localStorage first
+        importedEmployees = [];
+        localStorage.removeItem('importedEmployees');
+        renderImportedSchedule();
+        
+        // 2. Clear server (if logged in)
         var token = localStorage.getItem('authToken');
-        if (!token) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        
-        try {
-            var response = await fetch('/api/shift-roster/clear-all', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
+        if (token) {
+            try {
+                var response = await fetch('/api/shift-roster/clear-all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                var data = await response.json();
+                if (data.success) {
+                    showToast('✅ تم حذف جميع البيانات (سيرفر + متصفح)', 'success');
+                } else {
+                    showToast('⚠️ تم حذف بيانات المتصفح، فشل حذف السيرفر: ' + (data.error || ''), 'warning');
                 }
-            });
-            
-            var data = await response.json();
-            if (data.success) {
-                showToast('✅ ' + (data.message || 'تم حذف بيانات السيرفر'), 'success');
-            } else {
-                showToast('❌ فشل في الحذف: ' + (data.error || 'خطأ غير معروف'), 'error');
+            } catch (err) {
+                console.error('Clear error:', err);
+                showToast('⚠️ تم حذف بيانات المتصفح، السيرفر غير متاح', 'warning');
             }
-        } catch (err) {
-            console.error('Clear error:', err);
-            showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+        } else {
+            showToast('✅ تم حذف بيانات المتصفح', 'success');
         }
     }
 
