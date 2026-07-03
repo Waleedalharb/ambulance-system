@@ -5735,6 +5735,21 @@ function renderShiftNotes() {
     }
 }
 
+async function loadShiftNotes() {
+    if (currentShiftId) {
+        try {
+            var res = await apiFetch('/api/shift-notes/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var data = await res.json();
+            shiftNotes = data && data.notes ? data.notes : (Array.isArray(data) ? data : []);
+        } catch (e) {
+            shiftNotes = [];
+        }
+    } else {
+        shiftNotes = [];
+    }
+    renderShiftNotes();
+}
+
 function toggleNoteResolved(id) {
     var note = null;
     for (var i = 0; i < shiftNotes.length; i++) {
