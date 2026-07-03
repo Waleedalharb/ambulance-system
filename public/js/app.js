@@ -5713,6 +5713,24 @@ function addStructuredNote() {
     if (textEl) textEl.value = '';
 }
 
+async function loadShiftNotes() {
+    if (currentShiftId) {
+        try {
+            var res = await apiFetch('/api/shift-notes/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var data = await res.json();
+            shiftNotes = data && data.notes ? data.notes : (Array.isArray(data) ? data : []);
+        } catch (e) {
+            shiftNotes = [];
+        }
+    } else {
+        shiftNotes = [];
+    }
+    renderShiftNotes();
+}
+
+function renderShiftNotes() {
+}
+
 function renderShiftNotes() {
     var container = document.getElementById('savedNotesList');
     if (!container) return;
