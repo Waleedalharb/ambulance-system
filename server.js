@@ -1608,7 +1608,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
                 const startDate = new Date(shift.startTime);
                 const utcHour = startDate.getUTCHours();
                 const saudiHour = (utcHour + 3) % 24;
-                const derived = (saudiHour >= 18 || saudiHour < 6) ? 'ليلية' : 'صباحية';
+                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليلية' : 'صباحية';
                 console.log('[SHIFT-TYPE] startTime:', shift.startTime, 'UTC hour:', utcHour, 'Saudi hour:', saudiHour, '→', derived);
                 return derived;
             }
@@ -1629,7 +1629,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             const now = new Date();
             const nowUtcHour = now.getUTCHours();
             const nowSaudiHour = (nowUtcHour + 3) % 24;
-            const fallback = (nowSaudiHour >= 18 || nowSaudiHour < 6) ? 'ليلية' : 'صباحية';
+            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليلية' : 'صباحية';
             console.log('[SHIFT-TYPE] Fallback current UTC:', nowUtcHour, 'Saudi:', nowSaudiHour, '→', fallback);
             return fallback;
         }
