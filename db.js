@@ -260,6 +260,48 @@ const TABLE_SCHEMAS = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  );`,
+
+  // Leave Requests
+  `CREATE TABLE IF NOT EXISTS leave_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    type TEXT DEFAULT 'إجازة' CHECK(type IN ('إجازة', 'مرضية', 'استثنائية')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'cancelled')),
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    approved_by INTEGER,
+    approved_at DATETIME,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+  );`,
+
+  // Shift Schedule Auto
+  `CREATE TABLE IF NOT EXISTS shift_schedule_auto (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    shift_code TEXT NOT NULL,
+    shift_hours INTEGER DEFAULT 12 CHECK(shift_hours IN (8, 12)),
+    mode TEXT DEFAULT 'normal' CHECK(mode IN ('normal', 'alternative')),
+    is_override INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  );`,
+
+  // Staffing Alerts
+  `CREATE TABLE IF NOT EXISTS staffing_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_date TEXT NOT NULL,
+    shift_type TEXT NOT NULL,
+    severity TEXT DEFAULT 'green' CHECK(severity IN ('green', 'yellow', 'red')),
+    message TEXT NOT NULL,
+    recommendation TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved INTEGER DEFAULT 0
   );`
 ];
 
@@ -274,6 +316,13 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_employee ON shift_roster(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_employee ON team_assignments(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_team ON team_assignments(team_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_status ON leave_requests(status);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_dates ON leave_requests(start_date, end_date);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_schedule_auto_date ON shift_schedule_auto(shift_date);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_schedule_auto_employee ON shift_schedule_auto(employee_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_date ON staffing_alerts(alert_date);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_resolved ON staffing_alerts(resolved);`);
     logger.info('Indexes created successfully');
   } catch (idxErr) {
     logger.warn('Some indexes may already exist: ' + idxErr.message);
@@ -762,6 +811,105 @@ const TeamAssignments = {
 };
 
 // ============================================
+// CRUD: LEAVE REQUESTS
+// ============================================
+const LeaveRequests = {
+  async getAll() {
+    return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id ORDER BY lr.created_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.id = ?', [id]);
+  },
+  async getByEmployee(employee_id) {
+    return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.employee_id = ? ORDER BY lr.start_date DESC', [employee_id]);
+  },
+  async getByStatus(status) {
+    return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.status = ? ORDER BY lr.created_at DESC', [status]);
+  },
+  async getActiveForDate(date) {
+    return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.status = \'approved\' AND lr.start_date <= ? AND lr.end_date >= ?', [date, date]);
+  },
+  async getActiveForDateRange(start_date, end_date) {
+    return all('SELECT lr.*, e.name as employee_name, e.employee_code FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE lr.status = \'approved\' AND lr.start_date <= ? AND lr.end_date >= ?', [end_date, start_date]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO leave_requests (employee_id, start_date, end_date, type, status, reason, approved_by, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);', [data.employee_id, data.start_date, data.end_date, data.type || 'إجازة', data.status || 'pending', data.reason || null, data.approved_by || null, data.approved_at || null]);
+    return result.id;
+  },
+  async update(id, data) {
+    return run('UPDATE leave_requests SET employee_id = ?, start_date = ?, end_date = ?, type = ?, status = ?, reason = ?, approved_by = ?, approved_at = ? WHERE id = ?;', [data.employee_id, data.start_date, data.end_date, data.type, data.status, data.reason, data.approved_by, data.approved_at, id]);
+  },
+  async updateStatus(id, status, approved_by) {
+    return run('UPDATE leave_requests SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?;', [status, approved_by, id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM leave_requests WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT SCHEDULE AUTO
+// ============================================
+const ShiftScheduleAuto = {
+  async getAll() {
+    return all('SELECT ssa.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_schedule_auto ssa JOIN employees e ON ssa.employee_id = e.id LEFT JOIN teams t ON ssa.team_id = t.id ORDER BY ssa.shift_date, e.name');
+  },
+  async getById(id) {
+    return get('SELECT ssa.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_schedule_auto ssa JOIN employees e ON ssa.employee_id = e.id LEFT JOIN teams t ON ssa.team_id = t.id WHERE ssa.id = ?', [id]);
+  },
+  async getByMonthYear(month, year) {
+    return all('SELECT ssa.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_schedule_auto ssa JOIN employees e ON ssa.employee_id = e.id LEFT JOIN teams t ON ssa.team_id = t.id WHERE CAST(strftime(\'%m\', ssa.shift_date) AS INTEGER) = ? AND CAST(strftime(\'%Y\', ssa.shift_date) AS INTEGER) = ? ORDER BY ssa.shift_date, e.name', [month, year]);
+  },
+  async getByDate(shift_date) {
+    return all('SELECT ssa.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_schedule_auto ssa JOIN employees e ON ssa.employee_id = e.id LEFT JOIN teams t ON ssa.team_id = t.id WHERE ssa.shift_date = ? ORDER BY e.name', [shift_date]);
+  },
+  async getByEmployeeAndDate(employee_id, shift_date) {
+    return get('SELECT * FROM shift_schedule_auto WHERE employee_id = ? AND shift_date = ?', [employee_id, shift_date]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_schedule_auto (employee_id, team_id, shift_date, shift_code, shift_hours, mode, is_override) VALUES (?, ?, ?, ?, ?, ?, ?);', [data.employee_id, data.team_id || null, data.shift_date, data.shift_code, data.shift_hours || 12, data.mode || 'normal', data.is_override ? 1 : 0]);
+    return result.id;
+  },
+  async update(id, data) {
+    return run('UPDATE shift_schedule_auto SET employee_id = ?, team_id = ?, shift_date = ?, shift_code = ?, shift_hours = ?, mode = ?, is_override = ? WHERE id = ?;', [data.employee_id, data.team_id, data.shift_date, data.shift_code, data.shift_hours, data.mode, data.is_override ? 1 : 0, id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM shift_schedule_auto WHERE id = ?', [id]);
+  },
+  async deleteByMonthYear(month, year) {
+    return run('DELETE FROM shift_schedule_auto WHERE CAST(strftime(\'%m\', shift_date) AS INTEGER) = ? AND CAST(strftime(\'%Y\', shift_date) AS INTEGER) = ?', [month, year]);
+  }
+};
+
+// ============================================
+// CRUD: STAFFING ALERTS
+// ============================================
+const StaffingAlerts = {
+  async getAll() {
+    return all('SELECT * FROM staffing_alerts ORDER BY created_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM staffing_alerts WHERE id = ?', [id]);
+  },
+  async getActive() {
+    return all('SELECT * FROM staffing_alerts WHERE resolved = 0 ORDER BY alert_date, created_at DESC');
+  },
+  async getByDate(alert_date) {
+    return all('SELECT * FROM staffing_alerts WHERE alert_date = ? AND resolved = 0 ORDER BY created_at DESC', [alert_date]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO staffing_alerts (alert_date, shift_type, severity, message, recommendation, resolved) VALUES (?, ?, ?, ?, ?, ?);', [data.alert_date, data.shift_type, data.severity, data.message, data.recommendation || null, data.resolved ? 1 : 0]);
+    return result.id;
+  },
+  async resolve(id) {
+    return run('UPDATE staffing_alerts SET resolved = 1 WHERE id = ?', [id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM staffing_alerts WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -1007,6 +1155,9 @@ module.exports = {
   ShiftCodes,
   ShiftRoster,
   TeamAssignments,
+  LeaveRequests,
+  ShiftScheduleAuto,
+  StaffingAlerts,
 
   // Migration
   migrateAll

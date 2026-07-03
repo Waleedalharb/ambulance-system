@@ -24,7 +24,7 @@ try {
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts;
 }
 
 // Helper: safe DB response
@@ -4594,6 +4594,637 @@ app.delete('/api/team-assignments/:id', authenticate, authorize(['admin']), asyn
     } catch (error) {
         console.error('TeamAssignments DELETE error:', error);
         res.status(500).json({ error: 'فشل في حذف التعيين' });
+    }
+});
+
+// ============================================
+// Smart Scheduling Engine
+// ============================================
+
+const DAY_SHIFT_CODES = ['D12', 'D10', 'D11', 'D8', 'D6'];
+const NIGHT_SHIFT_CODES = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10'];
+const ABSENT_CODES = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+
+async function buildLeaveMap(year, month) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+    
+    const leaveRequests = await db.LeaveRequests.getActiveForDateRange(startDate, endDate);
+    
+    const leaveMap = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        leaveMap[dateStr] = new Set();
+    }
+    
+    for (const lr of leaveRequests) {
+        const start = new Date(lr.start_date);
+        const end = new Date(lr.end_date);
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const curr = new Date(dateStr);
+            if (curr >= start && curr <= end) {
+                leaveMap[dateStr].add(lr.employee_id);
+            }
+        }
+    }
+    return leaveMap;
+}
+
+async function generateNormalSchedule(year, month, leaveMap) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const schedule = [];
+    const alerts = [];
+    
+    const dayShiftCode = 'D12';
+    const nightShiftCode = 'N12';
+    const cycleLength = 8;
+    
+    // Pre-fetch team assignments for all employees
+    const teamAssignments = {};
+    for (const emp of employees) {
+        const assignments = await db.TeamAssignments.getByEmployee(emp.id);
+        const primary = assignments.find(a => a.is_primary) || assignments[0];
+        teamAssignments[emp.id] = primary ? primary.team_id : null;
+    }
+    
+    for (let i = 0; i < employees.length; i++) {
+        const emp = employees[i];
+        const startOffset = (i * 2) % cycleLength;
+        const teamId = teamAssignments[emp.id];
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            
+            if (leaveMap[dateStr].has(emp.id)) {
+                schedule.push({
+                    employee_id: emp.id,
+                    team_id: teamId,
+                    shift_date: dateStr,
+                    shift_code: 'V',
+                    shift_hours: 0,
+                    mode: 'normal',
+                    is_override: 0
+                });
+                continue;
+            }
+            
+            const dayInCycle = (d - 1 + startOffset) % cycleLength;
+            let shiftCode, shiftHours;
+            
+            if (dayInCycle < 2) {
+                shiftCode = dayShiftCode;
+                shiftHours = 12;
+            } else if (dayInCycle < 4) {
+                shiftCode = nightShiftCode;
+                shiftHours = 12;
+            } else {
+                shiftCode = 'WO';
+                shiftHours = 0;
+            }
+            
+            schedule.push({
+                employee_id: emp.id,
+                team_id: teamId,
+                shift_date: dateStr,
+                shift_code: shiftCode,
+                shift_hours: shiftHours,
+                mode: 'normal',
+                is_override: 0
+            });
+        }
+    }
+    
+    // Validate coverage and generate alerts
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayAssignments = schedule.filter(s => s.shift_date === dateStr && DAY_SHIFT_CODES.includes(s.shift_code));
+        const nightAssignments = schedule.filter(s => s.shift_date === dateStr && NIGHT_SHIFT_CODES.includes(s.shift_code));
+        const onLeave = leaveMap[dateStr].size;
+        const available = employees.length - onLeave;
+        
+        if (dayAssignments.length < 2) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'day',
+                severity: dayAssignments.length === 0 ? 'red' : 'yellow',
+                message: `النوبة الصباحية: ${dayAssignments.length}/2 مسعفين`,
+                recommendation: 'تعيين مسعفين إضافيين أو تفعيل الوضع البديل'
+            });
+        }
+        if (nightAssignments.length < 2) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'night',
+                severity: nightAssignments.length === 0 ? 'red' : 'yellow',
+                message: `النوبة الليلية: ${nightAssignments.length}/2 مسعفين`,
+                recommendation: 'تعيين مسعفين إضافيين أو تفعيل الوضع البديل'
+            });
+        }
+        if (available < 8) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'all',
+                severity: 'red',
+                message: `نقص حاد: ${available} متاح من ${employees.length}`,
+                recommendation: 'تفعيل الوضع البديل (8 ساعات) أو نقل موظفين'
+            });
+        }
+    }
+    
+    return { schedule, alerts };
+}
+
+async function generateAlternativeSchedule(year, month, leaveMap) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const schedule = [];
+    const alerts = [];
+    
+    const dayShiftCode = 'D8';
+    const nightShiftCode = 'N8';
+    
+    // Pre-fetch team assignments
+    const teamAssignments = {};
+    for (const emp of employees) {
+        const assignments = await db.TeamAssignments.getByEmployee(emp.id);
+        const primary = assignments.find(a => a.is_primary) || assignments[0];
+        teamAssignments[emp.id] = primary ? primary.team_id : null;
+    }
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const availableEmployees = employees.filter(e => !leaveMap[dateStr].has(e.id));
+        
+        // 3 day + 3 night = 6 slots, rest off
+        const daySlots = Math.min(3, availableEmployees.length);
+        const nightSlots = Math.min(3, Math.max(0, availableEmployees.length - daySlots));
+        
+        // Rotate start index to distribute shifts fairly
+        const startIdx = (d - 1) % Math.max(availableEmployees.length, 1);
+        
+        for (let i = 0; i < availableEmployees.length; i++) {
+            const emp = availableEmployees[i];
+            const teamId = teamAssignments[emp.id];
+            const rotatedIdx = (i + startIdx) % availableEmployees.length;
+            let shiftCode, shiftHours;
+            
+            if (rotatedIdx < daySlots) {
+                shiftCode = dayShiftCode;
+                shiftHours = 8;
+            } else if (rotatedIdx < daySlots + nightSlots) {
+                shiftCode = nightShiftCode;
+                shiftHours = 8;
+            } else {
+                shiftCode = 'WO';
+                shiftHours = 0;
+            }
+            
+            schedule.push({
+                employee_id: emp.id,
+                team_id: teamId,
+                shift_date: dateStr,
+                shift_code: shiftCode,
+                shift_hours: shiftHours,
+                mode: 'alternative',
+                is_override: 0
+            });
+        }
+        
+        if (availableEmployees.length < 6) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'all',
+                severity: 'red',
+                message: `نقص حاد في الوضع البديل: ${availableEmployees.length} متاح`,
+                recommendation: 'نقل موظفين من فرق أخرى أو طلب تعيينات طارئة'
+            });
+        }
+    }
+    
+    return { schedule, alerts };
+}
+
+async function analyzeTeamStaffing(dateStr, schedule) {
+    const teams = await db.Teams.getActive();
+    const assignments = await db.TeamAssignments.getAll();
+    const dayAssignments = schedule.filter(s => s.shift_date === dateStr && DAY_SHIFT_CODES.includes(s.shift_code));
+    const nightAssignments = schedule.filter(s => s.shift_date === dateStr && NIGHT_SHIFT_CODES.includes(s.shift_code));
+    
+    const teamStatus = [];
+    
+    for (const team of teams) {
+        const teamEmps = assignments.filter(a => a.team_id === team.id).map(a => a.employee_id);
+        const dayCount = dayAssignments.filter(s => teamEmps.includes(s.employee_id)).length;
+        const nightCount = nightAssignments.filter(s => teamEmps.includes(s.employee_id)).length;
+        
+        let status = 'green';
+        if (dayCount < 2 || nightCount < 2) status = 'yellow';
+        if (dayCount < 1 || nightCount < 1) status = 'red';
+        
+        teamStatus.push({
+            team_id: team.id,
+            team_name: team.name,
+            center: team.center,
+            day_count: dayCount,
+            night_count: nightCount,
+            status: status,
+            recommendation: status === 'red' ? 'نقل مسعف من فريق آخر' : status === 'yellow' ? 'مراقبة التغطية' : 'تغطية كافية'
+        });
+    }
+    
+    return teamStatus;
+}
+
+async function generateRecommendations(year, month) {
+    const leaveMap = await buildLeaveMap(year, month);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const recommendations = [];
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const available = employees.length - leaveMap[dateStr].size;
+        const onLeave = leaveMap[dateStr].size;
+        
+        if (available < 8) {
+            recommendations.push({
+                date: dateStr,
+                type: 'alternative_mode',
+                severity: 'red',
+                message: `نقص حاد: ${available} متاح، ${onLeave} في إجازة`,
+                action: 'تفعيل الوضع البديل (8 ساعات) مع 3 مسعفين لكل نوبة'
+            });
+        } else if (onLeave >= 2) {
+            recommendations.push({
+                date: dateStr,
+                type: 'monitor',
+                severity: 'yellow',
+                message: `إجازات متعددة: ${onLeave} موظفين`,
+                action: 'مراقبة التغطية وإعداد خطة بديلة'
+            });
+        }
+    }
+    
+    return recommendations;
+}
+
+// ============================================
+// API: Smart Shift Schedule
+// ============================================
+
+app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { year, month, mode = 'normal' } = req.body;
+        if (!year || !month) {
+            return res.status(400).json({ error: 'السنة والشهر مطلوبة' });
+        }
+        
+        const y = parseInt(year);
+        const m = parseInt(month);
+        const leaveMap = await buildLeaveMap(y, m);
+        
+        let result;
+        if (mode === 'alternative') {
+            result = await generateAlternativeSchedule(y, m, leaveMap);
+        } else {
+            result = await generateNormalSchedule(y, m, leaveMap);
+        }
+        
+        // Save to database
+        await db.beginTransaction();
+        try {
+            await db.ShiftScheduleAuto.deleteByMonthYear(m, y);
+            for (const entry of result.schedule) {
+                await db.ShiftScheduleAuto.create(entry);
+            }
+            const daysInMonth = new Date(y, m, 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                await db.run('DELETE FROM staffing_alerts WHERE alert_date = ? AND resolved = 0', [dateStr]);
+            }
+            for (const alert of result.alerts) {
+                await db.StaffingAlerts.create(alert);
+            }
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        
+        broadcast({
+            type: 'schedule_generated',
+            message: `تم إنشاء جدول ${mode === 'alternative' ? 'الوضع البديل' : 'الوضع العادي'} لشهر ${m}/${y}`,
+            year: y,
+            month: m,
+            mode
+        });
+        
+        res.json({ success: true, schedule: result.schedule, alerts: result.alerts, mode });
+    } catch (error) {
+        console.error('Schedule generation error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء الجدول' });
+    }
+});
+
+app.get('/api/shift-schedule/month', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'الشهر والسنة مطلوبة' });
+        }
+        
+        const schedule = await db.ShiftScheduleAuto.getByMonthYear(parseInt(month), parseInt(year));
+        const alerts = await db.StaffingAlerts.getActive();
+        
+        const byDate = {};
+        for (const entry of schedule) {
+            if (!byDate[entry.shift_date]) {
+                byDate[entry.shift_date] = { day: [], night: [], off: [], leave: [] };
+            }
+            if (DAY_SHIFT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].day.push(entry);
+            } else if (NIGHT_SHIFT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].night.push(entry);
+            } else if (ABSENT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].leave.push(entry);
+            } else {
+                byDate[entry.shift_date].off.push(entry);
+            }
+        }
+        
+        res.json({ success: true, schedule, byDate, alerts });
+    } catch (error) {
+        console.error('Schedule month GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الجدول' });
+    }
+});
+
+app.post('/api/shift-schedule/update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id, employee_id, team_id, shift_date, shift_code, shift_hours, mode, is_override } = req.body;
+        if (!id) {
+            return res.status(400).json({ error: 'معرف السجل مطلوب' });
+        }
+        
+        const existing = await db.ShiftScheduleAuto.getById(id);
+        if (!existing) {
+            return res.status(404).json({ error: 'السجل غير موجود' });
+        }
+        
+        await db.ShiftScheduleAuto.update(id, {
+            employee_id: employee_id !== undefined ? employee_id : existing.employee_id,
+            team_id: team_id !== undefined ? team_id : existing.team_id,
+            shift_date: shift_date || existing.shift_date,
+            shift_code: shift_code || existing.shift_code,
+            shift_hours: shift_hours !== undefined ? shift_hours : existing.shift_hours,
+            mode: mode || existing.mode,
+            is_override: is_override !== undefined ? is_override : existing.is_override
+        });
+        
+        broadcast({
+            type: 'schedule_updated',
+            message: 'تم تحديث جدول المناوبات',
+            entry: { id, shift_date, shift_code }
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Schedule update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الجدول' });
+    }
+});
+
+app.get('/api/staffing-levels', authenticate, async (req, res) => {
+    try {
+        const { date } = req.query;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        const schedule = await db.ShiftScheduleAuto.getByDate(targetDate);
+        const employees = await db.Employees.getActive();
+        const leaveRequests = await db.LeaveRequests.getActiveForDate(targetDate);
+        const onLeave = leaveRequests.length;
+        const available = employees.length - onLeave;
+        
+        const dayShift = schedule.filter(s => DAY_SHIFT_CODES.includes(s.shift_code));
+        const nightShift = schedule.filter(s => NIGHT_SHIFT_CODES.includes(s.shift_code));
+        
+        let daySeverity = 'green';
+        if (dayShift.length < 2) daySeverity = 'red';
+        else if (dayShift.length < 3) daySeverity = 'yellow';
+        
+        let nightSeverity = 'green';
+        if (nightShift.length < 2) nightSeverity = 'red';
+        else if (nightShift.length < 3) nightSeverity = 'yellow';
+        
+        let overallSeverity = 'green';
+        if (available < 8) overallSeverity = 'red';
+        else if (available < 10) overallSeverity = 'yellow';
+        
+        const teamStatus = await analyzeTeamStaffing(targetDate, schedule);
+        
+        res.json({
+            success: true,
+            date: targetDate,
+            available,
+            onLeave,
+            total: employees.length,
+            day: { count: dayShift.length, severity: daySeverity },
+            night: { count: nightShift.length, severity: nightSeverity },
+            overall: overallSeverity,
+            teams: teamStatus
+        });
+    } catch (error) {
+        console.error('Staffing levels error:', error);
+        res.status(500).json({ error: 'فشل في جلب مستويات التغطية' });
+    }
+});
+
+// ============================================
+// API: Leave Requests
+// ============================================
+
+app.get('/api/leave-requests', authenticate, async (req, res) => {
+    try {
+        const { status, employee_id } = req.query;
+        let requests;
+        if (status) {
+            requests = await db.LeaveRequests.getByStatus(status);
+        } else if (employee_id) {
+            requests = await db.LeaveRequests.getByEmployee(employee_id);
+        } else {
+            requests = await db.LeaveRequests.getAll();
+        }
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error('Leave requests GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات الإجازة' });
+    }
+});
+
+app.post('/api/leave-requests', authenticate, validateBody({
+    employee_id: { required: true, type: 'number' },
+    start_date: { required: true, type: 'string', minLength: 1 },
+    end_date: { required: true, type: 'string', minLength: 1 },
+    type: { required: true, type: 'string', minLength: 1 }
+}), async (req, res) => {
+    try {
+        const { employee_id, start_date, end_date, type, reason } = req.body;
+        
+        const start = new Date(start_date);
+        const end = new Date(end_date);
+        const daysInRange = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            daysInRange.push(d.toISOString().split('T')[0]);
+        }
+        
+        for (const dateStr of daysInRange) {
+            const activeLeave = await db.LeaveRequests.getActiveForDate(dateStr);
+            const otherLeave = activeLeave.filter(lr => lr.employee_id !== employee_id && lr.status !== 'cancelled');
+            if (otherLeave.length >= 2) {
+                return res.status(400).json({ 
+                    error: 'لا يمكن قبول الإجازة', 
+                    message: `يوجد ${otherLeave.length} موظفين في إجازة بتاريخ ${dateStr}. الحد الأقصى 2.`,
+                    date: dateStr
+                });
+            }
+        }
+        
+        const id = await db.LeaveRequests.create({
+            employee_id,
+            start_date,
+            end_date,
+            type,
+            reason,
+            status: 'pending'
+        });
+        
+        broadcast({
+            type: 'leave_request_submitted',
+            message: 'تم تقديم طلب إجازة جديد',
+            requestId: id
+        });
+        
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Leave request POST error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب الإجازة' });
+    }
+});
+
+app.put('/api/leave-requests/:id', authenticate, async (req, res) => {
+    try {
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status !== 'pending' && req.user.role !== 'admin' && req.user.role !== 'director') {
+            return res.status(403).json({ error: 'لا يمكن تعديل طلب تمت معالجته' });
+        }
+        
+        const data = { ...req.body, approved_by: null, approved_at: null };
+        await db.LeaveRequests.update(req.params.id, data);
+        
+        broadcast({
+            type: 'leave_request_updated',
+            message: 'تم تحديث طلب الإجازة',
+            requestId: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث طلب الإجازة' });
+    }
+});
+
+app.delete('/api/leave-requests/:id', authenticate, async (req, res) => {
+    try {
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status === 'approved' && req.user.role !== 'admin' && req.user.role !== 'director') {
+            return res.status(403).json({ error: 'لا يمكن إلغاء إجازة معتمدة' });
+        }
+        
+        await db.LeaveRequests.delete(req.params.id);
+        
+        broadcast({
+            type: 'leave_request_cancelled',
+            message: 'تم إلغاء طلب الإجازة',
+            requestId: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request DELETE error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب الإجازة' });
+    }
+});
+
+app.post('/api/leave-requests/:id/approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status || !['approved', 'denied'].includes(status)) {
+            return res.status(400).json({ error: 'الحالة يجب أن تكون approved أو denied' });
+        }
+        
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status !== 'pending') {
+            return res.status(400).json({ error: 'الطلب تمت معالجته مسبقاً' });
+        }
+        
+        await db.LeaveRequests.updateStatus(req.params.id, status, req.user.id);
+        
+        broadcast({
+            type: 'leave_request_resolved',
+            message: `تم ${status === 'approved' ? 'قبول' : 'رفض'} طلب الإجازة`,
+            requestId: req.params.id,
+            status
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request approve error:', error);
+        res.status(500).json({ error: 'فشل في معالجة طلب الإجازة' });
+    }
+});
+
+// ============================================
+// API: Staffing Alerts
+// ============================================
+
+app.get('/api/staffing-alerts', authenticate, async (req, res) => {
+    try {
+        const alerts = await db.StaffingAlerts.getActive();
+        res.json({ success: true, alerts });
+    } catch (error) {
+        console.error('Staffing alerts GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+app.get('/api/staffing-recommendations', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        const now = new Date();
+        const m = month ? parseInt(month) : now.getMonth() + 1;
+        const y = year ? parseInt(year) : now.getFullYear();
+        
+        const recommendations = await generateRecommendations(y, m);
+        res.json({ success: true, recommendations });
+    } catch (error) {
+        console.error('Recommendations error:', error);
+        res.status(500).json({ error: 'فشل في جلب التوصيات' });
     }
 });
 
