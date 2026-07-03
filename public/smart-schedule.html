@@ -1505,8 +1505,10 @@
         }
 
         function updateProgress(percent) {
-            document.getElementById('progressFill').style.width = percent + '%';
-            document.getElementById('progressText').textContent = percent + '%';
+            var fill = document.getElementById('progressFill');
+            if (fill) fill.style.width = percent + '%';
+            var txt = document.getElementById('progressText');
+            if (txt) txt.textContent = percent + '%';
         }
 
         // ==========================================
