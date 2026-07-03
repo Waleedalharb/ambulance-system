@@ -326,6 +326,8 @@ async function _performHealthCheck() {
   };
 
   // ── Auto-healing & alerting ──
+  await _autoFixData();
+  await _evaluateAndHeal(_currentHealth);
   await _evaluateAndHeal(_currentHealth);
 
   return _currentHealth;
