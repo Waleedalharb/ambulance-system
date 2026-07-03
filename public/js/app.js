@@ -1697,7 +1697,8 @@ async function loadAllData() {
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
         
         // تحديث الإنجازات ولوحة الصدارة
-        if (var el_achievementsModal_d15 = document.getElementById('achievementsModal'); if (el_achievementsModal_d15) el_achievementsModal_d15.style.display = == 'flex') {
+        var el_achievementsModal_d15 = document.getElementById('achievementsModal');
+        if (el_achievementsModal_d15 && el_achievementsModal_d15.style.display == 'flex') {
             renderAchievements();
             renderLeaderboard();
         }
