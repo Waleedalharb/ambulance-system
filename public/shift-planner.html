@@ -411,7 +411,7 @@
     // ============================================
     function loadFromSmartSchedule() {
         try {
-            var req = indexedDB.open('smartScheduleDB', 1);
+            var req = indexedDB.open('SmartScheduleDB_v13', 1);
             req.onsuccess = function(e) {
                 var db = e.target.result;
                 if (!db.objectStoreNames.contains('employees')) {
