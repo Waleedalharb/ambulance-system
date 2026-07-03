@@ -138,6 +138,43 @@ function getSaudiMonthYear() {
 }
 
 // ============================================
+// نظام النوبة التلقائي (Auto-Shift)
+// ============================================
+function getCurrentShiftType() {
+    const now = new Date();
+    // Get UTC time first, then add Saudi offset (+3)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
+    const hour = saudiTime.getHours();
+    // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
+    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+}
+
+function getCurrentShiftDate() {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
+    const year = saudiTime.getFullYear();
+    const month = saudiTime.getMonth();
+    const day = saudiTime.getDate();
+    const hour = saudiTime.getHours();
+    
+    let shiftDate = new Date(year, month, day);
+    
+    // Night shift runs from 17:00 to 05:00 next day
+    // If time is between 00:00 and 05:00, we are in the night shift that started yesterday
+    if (hour >= 0 && hour < 5) {
+        shiftDate.setDate(shiftDate.getDate() - 1);
+    }
+    
+    const shiftYear = shiftDate.getFullYear();
+    const shiftMonth = (shiftDate.getMonth() + 1).toString().padStart(2, '0');
+    const shiftDay = shiftDate.getDate().toString().padStart(2, '0');
+    return `${shiftYear}-${shiftMonth}-${shiftDay}`;
+}
+
+
+// ============================================
 // نظام الأصوات التفاعلية
 // ============================================
 
@@ -1650,6 +1687,15 @@ var selectedFiles = [];
 var docsViewMode = 'list';
 var centerNumbers = Array.from({length: 19}, function(_, i) { return i + 1; });
 var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
+
+var rapidTeams = [
+    { name: 'سريع 1', displayName: 'سريع 1', code: 'R1' },
+    { name: 'سريع 2', displayName: 'سريع 2', code: 'R2' },
+    { name: 'سريع 3', displayName: 'سريع 3', code: 'R3' },
+    { name: 'سريع 4', displayName: 'سريع 4', code: 'R4' }
+];
+
+var currentSheetIndex = 0;
 var currentSheetIndex = 0;
 var workbookData = null;
 var controlData = [
@@ -2459,28 +2505,263 @@ async function returnToCurrentShift() {
     var el_shiftModal_d25 = document.getElementById('shiftModal'); if (el_shiftModal_d25) el_shiftModal_d25.style.display = 'none';
 }
 
-async function saveShiftData() {
-    var shiftData = getShiftFromForm();
-    if (!shiftData.shiftType) { alert("❌ الرجاء اختيار نوع المناوبة (صباحية / ليلية)"); return; }
-    var targetId = viewingShiftId || currentShiftId;
-    if (!targetId) { alert("❌ لا توجد مناوبة محددة للحفظ. الرجاء بدء مناوبة جديدة أولاً."); return; }
+// ============================================
+// نظام الحفظ التلقائي (Draft Auto-Save)
+// ============================================
+function getShiftDraftKey() {
+    var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+    var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    return 'shiftDraft_' + shiftDate + '_' + shiftType;
+}
+
+function getShiftDraftKeyFor(date, type) {
+    return 'shiftDraft_' + date + '_' + type;
+}
+
+function saveShiftDraft() {
     try {
-        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftId: targetId, shiftData: shiftData }) });
+        var shiftData = getShiftFromForm();
+        var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        var draft = {
+            shiftDate: shiftDate,
+            shiftType: shiftType,
+            timestamp: Date.now(),
+            data: shiftData
+        };
+        localStorage.setItem(getShiftDraftKey(), JSON.stringify(draft));
+        console.log('[DRAFT] Saved draft for', shiftDate, shiftType);
+    } catch(e) { console.error('[DRAFT] Failed to save draft:', e); }
+}
+
+function loadShiftDraft() {
+    try {
+        var key = getShiftDraftKey();
+        var draftJson = localStorage.getItem(key);
+        if (!draftJson) return null;
+        var draft = JSON.parse(draftJson);
+        // Only use draft if it's from the same shift (same date & type)
+        var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        if (draft.shiftDate !== currentDate || draft.shiftType !== currentType) {
+            console.log('[DRAFT] Draft expired (different shift), ignoring');
+            return null;
+        }
+        console.log('[DRAFT] Loaded draft for', currentDate, currentType);
+        return draft.data;
+    } catch(e) { console.error('[DRAFT] Failed to load draft:', e); return null; }
+}
+
+function loadShiftDraftFor(date, type) {
+    try {
+        var key = getShiftDraftKeyFor(date, type);
+        var draftJson = localStorage.getItem(key);
+        if (!draftJson) return null;
+        var draft = JSON.parse(draftJson);
+        return draft.data;
+    } catch(e) { return null; }
+}
+
+function clearShiftDraft() {
+    try {
+        localStorage.removeItem(getShiftDraftKey());
+        console.log('[DRAFT] Cleared draft');
+    } catch(e) {}
+}
+
+function clearShiftDraftFor(date, type) {
+    try {
+        localStorage.removeItem(getShiftDraftKeyFor(date, type));
+    } catch(e) {}
+}
+
+function hasShiftDraft() {
+    return loadShiftDraft() !== null;
+}
+
+function loadDraftToForm(draftData) {
+    if (!draftData || !draftData.centersData) return;
+    console.log('[DRAFT] Loading draft data into form');
+    
+    // Load shift type
+    if (draftData.shiftType) {
+        document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) {
+            radio.checked = (radio.value === draftData.shiftType);
+        });
+    }
+    
+    // Load rapid response teams
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var data = draftData.centersData[rapid.name] || {};
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        updateRapidStatusIcon(r);
+    }
+    
+    // Load centers
+    for (var i = 0; i < centerList.length; i++) {
+        var center = centerList[i];
+        var data = draftData.centersData[center] || {};
+        var staffInput = document.getElementById('staff_' + i);
+        var carsInput = document.getElementById('cars_' + i);
+        var notesInput = document.getElementById('notes_' + i);
+        var vehicleSel = document.getElementById('vehicle_' + i);
+        var fuelSel = document.getElementById('fuel_' + i);
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        if (vehicleSel) vehicleSel.value = data.vehicleStatus || '';
+        if (fuelSel) fuelSel.value = data.fuelLevel || '';
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        updateStatusIcon(i);
+    }
+    
+    // Load general notes
+    if (draftData.generalNotes) {
+        document.getElementById('generalNotes').value = draftData.generalNotes;
+    }
+    
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+}
+
+
+// ============================================
+// فحص تغيير حدود المناوبة (Boundary Check)
+// ============================================
+function startShiftBoundaryCheck() {
+    if (shiftBoundaryCheckInterval) clearInterval(shiftBoundaryCheckInterval);
+    lastShiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    shiftBoundaryCheckInterval = setInterval(function() {
+        var modal = document.getElementById('shiftModal');
+        if (!modal || modal.style.display === 'none') {
+            clearInterval(shiftBoundaryCheckInterval);
+            shiftBoundaryCheckInterval = null;
+            return;
+        }
+        var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        if (currentType !== lastShiftType) {
+            console.log('[SHIFT-BOUNDARY] Shift changed from', lastShiftType, 'to', currentType, '- refreshing modal');
+            lastShiftType = currentType;
+            // Refresh the modal with new shift
+            var typeBadge = document.getElementById('shiftModalTypeBadge');
+            if (typeBadge) {
+                var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+                typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + currentType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+            }
+            // Reload shifts and switch to correct shift
+            currentShiftId = null;
+            viewingShiftId = null;
+            isViewingArchiveShift = false;
+            loadShifts().then(function() {
+                var currentDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+                var currentShift = null;
+                if (allShifts && allShifts.length > 0) {
+                    for (var i = 0; i < allShifts.length; i++) {
+                        if (allShifts[i].shiftDate === currentDate && allShifts[i].shiftType === currentType) {
+                            currentShift = allShifts[i];
+                            currentShiftId = allShifts[i].id;
+                            break;
+                        }
+                    }
+                }
+                if (currentShift) {
+                    loadShiftToForm(currentShift);
+                    showToast('🔄 تم تغيير المناوبة تلقائياً إلى ' + currentType, 'info');
+                } else {
+                    clearShiftForm();
+                    document.getElementById('shiftDate').innerText = getSaudiDate();
+                    showToast('🔄 تم تغيير نوع المناوبة إلى ' + currentType + ' - ابدأ تكميل جديد', 'info');
+                }
+            });
+        }
+    }, 30000); // Check every 30 seconds
+}
+
+function stopShiftBoundaryCheck() {
+    if (shiftBoundaryCheckInterval) {
+        clearInterval(shiftBoundaryCheckInterval);
+        shiftBoundaryCheckInterval = null;
+    }
+}
+
+async function saveShiftData(silent) {
+    var shiftData = getShiftFromForm();
+    var targetId = viewingShiftId || currentShiftId;
+    var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+    var shiftType = getCurrentShiftType ? getCurrentShiftType() : shiftData.shiftType;
+    try {
+        var body = { shiftData: shiftData };
+        if (targetId) body.shiftId = targetId;
+        else { body.shiftDate = shiftDate; body.shiftType = shiftType; }
+        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(body) });
         var result = await response.json();
         if (result.success) {
-            alert("✅ تم حفظ بيانات التكميل بنجاح");
-            await loadShifts();
-            await loadAllData();
-            calculateLiveReportStats();
-            updateWorkforceStats();
-            updateDistributionIndicator();
-            if (viewingShiftId) {
-                var viewResponse = await fetch('/api/shifts/' + viewingShiftId);
-                var viewResult = await viewResponse.json();
-                if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
+            if (result.shiftId) {
+                currentShiftId = result.shiftId;
+                // Persist currentShiftId to localStorage to survive page refreshes
+                try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
             }
-        } else { alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+            
+            // Save a copy to localStorage as lastSavedShift (for recovery after refresh)
+            try {
+                var savedData = {
+                    shiftId: currentShiftId,
+                    shiftDate: shiftDate,
+                    shiftType: shiftType,
+                    data: shiftData,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('lastSavedShift_' + shiftDate + '_' + shiftType, JSON.stringify(savedData));
+                // Clear draft since we have a saved version
+                clearShiftDraft();
+            } catch(e) {}
+            
+            if (!silent) {
+                // Manual save: reload UI and show confirmation
+                alert("✅ تم حفظ بيانات التكميل بنجاح");
+                await loadShifts();
+                await loadAllData();
+                calculateLiveReportStats();
+                updateWorkforceStats();
+                updateDistributionIndicator();
+                if (viewingShiftId) {
+                    var viewResponse = await fetch('/api/shifts/' + viewingShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                    var viewResult = await viewResponse.json();
+                    if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
+                }
+                // Add audit log for manual save
+                try {
+                    if (typeof addAuditEntry === 'function') {
+                        await addAuditEntry('shift', 'حفظ تكميل النوبة', 'تم حفظ بيانات تكميل النوبة يدوياً', currentUser && currentUser.name);
+                    }
+                } catch(e) {}
+            } else {
+                // Auto-save: don't reload form to avoid race condition
+                // The WebSocket broadcast will update other UI elements
+                // Form inputs keep their current values (user is still typing)
+                // Add audit log for auto-save (throttled — only log every 5 minutes to avoid spam)
+                try {
+                    if (typeof addAuditEntry === 'function') {
+                        var now = Date.now();
+                        if (!window._lastAutoSaveAudit || (now - window._lastAutoSaveAudit) > 300000) {
+                            window._lastAutoSaveAudit = now;
+                            addAuditEntry('shift', 'حفظ تلقائي للتكميل', 'تم حفظ بيانات تكميل النوبة تلقائياً', currentUser && currentUser.name);
+                        }
+                    }
+                } catch(e) {}
+            }
+            return true;
+        } else { if (!silent) alert("❌ فشل في حفظ البيانات: " + (result.error || "خطأ غير معروف")); return false; }
+    } catch (error) { if (!silent) alert("❌ خطأ في الاتصال: " + error.message); return false; }
 }
 
 async function deleteCurrentShift() {
@@ -2513,9 +2794,36 @@ async function deleteCurrentShift() {
 function loadShiftToForm(shift) {
     if (!shift) return;
     viewingShiftId = shift.id;
-    var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = shift.shiftDate || getSaudiDate();
+    document.getElementById('shiftDate').innerText = shift.shiftDate || getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = (radio.value === shift.shiftType); });
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = (shift.rapidLocations && shift.rapidLocations[input.dataset.unit]) || ''; });
+    // Update shift type badge in header
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var type = shift.shiftType || (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
+        var date = shift.shiftDate || getSaudiDate();
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + type + '</span> ' + date + ' — تسجيل بيانات تكميل النوبة';
+    }
+    
+    // Load rapid response teams data
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var data = (shift.centersData && shift.centersData[rapid.name]) || { staffCount: '', carsCount: '', notes: '' };
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        if (staffInput) staffInput.value = data.staffCount || '';
+        if (carsInput) carsInput.value = data.carsCount || '';
+        if (notesInput) notesInput.value = data.notes || '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        // Restore cached paramedic data if available
+        if (shift.id && data.assignedParamedics && data.assignedParamedics.length > 0) {
+            teamParamedicData[shift.id + '_' + rapid.name] = data.assignedParamedics;
+            renderTeamParamedics(rapid.name, 'rapid', r, data.assignedParamedics);
+        }
+        updateRapidStatusIcon(r);
+    }
+    
     for (var i = 0; i < centerList.length; i++) {
         var center = centerList[i];
         var data = (shift.centersData && shift.centersData[center]) || { staffCount: '', carsCount: '', notes: '', vehicleStatus: '', fuelLevel: '' };
@@ -2529,25 +2837,70 @@ function loadShiftToForm(shift) {
         if (notesInput) notesInput.value = data.notes || '';
         if (vehicleSel) vehicleSel.value = data.vehicleStatus || '';
         if (fuelSel) fuelSel.value = data.fuelLevel || '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (backupParamedicInput) backupParamedicInput.value = data.backupParamedic || '';
+        // Restore cached paramedic data if available
+        if (shift.id && data.assignedParamedics && data.assignedParamedics.length > 0) {
+            teamParamedicData[shift.id + '_' + center] = data.assignedParamedics;
+            renderTeamParamedics(center, 'center', i, data.assignedParamedics);
+        }
         updateStatusIcon(i);
     }
-    var el_generalNotes_v5 = document.getElementById('generalNotes'); if (el_generalNotes_v5) el_generalNotes_v5.value = shift.generalNotes || '';
+    document.getElementById('generalNotes').value = shift.generalNotes || '';
     initShiftProgressBar();
     loadShiftEventLog();
     loadAbsenceRecords();
+    loadShiftNotes();
     updateShiftKPIs();
     loadShiftComparison();
     initAutoSave();
     setTimeout(calculateWorkforceStatsLocally, 100);
-    if (shift.id) { loadWorkforceStats(shift.id); }
+    if (shift.id) { 
+        loadWorkforceStats(shift.id); 
+        loadTeamParamedics(shift.id);
+    }
 }
 
 function getShiftFromForm() {
     var shiftTypeEl = document.querySelector('input[name="shiftType"]:checked');
-    var shiftType = shiftTypeEl ? shiftTypeEl.value : '';
-    var rapidLocations = {};
-    document.querySelectorAll('.rapid-location').forEach(function(input) { rapidLocations[input.dataset.unit] = input.value; });
+    var shiftType = shiftTypeEl ? shiftTypeEl.value : (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
+    
+    // Read rapid response teams data
+    var rapidData = {};
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        rapidData[rapid.name] = {
+            staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
+            carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
+            notes: (notesInput && notesInput.value) ? notesInput.value : '',
+            isRapid: true
+        };
+    }
+    
     var centersDataForm = {};
+    // Add rapid response data to centersData
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        var assignedParamedics = teamParamedicData[viewingShiftId + '_' + rapid.name] || [];
+        var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + r);
+        centersDataForm[rapid.name] = {
+            staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
+            carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
+            notes: (notesInput && notesInput.value) ? notesInput.value : '',
+            vehicleStatus: '',
+            fuelLevel: '',
+            isRapid: true,
+            assignedParamedics: assignedParamedics,
+            backupParamedic: (backupParamedicInput && backupParamedicInput.value) ? backupParamedicInput.value : ''
+        };
+    }
+    
     for (var i = 0; i < centerList.length; i++) {
         var center = centerList[i];
         var staffInput = document.getElementById('staff_' + i);
@@ -2555,21 +2908,51 @@ function getShiftFromForm() {
         var notesInput = document.getElementById('notes_' + i);
         var vehicleSel = document.getElementById('vehicle_' + i);
         var fuelSel = document.getElementById('fuel_' + i);
+        var assignedParamedics = teamParamedicData[viewingShiftId + '_' + center] || [];
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
         centersDataForm[center] = {
             staffCount: (staffInput && staffInput.value) ? staffInput.value : '',
             carsCount: (carsInput && carsInput.value) ? carsInput.value : '',
             notes: (notesInput && notesInput.value) ? notesInput.value : '',
             vehicleStatus: (vehicleSel && vehicleSel.value) ? vehicleSel.value : '',
-            fuelLevel: (fuelSel && fuelSel.value) ? fuelSel.value : ''
+            fuelLevel: (fuelSel && fuelSel.value) ? fuelSel.value : '',
+            isRapid: false,
+            assignedParamedics: assignedParamedics,
+            backupParamedic: (backupParamedicInput && backupParamedicInput.value) ? backupParamedicInput.value : ''
         };
     }
-    return { shiftType: shiftType, rapidLocations: rapidLocations, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
+    return { shiftType: shiftType, rapidLocations: {}, centersData: centersDataForm, generalNotes: document.getElementById('generalNotes').value };
 }
 
 function clearShiftForm() {
-    var el_shiftDate = document.getElementById('shiftDate'); if (el_shiftDate) el_shiftDate.innerText = getSaudiDate();
+    viewingShiftId = null; // Reset to prevent saving to wrong shift
+    document.getElementById('shiftDate').innerText = getSaudiDate();
     document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
-    document.querySelectorAll('.rapid-location').forEach(function(input) { input.value = ''; });
+    // Update badge to current automatic shift
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var shiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+        var shiftDate = getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate();
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+    }
+    // Clear rapid response teams
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var staffInput = document.getElementById('rapid_staff_' + r);
+        var carsInput = document.getElementById('rapid_cars_' + r);
+        var notesInput = document.getElementById('rapid_notes_' + r);
+        if (staffInput) staffInput.value = '';
+        if (carsInput) carsInput.value = '';
+        if (notesInput) notesInput.value = '';
+        var backupParamedicInputRapid = document.getElementById('backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) backupParamedicInputRapid.value = '';
+        var container = document.getElementById('paramedics_' + safeTeamId(rapidTeams[r].name));
+        var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[r].name));
+        var fallbackDiv = document.getElementById('fallback_rapid_staff_' + r);
+        if (container) container.innerHTML = '<div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>';
+        if (countDisplay) countDisplay.textContent = '-';
+        if (fallbackDiv) fallbackDiv.style.display = 'none';
+        updateRapidStatusIcon(r);
+    }
     for (var i = 0; i < centerList.length; i++) {
         var staffInput = document.getElementById('staff_' + i);
         var carsInput = document.getElementById('cars_' + i);
@@ -2580,12 +2963,28 @@ function clearShiftForm() {
         if (carsInput) carsInput.value = '';
         if (notesInput) notesInput.value = '';
         if (vehicleSel) vehicleSel.value = '';
-        if (fuelSel) fuelSel.value = '';
+        var backupParamedicInput = document.getElementById('backup_paramedic_' + i);
+        if (backupParamedicInput) backupParamedicInput.value = '';
+        var safeName = safeTeamId(centerList[i]);
+        var container = document.getElementById('paramedics_' + safeName);
+        var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
+        var fallbackDiv = document.getElementById('fallback_staff_' + i);
+        if (container) container.innerHTML = '<div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>';
+        if (countDisplay) countDisplay.textContent = '-';
+        if (fallbackDiv) fallbackDiv.style.display = 'none';
         updateStatusIcon(i);
     }
-    var el_generalNotes_v6 = document.getElementById('generalNotes'); if (el_generalNotes_v6) el_generalNotes_v6.value = '';
-    var el_workforceStats_d29 = document.getElementById('workforceStats'); if (el_workforceStats_d29) el_workforceStats_d29.style.display = 'none';
-    var el_shiftReportStats_d30 = document.getElementById('shiftReportStats'); if (el_shiftReportStats_d30) el_shiftReportStats_d30.style.display = 'none';
+    // Clear paramedic cache for current viewing shift
+    if (viewingShiftId) {
+        for (var key in teamParamedicData) {
+            if (key.indexOf(viewingShiftId + '_') === 0) {
+                delete teamParamedicData[key];
+            }
+        }
+    }
+    document.getElementById('generalNotes').value = '';
+    document.getElementById('workforceStats').style.display = 'none';
+    document.getElementById('shiftReportStats').style.display = 'none';
 }
 
 function displayShiftReportStats(reportsData) {
@@ -4372,19 +4771,160 @@ async function deleteDoc(docId) {
 // ============================================
 // وظائف بناء الجدول
 // ============================================
+function updateRapidStatusIcon(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    var iconSpan = document.getElementById('rapid_status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
+    }
+}
+
+function setRapidComplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 1;
+    if (carsInput) carsInput.value = 1;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '1 حاضر';
+}
+
+function setRapidIncomplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 0;
+    if (carsInput) carsInput.value = 0;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '0 حاضر';
+}
+
+
 function buildCentersTable() {
     var tbody = document.getElementById('centersTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
     
+    // Add Rapid Response Teams first
+    for (var r = 0; r < rapidTeams.length; r++) {
+        var rapid = rapidTeams[r];
+        var tr = document.createElement('tr');
+        tr.id = 'rapid-row-' + r;
+        tr.className = 'rapid-team-row';
+        tr.style.background = 'rgba(255, 193, 7, 0.05)';
+        
+        var statusHtml = '<span id="rapid_status_' + r + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
+        
+        var actionHtml = `
+            <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                <button onclick="setRapidComplete(${r})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ✅ مكتمل
+                </button>
+                <button onclick="setRapidIncomplete(${r})" class="btn btn-danger" style="padding:2px 10px; font-size:0.6rem; background:#c0392b; color:white; border:none; border-radius:12px; cursor:pointer;">
+                    ❌ ناقص
+                </button>
+            </div>
+        `;
+        
+        var safeName = rapid.name.replace(/\s+/g, '_');
+        tr.innerHTML = `
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--gold);">⚡ تدخل سريع</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${rapid.displayName}</td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td style="min-width:130px; padding:4px;">
+                <div class="paramedic-box" id="paramedic-box-rapid-${r}">
+                    <div class="paramedic-list" id="paramedics_${safeName}">
+                        <div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>
+                    </div>
+                    <div class="staff-count-display" id="staffCountDisplay_${safeName}">-</div>
+                </div>
+                <input type="hidden" id="rapid_staff_${r}" value="">
+                <div class="fallback-staff-input" id="fallback_rapid_staff_${r}" style="display:none;">
+                    <input type="number" id="fallback_rapid_staff_input_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1">
+                </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_rapid_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
+            </td>
+            <td><input type="number" id="rapid_cars_${r}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="1" value="" placeholder="1"></td>
+            <td style="text-align:center;">${actionHtml}</td>
+            <td><input type="text" id="rapid_notes_${r}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+            <td style="text-align:center; color:var(--gray-400); font-size:0.7rem;">-</td>
+        `;
+        
+        var carsInput = tr.querySelector('#rapid_cars_' + r);
+        var fallbackStaffInput = tr.querySelector('#fallback_rapid_staff_input_' + r);
+        
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        // Backup paramedic input for rapid teams
+        var backupParamedicInputRapid = tr.querySelector('#backup_paramedic_rapid_' + r);
+        if (backupParamedicInputRapid) {
+            backupParamedicInputRapid.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('rapid_staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateRapidStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(r));
+        }
+        
+        carsInput.addEventListener('input', function(idx) { 
+            return function() { 
+                updateRapidStatusIcon(idx); 
+                calculateWorkforceStatsLocally(); 
+            };
+        }(r));
+        
+        tbody.appendChild(tr);
+    }
+    
+    // Add separator row
+    var sepTr = document.createElement('tr');
+    sepTr.innerHTML = '<td colspan="9" style="background:var(--gray-100); height:8px; padding:0;"></td>';
+    tbody.appendChild(sepTr);
+    
+    // Add Regular Centers
     for (var i = 0; i < centerList.length; i++) {
         var tr = document.createElement('tr');
         tr.id = 'center-row-' + i;
         
-        // أيقونة الحالة
         var statusHtml = '<span id="status_' + i + '" class="status-icon status-not" style="font-size:1.4rem;">❌</span>';
         
-        // أزرار الإجراء السريع
         var actionHtml = `
             <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
                 <button onclick="setCenterComplete(${i})" class="btn btn-success" style="padding:2px 10px; font-size:0.6rem; background:#2a7f3e; color:white; border:none; border-radius:12px; cursor:pointer;">
@@ -4396,11 +4936,27 @@ function buildCentersTable() {
             </div>
         `;
         
+        var safeName = centerList[i].replace(/\s+/g, '_');
         tr.innerHTML = `
-            <td style="font-weight:bold; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
+            <td style="font-weight:bold; font-size:0.75rem; text-align:center; color:var(--primary);">🏥 مركز</td>
+            <td style="font-weight:600; font-size:0.75rem; text-align:center;">${centerList[i]}</td>
             <td style="text-align:center;">${statusHtml}</td>
-            <td><input type="number" id="staff_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value=""></td>
-            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value=""></td>
+            <td style="min-width:130px; padding:4px;">
+                <div class="paramedic-box" id="paramedic-box-${i}">
+                    <div class="paramedic-list" id="paramedics_${safeName}">
+                        <div class="paramedic-no-data">اضغط تكميل لتحميل المسعفين</div>
+                    </div>
+                    <div class="staff-count-display" id="staffCountDisplay_${safeName}">-</div>
+                </div>
+                <input type="hidden" id="staff_${i}" value="">
+                <div class="fallback-staff-input" id="fallback_staff_${i}" style="display:none;">
+                    <input type="number" id="fallback_staff_input_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="4" value="" placeholder="2+">
+                </div>
+                <div style="margin-top:4px;">
+                    <input type="text" id="backup_paramedic_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="اسم المسعف الاحتياطي (تغطية يدوية)...">
+                </div>
+            </td>
+            <td><input type="number" id="cars_${i}" style="width:50px; text-align:center; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" min="0" max="2" value="" placeholder="1+"></td>
             <td style="text-align:center;">${actionHtml}</td>
             <td><input type="text" id="notes_${i}" style="width:100%; font-size:0.7rem; padding:4px; border:1px solid var(--gray-200); border-radius:4px;" placeholder="تأخير / غياب..."></td>
             <td><select id="vehicle_${i}" style="width:80px; font-size:0.7rem; padding:3px; border:1px solid var(--gray-200); border-radius:4px;">
@@ -4411,16 +4967,41 @@ function buildCentersTable() {
             </select></td>
         `;
         
-        var staffInput = tr.querySelector('#staff_' + i);
         var carsInput = tr.querySelector('#cars_' + i);
+        var fallbackStaffInput = tr.querySelector('#fallback_staff_input_' + i);
         
-        staffInput.addEventListener('input', function(idx) { 
-            return function() { 
-                updateStatusIcon(idx); 
-                calculateWorkforceStatsLocally(); 
-                updateShiftKPIs();
-            };
-        }(i));
+        if (fallbackStaffInput) {
+            fallbackStaffInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    if (hidden) hidden.value = this.value;
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
+        
+        // Backup paramedic input for manual coverage
+        var backupParamedicInput = tr.querySelector('#backup_paramedic_' + i);
+        if (backupParamedicInput) {
+            backupParamedicInput.addEventListener('input', function(idx) { 
+                return function() { 
+                    var hidden = document.getElementById('staff_' + idx);
+                    var backupValue = this.value.trim();
+                    if (backupValue) {
+                        // If backup paramedic entered, set staff to at least 1 (or current + 1)
+                        var currentStaff = parseInt(hidden ? hidden.value : '0') || 0;
+                        if (currentStaff < 1) {
+                            if (hidden) hidden.value = '1';
+                        }
+                    }
+                    updateStatusIcon(idx); 
+                    calculateWorkforceStatsLocally(); 
+                    updateShiftKPIs();
+                };
+            }(i));
+        }
         
         carsInput.addEventListener('input', function(idx) { 
             return function() { 
@@ -4428,7 +5009,6 @@ function buildCentersTable() {
                 calculateWorkforceStatsLocally(); 
             };
         }(i));
-        
         
         var vehicleSelect = tr.querySelector('#vehicle_' + i);
         var fuelSelect = tr.querySelector('#fuel_' + i);
