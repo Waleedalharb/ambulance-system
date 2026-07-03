@@ -583,6 +583,81 @@
             .leave-request-item { background: #1E293B; }
             .leave-cal-day { background: #1E293B; }
         }
+        /* ==========================================
+           File Upload / Drop Zone
+           ========================================== */
+        .upload-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+        .upload-section:hover { border-color: #CBD5E1; }
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #F8FAFC;
+            position: relative;
+        }
+        .drop-zone:hover { border-color: var(--primary); background: #EFF6FF; }
+        .drop-zone.dragover { border-color: var(--primary); background: #DBEAFE; transform: scale(1.01); }
+        .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .drop-zone i { font-size: 2.2rem; color: var(--primary); margin-bottom: 10px; display: block; }
+        .drop-zone-text { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+        .drop-zone-hint { font-size: 0.8rem; color: var(--text-muted); }
+        .upload-progress { display: none; margin-top: 12px; }
+        .upload-progress.active { display: block; }
+        .analysis-status { display: none; text-align: center; padding: 16px; color: var(--text-muted); font-size: 0.9rem; }
+        .analysis-status.active { display: block; }
+        .analysis-result { display: none; text-align: center; padding: 16px; background: #ECFDF5; border-radius: var(--radius-md); border: 1px solid #A7F3D0; margin-top: 12px; }
+        .analysis-result.active { display: block; }
+        .analysis-result-text { font-weight: 700; color: #065F46; font-size: 1rem; margin-bottom: 4px; }
+        .analysis-result-detail { font-size: 0.82rem; color: #059669; }
+        .extracted-table-container { display: none; margin-top: 16px; }
+        .extracted-table-container.active { display: block; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .data-table th { background: #F8FAFC; padding: 10px; text-align: right; font-weight: 700; border-bottom: 2px solid var(--border); color: var(--text); }
+        .data-table td { padding: 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+        .data-table tr:hover { background: #F8FAFC; }
+        .badge-status-work { background: #D1FAE5; color: #065F46; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+        .badge-status-off { background: #FEE2E2; color: #991B1B; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+        .badge-status-rest { background: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+        .saved-files-list { margin-top: 16px; }
+        .saved-file-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; background: #F8FAFC; border: 1px solid var(--border);
+            border-radius: 8px; margin-bottom: 8px; transition: all 0.2s;
+        }
+        .saved-file-item:hover { background: #FFFFFF; border-color: #CBD5E1; }
+        .saved-file-info { display: flex; align-items: center; gap: 10px; }
+        .saved-file-icon { font-size: 1.1rem; color: var(--primary); }
+        .saved-file-name { font-weight: 600; font-size: 0.85rem; color: var(--text); }
+        .saved-file-date { font-size: 0.75rem; color: var(--text-muted); }
+        .saved-file-actions { display: flex; gap: 6px; }
+        .calendar-employee-chips { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 4px; max-height: 72px; overflow: hidden; }
+        .emp-chip {
+            font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; font-weight: 600;
+            white-space: nowrap; display: inline-flex; align-items: center; gap: 2px;
+        }
+        .emp-chip-d12 { background: #DBEAFE; color: #1D4ED8; }
+        .emp-chip-n12 { background: #E9D5FF; color: #7C3AED; }
+        .emp-chip-v { background: #FEE2E2; color: #DC2626; }
+        .emp-chip-wo { background: #F1F5F9; color: #64748B; }
+        .emp-chip-m { background: #D1FAE5; color: #065F46; }
+        .emp-chip-c { background: #FEF3C7; color: #92400E; }
+        .emp-chip-me { background: #CFFAFE; color: #0E7490; }
+        .emp-chip-default { background: #F1F5F9; color: #475569; }
+        .calendar-more-chip {
+            font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; font-weight: 700;
+            background: #E2E8F0; color: #475569; cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -667,6 +742,43 @@
                 </div>
                 <div class="dash-widget-label">توليد جدول شهري</div>
             </div>
+        </div>
+
+        <!-- ==========================================
+             B. File Upload Section
+             ========================================== -->
+        <div class="upload-section fade-in" id="uploadSection">
+            <div class="section-title" style="margin-bottom:14px;">
+                <i class="fas fa-cloud-upload-alt"></i>
+                رفع جدول المناوبات (Excel / PDF)
+            </div>
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf">
+                <i class="fas fa-file-import"></i>
+                <div class="drop-zone-text">اسحب ملف Excel أو PDF هنا</div>
+                <div class="drop-zone-hint">أو اضغط لاختيار الملف (.xlsx, .xls, .csv, .pdf)</div>
+                <div class="upload-progress" id="uploadProgress">
+                    <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;margin-top:8px;">
+                        <div id="progressFill" style="height:100%;background:var(--primary);border-radius:4px;transition:width 0.3s;width:0%;"></div>
+                    </div>
+                    <div id="progressText" style="font-size:0.85rem;color:var(--text-muted);text-align:center;margin-top:4px;">0%</div>
+                </div>
+            </div>
+            <div class="analysis-status" id="analysisStatus">
+                <div class="spinner" style="margin:0 auto 10px;"></div>
+                جاري تحليل الملف...
+            </div>
+            <div class="analysis-result" id="analysisResult">
+                <div class="analysis-result-text" id="analysisText">--</div>
+                <div class="analysis-result-detail" id="analysisDetails">--</div>
+            </div>
+            <div class="extracted-table-container" id="extractedTableContainer">
+                <table class="data-table" id="extractedTable">
+                    <thead><tr></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="saved-files-list" id="savedFilesList"></div>
         </div>
 
         <!-- ==========================================
@@ -1209,8 +1321,8 @@
             }
 
             var dayClass = 'calendar-day' + (isToday ? ' today' : '');
-            html += '<div class="' + dayClass + '" data-date="' + dateStr + '" onclick="openEditModal(\'' + dateStr + '\')" ' +
-                'ondragover="handleDragOver(event)" ondrop="handleDrop(event, \'' + dateStr + '\')" ' +
+            html += '<div class="' + dayClass + '" data-date="' + dateStr + '" onclick="openEditModal('' + dateStr + '')" ' +
+                'ondragover="handleDragOver(event)" ondrop="handleDrop(event, '' + dateStr + '')" ' +
                 'ondragleave="handleDragLeave(event)">';
             if (staffingClass) html += '<div class="calendar-staffing-dot ' + staffingClass + '"></div>';
             html += '<div class="calendar-day-number' + (isWeekend ? ' calendar-day-weekend' : '') + '">' + day + '</div>';
@@ -1229,6 +1341,29 @@
             }
             if (isAlternativeMode && dayShifts.alt.length > 0) {
                 html += '<div class="calendar-shift-chip chip-alt"><i class="fas fa-random" style="font-size:0.55rem;"></i> بديل <span class="chip-count">' + dayShifts.alt.length + '</span></div>';
+            }
+            // Show detailed employee chips if we have imported data with employee names
+            var detailedEntries = daySchedule.filter(function(s) { return s.employee_name; });
+            if (detailedEntries.length > 0) {
+                html += '<div class="calendar-employee-chips">';
+                var maxShow = 6;
+                for (var di = 0; di < Math.min(detailedEntries.length, maxShow); di++) {
+                    var s = detailedEntries[di];
+                    var code = (s.shift_code || '').toUpperCase();
+                    var chipClass = 'emp-chip-default';
+                    if (code === 'D12' || code === 'D8' || code === 'D10' || code === 'D11' || code === 'D6') chipClass = 'emp-chip-d12';
+                    else if (code === 'N12' || code === 'N8' || code === 'N10' || code === 'N11' || code === 'N6') chipClass = 'emp-chip-n12';
+                    else if (code === 'V' || code === 'VC' || code === 'EV' || code === 'E') chipClass = 'emp-chip-v';
+                    else if (code === 'WO' || code === 'R') chipClass = 'emp-chip-wo';
+                    else if (code === 'M') chipClass = 'emp-chip-m';
+                    else if (code === 'C') chipClass = 'emp-chip-c';
+                    else if (code === 'ME') chipClass = 'emp-chip-me';
+                    html += '<span class="emp-chip ' + chipClass + '" title="' + (s.employee_name || '') + '">' + (s.employee_name || '؟').split(' ')[0] + ' ' + code + '</span>';
+                }
+                if (detailedEntries.length > maxShow) {
+                    html += '<span class="calendar-more-chip" onclick="event.stopPropagation(); openDayDetail('' + dateStr + '')">+' + (detailedEntries.length - maxShow) + '</span>';
+                }
+                html += '</div>';
             }
             html += '</div></div>';
         }
@@ -1711,25 +1846,82 @@
     // File Upload (Legacy)
     // ==========================================
     function setupDragAndDrop() {
-        var dz = document.getElementById('dropZone');
-        if (!dz) return;
-        dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
-        dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
-        dz.addEventListener('drop', function(e) {
-            e.preventDefault(); dz.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
-        });
+        try {
+            var dz = document.getElementById('dropZone');
+            if (!dz) { console.error('dropZone not found'); return; }
+            dz.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dz.classList.add('dragover');
+            });
+            dz.addEventListener('dragleave', function() {
+                dz.classList.remove('dragover');
+            });
+            dz.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dz.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+        } catch(e) { console.error('setupDragAndDrop error:', e); }
     }
 
     function setupFileInput() {
-        var fi = document.getElementById('fileInput');
-        if (!fi) return;
-        fi.addEventListener('change', function(e) { if (e.target.files.length > 0) handleFileUpload(e.target.files[0]); });
+        try {
+            var fi = document.getElementById('fileInput');
+            if (!fi) { console.error('fileInput not found'); return; }
+            fi.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+            var dz = document.getElementById('dropZone');
+            if (dz) {
+                dz.addEventListener('click', function(e) {
+                    if (e.target === dz || e.target.closest('.drop-zone')) {
+                        fi.click();
+                    }
+                });
+            }
+        } catch(e) { console.error('setupFileInput error:', e); }
     }
 
-    function handleFileUpload(file) {
-        showToast('رفع الملف: ' + file.name, 'info');
-        // Legacy import handler - simplified for new architecture
+    async function handleFileUpload(file) {
+        try {
+            console.log('handleFileUpload called:', file.name, file.size, file.type);
+            currentFile = file;
+            var ext = file.name.split('.').pop().toLowerCase();
+            var validExts = ['xlsx','xls','csv','pdf'];
+            if (validExts.indexOf(ext) === -1) {
+                showToast('نوع الملف غير مدعوم. يرجى رفع ملف Excel أو PDF', 'error');
+                return;
+            }
+            var token = getAuthToken();
+            if (!token) {
+                showToast('يجب تسجيل الدخول أولاً لرفع الملفات', 'error');
+                return;
+            }
+            var fileInfo = { id: Date.now(), name: file.name, type: ext, size: file.size, date: new Date().toISOString() };
+            savedFiles.unshift(fileInfo);
+            renderSavedFiles();
+            document.getElementById('uploadProgress').classList.add('active');
+            updateProgress(0);
+            document.getElementById('analysisStatus').classList.add('active');
+            document.getElementById('analysisResult').classList.remove('active');
+            document.getElementById('extractedTableContainer').classList.remove('active');
+            var progress = 0;
+            var interval = setInterval(function() {
+                progress += Math.random() * 15;
+                if (progress >= 100) { progress = 100; clearInterval(interval); }
+                updateProgress(Math.round(progress));
+            }, 200);
+            setTimeout(function() {
+                if (ext === 'pdf') { parsePDF(file); } else { parseExcel(file); }
+            }, 1500);
+        } catch(e) {
+            console.error('handleFileUpload error:', e);
+            showToast('خطأ غير متوقع: ' + e.message, 'error');
+        }
     }
 
     // ==========================================
@@ -1748,6 +1940,523 @@
         container.appendChild(toast);
         setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, duration || 3000);
     }
+
+
+
+    // ==========================================
+    // Auth Token Helper
+    // ==========================================
+    function getAuthToken() { return localStorage.getItem('authToken') || ''; }
+
+    // ==========================================
+    // Progress Update
+    // ==========================================
+    function updateProgress(percent) {
+        var fill = document.getElementById('progressFill');
+        var txt = document.getElementById('progressText');
+        if (fill) fill.style.width = percent + '%';
+        if (txt) txt.textContent = percent + '%';
+    }
+
+    // ==========================================
+    // Parse Excel
+    // ==========================================
+    async function parseExcel(file) {
+        console.log('parseExcel called');
+        var reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+                var result = extractEmployees(workbook);
+                importedEmployees = result;
+                finishAnalysis(result.length);
+                showExtractedTable(result);
+                convertImportedToScheduleData(result);
+                showToast('تم استخراج ' + result.length + ' موظف من ملف Excel', 'success');
+                await saveToServer();
+            } catch(err) {
+                showToast('خطأ في قراءة الملف: ' + err.message, 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // ==========================================
+    // Extract Employees from Workbook (ported from smart-schedule)
+    // ==========================================
+    function extractEmployees(workbook) {
+        console.log('extractEmployees (monthly format) called, sheets:', workbook.SheetNames.length);
+        var allEmployees = [];
+        var shiftMap = {
+            'D12': 'دوام 12 صباحاً', 'N12': 'دوام 12 ليلاً', 'M': 'مهمة', 'O12': 'أوفرلاب 12',
+            'V': 'إجازة', 'WO': 'Weekend Off', 'VC': 'إجازة مرضية', 'C': 'تدريب', 'ME': 'مكلف',
+            'N8': 'دوام 8 ليلاً', 'CP8': 'تكميلية 8', 'CP24': 'تكميلية 24', 'CPD': 'تكميلية صباحية',
+            'CPN': 'تكميلية ليلية', 'E': 'إجازة', 'EV': 'إجازة استثنائية', 'F': 'مكلف',
+            'LN8': 'ليلية 8', 'LN10': 'ليلية 10', 'D10': 'دوام 10 صباحاً', 'D11': 'دوام 11 صباحاً',
+            'D8': 'دوام 8 صباحاً', 'D6': 'دوام 6 صباحاً', 'N10': 'دوام 10 ليلاً',
+            'N11': 'دوام 11 ليلاً', 'N6': 'دوام 6 ليلاً', 'O10': 'أوفرلاب 10', 'O6': 'أوفرلاب 6'
+        };
+        var shiftTimeMap = {
+            'D12': '05:00-17:00', 'N12': '17:00-05:00', 'M': '08:00-14:00', 'O12': '05:00-17:00',
+            'V': '-', 'WO': '-', 'VC': '-', 'C': '08:00-14:00', 'ME': '14:00-22:00',
+            'N8': '17:00-01:00', 'CP8': 'تكميلية', 'CP24': 'تكميلية', 'CPD': 'تكميلية صباحية',
+            'CPN': 'تكميلية ليلية', 'E': '-', 'EV': '-', 'F': '14:00-22:00',
+            'LN8': '17:00-01:00', 'LN10': '17:00-03:00', 'D10': '05:00-15:00', 'D11': '05:00-16:00',
+            'D8': '05:00-13:00', 'D6': '05:00-11:00', 'N10': '17:00-03:00', 'N11': '17:00-04:00',
+            'N6': '17:00-23:00', 'O10': '05:00-15:00', 'O6': '05:00-11:00'
+        };
+        var shiftStatusMap = {
+            'D12': 'دوام', 'N12': 'دوام', 'M': 'دوام', 'O12': 'دوام', 'V': 'إجازة', 'WO': 'راحة',
+            'VC': 'إجازة', 'C': 'تدريب', 'ME': 'دوام', 'N8': 'دوام', 'CP8': 'تكميل', 'CP24': 'تكميل',
+            'CPD': 'تكميل', 'CPN': 'تكميل', 'E': 'إجازة', 'EV': 'إجازة', 'F': 'دوام', 'LN8': 'دوام',
+            'LN10': 'دوام', 'D10': 'دوام', 'D11': 'دوام', 'D8': 'دوام', 'D6': 'دوام', 'N10': 'دوام',
+            'N11': 'دوام', 'N6': 'دوام', 'O10': 'دوام', 'O6': 'دوام'
+        };
+        if (workbook.SheetNames.length === 0) {
+            console.warn('No sheets in workbook');
+            return allEmployees;
+        }
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
+        var jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (jsonData.length < 5) {
+            console.warn('Sheet too short for monthly format');
+            return allEmployees;
+        }
+        var monthNum = 0, yearNum = new Date().getFullYear();
+        if (jsonData[1] && jsonData[1].length >= 2) {
+            var r0 = jsonData[1][0];
+            var r1 = jsonData[1][1];
+            if (typeof r0 === 'number' && r0 > 0 && r0 < 13) monthNum = r0;
+            else if (typeof r0 === 'string') { var pm = parseInt(r0); if (!isNaN(pm) && pm > 0 && pm < 13) monthNum = pm; }
+            if (typeof r1 === 'number' && r1 > 2000) yearNum = r1;
+            else if (typeof r1 === 'string') { var py = parseInt(r1); if (!isNaN(py) && py > 2000) yearNum = py; }
+        }
+        if (monthNum === 0) {
+            for (var i = 0; i < Math.min(5, jsonData.length); i++) {
+                var row = jsonData[i]; if (!row) continue;
+                for (var c = 0; c < row.length; c++) {
+                    var cell = String(row[c] || '');
+                    var monthMatch = cell.match(/(?:شهر\s*)?(\d{1,2})\s*[-/]\s*(\d{4})/);
+                    if (!monthMatch) {
+                        monthMatch = cell.match(/(\d{4})\s*[-/]\s*(\d{1,2})/);
+                        if (monthMatch) { monthNum = parseInt(monthMatch[2]); yearNum = parseInt(monthMatch[1]); break; }
+                    } else { monthNum = parseInt(monthMatch[1]); yearNum = parseInt(monthMatch[2]); break; }
+                }
+                if (monthNum > 0) break;
+            }
+        }
+        if (monthNum === 0) { var now = new Date(); monthNum = now.getMonth() + 1; yearNum = now.getFullYear(); }
+        var currentTeam = '';
+        var dayNumbers = [];
+        var inEmployeeSection = false;
+        var teamCount = 0;
+        for (var i = 0; i < jsonData.length; i++) {
+            var row = jsonData[i]; if (!row || row.length === 0) continue;
+            var colA = row[0];
+            var colAStr = String(colA || '').trim();
+            var teamMatch = colAStr.match(/^(القائد\s+الميداني|جنوب|تدخل\s+سريع|التحكم\s+والتنسيق|الدعم\s+اللوجستي|مناوبو\s+باص\s+الاستجابة|المنتدبين|إجازة)\s*\d*$/i);
+            if (!teamMatch) {
+                if (colAStr === 'جنوب' || colAStr === 'سريع' || colAStr === 'القائد الميداني') teamMatch = true;
+            }
+            if (teamMatch && colAStr.length < 50 && colAStr.length > 1) {
+                currentTeam = colAStr; inEmployeeSection = true; dayNumbers = []; teamCount++; continue;
+            }
+            if ((!colA || String(colA).trim() === '') && row[1]) {
+                var colBStr = String(row[1] || '').trim();
+                var teamMatch2 = colBStr.match(/^(القائد\s+الميداني|جنوب|تدخل\s+سريع|التحكم\s+والتنسيق|الدعم\s+اللوجستي|مناوبو\s+باص\s+الاستجابة|المنتدبين|إجازة)\s*\d*$/i);
+                if (!teamMatch2) { if (colBStr === 'جنوب' || colBStr === 'سريع' || colBStr === 'القائد الميداني') teamMatch2 = true; }
+                if (teamMatch2 && colBStr.length < 50 && colBStr.length > 1) {
+                    currentTeam = colBStr; inEmployeeSection = true; dayNumbers = []; teamCount++; continue;
+                }
+            }
+            if (inEmployeeSection && (colAStr.indexOf('كود') !== -1 || colAStr.indexOf('الكود') !== -1 || colAStr.indexOf('الرقم') !== -1)) {
+                dayNumbers = [];
+                for (var c = 4; c < row.length && c < 40; c++) {
+                    var dayVal = parseInt(row[c]);
+                    if (!isNaN(dayVal) && dayVal >= 1 && dayVal <= 31) dayNumbers[c] = dayVal;
+                }
+                continue;
+            }
+            var empCode = null;
+            if (typeof colA === 'number' && colA > 100 && colA < 999999) empCode = String(parseInt(colA));
+            else if (typeof colA === 'string' && /^\d{3,6}$/.test(colA.trim())) empCode = colA.trim();
+            if (empCode && row[1] && typeof row[1] === 'string' && String(row[1]).trim().length > 2) {
+                var empName = String(row[1]).trim();
+                var empPhone = row[2] ? String(row[2]).trim() : '';
+                var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
+                if (!empName || empName.length < 3) continue;
+                var schedule = [];
+                var dayCols = Object.keys(dayNumbers).map(Number).sort(function(a, b) { return a - b; });
+                for (var d = 0; d < dayCols.length; d++) {
+                    var c = dayCols[d];
+                    var shiftCode = String(row[c] || '').trim();
+                    if (!shiftCode) continue;
+                    var dayNum = dayNumbers[c];
+                    if (!dayNum || dayNum < 1 || dayNum > 31) continue;
+                    var dateStr = yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum);
+                    var dayDate = new Date(Date.UTC(yearNum, monthNum - 1, dayNum));
+                    var dayName = ARABIC_DAYS[dayDate.getUTCDay()] || '';
+                    var shiftName = shiftMap[shiftCode] || shiftCode;
+                    var shiftTime = shiftTimeMap[shiftCode] || '';
+                    var status = shiftStatusMap[shiftCode] || 'دوام';
+                    schedule.push({ day: dayName, date: dateStr, shift: shiftName, shiftCode: shiftCode, time: shiftTime, location: currentTeam || 'غير محدد', status: status });
+                }
+                if (schedule.length > 0) {
+                    allEmployees.push({ id: empCode, name: empName, jobTitle: empJob, employeeNumber: empCode, phone: empPhone, team: currentTeam, schedule: schedule });
+                }
+            }
+        }
+        _lastImportedStats = { employees: allEmployees.length, month: monthNum, year: yearNum, teams: teamCount, teamNames: [...new Set(allEmployees.map(function(e) { return e.team; }))].filter(Boolean) };
+        return allEmployees;
+    }
+
+    // ==========================================
+    // Parse PDF
+    // ==========================================
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    function parsePDF(file) {
+        var reader = new FileReader();
+        reader.onload = function(e) { processPDFData(e.target.result); };
+        reader.readAsArrayBuffer(file);
+    }
+    async function processPDFData(arrayBuffer) {
+        try {
+            showToast('جاري قراءة ملف PDF...', 'info');
+            var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            var allEmployees = [];
+            var allTeams = [];
+            for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                showToast('جاري معالجة الصفحة ' + pageNum + ' من ' + pdf.numPages + '...', 'info');
+                var page = await pdf.getPage(pageNum);
+                var scale = 2.0;
+                var viewport = page.getViewport({ scale: scale });
+                var canvas = document.createElement('canvas');
+                var context = canvas.getContext('2d');
+                canvas.width = viewport.width; canvas.height = viewport.height;
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                var result = await Tesseract.recognize(canvas, 'ara', { logger: function(m) {} });
+                var pageResult = parseOCRPage(result.data.text, 6, 2026);
+                for (var t = 0; t < pageResult.teams.length; t++) {
+                    var team = pageResult.teams[t];
+                    var existingTeam = null;
+                    for (var et = 0; et < allTeams.length; et++) { if (allTeams[et].name === team.name) { existingTeam = allTeams[et]; break; } }
+                    if (existingTeam) { existingTeam.employees = existingTeam.employees.concat(team.employees); }
+                    else { allTeams.push(team); }
+                }
+            }
+            for (var t = 0; t < allTeams.length; t++) {
+                var team = allTeams[t];
+                for (var e = 0; e < team.employees.length; e++) { team.employees[e].team = team.name; allEmployees.push(team.employees[e]); }
+            }
+            if (allEmployees.length === 0) { showToast('لم يتم العثور على بيانات في ملف PDF', 'warning'); }
+            else {
+                importedEmployees = allEmployees;
+                finishAnalysis(allEmployees.length);
+                showExtractedTable(allEmployees);
+                convertImportedToScheduleData(allEmployees);
+                showToast('تم استخراج ' + allEmployees.length + ' موظف من ' + allTeams.length + ' فريق', 'success');
+                await saveToServer();
+            }
+        } catch(err) {
+            console.error('PDF Error:', err);
+            showToast('خطأ في قراءة PDF: ' + err.message, 'error');
+        }
+    }
+    function parseOCRPage(ocrText, monthNum, yearNum) {
+        var lines = ocrText.split('
+').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+        var teams = [];
+        var currentTeam = null;
+        var currentEmployees = [];
+        var dayNumbers = [];
+        var dayNames = [];
+        var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
+        var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var teamMatch = line.match(/^(تدخل\s+سريع\s*\d+|جنوب\s*\d+|قائد\s+ميداني|تحكم\s+وتنسيق|دعم\s+لوجستي)/);
+            if (teamMatch && line.length < 50) {
+                if (currentTeam && currentEmployees.length > 0) teams.push({ name: currentTeam, employees: currentEmployees });
+                currentTeam = teamMatch[1]; currentEmployees = []; dayNumbers = []; dayNames = []; continue;
+            }
+            var numMatch = line.match(/(\d{1,2}).*(\d{1,2}).*(\d{1,2}).*(\d{1,2}).*(\d{1,2})/);
+            if (numMatch && !line.match(/[؀-ۿ]{4,}/)) {
+                var nums = line.match(/(\d{1,2})/g);
+                if (nums && nums.length > 20) { dayNumbers = nums.map(Number); continue; }
+            }
+            if (line.match(/الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت/) && line.length < 200) {
+                var days = line.match(/الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت/g);
+                if (days && days.length > 10) { dayNames = days; continue; }
+            }
+            var empMatch = line.match(/^(\d{3,6})\s+([؀-ۿ\s]{5,30})\s+(.*)/);
+            if (empMatch && currentTeam) {
+                var empCode = empMatch[1];
+                var empName = empMatch[2].trim();
+                var rest = empMatch[3];
+                var shiftMatches = rest.match(/(D12|N12|V|M|C|R)/g);
+                if (shiftMatches && shiftMatches.length > 3) {
+                    var schedule = [];
+                    for (var s = 0; s < shiftMatches.length && s < dayNumbers.length; s++) {
+                        var shiftCode = shiftMatches[s];
+                        var dayNum = dayNumbers[s] || (s + 1);
+                        var shiftInfo = shiftMap[shiftCode] || shiftCode;
+                        var shiftTime = shiftTimeMap[shiftCode] || '';
+                        var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
+                        schedule.push({ day: dayNames[s] || ARABIC_DAYS[(dayNum - 1) % 7], date: yearNum + '-' + pad2(monthNum) + '-' + pad2(dayNum), shift: shiftInfo, shiftCode: shiftCode, time: shiftTime, location: currentTeam, status: status });
+                    }
+                    if (schedule.length > 0) {
+                        currentEmployees.push({ id: empCode, name: empName, jobTitle: 'مسعف', employeeNumber: empCode, phone: '', team: currentTeam, schedule: schedule });
+                    }
+                }
+            }
+        }
+        if (currentTeam && currentEmployees.length > 0) teams.push({ name: currentTeam, employees: currentEmployees });
+        return { teams: teams };
+    }
+
+    // ==========================================
+    // Analysis & Display
+    // ==========================================
+    function finishAnalysis(count) {
+        document.getElementById('uploadProgress').classList.remove('active');
+        document.getElementById('analysisStatus').classList.remove('active');
+        document.getElementById('analysisResult').classList.add('active');
+        var stats = _lastImportedStats || {};
+        var monthName = stats.month ? (ARABIC_MONTHS[stats.month - 1] || stats.month) : '';
+        document.getElementById('analysisText').textContent = 'تم استيراد ' + count + ' مسعف';
+        var detailsText = '';
+        if (stats.month && stats.year) detailsText += 'جدول شهر ' + monthName + ' ' + stats.year + ' — ';
+        if (stats.teams) detailsText += stats.teams + ' فرقة';
+        document.getElementById('analysisDetails').textContent = detailsText;
+        document.getElementById('extractedTableContainer').classList.add('active');
+    }
+    function showExtractedTable(data) {
+        var thead = document.querySelector('#extractedTable thead tr');
+        var tbody = document.querySelector('#extractedTable tbody');
+        if (!thead || !tbody) return;
+        thead.innerHTML = '<th>الرقم</th><th>الاسم</th><th>المسمى الوظيفي</th><th>الفرقة</th><th>رقم الجوال</th><th>عدد المناوبات</th>';
+        tbody.innerHTML = '';
+        for (var i = 0; i < Math.min(data.length, 20); i++) {
+            var emp = data[i];
+            var row = document.createElement('tr');
+            row.innerHTML = '<td>' + emp.id + '</td>' +
+                '<td><strong>' + emp.name + '</strong></td>' +
+                '<td>' + emp.jobTitle + '</td>' +
+                '<td>' + (emp.team || '-') + '</td>' +
+                '<td>' + emp.phone + '</td>' +
+                '<td><span class="badge-status-work">' + emp.schedule.length + ' مناوبة</span></td>';
+            tbody.appendChild(row);
+        }
+        if (data.length > 20) {
+            var infoRow = document.createElement('tr');
+            infoRow.innerHTML = '<td colspan="6" style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.85rem;">... و ' + (data.length - 20) + ' مسعف إضافي</td>';
+            tbody.appendChild(infoRow);
+        }
+    }
+
+    // ==========================================
+    // Convert imported data to shift-planner format
+    // ==========================================
+    function convertImportedToScheduleData(imported) {
+        if (!imported || imported.length === 0) return;
+        // Convert to employeesList format
+        employeesList = imported.map(function(emp, idx) {
+            return {
+                id: emp.id || idx,
+                name: emp.name,
+                employee_code: emp.id || emp.employeeNumber,
+                job_title: emp.jobTitle || 'مسعف',
+                phone: emp.phone || '',
+                team_id: emp.team || 'غير محدد',
+                team: emp.team || 'غير محدد'
+            };
+        });
+        // Convert to scheduleData format
+        scheduleData = [];
+        var uniqueId = 1;
+        for (var i = 0; i < imported.length; i++) {
+            var emp = imported[i];
+            for (var s = 0; s < emp.schedule.length; s++) {
+                var sch = emp.schedule[s];
+                var hours = 12;
+                var code = sch.shiftCode || '';
+                if (code === 'D8' || code === 'N8' || code === 'CP8' || code === 'LN8') hours = 8;
+                else if (code === 'D6' || code === 'N6' || code === 'O6') hours = 6;
+                else if (code === 'D10' || code === 'N10' || code === 'O10') hours = 10;
+                else if (code === 'D11' || code === 'N11') hours = 11;
+                else if (code === 'V' || code === 'WO' || code === 'VC' || code === 'E' || code === 'EV' || code === 'R') hours = 0;
+                scheduleData.push({
+                    id: uniqueId++,
+                    employee_id: emp.id || emp.employeeNumber,
+                    employee_name: emp.name,
+                    shift_date: sch.date,
+                    shift_code: sch.shiftCode,
+                    team_id: null,
+                    team_name: emp.team || 'غير محدد',
+                    shift_hours: hours,
+                    mode: 'normal'
+                });
+            }
+        }
+        // Build teamsList
+        var teamMap = {};
+        for (var i = 0; i < imported.length; i++) {
+            var t = imported[i].team || 'غير محدد';
+            if (!teamMap[t]) teamMap[t] = { name: t, employees: [] };
+            teamMap[t].employees.push(imported[i]);
+        }
+        teamsList = Object.keys(teamMap).map(function(tname, idx) {
+            return { id: idx + 1, name: tname, team_name: tname };
+        });
+        // Calculate staffing from imported data
+        calculateStaffingFromImported();
+        // Update current month to imported month
+        var stats = _lastImportedStats || {};
+        if (stats.month && stats.year) {
+            currentMonth = new Date(stats.year, stats.month - 1, 1);
+        }
+        // Update UI
+        updateDashboard();
+        renderScheduleCalendar();
+        renderStaffingPanel();
+        renderTeamsStatus();
+        populateSelects();
+        showToast('تم تحديث الجدول والفرق والمؤشرات بنجاح', 'success');
+    }
+
+    function calculateStaffingFromImported() {
+        var dayCounts = {};
+        for (var i = 0; i < scheduleData.length; i++) {
+            var s = scheduleData[i];
+            var d = s.shift_date;
+            if (!dayCounts[d]) dayCounts[d] = { day: 0, night: 0, total: 0 };
+            var code = s.shift_code || '';
+            if (code === 'D12' || code === 'D8' || code === 'D10' || code === 'D11' || code === 'D6' || code === 'M' || code === 'O12' || code === 'O10' || code === 'O6') {
+                dayCounts[d].day++;
+            } else if (code === 'N12' || code === 'N8' || code === 'N10' || code === 'N11' || code === 'N6' || code === 'LN8' || code === 'LN10') {
+                dayCounts[d].night++;
+            }
+            dayCounts[d].total++;
+        }
+        staffingData = [];
+        var dates = Object.keys(dayCounts).sort();
+        for (var i = 0; i < dates.length; i++) {
+            var d = dates[i];
+            var c = dayCounts[d];
+            var dayNeeded = 2, nightNeeded = 2;
+            var dayActual = c.day;
+            var nightActual = c.night;
+            staffingData.push({
+                date: d,
+                day_actual: dayActual,
+                day_needed: dayNeeded,
+                night_actual: nightActual,
+                night_needed: nightNeeded
+            });
+        }
+        // Build alerts and recommendations
+        alertsData = [];
+        recommendationsData = [];
+        for (var i = 0; i < staffingData.length; i++) {
+            var s = staffingData[i];
+            if (s.day_actual < s.day_needed || s.night_actual < s.night_needed) {
+                alertsData.push({ date: s.date, message: 'نقص تغطية في ' + s.date });
+                recommendationsData.push({ id: i, message: 'تفعيل الوضع البديل ليوم ' + s.date + ' (نقص ' + (s.day_needed - s.day_actual) + ' صباحية / ' + (s.night_needed - s.night_actual) + ' ليلية)', recommendation: 'تفعيل الوضع البديل ليوم ' + s.date });
+            }
+        }
+    }
+
+    function openDayDetail(dateStr) {
+        var dayEntries = scheduleData.filter(function(s) { return s.shift_date === dateStr && s.employee_name; });
+        if (dayEntries.length === 0) return;
+        var msg = dayEntries.map(function(s) {
+            return s.employee_name + ': ' + (s.shift_code || '-');
+        }).join('\n');
+        alert('تفاصيل يوم ' + dateStr + ':\n\n' + msg);
+    }
+
+    // ==========================================
+    // Save to Server
+    // ==========================================
+    async function saveToServer() {
+        try {
+            var token = getAuthToken();
+            if (!importedEmployees || importedEmployees.length === 0) {
+                showToast('لا توجد بيانات للحفظ', 'error');
+                return false;
+            }
+            var payload = buildImportPayload();
+            try {
+                var res = await fetch('/api/shift-roster/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showToast('تم استيراد ' + payload.employees.length + ' مسعف و ' + payload.totalShifts + ' مناوبة إلى قاعدة البيانات', 'success');
+                    return true;
+                }
+            } catch(e) { console.log('New API not available, falling back'); }
+            var res = await fetch('/api/schedule/employees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(importedEmployees)
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            showToast('تم حفظ البيانات على السيرفر (وضع التوافق)', 'success');
+            return true;
+        } catch(e) {
+            console.error('saveToServer error:', e);
+            showToast('خطأ في حفظ البيانات: ' + e.message, 'error');
+            return false;
+        }
+    }
+    function buildImportPayload() {
+        var stats = _lastImportedStats || {};
+        var month = stats.month || new Date().getMonth() + 1;
+        var year = stats.year || new Date().getFullYear();
+        var payloadEmployees = [];
+        var roster = [];
+        var totalShifts = 0;
+        for (var i = 0; i < importedEmployees.length; i++) {
+            var emp = importedEmployees[i];
+            payloadEmployees.push({ employee_code: emp.id, name: emp.name, phone: emp.phone || '', job_title: emp.jobTitle || 'مسعف', team_name: emp.team || 'غير محدد' });
+            for (var s = 0; s < emp.schedule.length; s++) {
+                var sch = emp.schedule[s];
+                roster.push({ employee_code: emp.id, shift_date: sch.date, shift_code: sch.shiftCode, team_name: emp.team || 'غير محدد' });
+                totalShifts++;
+            }
+        }
+        return { month: month, year: year, employees: payloadEmployees, roster: roster, totalShifts: totalShifts };
+    }
+
+    // ==========================================
+    // Saved Files UI
+    // ==========================================
+    function renderSavedFiles() {
+        var container = document.getElementById('savedFilesList');
+        if (!container || savedFiles.length === 0) { if (container) container.innerHTML = ''; return; }
+        var html = '<div style="font-weight:700; margin-bottom:10px; color:var(--primary); font-size:0.9rem;"><i class="fas fa-history"></i> الملفات المرفوعة مؤخراً:</div>';
+        for (var i = 0; i < Math.min(savedFiles.length, 5); i++) {
+            var f = savedFiles[i];
+            var icon = f.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-excel';
+            var date = new Date(f.date).toLocaleDateString('ar-SA');
+            html += '<div class="saved-file-item">' +
+                '<div class="saved-file-info"><i class="fas ' + icon + ' saved-file-icon"></i>' +
+                '<div><div class="saved-file-name">' + f.name + '</div><div class="saved-file-date">' + date + '</div></div></div>' +
+                '<div class="saved-file-actions">' +
+                '<button class="btn-icon danger" onclick="deleteSavedFile(' + f.id + ')" title="حذف"><i class="fas fa-trash"></i></button></div></div>';
+        }
+        container.innerHTML = html;
+    }
+    function deleteSavedFile(id) {
+        savedFiles = savedFiles.filter(function(f) { return f.id !== id; });
+        renderSavedFiles();
+        showToast('تم حذف الملف', 'info');
+    }
+
 
     // ==========================================
     // Demo Data Generator
@@ -1804,6 +2513,8 @@
     window.exportToExcel = exportToExcel;
     window.exportToPDF = exportToPDF;
     window.printSchedule = printSchedule;
+    window.openDayDetail = openDayDetail;
+    window.deleteSavedFile = deleteSavedFile;
     </script>
     <script src="js/websocket-sync.js"></script>
     <link rel="stylesheet" href="/css/nano-bot.css">

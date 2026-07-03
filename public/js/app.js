@@ -2605,6 +2605,10 @@ async function syncReportEntryData() {
 // مؤشرات القوى العاملة
 // ============================================
 function updateWorkforceStats() {
+    // Guard: only run on index.html where workforce elements exist
+    if (!document.getElementById('wfTotalStaff')) {
+        return;
+    }
     var shiftData = null;
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
