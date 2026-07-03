@@ -2965,6 +2965,264 @@ function loadShiftToForm(shift) {
     }
 }
 
+// ============================================
+// Paramedic display helpers
+// ============================================
+
+var teamParamedicData = {};
+
+function safeTeamId(teamName) {
+    return teamName.replace(/\s+/g, '_');
+}
+
+function isParamedicPresent(shiftCode) {
+    if (!shiftCode || shiftCode === '-' || shiftCode === '') return false;
+    var absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+    return absentCodes.indexOf(shiftCode.toString().toUpperCase()) === -1;
+}
+
+function renderTeamParamedics(teamName, type, index, paramedics) {
+    var safeName = safeTeamId(teamName);
+    var container = document.getElementById('paramedics_' + safeName);
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeName);
+    var staffInputId = type === 'rapid' ? 'rapid_staff_' + index : 'staff_' + index;
+    var staffInput = document.getElementById(staffInputId);
+    var fallbackDiv = document.getElementById('fallback_' + staffInputId);
+    
+    if (!container) return;
+    
+    var presentCount = 0;
+    var html = '';
+    
+    if (paramedics.length === 0) {
+        html = '<div class="paramedic-no-data">لا يوجد مسعفين مسندين</div>';
+        if (fallbackDiv) fallbackDiv.style.display = 'block';
+    } else {
+        if (fallbackDiv) fallbackDiv.style.display = 'none';
+        for (var i = 0; i < paramedics.length; i++) {
+            var p = paramedics[i];
+            var isPresent = isParamedicPresent(p.shift_code);
+            if (isPresent) presentCount++;
+            var dotClass = isPresent ? 'present' : 'absent';
+            var statusText = isPresent ? 'حاضر' : 'غائب';
+            var code = p.shift_code || '-';
+            html += '<div class="paramedic-item" title="' + (p.name || '') + ' — ' + statusText + '">';
+            html += '<span class="paramedic-dot ' + dotClass + '"></span>';
+            html += '<span class="paramedic-name">' + (p.name || 'غير معروف') + '</span>';
+            html += '<span class="paramedic-code">' + code + '</span>';
+            html += '</div>';
+        }
+    }
+    
+    container.innerHTML = html;
+    
+    if (countDisplay) {
+        countDisplay.textContent = presentCount + ' حاضر';
+    }
+    
+    if (staffInput) {
+        staffInput.value = presentCount;
+    }
+    
+    if (type === 'rapid') {
+        updateRapidStatusIcon(index);
+    } else {
+        updateStatusIcon(index);
+    }
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+}
+
+async function fetchTeamParamedics(shiftId, teamName, type, index) {
+    var cacheKey = shiftId + '_' + teamName;
+    try {
+        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now(), {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+        var data = await response.json();
+        console.log('[PARAMEDICS] Team:', teamName, 'ShiftType:', data.shiftType, 'Count:', data.paramedics.length, 'Codes:', data.paramedics.map(function(p) { return p.shift_code; }));
+        var paramedics = data.paramedics || [];
+        teamParamedicData[cacheKey] = paramedics;
+        renderTeamParamedics(teamName, type, index, paramedics);
+    } catch (error) {
+        console.error('Failed to fetch paramedics for', teamName, error);
+        renderTeamParamedics(teamName, type, index, []);
+    }
+}
+
+async function loadTeamParamedics(shiftId) {
+    if (!shiftId) return;
+    var teams = [];
+    for (var r = 0; r < rapidTeams.length; r++) {
+        teams.push({ name: rapidTeams[r].name, type: 'rapid', index: r });
+    }
+    for (var i = 0; i < centerList.length; i++) {
+        teams.push({ name: centerList[i], type: 'center', index: i });
+    }
+    teams.forEach(function(t) {
+        var safeName = safeTeamId(t.name);
+        var container = document.getElementById('paramedics_' + safeName);
+        if (container) {
+            container.innerHTML = '<div class="paramedic-no-data"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div>';
+        }
+    });
+    await Promise.all(teams.map(function(team) {
+        return fetchTeamParamedics(shiftId, team.name, team.type, team.index);
+    }));
+}
+
+function updateRapidStatusIcon(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    var iconSpan = document.getElementById('rapid_status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_rapid_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
+    }
+}
+
+function setRapidComplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 1;
+    if (carsInput) carsInput.value = 1;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '1 حاضر';
+}
+
+function setRapidIncomplete(index) {
+    var staffInput = document.getElementById('rapid_staff_' + index);
+    var carsInput = document.getElementById('rapid_cars_' + index);
+    if (staffInput) staffInput.value = 0;
+    if (carsInput) carsInput.value = 0;
+    updateRapidStatusIcon(index);
+    calculateWorkforceStatsLocally();
+    updateShiftKPIs();
+    var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
+    if (countDisplay) countDisplay.textContent = '0 حاضر';
+}
+
+function updateStatusIcon(index) {
+    var staffInput = document.getElementById('staff_' + index);
+    var carsInput = document.getElementById('cars_' + index);
+    var iconSpan = document.getElementById('status_' + index);
+    var backupParamedicInput = document.getElementById('backup_paramedic_' + index);
+    var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+    if (staffInput && carsInput && iconSpan) {
+        var staffCount = parseInt(staffInput.value) || 0;
+        var carsCount = parseInt(carsInput.value) || 0;
+        if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) { 
+            iconSpan.innerHTML = '✅'; 
+            iconSpan.className = 'status-icon status-ok'; 
+        } else { 
+            iconSpan.innerHTML = '❌'; 
+            iconSpan.className = 'status-icon status-not'; 
+        }
+    }
+}
+
+function calculateWorkforceStatsLocally() {
+    var centerRows = document.querySelectorAll('#centersTableBody tr');
+    var totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
+    var distribution = {}, carDistribution = {};
+    centerRows.forEach(function(tr) {
+        var centerName = tr.querySelector('td:nth-child(2)')?.innerText || '';
+        var isRapid = tr.classList.contains('rapid-team-row');
+        var staffInput = tr.querySelector('input[id^="staff_"], input[id^="rapid_staff_"]');
+        var carsInput = tr.querySelector('input[id^="cars_"], input[id^="rapid_cars_"]');
+        if (staffInput && carsInput) {
+            var staffCount = parseInt(staffInput.value) || 0;
+            var carsCount = parseInt(carsInput.value) || 0;
+            var backupParamedicInput = isRapid ? tr.querySelector('input[id^="backup_paramedic_rapid_"]') : tr.querySelector('input[id^="backup_paramedic_"]');
+            var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+            if (hasBackupParamedic) {
+                staffCount = Math.max(staffCount, 1);
+            }
+            totalStaff += staffCount; totalCars += carsCount; centerCount++;
+            distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
+            if (isRapid) {
+                if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
+            } else {
+                if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
+            }
+        }
+    });
+    var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+    var elWorkforceStats = document.getElementById('workforceStats');
+    if (elWorkforceStats) elWorkforceStats.style.display = 'block';
+    var elTotalStaffDisplay = document.getElementById('totalStaffDisplay');
+    if (elTotalStaffDisplay) elTotalStaffDisplay.innerText = totalStaff;
+    var elTotalCarsDisplay = document.getElementById('totalCarsDisplay');
+    if (elTotalCarsDisplay) elTotalCarsDisplay.innerText = totalCars;
+    var elMissingCentersDisplay = document.getElementById('missingCentersDisplay');
+    if (elMissingCentersDisplay) elMissingCentersDisplay.innerText = missingCenters;
+    var elStaffSubText = document.getElementById('staffSubText');
+    if (elStaffSubText) elStaffSubText.innerText = 'موزعين على ' + centerCount + ' فريق';
+    var elCarsSubText = document.getElementById('carsSubText');
+    if (elCarsSubText) elCarsSubText.innerText = 'إجمالي السيارات';
+    var elMissingSubText = document.getElementById('missingSubText');
+    if (elMissingSubText) elMissingSubText.innerText = missingCenters === 1 ? 'فريق ناقص' : missingCenters + ' فرق ناقصة';
+    var elReadinessSubText = document.getElementById('readinessSubText');
+    if (elReadinessSubText) elReadinessSubText.innerText = readyCenters + ' / ' + centerCount + ' فريق جاهز';
+    var circumference = 2 * Math.PI * 42;
+    var offset = circumference - (readinessRate / 100) * circumference;
+    var circle = document.getElementById('readinessCircle');
+    var text = document.getElementById('readinessText');
+    var color = '#c0392b';
+    if (readinessRate >= 80) color = '#2a7f3e';
+    else if (readinessRate >= 50) color = '#f39c12';
+    if (circle) {
+        circle.setAttribute('stroke', color);
+        circle.style.strokeDashoffset = offset;
+    }
+    if (text) text.textContent = readinessRate + '%';
+    var distList = document.getElementById('distributionList');
+    if (distList) {
+        distList.innerHTML = '';
+        var total = totalStaff || 1;
+        for (var center in distribution) {
+            var count = distribution[center];
+            var barWidth = Math.round((count / total) * 100);
+            var isRapidTeam = center.indexOf('سريع') !== -1;
+            var isReady = isRapidTeam ? (count >= 1) : (count >= 2);
+            var div = document.createElement('div');
+            div.className = 'distribution-bar';
+            div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
+            distList.appendChild(div);
+        }
+    }
+    var carDistList = document.getElementById('carDistributionList');
+    if (carDistList) {
+        carDistList.innerHTML = '';
+        var totalCarsValue = totalCars || 1;
+        for (var center2 in carDistribution) {
+            var count2 = carDistribution[center2];
+            var barWidth2 = Math.round((count2 / totalCarsValue) * 100);
+            var isRapidTeam2 = center2.indexOf('سريع') !== -1;
+            var hasCar = isRapidTeam2 ? (count2 >= 1) : (count2 >= 1);
+            var div2 = document.createElement('div');
+            div2.className = 'distribution-bar';
+            div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
+            carDistList.appendChild(div2);
+        }
+    }
+    if (totalStaff > 0 || totalCars > 0) {
+        updateWorkforceDisplay(totalStaff, totalCars, readinessRate, missingCenters);
+    }
+}
+
 function getShiftFromForm() {
     var shiftTypeEl = document.querySelector('input[name="shiftType"]:checked');
     var shiftType = shiftTypeEl ? shiftTypeEl.value : (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
