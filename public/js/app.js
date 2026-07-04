@@ -1776,6 +1776,15 @@ function updateShiftStatus() {
     // Always show current time-based shift type
     var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
     
+    // Update quick-action current shift button too
+    var currentShiftBtn = document.getElementById('currentShiftBtn');
+    var currentShiftDisplay = document.getElementById('currentShiftDisplay');
+    if (currentShiftDisplay) {
+        var nowTime = getSaudiTime ? getSaudiTime() : '';
+        currentShiftDisplay.innerHTML = '<span style="font-size:0.8rem; opacity:0.8;">' + nowTime + '</span><br><strong>' + (currentShiftId ? 'مناوبة نشطة' : currentType) + '</strong>';
+    }
+    if (currentShiftBtn) { currentShiftBtn.disabled = false; currentShiftBtn.style.cursor = 'pointer'; }
+    
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
         btn.className = 'btn btn-shift-status on';
@@ -3316,7 +3325,11 @@ function getShiftFromForm() {
 function clearShiftForm() {
     viewingShiftId = null; // Reset to prevent saving to wrong shift
     document.getElementById('shiftDate').innerText = getSaudiDate();
-    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { radio.checked = false; });
+    // Auto-select current shift type based on time
+    var currentShiftType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    document.querySelectorAll('input[name="shiftType"]').forEach(function(radio) { 
+        radio.checked = (radio.value === currentShiftType); 
+    });
     // Update badge to current automatic shift
     var typeBadge = document.getElementById('shiftModalTypeBadge');
     if (typeBadge) {
