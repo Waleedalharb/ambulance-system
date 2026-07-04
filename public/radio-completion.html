@@ -44,7 +44,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .section-title i { color:var(--gold); }
 
 /* Cards Grid */
-.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; }
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 
 .team-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:1rem; cursor:pointer; transition:all 0.2s; position:relative; overflow:hidden; }
 .team-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
@@ -73,11 +73,20 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .team-card.status-pending .card-status { background:var(--gray); color:#fff; }
 
 /* Reason Buttons (shown when missing) */
-.reason-bar { display:none; flex-wrap:wrap; gap:4px; margin-top:0.5rem; }
+.reason-bar { display:none; flex-direction:column; gap:6px; margin-top:0.5rem; }
 .team-card.status-missing .reason-bar { display:flex; }
+.reason-row { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 .reason-btn { font-size:0.65rem; padding:3px 8px; border-radius:6px; border:none; cursor:pointer; background:#fff; color:var(--text); border:1px solid var(--border); }
 .reason-btn:hover { background:var(--yellow-light); border-color:var(--yellow); }
 .reason-btn.active { background:var(--yellow); color:#fff; }
+
+/* Paramedic selector dropdown */
+.paramedic-select {
+    font-size:0.7rem; padding:3px 6px; border-radius:6px; border:1px solid var(--yellow);
+    background:#fff; color:var(--text); min-width:100px; cursor:pointer;
+}
+.paramedic-select:focus { outline:none; border-color:var(--primary); }
+.paramedic-label { font-size:0.65rem; color:var(--muted); margin-left:4px; }
 
 /* Quick Actions */
 .actions-bar { display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap; }
@@ -85,6 +94,23 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .btn-ready { background:var(--green); color:#fff; }
 .btn-missing { background:var(--yellow); color:#fff; }
 .btn-offline { background:var(--red); color:#fff; }
+
+/* Notes Section */
+.notes-section {
+    max-width:1400px; margin:0 auto; padding:0 1.5rem 1.5rem;
+}
+.notes-box {
+    background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem;
+    box-shadow:var(--shadow);
+}
+.notes-box h3 { font-size:1rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+.notes-box h3 i { color:var(--primary); }
+.notes-box textarea {
+    width:100%; min-height:100px; padding:0.75rem; border-radius:8px;
+    border:1px solid var(--border); font-family:inherit; font-size:0.9rem;
+    resize:vertical; background:var(--bg);
+}
+.notes-box textarea:focus { outline:none; border-color:var(--primary); }
 
 /* Summary Panel */
 .summary-panel { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.5rem; margin-top:1rem; box-shadow:var(--shadow); }
@@ -113,19 +139,19 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 /* Modal */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
 .modal-overlay.active { display:flex; }
-.modal-box { background:var(--card); border-radius:16px; padding:2rem; max-width:500px; width:90%; max-height:80vh; overflow-y:auto; }
+.modal-box { background:var(--card); border-radius:16px; padding:2rem; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; }
 .modal-box h2 { margin-bottom:1rem; }
 .modal-box .close { float:left; cursor:pointer; font-size:1.5rem; color:var(--muted); }
 
 /* Print */
 @media print {
-    .top-bar, .finish-bar, .btn { display:none !important; }
+    .top-bar, .finish-bar, .btn, .notes-section { display:none !important; }
     .team-card { break-inside:avoid; page-break-inside:avoid; }
 }
 
 /* Responsive */
 @media (max-width:768px) {
-    .cards-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+    .cards-grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
     .dashboard { grid-template-columns:repeat(2,1fr); }
 }
 </style>
@@ -138,7 +164,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=15'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=16'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -180,6 +206,14 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
     <div class="cards-grid" id="centerCards"></div>
 </div>
 
+<!-- Notes -->
+<div class="notes-section">
+    <div class="notes-box">
+        <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل</h3>
+        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value"></textarea>
+    </div>
+</div>
+
 <!-- Finish -->
 <div class="finish-bar">
     <button class="btn-finish" id="finishBtn" onclick="finishShift()"><i class="fas fa-flag-checkered"></i> إنهاء التكميل</button>
@@ -214,12 +248,21 @@ var rapidTeams = [
     { name: 'rapid_5', displayName: 'تدخل سريع 5' }
 ];
 
-var teamStatus = {}; // { teamId: { status: 'ready'|'missing'|'offline'|'pending', reason: '', paramedics: [] } }
+// teamStatus: { teamId: { status, reason, missingPerson, paramedics[] } }
+var teamStatus = {};
 var smartScheduleData = [];
 
 var STATUS_CYCLE = ['pending', 'ready', 'missing', 'offline'];
 var STATUS_LABELS = { ready: '✅ جاهز', missing: '⚠️ ناقص', offline: '🔴 خارج الخدمة', pending: '⏳ باقي' };
-var REASONS = ['مسعف غايب', 'سائق غايب', 'مركبة عاطلة', 'نقص معدات', 'سبب آخر'];
+var REASONS = [
+    { label: 'لا يوجد سائق', needsName: false },
+    { label: 'مسعف غائب', needsName: true },
+    { label: 'مسعف متأخر', needsName: true },
+    { label: 'مركبة عاطلة', needsName: false },
+    { label: 'نقص معدات', needsName: false },
+    { label: 'سبب آخر', needsName: false }
+];
+var globalNotes = '';
 
 // ============================================
 // SHIFT DETECTION (Saudi Time)
@@ -249,13 +292,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initStatuses() {
-    // Rapid teams
-    rapidTeams.forEach(function(t, i) {
-        teamStatus[t.name] = { status: 'pending', reason: '', paramedics: [] };
+    rapidTeams.forEach(function(t) {
+        teamStatus[t.name] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
     });
-    // Centers
-    centerList.forEach(function(c, i) {
-        teamStatus[c] = { status: 'pending', reason: '', paramedics: [] };
+    centerList.forEach(function(c) {
+        teamStatus[c] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
     });
     renderAll();
 }
@@ -269,7 +310,6 @@ function loadFromSmartSchedule() {
         req.onsuccess = function(e) {
             var db = e.target.result;
             if (!db.objectStoreNames.contains('employees')) {
-                console.log('[radio-completion] No employees store found');
                 tryLocalStorageFallback();
                 return;
             }
@@ -279,39 +319,23 @@ function loadFromSmartSchedule() {
             getReq.onsuccess = function(e) {
                 var employees = e.target.result || [];
                 db.close();
-                console.log('[radio-completion] Loaded', employees.length, 'employees from IndexedDB');
-                if (employees.length === 0) {
-                    tryLocalStorageFallback();
-                    return;
-                }
+                if (employees.length === 0) { tryLocalStorageFallback(); return; }
                 smartScheduleData = employees;
                 assignParamedics();
                 renderAll();
             };
-            getReq.onerror = function() {
-                console.error('[radio-completion] Error reading employees');
-                db.close();
-                tryLocalStorageFallback();
-            };
+            getReq.onerror = function() { db.close(); tryLocalStorageFallback(); };
         };
-        req.onerror = function() {
-            console.error('[radio-completion] Cannot open IndexedDB');
-            tryLocalStorageFallback();
-        };
-    } catch(err) {
-        console.error('[radio-completion] Exception:', err);
-        tryLocalStorageFallback();
-    }
+        req.onerror = function() { tryLocalStorageFallback(); };
+    } catch(err) { tryLocalStorageFallback(); }
 }
 
 function tryLocalStorageFallback() {
-    console.log('[radio-completion] Trying localStorage fallback...');
     var data = localStorage.getItem('ss_employees');
     if (data) {
         try {
             var employees = JSON.parse(data);
             if (Array.isArray(employees) && employees.length > 0) {
-                console.log('[radio-completion] Loaded', employees.length, 'employees from localStorage');
                 smartScheduleData = employees;
                 assignParamedics();
                 renderAll();
@@ -319,16 +343,13 @@ function tryLocalStorageFallback() {
             }
         } catch(e) {}
     }
-    console.log('[radio-completion] No data in localStorage, trying server...');
     tryServerFallback();
 }
 
 function tryServerFallback() {
-    console.log('[radio-completion] Trying server fallback...');
     var token = localStorage.getItem('authToken');
     if (!token) {
-        console.log('[radio-completion] No auth token, cannot fetch from server');
-        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
         renderAll();
         return;
     }
@@ -338,32 +359,27 @@ function tryServerFallback() {
     .then(function(r) { return r.json(); })
     .then(function(result) {
         if (result.success && Array.isArray(result.employees) && result.employees.length > 0) {
-            console.log('[radio-completion] Loaded', result.employees.length, 'employees from server');
             smartScheduleData = result.employees;
             assignParamedics();
             renderAll();
-            // Save locally for next time
             localStorage.setItem('ss_employees', JSON.stringify(result.employees));
         } else {
-            console.log('[radio-completion] Server returned empty or error');
-            showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+            showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
             renderAll();
         }
     })
     .catch(function(e) {
-        console.error('[radio-completion] Server fetch failed:', e);
-        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
         renderAll();
     });
 }
 
 function assignParamedics() {
-    var shiftType = getShiftType(); // 'صباح' or 'ليل'
+    var shiftType = getShiftType();
     var todayDate = getShiftDate();
     var availableDates = [];
     var dateSet = {};
-    
-    // First, find all available dates in the data
+
     smartScheduleData.forEach(function(emp) {
         (emp.schedule || []).forEach(function(s) {
             if (s.date && !dateSet[s.date]) {
@@ -373,58 +389,36 @@ function assignParamedics() {
         });
     });
     availableDates.sort();
-    
-    console.log('[radio-completion] Available dates in data:', availableDates);
-    console.log('[radio-completion] Today (Saudi):', todayDate, '| Shift type:', shiftType);
-    
-    // Use today's date if available, otherwise use the first available date
+
     var targetDate = todayDate;
     if (availableDates.indexOf(todayDate) === -1 && availableDates.length > 0) {
         targetDate = availableDates[0];
-        console.log('[radio-completion] Today not found, using first available date:', targetDate);
         showToast('⚠️ جدول اليوم غير موجود، يُعرض تاريخ: ' + targetDate, 'error');
     }
-    
-    if (availableDates.length === 0) {
-        console.log('[radio-completion] No schedule data found!');
-        return;
-    }
-    
+
+    if (availableDates.length === 0) return;
+
     smartScheduleData.forEach(function(emp) {
         var teamName = String(emp.team || '').trim();
-        var teamId = teamName; // e.g. 'جنوب 1'
-        
-        // Check if this employee has shift on target date
+        var teamId = teamName;
         var hasShift = false;
         var matchedCode = '';
         (emp.schedule || []).forEach(function(s) {
             if (s.date === targetDate) {
                 var code = String(s.shiftCode || s.shift || '').toUpperCase();
                 matchedCode = code;
-                // Day shift: D, D12, M, ME, D10, D11, D8, D6, CPD, CP8
                 var dayCodes = ['D','D12','M','ME','D10','D11','D8','D6','CPD','CP8'];
-                // Night shift: N, N12, LN8, LN10, CPN, N10, N11, N8, N6
                 var nightCodes = ['N','N12','LN8','LN10','CPN','N10','N11','N8','N6'];
+                var sharedCodes = ['CP24','F','O12','O10','O6'];
                 if (shiftType === 'صباح' && dayCodes.indexOf(code) !== -1) hasShift = true;
                 if (shiftType === 'ليل' && nightCodes.indexOf(code) !== -1) hasShift = true;
-                // Shared codes
-                var sharedCodes = ['CP24','F','O12','O10','O6'];
                 if (sharedCodes.indexOf(code) !== -1) hasShift = true;
             }
         });
-        
+
         if (hasShift && teamStatus[teamId]) {
             if (!teamStatus[teamId].paramedics) teamStatus[teamId].paramedics = [];
             teamStatus[teamId].paramedics.push(String(emp.name || ''));
-            console.log('[radio-completion] Added', emp.name, 'to', teamId, 'code:', matchedCode);
-        }
-    });
-    
-    // Log summary
-    Object.keys(teamStatus).forEach(function(k) {
-        var count = (teamStatus[k].paramedics || []).length;
-        if (count > 0) {
-            console.log('[radio-completion]', k, ':', count, 'paramedics');
         }
     });
 }
@@ -442,8 +436,8 @@ function renderRapidCards() {
     var container = document.getElementById('rapidCards');
     if (!container) return;
     var html = '';
-    rapidTeams.forEach(function(t, i) {
-        var status = teamStatus[t.name] || { status: 'pending', reason: '', paramedics: [] };
+    rapidTeams.forEach(function(t) {
+        var status = teamStatus[t.name] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
         html += renderCard(t.displayName, t.name, 'rapid', status);
     });
     container.innerHTML = html;
@@ -453,8 +447,8 @@ function renderCenterCards() {
     var container = document.getElementById('centerCards');
     if (!container) return;
     var html = '';
-    centerList.forEach(function(c, i) {
-        var status = teamStatus[c] || { status: 'pending', reason: '', paramedics: [] };
+    centerList.forEach(function(c) {
+        var status = teamStatus[c] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
         html += renderCard(c, c, 'center', status);
     });
     container.innerHTML = html;
@@ -462,15 +456,31 @@ function renderCenterCards() {
 
 function renderCard(name, teamId, type, status) {
     var paramedics = (status.paramedics || []).filter(function(n) { return n; });
-    var paramedicsHtml = paramedics.length > 0 
+    var paramedicsHtml = paramedics.length > 0
         ? paramedics.map(function(p) { return '<span class="name">' + p + '</span>'; }).join('')
         : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
-    
-    var reasonsHtml = REASONS.map(function(r) {
-        var active = status.reason === r ? 'active' : '';
-        return '<button class="reason-btn ' + active + '" onclick="setReason(\'' + teamId + '\', \'' + r + '\'); event.stopPropagation();">' + r + '</button>';
-    }).join('');
-    
+
+    // Build reason buttons with paramedic selector for needsName reasons
+    var reasonsHtml = '';
+    REASONS.forEach(function(r) {
+        var active = status.reason === r.label ? 'active' : '';
+        var rowHtml = '<button class="reason-btn ' + active + '" onclick="setReason(\'' + teamId + '\', \'' + r.label + '\'); event.stopPropagation();">' + r.label + '</button>';
+
+        // If this reason needs a name and it's selected, show dropdown
+        if (r.needsName && status.reason === r.label) {
+            var selectHtml = '<select class="paramedic-select" onchange="setMissingPerson(\'' + teamId + '\', this.value); event.stopPropagation();">' +
+                '<option value="">اختر المسعف...</option>';
+            paramedics.forEach(function(p) {
+                var selected = status.missingPerson === p ? ' selected' : '';
+                selectHtml += '<option value="' + p + '"' + selected + '>' + p + '</option>';
+            });
+            selectHtml += '</select>';
+            rowHtml += selectHtml;
+        }
+
+        reasonsHtml += '<div class="reason-row">' + rowHtml + '</div>';
+    });
+
     return '<div class="team-card status-' + status.status + '" onclick="cycleStatus(\'' + teamId + '\')">' +
         '<div class="card-header">' +
             '<span class="card-type ' + type + '">' + (type === 'rapid' ? '⚡ سريع' : '🏥 مركز') + '</span>' +
@@ -490,18 +500,27 @@ function cycleStatus(teamId) {
     var idx = STATUS_CYCLE.indexOf(current.status);
     var nextIdx = (idx + 1) % STATUS_CYCLE.length;
     var nextStatus = STATUS_CYCLE[nextIdx];
-    
+
     teamStatus[teamId].status = nextStatus;
-    if (nextStatus !== 'missing') teamStatus[teamId].reason = '';
-    
+    if (nextStatus !== 'missing') {
+        teamStatus[teamId].reason = '';
+        teamStatus[teamId].missingPerson = '';
+    }
+
     renderAll();
     showToast(nameOfTeam(teamId) + ' — ' + STATUS_LABELS[nextStatus], nextStatus === 'ready' ? 'success' : '');
 }
 
 function setReason(teamId, reason) {
-    if (!teamStatus[teamId]) teamStatus[teamId] = { status: 'missing', reason: '', paramedics: [] };
+    if (!teamStatus[teamId]) teamStatus[teamId] = { status: 'missing', reason: '', missingPerson: '', paramedics: [] };
     teamStatus[teamId].reason = reason;
+    teamStatus[teamId].missingPerson = '';
     renderAll();
+}
+
+function setMissingPerson(teamId, personName) {
+    if (!teamStatus[teamId]) return;
+    teamStatus[teamId].missingPerson = personName;
 }
 
 function nameOfTeam(id) {
@@ -521,19 +540,19 @@ function updateDashboard() {
         if (counts[s] !== undefined) counts[s]++;
         total++;
     });
-    
+
     document.getElementById('countReady').textContent = counts.ready;
     document.getElementById('countMissing').textContent = counts.missing;
     document.getElementById('countOffline').textContent = counts.offline;
     document.getElementById('countPending').textContent = counts.pending;
-    
+
     var done = counts.ready + counts.missing + counts.offline;
     var pct = total > 0 ? Math.round((done / total) * 100) : 0;
     var fill = document.getElementById('progressFill');
     fill.style.width = pct + '%';
     fill.textContent = pct + '% (' + done + '/' + total + ')';
     fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
-    
+
     var finishBtn = document.getElementById('finishBtn');
     finishBtn.disabled = counts.pending > 0;
     if (counts.pending > 0) {
@@ -549,40 +568,46 @@ function updateDashboard() {
 function finishShift() {
     var modal = document.getElementById('summaryModal');
     var content = document.getElementById('summaryContent');
-    
+
     var html = '<table class="summary-table">' +
         '<tr><th>الفرقة</th><th>الحالة</th><th>السبب</th><th>الكادر</th></tr>';
-    
-    // Rapid first
+
     rapidTeams.forEach(function(t) {
         var s = teamStatus[t.name] || {};
         html += summaryRow(t.displayName, s);
     });
-    // Centers
     centerList.forEach(function(c) {
         var s = teamStatus[c] || {};
         html += summaryRow(c, s);
     });
-    
+
     html += '</table>';
-    
-    // Stats
+
     var counts = { ready: 0, missing: 0, offline: 0 };
     Object.keys(teamStatus).forEach(function(k) {
         var st = teamStatus[k].status;
         if (counts[st] !== undefined) counts[st]++;
     });
-    
+
     html += '<div style="margin-top:1rem; padding:1rem; background:var(--bg); border-radius:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; text-align:center;">' +
         '<div><div style="font-size:1.5rem; font-weight:700; color:var(--green);">' + counts.ready + '</div><div style="font-size:0.8rem; color:var(--muted);">جاهز</div></div>' +
         '<div><div style="font-size:1.5rem; font-weight:700; color:var(--yellow);">' + counts.missing + '</div><div style="font-size:0.8rem; color:var(--muted);">ناقص</div></div>' +
         '<div><div style="font-size:1.5rem; font-weight:700; color:var(--red);">' + counts.offline + '</div><div style="font-size:0.8rem; color:var(--muted);">خارج الخدمة</div></div>' +
         '</div>';
-    
+
+    // Notes
+    var notes = document.getElementById('globalNotes').value.trim();
+    if (notes) {
+        html += '<div style="margin-top:1rem; padding:1rem; background:var(--yellow-light); border-radius:12px; border-right:4px solid var(--yellow);">' +
+            '<div style="font-weight:700; margin-bottom:0.5rem;">📝 ملاحظات:</div>' +
+            '<div style="font-size:0.9rem; white-space:pre-wrap;">' + escapeHtml(notes) + '</div>' +
+            '</div>';
+    }
+
     html += '<div style="margin-top:1rem; text-align:center; color:var(--muted); font-size:0.85rem;">' +
         'تاريخ: ' + getShiftDate() + ' — نوع المناوبة: ' + getShiftType() +
         '</div>';
-    
+
     content.innerHTML = html;
     modal.classList.add('active');
 }
@@ -591,10 +616,16 @@ function summaryRow(name, s) {
     var statusClass = 'badge-' + (s.status || 'pending');
     var statusText = STATUS_LABELS[s.status] || s.status;
     var paramedics = (s.paramedics || []).filter(function(n) { return n; }).join('، ') || '-';
+
+    var reasonText = s.reason || '-';
+    if (s.missingPerson) {
+        reasonText += ' (' + s.missingPerson + ')';
+    }
+
     return '<tr>' +
         '<td>' + name + '</td>' +
         '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>' +
-        '<td>' + (s.reason || '-') + '</td>' +
+        '<td>' + reasonText + '</td>' +
         '<td>' + paramedics + '</td>' +
         '</tr>';
 }
@@ -604,6 +635,7 @@ function saveToServer() {
         shiftType: getShiftType(),
         shiftDate: getShiftDate(),
         teams: teamStatus,
+        notes: document.getElementById('globalNotes').value.trim(),
         timestamp: new Date().toISOString()
     };
     fetch('/api/shift-completion', {
@@ -628,6 +660,12 @@ function showToast(msg, type) {
     t.textContent = msg;
     c.appendChild(t);
     setTimeout(function() { t.remove(); }, 3000);
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 </script>
 </body>
