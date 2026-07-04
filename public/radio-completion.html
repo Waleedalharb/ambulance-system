@@ -447,7 +447,7 @@ function loadSavedCompletion() {
     var shiftType = getShiftType();
     var shiftDate = getShiftDate();
     
-    fetch('/api/shift-completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
+    fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
         headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(function(r) { return r.json(); })

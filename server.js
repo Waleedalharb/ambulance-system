@@ -1942,7 +1942,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
 // ============================================
 app.post('/api/shift-completion', authenticate, async (req, res) => {
     try {
-        const { shiftType, shiftDate, teams, timestamp } = req.body;
+        const { shiftType, shiftDate, teams, notes, timestamp } = req.body;
         if (!shiftType || !shiftDate || !teams) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
@@ -1952,6 +1952,7 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
             shiftType,
             shiftDate,
             teams,
+            notes: notes || '',
             timestamp: timestamp || new Date().toISOString(),
             createdBy: req.user ? req.user.name || req.user.username || 'مستخدم' : 'مستخدم'
         };
@@ -1981,8 +1982,8 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
                     )
                 `);
                 await db.run(
-                    'INSERT INTO shift_completions (shift_type, shift_date, teams_data, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
-                    [shiftType, shiftDate, JSON.stringify(teams), completionData.createdBy, completionData.timestamp]
+                    'INSERT INTO shift_completions (shift_type, shift_date, teams_data, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                    [shiftType, shiftDate, JSON.stringify(teams), notes || '', completionData.createdBy, completionData.timestamp]
                 );
             } catch (dbErr) {
                 console.log('[DB] SQLite save failed, using JSON fallback:', dbErr.message);
@@ -1999,7 +2000,7 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
 // ============================================
 // API: Get Radio Completion (latest for shift date + type)
 // ============================================
-app.get('/api/shift-completion/latest', authenticate, async (req, res) => {
+app.get('/api/completion/latest', authenticate, async (req, res) => {
     try {
         const { shiftDate, shiftType } = req.query;
         if (!shiftDate || !shiftType) {
@@ -2029,6 +2030,7 @@ app.get('/api/shift-completion/latest', authenticate, async (req, res) => {
                                 shiftDate: row.shift_date,
                                 shiftType: row.shift_type,
                                 teams: JSON.parse(row.teams_data),
+                                notes: row.notes || '',
                                 timestamp: row.created_at,
                                 createdBy: row.created_by
                             }
