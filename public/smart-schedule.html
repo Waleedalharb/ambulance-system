@@ -1373,7 +1373,7 @@
         function setupFilterListeners() {
             var shiftSelect = document.getElementById('filterShift');
             if (shiftSelect) {
-                shiftSelect.innerHTML = '<option value="">الكل</option><option value="دوام 12 ساعة">دوام 12 ساعة</option><option value="دوام ليلي 12 ساعة">دوام ليلي 12 ساعة</option><option value="صباح">صباح</option><option value="إجازة">إجازة</option><option value="تدريب">تدريب</option><option value="راحة">راحة</option>';
+                shiftSelect.innerHTML = '<option value="">الكل</option><option value="مناوبة نهارية">مناوبة نهارية</option><option value="مناوبة ليلية">مناوبة ليلية</option><option value="دوام رسمي">دوام رسمي</option><option value="مكلف / مهمة رسمية">مكلف / مهمة رسمية</option><option value="أوفر لاب / نوبات تداخلية">أوفر لاب / نوبات تداخلية</option><option value="إجازة">إجازة</option><option value="إجازة تعويضية">إجازة تعويضية</option><option value="راحة">راحة</option><option value="تدريب">تدريب</option>';
             }
         }
 
@@ -1550,8 +1550,8 @@
         function extractEmployees(workbook) {
             console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
             var allEmployees = [];
-            var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
-            var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
+            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
+            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
             var sheetNames = workbook.SheetNames;
             
             for (var s = 0; s < sheetNames.length; s++) {
@@ -1664,7 +1664,7 @@
                             
                             var shiftName = shiftMap[shiftCode] || shiftCode;
                             var shiftTime = shiftTimeMap[shiftCode] || '';
-                            var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
+                            var status = (shiftCode === 'V' || shiftCode === 'VC') ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
                             
                             schedule.push({
                                 day: dayName,
@@ -1835,8 +1835,8 @@
             var currentEmployees = [];
             var dayNumbers = [];
             var dayNames = [];
-            var shiftMap = { 'D12': 'دوام 12 ساعة', 'N12': 'دوام ليلي 12 ساعة', 'V': 'إجازة', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة', 'O12': 'أوفرلاب 12 ساعة', 'ME': 'مسائي' };
-            var shiftTimeMap = { 'D12': '05:00-17:00', 'N12': '17:00-05:00', 'V': '-', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-', 'O12': '05:00-17:00', 'ME': '14:00-22:00' };
+            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
+            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
@@ -1883,7 +1883,7 @@
                     var rest = empMatch[3];
                     
                     // استخراج المناوبات من بقية السطر
-                    var shiftMatches = rest.match(/\b(D12|N12|V|M|C|R)\b/g);
+                    var shiftMatches = rest.match(/\b(D12|N12|WO|ME|VC|V|O12|M|C|R)\b/g);
                     
                     if (shiftMatches && shiftMatches.length > 3) {
                         var schedule = [];
@@ -1892,7 +1892,7 @@
                             var dayNum = dayNumbers[s] || (s + 1);
                             var shiftInfo = shiftMap[shiftCode] || shiftCode;
                             var shiftTime = shiftTimeMap[shiftCode] || '';
-                            var status = shiftCode === 'V' ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
+                            var status = (shiftCode === 'V' || shiftCode === 'VC') ? 'إجازة' : (shiftCode === 'R' ? 'راحة' : (shiftCode === 'C' ? 'تدريب' : 'دوام'));
                             
                             schedule.push({
                                 day: dayNames[s] || ARABIC_DAYS[(dayNum - 1) % 7],
