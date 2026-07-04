@@ -4754,6 +4754,60 @@ app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (r
 });
 
 // ============================================
+// API: DESTROY DATABASE - Delete physical DB file
+// ⚠️ WARNING: This deletes database.db and data/ folder completely
+// ============================================
+app.post('/api/admin/destroy-db', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const fsSync = require('fs');
+        const path = require('path');
+        
+        // 1. Close DB connection
+        if (db && db.closeDb) {
+            await db.closeDb();
+            console.log('[DESTROY] Database connection closed');
+        }
+        
+        // 2. Delete database.db file
+        const dbFile = path.join(__dirname, 'database.db');
+        const dbWal = path.join(__dirname, 'database.db-shm');
+        const dbJournal = path.join(__dirname, 'database.db-wal');
+        
+        let deletedFiles = [];
+        [dbFile, dbWal, dbJournal].forEach(f => {
+            if (fsSync.existsSync(f)) {
+                fsSync.unlinkSync(f);
+                deletedFiles.push(path.basename(f));
+            }
+        });
+        
+        // 3. Delete data/ directory recursively
+        const dataDir = path.join(__dirname, 'data');
+        if (fsSync.existsSync(dataDir)) {
+            fsSync.rmSync(dataDir, { recursive: true, force: true });
+            deletedFiles.push('data/');
+        }
+        
+        console.log('[DESTROY] Deleted:', deletedFiles);
+        
+        // 4. Re-initialize fresh database
+        if (db && db.init) {
+            await db.init(false);
+            console.log('[DESTROY] Fresh database initialized');
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'تم حذف قاعدة البيانات بالكامل وإعادة إنشائها', 
+            deleted: deletedFiles 
+        });
+    } catch (error) {
+        console.error('[DESTROY] Error:', error);
+        res.status(500).json({ error: 'فشل في حذف قاعدة البيانات: ' + error.message });
+    }
+});
+
+// ============================================
 // API: Team Assignments
 // ============================================
 app.get('/api/team-assignments', authenticate, async (req, res) => {
