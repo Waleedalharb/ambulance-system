@@ -468,7 +468,7 @@ function renderCard(name, teamId, type, status) {
 
         // If this reason needs a name and it's selected, show dropdown
         if (r.needsName && status.reason === r.label) {
-            var selectHtml = '<select class="paramedic-select" onchange="setMissingPerson(\'' + teamId + '\', this.value); event.stopPropagation();">' +
+            var selectHtml = '<select class="paramedic-select" onclick="event.stopPropagation();" onchange="setMissingPerson(\'' + teamId + '\', this.value); event.stopPropagation();">' +
                 '<option value="">اختر المسعف...</option>';
             paramedics.forEach(function(p) {
                 var selected = status.missingPerson === p ? ' selected' : '';
