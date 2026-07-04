@@ -1621,7 +1621,7 @@
                             if (row[4].indexOf(DAY_NAMES_AR[dn]) !== -1) { dayNameMatch = true; break; }
                         }
                     }
-                    if (colA === null && dayNameMatch) {
+                    if (!colA && dayNameMatch) {
                         for (var c = 4; c < row.length && c < 36; c++) {
                             if (row[c]) {
                                 dayNames[c] = String(row[c]);
