@@ -736,16 +736,6 @@ const uploadExcel = multer({
         }
     }
 });
-    dest: path.join(STORAGE_PATH, 'temp'),
-    limits: { fileSize: MAX_FILE_SIZE },
-    fileFilter: function(req, file, cb) {
-        if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype));
-        }
-    }
-});
 
 // Multer error handler middleware
 function handleMulterError(err, req, res, next) {
