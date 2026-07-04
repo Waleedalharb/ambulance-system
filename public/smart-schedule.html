@@ -1623,6 +1623,30 @@
         // الهيكل: كل sheet = شهر → فرق (تدخل سريع/جنوب) → موظفين → مناوبات حسب اليوم
         // المناوبات: D12=دوام 12ص, N12=دوام 12ل, V=إجازة, M=صباح, C=تدريب, R=راحة
         // ============================================
+        // ============================================
+        // NORMALIZE TEAM NAME - convert Excel names to system keys
+        // ============================================
+        function normalizeTeamName(rawName) {
+            var name = String(rawName || '').trim();
+            // Rapid teams: تدخل سريع 1 → rapid_1
+            var rapidMatch = name.match(/^(?:تدخل\s+سريع|rapid|تدخل)\s*(\d+)$/i);
+            if (rapidMatch) {
+                var num = parseInt(rapidMatch[1]);
+                if (num >= 1 && num <= 10) return 'rapid_' + num;
+            }
+            // Centers: جنوب 1 → جنوب 1
+            var centerMatch = name.match(/^جنوب\s*(\d+)$/);
+            if (centerMatch) {
+                var num = parseInt(centerMatch[1]);
+                if (num >= 1 && num <= 20) return 'جنوب ' + num;
+            }
+            // Other known teams
+            if (name === 'القائد الميداني') return 'قائد_ميداني';
+            if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
+            if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
+            return name;
+        }
+
         function extractEmployees(workbook) {
             console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
             var empMap = {}; // Deduplicate by employee code
@@ -1678,7 +1702,7 @@
                         colA === 'المنتدبين' ||
                         colA === 'إجازة'
                     )) {
-                        currentTeam = colA;
+                        currentTeam = normalizeTeamName(colA);
                         currentTeamNote = row[4] || '';
                         dayNames = [];
                         dayNumbers = [];

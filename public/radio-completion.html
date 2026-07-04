@@ -284,7 +284,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 // ============================================
 // CONFIGURATION
 // ============================================
-var centerNumbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+var centerNumbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
 var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
 var rapidTeams = [
     { name: 'rapid_1', displayName: 'تدخل سريع 1' },
@@ -494,7 +494,14 @@ function normalizeTeamName(rawName) {
             return 'rapid_' + num;
         }
     }
-    // Check for centers (جنوب 1-15)
+    // Check for centers (جنوب 1-20)
+    var centerMatch = name.match(/جنوب\s*(\d+)/);
+    if (centerMatch) {
+        var num = parseInt(centerMatch[1]);
+        if (num >= 1 && num <= 20) {
+            return 'جنوب ' + num;
+        }
+    }
     var centerMatch = name.match(/جنوب\s*(\d+)/);
     if (centerMatch) {
         var num = parseInt(centerMatch[1]);
