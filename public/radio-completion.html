@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=16'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=17'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -442,16 +442,22 @@ function tryServerFallback() {
 // ============================================
 function loadSavedCompletion() {
     var token = localStorage.getItem('authToken');
+    console.log('[loadSavedCompletion] Token:', token ? 'exists' : 'missing');
     if (!token) return;
     
     var shiftType = getShiftType();
     var shiftDate = getShiftDate();
+    console.log('[loadSavedCompletion] Loading for:', shiftDate, shiftType);
     
     fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
         headers: { 'Authorization': 'Bearer ' + token }
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) { 
+        console.log('[loadSavedCompletion] Response status:', r.status);
+        return r.json(); 
+    })
     .then(function(result) {
+        console.log('[loadSavedCompletion] Response:', result);
         if (result.success && result.completion && result.completion.teams) {
             var savedTeams = result.completion.teams;
             Object.keys(savedTeams).forEach(function(teamId) {
@@ -468,10 +474,12 @@ function loadSavedCompletion() {
             }
             renderAll();
             showToast('✅ تم تحميل التكميل المحفوظ لهذه المناوبة', 'success');
+        } else {
+            console.log('[loadSavedCompletion] No saved completion found');
         }
     })
     .catch(function(e) {
-        console.log('[radio-completion] No saved completion found');
+        console.error('[loadSavedCompletion] Error:', e);
     });
 }
 
@@ -733,6 +741,13 @@ function summaryRow(name, s) {
 }
 
 function saveToServer() {
+    var token = localStorage.getItem('authToken');
+    if (!token) {
+        console.error('[saveToServer] No auth token found');
+        showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+    
     var payload = {
         shiftType: getShiftType(),
         shiftDate: getShiftDate(),
@@ -740,15 +755,29 @@ function saveToServer() {
         notes: document.getElementById('globalNotes').value.trim(),
         timestamp: new Date().toISOString()
     };
+    console.log('[saveToServer] Sending payload:', payload);
+    
     fetch('/api/shift-completion', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
         body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); })
+    }).then(function(r) { 
+        console.log('[saveToServer] Response status:', r.status);
+        return r.json(); 
+    })
     .then(function(d) {
-        showToast('تم حفظ التكميل في السيرفر', 'success');
+        console.log('[saveToServer] Response data:', d);
+        if (d.success) {
+            showToast('✅ تم حفظ التكميل في السيرفر', 'success');
+        } else {
+            showToast('⚠️ ' + (d.error || 'فشل في الحفظ'), 'error');
+        }
     }).catch(function(e) {
-        showToast('تم حفظ التكميل محلياً فقط', 'success');
+        console.error('[saveToServer] Error:', e);
+        showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
     });
 }
 
