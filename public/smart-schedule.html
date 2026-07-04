@@ -1633,26 +1633,32 @@
         // ============================================
         function normalizeTeamName(rawName) {
             var name = String(rawName || '').trim();
+            // Convert Arabic-Indic numerals to Western numerals
+            var arabicToWestern = {
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+            };
+            var normalized = name.split('').map(function(c) { return arabicToWestern[c] || c; }).join('');
             // Direct fallback: explicit Arabic names (most common case)
-            if (name === 'تدخل سريع 1') return 'rapid_1';
-            if (name === 'تدخل سريع 2') return 'rapid_2';
-            if (name === 'تدخل سريع 3') return 'rapid_3';
-            if (name === 'تدخل سريع 4') return 'rapid_4';
-            if (name === 'تدخل سريع 5') return 'rapid_5';
-            if (name.indexOf('جنوب') !== -1) {
-                var m = name.match(/(\d+)/);
+            if (normalized === 'تدخل سريع 1') return 'rapid_1';
+            if (normalized === 'تدخل سريع 2') return 'rapid_2';
+            if (normalized === 'تدخل سريع 3') return 'rapid_3';
+            if (normalized === 'تدخل سريع 4') return 'rapid_4';
+            if (normalized === 'تدخل سريع 5') return 'rapid_5';
+            if (normalized.indexOf('جنوب') !== -1) {
+                var m = normalized.match(/(\d+)/);
                 if (m) return 'جنوب ' + parseInt(m[1]);
             }
             // Other known teams
-            if (name === 'القائد الميداني') return 'قائد_ميداني';
-            if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
-            if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
-            if (name === 'مناوبو باص الاستجابة') return 'باص_استجابة';
-            if (name === 'المنتدبين') return 'المنتدبين';
-            if (name === 'بنك الدم') return 'بنك_الدم';
-            if (name === 'الإجازة') return 'إجازة';
-            if (name === 'إجازة') return 'إجازة';
-            return name;
+            if (normalized === 'القائد الميداني') return 'قائد_ميداني';
+            if (normalized === 'التحكم والتنسيق') return 'تحكم_تنسيق';
+            if (normalized === 'الدعم اللوجستي') return 'دعم_لوجستي';
+            if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
+            if (normalized === 'المنتدبين') return 'المنتدبين';
+            if (normalized === 'بنك الدم') return 'بنك_الدم';
+            if (normalized === 'الإجازة') return 'إجازة';
+            if (normalized === 'إجازة') return 'إجازة';
+            return normalized;
         }
 
         function extractEmployees(workbook) {
@@ -1701,17 +1707,21 @@
                     if (!row || row.length === 0) continue;
                     var colA = row[0];
                     
-                    if (colA && typeof colA === 'string' && (
-                        (colA.match(/^(تدخل\s+سريع|جنوب)\s*\d+$/) && colA.length < 30) ||
-                        colA === 'القائد الميداني' ||
-                        colA === 'التحكم والتنسيق' ||
-                        colA === 'الدعم اللوجستي' ||
-                        colA === 'مناوبو باص الاستجابة' ||
-                        colA === 'المنتدبين' ||
-                        colA === 'إجازة'
-                    )) {
+                    // More flexible team header matching with fallback
+                    var isTeamHeader = false;
+                    if (colA && typeof colA === 'string' && colA.length < 40) {
+                        var trimmed = colA.trim();
+                        // Rapid teams: any variation of "تدخل سريع N" with any whitespace
+                        if (/تدخل\s+سريع\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(trimmed)) isTeamHeader = true;
+                        // Centers: any variation of "جنوب N" with any whitespace
+                        else if (/جنوب\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(trimmed)) isTeamHeader = true;
+                        // Exact matches for special teams
+                        else if (['القائد الميداني','التحكم والتنسيق','الدعم اللوجستي','مناوبو باص الاستجابة','المنتدبين','إجازة','بنك الدم'].indexOf(trimmed) !== -1) isTeamHeader = true;
+                    }
+                    
+                    if (isTeamHeader) {
                         currentTeam = normalizeTeamName(colA);
-                        console.log('[extractEmployees] Found team header:', colA, '→ normalized:', currentTeam);
+                        console.log('[extractEmployees] Found team header:', JSON.stringify(colA), '→ normalized:', currentTeam);
                         currentTeamNote = row[4] || '';
                         dayNames = [];
                         dayNumbers = [];
@@ -1746,6 +1756,24 @@
                     if (colA && (typeof colA === 'number' || !isNaN(parseInt(colA))) && 
                         row[1] && typeof row[1] === 'string' && row[1].length > 5) {
                         
+                        // Fallback: if currentTeam is empty, look back at previous rows for team header
+                        if (!currentTeam && i > 5) {
+                            for (var back = i - 1; back >= 5 && back >= i - 10; back--) {
+                                var prevRow = jsonData[back];
+                                if (!prevRow || !prevRow[0]) continue;
+                                var prevColA = String(prevRow[0]).trim();
+                                if (/تدخل\s+سريع\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(prevColA) || 
+                                    /جنوب\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(prevColA) ||
+                                    ['القائد الميداني','التحكم والتنسيق','الدعم اللوجستي','مناوبو باص الاستجابة','المنتدبين','إجازة','بنك الدم'].indexOf(prevColA) !== -1) {
+                                    currentTeam = normalizeTeamName(prevColA);
+                                    console.log('[extractEmployees] Fallback team found:', prevColA, '→', currentTeam, 'for employee at row', i);
+                                    break;
+                                }
+                                // Stop looking back if we hit another employee row
+                                if (prevColA && !isNaN(parseInt(prevColA)) && prevRow[1] && String(prevRow[1]).length > 5) break;
+                            }
+                        }
+                        
                         var empCode = String(parseInt(colA));
                         var empName = String(row[1]).trim();
                         var empPhone = row[2] ? String(row[2]).trim() : '';
@@ -1753,7 +1781,7 @@
                         
                         if (!empName || empName.length < 3) continue;
                         
-                        console.log('[extractEmployees] Processing employee:', empName, 'currentTeam:', currentTeam, 'row:', row.slice(0,5));
+                        console.log('[extractEmployees] Processing employee:', empName, 'currentTeam:', currentTeam, 'row[0]:', JSON.stringify(colA));
                         
                         var schedule = [];
                         for (var c = 4; c < row.length && c < 36; c++) {

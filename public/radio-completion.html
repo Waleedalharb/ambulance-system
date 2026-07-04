@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=17'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=18'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -491,33 +491,39 @@ function loadSavedCompletion() {
 // Normalize team name from various formats to internal key
 function normalizeTeamName(rawName) {
     var name = String(rawName || '').trim();
+    // Convert Arabic-Indic numerals to Western numerals
+    var arabicToWestern = {
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    };
+    var normalized = name.split('').map(function(c) { return arabicToWestern[c] || c; }).join('');
     // Direct fallback: explicit Arabic names (most common case)
-    if (name === 'تدخل سريع 1') return 'rapid_1';
-    if (name === 'تدخل سريع 2') return 'rapid_2';
-    if (name === 'تدخل سريع 3') return 'rapid_3';
-    if (name === 'تدخل سريع 4') return 'rapid_4';
-    if (name === 'تدخل سريع 5') return 'rapid_5';
-    if (name.indexOf('جنوب') !== -1) {
-        var m = name.match(/(\d+)/);
+    if (normalized === 'تدخل سريع 1') return 'rapid_1';
+    if (normalized === 'تدخل سريع 2') return 'rapid_2';
+    if (normalized === 'تدخل سريع 3') return 'rapid_3';
+    if (normalized === 'تدخل سريع 4') return 'rapid_4';
+    if (normalized === 'تدخل سريع 5') return 'rapid_5';
+    if (normalized.indexOf('جنوب') !== -1) {
+        var m = normalized.match(/(\d+)/);
         if (m) return 'جنوب ' + parseInt(m[1]);
     }
     // Special teams
-    if (name === 'بنك الدم') return 'بنك_الدم';
-    if (name === 'الإجازة') return 'إجازة';
-    if (name === 'القائد الميداني') return 'قائد_ميداني';
-    if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
-    if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
-    if (name === 'مناوبو باص الاستجابة') return 'باص_استجابة';
-    if (name === 'المنتدبين') return 'المنتدبين';
+    if (normalized === 'بنك الدم') return 'بنك_الدم';
+    if (normalized === 'الإجازة') return 'إجازة';
+    if (normalized === 'القائد الميداني') return 'قائد_ميداني';
+    if (normalized === 'التحكم والتنسيق') return 'تحكم_تنسيق';
+    if (normalized === 'الدعم اللوجستي') return 'دعم_لوجستي';
+    if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
+    if (normalized === 'المنتدبين') return 'المنتدبين';
     // Direct match (already normalized)
-    if (teamStatus[name]) return name;
+    if (teamStatus[normalized]) return normalized;
     // Try to find by checking all rapid team display names
     for (var i = 0; i < rapidTeams.length; i++) {
-        if (rapidTeams[i].displayName === name || rapidTeams[i].name === name) {
+        if (rapidTeams[i].displayName === normalized || rapidTeams[i].name === normalized) {
             return rapidTeams[i].name;
         }
     }
-    return name; // fallback
+    return normalized; // fallback
 }
 
 function assignParamedics() {
