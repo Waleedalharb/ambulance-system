@@ -1997,6 +1997,55 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
 });
 
 // ============================================
+// API: Get Radio Completion (latest for shift date + type)
+// ============================================
+app.get('/api/shift-completion/latest', authenticate, async (req, res) => {
+    try {
+        const { shiftDate, shiftType } = req.query;
+        if (!shiftDate || !shiftType) {
+            return res.status(400).json({ error: 'shiftDate and shiftType required' });
+        }
+        
+        const fs = require('fs').promises;
+        const path = require('path');
+        const completionsDir = path.join(__dirname, 'data', 'completions');
+        const filePath = path.join(completionsDir, `completion_${shiftDate}_${shiftType}.json`);
+        
+        try {
+            const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+            res.json({ success: true, completion: data });
+        } catch (e) {
+            // Try SQLite fallback
+            if (dbAvailable()) {
+                try {
+                    const row = await db.get(
+                        'SELECT * FROM shift_completions WHERE shift_date = ? AND shift_type = ? ORDER BY created_at DESC LIMIT 1',
+                        [shiftDate, shiftType]
+                    );
+                    if (row) {
+                        res.json({ 
+                            success: true, 
+                            completion: {
+                                shiftDate: row.shift_date,
+                                shiftType: row.shift_type,
+                                teams: JSON.parse(row.teams_data),
+                                timestamp: row.created_at,
+                                createdBy: row.created_by
+                            }
+                        });
+                        return;
+                    }
+                } catch (dbErr) {}
+            }
+            res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
+        }
+    } catch (error) {
+        console.error('[API] Error getting shift-completion:', error);
+        res.status(500).json({ error: 'فشل في جلب التكميل' });
+    }
+});
+
+// ============================================
 // API: المستندات (التحديثات التشغيلية)
 // ============================================
 app.get('/api/docs', authenticate, async (req, res) => {

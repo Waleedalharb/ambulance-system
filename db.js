@@ -292,6 +292,17 @@ const TABLE_SCHEMAS = [
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
   );`,
 
+  // Shift Completions (Radio Mode)
+  `CREATE TABLE IF NOT EXISTS shift_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_type TEXT NOT NULL,
+    shift_date TEXT NOT NULL,
+    teams_data TEXT NOT NULL,
+    notes TEXT,
+    created_by TEXT,
+    created_at TEXT
+  );`,
+
   // Staffing Alerts
   `CREATE TABLE IF NOT EXISTS staffing_alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -323,6 +334,7 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_schedule_auto_employee ON shift_schedule_auto(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_date ON staffing_alerts(alert_date);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_resolved ON staffing_alerts(resolved);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_completions_date_type ON shift_completions(shift_date, shift_type);`);
     logger.info('Indexes created successfully');
   } catch (idxErr) {
     logger.warn('Some indexes may already exist: ' + idxErr.message);

@@ -319,10 +319,12 @@ function getSaudiTime() {
     return new Date(utc + (3 * 60 * 60 * 1000));
 }
 function getShiftType() {
+    if (window.overrideShiftType) return window.overrideShiftType;
     var hour = getSaudiTime().getHours();
     return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
 }
 function getShiftDate() {
+    if (window.overrideShiftDate) return window.overrideShiftDate;
     var st = getSaudiTime();
     var y = st.getFullYear(), m = (st.getMonth()+1).toString().padStart(2,'0'), d = st.getDate().toString().padStart(2,'0');
     return y + '-' + m + '-' + d;
@@ -335,6 +337,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate();
     initStatuses();
     loadFromSmartSchedule();
+    
+    // Check for URL params (from archive edit)
+    var urlParams = new URLSearchParams(window.location.search);
+    var dateParam = urlParams.get('date');
+    var typeParam = urlParams.get('type');
+    if (dateParam) {
+        // Override shift detection for editing past shifts
+        window.overrideShiftDate = dateParam;
+        window.overrideShiftType = typeParam || getShiftType();
+        document.getElementById('shiftBadge').textContent = window.overrideShiftType + ' — ' + dateParam + ' (أرشيف)';
+    }
 });
 
 function initStatuses() {
@@ -345,6 +358,8 @@ function initStatuses() {
         teamStatus[c] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
     });
     renderAll();
+    // Load saved completion from server after paramedics are assigned
+    setTimeout(loadSavedCompletion, 500);
 }
 
 // ============================================
@@ -409,6 +424,8 @@ function tryServerFallback() {
             assignParamedics();
             renderAll();
             localStorage.setItem('ss_employees', JSON.stringify(result.employees));
+            // After paramedics loaded, try loading saved completion
+            loadSavedCompletion();
         } else {
             showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
             renderAll();
@@ -417,6 +434,44 @@ function tryServerFallback() {
     .catch(function(e) {
         showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
         renderAll();
+    });
+}
+
+// ============================================
+// LOAD SAVED COMPLETION FROM SERVER
+// ============================================
+function loadSavedCompletion() {
+    var token = localStorage.getItem('authToken');
+    if (!token) return;
+    
+    var shiftType = getShiftType();
+    var shiftDate = getShiftDate();
+    
+    fetch('/api/shift-completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        if (result.success && result.completion && result.completion.teams) {
+            var savedTeams = result.completion.teams;
+            Object.keys(savedTeams).forEach(function(teamId) {
+                if (teamStatus[teamId]) {
+                    teamStatus[teamId].status = savedTeams[teamId].status || 'pending';
+                    teamStatus[teamId].reason = savedTeams[teamId].reason || '';
+                    teamStatus[teamId].missingPerson = savedTeams[teamId].missingPerson || '';
+                }
+            });
+            // Load notes
+            if (result.completion.notes) {
+                document.getElementById('globalNotes').value = result.completion.notes;
+                globalNotes = result.completion.notes;
+            }
+            renderAll();
+            showToast('✅ تم تحميل التكميل المحفوظ لهذه المناوبة', 'success');
+        }
+    })
+    .catch(function(e) {
+        console.log('[radio-completion] No saved completion found');
     });
 }
 

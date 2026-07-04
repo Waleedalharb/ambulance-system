@@ -1848,14 +1848,150 @@ function openShiftArchiveModal() {
     updateShiftsHistoryWidget();
 }
 
+function openShiftArchiveModal() {
+    var el_shiftArchiveModal_d16 = document.getElementById('shiftArchiveModal'); if (el_shiftArchiveModal_d16) el_shiftArchiveModal_d16.style.display = 'flex';
+    updateShiftsHistoryWidget();
+    clearArchiveSummary();
+}
+
+function clearArchiveSummary() {
+    var area = document.getElementById('archiveSummaryArea');
+    if (area) area.style.display = 'none';
+}
+
+function editSelectedArchiveShift() {
+    var select = document.getElementById('archiveModalSelect');
+    if (!select || !select.value) {
+        alert('الرجاء اختيار مناوبة من القائمة');
+        return;
+    }
+    var shiftId = parseInt(select.value);
+    var shift = allShifts.find(function(s) { return s.id === shiftId; });
+    if (!shift) {
+        alert('المناوبة غير موجودة');
+        return;
+    }
+    // Redirect to radio-completion with date and type
+    var shiftType = shift.shiftType || 'صباح';
+    var shiftDate = shift.shiftDate || '';
+    var url = 'radio-completion.html?v=16';
+    if (shiftDate) {
+        url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
+    }
+    window.location.href = url;
+}
+
 function viewSelectedArchiveShift() {
     var select = document.getElementById('archiveModalSelect');
     if (!select || !select.value) {
         alert('الرجاء اختيار مناوبة من القائمة');
         return;
     }
-    var el_shiftArchiveModal_d17 = document.getElementById('shiftArchiveModal'); if (el_shiftArchiveModal_d17) el_shiftArchiveModal_d17.style.display = 'none';
-    selectShiftFromHistory(select.value);
+    var shiftId = parseInt(select.value);
+    var shift = allShifts.find(function(s) { return s.id === shiftId; });
+    if (!shift) {
+        alert('المناوبة غير موجودة');
+        return;
+    }
+    
+    // Show summary inline
+    var area = document.getElementById('archiveSummaryArea');
+    if (area) area.style.display = 'block';
+    
+    // Update title
+    var title = document.getElementById('archiveSummaryTitle');
+    if (title) {
+        var typeLabel = (shift.shiftType === 'صباحية' || shift.shiftType === 'morning' || shift.shiftType === 'صباح') ? 'صباحي' : 'ليلي';
+        title.textContent = 'ملخص المناوبة — ' + typeLabel + ' ' + (shift.shiftDate || '');
+    }
+    
+    // Build stats grid
+    var statsGrid = document.getElementById('archiveStatsGrid');
+    if (statsGrid) {
+        // Calculate counts from shift completion data if available
+        var ready = 0, missing = 0, offline = 0, pending = 0;
+        var totalReports = shift.totalReports || 0;
+        
+        // Try to get completion data from shift.centersData
+        if (shift.centersData) {
+            Object.keys(shift.centersData).forEach(function(team) {
+                var data = shift.centersData[team];
+                if (data) {
+                    // Infer status from data
+                    if (data.staffCount && parseInt(data.staffCount) > 0) ready++;
+                    else if (data.vehicleStatus === 'offline' || data.vehicleStatus === 'عاطلة') offline++;
+                    else missing++;
+                }
+            });
+        }
+        
+        statsGrid.innerHTML = 
+            '<div style="background:var(--green-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--green);">' + ready + '</div><div style="font-size:0.75rem; color:var(--gray-600);">✅ جاهز</div></div>' +
+            '<div style="background:var(--yellow-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--gold);">' + missing + '</div><div style="font-size:0.75rem; color:var(--gray-600);">⚠️ ناقص</div></div>' +
+            '<div style="background:var(--red-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--red);">' + offline + '</div><div style="font-size:0.75rem; color:var(--gray-600);">🔴 خارج الخدمة</div></div>';
+    }
+    
+    // Reports stats
+    var reportsStats = document.getElementById('archiveReportsStats');
+    if (reportsStats) {
+        var totalReports = shift.totalReports || 0;
+        var reportsHtml = '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">' +
+            '<div><strong>إجمالي البلاغات:</strong> ' + totalReports + '</div>';
+        
+        // Top unit
+        var topUnit = '-';
+        var topCount = 0;
+        if (shift.savedReports) {
+            Object.keys(shift.savedReports).forEach(function(key) {
+                var r = shift.savedReports[key];
+                if (r && r.count > topCount) {
+                    topCount = r.count;
+                    topUnit = key.split('|')[1] || key;
+                }
+            });
+        }
+        reportsHtml += '<div><strong>أكثر فرقة:</strong> ' + topUnit + ' (' + topCount + ')</div>';
+        reportsHtml += '</div>';
+        reportsStats.innerHTML = reportsHtml;
+    }
+    
+    // Notes
+    var notesContent = document.getElementById('archiveNotesContent');
+    if (notesContent) {
+        notesContent.textContent = shift.generalNotes || '—';
+    }
+    
+    // Also try to fetch completion data from server for more accurate stats
+    var token = localStorage.getItem('authToken');
+    if (token && shift.shiftDate && shift.shiftType) {
+        var shiftTypeNorm = (shift.shiftType === 'صباحية' || shift.shiftType === 'morning' || shift.shiftType === 'صباح') ? 'صباح' : 'ليل';
+        fetch('/api/shift-completion/latest?shiftDate=' + encodeURIComponent(shift.shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeNorm), {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success && result.completion && result.completion.teams) {
+                var teams = result.completion.teams;
+                var ready = 0, missing = 0, offline = 0;
+                Object.keys(teams).forEach(function(k) {
+                    var st = teams[k].status;
+                    if (st === 'ready') ready++;
+                    else if (st === 'missing') missing++;
+                    else if (st === 'offline') offline++;
+                });
+                if (statsGrid) {
+                    statsGrid.innerHTML = 
+                        '<div style="background:var(--green-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--green);">' + ready + '</div><div style="font-size:0.75rem; color:var(--gray-600);">✅ جاهز</div></div>' +
+                        '<div style="background:var(--yellow-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--gold);">' + missing + '</div><div style="font-size:0.75rem; color:var(--gray-600);">⚠️ ناقص</div></div>' +
+                        '<div style="background:var(--red-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--red);">' + offline + '</div><div style="font-size:0.75rem; color:var(--gray-600);">🔴 خارج الخدمة</div></div>';
+                }
+                if (notesContent && result.completion.notes) {
+                    notesContent.textContent = result.completion.notes;
+                }
+            }
+        })
+        .catch(function(e) { console.log('No completion data for this shift'); });
+    }
 }
 
 function selectShiftFromHistory(shiftId) {
