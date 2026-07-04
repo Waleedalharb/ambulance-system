@@ -2385,16 +2385,81 @@ function showShiftTypeDialog() {
     });
 }
 
+function canStartNewShift() {
+    // If no active shift, always allow starting a new one
+    if (!currentShiftId) {
+        return { allowed: true };
+    }
+    
+    // Get current Saudi time
+    var now = new Date();
+    var utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    var saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
+    var hour = saudiTime.getHours();
+    var minute = saudiTime.getMinutes();
+    var currentTimeDecimal = hour + (minute / 60);
+    
+    // Grace period: first 2 hours of each shift window
+    // Morning shift grace: 05:00 - 07:00
+    // Night shift grace: 17:00 - 19:00
+    var isMorningGrace = (currentTimeDecimal >= 5 && currentTimeDecimal < 7);
+    var isNightGrace = (currentTimeDecimal >= 17 && currentTimeDecimal < 19);
+    
+    if (isMorningGrace || isNightGrace) {
+        return { allowed: true, inGracePeriod: true };
+    }
+    
+    // Not in grace period — block and show next shift time
+    var nextShiftTime;
+    if (hour >= 5 && hour < 17) {
+        // Currently in morning shift period, next is night at 17:00
+        nextShiftTime = '5:00 مساءً';
+    } else {
+        // Currently in night shift period, next is morning at 05:00
+        nextShiftTime = '5:00 صباحاً';
+    }
+    
+    return {
+        allowed: false,
+        message: '⚠️ المناوبة الحالية نشطة.\n\nلا يمكن بدء مناوبة جديدة إلا خلال أول ساعتين من بداية المناوبة (5:00 - 7:00 صباحًا أو 5:00 - 7:00 مساءً).\n\nالمناوبة القادمة تبدأ الساعة ' + nextShiftTime + '.'
+    };
+}
+
 async function startNewShift() {
+    // Check time-window protection
+    var check = canStartNewShift();
+    if (!check.allowed) {
+        alert(check.message);
+        return;
+    }
+    
+    // Auto-save current shift data silently before starting new one
+    if (currentShiftId && typeof saveShiftData === 'function') {
+        try {
+            await saveShiftData(true);
+            console.log('✅ تم حفظ بيانات المناوبة الحالية تلقائياً قبل بدء الجديدة');
+        } catch (e) {
+            console.error('⚠️ فشل الحفظ التلقائي للمناوبة الحالية:', e);
+        }
+    }
+    
     var shiftType = await showShiftTypeDialog();
     if (!shiftType) return;
-    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (shiftType === 'صباحية' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
+    
+    // Normalize shift type for API (صباحية → صباح, ليلية → ليل)
+    var normalizedType = shiftType;
+    if (shiftType === 'صباحية') normalizedType = 'صباح';
+    if (shiftType === 'ليلية') normalizedType = 'ليل';
+    
+    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (normalizedType === 'صباح' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
     try {
-        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: shiftType }) });
+        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: normalizedType }) });
         var result = await response.json();
         if (result.success) {
             currentShiftId = result.shiftId;
-            alert('✅ تم بدء المناوبة ' + shiftType + ' بنجاح');
+            // Persist to localStorage so it survives refreshes
+            try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
+            alert('✅ تم بدء المناوبة ' + (normalizedType === 'صباح' ? 'الصباحية' : 'الليلية') + ' بنجاح');
             await loadShifts();
             await loadAllData();
             calculateLiveReportStats();
@@ -3116,6 +3181,13 @@ async function loadTeamParamedics(shiftId) {
             container.innerHTML = '<div class="paramedic-no-data">لا يوجد بيانات (فشل الاتصال)</div>';
         }
     });
+}
+
+function normalizeShiftType(type) {
+    if (!type) return 'صباح';
+    if (type === 'صباحية' || type === 'صباح') return 'صباح';
+    if (type === 'ليلية' || type === 'ليل') return 'ليل';
+    return type;
 }
 
 function updateRapidStatusIcon(index) {
