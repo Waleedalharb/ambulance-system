@@ -158,8 +158,8 @@
             </div>
         </div>
         <div class="top-bar-actions">
-            <button class="btn btn-danger" onclick="clearFakeData(); renderTeamList(); updateStats(); populateLeaveMembers();">
-                <i class="fas fa-broom"></i> مسح تجريبي
+            <button class="btn btn-danger" onclick="clearAllPlannerData()">
+                <i class="fas fa-trash-alt"></i> مسح كل البيانات
             </button>
             <button class="btn btn-outline" onclick="window.location.href='smart-schedule.html'">
                 <i class="fas fa-calendar-alt"></i> نظام الجداول
@@ -370,6 +370,24 @@
         }
     }
 
+    function clearAllPlannerData() {
+        if (!confirm('هل أنت متأكد من مسح كل البيانات؟\nسيتم حذف الأعضاء والجداول والإجازات')) return;
+        localStorage.removeItem('teamMembers');
+        localStorage.removeItem('leaveRequests');
+        localStorage.removeItem('scheduleData');
+        localStorage.removeItem('shiftSettings');
+        localStorage.removeItem('ss_employees');
+        localStorage.removeItem('ss_employee_metadata');
+        teamMembers = [];
+        leaveRequests = [];
+        scheduleData = {};
+        smartScheduleData = [];
+        var req = indexedDB.deleteDatabase('SmartScheduleDB_v13');
+        req.onsuccess = function() { showToast('تم مسح كل البيانات', 'success'); };
+        req.onerror = function() { showToast('تم مسح البيانات المحلية', 'success'); };
+        renderSchedule(); renderTeamList(); renderLeaveRequests(); updateStats(); populateLeaveMembers(); renderImportedSchedule();
+    }
+
     function switchTab(tabId, btn) { document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); }); document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); }); document.getElementById(tabId).classList.add('active'); btn.classList.add('active'); }
     function showToast(msg, type) { var c = document.getElementById('toastContainer'); var t = document.createElement('div'); t.className = 'toast ' + (type || ''); t.textContent = msg; c.appendChild(t); setTimeout(function() { t.remove(); }, 3000); }
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -512,6 +530,8 @@
     window.saveSettings = saveSettings;
     window.loadFromSmartSchedule = loadFromSmartSchedule;
     window.renderImportedSchedule = renderImportedSchedule;
+    window.clearFakeData = clearFakeData;
+    window.clearAllPlannerData = clearAllPlannerData;
     </script>
 </body>
 </html>
