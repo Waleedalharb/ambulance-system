@@ -1711,6 +1711,7 @@
                         colA === 'إجازة'
                     )) {
                         currentTeam = normalizeTeamName(colA);
+                        console.log('[extractEmployees] Found team header:', colA, '→ normalized:', currentTeam);
                         currentTeamNote = row[4] || '';
                         dayNames = [];
                         dayNumbers = [];
@@ -1751,6 +1752,8 @@
                         var empJob = row[3] ? String(row[3]).trim() : 'مسعف';
                         
                         if (!empName || empName.length < 3) continue;
+                        
+                        console.log('[extractEmployees] Processing employee:', empName, 'currentTeam:', currentTeam, 'row:', row.slice(0,5));
                         
                         var schedule = [];
                         for (var c = 4; c < row.length && c < 36; c++) {
