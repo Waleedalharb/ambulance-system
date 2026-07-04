@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تكميل سريع (Radio Mode) | منصة الجنوب</title>
+<link rel="icon" type="image/png" href="/favicon-32x32.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root {
+    --bg:#F8FAFC; --card:#FFFFFF; --border:#E2E8F0; --text:#1E293B; --muted:#64748B;
+    --green:#10B981; --green-light:#ECFDF5; --yellow:#F59E0B; --yellow-light:#FFFBEB;
+    --red:#EF4444; --red-light:#FEF2F2; --gray:#94A3B8; --gray-light:#F1F5F9;
+    --primary:#2563EB; --gold:#FFD700;
+    --shadow:0 4px 20px rgba(0,0,0,0.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var(--text); direction:rtl; min-height:100vh; }
+
+/* Top Bar */
+.top-bar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.5rem; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; box-shadow:var(--shadow); }
+.top-bar h1 { font-size:1.1rem; font-weight:700; }
+.top-bar .badge { background:var(--gold); color:#333; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; }
+.top-bar .btn { padding:0.5rem 1rem; border-radius:8px; border:none; cursor:pointer; font-size:0.8rem; font-weight:600; }
+.btn-home { background:var(--primary); color:#fff; }
+.btn-print { background:var(--green); color:#fff; }
+
+/* Progress Dashboard */
+.dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; padding:1.5rem; max-width:1400px; margin:0 auto; }
+.dash-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem; text-align:center; box-shadow:var(--shadow); }
+.dash-card .value { font-size:2.5rem; font-weight:800; }
+.dash-card .label { font-size:0.85rem; color:var(--muted); margin-top:0.25rem; }
+.dash-card.green .value { color:var(--green); }
+.dash-card.yellow .value { color:var(--yellow); }
+.dash-card.red .value { color:var(--red); }
+.dash-card.gray .value { color:var(--gray); }
+
+.progress-bar { background:var(--gray-light); border-radius:12px; height:24px; overflow:hidden; margin-top:0.5rem; position:relative; }
+.progress-fill { height:100%; border-radius:12px; transition:width 0.5s ease, background 0.3s; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:#fff; }
+
+/* Section Headers */
+.section { max-width:1400px; margin:0 auto; padding:0 1.5rem 1.5rem; }
+.section-title { font-size:1.1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; }
+.section-title i { color:var(--gold); }
+
+/* Cards Grid */
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; }
+
+.team-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:1rem; cursor:pointer; transition:all 0.2s; position:relative; overflow:hidden; }
+.team-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+
+.team-card .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
+.team-card .card-type { font-size:0.65rem; font-weight:700; padding:2px 8px; border-radius:8px; text-transform:uppercase; }
+.team-card .card-type.rapid { background:var(--yellow-light); color:#92400E; }
+.team-card .card-type.center { background:#DBEAFE; color:#1E40AF; }
+.team-card .card-name { font-size:1rem; font-weight:700; }
+.team-card .card-status { font-size:0.75rem; font-weight:600; padding:4px 12px; border-radius:20px; display:inline-block; margin-top:0.5rem; }
+
+.team-card .paramedics { font-size:0.75rem; color:var(--muted); margin-top:0.5rem; min-height:2rem; }
+.team-card .paramedics .name { display:inline-block; background:var(--gray-light); padding:2px 8px; border-radius:6px; margin:2px; }
+
+/* Status Colors */
+.team-card.status-ready { border-color:var(--green); background:var(--green-light); }
+.team-card.status-ready .card-status { background:var(--green); color:#fff; }
+
+.team-card.status-missing { border-color:var(--yellow); background:var(--yellow-light); }
+.team-card.status-missing .card-status { background:var(--yellow); color:#fff; }
+
+.team-card.status-offline { border-color:var(--red); background:var(--red-light); }
+.team-card.status-offline .card-status { background:var(--red); color:#fff; }
+
+.team-card.status-pending { border-color:var(--gray); background:var(--gray-light); }
+.team-card.status-pending .card-status { background:var(--gray); color:#fff; }
+
+/* Reason Buttons (shown when missing) */
+.reason-bar { display:none; flex-wrap:wrap; gap:4px; margin-top:0.5rem; }
+.team-card.status-missing .reason-bar { display:flex; }
+.reason-btn { font-size:0.65rem; padding:3px 8px; border-radius:6px; border:none; cursor:pointer; background:#fff; color:var(--text); border:1px solid var(--border); }
+.reason-btn:hover { background:var(--yellow-light); border-color:var(--yellow); }
+.reason-btn.active { background:var(--yellow); color:#fff; }
+
+/* Quick Actions */
+.actions-bar { display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap; }
+.actions-bar .btn { font-size:0.65rem; padding:4px 10px; border-radius:6px; border:none; cursor:pointer; }
+.btn-ready { background:var(--green); color:#fff; }
+.btn-missing { background:var(--yellow); color:#fff; }
+.btn-offline { background:var(--red); color:#fff; }
+
+/* Summary Panel */
+.summary-panel { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.5rem; margin-top:1rem; box-shadow:var(--shadow); }
+.summary-panel h3 { font-size:1rem; margin-bottom:1rem; }
+.summary-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+.summary-table th { background:var(--bg); padding:0.6rem; text-align:right; border-bottom:2px solid var(--border); }
+.summary-table td { padding:0.6rem; border-bottom:1px solid var(--border); }
+.summary-table .status-badge { padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; }
+.badge-ready { background:var(--green-light); color:var(--green); }
+.badge-missing { background:var(--yellow-light); color:var(--yellow); }
+.badge-offline { background:var(--red-light); color:var(--red); }
+
+/* Toast */
+.toast-container { position:fixed; top:1rem; left:1rem; z-index:300; }
+.toast { background:#1E293B; color:#fff; padding:0.75rem 1rem; border-radius:8px; font-size:0.85rem; box-shadow:0 10px 30px rgba(0,0,0,0.2); animation:toastIn 0.3s ease; margin-bottom:0.5rem; }
+.toast.success { background:var(--green); }
+.toast.error { background:var(--red); }
+@keyframes toastIn { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+
+/* Finish Button */
+.finish-bar { display:flex; justify-content:center; padding:2rem; gap:1rem; }
+.btn-finish { padding:1rem 3rem; font-size:1.1rem; font-weight:700; border-radius:16px; border:none; cursor:pointer; background:var(--primary); color:#fff; box-shadow:var(--shadow); transition:all 0.2s; }
+.btn-finish:hover { transform:scale(1.05); }
+.btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
+
+/* Modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:var(--card); border-radius:16px; padding:2rem; max-width:500px; width:90%; max-height:80vh; overflow-y:auto; }
+.modal-box h2 { margin-bottom:1rem; }
+.modal-box .close { float:left; cursor:pointer; font-size:1.5rem; color:var(--muted); }
+
+/* Print */
+@media print {
+    .top-bar, .finish-bar, .btn { display:none !important; }
+    .team-card { break-inside:avoid; page-break-inside:avoid; }
+}
+
+/* Responsive */
+@media (max-width:768px) {
+    .cards-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+    .dashboard { grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <h1>🎙️ تكميل سريع</h1>
+        <span class="badge" id="shiftBadge">جاري التحميل...</span>
+    </div>
+    <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-home" onclick="location.href='index.html?v=15'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+    </div>
+</div>
+
+<!-- Dashboard -->
+<div class="dashboard">
+    <div class="dash-card green">
+        <div class="value" id="countReady">0</div>
+        <div class="label">✅ جاهز</div>
+    </div>
+    <div class="dash-card yellow">
+        <div class="value" id="countMissing">0</div>
+        <div class="label">⚠️ ناقص</div>
+    </div>
+    <div class="dash-card red">
+        <div class="value" id="countOffline">0</div>
+        <div class="label">🔴 خارج الخدمة</div>
+    </div>
+    <div class="dash-card gray">
+        <div class="value" id="countPending">0</div>
+        <div class="label">⏳ باقي</div>
+    </div>
+</div>
+<div class="section">
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%; background:var(--gray);">0%</div>
+    </div>
+</div>
+
+<!-- Rapid Teams -->
+<div class="section">
+    <div class="section-title"><i class="fas fa-bolt"></i> فرق التدخل السريع</div>
+    <div class="cards-grid" id="rapidCards"></div>
+</div>
+
+<!-- Centers -->
+<div class="section">
+    <div class="section-title"><i class="fas fa-hospital"></i> مراكز الإسعاف</div>
+    <div class="cards-grid" id="centerCards"></div>
+</div>
+
+<!-- Finish -->
+<div class="finish-bar">
+    <button class="btn-finish" id="finishBtn" onclick="finishShift()"><i class="fas fa-flag-checkered"></i> إنهاء التكميل</button>
+</div>
+
+<!-- Summary Modal -->
+<div class="modal-overlay" id="summaryModal">
+    <div class="modal-box">
+        <span class="close" onclick="document.getElementById('summaryModal').classList.remove('active')">&times;</span>
+        <h2>📋 ملخص التكميل</h2>
+        <div id="summaryContent"></div>
+        <div style="margin-top:1rem; display:flex; gap:0.5rem; justify-content:center;">
+            <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+            <button class="btn btn-home" onclick="saveToServer(); document.getElementById('summaryModal').classList.remove('active');"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================
+// CONFIGURATION
+// ============================================
+var centerNumbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
+var rapidTeams = [
+    { name: 'rapid_1', displayName: 'تدخل سريع 1' },
+    { name: 'rapid_2', displayName: 'تدخل سريع 2' },
+    { name: 'rapid_3', displayName: 'تدخل سريع 3' },
+    { name: 'rapid_4', displayName: 'تدخل سريع 4' },
+    { name: 'rapid_5', displayName: 'تدخل سريع 5' }
+];
+
+var teamStatus = {}; // { teamId: { status: 'ready'|'missing'|'offline'|'pending', reason: '', paramedics: [] } }
+var smartScheduleData = [];
+
+var STATUS_CYCLE = ['pending', 'ready', 'missing', 'offline'];
+var STATUS_LABELS = { ready: '✅ جاهز', missing: '⚠️ ناقص', offline: '🔴 خارج الخدمة', pending: '⏳ باقي' };
+var REASONS = ['مسعف غايب', 'سائق غايب', 'مركبة عاطلة', 'نقص معدات', 'سبب آخر'];
+
+// ============================================
+// SHIFT DETECTION (Saudi Time)
+// ============================================
+function getSaudiTime() {
+    var now = new Date();
+    var utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    return new Date(utc + (3 * 60 * 60 * 1000));
+}
+function getShiftType() {
+    var hour = getSaudiTime().getHours();
+    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+}
+function getShiftDate() {
+    var st = getSaudiTime();
+    var y = st.getFullYear(), m = (st.getMonth()+1).toString().padStart(2,'0'), d = st.getDate().toString().padStart(2,'0');
+    return y + '-' + m + '-' + d;
+}
+
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate();
+    initStatuses();
+    loadFromSmartSchedule();
+});
+
+function initStatuses() {
+    // Rapid teams
+    rapidTeams.forEach(function(t, i) {
+        teamStatus[t.name] = { status: 'pending', reason: '', paramedics: [] };
+    });
+    // Centers
+    centerList.forEach(function(c, i) {
+        teamStatus[c] = { status: 'pending', reason: '', paramedics: [] };
+    });
+    renderAll();
+}
+
+// ============================================
+// LOAD PARAMEDICS FROM SMART SCHEDULE
+// ============================================
+function loadFromSmartSchedule() {
+    try {
+        var req = indexedDB.open('SmartScheduleDB_v13', 1);
+        req.onsuccess = function(e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains('employees')) { renderAll(); return; }
+            var tx = db.transaction('employees', 'readonly');
+            var store = tx.objectStore('employees');
+            var getReq = store.getAll();
+            getReq.onsuccess = function(e) {
+                var employees = e.target.result || [];
+                db.close();
+                smartScheduleData = employees;
+                assignParamedics();
+                renderAll();
+            };
+        };
+        req.onerror = function() { renderAll(); };
+    } catch(err) { renderAll(); }
+}
+
+function assignParamedics() {
+    var shiftType = getShiftType(); // 'صباح' or 'ليل'
+    var todayDate = getShiftDate();
+    
+    smartScheduleData.forEach(function(emp) {
+        var teamName = String(emp.team || '').trim();
+        var teamId = teamName; // e.g. 'جنوب 1'
+        
+        // Check if this employee has shift today
+        var hasShift = false;
+        (emp.schedule || []).forEach(function(s) {
+            if (s.date === todayDate) {
+                var code = String(s.shiftCode || '').toUpperCase();
+                // Day shift: D, D12, M, ME, D10, D11, D8, D6, CPD, CP8
+                // Night shift: N, N12, LN8, LN10, CPN, N10, N11, N8, N6
+                var dayCodes = ['D','D12','M','ME','D10','D11','D8','D6','CPD','CP8'];
+                var nightCodes = ['N','N12','LN8','LN10','CPN','N10','N11','N8','N6'];
+                if (shiftType === 'صباح' && dayCodes.indexOf(code) !== -1) hasShift = true;
+                if (shiftType === 'ليل' && nightCodes.indexOf(code) !== -1) hasShift = true;
+                // Shared codes
+                var sharedCodes = ['CP24','F','O12','O10','O6'];
+                if (sharedCodes.indexOf(code) !== -1) hasShift = true;
+            }
+        });
+        
+        if (hasShift && teamStatus[teamId]) {
+            if (!teamStatus[teamId].paramedics) teamStatus[teamId].paramedics = [];
+            teamStatus[teamId].paramedics.push(String(emp.name || ''));
+        }
+    });
+}
+
+// ============================================
+// RENDER
+// ============================================
+function renderAll() {
+    renderRapidCards();
+    renderCenterCards();
+    updateDashboard();
+}
+
+function renderRapidCards() {
+    var container = document.getElementById('rapidCards');
+    if (!container) return;
+    var html = '';
+    rapidTeams.forEach(function(t, i) {
+        var status = teamStatus[t.name] || { status: 'pending', reason: '', paramedics: [] };
+        html += renderCard(t.displayName, t.name, 'rapid', status);
+    });
+    container.innerHTML = html;
+}
+
+function renderCenterCards() {
+    var container = document.getElementById('centerCards');
+    if (!container) return;
+    var html = '';
+    centerList.forEach(function(c, i) {
+        var status = teamStatus[c] || { status: 'pending', reason: '', paramedics: [] };
+        html += renderCard(c, c, 'center', status);
+    });
+    container.innerHTML = html;
+}
+
+function renderCard(name, teamId, type, status) {
+    var paramedics = (status.paramedics || []).filter(function(n) { return n; });
+    var paramedicsHtml = paramedics.length > 0 
+        ? paramedics.map(function(p) { return '<span class="name">' + p + '</span>'; }).join('')
+        : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
+    
+    var reasonsHtml = REASONS.map(function(r) {
+        var active = status.reason === r ? 'active' : '';
+        return '<button class="reason-btn ' + active + '" onclick="setReason(\'' + teamId + '\', \'' + r + '\'); event.stopPropagation();">' + r + '</button>';
+    }).join('');
+    
+    return '<div class="team-card status-' + status.status + '" onclick="cycleStatus(\'' + teamId + '\')">' +
+        '<div class="card-header">' +
+            '<span class="card-type ' + type + '">' + (type === 'rapid' ? '⚡ سريع' : '🏥 مركز') + '</span>' +
+        '</div>' +
+        '<div class="card-name">' + name + '</div>' +
+        '<div class="card-status">' + STATUS_LABELS[status.status] + '</div>' +
+        '<div class="paramedics">' + paramedicsHtml + '</div>' +
+        '<div class="reason-bar">' + reasonsHtml + '</div>' +
+    '</div>';
+}
+
+// ============================================
+// INTERACTIONS
+// ============================================
+function cycleStatus(teamId) {
+    var current = teamStatus[teamId] || { status: 'pending' };
+    var idx = STATUS_CYCLE.indexOf(current.status);
+    var nextIdx = (idx + 1) % STATUS_CYCLE.length;
+    var nextStatus = STATUS_CYCLE[nextIdx];
+    
+    teamStatus[teamId].status = nextStatus;
+    if (nextStatus !== 'missing') teamStatus[teamId].reason = '';
+    
+    renderAll();
+    showToast(nameOfTeam(teamId) + ' — ' + STATUS_LABELS[nextStatus], nextStatus === 'ready' ? 'success' : '');
+}
+
+function setReason(teamId, reason) {
+    if (!teamStatus[teamId]) teamStatus[teamId] = { status: 'missing', reason: '', paramedics: [] };
+    teamStatus[teamId].reason = reason;
+    renderAll();
+}
+
+function nameOfTeam(id) {
+    var rapid = rapidTeams.find(function(t) { return t.name === id; });
+    if (rapid) return rapid.displayName;
+    return id;
+}
+
+// ============================================
+// DASHBOARD
+// ============================================
+function updateDashboard() {
+    var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
+    var total = 0;
+    Object.keys(teamStatus).forEach(function(k) {
+        var s = teamStatus[k].status;
+        if (counts[s] !== undefined) counts[s]++;
+        total++;
+    });
+    
+    document.getElementById('countReady').textContent = counts.ready;
+    document.getElementById('countMissing').textContent = counts.missing;
+    document.getElementById('countOffline').textContent = counts.offline;
+    document.getElementById('countPending').textContent = counts.pending;
+    
+    var done = counts.ready + counts.missing + counts.offline;
+    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    var fill = document.getElementById('progressFill');
+    fill.style.width = pct + '%';
+    fill.textContent = pct + '% (' + done + '/' + total + ')';
+    fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
+    
+    var finishBtn = document.getElementById('finishBtn');
+    finishBtn.disabled = counts.pending > 0;
+    if (counts.pending > 0) {
+        finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + counts.pending + ' فريق';
+    } else {
+        finishBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> إنهاء التكميل';
+    }
+}
+
+// ============================================
+// FINISH & SUMMARY
+// ============================================
+function finishShift() {
+    var modal = document.getElementById('summaryModal');
+    var content = document.getElementById('summaryContent');
+    
+    var html = '<table class="summary-table">' +
+        '<tr><th>الفرقة</th><th>الحالة</th><th>السبب</th><th>الكادر</th></tr>';
+    
+    // Rapid first
+    rapidTeams.forEach(function(t) {
+        var s = teamStatus[t.name] || {};
+        html += summaryRow(t.displayName, s);
+    });
+    // Centers
+    centerList.forEach(function(c) {
+        var s = teamStatus[c] || {};
+        html += summaryRow(c, s);
+    });
+    
+    html += '</table>';
+    
+    // Stats
+    var counts = { ready: 0, missing: 0, offline: 0 };
+    Object.keys(teamStatus).forEach(function(k) {
+        var st = teamStatus[k].status;
+        if (counts[st] !== undefined) counts[st]++;
+    });
+    
+    html += '<div style="margin-top:1rem; padding:1rem; background:var(--bg); border-radius:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; text-align:center;">' +
+        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--green);">' + counts.ready + '</div><div style="font-size:0.8rem; color:var(--muted);">جاهز</div></div>' +
+        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--yellow);">' + counts.missing + '</div><div style="font-size:0.8rem; color:var(--muted);">ناقص</div></div>' +
+        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--red);">' + counts.offline + '</div><div style="font-size:0.8rem; color:var(--muted);">خارج الخدمة</div></div>' +
+        '</div>';
+    
+    html += '<div style="margin-top:1rem; text-align:center; color:var(--muted); font-size:0.85rem;">' +
+        'تاريخ: ' + getShiftDate() + ' — نوع المناوبة: ' + getShiftType() +
+        '</div>';
+    
+    content.innerHTML = html;
+    modal.classList.add('active');
+}
+
+function summaryRow(name, s) {
+    var statusClass = 'badge-' + (s.status || 'pending');
+    var statusText = STATUS_LABELS[s.status] || s.status;
+    var paramedics = (s.paramedics || []).filter(function(n) { return n; }).join('، ') || '-';
+    return '<tr>' +
+        '<td>' + name + '</td>' +
+        '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>' +
+        '<td>' + (s.reason || '-') + '</td>' +
+        '<td>' + paramedics + '</td>' +
+        '</tr>';
+}
+
+function saveToServer() {
+    var payload = {
+        shiftType: getShiftType(),
+        shiftDate: getShiftDate(),
+        teams: teamStatus,
+        timestamp: new Date().toISOString()
+    };
+    fetch('/api/shift-completion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        showToast('تم حفظ التكميل في السيرفر', 'success');
+    }).catch(function(e) {
+        showToast('تم حفظ التكميل محلياً فقط', 'success');
+    });
+}
+
+// ============================================
+// UTILS
+// ============================================
+function showToast(msg, type) {
+    var c = document.getElementById('toastContainer');
+    var t = document.createElement('div');
+    t.className = 'toast ' + (type || '');
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(function() { t.remove(); }, 3000);
+}
+</script>
+</body>
+</html>

@@ -1912,6 +1912,65 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
 });
 
 // ============================================
+// API: Save Radio Completion (Shift Quick Log)
+// ============================================
+app.post('/api/shift-completion', authenticate, async (req, res) => {
+    try {
+        const { shiftType, shiftDate, teams, timestamp } = req.body;
+        if (!shiftType || !shiftDate || !teams) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        
+        const completionData = {
+            id: Date.now().toString(),
+            shiftType,
+            shiftDate,
+            teams,
+            timestamp: timestamp || new Date().toISOString(),
+            createdBy: req.user ? req.user.name || req.user.username || 'مستخدم' : 'مستخدم'
+        };
+        
+        // Save to a JSON file as backup (Render free tier SQLite is ephemeral)
+        const fs = require('fs').promises;
+        const path = require('path');
+        const completionsDir = path.join(__dirname, 'data', 'completions');
+        try {
+            await fs.mkdir(completionsDir, { recursive: true });
+        } catch (e) {}
+        const filePath = path.join(completionsDir, `completion_${shiftDate}_${shiftType}.json`);
+        await fs.writeFile(filePath, JSON.stringify(completionData, null, 2));
+        
+        // Also try to save to SQLite if available
+        if (dbAvailable()) {
+            try {
+                // Check if table exists, create if not
+                await db.exec(`
+                    CREATE TABLE IF NOT EXISTS shift_completions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        shift_type TEXT,
+                        shift_date TEXT,
+                        teams_data TEXT,
+                        created_by TEXT,
+                        created_at TEXT
+                    )
+                `);
+                await db.run(
+                    'INSERT INTO shift_completions (shift_type, shift_date, teams_data, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+                    [shiftType, shiftDate, JSON.stringify(teams), completionData.createdBy, completionData.timestamp]
+                );
+            } catch (dbErr) {
+                console.log('[DB] SQLite save failed, using JSON fallback:', dbErr.message);
+            }
+        }
+        
+        res.json({ success: true, message: 'تم حفظ التكميل', id: completionData.id });
+    } catch (error) {
+        console.error('[API] Error saving shift-completion:', error);
+        res.status(500).json({ error: 'فشل في حفظ التكميل' });
+    }
+});
+
+// ============================================
 // API: المستندات (التحديثات التشغيلية)
 // ============================================
 app.get('/api/docs', authenticate, async (req, res) => {
