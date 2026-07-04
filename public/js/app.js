@@ -859,6 +859,17 @@ function clearAuditLog() {
     showNotification('تم المسح', 'تم مسح سجل العمليات بنجاح', 'success', 2000);
 }
 
+function openAuditLogModal() {
+    var el = document.getElementById('auditLogModal');
+    if (el) el.style.display = 'flex';
+    renderAuditLog();
+}
+
+function closeAuditLogModal() {
+    var el = document.getElementById('auditLogModal');
+    if (el) el.style.display = 'none';
+}
+
 function refreshAuditLog() {
     auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
     renderAuditLog();
