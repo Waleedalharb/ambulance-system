@@ -268,38 +268,109 @@ function loadFromSmartSchedule() {
         var req = indexedDB.open('SmartScheduleDB_v13', 1);
         req.onsuccess = function(e) {
             var db = e.target.result;
-            if (!db.objectStoreNames.contains('employees')) { renderAll(); return; }
+            if (!db.objectStoreNames.contains('employees')) {
+                console.log('[radio-completion] No employees store found');
+                tryLocalStorageFallback();
+                return;
+            }
             var tx = db.transaction('employees', 'readonly');
             var store = tx.objectStore('employees');
             var getReq = store.getAll();
             getReq.onsuccess = function(e) {
                 var employees = e.target.result || [];
                 db.close();
+                console.log('[radio-completion] Loaded', employees.length, 'employees from IndexedDB');
+                if (employees.length === 0) {
+                    tryLocalStorageFallback();
+                    return;
+                }
                 smartScheduleData = employees;
                 assignParamedics();
                 renderAll();
             };
+            getReq.onerror = function() {
+                console.error('[radio-completion] Error reading employees');
+                db.close();
+                tryLocalStorageFallback();
+            };
         };
-        req.onerror = function() { renderAll(); };
-    } catch(err) { renderAll(); }
+        req.onerror = function() {
+            console.error('[radio-completion] Cannot open IndexedDB');
+            tryLocalStorageFallback();
+        };
+    } catch(err) {
+        console.error('[radio-completion] Exception:', err);
+        tryLocalStorageFallback();
+    }
+}
+
+function tryLocalStorageFallback() {
+    console.log('[radio-completion] Trying localStorage fallback...');
+    var data = localStorage.getItem('ss_employees');
+    if (data) {
+        try {
+            var employees = JSON.parse(data);
+            if (Array.isArray(employees) && employees.length > 0) {
+                console.log('[radio-completion] Loaded', employees.length, 'employees from localStorage');
+                smartScheduleData = employees;
+                assignParamedics();
+                renderAll();
+                return;
+            }
+        } catch(e) {}
+    }
+    console.log('[radio-completion] No data found in localStorage either');
+    showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+    renderAll();
 }
 
 function assignParamedics() {
     var shiftType = getShiftType(); // 'صباح' or 'ليل'
     var todayDate = getShiftDate();
+    var availableDates = [];
+    var dateSet = {};
+    
+    // First, find all available dates in the data
+    smartScheduleData.forEach(function(emp) {
+        (emp.schedule || []).forEach(function(s) {
+            if (s.date && !dateSet[s.date]) {
+                dateSet[s.date] = true;
+                availableDates.push(s.date);
+            }
+        });
+    });
+    availableDates.sort();
+    
+    console.log('[radio-completion] Available dates in data:', availableDates);
+    console.log('[radio-completion] Today (Saudi):', todayDate, '| Shift type:', shiftType);
+    
+    // Use today's date if available, otherwise use the first available date
+    var targetDate = todayDate;
+    if (availableDates.indexOf(todayDate) === -1 && availableDates.length > 0) {
+        targetDate = availableDates[0];
+        console.log('[radio-completion] Today not found, using first available date:', targetDate);
+        showToast('⚠️ جدول اليوم غير موجود، يُعرض تاريخ: ' + targetDate, 'error');
+    }
+    
+    if (availableDates.length === 0) {
+        console.log('[radio-completion] No schedule data found!');
+        return;
+    }
     
     smartScheduleData.forEach(function(emp) {
         var teamName = String(emp.team || '').trim();
         var teamId = teamName; // e.g. 'جنوب 1'
         
-        // Check if this employee has shift today
+        // Check if this employee has shift on target date
         var hasShift = false;
+        var matchedCode = '';
         (emp.schedule || []).forEach(function(s) {
-            if (s.date === todayDate) {
-                var code = String(s.shiftCode || '').toUpperCase();
+            if (s.date === targetDate) {
+                var code = String(s.shiftCode || s.shift || '').toUpperCase();
+                matchedCode = code;
                 // Day shift: D, D12, M, ME, D10, D11, D8, D6, CPD, CP8
-                // Night shift: N, N12, LN8, LN10, CPN, N10, N11, N8, N6
                 var dayCodes = ['D','D12','M','ME','D10','D11','D8','D6','CPD','CP8'];
+                // Night shift: N, N12, LN8, LN10, CPN, N10, N11, N8, N6
                 var nightCodes = ['N','N12','LN8','LN10','CPN','N10','N11','N8','N6'];
                 if (shiftType === 'صباح' && dayCodes.indexOf(code) !== -1) hasShift = true;
                 if (shiftType === 'ليل' && nightCodes.indexOf(code) !== -1) hasShift = true;
@@ -312,6 +383,15 @@ function assignParamedics() {
         if (hasShift && teamStatus[teamId]) {
             if (!teamStatus[teamId].paramedics) teamStatus[teamId].paramedics = [];
             teamStatus[teamId].paramedics.push(String(emp.name || ''));
+            console.log('[radio-completion] Added', emp.name, 'to', teamId, 'code:', matchedCode);
+        }
+    });
+    
+    // Log summary
+    Object.keys(teamStatus).forEach(function(k) {
+        var count = (teamStatus[k].paramedics || []).length;
+        if (count > 0) {
+            console.log('[radio-completion]', k, ':', count, 'paramedics');
         }
     });
 }
