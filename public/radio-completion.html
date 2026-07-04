@@ -508,6 +508,8 @@ function normalizeTeamName(rawName) {
     if (name === 'القائد الميداني') return 'قائد_ميداني';
     if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
     if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
+    if (name === 'مناوبو باص الاستجابة') return 'باص_استجابة';
+    if (name === 'المنتدبين') return 'المنتدبين';
     // Direct match (already normalized)
     if (teamStatus[name]) return name;
     // Try to find by checking all rapid team display names

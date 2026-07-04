@@ -1649,8 +1649,11 @@
             if (name === 'القائد الميداني') return 'قائد_ميداني';
             if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
             if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
+            if (name === 'مناوبو باص الاستجابة') return 'باص_استجابة';
+            if (name === 'المنتدبين') return 'المنتدبين';
             if (name === 'بنك الدم') return 'بنك_الدم';
             if (name === 'الإجازة') return 'إجازة';
+            if (name === 'إجازة') return 'إجازة';
             return name;
         }
 
@@ -2662,7 +2665,9 @@
                 'إجازة': 'إجازة',
                 'قائد_ميداني': 'القائد الميداني',
                 'تحكم_تنسيق': 'التحكم والتنسيق',
-                'دعم_لوجستي': 'الدعم اللوجستي'
+                'دعم_لوجستي': 'الدعم اللوجستي',
+                'باص_استجابة': 'مناوبو باص الاستجابة',
+                'المنتدبين': 'المنتدبين'
             };
             for (var key in STATIC_TEAMS) { locations[key] = STATIC_TEAMS[key]; }
             // Also add any teams found in employee data
@@ -2704,7 +2709,7 @@
                 emp.schedule = emp.schedule.filter(function(s) {
                     if (dateFilter && s.date !== dateFilter) return false;
                     if (monthFilter && !s.date.startsWith(monthFilter)) return false;
-                    if (locFilter && s.location !== locFilter) return false;
+                    if (locFilter && s.location !== locFilter && emp.team !== locFilter) return false;
                     if (shiftFilter && s.shift !== shiftFilter) return false;
                     if (statusFilter && s.status !== statusFilter) return false;
                     return true;
