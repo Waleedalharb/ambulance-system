@@ -319,9 +319,42 @@ function tryLocalStorageFallback() {
             }
         } catch(e) {}
     }
-    console.log('[radio-completion] No data found in localStorage either');
-    showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
-    renderAll();
+    console.log('[radio-completion] No data in localStorage, trying server...');
+    tryServerFallback();
+}
+
+function tryServerFallback() {
+    console.log('[radio-completion] Trying server fallback...');
+    var token = localStorage.getItem('authToken');
+    if (!token) {
+        console.log('[radio-completion] No auth token, cannot fetch from server');
+        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+        renderAll();
+        return;
+    }
+    fetch('/api/schedule/employees', {
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        if (result.success && Array.isArray(result.employees) && result.employees.length > 0) {
+            console.log('[radio-completion] Loaded', result.employees.length, 'employees from server');
+            smartScheduleData = result.employees;
+            assignParamedics();
+            renderAll();
+            // Save locally for next time
+            localStorage.setItem('ss_employees', JSON.stringify(result.employees));
+        } else {
+            console.log('[radio-completion] Server returned empty or error');
+            showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+            renderAll();
+        }
+    })
+    .catch(function(e) {
+        console.error('[radio-completion] Server fetch failed:', e);
+        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً في صفحة نظام الجداول.', 'error');
+        renderAll();
+    });
 }
 
 function assignParamedics() {

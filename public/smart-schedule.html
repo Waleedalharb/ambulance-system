@@ -1572,6 +1572,7 @@
                 // استخراج الموظفين من الجدول
                 employees = extractEmployees(workbook);
                 saveToIndexedDB();
+                saveToLocalStorage();
                 saveToServer();
                 
                 finishAnalysis(employees.length);
@@ -1604,6 +1605,7 @@
                     console.log('👥 Extracted employees:', result.length);
                     employees = result;
                     saveToIndexedDB();
+                    saveToLocalStorage();
                     saveToServer();
                     finishAnalysis(result.length);
                     showExtractedTable(result);
@@ -2040,7 +2042,7 @@
         // التخزين المحلي - Storage
         // ==========================================
         var DB_NAME = 'SmartScheduleDB_v13';
-        var DB_VERSION = 1;
+        var DB_VERSION = 2;  // BUMPED to force store creation
         var db = null;
 
         function openDB() {
@@ -2048,44 +2050,81 @@
                 var req = indexedDB.open(DB_NAME, DB_VERSION);
                 req.onupgradeneeded = function(e) {
                     var database = e.target.result;
-                    if (!database.objectStoreNames.contains('employees')) {
-                        database.createObjectStore('employees', { keyPath: 'id' });
+                    console.log('[DB] Upgrade needed, creating stores...');
+                    // Recreate the store if it doesn't exist (or delete + recreate for clean state)
+                    if (database.objectStoreNames.contains('employees')) {
+                        database.deleteObjectStore('employees');
                     }
+                    database.createObjectStore('employees', { keyPath: 'id' });
+                    console.log('[DB] employees store created');
                 };
                 req.onsuccess = function(e) {
                     db = e.target.result;
+                    console.log('[DB] Opened successfully, version:', db.version);
                     resolve(db);
                 };
-                req.onerror = function() { resolve(null); };
+                req.onerror = function(e) {
+                    console.error('[DB] Failed to open:', e.target.error);
+                    resolve(null);
+                };
             });
         }
 
         async function saveToIndexedDB() {
-            var database = await openDB();
-            if (!database) return;
-            var tx = database.transaction('employees', 'readwrite');
-            var store = tx.objectStore('employees');
-            store.clear(); // 🧹 امسح القديم قبل إضافة الجديد!
-            for (var i = 0; i < employees.length; i++) {
-                store.put(employees[i]);
+            try {
+                var database = await openDB();
+                if (!database) {
+                    console.warn('[DB] Cannot open DB for saving');
+                    return;
+                }
+                if (!database.objectStoreNames.contains('employees')) {
+                    console.error('[DB] employees store missing, cannot save');
+                    return;
+                }
+                var tx = database.transaction('employees', 'readwrite');
+                var store = tx.objectStore('employees');
+                store.clear(); // 🧹 امسح القديم قبل إضافة الجديد!
+                for (var i = 0; i < employees.length; i++) {
+                    store.put(employees[i]);
+                }
+                console.log('[DB] Saved', employees.length, 'employees');
+            } catch(e) {
+                console.error('[DB] saveToIndexedDB error:', e);
             }
         }
 
         async function loadFromIndexedDB() {
-            var database = await openDB();
-            if (!database) return;
-            var tx = database.transaction('employees', 'readonly');
-            var store = tx.objectStore('employees');
-            var req = store.getAll();
-            req.onsuccess = function(e) {
-                if (e.target.result.length > 0) {
-                    employees = e.target.result;
-                    updateStats();
-                    renderCharts();
-                    renderCurrentView();
-                    populateLocationFilter();
+            try {
+                var database = await openDB();
+                if (!database) {
+                    console.warn('[DB] Cannot open DB for loading');
+                    return;
                 }
-            };
+                if (!database.objectStoreNames.contains('employees')) {
+                    console.warn('[DB] employees store missing, nothing to load');
+                    return;
+                }
+                var tx = database.transaction('employees', 'readonly');
+                var store = tx.objectStore('employees');
+                var req = store.getAll();
+                req.onsuccess = function(e) {
+                    if (e.target.result.length > 0) {
+                        employees = e.target.result;
+                        console.log('[DB] Loaded', employees.length, 'employees from IndexedDB');
+                        updateStats();
+                        renderCharts();
+                        renderCurrentView();
+                        populateLocationFilter();
+                    } else {
+                        console.log('[DB] No employees in store');
+                    }
+                };
+                req.onerror = function(e) {
+                    console.error('[DB] Error reading employees:', e.target.error);
+                };
+            } catch(err) {
+                console.error('[DB] loadFromIndexedDB error:', err);
+            }
         }
 
         async function loadFromServer() {
@@ -2183,19 +2222,38 @@
         // ==========================================
         async function setupDemoData() {
             if (employees.length > 0) return;
+            // 1. Try IndexedDB first (most reliable)
+            try {
+                await loadFromIndexedDB();
+                if (employees.length > 0) {
+                    console.log('[setupDemoData] Loaded', employees.length, 'from IndexedDB');
+                    return;
+                }
+            } catch(e) { console.error('[setupDemoData] IndexedDB load failed:', e); }
+            // 2. Try localStorage
             var saved = loadFromLocalStorage();
             if (saved && saved.length > 0) {
                 employees = saved;
+                console.log('[setupDemoData] Loaded', employees.length, 'from localStorage');
+                // Also save back to IndexedDB for consistency
+                saveToIndexedDB();
                 return;
             }
-            // Try loading from server first (for any device)
+            // 3. Try server
             var token = localStorage.getItem('authToken');
             if (token) {
                 try {
                     await loadFromServer();
-                    if (employees.length > 0) return;
+                    if (employees.length > 0) {
+                        console.log('[setupDemoData] Loaded', employees.length, 'from server');
+                        // Save to local for offline use
+                        saveToIndexedDB();
+                        saveToLocalStorage();
+                        return;
+                    }
                 } catch(e) { console.error('Auto-load from server failed:', e); }
             }
+            // 4. Empty
             employees = generateDemoData();
             saveToIndexedDB();
             saveToLocalStorage();
