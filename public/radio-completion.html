@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=20'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=21'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -584,53 +584,6 @@ function assignParamedics() {
     });
     
     console.log('[assignParamedics] Assigned teams:', Object.keys(teamStatus).filter(function(k) { return teamStatus[k].paramedics && teamStatus[k].paramedics.length > 0; }));
-}
-    var shiftType = getShiftType();
-    var todayDate = getShiftDate();
-    var availableDates = [];
-    var dateSet = {};
-
-    smartScheduleData.forEach(function(emp) {
-        (emp.schedule || []).forEach(function(s) {
-            if (s.date && !dateSet[s.date]) {
-                dateSet[s.date] = true;
-                availableDates.push(s.date);
-            }
-        });
-    });
-    availableDates.sort();
-
-    var targetDate = todayDate;
-    if (availableDates.indexOf(todayDate) === -1 && availableDates.length > 0) {
-        targetDate = availableDates[0];
-        showToast('⚠️ جدول اليوم غير موجود، يُعرض تاريخ: ' + targetDate, 'error');
-    }
-
-    if (availableDates.length === 0) return;
-
-    smartScheduleData.forEach(function(emp) {
-        var teamName = String(emp.team || '').trim();
-        var teamId = teamName;
-        var hasShift = false;
-        var matchedCode = '';
-        (emp.schedule || []).forEach(function(s) {
-            if (s.date === targetDate) {
-                var code = String(s.shiftCode || s.shift || '').toUpperCase();
-                matchedCode = code;
-                var dayCodes = ['D','D12','M','ME','D10','D11','D8','D6','CPD','CP8'];
-                var nightCodes = ['N','N12','LN8','LN10','CPN','N10','N11','N8','N6'];
-                var sharedCodes = ['CP24','F','O12','O10','O6'];
-                if (shiftType === 'صباح' && dayCodes.indexOf(code) !== -1) hasShift = true;
-                if (shiftType === 'ليل' && nightCodes.indexOf(code) !== -1) hasShift = true;
-                if (sharedCodes.indexOf(code) !== -1) hasShift = true;
-            }
-        });
-
-        if (hasShift && teamStatus[teamId]) {
-            if (!teamStatus[teamId].paramedics) teamStatus[teamId].paramedics = [];
-            teamStatus[teamId].paramedics.push(String(emp.name || ''));
-        }
-    });
 }
 
 // ============================================
