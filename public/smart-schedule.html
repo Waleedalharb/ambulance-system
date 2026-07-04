@@ -2063,12 +2063,20 @@
         // ==========================================
         // البيانات التجريبية - Demo Data
         // ==========================================
-        function setupDemoData() {
+        async function setupDemoData() {
             if (employees.length > 0) return;
             var saved = loadFromLocalStorage();
             if (saved && saved.length > 0) {
                 employees = saved;
                 return;
+            }
+            // Try loading from server first (for any device)
+            var token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    await loadFromServer();
+                    if (employees.length > 0) return;
+                } catch(e) { console.error('Auto-load from server failed:', e); }
             }
             employees = generateDemoData();
             saveToIndexedDB();
@@ -2846,14 +2854,14 @@
                 // Convert server format to employee format
                 var empMap = {};
                 data.roster.forEach(function(r) {
-                    var key = r.employee_number || r.name;
+                    var key = r.employee_code || r.employee_name;
                     if (!empMap[key]) {
                         empMap[key] = {
-                            id: r.employee_number || String(Date.now()),
-                            name: r.name,
+                            id: r.employee_code || String(Date.now()),
+                            name: r.employee_name || '',
                             jobTitle: r.job_title || '',
-                            phone: r.phone || '',
-                            team: r.team || '',
+                            phone: '',
+                            team: r.team_name || '',
                             schedule: []
                         };
                     }
@@ -2863,7 +2871,7 @@
                         shift: r.shift_code,
                         shiftCode: r.shift_code,
                         time: '',
-                        location: r.team || '',
+                        location: r.team_name || '',
                         status: (r.shift_code === 'V' || r.shift_code === 'VC') ? 'إجازة' : 'دوام'
                     });
                 });
