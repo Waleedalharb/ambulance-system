@@ -1344,6 +1344,7 @@
             console.log('🚀 DOMContentLoaded fired');
             try { initClock(); } catch(e) { console.error('initClock failed:', e); }
             try { loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
+            try { loadFromServer(); } catch(e) { console.error('loadFromServer failed:', e); }
             try { loadFromIndexedDB(); } catch(e) { console.error('loadFromIndexedDB failed:', e); }
             try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
             try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
@@ -1530,6 +1531,7 @@
                     console.log('👥 Extracted employees:', result.length);
                     employees = result;
                     saveToIndexedDB();
+                    saveToServer();
                     finishAnalysis(result.length);
                     showExtractedTable(result);
                     updateStats();
@@ -1814,6 +1816,7 @@
                 
                 employees = allEmployees;
                 saveToIndexedDB();
+                saveToServer();
                 finishAnalysis(allEmployees.length);
                 showExtractedTable(allEmployees);
                 updateStats();
@@ -2010,6 +2013,48 @@
                     populateLocationFilter();
                 }
             };
+        }
+
+        async function loadFromServer() {
+            try {
+                var token = localStorage.getItem('authToken');
+                var response = await fetch('/api/schedule/employees', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var result = await response.json();
+                if (result.success && Array.isArray(result.employees) && result.employees.length > 0) {
+                    employees = result.employees;
+                    updateStats();
+                    renderCharts();
+                    renderCurrentView();
+                    populateLocationFilter();
+                    showToast('تم تحميل ' + employees.length + ' موظف من السيرفر', 'success');
+                }
+            } catch (error) {
+                console.error('خطأ في تحميل البيانات من السيرفر:', error);
+            }
+        }
+
+        async function saveToServer() {
+            try {
+                var token = localStorage.getItem('authToken');
+                var response = await fetch('/api/schedule/employees', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ employees: employees })
+                });
+                var result = await response.json();
+                if (result.success) {
+                    showToast('تم حفظ البيانات في السيرفر بنجاح', 'success');
+                } else {
+                    console.warn('فشل حفظ البيانات في السيرفر:', result.error);
+                }
+            } catch (error) {
+                console.error('خطأ في حفظ البيانات في السيرفر:', error);
+            }
         }
 
         function saveToLocalStorage(data) {
