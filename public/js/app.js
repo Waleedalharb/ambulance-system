@@ -2273,6 +2273,13 @@ function openShiftModal() {
     if (modalContent) {
         modalContent.scrollTop = 0;
     }
+    // Update badge immediately so it doesn't show "جاري التحميل"
+    var typeBadge = document.getElementById('shiftModalTypeBadge');
+    if (typeBadge) {
+        var shiftType = (getCurrentShiftType ? getCurrentShiftType() : 'صباح');
+        var shiftDate = (getCurrentShiftDate ? getCurrentShiftDate() : getSaudiDate());
+        typeBadge.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + shiftType + '</span> ' + shiftDate + ' — تسجيل بيانات تكميل النوبة';
+    }
     loadShifts().then(function() {
         // Auto-load current shift data if available
         if (currentShiftId && allShifts && allShifts.length > 0) {
@@ -3066,9 +3073,23 @@ async function loadTeamParamedics(shiftId) {
             container.innerHTML = '<div class="paramedic-no-data"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div>';
         }
     });
-    await Promise.all(teams.map(function(team) {
+    // Add timeout to prevent hanging forever
+    var timeoutMs = 8000; // 8 seconds
+    var fetchPromises = teams.map(function(team) {
         return fetchTeamParamedics(shiftId, team.name, team.type, team.index);
-    }));
+    });
+    var timeoutPromise = new Promise(function(resolve) {
+        setTimeout(function() { resolve('timeout'); }, timeoutMs);
+    });
+    await Promise.race([Promise.all(fetchPromises), timeoutPromise]);
+    // If timeout occurred, ensure remaining containers show fallback
+    teams.forEach(function(t) {
+        var safeName = safeTeamId(t.name);
+        var container = document.getElementById('paramedics_' + safeName);
+        if (container && container.innerHTML.indexOf('fa-spinner') !== -1) {
+            container.innerHTML = '<div class="paramedic-no-data">لا يوجد بيانات (فشل الاتصال)</div>';
+        }
+    });
 }
 
 function updateRapidStatusIcon(index) {
