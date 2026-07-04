@@ -158,6 +158,9 @@
             </div>
         </div>
         <div class="top-bar-actions">
+            <button class="btn btn-danger" onclick="clearFakeData(); renderTeamList(); updateStats(); populateLeaveMembers();">
+                <i class="fas fa-broom"></i> مسح تجريبي
+            </button>
             <button class="btn btn-outline" onclick="window.location.href='smart-schedule.html'">
                 <i class="fas fa-calendar-alt"></i> نظام الجداول
             </button>
@@ -351,22 +354,20 @@
     var shifts = [{ key: 'morning', label: 'صباحية', class: 'shift-morning' }, { key: 'evening', label: 'مسائية', class: 'shift-evening' }, { key: 'night', label: 'ليلية', class: 'shift-night' }];
 
     document.addEventListener('DOMContentLoaded', function() {
-        if (teamMembers.length === 0) seedDemoData();
+        clearFakeData();
         renderSchedule(); renderTeamList(); renderLeaveRequests(); updateStats(); populateLeaveMembers(); loadSettings(); loadFromSmartSchedule();
     });
 
-    function seedDemoData() {
-        teamMembers = [
-            { id: '1', name: 'أحمد محمد', role: 'paramedic', phone: '0551234567', center: 'مركز اليرموك', status: 'online' },
-            { id: '2', name: 'خالد عبدالله', role: 'driver', phone: '0552345678', center: 'مركز السلام', status: 'online' },
-            { id: '3', name: 'سعد إبراهيم', role: 'nurse', phone: '0553456789', center: 'مركز اليرموك', status: 'busy' },
-            { id: '4', name: 'ناصر فهد', role: 'supervisor', phone: '0554567890', center: 'مركز الفيصلية', status: 'online' },
-            { id: '5', name: 'عبدالرحمن سالم', role: 'paramedic', phone: '0555678901', center: 'مركز السلام', status: 'offline' },
-            { id: '6', name: 'فهد محمد', role: 'driver', phone: '0556789012', center: 'مركز اليرموك', status: 'online' },
-            { id: '7', name: 'محمد علي', role: 'doctor', phone: '0557890123', center: 'مركز الفيصلية', status: 'online' },
-            { id: '8', name: 'يوسف أحمد', role: 'paramedic', phone: '0558901234', center: 'مركز السلام', status: 'offline' }
-        ];
-        saveTeamMembers();
+    function clearFakeData() {
+        var fakeNames = ['أحمد محمد','خالد عبدالله','سعد إبراهيم','ناصر فهد','عبدالرحمن سالم','فهد محمد','محمد علي','يوسف أحمد'];
+        var before = teamMembers.length;
+        teamMembers = teamMembers.filter(function(m) {
+            return fakeNames.indexOf(m.name) === -1;
+        });
+        if (teamMembers.length !== before) {
+            saveTeamMembers();
+            showToast('تم حذف ' + (before - teamMembers.length) + ' اسم تجريبي', 'success');
+        }
     }
 
     function switchTab(tabId, btn) { document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); }); document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); }); document.getElementById(tabId).classList.add('active'); btn.classList.add('active'); }
