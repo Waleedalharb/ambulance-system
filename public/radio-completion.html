@@ -136,23 +136,67 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .btn-finish:hover { transform:scale(1.05); }
 .btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
 
-/* Modal */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+/* Modal - Platform Identity Style */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
 .modal-overlay.active { display:flex; }
-.modal-box { background:var(--card); border-radius:16px; padding:2rem; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; }
-.modal-box h2 { margin-bottom:1rem; }
-.modal-box .close { float:left; cursor:pointer; font-size:1.5rem; color:var(--muted); }
+.modal-box { background:var(--card); border-radius:20px; padding:0; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.25); border:1px solid var(--border); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; background:var(--bg); border-bottom:1px solid var(--border); border-radius:20px 20px 0 0; }
+.modal-header h2 { margin:0; font-size:1.25rem; display:flex; align-items:center; gap:0.5rem; }
+.modal-header h2 i { color:var(--primary); }
+.modal-header .close { cursor:pointer; font-size:1.5rem; color:var(--muted); background:none; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+.modal-header .close:hover { background:var(--red-light); color:var(--red); }
+.modal-body { padding:1.5rem; }
+.modal-footer { display:flex; gap:0.75rem; justify-content:center; padding:1rem 1.5rem 1.5rem; border-top:1px solid var(--border); }
+
+/* Summary Table - Clean Platform Style */
+.summary-table { width:100%; border-collapse:separate; border-spacing:0; font-size:0.85rem; border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+.summary-table th { background:var(--bg); padding:0.75rem; text-align:right; font-weight:700; color:var(--text); border-bottom:2px solid var(--border); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; }
+.summary-table td { padding:0.75rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+.summary-table tr:last-child td { border-bottom:none; }
+.summary-table tr:hover td { background:var(--gray-light); }
+.summary-table .status-badge { padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; display:inline-block; }
+.badge-ready { background:var(--green-light); color:var(--green); }
+.badge-missing { background:var(--yellow-light); color:var(--yellow); }
+.badge-offline { background:var(--red-light); color:var(--red); }
+.badge-pending { background:var(--gray-light); color:var(--gray); }
+
+/* Stats Grid in Modal */
+.modal-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin:1.5rem 0; }
+.modal-stat { background:var(--bg); border-radius:16px; padding:1.25rem; text-align:center; border:1px solid var(--border); }
+.modal-stat .value { font-size:2rem; font-weight:800; margin-bottom:0.25rem; }
+.modal-stat .label { font-size:0.8rem; color:var(--muted); font-weight:600; }
+.modal-stat.green .value { color:var(--green); }
+.modal-stat.yellow .value { color:var(--yellow); }
+.modal-stat.red .value { color:var(--red); }
+
+/* Notes in Modal */
+.modal-notes { margin-top:1rem; padding:1rem; background:var(--yellow-light); border-radius:12px; border-right:4px solid var(--yellow); }
+.modal-notes .title { font-weight:700; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem; }
+.modal-notes .title i { color:var(--yellow); }
+.modal-notes .content { font-size:0.9rem; white-space:pre-wrap; line-height:1.6; }
+
+/* Modal Info Footer */
+.modal-info { text-align:center; color:var(--muted); font-size:0.85rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); }
 
 /* Print */
 @media print {
-    .top-bar, .finish-bar, .btn, .notes-section { display:none !important; }
+    .top-bar, .finish-bar, .btn, .notes-section, .dashboard, .section, .toast-container { display:none !important; }
+    .modal-overlay { display:flex !important; position:static; background:transparent; }
+    .modal-box { box-shadow:none; border:1px solid #ccc; max-height:none; width:100%; max-width:100%; }
+    .modal-header { background:#f8fafc; border-bottom:2px solid #ccc; }
+    .modal-footer { display:none !important; }
     .team-card { break-inside:avoid; page-break-inside:avoid; }
+    body { background:#fff; }
+    .summary-table { border:1px solid #ccc; }
+    .summary-table th { background:#f1f5f9; }
 }
 
 /* Responsive */
 @media (max-width:768px) {
     .cards-grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
     .dashboard { grid-template-columns:repeat(2,1fr); }
+    .modal-stats { grid-template-columns:1fr; }
+    .modal-box { width:95%; max-height:90vh; }
 }
 </style>
 </head>
@@ -222,12 +266,14 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 <!-- Summary Modal -->
 <div class="modal-overlay" id="summaryModal">
     <div class="modal-box">
-        <span class="close" onclick="document.getElementById('summaryModal').classList.remove('active')">&times;</span>
-        <h2>📋 ملخص التكميل</h2>
-        <div id="summaryContent"></div>
-        <div style="margin-top:1rem; display:flex; gap:0.5rem; justify-content:center;">
-            <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
-            <button class="btn btn-home" onclick="saveToServer(); document.getElementById('summaryModal').classList.remove('active');"><i class="fas fa-save"></i> حفظ</button>
+        <div class="modal-header">
+            <h2><i class="fas fa-flag-checkered"></i> ملخص تكميل المناوبة</h2>
+            <button class="close" onclick="document.getElementById('summaryModal').classList.remove('active')">&times;</button>
+        </div>
+        <div class="modal-body" id="summaryContent"></div>
+        <div class="modal-footer">
+            <button class="btn btn-print" onclick="printSummary()"><i class="fas fa-print"></i> طباعة الملخص</button>
+            <button class="btn btn-home" onclick="saveToServer(); document.getElementById('summaryModal').classList.remove('active');"><i class="fas fa-save"></i> حفظ في السيرفر</button>
         </div>
     </div>
 </div>
@@ -583,29 +629,30 @@ function finishShift() {
 
     html += '</table>';
 
-    var counts = { ready: 0, missing: 0, offline: 0 };
+    var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
     Object.keys(teamStatus).forEach(function(k) {
         var st = teamStatus[k].status;
         if (counts[st] !== undefined) counts[st]++;
     });
 
-    html += '<div style="margin-top:1rem; padding:1rem; background:var(--bg); border-radius:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; text-align:center;">' +
-        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--green);">' + counts.ready + '</div><div style="font-size:0.8rem; color:var(--muted);">جاهز</div></div>' +
-        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--yellow);">' + counts.missing + '</div><div style="font-size:0.8rem; color:var(--muted);">ناقص</div></div>' +
-        '<div><div style="font-size:1.5rem; font-weight:700; color:var(--red);">' + counts.offline + '</div><div style="font-size:0.8rem; color:var(--muted);">خارج الخدمة</div></div>' +
+    html += '<div class="modal-stats">' +
+        '<div class="modal-stat green"><div class="value">' + counts.ready + '</div><div class="label">✅ جاهز</div></div>' +
+        '<div class="modal-stat yellow"><div class="value">' + counts.missing + '</div><div class="label">⚠️ ناقص</div></div>' +
+        '<div class="modal-stat red"><div class="value">' + counts.offline + '</div><div class="label">🔴 خارج الخدمة</div></div>' +
         '</div>';
 
-    // Notes
     var notes = document.getElementById('globalNotes').value.trim();
     if (notes) {
-        html += '<div style="margin-top:1rem; padding:1rem; background:var(--yellow-light); border-radius:12px; border-right:4px solid var(--yellow);">' +
-            '<div style="font-weight:700; margin-bottom:0.5rem;">📝 ملاحظات:</div>' +
-            '<div style="font-size:0.9rem; white-space:pre-wrap;">' + escapeHtml(notes) + '</div>' +
+        html += '<div class="modal-notes">' +
+            '<div class="title"><i class="fas fa-sticky-note"></i> ملاحظات التكميل</div>' +
+            '<div class="content">' + escapeHtml(notes) + '</div>' +
             '</div>';
     }
 
-    html += '<div style="margin-top:1rem; text-align:center; color:var(--muted); font-size:0.85rem;">' +
-        'تاريخ: ' + getShiftDate() + ' — نوع المناوبة: ' + getShiftType() +
+    html += '<div class="modal-info">' +
+        '<i class="fas fa-calendar-alt"></i> ' + getShiftDate() +
+        ' &nbsp;|&nbsp; <i class="fas fa-clock"></i> ' + getShiftType() +
+        ' &nbsp;|&nbsp; <i class="fas fa-check-circle"></i> ' + (counts.ready + counts.missing + counts.offline) + ' / ' + (counts.ready + counts.missing + counts.offline + counts.pending) + ' فرقة' +
         '</div>';
 
     content.innerHTML = html;
@@ -648,6 +695,10 @@ function saveToServer() {
     }).catch(function(e) {
         showToast('تم حفظ التكميل محلياً فقط', 'success');
     });
+}
+
+function printSummary() {
+    window.print();
 }
 
 // ============================================
