@@ -486,7 +486,7 @@ function loadSavedCompletion() {
 // Normalize team name from various formats to internal key
 function normalizeTeamName(rawName) {
     var name = String(rawName || '').trim();
-    // Check for rapid teams (Arabic or English)
+    // Check for rapid teams (Arabic or English): تدخل سريع 1-5 → rapid_1
     var rapidMatch = name.match(/(?:تدخل\s*سريع|rapid|تدخل)\s*(\d+)/i);
     if (rapidMatch) {
         var num = rapidMatch[1];
@@ -502,13 +502,12 @@ function normalizeTeamName(rawName) {
             return 'جنوب ' + num;
         }
     }
-    var centerMatch = name.match(/جنوب\s*(\d+)/);
-    if (centerMatch) {
-        var num = parseInt(centerMatch[1]);
-        if (num >= 1 && num <= 15) {
-            return 'جنوب ' + num;
-        }
-    }
+    // Special teams
+    if (name === 'بنك الدم') return 'بنك_الدم';
+    if (name === 'الإجازة') return 'إجازة';
+    if (name === 'القائد الميداني') return 'قائد_ميداني';
+    if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
+    if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
     // Direct match (already normalized)
     if (teamStatus[name]) return name;
     // Try to find by checking all rapid team display names

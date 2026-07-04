@@ -1228,6 +1228,11 @@
                     <div class="stat-value" id="statLeaves">0</div>
                     <div class="stat-label">الإجازات / الراحات</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-hand-fist"></i></div>
+                    <div class="stat-value" id="statWorkforce">0</div>
+                    <div class="stat-label">القوة البشرية</div>
+                </div>
             </div>
             <div class="charts-row">
                 <div class="section" style="padding:16px;">
@@ -1644,6 +1649,8 @@
             if (name === 'القائد الميداني') return 'قائد_ميداني';
             if (name === 'التحكم والتنسيق') return 'تحكم_تنسيق';
             if (name === 'الدعم اللوجستي') return 'دعم_لوجستي';
+            if (name === 'بنك الدم') return 'بنك_الدم';
+            if (name === 'الإجازة') return 'إجازة';
             return name;
         }
 
@@ -2725,7 +2732,8 @@
                 }
             }
             var coverage = totalSlots > 0 ? Math.round(((totalSlots - leaves) / totalSlots) * 100) : 0;
-            return { totalEmployees: totalEmployees, todayShifts: todayShifts, coverage: coverage, leaves: leaves };
+            var workforce = totalEmployees - leaves; // القوة البشرية = إجمالي - الإجازات
+            return { totalEmployees: totalEmployees, todayShifts: todayShifts, coverage: coverage, leaves: leaves, workforce: workforce };
         }
 
         function updateStats() {
@@ -2734,6 +2742,8 @@
             document.getElementById('statTodayShifts').textContent = stats.todayShifts;
             document.getElementById('statCoverage').textContent = stats.coverage + '%';
             document.getElementById('statLeaves').textContent = stats.leaves;
+            var elWf = document.getElementById('statWorkforce');
+            if (elWf) elWf.textContent = stats.workforce;
             // Show/hide sync button
             var syncBtn = document.getElementById('syncBtn');
             if (syncBtn) {
