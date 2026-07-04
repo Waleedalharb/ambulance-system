@@ -109,6 +109,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         showLogin();
     }
+    
+    // Update shift status immediately based on time (don't wait for server)
+    updateShiftStatus();
 });
 
 
@@ -1770,6 +1773,9 @@ function updateShiftStatus() {
     
     if (!btn || !btnDot || !btnText) return;
     
+    // Always show current time-based shift type
+    var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
+    
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
         btn.className = 'btn btn-shift-status on';
@@ -1782,7 +1788,7 @@ function updateShiftStatus() {
     } else {
         btn.className = 'btn btn-shift-status off';
         btnDot.style.display = 'inline-block';
-        btnText.textContent = 'مناوبة جديدة';
+        btnText.textContent = 'مناوبة جديدة (' + currentType + ')';
     }
     
     updateShiftsHistoryWidget();
