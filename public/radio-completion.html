@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=23'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=24'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -248,6 +248,12 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 <div class="section">
     <div class="section-title"><i class="fas fa-hospital"></i> مراكز الإسعاف</div>
     <div class="cards-grid" id="centerCards"></div>
+</div>
+
+<!-- Special Teams -->
+<div class="section">
+    <div class="section-title"><i class="fas fa-users"></i> الفرق الخاصة</div>
+    <div class="cards-grid" id="specialCards"></div>
 </div>
 
 <!-- Notes -->
@@ -635,6 +641,7 @@ function assignParamedics() {
 function renderAll() {
     renderRapidCards();
     renderCenterCards();
+    renderSpecialCards();
     updateDashboard();
 }
 
@@ -644,6 +651,8 @@ function renderRapidCards() {
     var html = '';
     rapidTeams.forEach(function(t) {
         var status = teamStatus[t.name] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
+        // Only show teams that have paramedics on this shift
+        if (!status.paramedics || status.paramedics.length === 0) return;
         html += renderCard(t.displayName, t.name, 'rapid', status);
     });
     container.innerHTML = html;
@@ -655,7 +664,31 @@ function renderCenterCards() {
     var html = '';
     centerList.forEach(function(c) {
         var status = teamStatus[c] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
+        // Only show centers that have paramedics on this shift
+        if (!status.paramedics || status.paramedics.length === 0) return;
         html += renderCard(c, c, 'center', status);
+    });
+    container.innerHTML = html;
+}
+
+function renderSpecialCards() {
+    var container = document.getElementById('specialCards');
+    if (!container) return;
+    var specialTeams = [
+        { id: 'بنك_الدم', name: 'بنك الدم' },
+        { id: 'إجازة', name: 'الإجازة' },
+        { id: 'قائد_ميداني', name: 'القائد الميداني' },
+        { id: 'تحكم_تنسيق', name: 'التحكم والتنسيق' },
+        { id: 'دعم_لوجستي', name: 'الدعم اللوجستي' },
+        { id: 'باص_استجابة', name: 'باص الاستجابة' },
+        { id: 'المنتدبين', name: 'المنتدبين' }
+    ];
+    var html = '';
+    specialTeams.forEach(function(t) {
+        var status = teamStatus[t.id] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
+        // Only show special teams that have paramedics on this shift
+        if (!status.paramedics || status.paramedics.length === 0) return;
+        html += renderCard(t.name, t.id, 'special', status);
     });
     container.innerHTML = html;
 }
@@ -742,6 +775,10 @@ function updateDashboard() {
     var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
     var total = 0;
     Object.keys(teamStatus).forEach(function(k) {
+        // Only count teams that have paramedics (actual employees on shift)
+        var paramedics = teamStatus[k].paramedics || [];
+        if (paramedics.length === 0) return;
+        
         var s = teamStatus[k].status;
         if (counts[s] !== undefined) counts[s]++;
         total++;
