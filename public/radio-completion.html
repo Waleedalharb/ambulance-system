@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=22'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=23'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -345,8 +345,26 @@ function getShiftType() {
 function getShiftDate() {
     if (window.overrideShiftDate) return window.overrideShiftDate;
     var st = getSaudiTime();
-    var y = st.getFullYear(), m = (st.getMonth()+1).toString().padStart(2,'0'), d = st.getDate().toString().padStart(2,'0');
-    return y + '-' + m + '-' + d;
+    var y = st.getFullYear();
+    var m = st.getMonth(); // 0-indexed
+    var d = st.getDate();
+    var hour = st.getHours();
+    
+    // Night shift runs 17:00 - 04:59 and belongs to the PREVIOUS day
+    // e.g., 01:26 on July 5 = still Night Shift of July 4
+    if (hour < 5) {
+        d = d - 1;
+        // Handle month/year boundary
+        if (d < 1) {
+            m = m - 1;
+            if (m < 0) { m = 11; y = y - 1; }
+            // Days in month (simplified for EMS needs, accurate enough)
+            var daysInMonth = [31, (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            d = daysInMonth[m];
+        }
+    }
+    
+    return y + '-' + (m + 1).toString().padStart(2, '0') + '-' + d.toString().padStart(2, '0');
 }
 function getShiftTimeStr() {
     var st = getSaudiTime();
