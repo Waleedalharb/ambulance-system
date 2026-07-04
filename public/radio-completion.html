@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=21'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=22'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -311,16 +311,35 @@ var REASONS = [
 var globalNotes = '';
 
 // ============================================
-// SHIFT DETECTION (Saudi Time)
+// SHIFT DETECTION (Saudi Time - Asia/Riyadh)
 // ============================================
 function getSaudiTime() {
+    // Use Intl.DateTimeFormat for precise Saudi timezone (UTC+3, no DST)
     var now = new Date();
-    var utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    return new Date(utc + (3 * 60 * 60 * 1000));
+    var parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Riyadh',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    }).formatToParts(now);
+    
+    var y, m, d, h, min, s;
+    parts.forEach(function(p) {
+        if (p.type === 'year') y = p.value;
+        if (p.type === 'month') m = p.value;
+        if (p.type === 'day') d = p.value;
+        if (p.type === 'hour') h = p.value;
+        if (p.type === 'minute') min = p.value;
+        if (p.type === 'second') s = p.value;
+    });
+    
+    return new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':' + s);
 }
 function getShiftType() {
     if (window.overrideShiftType) return window.overrideShiftType;
     var hour = getSaudiTime().getHours();
+    // Morning shift: 05:00 - 16:59
+    // Night shift: 17:00 - 04:59
     return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
 }
 function getShiftDate() {
@@ -329,12 +348,18 @@ function getShiftDate() {
     var y = st.getFullYear(), m = (st.getMonth()+1).toString().padStart(2,'0'), d = st.getDate().toString().padStart(2,'0');
     return y + '-' + m + '-' + d;
 }
+function getShiftTimeStr() {
+    var st = getSaudiTime();
+    var h = st.getHours().toString().padStart(2,'0');
+    var min = st.getMinutes().toString().padStart(2,'0');
+    return h + ':' + min;
+}
 
 // ============================================
 // INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate();
+    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
     initStatuses();
     loadFromSmartSchedule();
     
