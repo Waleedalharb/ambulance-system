@@ -1649,13 +1649,15 @@
                 var m = normalized.match(/(\d+)/);
                 if (m) return 'جنوب ' + parseInt(m[1]);
             }
-            // Other known teams
+            // Other known teams (including variations from Excel)
             if (normalized === 'القائد الميداني') return 'قائد_ميداني';
             if (normalized === 'التحكم والتنسيق') return 'تحكم_تنسيق';
             if (normalized === 'الدعم اللوجستي') return 'دعم_لوجستي';
             if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
             if (normalized === 'المنتدبين') return 'المنتدبين';
+            if (normalized === 'مناوبو بنك الدم') return 'بنك_الدم';  // ← Excel full name
             if (normalized === 'بنك الدم') return 'بنك_الدم';
+            if (normalized === 'الاجازة') return 'إجازة';  // ← Excel uses Alif-lam variant
             if (normalized === 'الإجازة') return 'إجازة';
             if (normalized === 'إجازة') return 'إجازة';
             return normalized;
@@ -1702,21 +1704,31 @@
                 var dayNames = [];
                 var dayNumbers = [];
                 
-                for (var i = 5; i < jsonData.length; i++) {
+                for (var i = 0; i < jsonData.length; i++) {
                     var row = jsonData[i];
                     if (!row || row.length === 0) continue;
                     var colA = row[0];
                     
                     // More flexible team header matching with fallback
                     var isTeamHeader = false;
-                    if (colA && typeof colA === 'string' && colA.length < 40) {
+                    if (colA && typeof colA === 'string' && colA.length < 50) {
                         var trimmed = colA.trim();
                         // Rapid teams: any variation of "تدخل سريع N" with any whitespace
                         if (/تدخل\s+سريع\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(trimmed)) isTeamHeader = true;
                         // Centers: any variation of "جنوب N" with any whitespace
                         else if (/جنوب\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(trimmed)) isTeamHeader = true;
-                        // Exact matches for special teams
-                        else if (['القائد الميداني','التحكم والتنسيق','الدعم اللوجستي','مناوبو باص الاستجابة','المنتدبين','إجازة','بنك الدم'].indexOf(trimmed) !== -1) isTeamHeader = true;
+                        // Exact matches for special teams (including variations)
+                        else if ([
+                            'القائد الميداني',
+                            'التحكم والتنسيق',
+                            'الدعم اللوجستي',
+                            'مناوبو باص الاستجابة',
+                            'المنتدبين',
+                            'الاجازة',           // ← Alif lam variant (Excel uses this)
+                            'إجازة',             // ← Hamza variant
+                            'مناوبو بنك الدم',   // ← Full name in Excel
+                            'بنك الدم'
+                        ].indexOf(trimmed) !== -1) isTeamHeader = true;
                     }
                     
                     if (isTeamHeader) {
@@ -1757,14 +1769,14 @@
                         row[1] && typeof row[1] === 'string' && row[1].length > 5) {
                         
                         // Fallback: if currentTeam is empty, look back at previous rows for team header
-                        if (!currentTeam && i > 5) {
-                            for (var back = i - 1; back >= 5 && back >= i - 10; back--) {
+                        if (!currentTeam && i > 0) {
+                            for (var back = i - 1; back >= 0 && back >= i - 15; back--) {
                                 var prevRow = jsonData[back];
                                 if (!prevRow || !prevRow[0]) continue;
                                 var prevColA = String(prevRow[0]).trim();
                                 if (/تدخل\s+سريع\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(prevColA) || 
                                     /جنوب\s*[٠١٢٣٤٥٦٧٨٩0-9]/.test(prevColA) ||
-                                    ['القائد الميداني','التحكم والتنسيق','الدعم اللوجستي','مناوبو باص الاستجابة','المنتدبين','إجازة','بنك الدم'].indexOf(prevColA) !== -1) {
+                                    ['القائد الميداني','التحكم والتنسيق','الدعم اللوجستي','مناوبو باص الاستجابة','المنتدبين','الاجازة','إجازة','مناوبو بنك الدم','بنك الدم'].indexOf(prevColA) !== -1) {
                                     currentTeam = normalizeTeamName(prevColA);
                                     console.log('[extractEmployees] Fallback team found:', prevColA, '→', currentTeam, 'for employee at row', i);
                                     break;

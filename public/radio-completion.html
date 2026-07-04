@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=18'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=19'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -507,10 +507,14 @@ function normalizeTeamName(rawName) {
         var m = normalized.match(/(\d+)/);
         if (m) return 'جنوب ' + parseInt(m[1]);
     }
-    // Special teams
+    // Special teams (including variations from Excel)
+    if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
+    if (normalized === 'المنتدبين') return 'المنتدبين';
+    if (normalized === 'مناوبو بنك الدم') return 'بنك_الدم';  // ← Excel full name
     if (normalized === 'بنك الدم') return 'بنك_الدم';
+    if (normalized === 'الاجازة') return 'إجازة';  // ← Excel uses Alif-lam variant
     if (normalized === 'الإجازة') return 'إجازة';
-    if (normalized === 'القائد الميداني') return 'قائد_ميداني';
+    if (normalized === 'إجازة') return 'إجازة';
     if (normalized === 'التحكم والتنسيق') return 'تحكم_تنسيق';
     if (normalized === 'الدعم اللوجستي') return 'دعم_لوجستي';
     if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
