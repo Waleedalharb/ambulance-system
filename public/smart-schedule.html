@@ -2645,20 +2645,36 @@
         // ==========================================
         function populateLocationFilter() {
             var select = document.getElementById('filterLocation');
-            // قائمة المواقع الوهمية (demo) - نستبعدها
             var blockedLocs = ['محايل عسير','المطار','سراة عبيدة','جرش','خميس مشيط','خالد بن فهد','غير محدد',''];
             var locations = {};
+            // Static list: all known teams with Arabic display names
+            var STATIC_TEAMS = {
+                'rapid_1': 'تدخل سريع 1',
+                'rapid_2': 'تدخل سريع 2',
+                'rapid_3': 'تدخل سريع 3',
+                'rapid_4': 'تدخل سريع 4',
+                'rapid_5': 'تدخل سريع 5',
+                'جنوب 1': 'جنوب 1', 'جنوب 2': 'جنوب 2', 'جنوب 3': 'جنوب 3', 'جنوب 4': 'جنوب 4',
+                'جنوب 5': 'جنوب 5', 'جنوب 6': 'جنوب 6', 'جنوب 7': 'جنوب 7', 'جنوب 8': 'جنوب 8',
+                'جنوب 9': 'جنوب 9', 'جنوب 10': 'جنوب 10', 'جنوب 11': 'جنوب 11', 'جنوب 12': 'جنوب 12',
+                'جنوب 13': 'جنوب 13', 'جنوب 14': 'جنوب 14', 'جنوب 15': 'جنوب 15', 'جنوب 16': 'جنوب 16',
+                'بنك_الدم': 'بنك الدم',
+                'إجازة': 'إجازة',
+                'قائد_ميداني': 'القائد الميداني',
+                'تحكم_تنسيق': 'التحكم والتنسيق',
+                'دعم_لوجستي': 'الدعم اللوجستي'
+            };
+            for (var key in STATIC_TEAMS) { locations[key] = STATIC_TEAMS[key]; }
+            // Also add any teams found in employee data
             for (var i = 0; i < employees.length; i++) {
-                // نفضل استخدام team بدلاً من location
                 var team = employees[i].team;
-                if (team && blockedLocs.indexOf(team) === -1) {
-                    locations[team] = true;
+                if (team && blockedLocs.indexOf(team) === -1 && !locations[team]) {
+                    locations[team] = team; // fallback: raw name
                 }
-                // نسقط من location في schedule
                 for (var s = 0; s < employees[i].schedule.length; s++) {
                     var loc = employees[i].schedule[s].location;
-                    if (loc && blockedLocs.indexOf(loc) === -1) {
-                        locations[loc] = true;
+                    if (loc && blockedLocs.indexOf(loc) === -1 && !locations[loc]) {
+                        locations[loc] = loc; // fallback: raw name
                     }
                 }
             }
@@ -2666,7 +2682,7 @@
             var html = '<option value="">الكل</option>';
             var locs = Object.keys(locations).sort();
             for (var l = 0; l < locs.length; l++) {
-                html += '<option value="' + locs[l] + '">' + locs[l] + '</option>';
+                html += '<option value="' + locs[l] + '">' + locations[locs[l]] + '</option>';
             }
             select.innerHTML = html;
             select.value = currentVal;
