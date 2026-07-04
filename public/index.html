@@ -1169,17 +1169,17 @@
                 <label><i class="fas fa-calendar-day"></i> اليوم والتاريخ:</label>
                 <span id="shiftDate" class="shift-date-display"></span>
             </div>
-            <div class="shift-form-row form-row" style="display:none;">
+            <div class="shift-form-row form-row" id="shiftTypeRow">
                 <label><i class="fas fa-clock"></i> توقيت المناوبة:</label>
                 <div class="shift-type-selector">
                     <label class="shift-type-option">
-                        <input type="radio" name="shiftType" value="صباح">
+                        <input type="radio" name="shiftType" value="صباح" id="shiftTypeMorning">
                         <span class="shift-type-label">
                             <i class="fas fa-sun"></i> صباحي
                         </span>
                     </label>
                     <label class="shift-type-option">
-                        <input type="radio" name="shiftType" value="ليل">
+                        <input type="radio" name="shiftType" value="ليل" id="shiftTypeNight">
                         <span class="shift-type-label">
                             <i class="fas fa-moon"></i> ليلي
                         </span>
