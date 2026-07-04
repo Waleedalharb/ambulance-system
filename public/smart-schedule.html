@@ -1344,8 +1344,7 @@
             console.log('🚀 DOMContentLoaded fired');
             try { initClock(); } catch(e) { console.error('initClock failed:', e); }
             try { loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
-            try { loadFromServer(); } catch(e) { console.error('loadFromServer failed:', e); }
-            try { loadFromIndexedDB(); } catch(e) { console.error('loadFromIndexedDB failed:', e); }
+            try { loadMonthlyTableFromServer(); } catch(e) { console.error('loadMonthlyTableFromServer failed:', e); }
             try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
             try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
             try { setupDemoData(); } catch(e) { console.error('setupDemoData failed:', e); }
@@ -1458,6 +1457,13 @@
             } catch(e) { console.error('setupFileInput error:', e); }
         }
 
+        function updateProgress(percent) {
+            var fill = document.getElementById('progressFill');
+            if (fill) fill.style.width = percent + '%';
+            var txt = document.getElementById('progressText');
+            if (txt) txt.textContent = percent + '%';
+        }
+
         function handleFileUpload(file) {
             try {
                 console.log('📁 handleFileUpload called:', file.name, file.size, file.type);
@@ -1495,28 +1501,95 @@
                     if (progress >= 100) { progress = 100; clearInterval(interval); }
                     updateProgress(Math.round(progress));
                 }, 200);
-                // معالجة الملف
-                console.log('⏳ Starting file processing in 1.5s...');
+                // معالجة الملف - رفع على السيرفر بشكل بسيط
+                console.log('⏳ Starting file upload in 1.5s...');
                 setTimeout(function() {
-                    console.log('🚀 Processing file now...');
+                    console.log('🚀 Uploading file to server...');
                     if (ext === 'pdf') {
                         parsePDF(file);
                     } else {
-                        parseExcel(file);
+                        uploadExcelToServer(file);
                     }
                 }, 1500);
             } catch(e) { console.error('handleFileUpload error:', e); }
         }
 
-        function updateProgress(percent) {
-            var fill = document.getElementById('progressFill');
-            if (fill) fill.style.width = percent + '%';
-            var txt = document.getElementById('progressText');
-            if (txt) txt.textContent = percent + '%';
+        // ==========================================
+        // رفع Excel على السيرفر (بسيط - FormData)
+        // ==========================================
+        async function uploadExcelToServer(file) {
+            try {
+                var token = localStorage.getItem('authToken');
+                var formData = new FormData();
+                formData.append('file', file);
+                
+                var response = await fetch('/api/upload-monthly-table', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: formData
+                });
+                var result = await response.json();
+                if (result.success) {
+                    // بعد الرفع، حمل الجدول المحفوظ واعرضه
+                    await loadMonthlyTableFromServer();
+                    document.getElementById('uploadProgress').classList.remove('active');
+                    document.getElementById('analysisStatus').classList.add('hidden');
+                    document.getElementById('analysisResult').classList.remove('hidden');
+                    document.getElementById('analysisText').textContent = 'تم رفع الجدول بنجاح';
+                    document.getElementById('analysisDetails').textContent = 'تم الحفظ في السيرفر - يمكن لأي جهاز الدخول وعرضه';
+                    document.getElementById('extractedTableContainer').classList.remove('hidden');
+                    showToast('تم رفع وحفظ الجدول بنجاح', 'success');
+                } else {
+                    document.getElementById('uploadProgress').classList.remove('active');
+                    showToast('فشل في الحفظ: ' + (result.error || ''), 'error');
+                }
+            } catch (error) {
+                document.getElementById('uploadProgress').classList.remove('active');
+                showToast('خطأ في الاتصال: ' + error.message, 'error');
+            }
         }
 
         // ==========================================
-        // قراءة Excel - Parse Excel
+        // تحميل الجدول من السيرفر وعرضه
+        // ==========================================
+        async function loadMonthlyTableFromServer() {
+            try {
+                var token = localStorage.getItem('authToken');
+                var response = await fetch('/api/get-monthly-table', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (!response.ok) {
+                    console.log('لا يوجد جدول محفوظ على السيرفر');
+                    return;
+                }
+                var blob = await response.blob();
+                var arrayBuffer = await blob.arrayBuffer();
+                var data = new Uint8Array(arrayBuffer);
+                var workbook = XLSX.read(data, { type: 'array' });
+                
+                // استخراج الموظفين من الجدول
+                employees = extractEmployees(workbook);
+                saveToIndexedDB();
+                saveToServer();
+                
+                finishAnalysis(employees.length);
+                showExtractedTable(employees);
+                updateStats();
+                renderCharts();
+                renderCurrentView();
+                populateLocationFilter();
+                
+                showToast('تم تحميل ' + employees.length + ' موظف من الجدول المحفوظ', 'success');
+            } catch (error) {
+                console.error('خطأ في تحميل الجدول من السيرفر:', error);
+                showToast('لم يتم العثور على جدول محفوظ', 'info');
+            }
+        }
+
+        // ==========================================
+        // قراءة Excel - Parse Excel (للاستخدام المحلي)
         // ==========================================
         function parseExcel(file) {
             console.log('📊 parseExcel called');
