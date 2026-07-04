@@ -1796,6 +1796,9 @@ function updateShiftStatus() {
     }
     if (currentShiftBtn) { currentShiftBtn.disabled = false; currentShiftBtn.style.cursor = 'pointer'; }
     
+    // Enable the newShiftBtn so it's clickable (was disabled in HTML)
+    if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.opacity = '1'; }
+    
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
         btn.className = 'btn btn-shift-status on';
