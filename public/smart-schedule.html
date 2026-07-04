@@ -1633,17 +1633,15 @@
         // ============================================
         function normalizeTeamName(rawName) {
             var name = String(rawName || '').trim();
-            // Rapid teams: تدخل سريع 1 → rapid_1
-            var rapidMatch = name.match(/^(?:تدخل\s+سريع|rapid|تدخل)\s*(\d+)$/i);
-            if (rapidMatch) {
-                var num = parseInt(rapidMatch[1]);
-                if (num >= 1 && num <= 10) return 'rapid_' + num;
-            }
-            // Centers: جنوب 1 → جنوب 1
-            var centerMatch = name.match(/^جنوب\s*(\d+)$/);
-            if (centerMatch) {
-                var num = parseInt(centerMatch[1]);
-                if (num >= 1 && num <= 20) return 'جنوب ' + num;
+            // Direct fallback: explicit Arabic names (most common case)
+            if (name === 'تدخل سريع 1') return 'rapid_1';
+            if (name === 'تدخل سريع 2') return 'rapid_2';
+            if (name === 'تدخل سريع 3') return 'rapid_3';
+            if (name === 'تدخل سريع 4') return 'rapid_4';
+            if (name === 'تدخل سريع 5') return 'rapid_5';
+            if (name.indexOf('جنوب') !== -1) {
+                var m = name.match(/(\d+)/);
+                if (m) return 'جنوب ' + parseInt(m[1]);
             }
             // Other known teams
             if (name === 'القائد الميداني') return 'قائد_ميداني';
