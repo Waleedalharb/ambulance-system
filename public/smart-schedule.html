@@ -1272,6 +1272,9 @@
                 <button class="btn btn-primary" onclick="syncToServer()" id="syncBtn" style="display:none;">
                     <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
                 </button>
+                <button class="btn btn-info" onclick="loadFromServer()" id="loadServerBtn">
+                    <i class="fas fa-cloud-download-alt"></i> تحميل من السيرفر
+                </button>
                 <button class="btn btn-danger" onclick="clearServerRoster()">
                     <i class="fas fa-trash-alt"></i> مسح كل البيانات
                 </button>
@@ -2822,6 +2825,63 @@
         }
 
         // ==========================================
+        // تحميل من السيرفر - Load from Server
+        // ==========================================
+        async function loadFromServer() {
+            var token = localStorage.getItem('authToken');
+            if (!token) {
+                showToast('يجب تسجيل الدخول أولاً', 'error');
+                return;
+            }
+            try {
+                showToast('جاري تحميل البيانات من السيرفر...', 'info');
+                var response = await fetch('/api/shift-roster', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var data = await response.json();
+                if (!data.success || !data.roster || data.roster.length === 0) {
+                    showToast('لا توجد بيانات في السيرفر', 'info');
+                    return;
+                }
+                // Convert server format to employee format
+                var empMap = {};
+                data.roster.forEach(function(r) {
+                    var key = r.employee_number || r.name;
+                    if (!empMap[key]) {
+                        empMap[key] = {
+                            id: r.employee_number || String(Date.now()),
+                            name: r.name,
+                            jobTitle: r.job_title || '',
+                            phone: r.phone || '',
+                            team: r.team || '',
+                            schedule: []
+                        };
+                    }
+                    empMap[key].schedule.push({
+                        day: r.day_name || '',
+                        date: r.shift_date,
+                        shift: r.shift_code,
+                        shiftCode: r.shift_code,
+                        time: '',
+                        location: r.team || '',
+                        status: (r.shift_code === 'V' || r.shift_code === 'VC') ? 'إجازة' : 'دوام'
+                    });
+                });
+                employees = Object.values(empMap);
+                saveToIndexedDB();
+                saveToLocalStorage();
+                updateStats();
+                renderCharts();
+                renderCurrentView();
+                populateLocationFilter();
+                showToast('✅ تم تحميل ' + employees.length + ' موظف من السيرفر', 'success');
+            } catch (err) {
+                console.error('Load from server error:', err);
+                showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+            }
+        }
+
+        // ==========================================
         // Toast Notifications
         // ==========================================
         function showToast(message, type) {
@@ -2848,6 +2908,7 @@
         window.exportToPDF = exportToPDF;
         window.printSchedule = printSchedule;
         window.syncToServer = syncToServer;
+        window.loadFromServer = loadFromServer;
         window.clearServerRoster = clearServerRoster;
         window.closeDocumentViewer = closeDocumentViewer;
         window.changeMonth = changeMonth;
