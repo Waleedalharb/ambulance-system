@@ -1629,7 +1629,7 @@
         // ============================================
         function extractEmployees(workbook) {
             console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
-            var allEmployees = [];
+            var empMap = {}; // Deduplicate by employee code
             var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
             var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
             var sheetNames = workbook.SheetNames;
@@ -1646,8 +1646,7 @@
                 for (var i = 0; i < 5 && i < jsonData.length; i++) {
                     var r0 = jsonData[i][0];
                     var r1 = jsonData[i][1];
-                    // Row 0: 'الشهر', 'السنة' → skip, Row 1: 5, 2026 → extract
-                    if (r0 === 'الشهر') continue; // skip header row
+                    if (r0 === 'الشهر') continue;
                     if (typeof r0 === 'number' && r0 > 0 && r0 < 13) {
                         monthNum = r0;
                     }
@@ -1655,7 +1654,6 @@
                         yearNum = r1;
                     }
                 }
-                // Fallback: try row 1 directly
                 if (monthNum === 0 && jsonData[1]) {
                     if (typeof jsonData[1][0] === 'number' && jsonData[1][0] > 0 && jsonData[1][0] < 13) {
                         monthNum = jsonData[1][0];
@@ -1665,7 +1663,6 @@
                     }
                 }
                 
-                // تمرير الصفوف والبحث عن الفرق
                 var currentTeam = '';
                 var currentTeamNote = '';
                 var dayNames = [];
@@ -1676,7 +1673,6 @@
                     if (!row || row.length === 0) continue;
                     var colA = row[0];
                     
-                    // اكتشاف هيدر الفرقة أو القسم ("تدخل سريع 1", "جنوب 1", "القائد الميداني", "التحكم والتنسيق", "الدعم اللوجستي", "مناوبو باص الاستجابة", "المنتدبين", "إجازة")
                     if (colA && typeof colA === 'string' && (
                         (colA.match(/^(تدخل\s+سريع|جنوب)\s*\d+$/) && colA.length < 30) ||
                         colA === 'القائد الميداني' ||
@@ -1693,7 +1689,6 @@
                         continue;
                     }
                     
-                    // اكتشاف صف أيام الأسبوع
                     var DAY_NAMES_AR = ['الأحد','الاحد','الاثنين','الثلاثاء','الاربعاء','الخميس','الجمعة','السبت'];
                     var dayNameMatch = false;
                     if (row[4] && typeof row[4] === 'string') {
@@ -1710,7 +1705,6 @@
                         continue;
                     }
                     
-                    // اكتشاف صف أرقام الأيام
                     if (colA && String(colA).indexOf('كود') !== -1 && row[1] && String(row[1]).indexOf('الاسم') !== -1) {
                         for (var c = 4; c < row.length && c < 36; c++) {
                             if (row[c] && !isNaN(parseInt(row[c]))) {
@@ -1720,7 +1714,6 @@
                         continue;
                     }
                     
-                    // اكتشاف صف موظف (عنده كود رقمي + اسم)
                     if (colA && (typeof colA === 'number' || !isNaN(parseInt(colA))) && 
                         row[1] && typeof row[1] === 'string' && row[1].length > 5) {
                         
@@ -1731,7 +1724,6 @@
                         
                         if (!empName || empName.length < 3) continue;
                         
-                        // استخراج المناوبات
                         var schedule = [];
                         for (var c = 4; c < row.length && c < 36; c++) {
                             var shiftCode = row[c];
@@ -1758,21 +1750,46 @@
                         }
                         
                         if (schedule.length > 0) {
-                            allEmployees.push({
-                                id: empCode,
-                                name: empName,
-                                jobTitle: empJob,
-                                employeeNumber: empCode,
-                                phone: empPhone,
-                                team: currentTeam,
-                                schedule: schedule
-                            });
+                            if (empMap[empCode]) {
+                                // Merge with existing employee
+                                empMap[empCode].schedule = empMap[empCode].schedule.concat(schedule);
+                                // Keep team with most shifts (or first occurrence)
+                                var teamCounts = {};
+                                empMap[empCode].schedule.forEach(function(sch) {
+                                    var t = sch.location || 'غير محدد';
+                                    teamCounts[t] = (teamCounts[t] || 0) + 1;
+                                });
+                                var bestTeam = currentTeam;
+                                var bestCount = 0;
+                                for (var t in teamCounts) {
+                                    if (teamCounts[t] > bestCount) {
+                                        bestCount = teamCounts[t];
+                                        bestTeam = t;
+                                    }
+                                }
+                                empMap[empCode].team = bestTeam;
+                            } else {
+                                empMap[empCode] = {
+                                    id: empCode,
+                                    name: empName,
+                                    jobTitle: empJob,
+                                    employeeNumber: empCode,
+                                    phone: empPhone,
+                                    team: currentTeam,
+                                    schedule: schedule
+                                };
+                            }
                         }
                     }
                 }
             }
             
-            console.log('✅ extractEmployees done, total:', allEmployees.length);
+            var allEmployees = [];
+            for (var code in empMap) {
+                allEmployees.push(empMap[code]);
+            }
+            
+            console.log('✅ extractEmployees done, unique employees:', allEmployees.length, '(from all sheets/teams)');
             return allEmployees.length > 0 ? allEmployees : generateDemoData();
         }
 
