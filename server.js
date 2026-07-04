@@ -697,9 +697,45 @@ app.get('/sw.js', function(req, res) {
 // ============================================
 // إعداد Multer لرفع الملفات (مع حماية أفضل)
 // ============================================
-const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'];
+const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
 
 const upload = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype));
+        }
+    }
+});
+
+// ============================================
+// Multer مخصص لملفات Excel (أكثر مرونة)
+// ============================================
+const EXCEL_MIME_TYPES = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/octet-stream'
+];
+const EXCEL_EXTENSIONS = ['.xlsx', '.xls'];
+
+const uploadExcel = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        // السماح بأي ملف امتداده .xlsx أو .xls حتى لو MIME type غير واضح
+        if (EXCEL_EXTENSIONS.includes(ext)) {
+            cb(null, true);
+        } else if (EXCEL_MIME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح. يُسمح فقط بملفات Excel (.xlsx, .xls). نوع الملف المستلم: ' + file.mimetype + ', الامتداد: ' + ext));
+        }
+    }
+});
     dest: path.join(STORAGE_PATH, 'temp'),
     limits: { fileSize: MAX_FILE_SIZE },
     fileFilter: function(req, file, cb) {
@@ -3515,7 +3551,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 // ============================================
 // API: الجدول الشهري
 // ============================================
-app.post('/api/upload-monthly-table', authenticate, upload.single('file'), handleMulterError, async (req, res) => {
+app.post('/api/upload-monthly-table', authenticate, uploadExcel.single('file'), handleMulterError, async (req, res) => {
     try {
         const file = req.file;
         if (!file) {
