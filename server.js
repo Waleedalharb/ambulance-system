@@ -2036,17 +2036,24 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
         // Also try to save to SQLite if available
         if (dbAvailable()) {
             try {
-                // Check if table exists, create if not
+                // Ensure table exists with correct schema (matches db.js)
                 await db.exec(`
                     CREATE TABLE IF NOT EXISTS shift_completions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        shift_type TEXT,
-                        shift_date TEXT,
-                        teams_data TEXT,
+                        shift_type TEXT NOT NULL,
+                        shift_date TEXT NOT NULL,
+                        teams_data TEXT NOT NULL,
+                        notes TEXT,
                         created_by TEXT,
                         created_at TEXT
                     )
                 `);
+                // Fix older tables that were created without the notes column
+                try {
+                    await db.exec(`ALTER TABLE shift_completions ADD COLUMN notes TEXT`);
+                } catch (alterErr) {
+                    // Column already exists — ignore
+                }
                 await db.run(
                     'INSERT INTO shift_completions (shift_type, shift_date, teams_data, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
                     [shiftType, shiftDate, JSON.stringify(teams), notes || '', completionData.createdBy, completionData.timestamp]
