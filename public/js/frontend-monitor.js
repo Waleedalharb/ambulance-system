@@ -237,5 +237,45 @@
         }
     }, 300000);
 
+    // ==========================
+    // Fix 7: مسح الـ cache القديم في localStorage (>30 يوم)
+    // ==========================
+    function clearOldCache() {
+        var thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        var cacheKeys = [];
+        var knownCachePrefixes = ['_cache', 'cached_', 'temp_', '_tmp', 'old_'];
+        for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (!key) continue;
+            var isCacheKey = false;
+            for (var p = 0; p < knownCachePrefixes.length; p++) {
+                if (key.indexOf(knownCachePrefixes[p]) === 0) {
+                    isCacheKey = true;
+                    break;
+                }
+            }
+            if (!isCacheKey) continue;
+            try {
+                var item = localStorage.getItem(key);
+                var parsed = JSON.parse(item);
+                if (parsed && parsed.timestamp && parsed.timestamp < thirtyDaysAgo) {
+                    cacheKeys.push(key);
+                }
+            } catch (e) {
+                // Not JSON or no timestamp, skip
+            }
+        }
+        for (var j = 0; j < cacheKeys.length; j++) {
+            localStorage.removeItem(cacheKeys[j]);
+        }
+        if (cacheKeys.length > 0) {
+            console.log('[FrontendMonitor] Cleared old cache items:', cacheKeys);
+        }
+    }
+
+    // Run cache cleanup on startup and every 24 hours
+    clearOldCache();
+    setInterval(clearOldCache, 24 * 60 * 60 * 1000);
+
     console.log('[FrontendMonitor] Initialized | Session:', sessionId);
 })();

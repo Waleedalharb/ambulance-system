@@ -119,6 +119,7 @@
                     <h2><i class="fas fa-heartbeat"></i> مراقبة النظام (AI Monitor)</h2>
                     <div>
                         <button class="btn-force-check" onclick="forceHealthCheck()"><i class="fas fa-stethoscope"></i> فحص الآن</button>
+                        <button class="btn-force-check" onclick="runAutoFix()" style="margin-right:8px;background:var(--teal);"><i class="fas fa-magic"></i> تشغيل الإصلاح</button>
                         <button class="btn-refresh" onclick="loadMonitor()" style="margin-right:8px;"><i class="fas fa-sync-alt"></i> تحديث</button>
                     </div>
                 </div>
@@ -192,11 +193,6 @@
 
                 // Load AI Monitor data
                 loadMonitor();
-
-                document.getElementById('loading').style.display = 'none';
-                var auditRes = await fetch('/api/audit-log', { headers: { 'Authorization': 'Bearer ' + authToken } });
-                var auditResult = await auditRes.json();
-                if (auditResult.success) renderAuditLog(auditResult.logs || []);
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
@@ -308,20 +304,6 @@
             `).join('');
         }
 
-        function renderAuditLog(logs) {
-            var container = document.getElementById('auditLog');
-            if (!logs || logs.length === 0) {
-                container.innerHTML = '<p style="color:var(--gray-400)">لا توجد أنشطة حديثة</p>';
-                return;
-            }
-            container.innerHTML = logs.slice(0, 15).map(entry => `
-                <div class="audit-item">
-                    <div><strong>${entry.action}</strong> — ${entry.user}</div>
-                    <div class="audit-time">${new Date(entry.timestamp).toLocaleString('ar-SA')}</div>
-                </div>
-            `).join('');
-        }
-
         // ─── AI Monitor Functions ───
         async function loadMonitor() {
             try {
@@ -340,8 +322,28 @@
                 renderMonitorHealth(health, stats);
                 renderMonitorAlerts(alerts);
                 renderMonitorLogs(logs);
+                renderAutoFixStats(stats);
+                loadFrontendErrors();
             } catch (e) {
                 console.error('Monitor load error:', e);
+            }
+        }
+
+        async function runAutoFix() {
+            try {
+                var res = await fetch('/api/admin/auto-fix', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                var result = await res.json();
+                if (result.success) {
+                    alert('✅ تم الإصلاح التلقائي: ' + result.totalFixed + ' إصلاح');
+                    loadMonitor();
+                } else {
+                    alert('❌ ' + (result.error || 'فشل في الإصلاح'));
+                }
+            } catch (e) {
+                alert('فشل في الاتصال');
             }
         }
 

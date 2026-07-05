@@ -25,6 +25,9 @@ try {
 // AI Monitor Agent — System health, alerts & auto-healing
 const aiMonitor = require('./ai-monitor');
 
+// Auto-Fix Engine — Data integrity & self-healing
+const autoFixEngine = require('./auto-fix-engine');
+
 // Helper: check if DB is available
 function dbAvailable() {
     return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts;
@@ -616,6 +619,17 @@ app.post('/api/auth/login', validateBody({
         if (!validPassword) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
         
         const token = jwt.sign({ id: user.id, username: user.username, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        
+        // Broadcast login notification via WebSocket
+        broadcast({
+            type: 'user_login',
+            message: 'تسجيل دخول جديد: ' + user.name,
+            user: { id: user.id, name: user.name, role: user.role }
+        });
+        
+        // Audit log
+        await addAuditLogEntry('user_login', 'تسجيل دخول للنظام', 'auth', user.name, user.role, user.id);
+        
         res.json({ success: true, token, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تسجيل الدخول' });
@@ -949,6 +963,34 @@ async function readAuditLog() {
 
 async function writeAuditLog(data) {
     await fs.writeFile(AUDIT_LOG_PATH, JSON.stringify(data, null, 2));
+}
+
+async function addAuditLogEntry(action, details, category, user, role, userId) {
+    try {
+        const logs = await readAuditLog();
+        const newEntry = {
+            id: Date.now().toString(),
+            action,
+            details: details || '',
+            category: category || 'general',
+            user: user || 'غير معروف',
+            role: role || 'unknown',
+            userId: userId || null,
+            timestamp: new Date().toISOString()
+        };
+        logs.unshift(newEntry);
+        if (logs.length > 500) logs.pop();
+        await writeAuditLog(logs);
+        broadcast({
+            type: 'audit_log_added',
+            message: 'تم إضافة سجل تدقيق جديد',
+            entry: newEntry
+        });
+        return newEntry;
+    } catch (error) {
+        console.error('Audit log error:', error);
+        return null;
+    }
 }
 
 // ============================================
@@ -1433,6 +1475,27 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             shiftId: targetShift ? targetShift.id : null
         });
 
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تحديث المناوبة',
+                        message: 'تم تحديث بيانات المناوبة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('shift_updated', 'تم تحديث بيانات المناوبة', 'shifts', req.user.name, req.user.role, req.user.id);
+
         res.json({ success: true, shiftId: targetShift ? targetShift.id : null });
     } catch (error) {
         console.error("خطأ في تحديث بيانات المناوبة:", error);
@@ -1452,6 +1515,9 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
             message: 'تم حذف المناوبة',
             shiftId: id
         });
+
+        // Audit log
+        await addAuditLogEntry('shift_deleted', 'تم حذف المناوبة: ' + id, 'shifts', req.user.name, req.user.role, req.user.id);
 
         if (currentShiftId === id) {
             currentShiftId = null;
@@ -1990,6 +2056,27 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
             }
         }
         
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تكميل جديد',
+                        message: 'تم حفظ تكميل جديد للمناوبة ' + shiftDate + ' ' + shiftType,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('shift_completion_saved', 'تم حفظ تكميل للمناوبة: ' + shiftDate + ' ' + shiftType, 'shifts', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, message: 'تم حفظ التكميل', id: completionData.id });
     } catch (error) {
         console.error('[API] Error saving shift-completion:', error);
@@ -2086,6 +2173,27 @@ app.post('/api/upload-doc', authenticate, async (req, res) => {
             doc: { id: newDoc.id, filename: newDoc.filename, category: newDoc.category }
         });
         
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'مستند جديد',
+                        message: 'تم رفع مستند جديد: ' + newDoc.filename,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('doc_uploaded', 'تم رفع مستند: ' + newDoc.filename, 'files', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, doc: newDoc });
     } catch (error) {
         console.error(error);
@@ -2153,6 +2261,27 @@ app.post('/api/upload-identity', authenticate, async (req, res) => {
             message: 'تم تحديث هوية القطاع'
         });
         
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تحديث هوية القطاع',
+                        message: 'تم تحديث هوية القطاع',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('identity_uploaded', 'تم تحديث هوية القطاع', 'files', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
     } catch (error) {
         console.error(error);
@@ -2207,6 +2336,9 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
             message: 'بلاغ إسعاف جوي جديد: ' + reportNumber,
             record: newRecord
         });
+
+        // Audit log
+        await addAuditLogEntry('air_ambulance_saved', 'بلاغ إسعاف جوي جديد: ' + reportNumber, 'air_ambulance', req.user.name, req.user.role, req.user.id);
 
         res.json({ success: true, record: newRecord });
     } catch (error) {
@@ -3072,6 +3204,10 @@ app.post('/api/announcements', authenticate, authorize(['admin']), async (req, r
             type: 'announcements_updated',
             message: 'تم تحديث الإعلانات'
         });
+        
+        // Audit log
+        await addAuditLogEntry('announcements_updated', 'تم تحديث الإعلانات', 'announcements', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الإعلانات' });
@@ -3413,6 +3549,36 @@ app.post('/api/admin/monitor/force-check', authenticate, authorize(['admin']), a
         res.json({ success: true, health });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تشغيل فحص النظام' });
+    }
+});
+
+// ============================================
+// API: Auto-Fix Engine — الإصلاح التلقائي
+// ============================================
+app.post('/api/admin/auto-fix', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await autoFixEngine.runAll(
+            () => currentShiftId,
+            (id) => { currentShiftId = id; }
+        );
+        broadcast({
+            type: 'auto_fix_complete',
+            message: `تم تشغيل الإصلاح التلقائي — ${result.totalFixed} إصلاح`,
+            result
+        });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Auto-fix error:', error);
+        res.status(500).json({ error: 'فشل في تشغيل الإصلاح التلقائي' });
+    }
+});
+
+app.get('/api/admin/auto-fix/logs', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        res.json({ success: true, logs: autoFixEngine.getFixLogs(limit) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل الإصلاحات' });
     }
 });
 
@@ -3798,6 +3964,27 @@ app.post('/api/upload-operational', authenticate, opsUpload.array('files'), hand
             files: results.map(f => ({ id: f.id, filename: f.filename, category: f.category }))
         });
         
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'ملفات تشغيلية جديدة',
+                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('ops_files_uploaded', 'تم رفع ملفات تشغيلية: ' + results.length, 'files', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, count: results.length, files: results });
     } catch (error) {
         console.error('خطأ في رفع الملفات:', error);
@@ -3882,6 +4069,28 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
             message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
             count: results.length
         });
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'ملفات تشغيلية جديدة',
+                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('ops_files_uploaded', 'تم رفع ملفات تشغيلية: ' + results.length, 'files', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, count: results.length, files: results });
     } catch (error) {
         console.error('خطأ في رفع الملفات:', error);
@@ -4194,6 +4403,10 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
             message: 'تم إضافة حدث جديد للمناوبة',
             event: newEvent
         });
+        
+        // Audit log
+        await addAuditLogEntry('shift_event_added', 'تم إضافة حدث جديد للمناوبة', 'shifts', req.user.name, req.user.role, req.user.id);
+        
         res.json({ success: true, event: newEvent });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الحدث' });
@@ -4443,6 +4656,101 @@ app.post('/api/audit-log', authenticate, async (req, res) => {
 });
 
 // ============================================
+// API: Notifications
+// ============================================
+app.get('/api/notifications', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (!userId) {
+            return res.status(400).json({ error: 'لا يمكن تحديد المستخدم' });
+        }
+        let notifications = [];
+        if (dbAvailable() && db.Notifications) {
+            notifications = await db.Notifications.getByUser(userId.toString(), 50);
+        }
+        res.json({ success: true, notifications });
+    } catch (error) {
+        console.error('[API] Error fetching notifications:', error);
+        res.status(500).json({ error: 'فشل في جلب الإشعارات' });
+    }
+});
+
+app.post('/api/notifications', authenticate, async (req, res) => {
+    try {
+        const { user_id, title, message, type } = req.body;
+        if (!user_id || !title) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const targetUserId = user_id.toString();
+        const currentUserId = req.user.id || req.user.username || req.user.userId;
+        const currentRole = req.user.role;
+        if (currentRole !== 'admin' && currentRole !== 'director') {
+            if (targetUserId !== (currentUserId ? currentUserId.toString() : '')) {
+                return res.status(403).json({ error: 'ليس لديك الصلاحية لإرسال إشعارات لهذا المستخدم' });
+            }
+        }
+        let notificationId = null;
+        if (dbAvailable() && db.Notifications) {
+            notificationId = await db.Notifications.create({
+                user_id: targetUserId,
+                title,
+                message: message || '',
+                type: type || 'info'
+            });
+        }
+        broadcast({
+            type: 'notification_created',
+            message: 'تم إنشاء إشعار جديد',
+            notification: { id: notificationId, user_id: targetUserId, title, message, type }
+        });
+        res.json({ success: true, id: notificationId });
+    } catch (error) {
+        console.error('[API] Error creating notification:', error);
+        res.status(500).json({ error: 'فشل في إنشاء الإشعار' });
+    }
+});
+
+app.post('/api/notifications/read', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (!userId) {
+            return res.status(400).json({ error: 'لا يمكن تحديد المستخدم' });
+        }
+        if (dbAvailable() && db.Notifications) {
+            await db.Notifications.markAllAsRead(userId.toString());
+        }
+        res.json({ success: true, message: 'تم تحديد جميع الإشعارات كمقروءة' });
+    } catch (error) {
+        console.error('[API] Error marking all notifications as read:', error);
+        res.status(500).json({ error: 'فشل في تحديث الإشعارات' });
+    }
+});
+
+app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
+    try {
+        const notificationId = parseInt(req.params.id);
+        if (isNaN(notificationId)) {
+            return res.status(400).json({ error: 'معرف الإشعار غير صالح' });
+        }
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (dbAvailable() && db.Notifications) {
+            const notification = await db.Notifications.getById(notificationId);
+            if (!notification) {
+                return res.status(404).json({ error: 'الإشعار غير موجود' });
+            }
+            if (notification.user_id !== (userId ? userId.toString() : '')) {
+                return res.status(403).json({ error: 'ليس لديك الصلاحية' });
+            }
+            await db.Notifications.markAsRead(notificationId);
+        }
+        res.json({ success: true, message: 'تم تحديد الإشعار كمقروء' });
+    } catch (error) {
+        console.error('[API] Error marking notification as read:', error);
+        res.status(500).json({ error: 'فشل في تحديث الإشعار' });
+    }
+});
+
+// ============================================
 // API: تسجيل البلاغات (Report Entry)
 // ============================================
 app.get('/api/report-entry', authenticate, async (req, res) => {
@@ -4475,6 +4783,27 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
             record: newRecord
         });
 
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'بلاغ جديد',
+                        message: 'تم تسجيل بلاغ جديد في النظام',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('report_entry_added', 'تم تسجيل بلاغ جديد', 'reports', req.user.name, req.user.role, req.user.id);
+
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4494,6 +4823,9 @@ app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
             recordId: req.params.id
         });
 
+        // Audit log
+        await addAuditLogEntry('report_entry_deleted', 'تم حذف بلاغ: ' + req.params.id, 'reports', req.user.name, req.user.role, req.user.id);
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
@@ -4508,6 +4840,9 @@ app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, 
             type: 'report_entry_cleared',
             message: 'تم حذف جميع البلاغات'
         });
+
+        // Audit log
+        await addAuditLogEntry('report_entry_cleared', 'تم حذف جميع البلاغات', 'reports', req.user.name, req.user.role, req.user.id);
 
         res.json({ success: true });
     } catch (error) {

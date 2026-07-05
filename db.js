@@ -313,6 +313,17 @@ const TABLE_SCHEMAS = [
     recommendation TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     resolved INTEGER DEFAULT 0
+  );`,
+
+  // Notifications
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    type TEXT DEFAULT 'info',
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -922,6 +933,40 @@ const StaffingAlerts = {
 };
 
 // ============================================
+// CRUD: NOTIFICATIONS
+// ============================================
+const Notifications = {
+  async getAll() {
+    return all('SELECT * FROM notifications ORDER BY created_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM notifications WHERE id = ?', [id]);
+  },
+  async getByUser(userId, limit = 50) {
+    return all('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?', [userId, limit]);
+  },
+  async getUnreadByUser(userId) {
+    return all('SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC', [userId]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, ?);', [data.user_id, data.title, data.message || '', data.type || 'info', data.is_read ? 1 : 0]);
+    return result.id;
+  },
+  async markAsRead(id) {
+    return run('UPDATE notifications SET is_read = 1 WHERE id = ?', [id]);
+  },
+  async markAllAsRead(userId) {
+    return run('UPDATE notifications SET is_read = 1 WHERE user_id = ?', [userId]);
+  },
+  async delete(id) {
+    return run('DELETE FROM notifications WHERE id = ?', [id]);
+  },
+  async deleteAll() {
+    return run('DELETE FROM notifications');
+  }
+};
+
+// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -1170,6 +1215,7 @@ module.exports = {
   LeaveRequests,
   ShiftScheduleAuto,
   StaffingAlerts,
+  Notifications,
 
   // Migration
   migrateAll

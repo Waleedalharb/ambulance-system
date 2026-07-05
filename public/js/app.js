@@ -4,6 +4,10 @@
 var currentUser = null;
 var authToken = localStorage.getItem('authToken') || null;
 
+function getCurrentUserName() {
+    return (currentUser && currentUser.name) || (currentUser && currentUser.username) || 'غير معروف';
+}
+
 function showNotification(title, message, type, duration) {
     var container = document.getElementById('toastContainer');
     if (!container) { console.log('[' + type + '] ' + title + ': ' + message); return; }
@@ -55,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ username, password })
             });
             var data = await res.json();
-            if (data.success && data.token) {
+                if (data.success && data.token) {
                 localStorage.setItem('authToken', data.token);
                 localStorage.setItem('currentUser', JSON.stringify(data.user));
                 currentUser = data.user;
@@ -64,6 +68,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyUserPermissions(data.user);
                 if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
                 loadAllData();
+                loadNotifications();
+                addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
             } else {
                 loginError.textContent = data.error || 'فشل في تسجيل الدخول';
                 loginError.style.display = 'block';
@@ -75,6 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function doLogout() {
+        addAuditEntry('system', 'تسجيل خروج', 'المستخدم ' + getCurrentUserName() + ' سجل الخروج من النظام', getCurrentUserName());
         localStorage.removeItem('authToken');
         localStorage.removeItem('currentUser');
         currentUser = null;
@@ -789,7 +796,7 @@ function addAuditEntry(type, action, detail, user) {
         type: type || 'system',
         action: action || '',
         detail: detail || '',
-        user: user || 'المشرف',
+        user: user || getCurrentUserName(),
         timestamp: new Date().toISOString()
     };
 
@@ -797,6 +804,20 @@ function addAuditEntry(type, action, detail, user) {
     if (auditLog.length > 200) auditLog = auditLog.slice(0, 200);
 
     localStorage.setItem('auditLog', JSON.stringify(auditLog));
+
+    // Fire-and-forget server-side logging
+    try {
+        if (authToken) {
+            fetch('/api/audit-log', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + authToken
+                },
+                body: JSON.stringify(entry)
+            }).catch(function() {});
+        }
+    } catch(e) {}
 }
 
 function renderAuditLog() {
@@ -898,7 +919,7 @@ function setupAutoAuditLogging() {
     if (typeof startNewShift === 'function') {
         startNewShift = function() {
             var result = origStartNewShift.apply(this, arguments);
-            addAuditEntry('shift', 'بدء مناوبة جديدة', '', 'المشرف');
+            addAuditEntry('shift', 'بدء مناوبة جديدة', '', getCurrentUserName());
             return result;
         };
     }
@@ -908,9 +929,89 @@ function setupAutoAuditLogging() {
     if (typeof addReportToServer === 'function') {
         addReportToServer = function(center, unit) {
             var result = origAddReport.apply(this, arguments);
-            addAuditEntry('report', 'تسجيل بلاغ', center + ' - ' + unit, 'المشرف');
+            addAuditEntry('report', 'تسجيل بلاغ', center + ' - ' + unit, getCurrentUserName());
             return result;
         };
+    }
+
+    // تسجيل رفع الملفات التشغيلية
+    var origOpsUploadFiles = opsUploadFiles;
+    if (typeof opsUploadFiles === 'function') {
+        opsUploadFiles = async function() {
+            var result = await origOpsUploadFiles.apply(this, arguments);
+            addAuditEntry('file', 'رفع ملفات تشغيلية', 'تم رفع ملفات إلى التحديثات التشغيلية', getCurrentUserName());
+            return result;
+        };
+    }
+
+    // تسجيل فتح صفحة المستندات
+    var origOpenDocsPage = openDocsPage;
+    if (typeof openDocsPage === 'function') {
+        openDocsPage = function() {
+            addAuditEntry('system', 'فتح صفحة المستندات', 'المستخدم فتح صفحة التحديثات والمستندات', getCurrentUserName());
+            return origOpenDocsPage.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح غرفة العمليات
+    var origOpenOperationsRoom = openOperationsRoom;
+    if (typeof openOperationsRoom === 'function') {
+        openOperationsRoom = function() {
+            addAuditEntry('system', 'فتح غرفة العمليات', 'المستخدم فتح غرفة العمليات', getCurrentUserName());
+            return origOpenOperationsRoom.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح وقت الذروة
+    var origOpenPeakTimeModal = openPeakTimeModal;
+    if (typeof openPeakTimeModal === 'function') {
+        openPeakTimeModal = function() {
+            addAuditEntry('system', 'فتح وقت الذروة', 'المستخدم فتح نافذة وقت الذروة', getCurrentUserName());
+            return origOpenPeakTimeModal.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح نافذة المناوبة
+    var origOpenShiftModal = openShiftModal;
+    if (typeof openShiftModal === 'function') {
+        openShiftModal = function() {
+            addAuditEntry('system', 'فتح نافذة المناوبة', 'المستخدم فتح نافذة المناوبة', getCurrentUserName());
+            return origOpenShiftModal.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح أرشيف المناوبات
+    var origOpenShiftArchiveModal = openShiftArchiveModal;
+    if (typeof openShiftArchiveModal === 'function') {
+        openShiftArchiveModal = function() {
+            addAuditEntry('system', 'فتح أرشيف المناوبات', 'المستخدم فتح أرشيف المناوبات', getCurrentUserName());
+            return origOpenShiftArchiveModal.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح سجل العمليات
+    var origOpenAuditLogModal = openAuditLogModal;
+    if (typeof openAuditLogModal === 'function') {
+        openAuditLogModal = function() {
+            addAuditEntry('system', 'فتح سجل العمليات', 'المستخدم فتح سجل العمليات', getCurrentUserName());
+            return origOpenAuditLogModal.apply(this, arguments);
+        };
+    }
+
+    // تسجيل فتح الجدول الشهري
+    var monthlyTableBtn = document.getElementById('monthlyTableBtn');
+    if (monthlyTableBtn) {
+        monthlyTableBtn.addEventListener('click', function() {
+            addAuditEntry('system', 'فتح الجدول الشهري', 'المستخدم فتح الجدول الشهري', getCurrentUserName());
+        });
+    }
+
+    // تسجيل فتح لوحة التحكم
+    var controlBtn = document.getElementById('controlBtn');
+    if (controlBtn) {
+        controlBtn.addEventListener('click', function() {
+            addAuditEntry('system', 'فتح لوحة التحكم', 'المستخدم فتح لوحة التحكم والتنسيق', getCurrentUserName());
+        });
     }
 
     // تسجيل تلقائي عند فتح الخريطة
@@ -919,6 +1020,7 @@ function setupAutoAuditLogging() {
         mapBtn.addEventListener('click', function() {
             gamificationStats.mapOpens = (gamificationStats.mapOpens || 0) + 1;
             localStorage.setItem('gamificationStats', JSON.stringify(gamificationStats));
+            addAuditEntry('system', 'فتح الخريطة', 'المستخدم فتح الخريطة', getCurrentUserName());
         });
     }
 }
@@ -945,6 +1047,143 @@ function dismissAlert() {
     var el_alertBar_d5 = document.getElementById('alertBar'); if (el_alertBar_d5) el_alertBar_d5.style.display = 'none';
     localStorage.setItem('alertDismissed', 'true');
 }
+
+// ============================================
+// نظام الإشعارات
+// ============================================
+var notifications = [];
+var unreadNotificationsCount = 0;
+
+function loadNotifications() {
+    if (!authToken) return;
+    fetch('/api/notifications', { headers: { 'Authorization': 'Bearer ' + authToken } })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success && Array.isArray(data.notifications)) {
+                notifications = data.notifications;
+                unreadNotificationsCount = notifications.filter(function(n) { return !n.read; }).length;
+                updateNotificationBadge();
+                renderNotifications();
+            }
+        })
+        .catch(function() {});
+}
+
+function updateNotificationBadge() {
+    var badge = document.getElementById('notificationBadge');
+    var count = document.getElementById('notificationCount');
+    if (badge) {
+        if (unreadNotificationsCount > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = unreadNotificationsCount;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    if (count) count.textContent = unreadNotificationsCount;
+}
+
+function markNotificationsRead() {
+    if (!authToken) return;
+    fetch('/api/notifications/read', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            notifications.forEach(function(n) { n.read = true; });
+            unreadNotificationsCount = 0;
+            updateNotificationBadge();
+            renderNotifications();
+        }
+    })
+    .catch(function() {});
+}
+
+function showNotificationPanel() {
+    var panel = document.getElementById('notificationPanel');
+    if (panel) {
+        panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'block' : 'none';
+        if (panel.style.display === 'block') {
+            loadNotifications();
+        }
+    }
+}
+
+function toggleNotificationPanel(event) {
+    if (event) event.stopPropagation();
+    showNotificationPanel();
+}
+
+function renderNotifications() {
+    var list = document.getElementById('notificationList');
+    if (!list) return;
+    if (notifications.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:24px; font-size:0.85rem;">📭 لا توجد إشعارات</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < notifications.length; i++) {
+        var n = notifications[i];
+        var readStyle = n.read ? 'opacity:0.7; background:var(--gray-50);' : 'background:var(--white); border-right:3px solid var(--coral);';
+        html += '<div style="padding:12px 16px; border-bottom:1px solid var(--gray-200); ' + readStyle + '">' +
+            '<div style="font-weight:700; font-size:0.85rem; color:var(--text);">' + (n.title || 'إشعار') + '</div>' +
+            '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:4px;">' + (n.message || '') + '</div>' +
+            '<div style="font-size:0.7rem; color:var(--gray-400); margin-top:4px;">' + (n.time || n.createdAt || '') + '</div>' +
+        '</div>';
+    }
+    list.innerHTML = html;
+}
+
+function markNotificationRead(id) {
+    if (!authToken || id === undefined) return;
+    fetch('/api/notifications/read/' + id, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+    })
+    .then(function() {
+        var n = notifications.find(function(x) { return x.id === id; });
+        if (n && !n.read) {
+            n.read = true;
+            unreadNotificationsCount = Math.max(0, unreadNotificationsCount - 1);
+            updateNotificationBadge();
+            renderNotifications();
+        }
+    })
+    .catch(function() {});
+}
+
+function markAllNotificationsRead() {
+    markNotificationsRead();
+}
+
+function clearAllNotifications() {
+    if (!authToken) return;
+    if (!confirm('هل أنت متأكد من مسح جميع الإشعارات؟')) return;
+    fetch('/api/notifications/clear', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+    })
+    .then(function() {
+        notifications = [];
+        unreadNotificationsCount = 0;
+        updateNotificationBadge();
+        renderNotifications();
+    })
+    .catch(function() {});
+}
+
+// إغلاق قائمة الإشعارات عند النقر خارجها
+document.addEventListener('click', function(e) {
+    var panel = document.getElementById('notificationPanel');
+    var bell = document.getElementById('notificationBellBtn');
+    if (panel && panel.style.display === 'block') {
+        if (!panel.contains(e.target) && (!bell || !bell.contains(e.target))) {
+            panel.style.display = 'none';
+        }
+    }
+});
 
 function goToPeakTime() {
     var el_alertBar_d6 = document.getElementById('alertBar'); if (el_alertBar_d6) el_alertBar_d6.style.display = 'none';
@@ -1874,7 +2113,7 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=24';
+    var url = 'radio-completion.html?v=25';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
@@ -2978,7 +3217,7 @@ async function saveShiftData(silent) {
                 // Add audit log for manual save
                 try {
                     if (typeof addAuditEntry === 'function') {
-                        await addAuditEntry('shift', 'حفظ تكميل النوبة', 'تم حفظ بيانات تكميل النوبة يدوياً', currentUser && currentUser.name);
+                        await addAuditEntry('shift', 'حفظ تكميل النوبة', 'تم حفظ بيانات تكميل النوبة يدوياً', getCurrentUserName());
                     }
                 } catch(e) {}
             } else {
@@ -2991,7 +3230,7 @@ async function saveShiftData(silent) {
                         var now = Date.now();
                         if (!window._lastAutoSaveAudit || (now - window._lastAutoSaveAudit) > 300000) {
                             window._lastAutoSaveAudit = now;
-                            addAuditEntry('shift', 'حفظ تلقائي للتكميل', 'تم حفظ بيانات تكميل النوبة تلقائياً', currentUser && currentUser.name);
+                            addAuditEntry('shift', 'حفظ تلقائي للتكميل', 'تم حفظ بيانات تكميل النوبة تلقائياً', getCurrentUserName());
                         }
                     }
                 } catch(e) {}
@@ -5115,6 +5354,7 @@ var el_excelFileInput=document.getElementById("excelFileInput");if(el_excelFileI
                 var el_tableStatsBar_d43 = document.getElementById('tableStatsBar'); if (el_tableStatsBar_d43) el_tableStatsBar_d43.style.display = 'flex';
                 updateTableStats();
                 showNotification('تم الرفع', 'تم رفع وحفظ الجدول بنجاح', 'success', 3000);
+                addAuditEntry('file', 'رفع جدول إكسل', 'تم رفع وحفظ الجدول الشهري بنجاح', getCurrentUserName());
             } else {
                 showNotification('فشل', 'فشل في حفظ الجدول', 'error', 3000);
             }
@@ -7191,10 +7431,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadShifts();
     loadAllData();
     setupAutoAuditLogging();
+    loadNotifications();
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=24'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=25'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
