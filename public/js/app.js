@@ -847,16 +847,33 @@ function renderAuditLog() {
         var entry = filtered[i];
         var date = new Date(entry.timestamp);
         var timeStr = saudiTimeFormatter.format(date);
+        var typeLabels = {
+            report: 'بلاغ', shift: 'مناوبة', theme: 'تصميم',
+            file: 'ملف', alert: 'تنبيه', system: 'نظام'
+        };
+        var typeLabel = typeLabels[entry.type] || 'نظام';
+        var typeColors = {
+            report: '#EF4444', shift: '#3B82F6', theme: '#8B5CF6',
+            file: '#F59E0B', alert: '#10B981', system: '#6B7280'
+        };
+        var color = typeColors[entry.type] || '#6B7280';
 
         html +=
-            '<div class="audit-entry">' +
-                '<span class="audit-time">' + timeStr + '</span>' +
-                '<span class="audit-icon ' + entry.type + '">' + (icons[entry.type] || '&#x2699;&#xFE0F;') + '</span>' +
-                '<div class="audit-content">' +
-                    '<div class="audit-action">' + entry.action + '</div>' +
-                    '<div class="audit-detail">' + entry.detail + '</div>' +
+            '<div class="audit-card" style="display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:10px; border:1px solid var(--gray-200); background:var(--white); margin-bottom:8px; transition:all 0.2s;">' +
+                '<div style="width:40px; height:40px; border-radius:10px; background:' + color + '15; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; color:' + color + ';">' + 
+                    (icons[entry.type] || '&#x2699;&#xFE0F;') + 
                 '</div>' +
-                '<span class="audit-user">' + entry.user + '</span>' +
+                '<div style="flex:1; min-width:0; text-align:right;">' +
+                    '<div style="font-size:0.9rem; font-weight:600; color:var(--gray-800); margin-bottom:2px;">' + entry.action + '</div>' +
+                    '<div style="font-size:0.8rem; color:var(--gray-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + (entry.detail || '') + '</div>' +
+                '</div>' +
+                '<div style="text-align:left; flex-shrink:0; min-width:100px;">' +
+                    '<div style="font-size:0.75rem; color:var(--gray-400); margin-bottom:2px;">' + timeStr + '</div>' +
+                    '<div style="display:flex; align-items:center; gap:4px;">' +
+                        '<div style="font-size:0.7rem; color:' + color + '; background:' + color + '15; padding:2px 8px; border-radius:6px; display:inline-block; font-weight:500;">' + typeLabel + '</div>' +
+                        '<div style="font-size:0.7rem; color:var(--gray-400); background:var(--gray-100); padding:2px 8px; border-radius:6px; display:inline-block;">' + (entry.user || 'غير معروف') + '</div>' +
+                    '</div>' +
+                '</div>' +
             '</div>';
     }
 
@@ -2113,7 +2130,7 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=25';
+    var url = 'radio-completion.html?v=27';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
@@ -7435,7 +7452,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=25'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=27'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
