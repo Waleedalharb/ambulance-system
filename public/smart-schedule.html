@@ -2238,13 +2238,18 @@
         async function saveToServer() {
             try {
                 var token = localStorage.getItem('authToken');
+                var shiftId = localStorage.getItem('currentShiftId');
+                var payload = { employees: employees };
+                if (shiftId) {
+                    payload.shift_id = parseInt(shiftId);
+                }
                 var response = await fetch('/api/schedule/employees', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     },
-                    body: JSON.stringify({ employees: employees })
+                    body: JSON.stringify(payload)
                 });
                 var result = await response.json();
                 if (result.success) {
@@ -3041,18 +3046,23 @@
             }
             showToast('جاري المزامنة مع السيرفر...', 'info');
             try {
+                var shiftId = localStorage.getItem('currentShiftId');
+                var payload = {
+                    employees: employeesList,
+                    roster: roster,
+                    month: month,
+                    year: year
+                };
+                if (shiftId) {
+                    payload.shift_id = parseInt(shiftId);
+                }
                 var response = await fetch('/api/shift-roster/import', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     },
-                    body: JSON.stringify({
-                        employees: employeesList,
-                        roster: roster,
-                        month: month,
-                        year: year
-                    })
+                    body: JSON.stringify(payload)
                 });
                 var data = await response.json();
                 if (data.success) {

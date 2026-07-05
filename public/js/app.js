@@ -797,7 +797,8 @@ function addAuditEntry(type, action, detail, user) {
         action: action || '',
         detail: detail || '',
         user: user || getCurrentUserName(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        shift_id: currentShiftId || null
     };
 
     auditLog.unshift(entry);
@@ -1949,6 +1950,7 @@ var allShifts = [];
 var isViewingArchiveShift = false;
 var currentViewingShift = null;
 var viewingShiftId = null;
+var currentViewingShiftData = null;
 var uploadedDocs = [];
 var filteredDocs = [];
 var currentDocsPage = 1;
@@ -2009,6 +2011,9 @@ async function loadAllData() {
             }
         }
         currentShiftId = result.currentShiftId || null;
+        if (currentShiftId) {
+            localStorage.setItem('currentShiftId', currentShiftId);
+        }
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
         
@@ -2111,8 +2116,18 @@ function openShiftArchiveModal() {
 }
 
 function clearArchiveSummary() {
-    var area = document.getElementById('archiveSummaryArea');
-    if (area) area.style.display = 'none';
+    var area = document.getElementById('archiveTabContentArea');
+    if (area) {
+        area.style.display = 'none';
+        area.innerHTML = '';
+    }
+    window._currentArchiveData = null;
+    // Reset tab buttons
+    document.querySelectorAll('.archive-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    var summaryBtn = document.querySelector('.archive-tab-btn[data-tab="summary"]');
+    if (summaryBtn) summaryBtn.classList.add('active');
 }
 
 function editSelectedArchiveShift() {
@@ -2130,124 +2145,317 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=27';
+    var url = 'radio-completion.html?v=28';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
     window.location.href = url;
 }
 
-function viewSelectedArchiveShift() {
+async function viewSelectedArchiveShift() {
     var select = document.getElementById('archiveModalSelect');
     if (!select || !select.value) {
         alert('الرجاء اختيار مناوبة من القائمة');
         return;
     }
     var shiftId = parseInt(select.value);
-    var shift = allShifts.find(function(s) { return s.id === shiftId; });
-    if (!shift) {
-        alert('المناوبة غير موجودة');
+    
+    // Show loading state
+    var contentArea = document.getElementById('archiveTabContentArea');
+    if (contentArea) {
+        contentArea.innerHTML = '<div style="text-align:center; padding:40px; color:var(--gray-500);"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem; margin-bottom:10px; display:block;"></i>جاري تحميل البيانات...</div>';
+    }
+    
+    try {
+        var response = await fetch('/api/shifts/' + shiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var result = await response.json();
+        if (!result || !result.shift) {
+            alert('المناوبة غير موجودة');
+            return;
+        }
+        
+        // Store data for tab switching
+        window._currentArchiveData = result;
+        
+        // Show content area
+        if (contentArea) contentArea.style.display = 'block';
+        
+        // Switch to summary tab by default
+        switchArchiveTab('summary');
+        
+    } catch (err) {
+        console.error('Error loading archive shift data:', err);
+        alert('❌ فشل في تحميل بيانات المناوبة');
+    }
+}
+
+function switchArchiveTab(tabName) {
+    var data = window._currentArchiveData;
+    if (!data) return;
+    
+    // Update tab buttons
+    document.querySelectorAll('.archive-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    var activeBtn = document.querySelector('.archive-tab-btn[data-tab="' + tabName + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    
+    var container = document.getElementById('archiveTabContentArea');
+    if (!container) return;
+    
+    var shift = data.shift || {};
+    var totalReports = data.total || Object.keys(data.reports || {}).reduce(function(sum, key) { return sum + ((data.reports[key] && data.reports[key].count) || 0); }, 0);
+    
+    switch(tabName) {
+        case 'summary':
+            renderArchiveSummaryTab(container, shift, totalReports);
+            break;
+        case 'reports':
+            renderArchiveReportsTab(container, data.reports, totalReports);
+            break;
+        case 'completion':
+            renderArchiveCompletionTab(container, data.completion, shift);
+            break;
+        case 'forms':
+            renderArchiveFormsTab(container, data.forms);
+            break;
+        case 'audit':
+            renderArchiveAuditTab(container, data.auditLog);
+            break;
+        case 'files':
+            renderArchiveFilesTab(container, data.files);
+            break;
+    }
+}
+
+function renderArchiveSummaryTab(container, shift, totalReports) {
+    var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'morning' || shift.shiftType === 'صباحية') ? 'صباحي' : 'ليلي';
+    var date = shift.shiftDate || '-';
+    var createdAt = shift.createdAt ? new Date(shift.createdAt).toLocaleString('ar-SA') : '-';
+    var updatedAt = shift.updatedAt ? new Date(shift.updatedAt).toLocaleString('ar-SA') : '-';
+    
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-summary-grid">' +
+                '<div class="archive-summary-card">' +
+                    '<div class="archive-summary-icon"><i class="fas fa-calendar-alt"></i></div>' +
+                    '<div class="archive-summary-value">' + date + '</div>' +
+                    '<div class="archive-summary-label">تاريخ المناوبة</div>' +
+                '</div>' +
+                '<div class="archive-summary-card">' +
+                    '<div class="archive-summary-icon"><i class="fas fa-sun"></i></div>' +
+                    '<div class="archive-summary-value">' + typeLabel + '</div>' +
+                    '<div class="archive-summary-label">نوع المناوبة</div>' +
+                '</div>' +
+                '<div class="archive-summary-card">' +
+                    '<div class="archive-summary-icon"><i class="fas fa-file-alt"></i></div>' +
+                    '<div class="archive-summary-value">' + totalReports + '</div>' +
+                    '<div class="archive-summary-label">إجمالي البلاغات</div>' +
+                '</div>' +
+                '<div class="archive-summary-card">' +
+                    '<div class="archive-summary-icon"><i class="fas fa-clock"></i></div>' +
+                    '<div class="archive-summary-value">' + createdAt + '</div>' +
+                    '<div class="archive-summary-label">تاريخ الإنشاء</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="archive-section">' +
+                '<h4><i class="fas fa-sticky-note"></i> ملاحظات المناوبة</h4>' +
+                '<div class="archive-notes-box">' + (shift.generalNotes || 'لا توجد ملاحظات') + '</div>' +
+            '</div>' +
+        '</div>';
+}
+
+function renderArchiveReportsTab(container, reports, totalReports) {
+    if (!reports || Object.keys(reports).length === 0) {
+        container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد بلاغات في هذه المناوبة</p></div></div>';
         return;
     }
     
-    // Show summary inline
-    var area = document.getElementById('archiveSummaryArea');
-    if (area) area.style.display = 'block';
-    
-    // Update title
-    var title = document.getElementById('archiveSummaryTitle');
-    if (title) {
-        var typeLabel = (shift.shiftType === 'صباحية' || shift.shiftType === 'morning' || shift.shiftType === 'صباح') ? 'صباحي' : 'ليلي';
-        title.textContent = 'ملخص المناوبة — ' + typeLabel + ' ' + (shift.shiftDate || '');
+    var rows = '';
+    var keys = Object.keys(reports).sort();
+    for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var r = reports[key];
+        if (!r || r.count === 0) continue;
+        var parts = key.split('|');
+        var center = parts[0] || '-';
+        var unit = parts[1] || '-';
+        rows += 
+            '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + center + '</td>' +
+                '<td>' + unit + '</td>' +
+                '<td><span class="archive-badge archive-badge-primary">' + r.count + '</span></td>' +
+            '</tr>';
     }
     
-    // Build stats grid
-    var statsGrid = document.getElementById('archiveStatsGrid');
-    if (statsGrid) {
-        // Calculate counts from shift completion data if available
-        var ready = 0, missing = 0, offline = 0, pending = 0;
-        var totalReports = shift.totalReports || 0;
-        
-        // Try to get completion data from shift.centersData
-        if (shift.centersData) {
-            Object.keys(shift.centersData).forEach(function(team) {
-                var data = shift.centersData[team];
-                if (data) {
-                    // Infer status from data
-                    if (data.staffCount && parseInt(data.staffCount) > 0) ready++;
-                    else if (data.vehicleStatus === 'offline' || data.vehicleStatus === 'عاطلة') offline++;
-                    else missing++;
-                }
-            });
-        }
-        
-        statsGrid.innerHTML = 
-            '<div style="background:var(--green-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--green);">' + ready + '</div><div style="font-size:0.75rem; color:var(--gray-600);">✅ جاهز</div></div>' +
-            '<div style="background:var(--yellow-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--gold);">' + missing + '</div><div style="font-size:0.75rem; color:var(--gray-600);">⚠️ ناقص</div></div>' +
-            '<div style="background:var(--red-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--red);">' + offline + '</div><div style="font-size:0.75rem; color:var(--gray-600);">🔴 خارج الخدمة</div></div>';
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-table-wrapper">' +
+                '<table class="archive-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>#</th>' +
+                            '<th>المركز</th>' +
+                            '<th>الفرقة</th>' +
+                            '<th>العدد</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+            '</div>' +
+            '<div class="archive-footer-stats">إجمالي البلاغات: <strong>' + totalReports + '</strong></div>' +
+        '</div>';
+}
+
+function renderArchiveCompletionTab(container, completion, shift) {
+    if (!completion && !shift.centersData) {
+        container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد بيانات تكميل لهذه المناوبة</p></div></div>';
+        return;
     }
     
-    // Reports stats
-    var reportsStats = document.getElementById('archiveReportsStats');
-    if (reportsStats) {
-        var totalReports = shift.totalReports || 0;
-        var reportsHtml = '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">' +
-            '<div><strong>إجمالي البلاغات:</strong> ' + totalReports + '</div>';
-        
-        // Top unit
-        var topUnit = '-';
-        var topCount = 0;
-        if (shift.savedReports) {
-            Object.keys(shift.savedReports).forEach(function(key) {
-                var r = shift.savedReports[key];
-                if (r && r.count > topCount) {
-                    topCount = r.count;
-                    topUnit = key.split('|')[1] || key;
-                }
-            });
-        }
-        reportsHtml += '<div><strong>أكثر فرقة:</strong> ' + topUnit + ' (' + topCount + ')</div>';
-        reportsHtml += '</div>';
-        reportsStats.innerHTML = reportsHtml;
+    var data = completion || shift.centersData || {};
+    var rows = '';
+    var keys = Object.keys(data).sort();
+    for (var i = 0; i < keys.length; i++) {
+        var team = keys[i];
+        var teamData = data[team];
+        if (!teamData) continue;
+        var status = teamData.status || (teamData.staffCount && parseInt(teamData.staffCount) > 0 ? 'ready' : teamData.vehicleStatus === 'offline' || teamData.vehicleStatus === 'عاطلة' ? 'offline' : 'missing');
+        var statusLabels = { ready: '✅ جاهز', missing: '⚠️ ناقص', offline: '🔴 خارج الخدمة' };
+        var statusClass = 'archive-badge-' + status;
+        rows += 
+            '<tr>' +
+                '<td>' + team + '</td>' +
+                '<td>' + (teamData.staffCount || '-') + '</td>' +
+                '<td>' + (teamData.carsCount || '-') + '</td>' +
+                '<td><span class="archive-badge ' + statusClass + '">' + (statusLabels[status] || status) + '</span></td>' +
+            '</tr>';
     }
     
-    // Notes
-    var notesContent = document.getElementById('archiveNotesContent');
-    if (notesContent) {
-        notesContent.textContent = shift.generalNotes || '—';
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-table-wrapper">' +
+                '<table class="archive-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>الفريق</th>' +
+                            '<th>المسعفين</th>' +
+                            '<th>المركبات</th>' +
+                            '<th>الحالة</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
+}
+
+function renderArchiveFormsTab(container, forms) {
+    if (!forms || forms.length === 0) {
+        container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد نماذج في هذه المناوبة</p></div></div>';
+        return;
     }
     
-    // Also try to fetch completion data from server for more accurate stats
-    var token = localStorage.getItem('authToken');
-    if (token && shift.shiftDate && shift.shiftType) {
-        var shiftTypeNorm = (shift.shiftType === 'صباحية' || shift.shiftType === 'morning' || shift.shiftType === 'صباح') ? 'صباح' : 'ليل';
-        fetch('/api/shift-completion/latest?shiftDate=' + encodeURIComponent(shift.shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeNorm), {
-            headers: { 'Authorization': 'Bearer ' + token }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            if (result.success && result.completion && result.completion.teams) {
-                var teams = result.completion.teams;
-                var ready = 0, missing = 0, offline = 0;
-                Object.keys(teams).forEach(function(k) {
-                    var st = teams[k].status;
-                    if (st === 'ready') ready++;
-                    else if (st === 'missing') missing++;
-                    else if (st === 'offline') offline++;
-                });
-                if (statsGrid) {
-                    statsGrid.innerHTML = 
-                        '<div style="background:var(--green-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--green);">' + ready + '</div><div style="font-size:0.75rem; color:var(--gray-600);">✅ جاهز</div></div>' +
-                        '<div style="background:var(--yellow-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--gold);">' + missing + '</div><div style="font-size:0.75rem; color:var(--gray-600);">⚠️ ناقص</div></div>' +
-                        '<div style="background:var(--red-50); border-radius:8px; padding:12px; text-align:center;"><div style="font-size:1.8rem; font-weight:700; color:var(--red);">' + offline + '</div><div style="font-size:0.75rem; color:var(--gray-600);">🔴 خارج الخدمة</div></div>';
-                }
-                if (notesContent && result.completion.notes) {
-                    notesContent.textContent = result.completion.notes;
-                }
-            }
-        })
-        .catch(function(e) { console.log('No completion data for this shift'); });
+    var rows = '';
+    for (var i = 0; i < forms.length; i++) {
+        var f = forms[i];
+        rows += 
+            '<tr>' +
+                '<td>' + (f.name || f.title || 'نموذج') + '</td>' +
+                '<td>' + (f.createdAt ? new Date(f.createdAt).toLocaleString('ar-SA') : '-') + '</td>' +
+                '<td>' + (f.status || 'مكتمل') + '</td>' +
+            '</tr>';
     }
+    
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-table-wrapper">' +
+                '<table class="archive-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>اسم النموذج</th>' +
+                            '<th>التاريخ</th>' +
+                            '<th>الحالة</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
+}
+
+function renderArchiveAuditTab(container, auditLog) {
+    if (!auditLog || auditLog.length === 0) {
+        container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد سجلات عمليات في هذه المناوبة</p></div></div>';
+        return;
+    }
+    
+    var rows = '';
+    for (var i = 0; i < auditLog.length; i++) {
+        var e = auditLog[i];
+        var time = e.timestamp ? new Date(e.timestamp).toLocaleString('ar-SA') : '-';
+        rows += 
+            '<tr>' +
+                '<td>' + (e.action || '-') + '</td>' +
+                '<td>' + (e.detail || '-') + '</td>' +
+                '<td>' + (e.user || '-') + '</td>' +
+                '<td>' + time + '</td>' +
+            '</tr>';
+    }
+    
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-table-wrapper">' +
+                '<table class="archive-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>الإجراء</th>' +
+                            '<th>التفاصيل</th>' +
+                            '<th>المستخدم</th>' +
+                            '<th>الوقت</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
+}
+
+function renderArchiveFilesTab(container, files) {
+    if (!files || files.length === 0) {
+        container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد ملفات في هذه المناوبة</p></div></div>';
+        return;
+    }
+    
+    var rows = '';
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        rows += 
+            '<tr>' +
+                '<td><i class="fas fa-file" style="color:var(--primary-700); margin-left:6px;"></i>' + (f.name || f.fileName || '-') + '</td>' +
+                '<td>' + (f.category || 'عام') + '</td>' +
+                '<td>' + (f.size ? (f.size > 1024 ? (f.size/1024).toFixed(1) + ' KB' : f.size + ' B') : '-') + '</td>' +
+                '<td>' + (f.createdAt ? new Date(f.createdAt).toLocaleString('ar-SA') : '-') + '</td>' +
+            '</tr>';
+    }
+    
+    container.innerHTML = 
+        '<div class="archive-tab-content">' +
+            '<div class="archive-table-wrapper">' +
+                '<table class="archive-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>اسم الملف</th>' +
+                            '<th>التصنيف</th>' +
+                            '<th>الحجم</th>' +
+                            '<th>التاريخ</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
 }
 
 function selectShiftFromHistory(shiftId) {
@@ -2287,6 +2495,8 @@ function selectShiftFromHistory(shiftId) {
         .then(function(result) {
             if (result.shift) {
                 // Update global data
+                currentViewingShift = result.shift;
+                currentViewingShiftData = result;
                 reports = result.reports || {};
                 // Don't overwrite centersData with shift form data (different structure)
                 // centersData from /api/data is the unit mapping {center: [units]}
@@ -2298,6 +2508,10 @@ function selectShiftFromHistory(shiftId) {
                 calculateLiveReportStats();
                 updateWorkforceStats();
                 updateDistributionIndicator();
+                
+                // Update archive summary card
+                var totalReports = result.total || Object.keys(result.reports || {}).reduce(function(sum, key) { return sum + (result.reports[key]?.count || 0); }, 0);
+                updateArchiveSummaryCard(result.shift, totalReports);
                 
                 // Open shift modal with the selected shift data
                 var el_shiftModal_d18 = document.getElementById('shiftModal'); if (el_shiftModal_d18) el_shiftModal_d18.style.display = 'flex';
@@ -2327,6 +2541,65 @@ function selectShiftFromHistory(shiftId) {
 function loadShiftArchive(shiftId) {
     // Compatibility function for direct clicks
     selectShiftFromHistory(shiftId);
+}
+
+// Archive summary card for past shifts
+function updateArchiveSummaryCard(shift, totalReports) {
+    var card = document.getElementById('archiveSummaryCard');
+    if (!card) return;
+    if (!shift) {
+        card.style.display = 'none';
+        return;
+    }
+    card.style.display = 'block';
+    var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'morning' || shift.shiftType === 'صباحية') ? 'صباحي' : 'ليلي';
+    var date = shift.shiftDate || '-';
+    var total = totalReports || shift.totalReports || 0;
+    card.innerHTML = 
+        '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">' +
+            '<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">' +
+                '<div style="display:flex; align-items:center; gap:8px;">' +
+                    '<span style="background:var(--primary-700); color:#fff; padding:6px 12px; border-radius:var(--radius-md); font-size:0.8rem; font-weight:700;">' + typeLabel + '</span>' +
+                    '<span style="font-weight:600; color:var(--gray-800);"><i class="far fa-calendar-alt" style="color:var(--primary-700); margin-left:6px;"></i>' + date + '</span>' +
+                '</div>' +
+                '<div style="display:flex; align-items:center; gap:6px; background:var(--primary-50); padding:4px 12px; border-radius:var(--radius-md);">' +
+                    '<i class="fas fa-file-alt" style="color:var(--primary-700); font-size:0.8rem;"></i>' +
+                    '<span style="font-weight:700; color:var(--primary-700); font-size:0.9rem;">' + total + '</span>' +
+                    '<span style="font-size:0.75rem; color:var(--gray-600);">بلاغ</span>' +
+                '</div>' +
+            '</div>' +
+            '<button onclick="openShiftArchiveModalForCurrentView()" class="btn btn-primary" style="padding:6px 16px; font-size:0.8rem;">' +
+                '<i class="fas fa-eye"></i> عرض التفاصيل الكاملة' +
+            '</button>' +
+        '</div>';
+}
+
+function openShiftArchiveModalForCurrentView() {
+    if (!viewingShiftId || !currentViewingShift) {
+        alert('الرجاء اختيار مناوبة أولاً');
+        return;
+    }
+    // Pre-select the current viewing shift in the archive modal
+    var archiveModalSelect = document.getElementById('archiveModalSelect');
+    if (archiveModalSelect) archiveModalSelect.value = viewingShiftId;
+    openShiftArchiveModal();
+    // Auto-load the selected shift data
+    setTimeout(function() {
+        viewSelectedArchiveShift();
+    }, 100);
+}
+
+function openShiftArchiveModalForShift(shiftId) {
+    if (!shiftId) {
+        openShiftArchiveModal();
+        return;
+    }
+    var archiveModalSelect = document.getElementById('archiveModalSelect');
+    if (archiveModalSelect) archiveModalSelect.value = shiftId;
+    openShiftArchiveModal();
+    setTimeout(function() {
+        viewSelectedArchiveShift();
+    }, 100);
 }
 
 function updateUnitCounter(center, unit) {
@@ -2730,9 +3003,11 @@ async function loadShifts() {
         var data = await response.json();
         if (Array.isArray(data)) {
             allShifts = data;
+        } else if (data && Array.isArray(data.shifts)) {
+            allShifts = data.shifts;
         } else {
             allShifts = [];
-            console.log('⚠️ /api/shifts returned non-array:', data);
+            console.log('⚠️ /api/shifts returned unexpected format:', data);
         }
         var archiveSelect = document.getElementById('archiveSelect');
         if (archiveSelect) {
@@ -2889,10 +3164,12 @@ async function addReportToServer(center, unit) {
     }
     
     try {
+        var reportBody = { center: center.trim(), unit: unit.trim() };
+        if (currentShiftId) reportBody.shiftId = currentShiftId;
         var response = await fetch('/api/report', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
+            body: JSON.stringify(reportBody)
         });
         var result = await response.json();
         if (result.success) {
@@ -2926,10 +3203,12 @@ async function undoLastReport(center, unit) {
     }
     
     try {
+        var undoBody = { center: center.trim(), unit: unit.trim() };
+        if (currentShiftId) undoBody.shiftId = currentShiftId;
         var response = await fetch('/api/undo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ center: center.trim(), unit: unit.trim() })
+            body: JSON.stringify(undoBody)
         });
         var result = await response.json();
         if (result.success) {
@@ -2960,10 +3239,11 @@ async function viewShiftReports() {
     var shiftId = parseInt(select.value);
     if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
     try {
-        var response = await fetch('/api/shifts/' + shiftId);
+        var response = await fetch('/api/shifts/' + shiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
         var result = await response.json();
         if (result && result.shift) {
             currentViewingShift = result.shift;
+            currentViewingShiftData = result;
             isViewingArchiveShift = true;
             viewingShiftId = shiftId;
             reports = result.reports || {};
@@ -2979,6 +3259,8 @@ async function viewShiftReports() {
             var el_viewingBadge_h5 = document.getElementById('viewingBadge'); if (el_viewingBadge_h5) el_viewingBadge_h5.innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
             var el_updateStatus_h6 = document.getElementById('updateStatus'); if (el_updateStatus_h6) el_updateStatus_h6.innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + getSaudiTime();
             var el_shiftModal_d22 = document.getElementById('shiftModal'); if (el_shiftModal_d22) el_shiftModal_d22.style.display = 'flex';
+            // Show archive summary card
+            updateArchiveSummaryCard(result.shift, totalReports);
         } else { alert("لا توجد بيانات في هذه المناوبة"); }
     } catch (error) { console.error(error); alert("❌ فشل في تحميل المناوبة"); }
 }
@@ -2986,6 +3268,7 @@ async function viewShiftReports() {
 async function returnToCurrentShift() {
     isViewingArchiveShift = false;
     currentViewingShift = null;
+    currentViewingShiftData = null;
     viewingShiftId = null;
     await loadAllData();
     calculateLiveReportStats();
@@ -2993,6 +3276,7 @@ async function returnToCurrentShift() {
     updateDistributionIndicator();
     var el_viewingBadge_d23 = document.getElementById('viewingBadge'); if (el_viewingBadge_d23) el_viewingBadge_d23.style.display = 'none';
     var el_returnToCurrentBtn_d24 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d24) el_returnToCurrentBtn_d24.style.display = 'none';
+    var el_archiveSummaryCard = document.getElementById('archiveSummaryCard'); if (el_archiveSummaryCard) el_archiveSummaryCard.style.display = 'none';
     var el_archiveSelect_v4 = document.getElementById('archiveSelect'); if (el_archiveSelect_v4) el_archiveSelect_v4.value = '';
     var el_updateStatus_h7 = document.getElementById('updateStatus'); if (el_updateStatus_h7) el_updateStatus_h7.innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
     var el_shiftModal_d25 = document.getElementById('shiftModal'); if (el_shiftModal_d25) el_shiftModal_d25.style.display = 'none';
@@ -7452,7 +7736,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=27'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=28'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
@@ -7870,6 +8154,7 @@ async function opsUploadFiles() {
     formData.append('category', category);
     formData.append('note', note);
     formData.append('uploader', 'المشرف');
+    if (currentShiftId) formData.append('shiftId', String(currentShiftId));
 
     var progressBar = document.getElementById('opsUploadProgress');
     var progressDiv = progressBar.querySelector('div');

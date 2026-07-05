@@ -357,6 +357,72 @@ async function initTables() {
 }
 
 // ============================================
+// MIGRATIONS: Add shift_id columns & new tables
+// ============================================
+async function runMigrations() {
+  logger.info('Running database migrations...');
+
+  // Add shift_id columns to existing tables (backward-compatible)
+  const migrations = [
+    `ALTER TABLE reports ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
+    `ALTER TABLE shift_completions ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE`,
+    `ALTER TABLE ops_files ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
+    `ALTER TABLE timeline ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
+    `ALTER TABLE announcements ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`
+  ];
+
+  for (const sql of migrations) {
+    try {
+      await exec(sql);
+      logger.info(`Migration executed: ${sql}`);
+    } catch (err) {
+      if (err.message && err.message.includes('duplicate column')) {
+        logger.info(`Column already exists, skipping: ${sql}`);
+      } else {
+        logger.warn(`Migration warning: ${err.message}`);
+      }
+    }
+  }
+
+  // Create audit_log table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+      user_id TEXT,
+      user_name TEXT,
+      action TEXT NOT NULL,
+      detail TEXT,
+      type TEXT DEFAULT 'system',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_audit_shift ON audit_log(shift_id)`);
+    logger.info('audit_log table created');
+  } catch (err) {
+    logger.warn('audit_log table creation warning: ' + err.message);
+  }
+
+  // Create shift_forms table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_forms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
+      form_id TEXT NOT NULL,
+      form_name TEXT,
+      form_data TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_forms_shift ON shift_forms(shift_id)`);
+    logger.info('shift_forms table created');
+  } catch (err) {
+    logger.warn('shift_forms table creation warning: ' + err.message);
+  }
+
+  logger.info('Migrations complete');
+}
+
+// ============================================
 // CRUD: REPORTS
 // ============================================
 const Reports = {
@@ -369,9 +435,12 @@ const Reports = {
   async getByCenterUnit(center, unit) {
     return get('SELECT * FROM reports WHERE center = ? AND unit = ?', [center, unit]);
   },
-  async create(center, unit, count = 0) {
-    const result = await run('INSERT INTO reports (center, unit, count) VALUES (?, ?, ?);', [center, unit, count]);
+  async create(center, unit, count = 0, shift_id = null) {
+    const result = await run('INSERT INTO reports (center, unit, count, shift_id) VALUES (?, ?, ?, ?);', [center, unit, count, shift_id]);
     return result.id;
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM reports WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
   },
   async updateCount(id, count) {
     return run('UPDATE reports SET count = ? WHERE id = ?', [count, id]);
@@ -466,7 +535,10 @@ const Announcements = {
     return get('SELECT * FROM announcements WHERE id = ?', [id]);
   },
   async create(data) {
-    return run('INSERT INTO announcements (id, title, body, date, pinned, urgent) VALUES (?, ?, ?, ?, ?, ?);', [data.id, data.title, data.body, data.date, data.pinned ? 1 : 0, data.urgent ? 1 : 0]);
+    return run('INSERT INTO announcements (id, title, body, date, pinned, urgent, shift_id) VALUES (?, ?, ?, ?, ?, ?, ?);', [data.id, data.title, data.body, data.date, data.pinned ? 1 : 0, data.urgent ? 1 : 0, data.shift_id || null]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM announcements WHERE shift_id = ? ORDER BY pinned DESC, urgent DESC, created_at DESC', [shift_id]);
   },
   async update(id, data) {
     return run('UPDATE announcements SET title = ?, body = ?, date = ?, pinned = ?, urgent = ? WHERE id = ?;', [data.title, data.body, data.date, data.pinned ? 1 : 0, data.urgent ? 1 : 0, id]);
@@ -490,7 +562,10 @@ const OpsFiles = {
     return get('SELECT * FROM ops_files WHERE id = ?', [id]);
   },
   async create(data) {
-    return run('INSERT INTO ops_files (id, filename, stored_name, size, mime_type, upload_date, uploader, category, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);', [data.id, data.filename, data.storedName, data.size, data.mimeType, data.uploadDate, data.uploader, data.category, data.note]);
+    return run('INSERT INTO ops_files (id, filename, stored_name, size, mime_type, upload_date, uploader, category, note, shift_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [data.id, data.filename, data.storedName, data.size, data.mimeType, data.uploadDate, data.uploader, data.category, data.note, data.shift_id || null]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM ops_files WHERE shift_id = ? ORDER BY upload_date DESC', [shift_id]);
   },
   async update(id, data) {
     return run('UPDATE ops_files SET filename = ?, stored_name = ?, size = ?, mime_type = ?, upload_date = ?, uploader = ?, category = ?, note = ? WHERE id = ?;', [data.filename, data.storedName, data.size, data.mimeType, data.uploadDate, data.uploader, data.category, data.note, id]);
@@ -562,7 +637,10 @@ const Timeline = {
     return get('SELECT * FROM timeline WHERE id = ?', [id]);
   },
   async create(data) {
-    return run('INSERT INTO timeline (title, desc, type, date, time) VALUES (?, ?, ?, ?, ?);', [data.title, data.desc, data.type, data.date, data.time]);
+    return run('INSERT INTO timeline (title, desc, type, date, time, shift_id) VALUES (?, ?, ?, ?, ?, ?);', [data.title, data.desc, data.type, data.date, data.time, data.shift_id || null]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM timeline WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
   },
   async update(id, data) {
     return run('UPDATE timeline SET title = ?, desc = ?, type = ?, date = ?, time = ? WHERE id = ?;', [data.title, data.desc, data.type, data.date, data.time, id]);
@@ -967,6 +1045,63 @@ const Notifications = {
 };
 
 // ============================================
+// CRUD: SHIFT COMPLETIONS
+// ============================================
+const ShiftCompletions = {
+  async getAll() {
+    return all('SELECT * FROM shift_completions ORDER BY id DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_completions WHERE id = ?', [id]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM shift_completions WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_completions (shift_type, shift_date, teams_data, notes, created_by, created_at, shift_id) VALUES (?, ?, ?, ?, ?, ?, ?);', [data.shift_type, data.shift_date, data.teams_data, data.notes || '', data.created_by, data.created_at, data.shift_id || null]);
+    return result.id;
+  }
+};
+
+// ============================================
+// CRUD: AUDIT LOG
+// ============================================
+const AuditLog = {
+  async getAll() {
+    return all('SELECT * FROM audit_log ORDER BY id DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM audit_log WHERE id = ?', [id]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM audit_log WHERE shift_id = ? ORDER BY created_at DESC', [shift_id]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO audit_log (shift_id, user_id, user_name, action, detail, type) VALUES (?, ?, ?, ?, ?, ?);', [data.shift_id || null, data.user_id || null, data.user_name || null, data.action, data.detail || '', data.type || 'system']);
+    return result.id;
+  }
+};
+
+// ============================================
+// CRUD: SHIFT FORMS
+// ============================================
+const ShiftForms = {
+  async getAll() {
+    return all('SELECT * FROM shift_forms ORDER BY id DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_forms WHERE id = ?', [id]);
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM shift_forms WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_forms (shift_id, form_id, form_name, form_data, created_by) VALUES (?, ?, ?, ?, ?);', [data.shift_id, data.form_id, data.form_name || null, data.form_data || null, data.created_by || null]);
+    return result.id;
+  }
+};
+
+// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -1178,6 +1313,7 @@ async function migrateAll() {
 async function init(runMigration = false) {
   await openDb();
   await initTables();
+  await runMigrations();
   if (runMigration) {
     await migrateAll();
   }
@@ -1216,6 +1352,9 @@ module.exports = {
   ShiftScheduleAuto,
   StaffingAlerts,
   Notifications,
+  ShiftCompletions,
+  AuditLog,
+  ShiftForms,
 
   // Migration
   migrateAll

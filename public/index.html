@@ -186,7 +186,7 @@
                     <i class="fas fa-clock"></i>
                     <span id="currentShiftDisplay">جاري التحميل...</span>
                 </button>
-                <button class="qa-btn" title="تكميل النوبة" onclick="location.href='radio-completion.html?v=27'">
+                <button class="qa-btn" title="تكميل النوبة" onclick="location.href='radio-completion.html?v=28'">
                     <i class="fas fa-clipboard-list"></i>
                     <span>تكميل</span>
                 </button>
@@ -299,6 +299,8 @@
             <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
             <span id="viewingBadge" class="viewing-badge" style="display:none;"></span>
             <button id="returnToCurrentBtn" class="btn" style="display:none;">↩️ العودة للحالية</button>
+            <!-- Archive Summary Card (shown when viewing past shift) -->
+            <div id="archiveSummaryCard" class="archive-summary-card-top" style="display:none;"></div>
             <!-- مؤشر حالة المناوبة -->
             <div id="shiftStatus" class="shift-status-indicator" style="display:none;">
                 <span class="shift-status-dot" id="shiftStatusDot"></span>
@@ -309,6 +311,7 @@
             <label style="font-weight:600; font-size:0.85rem;">📂 المناوبات السابقة:</label>
             <select id="archiveSelect"><option value="">-- مناوبة جديدة --</option></select>
             <button id="viewShiftBtn" class="btn">📋 عرض البلاغات</button>
+            <button id="viewArchiveDataBtn" class="btn btn-primary" onclick="openShiftArchiveModalForShift(parseInt(document.getElementById('archiveSelect').value) || null)">📋 عرض البيانات</button>
         </div>
         <div class="toolbar">
             <!-- ===== المجموعة الأولى: من اليمين ===== -->
@@ -316,7 +319,7 @@
                 <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
                 <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>
-            <button id="shiftBtn" class="btn btn-secondary" onclick="location.href='radio-completion.html?v=27'"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+            <button id="shiftBtn" class="btn btn-secondary" onclick="location.href='radio-completion.html?v=28'"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
             <button class="btn btn-info" onclick="window.location.href='smart-schedule.html?v=15'"><i class="fas fa-calendar-alt"></i> الجداول</button>
             <button class="btn btn-daily-report" onclick="window.location.href='daily-report.html?v=10'"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
@@ -1341,39 +1344,53 @@
 
 <!-- ===== نافذة أرشيف المناوبات ===== -->
 <div id="shiftArchiveModal" class="modal">
-    <div class="modal-content" style="min-width:600px; width:95%; max-width:800px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0; color:var(--primary-700);"><i class="fas fa-archive" style="color:var(--gold);"></i> أرشيف المناوبات</h2>
-            <button onclick="document.getElementById('shiftArchiveModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
-        </div>
-        <p style="color:var(--gray-600); margin-bottom:15px; font-size:0.85rem;">اختر مناوبة سابقة لعرض ملخصها أو تعديلها</p>
-        <div style="margin-bottom:20px;">
-            <select id="archiveModalSelect" onchange="clearArchiveSummary()" style="width:100%; padding:10px; border-radius:var(--radius-md); border:2px solid var(--gray-200); font-family:&#x27;Inter&#x27;,sans-serif; font-size:0.9rem; font-weight:600; color:var(--primary-700); background:var(--white);">
-                <option value="">-- اختر التاريخ --</option>
-            </select>
-        </div>
-        <div class="modal-buttons" style="justify-content:center; gap:12px; margin-bottom:20px;">
-            <button onclick="viewSelectedArchiveShift()" class="btn btn-primary" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-eye"></i> عرض الملخص</button>
-            <button onclick="editSelectedArchiveShift()" class="btn btn-success" style="padding:10px 30px; font-size:1rem;"><i class="fas fa-edit"></i> تعديل التكميل</button>
-        </div>
-        <div id="archiveSummaryArea" style="display:none; background:var(--gray-50); border-radius:var(--radius-md); padding:20px; margin-bottom:20px; border:1px solid var(--gray-200);">
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px; padding-bottom:10px; border-bottom:2px solid var(--gray-200);">
-                <i class="fas fa-clipboard-list" style="color:var(--primary-700); font-size:1.2rem;"></i>
-                <h3 style="margin:0; font-size:1.1rem; color:var(--primary-700);" id="archiveSummaryTitle">ملخص المناوبة</h3>
+    <div class="modal-content" style="min-width:700px; width:95%; max-width:1000px; padding:0; overflow:hidden; display:flex; flex-direction:column;">
+        <!-- Header -->
+        <div class="peak-header">
+            <div class="peak-header-left">
+                <div class="peak-header-icon" style="background:linear-gradient(135deg, var(--gold), #FBBF24);"><i class="fas fa-archive"></i></div>
+                <div class="peak-header-text">
+                    <h2>📂 أرشيف المناوبات</h2>
+                    <p>استعراض بيانات المناوبات السابقة</p>
+                </div>
             </div>
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-bottom:15px;" id="archiveStatsGrid"></div>
-            <div style="background:var(--white); border-radius:var(--radius-sm); padding:15px; margin-bottom:15px;">
-                <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:var(--gray-600);"><i class="fas fa-chart-bar"></i> إحصائيات البلاغات</h4>
-                <div id="archiveReportsStats" style="font-size:0.85rem; color:var(--text);"></div>
-            </div>
-            <div style="background:var(--yellow-50); border-right:4px solid var(--gold); border-radius:var(--radius-sm); padding:12px;">
-                <h4 style="margin:0 0 8px 0; font-size:0.9rem; color:var(--gray-600);"><i class="fas fa-sticky-note"></i> الملاحظات</h4>
-                <div id="archiveNotesContent" style="font-size:0.85rem; color:var(--text); white-space:pre-wrap;">—</div>
+            <button onclick="document.getElementById('shiftArchiveModal').style.display='none'" class="peak-close-btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <!-- Shift selector -->
+        <div style="padding:16px 20px; border-bottom:1px solid var(--gray-200); background:var(--gray-50);">
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                <label style="font-weight:600; font-size:0.85rem; color:var(--gray-700);">اختر المناوبة:</label>
+                <select id="archiveModalSelect" onchange="clearArchiveSummary()" style="flex:1; min-width:200px; padding:10px; border-radius:var(--radius-md); border:2px solid var(--gray-200); font-size:0.9rem; font-weight:600; color:var(--primary-700); background:var(--white);">
+                    <option value="">-- اختر التاريخ --</option>
+                </select>
+                <button onclick="viewSelectedArchiveShift()" class="btn btn-primary" style="padding:8px 20px; font-size:0.85rem;"><i class="fas fa-eye"></i> عرض</button>
+                <button onclick="editSelectedArchiveShift()" class="btn btn-success" style="padding:8px 20px; font-size:0.85rem;"><i class="fas fa-edit"></i> تعديل التكميل</button>
             </div>
         </div>
-        <div style="text-align:center; border-top:1px solid var(--gray-200); padding-top:16px;">
-            <button onclick="selectShiftFromHistory(null); document.getElementById('shiftArchiveModal').style.display='none';" class="btn" style="color:var(--primary); background:transparent; border:1px solid var(--primary);">
+        
+        <!-- Tabs -->
+        <div class="archive-tabs" style="display:flex; gap:0; border-bottom:1px solid var(--gray-200); background:var(--white); overflow-x:auto;">
+            <button onclick="switchArchiveTab('summary')" class="archive-tab-btn active" data-tab="summary"><i class="fas fa-clipboard-list"></i> ملخص المناوبة</button>
+            <button onclick="switchArchiveTab('reports')" class="archive-tab-btn" data-tab="reports"><i class="fas fa-file-alt"></i> البلاغات</button>
+            <button onclick="switchArchiveTab('completion')" class="archive-tab-btn" data-tab="completion"><i class="fas fa-clipboard-check"></i> التكميل</button>
+            <button onclick="switchArchiveTab('forms')" class="archive-tab-btn" data-tab="forms"><i class="fas fa-file-alt"></i> النماذج</button>
+            <button onclick="switchArchiveTab('audit')" class="archive-tab-btn" data-tab="audit"><i class="fas fa-history"></i> سجل العمليات</button>
+            <button onclick="switchArchiveTab('files')" class="archive-tab-btn" data-tab="files"><i class="fas fa-folder-open"></i> الملفات</button>
+        </div>
+        
+        <!-- Tab Content -->
+        <div id="archiveTabContentArea" style="display:none; flex:1; overflow-y:auto; padding:20px; background:var(--gray-50); min-height:300px;">
+            <!-- يُملأ ديناميكياً -->
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding:16px 20px; border-top:1px solid var(--gray-200); background:var(--white); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <button onclick="selectShiftFromHistory(null); document.getElementById('shiftArchiveModal').style.display='none';" class="btn" style="color:var(--primary-700); background:transparent; border:1px solid var(--primary-700);">
                 <i class="fas fa-arrow-right"></i> العودة للمناوبة الحالية
+            </button>
+            <button onclick="document.getElementById('shiftArchiveModal').style.display='none'" class="btn">
+                <i class="fas fa-times"></i> إغلاق
             </button>
         </div>
     </div>
@@ -1542,7 +1559,7 @@
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); location.href='radio-completion.html?v=27';"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); location.href='radio-completion.html?v=28';"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='report-entry.html?v=10';"><i class="fas fa-clipboard-check"></i> إدخال بلاغات الفرق</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='daily-report.html?v=10';"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>

@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=26'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=28'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -380,6 +380,26 @@ function getShiftTimeStr() {
 }
 
 // ============================================
+// SHIFT ID HELPER
+// ============================================
+function getCurrentShiftId() {
+    // Try to get from localStorage (if app.js stored it)
+    var stored = localStorage.getItem('currentShiftId');
+    if (stored) {
+        try {
+            var parsed = parseInt(stored);
+            if (!isNaN(parsed) && parsed > 0) {
+                console.log('[getCurrentShiftId] From localStorage:', parsed);
+                return parsed;
+            }
+        } catch(e) {}
+    }
+    // Infer from shift_date + shift_type: not possible without server lookup
+    console.log('[getCurrentShiftId] Not available in localStorage');
+    return null;
+}
+
+// ============================================
 // INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -526,6 +546,12 @@ function loadSavedCompletion() {
             if (result.completion.notes) {
                 document.getElementById('globalNotes').value = result.completion.notes;
                 globalNotes = result.completion.notes;
+            }
+            // If server returned shift_id, store it for future saves
+            if (result.shift_id || result.completion.shift_id) {
+                var sid = result.shift_id || result.completion.shift_id;
+                console.log('[loadSavedCompletion] Storing shift_id from server:', sid);
+                localStorage.setItem('currentShiftId', String(sid));
             }
             renderAll();
             showToast('✅ تم تحميل التكميل المحفوظ لهذه المناوبة', 'success');
@@ -883,6 +909,7 @@ function saveToServer() {
         return;
     }
     
+    var shiftId = getCurrentShiftId();
     var payload = {
         shiftType: getShiftType(),
         shiftDate: getShiftDate(),
@@ -890,6 +917,10 @@ function saveToServer() {
         notes: document.getElementById('globalNotes').value.trim(),
         timestamp: new Date().toISOString()
     };
+    // Include shift_id if available (backward-compatible: optional)
+    if (shiftId) {
+        payload.shift_id = shiftId;
+    }
     console.log('[saveToServer] Sending payload:', payload);
     
     fetch('/api/shift-completion', {

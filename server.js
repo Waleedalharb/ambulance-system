@@ -47,6 +47,33 @@ function dbResponse(res, promise, fallback) {
     });
 }
 
+// Helper: resolve shift_id from request, currentShiftId, or date+type
+async function resolveShiftId(req, shiftDate, shiftType) {
+    let shiftId = req.body.shift_id || req.body.shiftId || null;
+    if (shiftId) return parseInt(shiftId);
+    
+    // Try currentShiftId global
+    if (currentShiftId) return currentShiftId;
+    
+    // Try to infer from shift_date + shift_type
+    if (shiftDate && shiftType) {
+        try {
+            if (dbAvailable() && db.Shifts) {
+                const shift = await db.get('SELECT id FROM shifts WHERE shift_date = ? AND shift_type = ? LIMIT 1', [shiftDate, shiftType]);
+                if (shift) return shift.id;
+            }
+            // Fallback to JSON
+            const shifts = await readShifts();
+            const shift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            if (shift) return shift.id;
+        } catch (e) {
+            console.warn('Could not resolve shift_id:', e.message);
+        }
+    }
+    
+    return null;
+}
+
 // ============================================
 // Logger (بسيط — يعمل حتى بدون winston)
 // ============================================
@@ -965,7 +992,7 @@ async function writeAuditLog(data) {
     await fs.writeFile(AUDIT_LOG_PATH, JSON.stringify(data, null, 2));
 }
 
-async function addAuditLogEntry(action, details, category, user, role, userId) {
+async function addAuditLogEntry(action, details, category, user, role, userId, shiftId = null) {
     try {
         const logs = await readAuditLog();
         const newEntry = {
@@ -976,11 +1003,29 @@ async function addAuditLogEntry(action, details, category, user, role, userId) {
             user: user || 'غير معروف',
             role: role || 'unknown',
             userId: userId || null,
+            shift_id: shiftId,
             timestamp: new Date().toISOString()
         };
         logs.unshift(newEntry);
         if (logs.length > 500) logs.pop();
         await writeAuditLog(logs);
+        
+        // Also save to SQLite audit_log if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                await db.AuditLog.create({
+                    shift_id: shiftId || null,
+                    user_id: userId || null,
+                    user_name: user || 'غير معروف',
+                    action: action,
+                    detail: details || '',
+                    type: category || 'general'
+                });
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log save failed in helper:', dbErr.message);
+        }
+        
         broadcast({
             type: 'audit_log_added',
             message: 'تم إضافة سجل تدقيق جديد',
@@ -1349,11 +1394,45 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
-        res.json({
+        
+        const response = {
             shift: shift,
             reports: shift.savedReports || {},
-            total: shift.totalReports || 0
-        });
+            total: shift.totalReports || 0,
+            completions: [],
+            forms: [],
+            audit_log: [],
+            files: [],
+            timeline: []
+        };
+        
+        // Query related data from SQLite if available
+        try {
+            if (dbAvailable()) {
+                if (db.Reports && db.Reports.getByShift) {
+                    response.reports = await db.Reports.getByShift(shiftId);
+                }
+                if (db.ShiftCompletions && db.ShiftCompletions.getByShift) {
+                    response.completions = await db.ShiftCompletions.getByShift(shiftId);
+                }
+                if (db.ShiftForms && db.ShiftForms.getByShift) {
+                    response.forms = await db.ShiftForms.getByShift(shiftId);
+                }
+                if (db.AuditLog && db.AuditLog.getByShift) {
+                    response.audit_log = await db.AuditLog.getByShift(shiftId);
+                }
+                if (db.OpsFiles && db.OpsFiles.getByShift) {
+                    response.files = await db.OpsFiles.getByShift(shiftId);
+                }
+                if (db.Timeline && db.Timeline.getByShift) {
+                    response.timeline = await db.Timeline.getByShift(shiftId);
+                }
+            }
+        } catch (dbErr) {
+            console.warn('[DB] Failed to load related shift data:', dbErr.message);
+        }
+        
+        res.json(response);
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب المناوبة' });
     }
@@ -1659,6 +1738,16 @@ app.post('/api/report', authenticate, validateBody({
         allData[key].times.unshift(timestamp);
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
+
+        // Also save to SQLite with shift_id if available
+        try {
+            if (dbAvailable() && db.Reports) {
+                const shiftId = await resolveShiftId(req);
+                await db.Reports.create(center, unit, allData[key].count, shiftId);
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite report save failed, using JSON fallback:', dbErr.message);
+        }
 
         // بث البلاغ الجديد لجميع المتصلين
         broadcast({
@@ -2013,10 +2102,13 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         
+        const shiftId = await resolveShiftId(req, shiftDate, shiftType);
+        
         const completionData = {
             id: Date.now().toString(),
             shiftType,
             shiftDate,
+            shift_id: shiftId,
             teams,
             notes: notes || '',
             timestamp: timestamp || new Date().toISOString(),
@@ -2036,28 +2128,41 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
         // Also try to save to SQLite if available
         if (dbAvailable()) {
             try {
-                // Ensure table exists with correct schema (matches db.js)
-                await db.exec(`
-                    CREATE TABLE IF NOT EXISTS shift_completions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        shift_type TEXT NOT NULL,
-                        shift_date TEXT NOT NULL,
-                        teams_data TEXT NOT NULL,
-                        notes TEXT,
-                        created_by TEXT,
-                        created_at TEXT
-                    )
-                `);
-                // Fix older tables that were created without the notes column
-                try {
-                    await db.exec(`ALTER TABLE shift_completions ADD COLUMN notes TEXT`);
-                } catch (alterErr) {
-                    // Column already exists — ignore
+                if (db.ShiftCompletions) {
+                    await db.ShiftCompletions.create({
+                        shift_type: shiftType,
+                        shift_date: shiftDate,
+                        teams_data: JSON.stringify(teams),
+                        notes: notes || '',
+                        created_by: completionData.createdBy,
+                        created_at: completionData.timestamp,
+                        shift_id: shiftId
+                    });
+                } else {
+                    // Fallback inline SQL for older db.js without ShiftCompletions namespace
+                    await db.exec(`
+                        CREATE TABLE IF NOT EXISTS shift_completions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            shift_type TEXT NOT NULL,
+                            shift_date TEXT NOT NULL,
+                            shift_id INTEGER,
+                            teams_data TEXT NOT NULL,
+                            notes TEXT,
+                            created_by TEXT,
+                            created_at TEXT
+                        )
+                    `);
+                    try {
+                        await db.exec(`ALTER TABLE shift_completions ADD COLUMN notes TEXT`);
+                    } catch (alterErr) {}
+                    try {
+                        await db.exec(`ALTER TABLE shift_completions ADD COLUMN shift_id INTEGER`);
+                    } catch (alterErr) {}
+                    await db.run(
+                        'INSERT INTO shift_completions (shift_type, shift_date, shift_id, teams_data, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [shiftType, shiftDate, shiftId, JSON.stringify(teams), notes || '', completionData.createdBy, completionData.timestamp]
+                    );
                 }
-                await db.run(
-                    'INSERT INTO shift_completions (shift_type, shift_date, teams_data, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                    [shiftType, shiftDate, JSON.stringify(teams), notes || '', completionData.createdBy, completionData.timestamp]
-                );
             } catch (dbErr) {
                 console.log('[DB] SQLite save failed, using JSON fallback:', dbErr.message);
             }
@@ -2108,7 +2213,7 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
         
         try {
             const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-            res.json({ success: true, completion: data });
+            res.json({ success: true, completion: data, shift_id: data.shift_id || null });
         } catch (e) {
             // Try SQLite fallback
             if (dbAvailable()) {
@@ -2123,11 +2228,13 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
                             completion: {
                                 shiftDate: row.shift_date,
                                 shiftType: row.shift_type,
+                                shift_id: row.shift_id || null,
                                 teams: JSON.parse(row.teams_data),
                                 notes: row.notes || '',
                                 timestamp: row.created_at,
                                 createdBy: row.created_by
-                            }
+                            },
+                            shift_id: row.shift_id || null
                         });
                         return;
                     }
@@ -3180,6 +3287,30 @@ app.post('/api/timeline', authenticate, authorize(['admin']), async (req, res) =
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         await writeTimeline(data);
+        
+        // Also try to sync to SQLite with shift_id
+        try {
+            if (dbAvailable() && db.Timeline) {
+                const shiftId = await resolveShiftId(req);
+                if (Array.isArray(data) && shiftId) {
+                    for (const item of data) {
+                        if (item.title && item.date) {
+                            await db.Timeline.create({
+                                title: item.title,
+                                desc: item.desc || '',
+                                type: item.type || 'event',
+                                date: item.date,
+                                time: item.time || '',
+                                shift_id: shiftId
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite timeline sync failed:', dbErr.message);
+        }
+        
         broadcast({
             type: 'timeline_updated',
             message: 'تم تحديث الخط الزمني'
@@ -4046,6 +4177,7 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
         if (!files || files.length === 0) {
             return res.status(400).json({ error: 'لا يوجد ملفات' });
         }
+        const shiftId = await resolveShiftId(req);
         const metadata = await readOpsMetadata();
         const results = [];
         for (const file of files) {
@@ -4064,6 +4196,7 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
                 uploader: req.body.uploader || 'مستخدم',
                 category: req.body.category || 'عام',
                 note: req.body.note || '',
+                shift_id: shiftId,
                 icon: file.mimetype.startsWith('image/') ? '🖼️' :
                       file.mimetype === 'application/pdf' ? '📄' :
                       file.mimetype.includes('word') ? '📝' :
@@ -4071,6 +4204,26 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
             };
             metadata.unshift(entry);
             results.push(entry);
+            
+            // Also save to SQLite ops_files if available
+            try {
+                if (dbAvailable() && db.OpsFiles) {
+                    await db.OpsFiles.create({
+                        id: entry.id,
+                        filename: entry.filename,
+                        storedName: entry.storedName,
+                        size: entry.size,
+                        mimeType: entry.mimeType,
+                        uploadDate: entry.uploadDate,
+                        uploader: entry.uploader,
+                        category: entry.category,
+                        note: entry.note,
+                        shift_id: shiftId
+                    });
+                }
+            } catch (dbErr) {
+                console.log('[DB] SQLite ops_files save failed:', dbErr.message);
+            }
         }
         await writeOpsMetadata(metadata);
         broadcast({
@@ -4625,6 +4778,34 @@ app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
 app.get('/api/audit-log', authenticate, async (req, res) => {
     try {
         const logs = await readAuditLog();
+        // Also try to include SQLite audit logs if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                const dbLogs = await db.AuditLog.getAll();
+                // Merge and sort by timestamp desc, deduplicate by action+timestamp
+                const seen = new Set(logs.map(l => l.timestamp + '|' + l.action + '|' + l.user));
+                for (const dbLog of dbLogs) {
+                    const key = (dbLog.created_at || '') + '|' + (dbLog.action || '') + '|' + (dbLog.user_name || '');
+                    if (!seen.has(key)) {
+                        logs.push({
+                            id: dbLog.id ? dbLog.id.toString() : Date.now().toString(),
+                            action: dbLog.action,
+                            details: dbLog.detail || '',
+                            category: dbLog.type || 'general',
+                            user: dbLog.user_name || 'غير معروف',
+                            role: 'unknown',
+                            userId: dbLog.user_id || null,
+                            shift_id: dbLog.shift_id || null,
+                            timestamp: dbLog.created_at || new Date().toISOString()
+                        });
+                    }
+                }
+                logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                if (logs.length > 500) logs.length = 500;
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log read failed:', dbErr.message);
+        }
         res.json({ success: true, logs });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
@@ -4633,10 +4814,11 @@ app.get('/api/audit-log', authenticate, async (req, res) => {
 
 app.post('/api/audit-log', authenticate, async (req, res) => {
     try {
-        const { action, details, category, user } = req.body;
+        const { action, details, category, user, shift_id } = req.body;
         if (!action) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
+        const shiftId = await resolveShiftId(req);
         const logs = await readAuditLog();
         // Use client-provided user name as override if present, otherwise JWT
         var displayUser = user || req.user.name || req.user.username || 'غير معروف';
@@ -4648,11 +4830,29 @@ app.post('/api/audit-log', authenticate, async (req, res) => {
             user: displayUser,
             role: req.user.role || 'unknown',
             userId: req.user.id || req.user.userId || null,
+            shift_id: shiftId,
             timestamp: new Date().toISOString()
         };
         logs.unshift(newEntry);
         if (logs.length > 500) logs.pop();
         await writeAuditLog(logs);
+        
+        // Also save to SQLite audit_log if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                await db.AuditLog.create({
+                    shift_id: shiftId,
+                    user_id: req.user.id || req.user.userId || null,
+                    user_name: displayUser,
+                    action: action,
+                    detail: details || '',
+                    type: category || 'general'
+                });
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log save failed:', dbErr.message);
+        }
+        
         broadcast({
             type: 'audit_log_added',
             message: 'تم إضافة سجل تدقيق جديد',

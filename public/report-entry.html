@@ -1418,17 +1418,24 @@ async function saveRecords(records) {
         serverIds[serverRecords[i].id] = true;
     }
 
+    // Get current shift_id if available
+    var shiftId = localStorage.getItem('currentShiftId');
+
     // POST new records
     for (var i = 0; i < records.length; i++) {
         if (!serverIds[records[i].id]) {
             try {
+                var record = records[i];
+                if (shiftId) {
+                    record.shift_id = parseInt(shiftId);
+                }
                 await fetch('/api/report-entry', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + (authToken || '')
                     },
-                    body: JSON.stringify(records[i])
+                    body: JSON.stringify(record)
                 });
             } catch(e) {
                 console.error('Failed to POST record:', e);
