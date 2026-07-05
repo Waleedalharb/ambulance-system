@@ -26,7 +26,7 @@ try {
 const aiMonitor = require('./ai-monitor');
 
 // Auto-Fix Engine — Data integrity & self-healing
-const autoFixEngine = require('./auto-fix-engine');
+// const autoFixEngine = require('./auto-fix-engine'); // disabled - file not tracked
 
 // Helper: check if DB is available
 function dbAvailable() {
@@ -3553,8 +3553,9 @@ app.post('/api/admin/monitor/force-check', authenticate, authorize(['admin']), a
 });
 
 // ============================================
-// API: Auto-Fix Engine — الإصلاح التلقائي
+// API: Auto-Fix Engine — الإصلاح التلقائي (disabled - module not available)
 // ============================================
+/*
 app.post('/api/admin/auto-fix', authenticate, authorize(['admin']), async (req, res) => {
     try {
         const result = await autoFixEngine.runAll(
@@ -3581,6 +3582,7 @@ app.get('/api/admin/auto-fix/logs', authenticate, authorize(['admin']), async (r
         res.status(500).json({ error: 'فشل في جلب سجل الإصلاحات' });
     }
 });
+*/
 
 // ============================================
 // API: Frontend Errors — أخطاء المتصفح
