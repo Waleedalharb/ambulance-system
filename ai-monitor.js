@@ -329,7 +329,6 @@ async function _performHealthCheck() {
     // ── Auto-healing & alerting ──
     await _autoFixData();
     await _evaluateAndHeal(_currentHealth);
-    await _evaluateAndHeal(_currentHealth);
 
     return _currentHealth;
   } catch (err) {
@@ -373,6 +372,12 @@ async function _performHealthCheck() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. Auto-Healer & Rule Engine
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Placeholder for data auto-fix operations (currently no-op)
+async function _autoFixData() {
+  // Reserved for future auto-healing logic
+  // e.g. clean up orphaned records, rebuild corrupted indices, etc.
+}
 
 async function _evaluateAndHeal(health) {
   // Rule 1: DB connection failure → retry up to 3 times
