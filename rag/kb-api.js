@@ -13,7 +13,6 @@ const { processDocument } = require('./document-processor');
 const { SOPRAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
 const { getAgent } = require('./agent-layer');
 const { getAIProvider } = require('./ai-provider');
-const { SOPRAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
 
 const router = express.Router();
 
