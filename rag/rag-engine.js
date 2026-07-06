@@ -208,6 +208,158 @@ class RAGIndex {
 }
 
 // ============================================
+// STRUCTURED ANSWER EXTRACTION
+// ============================================
+
+function extractSOPInfo(content) {
+  // Extract SOP number and name
+  const sopMatch = content.match(/الإجراء\s*رقم[\s:]*SOP-?\s*(\d+)/i);
+  const nameMatch = content.match(/اسم\s*الإجراء[\s:]*(.+?)(?:\n|$)/i);
+  
+  return {
+    sopNumber: sopMatch ? `SOP-${sopMatch[1]}` : null,
+    sopName: nameMatch ? nameMatch[1].trim() : null
+  };
+}
+
+function extractSteps(content) {
+  // Extract numbered steps
+  const steps = [];
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const stepMatch = line.match(/^\s*(\d+)[\.\-]\s*(.+)/);
+    if (stepMatch) {
+      steps.push(stepMatch[2].trim());
+    }
+  }
+  return steps;
+}
+
+function extractRules(content) {
+  // Extract bullet points
+  const rules = [];
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const ruleMatch = line.match(/^\s*[•\-\*]\s*(.+)/);
+    if (ruleMatch) {
+      rules.push(ruleMatch[1].trim());
+    }
+  }
+  return rules;
+}
+
+function extractAnswer(content) {
+  // Extract answer from Q&A section
+  const answerMatch = content.match(/###\s*الإجابة\s*\n+([\s\S]+?)(?:\n---|\n###\s*سؤال|$)/i);
+  if (answerMatch) {
+    return answerMatch[1].trim();
+  }
+  
+  // Look for "وفقاً للإجراء" pattern
+  const accordMatch = content.match(/وفقاً\s*للإجراء\s+SOP-\d+[^\n]*/i);
+  if (accordMatch) {
+    return accordMatch[0].trim();
+  }
+  
+  return null;
+}
+
+function determineAnswerType(query, results) {
+  const q = query.toLowerCase();
+  
+  // Yes/No questions
+  if (q.match(/^(هل|هل\s+يمكن|هل\s+يسمح|هل\s+يحق)/)) {
+    return 'yesno';
+  }
+  
+  // Procedure/step questions
+  if (q.includes('كيف') || q.includes('ما\s*الخطوات') || q.includes('ماذا\s*أفعل') || q.includes('ما\s*الإجراء')) {
+    return 'procedure';
+  }
+  
+  // Where/location questions
+  if (q.includes('أين') || q.includes('إلى\s*أين') || q.includes('مستشفى')) {
+    return 'location';
+  }
+  
+  // Check first result for classification keywords
+  if (results.length > 0) {
+    const content = results[0].content.toLowerCase();
+    if (content.includes('خطوات') || content.includes('تنفيذ')) return 'procedure';
+    if (content.includes('ينقل') || content.includes('مستشفى')) return 'location';
+    if (content.includes('لا') || content.includes('نعم') || content.includes('يمكن')) return 'yesno';
+  }
+  
+  return 'general';
+}
+
+function buildStructuredAnswer(query, results) {
+  if (!results || results.length === 0) {
+    return null;
+  }
+  
+  const bestResult = results[0];
+  const content = bestResult.content;
+  const sopInfo = extractSOPInfo(content);
+  const answerType = determineAnswerType(query, results);
+  
+  // Build structured answer parts
+  let answer = '';
+  
+  // 1. Determine if it's a Yes/No question
+  if (answerType === 'yesno') {
+    const q = query.toLowerCase();
+    // Check if the content contains "لا" or prohibition
+    if (content.includes('لا يجوز') || content.includes('يمنع') || content.includes('لا يسمح') || content.includes('لا.')) {
+      answer = '**لا.**\n\n';
+    } else if (content.includes('نعم') || content.includes('يمكن') || content.includes('يسمح')) {
+      answer = '**نعم.**\n\n';
+    } else {
+      answer = '**لا.**\n\n';
+    }
+  }
+  
+  // 2. Try to extract answer from Q&A section first
+  const extractedAnswer = extractAnswer(content);
+  if (extractedAnswer) {
+    answer += extractedAnswer.replace(/^لا\./, '').replace(/^نعم\./, '').trim();
+    answer += '\n';
+  } else {
+    // 3. Extract steps if this is a procedure
+    const steps = extractSteps(content);
+    if (steps.length > 0 && answerType === 'procedure') {
+      answer += '\n';
+      for (let i = 0; i < steps.length; i++) {
+        answer += `${i + 1}. ${steps[i]}\n`;
+      }
+    } else {
+      // 4. Extract rules/bullets
+      const rules = extractRules(content);
+      if (rules.length > 0) {
+        for (const rule of rules) {
+          answer += `• ${rule}\n`;
+        }
+      } else {
+        // 5. Fallback: use first 2 sentences of content
+        const sentences = content.split(/[\.\n]/).filter(s => s.trim().length > 10);
+        if (sentences.length > 0) {
+          answer += sentences[0].trim() + '\n';
+          if (sentences.length > 1 && answer.length < 200) {
+            answer += sentences[1].trim() + '\n';
+          }
+        }
+      }
+    }
+  }
+  
+  return {
+    answer: answer.trim(),
+    sopInfo,
+    answerType
+  };
+}
+
+// ============================================
 // TEMPLATE-BASED ANSWER GENERATION
 // ============================================
 const EMS_TEMPLATES = {
@@ -216,64 +368,98 @@ const EMS_TEMPLATES = {
     'مرحباً! أنا هنا للإجابة على استفساراتك التشغيلية بناءً على البروتوكولات والوثائق المتاحة.',
     'أهلاً وسهلاً! اسألني عن أي بروتوكول أو إجراء تشغيلي.'
   ],
-  noResult: [
-    'لم أجد معلومات محددة في قاعدة المعرفة. يمكنك التواصل مع المشرف لإضافة وثائق جديدة.',
-    'عذراً، لا توجد معلومات كافية في النظام للإجابة على هذا الاستفسار.',
-    'لم أجد وثائق متعلقة بهذا الموضوع. هل تريد مساعدة في شيء آخر؟'
-  ],
-  protocol: 'بناءً على البروتوكولات المتاحة، إليك المعلومات:',
-  procedure: 'وفقاً للإجراءات التشغيلية:',
-  general: 'بناءً على الوثائق المتاحة:'
+  noResult: 'لم يتم العثور على إجراء رسمي يتعلق بهذا السؤال داخل قاعدة المعرفة الحالية.',
+  
+  // Structured answer templates
+  procedureIntro: '**الإجراء:** {sopName} ({sopNumber})\n\n**الخطوات:**\n\n',
+  locationIntro: '**الإجابة:**\n\n',
+  yesnoIntro: '',
+  generalIntro: '**الإجابة:**\n\n',
+  
+  reference: '\n\n**المرجع:**\n{sopNumber} – {sopName}.',
+  referenceShort: '\n\n**المرجع:**\n{sopNumber}.'
 };
 
 function generateAnswer(query, results) {
   if (!results || results.length === 0) {
-    const idx = Math.floor(Math.random() * EMS_TEMPLATES.noResult.length);
     return {
-      answer: EMS_TEMPLATES.noResult[idx],
+      answer: EMS_TEMPLATES.noResult,
       sources: [],
       confidence: 0
     };
   }
 
-  // Build context from top results
-  let context = '';
+  // Calculate average similarity for confidence
   let totalSimilarity = 0;
   const sources = [];
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
     totalSimilarity += r.similarity;
-    context += `\n[${i + 1}] ${r.content}\n`;
     sources.push({
       docId: r.docId,
       chunkIndex: r.chunkIndex,
       similarity: Math.round(r.similarity * 1000) / 1000,
-      excerpt: r.content.slice(0, 200) + (r.content.length > 200 ? '...' : '')
+      excerpt: r.content.slice(0, 150) + (r.content.length > 150 ? '...' : ''),
+      fullContent: r.content  // Store full content for "Show Details" button
     });
-    if (context.length > RAG_CONFIG.maxContextLength) break;
+    if (i >= 2) break; // Only keep top 3 sources for the response
   }
 
-  const avgSimilarity = totalSimilarity / results.length;
+  const avgSimilarity = totalSimilarity / Math.min(results.length, 3);
   const confidence = Math.round(avgSimilarity * 100);
-
-  // Determine template based on query keywords
-  const q = query.toLowerCase();
-  let prefix = EMS_TEMPLATES.general;
-  if (q.includes('بروتوكول') || q.includes('protocol') || q.includes('إجراء')) {
-    prefix = EMS_TEMPLATES.protocol;
-  } else if (q.includes('خطوة') || q.includes('إجراء') || q.includes('procedure') || q.includes('كيف')) {
-    prefix = EMS_TEMPLATES.procedure;
-  }
-
+  
   // Build structured answer
-  let answer = `${prefix}\n\n`;
-  answer += context.trim();
-  answer += `\n\n—\nتم الاسترجاع من ${results.length} مقطع من قاعدة المعرفة.\n`;
-  if (confidence < 30) {
-    answer += '⚠️ تنبيه: مستوى الثقة منخفض. يُفضل مراجعة المشرف التشغيلي.';
+  const structured = buildStructuredAnswer(query, results);
+  
+  if (!structured || !structured.answer) {
+    return {
+      answer: EMS_TEMPLATES.noResult,
+      sources,
+      confidence
+    };
   }
 
-  return { answer, sources, confidence };
+  // Build the final answer based on type
+  let finalAnswer = '';
+  const answerType = structured.answerType;
+  const sopInfo = structured.sopInfo;
+  
+  if (answerType === 'procedure' && sopInfo.sopNumber && sopInfo.sopName) {
+    finalAnswer = EMS_TEMPLATES.procedureIntro
+      .replace('{sopName}', sopInfo.sopName)
+      .replace('{sopNumber}', sopInfo.sopNumber);
+    finalAnswer += structured.answer;
+    finalAnswer += EMS_TEMPLATES.reference
+      .replace('{sopNumber}', sopInfo.sopNumber)
+      .replace('{sopName}', sopInfo.sopName);
+  } else if (answerType === 'location' || answerType === 'yesno') {
+    finalAnswer = EMS_TEMPLATES.locationIntro;
+    finalAnswer += structured.answer;
+    if (sopInfo.sopNumber) {
+      finalAnswer += EMS_TEMPLATES.referenceShort
+        .replace('{sopNumber}', sopInfo.sopNumber);
+    }
+  } else {
+    finalAnswer = EMS_TEMPLATES.generalIntro;
+    finalAnswer += structured.answer;
+    if (sopInfo.sopNumber && sopInfo.sopName) {
+      finalAnswer += EMS_TEMPLATES.reference
+        .replace('{sopNumber}', sopInfo.sopNumber)
+        .replace('{sopName}', sopInfo.sopName);
+    }
+  }
+  
+  // Add low confidence warning
+  if (confidence < 30) {
+    finalAnswer += '\n\n⚠️ تنبيه: مستوى الثقة منخفض. يُفضل مراجعة المشرف التشغيلي.';
+  }
+
+  return { 
+    answer: finalAnswer.trim(), 
+    sources, 
+    confidence,
+    answerType
+  };
 }
 
 // ============================================

@@ -431,7 +431,7 @@
             this.scrollToBottom();
         }
 
-        addBotMessage(text, confidence, sources) {
+        addBotMessage(text, confidence, sources, answerType) {
             this.elements.welcome.style.display = 'none';
             const el = document.createElement('div');
             el.className = 'ai-message bot';
@@ -450,11 +450,34 @@
                 `;
             }
 
+            // Format structured answer with proper line breaks and bold text
+            let formattedText = this.formatText(text);
+            
+            // Convert markdown-style **text** to bold HTML
+            formattedText = formattedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            
+            // Add details button if sources exist with full content
+            let detailsHtml = '';
+            if (sources && sources.length > 0 && sources[0].fullContent) {
+                const detailsId = 'details-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                detailsHtml = `
+                    <div class="ai-details-toggle">
+                        <button class="ai-details-btn" onclick="document.getElementById('${detailsId}').style.display = document.getElementById('${detailsId}').style.display === 'none' ? 'block' : 'none'; this.textContent = document.getElementById('${detailsId}').style.display === 'none' ? 'عرض الإجراء الكامل' : 'إخفاء التفاصيل';">
+                            <i class="fas fa-file-alt"></i> عرض الإجراء الكامل
+                        </button>
+                        <div id="${detailsId}" class="ai-details-panel" style="display:none;">
+                            <div class="ai-details-content">
+                                ${this.escapeHtml(sources[0].fullContent).replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             let sourcesHtml = '';
             if (sources && sources.length > 0) {
                 const srcTags = sources.map((s, i) => {
-                    const excerpt = s.excerpt || s.content || '';
-                    return `<span class="ai-source-tag" title="${this.escapeHtml(excerpt.substring(0, 100))}">${i + 1}</span>`;
+                    return `<span class="ai-source-tag" title="SOP">${i + 1}</span>`;
                 }).join('');
                 sourcesHtml = `
                     <div class="ai-message-sources">
@@ -465,7 +488,8 @@
             }
 
             el.innerHTML = `
-                <div class="ai-message-content">${this.formatText(text)}</div>
+                <div class="ai-message-content">${formattedText}</div>
+                ${detailsHtml}
                 ${confHtml}
                 ${sourcesHtml}
                 <span class="ai-message-time">${time}</span>
@@ -534,7 +558,7 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    this.addBotMessage(data.answer, data.confidence, data.sources);
+                    this.addBotMessage(data.answer, data.confidence, data.sources, data.answerType);
                     // Refresh sessions if this was a new session
                     if (!this.sessions.find(s => s.session_id === this.sessionId)) {
                         await this.loadSessions();
