@@ -572,8 +572,20 @@
     window.toggleAIChatPanel = function() {
         if (window.aiAssistant) {
             window.aiAssistant.togglePanel();
-        } else {
-            console.warn('[AI Assistant] Not initialized yet');
+            return;
         }
+        // Retry: AI assistant may still be loading
+        let attempts = 0;
+        const retry = setInterval(() => {
+            attempts++;
+            if (window.aiAssistant) {
+                clearInterval(retry);
+                window.aiAssistant.togglePanel();
+            } else if (attempts > 20) { // Give up after ~2 seconds
+                clearInterval(retry);
+                console.warn('[AI Assistant] Failed to load after retries');
+                alert('المساعد الذكي قيد التحميل، يرجى المحاولة بعد لحظات');
+            }
+        }, 100);
     };
 })();
