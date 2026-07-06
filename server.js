@@ -1472,16 +1472,66 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
 });
 
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
-    // Shifts are now automatic - manual start is disabled
-    res.json({ 
-        success: false, 
-        message: 'النظام يدير النوبات تلقائياً. لا حاجة لبدء مناوبة يدوياً.',
-        currentShift: {
-            type: getCurrentShiftType(),
-            date: getCurrentShiftDate(),
-            key: getShiftKey()
+    try {
+        const { shiftType } = req.body;
+        const normalizedType = shiftType === 'صباحية' ? 'صباح' : shiftType === 'ليلية' ? 'ليل' : shiftType;
+        const now = new Date();
+        const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+        const year = saudiTime.getFullYear();
+        const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+        const day = saudiTime.getDate().toString().padStart(2, '0');
+        const isoDate = `${year}-${month}-${day}`;
+        const hour = saudiTime.getHours();
+        
+        // Handle night shift after midnight (hour < 5) — date belongs to previous day
+        let shiftDate = isoDate;
+        if (normalizedType === 'ليل' && hour < 5) {
+            const prevDay = new Date(saudiTime);
+            prevDay.setDate(prevDay.getDate() - 1);
+            const prevYear = prevDay.getFullYear();
+            const prevMonth = (prevDay.getMonth() + 1).toString().padStart(2, '0');
+            const prevDayNum = prevDay.getDate().toString().padStart(2, '0');
+            shiftDate = `${prevYear}-${prevMonth}-${prevDayNum}`;
         }
-    });
+        
+        const newShift = {
+            id: Date.now(),
+            shiftName: `${normalizedType} - ${shiftDate}`,
+            shiftDate: shiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: normalizedType,
+            shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
+            startTime: saudiTime.toISOString(),
+            totalReports: 0,
+            savedReports: {},
+            rapidLocations: {},
+            centersData: {},
+            vehicleData: {},
+            fuelData: {},
+            generalNotes: '',
+            lastUpdate: saudiTime.toISOString(),
+            autoArchived: false
+        };
+        
+        // Save to file
+        const shifts = await readShifts();
+        shifts.unshift(newShift);
+        if (shifts.length > 50) shifts.pop();
+        await writeShifts(shifts);
+        
+        // Set as current shift
+        currentShiftId = newShift.id;
+        
+        res.json({ 
+            success: true, 
+            shiftId: newShift.id,
+            shift: newShift,
+            message: `تم بدء المناوبة ${normalizedType === 'صباح' ? 'الصباحية' : 'الليلية'} بنجاح`
+        });
+    } catch (error) {
+        console.error('Error starting new shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في بدء المناوبة: ' + error.message });
+    }
 });
 
 app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
