@@ -324,6 +324,138 @@ const TABLE_SCHEMAS = [
     type TEXT DEFAULT 'info',
     is_read INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Knowledge Chunks (RAG)
+  `CREATE TABLE IF NOT EXISTS ai_knowledge_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source TEXT,
+    category TEXT DEFAULT 'عام',
+    chunk_index INTEGER DEFAULT 0,
+    total_chunks INTEGER DEFAULT 1,
+    tokens_json TEXT,
+    tf_json TEXT,
+    meta_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Unanswered Questions
+  `CREATE TABLE IF NOT EXISTS ai_unanswered_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    user_id TEXT,
+    user_name TEXT,
+    score REAL DEFAULT 0,
+    page_context TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'resolved', 'dismissed')),
+    resolution TEXT,
+    resolved_by TEXT,
+    resolved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Chat Logs
+  `CREATE TABLE IF NOT EXISTS ai_chat_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    confidence TEXT,
+    user_id TEXT,
+    user_name TEXT,
+    page_context TEXT,
+    sources_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Feedback
+  `CREATE TABLE IF NOT EXISTS ai_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_log_id INTEGER,
+    feedback TEXT CHECK(feedback IN ('positive', 'negative')),
+    user_id TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Knowledge Base Documents
+  `CREATE TABLE IF NOT EXISTS kb_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id TEXT UNIQUE,
+    title TEXT NOT NULL,
+    filename TEXT,
+    original_name TEXT,
+    file_type TEXT,
+    mime_type TEXT,
+    file_path TEXT,
+    file_size INTEGER DEFAULT 0,
+    content TEXT,
+    category TEXT DEFAULT 'عام',
+    description TEXT,
+    status TEXT DEFAULT 'active' CHECK(status IN ('active', 'processing', 'error', 'archived')),
+    chunk_count INTEGER DEFAULT 0,
+    metadata TEXT,
+    meta TEXT,
+    created_by TEXT,
+    uploader TEXT,
+    upload_date TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Knowledge Base Chunks (with TF-IDF embeddings as JSON)
+  `CREATE TABLE IF NOT EXISTS kb_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+    doc_id INTEGER REFERENCES kb_documents(id) ON DELETE CASCADE,
+    chunk_index INTEGER DEFAULT 0,
+    content TEXT NOT NULL,
+    embedding TEXT,
+    token_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Chat Sessions
+  `CREATE TABLE IF NOT EXISTS kb_chat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE NOT NULL,
+    user_id TEXT,
+    title TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Chat Messages
+  `CREATE TABLE IF NOT EXISTS kb_chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES kb_chat_sessions(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    sources TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Query Log
+  `CREATE TABLE IF NOT EXISTS kb_queries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query TEXT NOT NULL,
+    answer TEXT,
+    sources TEXT,
+    query_time REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // AI Chat History (legacy unified table, kept for backward compatibility)
+  `CREATE TABLE IF NOT EXISTS kb_chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    session_id TEXT,
+    role TEXT CHECK(role IN ('user', 'assistant', 'system')),
+    message TEXT NOT NULL,
+    sources TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -346,6 +478,18 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_date ON staffing_alerts(alert_date);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_resolved ON staffing_alerts(resolved);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_completions_date_type ON shift_completions(shift_date, shift_type);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_status ON kb_documents(status);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_category ON kb_documents(category);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_doc_id ON kb_documents(doc_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chunks_document ON kb_chunks(document_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chat_session ON kb_chat_history(session_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chat_sessions_sid ON kb_chat_sessions(session_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chat_messages_session ON kb_chat_messages(session_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_queries_created ON kb_queries(created_at);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_ai_knowledge_category ON ai_knowledge_chunks(category);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_ai_unanswered_status ON ai_unanswered_questions(status);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_user ON ai_chat_logs(user_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_created ON ai_chat_logs(created_at);`);
     logger.info('Indexes created successfully');
   } catch (idxErr) {
     logger.warn('Some indexes may already exist: ' + idxErr.message);
@@ -417,6 +561,94 @@ async function runMigrations() {
     logger.info('shift_forms table created');
   } catch (err) {
     logger.warn('shift_forms table creation warning: ' + err.message);
+  }
+
+  // KB migrations: add columns to existing kb_documents for backward compatibility
+  try {
+    const kbCols = [
+      { name: 'doc_id', type: 'TEXT' },
+      { name: 'mime_type', type: 'TEXT' },
+      { name: 'file_path', type: 'TEXT' },
+      { name: 'description', type: 'TEXT' },
+      { name: 'uploader', type: 'TEXT' },
+      { name: 'upload_date', type: 'TEXT' },
+      { name: 'is_active', type: 'INTEGER', default: '1' },
+      { name: 'meta', type: 'TEXT' }
+    ];
+    for (const col of kbCols) {
+      try {
+        await exec(`ALTER TABLE kb_documents ADD COLUMN ${col.name} ${col.type} ${col.default ? 'DEFAULT ' + col.default : ''}`);
+        logger.info(`Added kb_documents column: ${col.name}`);
+      } catch (colErr) {
+        if (colErr.message && colErr.message.includes('duplicate column')) {
+          logger.info(`Column ${col.name} already exists, skipping`);
+        } else {
+          logger.warn(`Column ${col.name} migration warning: ${colErr.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('KB documents column migration warning: ' + err.message);
+  }
+
+  // KB migrations: add doc_id to kb_chunks
+  try {
+    await exec(`ALTER TABLE kb_chunks ADD COLUMN doc_id INTEGER REFERENCES kb_documents(id) ON DELETE CASCADE`);
+    logger.info('Added kb_chunks column: doc_id');
+  } catch (err) {
+    if (err.message && err.message.includes('duplicate column')) {
+      logger.info('Column doc_id already exists in kb_chunks, skipping');
+    } else {
+      logger.warn('kb_chunks doc_id migration warning: ' + err.message);
+    }
+  }
+
+  // Create kb_chat_sessions table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS kb_chat_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT UNIQUE NOT NULL,
+      user_id TEXT,
+      title TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chat_sessions_sid ON kb_chat_sessions(session_id)`);
+    logger.info('kb_chat_sessions table created');
+  } catch (err) {
+    logger.warn('kb_chat_sessions table creation warning: ' + err.message);
+  }
+
+  // Create kb_chat_messages table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS kb_chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES kb_chat_sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+      content TEXT NOT NULL,
+      sources TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_chat_messages_session ON kb_chat_messages(session_id)`);
+    logger.info('kb_chat_messages table created');
+  } catch (err) {
+    logger.warn('kb_chat_messages table creation warning: ' + err.message);
+  }
+
+  // Create kb_queries table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS kb_queries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      query TEXT NOT NULL,
+      answer TEXT,
+      sources TEXT,
+      query_time REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_kb_queries_created ON kb_queries(created_at)`);
+    logger.info('kb_queries table created');
+  } catch (err) {
+    logger.warn('kb_queries table creation warning: ' + err.message);
   }
 
   logger.info('Migrations complete');
@@ -1102,6 +1334,295 @@ const ShiftForms = {
 };
 
 // ============================================
+// CRUD: KNOWLEDGE BASE
+// ============================================
+const KBDocuments = {
+  async getAll() {
+    return all('SELECT id, doc_id, title, filename, original_name, file_type, mime_type, file_size, category, description, status, chunk_count, created_by, uploader, upload_date, is_active, created_at, updated_at FROM kb_documents ORDER BY created_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM kb_documents WHERE id = ?', [id]);
+  },
+  async getByDocId(docId) {
+    return get('SELECT * FROM kb_documents WHERE doc_id = ?', [docId]);
+  },
+  async getByStatus(status) {
+    return all('SELECT * FROM kb_documents WHERE status = ? ORDER BY created_at DESC', [status]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO kb_documents (doc_id, title, filename, original_name, file_type, mime_type, file_path, file_size, content, category, description, status, chunk_count, metadata, meta, created_by, uploader, upload_date, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        data.doc_id || null,
+        data.title || data.original_name || 'Untitled',
+        data.filename || null,
+        data.original_name || null,
+        data.file_type || null,
+        data.mime_type || null,
+        data.file_path || null,
+        data.file_size || 0,
+        data.content || null,
+        data.category || 'عام',
+        data.description || null,
+        data.status || 'active',
+        data.chunk_count || 0,
+        data.metadata ? JSON.stringify(data.metadata) : null,
+        data.meta ? JSON.stringify(data.meta) : null,
+        data.created_by || null,
+        data.uploader || null,
+        data.upload_date || new Date().toISOString(),
+        data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
+      ]
+    );
+    return result.id;
+  },
+  async update(id, data) {
+    return run(
+      'UPDATE kb_documents SET title = ?, category = ?, status = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;',
+      [data.title, data.category, data.status, data.content, id]
+    );
+  },
+  async updateChunkCount(id, chunkCount) {
+    return run('UPDATE kb_documents SET chunk_count = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [chunkCount, 'active', id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM kb_documents WHERE id = ?', [id]);
+  },
+  async search(query) {
+    const searchTerm = `%${query}%`;
+    return all('SELECT * FROM kb_documents WHERE title LIKE ? OR content LIKE ? OR description LIKE ? ORDER BY created_at DESC', [searchTerm, searchTerm, searchTerm]);
+  }
+};
+
+const KBChunks = {
+  async getAll() {
+    return all('SELECT * FROM kb_chunks ORDER BY id DESC');
+  },
+  async getByDocumentId(documentId) {
+    return all('SELECT * FROM kb_chunks WHERE document_id = ? ORDER BY chunk_index', [documentId]);
+  },
+  async getByDocId(docId) {
+    return all('SELECT * FROM kb_chunks WHERE doc_id = ? ORDER BY chunk_index', [docId]);
+  },
+  async getAllWithEmbeddings() {
+    return all('SELECT id, document_id, doc_id, chunk_index, content, embedding FROM kb_chunks WHERE embedding IS NOT NULL');
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO kb_chunks (document_id, doc_id, chunk_index, content, embedding, token_count) VALUES (?, ?, ?, ?, ?, ?);',
+      [data.document_id, data.doc_id || null, data.chunk_index, data.content, data.embedding ? JSON.stringify(data.embedding) : null, data.token_count || 0]
+    );
+    return result.id;
+  },
+  async deleteByDocumentId(documentId) {
+    return run('DELETE FROM kb_chunks WHERE document_id = ?', [documentId]);
+  }
+};
+
+const KBChatSessions = {
+  async getAll() {
+    return all('SELECT * FROM kb_chat_sessions ORDER BY updated_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM kb_chat_sessions WHERE id = ?', [id]);
+  },
+  async getBySessionId(sessionId) {
+    return get('SELECT * FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO kb_chat_sessions (session_id, user_id, title) VALUES (?, ?, ?);',
+      [data.session_id, data.user_id || null, data.title || null]
+    );
+    return result.id;
+  },
+  async updateTitle(id, title) {
+    return run('UPDATE kb_chat_sessions SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [title, id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM kb_chat_sessions WHERE id = ?', [id]);
+  },
+  async deleteBySessionId(sessionId) {
+    return run('DELETE FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
+  }
+};
+
+const KBChatMessages = {
+  async getBySessionId(sessionId) {
+    const session = await get('SELECT id FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
+    if (!session) return [];
+    return all('SELECT * FROM kb_chat_messages WHERE session_id = ? ORDER BY created_at', [session.id]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO kb_chat_messages (session_id, role, content, sources) VALUES (?, ?, ?, ?);',
+      [data.session_id, data.role, data.content, data.sources ? JSON.stringify(data.sources) : null]
+    );
+    return result.id;
+  },
+  async deleteBySessionId(sessionId) {
+    const session = await get('SELECT id FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
+    if (!session) return { changes: 0 };
+    return run('DELETE FROM kb_chat_messages WHERE session_id = ?', [session.id]);
+  }
+};
+
+const KBQueries = {
+  async getAll(limit = 100) {
+    return all('SELECT * FROM kb_queries ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO kb_queries (query, answer, sources, query_time) VALUES (?, ?, ?, ?);',
+      [data.query, data.answer || null, data.sources ? JSON.stringify(data.sources) : null, data.query_time || 0]
+    );
+    return result.id;
+  }
+};
+
+const KBChatHistory = {
+  async getBySession(sessionId, limit = 50) {
+    return all('SELECT * FROM kb_chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT ?', [sessionId, limit]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO kb_chat_history (user_id, session_id, role, message, sources) VALUES (?, ?, ?, ?, ?);',
+      [data.user_id || null, data.session_id, data.role, data.message, data.sources ? JSON.stringify(data.sources) : null]
+    );
+    return result.id;
+  },
+  async deleteBySession(sessionId) {
+    return run('DELETE FROM kb_chat_history WHERE session_id = ?', [sessionId]);
+  }
+};
+
+// ============================================
+// CRUD: AI KNOWLEDGE CHUNKS (RAG TF-IDF)
+// ============================================
+const AIKnowledgeChunks = {
+  async getAll(limit = 100, offset = 0) {
+    return all('SELECT id, title, source, category, chunk_index, total_chunks, created_at FROM ai_knowledge_chunks ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM ai_knowledge_chunks WHERE id = ?', [id]);
+  },
+  async getByCategory(category) {
+    return all('SELECT id, title, source, category, chunk_index, total_chunks, created_at FROM ai_knowledge_chunks WHERE category = ? ORDER BY created_at DESC', [category]);
+  },
+  async searchByTitleOrContent(query) {
+    return all('SELECT id, title, source, category, content, chunk_index, total_chunks, created_at FROM ai_knowledge_chunks WHERE title LIKE ? OR content LIKE ? ORDER BY created_at DESC', [`%${query}%`, `%${query}%`]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO ai_knowledge_chunks (title, content, source, category, chunk_index, total_chunks, tokens_json, tf_json, meta_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [data.title, data.content, data.source || '', data.category || 'عام', data.chunk_index || 0, data.total_chunks || 1, data.tokens_json || '[]', data.tf_json || '{}', data.meta_json || '{}', data.created_at || new Date().toISOString()]
+    );
+    return result.id;
+  },
+  async delete(id) {
+    return run('DELETE FROM ai_knowledge_chunks WHERE id = ?', [id]);
+  },
+  async deleteAll() {
+    return run('DELETE FROM ai_knowledge_chunks');
+  },
+  async count() {
+    const row = await get('SELECT COUNT(*) as count FROM ai_knowledge_chunks');
+    return row ? row.count : 0;
+  }
+};
+
+// ============================================
+// CRUD: AI UNANSWERED QUESTIONS
+// ============================================
+const AIUnansweredQuestions = {
+  async getAll(limit = 100, offset = 0) {
+    return all('SELECT * FROM ai_unanswered_questions ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM ai_unanswered_questions WHERE id = ?', [id]);
+  },
+  async getPending(limit = 100) {
+    return all('SELECT * FROM ai_unanswered_questions WHERE status = ? ORDER BY created_at DESC LIMIT ?', ['pending', limit]);
+  },
+  async getByStatus(status, limit = 100) {
+    return all('SELECT * FROM ai_unanswered_questions WHERE status = ? ORDER BY created_at DESC LIMIT ?', [status, limit]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO ai_unanswered_questions (question, user_id, user_name, score, page_context, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?);',
+      [data.question, data.user_id || null, data.user_name || null, data.score || 0, data.page_context || '', data.status || 'pending', data.created_at || new Date().toISOString()]
+    );
+    return result.id;
+  },
+  async resolve(id, resolution, resolvedBy) {
+    return run('UPDATE ai_unanswered_questions SET status = ?, resolution = ?, resolved_by = ?, resolved_at = ? WHERE id = ?', ['resolved', resolution || '', resolvedBy || null, new Date().toISOString(), id]);
+  },
+  async dismiss(id) {
+    return run('UPDATE ai_unanswered_questions SET status = ?, resolved_at = ? WHERE id = ?', ['dismissed', new Date().toISOString(), id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM ai_unanswered_questions WHERE id = ?', [id]);
+  },
+  async countByStatus(status) {
+    const row = await get('SELECT COUNT(*) as count FROM ai_unanswered_questions WHERE status = ?', [status]);
+    return row ? row.count : 0;
+  }
+};
+
+// ============================================
+// CRUD: AI CHAT LOGS
+// ============================================
+const AIChatLogs = {
+  async getAll(limit = 100, offset = 0) {
+    return all('SELECT * FROM ai_chat_logs ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM ai_chat_logs WHERE id = ?', [id]);
+  },
+  async getByUser(userId, limit = 50) {
+    return all('SELECT * FROM ai_chat_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?', [userId, limit]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO ai_chat_logs (query, answer, confidence, user_id, user_name, page_context, sources_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
+      [data.query, data.answer, data.confidence || 'low', data.user_id || null, data.user_name || null, data.page_context || '', data.sources_json || '[]', data.created_at || new Date().toISOString()]
+    );
+    return result.id;
+  },
+  async getStats(days = 30) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const total = await get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE created_at >= ?', [since.toISOString()]);
+    const highConf = await get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['high', since.toISOString()]);
+    return { total: total ? total.count : 0, highConfidence: highConf ? highConf.count : 0 };
+  }
+};
+
+// ============================================
+// CRUD: AI FEEDBACK
+// ============================================
+const AIFeedback = {
+  async getAll(limit = 100) {
+    return all('SELECT * FROM ai_feedback ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO ai_feedback (chat_log_id, feedback, user_id, notes, created_at) VALUES (?, ?, ?, ?, ?);',
+      [data.chat_log_id, data.feedback, data.user_id || null, data.notes || '', data.created_at || new Date().toISOString()]
+    );
+    return result.id;
+  },
+  async getStats(days = 30) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const positive = await get('SELECT COUNT(*) as count FROM ai_feedback WHERE feedback = ? AND created_at >= ?', ['positive', since.toISOString()]);
+    const negative = await get('SELECT COUNT(*) as count FROM ai_feedback WHERE feedback = ? AND created_at >= ?', ['negative', since.toISOString()]);
+    return { positive: positive ? positive.count : 0, negative: negative ? negative.count : 0 };
+  }
+};
+
+// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -1355,6 +1876,16 @@ module.exports = {
   ShiftCompletions,
   AuditLog,
   ShiftForms,
+  KBDocuments,
+  KBChunks,
+  KBChatSessions,
+  KBChatMessages,
+  KBQueries,
+  KBChatHistory,
+  AIKnowledgeChunks,
+  AIUnansweredQuestions,
+  AIChatLogs,
+  AIFeedback,
 
   // Migration
   migrateAll

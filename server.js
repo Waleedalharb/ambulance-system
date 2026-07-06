@@ -30,7 +30,7 @@ const aiMonitor = require('./ai-monitor');
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries;
 }
 
 // Helper: safe DB response
@@ -83,8 +83,25 @@ const logger = {
   warn: (...args) => console.warn(`[${new Date().toISOString()}] [WARN]`, ...args),
   debug: (...args) => process.env.DEBUG === '1' && console.log(`[${new Date().toISOString()}] [DEBUG]`, ...args)
 };
+
+// RAG Engine for AI Assistant
+let ragEngine = null;
+let ragInstance = null;
+let ragInitialized = false;
+try {
+    ragEngine = require('./rag-engine');
+    ragInstance = new ragEngine.RAGEngine();
+    console.log('✅ RAG Engine initialized');
+} catch (err) {
+    console.error('⚠️ RAG Engine failed to load:', err.message);
+}
+
+// New RAG KB API (replaces Nano AI backend)
+const kbApi = require('./rag/kb-api');
+
 const securityConfig = require('./config/security');
 const app = express();
+app.locals.db = db;
 const PORT = process.env.PORT || 3002;
 
 const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
@@ -6350,6 +6367,592 @@ app.get('/api/staffing-recommendations', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// RAG AI Assistant - Knowledge Base Routes
+// ============================================
+
+async function initRAG() {
+    try {
+        if (!dbAvailable() || !db.KBChunks) return;
+        const chunks = await db.KBChunks.getAllWithEmbeddings();
+        if (chunks.length > 0) {
+            await ragInstance.loadDocuments(chunks);
+            ragInitialized = true;
+            console.log(`✅ RAG Engine initialized with ${chunks.length} chunks`);
+        } else {
+            console.log('ℹ️ RAG Engine: no chunks found yet');
+        }
+        
+        // Seed default AI knowledge if ai_knowledge_chunks is empty
+        try {
+            if (db.AIKnowledgeChunks) {
+                const count = await db.AIKnowledgeChunks.count();
+                if (count === 0) {
+                    console.log('[AI] Seeding default operational knowledge...');
+                    const defaults = [
+                        { title: 'تسجيل البلاغات', content: 'لتسجيل بلاغ جديد: 1) اذهب إلى صفحة تسجيل البلاغات. 2) اضغط على زر + أمام الفرقة المطلوبة. 3) يتم التسجيل تلقائياً مع الوقت والتاريخ. 4) يمكن التراجع عن آخر بلاغ بالضغط على زر تراجع. 5) الإجمالي يُحدّث تلقائياً لجميع المستخدمين.', source: 'دليل المستخدم', category: 'البلاغات' },
+                        { title: 'تكميل النوبة', content: 'خطوات تكميل النوبة: 1) اضغط على "تكميل النوبة" من الصفحة الرئيسية. 2) أدخل بيانات المسعفين المتواجدين في كل فرقة. 3) حدد حالة كل سيارة (جاهزة/صيانة/غير جاهزة). 4) أدخل بيانات الوقود. 5) أضف أي ملاحظات عامة. 6) اضغط حفظ.', source: 'دليل المستخدم', category: 'المناوبات' },
+                        { title: 'الإسعاف الجوي', content: 'بلاغ الإسعاف الجوي: يُستخدم للحالات التي تتطلب نقلاً جوياً للمستشفى. يجب تحديد المستشفى الوجهة بدقة وإدخال ملاحظات الحالة. يتم تسجيل البلاغ وتتبعه من قبل الإشراف.', source: 'البروتوكولات التشغيلية', category: 'الإسعاف الجوي' },
+                        { title: 'حالات توقف القلب والتنفس', content: 'نموذج E-Case: يُستخدم لتسجيل حالات توقف القلب والتنفس (Cardiac Arrest). يجب تسجيل: زمن الاستجابة، الإجراءات المتخذة (CPR، صدمات)، الأدوية المستخدمة، النتيجة النهائية (استعادة نبض/وفاة). الملاحظات تساعد في مراجعات الجودة.', source: 'البروتوكولات الطبية', category: 'النماذج الإسعافية' },
+                        { title: 'بلاغ التصعيد', content: 'بلاغ التصعيد: للحالات التي تتطلب تدخلاً إضافياً من جهات أخرى (الدفاع المدني، المرور، الشرطة). يجب تحديد الجهات المشاركة وتفاصيل الحالة. الوصف التفصيلي يساعد في التحقيقات المستقبلية.', source: 'البروتوكولات التشغيلية', category: 'البلاغات' },
+                        { title: 'الجداول التشغيلية', content: 'نظام الجداول: يمكن استيراد الجداول من Excel مباشرة. يدعم النظام تصدير الجداول كـ PDF أو Excel. يمكن إنشاء QR Code للمشاركة السريعة. يدعم OCR لتحويل صور الجداول إلى بيانات.', source: 'دليل المستخدم', category: 'الجداول' },
+                        { title: 'غرفة العمليات', content: 'غرفة العمليات (Operations Command): مركز إدارة الملفات والبروتوكولات. يمكن رفع الملفات بالسحب والإفلات. تصنيف الملفات: عاجل/عام/تقرير/بروتوكول. البروتوكولات التشغيلية تُراجع بشكل دوري.', source: 'دليل المستخدم', category: 'العمليات' },
+                        { title: 'التحقق من صحة البيانات', content: 'التوقيع الرقمي: يُستخدم لتأكيد صحة بيانات المناوبة من قبل كبار المسعفين. يجب مراجعة بيانات التكميل قبل التوقيع. التوقيع الرقمي يُربط بالمناوبة الحالية.', source: 'دليل المستخدم', category: 'الجودة' },
+                        { title: 'الفرق والمراكز', content: 'الفرق الإسعافية: يتكون القطاع من فرق إسعافية (جنوب 1 إلى جنوب 19) وفرق سريعة (سريع 1 إلى سريع 4). كل فرقة تابعة لمركز إسعافي محدد. يمكن مراجعة بيانات الفرق في قسم الإدارة.', source: 'دليل المستخدم', category: 'الفرق' },
+                        { title: 'الإشعارات والتنبيهات', content: 'الإشعارات: تظهر فوراً عند حدوث أحداث مهمة. يمكن تخصيص الصوت من الإعدادات. شريط التنبيهات يظهر التنبيهات العاجلة فور وصولها. مؤشرات القوى العاملة تساعد في تحديد المراكز الناقصة.', source: 'دليل المستخدم', category: 'الإشعارات' }
+                    ];
+                    for (const item of defaults) {
+                        const ch = chunkDocument(item.content, 500, 50);
+                        for (let i = 0; i < ch.length; i++) {
+                            const tokens = preprocessText(ch[i]);
+                            const tf = computeTF(tokens);
+                            await db.AIKnowledgeChunks.create({
+                                title: item.title,
+                                content: ch[i],
+                                source: item.source,
+                                category: item.category,
+                                chunk_index: i,
+                                total_chunks: ch.length,
+                                tokens_json: JSON.stringify(tokens),
+                                tf_json: JSON.stringify(tf)
+                            });
+                        }
+                    }
+                    console.log(`[AI] Seeded ${defaults.length} default knowledge items`);
+                }
+            }
+        } catch (seedErr) {
+            console.error('[AI] Failed to seed default knowledge:', seedErr.message);
+        }
+    } catch (err) {
+        console.error('RAG init error:', err.message);
+    }
+}
+
+// Upload knowledge document (admin only)
+app.post('/api/kb/upload', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { title, content, category, fileType, fileName, fileSize } = req.body;
+        if (!title || !content) {
+            return res.status(400).json({ error: 'العنوان والمحتوى مطلوبان' });
+        }
+        
+        const docId = await db.KBDocuments.create({
+            title,
+            content,
+            category: category || 'عام',
+            file_type: fileType || 'text',
+            original_name: fileName || null,
+            file_size: fileSize || 0,
+            status: 'processing',
+            created_by: req.user.username
+        });
+        
+        res.json({ success: true, id: docId, message: 'تم رفع الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB upload error:', error);
+        res.status(500).json({ error: 'فشل في رفع الوثيقة' });
+    }
+});
+
+// List knowledge documents
+app.get('/api/kb/documents', authenticate, async (req, res) => {
+    try {
+        const docs = await db.KBDocuments.getAll();
+        res.json({ success: true, documents: docs });
+    } catch (error) {
+        console.error('KB documents error:', error);
+        res.status(500).json({ error: 'فشل في جلب الوثائق' });
+    }
+});
+
+// Delete knowledge document (admin only)
+app.delete('/api/kb/documents/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        await db.KBChunks.deleteByDocumentId(id);
+        await db.KBDocuments.delete(id);
+        
+        // Re-initialize RAG
+        await initRAG();
+        
+        res.json({ success: true, message: 'تم حذف الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف الوثيقة' });
+    }
+});
+
+// Process document into chunks (admin only)
+app.post('/api/kb/process/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!ragEngine) {
+            return res.status(503).json({ error: 'محرك RAG غير متوفر' });
+        }
+        
+        const id = parseInt(req.params.id);
+        const doc = await db.KBDocuments.getById(id);
+        if (!doc) {
+            return res.status(404).json({ error: 'الوثيقة غير موجودة' });
+        }
+        
+        // Delete old chunks
+        await db.KBChunks.deleteByDocumentId(id);
+        
+        // Chunk document
+        const chunks = ragEngine.chunkDocument(doc.content, 500, 50);
+        
+        // Process each chunk
+        const allTokens = [];
+        const chunkEmbeddings = [];
+        
+        for (let i = 0; i < chunks.length; i++) {
+            const tokens = ragEngine.preprocessText(chunks[i]);
+            allTokens.push(tokens);
+        }
+        
+        const idf = ragEngine.computeIDF(allTokens);
+        
+        for (let i = 0; i < chunks.length; i++) {
+            const tf = ragEngine.computeTF(allTokens[i]);
+            const tfidf = ragEngine.normalizeVector(ragEngine.computeTFIDF(tf, idf));
+            chunkEmbeddings.push(tfidf);
+        }
+        
+        // Save chunks
+        for (let i = 0; i < chunks.length; i++) {
+            await db.KBChunks.create({
+                document_id: id,
+                chunk_index: i,
+                content: chunks[i],
+                embedding: chunkEmbeddings[i],
+                token_count: allTokens[i].length
+            });
+        }
+        
+        await db.KBDocuments.updateChunkCount(id, chunks.length);
+        
+        // Re-initialize RAG
+        await initRAG();
+        
+        res.json({ success: true, chunkCount: chunks.length, message: 'تم معالجة الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB process error:', error);
+        res.status(500).json({ error: 'فشل في معالجة الوثيقة' });
+    }
+});
+
+// AI Chat endpoint
+app.post('/api/ai/chat', authenticate, async (req, res) => {
+    try {
+        const { message, sessionId } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        }
+        
+        const session_id = sessionId || req.user.username + '-' + Date.now();
+        
+        // Save user message
+        await db.KBChatHistory.create({
+            user_id: req.user.username,
+            session_id,
+            role: 'user',
+            message
+        });
+        
+        // Initialize RAG if not already done
+        if (!ragInitialized) {
+            await initRAG();
+        }
+        
+        // Query RAG
+        let retrieved = [];
+        if (ragInstance && ragInitialized && ragInstance.isInitialized) {
+            retrieved = await ragInstance.query(message, 5);
+        }
+        
+        // Generate answer
+        let result;
+        if (ragInstance) {
+            result = await ragInstance.generateAnswer(message, retrieved, {
+                user: req.user.username,
+                role: req.user.role
+            });
+        } else {
+            result = {
+                answer: 'المساعد الذكي غير متوفر حالياً. يرجى التحقق من إعدادات النظام أو الاتصال بالمسؤول.',
+                followUp: '',
+                sources: [],
+                confidence: 0,
+                queryType: 'unavailable'
+            };
+        }
+        
+        // Save assistant response
+        await db.KBChatHistory.create({
+            user_id: req.user.username,
+            session_id,
+            role: 'assistant',
+            message: result.answer,
+            sources: result.sources
+        });
+        
+        res.json({
+            success: true,
+            answer: result.answer,
+            followUp: result.followUp,
+            sources: result.sources,
+            confidence: result.confidence,
+            queryType: result.queryType,
+            sessionId: session_id
+        });
+    } catch (error) {
+        console.error('AI chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة السؤال' });
+    }
+});
+
+// AI Chat history
+app.get('/api/ai/history', authenticate, async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+        if (!sessionId) {
+            return res.status(400).json({ error: 'معرف الجلسة مطلوب' });
+        }
+        const history = await db.KBChatHistory.getBySession(sessionId, 50);
+        res.json({ success: true, history: history.reverse() });
+    } catch (error) {
+        console.error('AI history error:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل' });
+    }
+});
+
+// AI Stats
+app.get('/api/ai/stats', authenticate, async (req, res) => {
+    try {
+        const docs = await db.KBDocuments.getAll();
+        const chunks = await db.KBChunks.getAll();
+        const totalDocs = docs.length;
+        const totalChunks = chunks.length;
+        const activeDocs = docs.filter(d => d.status === 'active').length;
+        
+        res.json({
+            success: true,
+            stats: {
+                totalDocuments: totalDocs,
+                activeDocuments: activeDocs,
+                totalChunks: totalChunks,
+                ragInitialized: ragInitialized
+            }
+        });
+    } catch (error) {
+        console.error('AI stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// AI Assistant V2 — Unanswered Questions, Feedback, Knowledge Management
+// ============================================
+
+// AI Chat V2 (uses ai_chat_logs with confidence tracking)
+app.post('/api/ai/v2/chat', authenticate, async (req, res) => {
+    try {
+        const { message, pageContext } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        }
+        
+        const userId = req.user.id || req.user.username;
+        const userName = req.user.name || req.user.username;
+        
+        // Initialize RAG if not already done
+        if (!ragInitialized) {
+            await initRAG();
+        }
+        
+        // Query RAG
+        let retrieved = [];
+        if (ragInitialized && ragInstance.isInitialized) {
+            retrieved = await ragInstance.query(message, 5);
+        }
+        
+        // Generate answer
+        const result = await ragInstance.generateAnswer(message, retrieved, {
+            user: userName,
+            role: req.user.role
+        });
+        
+        // Determine confidence level
+        let confidence = 'low';
+        if (result.confidence >= 65) confidence = 'high';
+        else if (result.confidence >= 35) confidence = 'medium';
+        
+        // Log to ai_chat_logs
+        try {
+            if (db && db.AIChatLogs) {
+                await db.AIChatLogs.create({
+                    query: message,
+                    answer: result.answer,
+                    confidence: confidence,
+                    user_id: String(userId),
+                    user_name: userName,
+                    page_context: pageContext || '',
+                    sources_json: JSON.stringify(result.sources || [])
+                });
+            }
+        } catch (logErr) {
+            console.error('[AI] Failed to log chat:', logErr.message);
+        }
+        
+        // Log unanswered if low confidence
+        if (confidence === 'low' && db && db.AIUnansweredQuestions) {
+            try {
+                await db.AIUnansweredQuestions.create({
+                    question: message,
+                    user_id: String(userId),
+                    user_name: userName,
+                    score: result.confidence / 100,
+                    page_context: pageContext || ''
+                });
+            } catch (uerr) {
+                console.error('[AI] Failed to log unanswered:', uerr.message);
+            }
+        }
+        
+        res.json({
+            success: true,
+            answer: result.answer,
+            followUp: result.followUp,
+            sources: result.sources,
+            confidence: confidence,
+            bestScore: result.confidence / 100,
+            requiresReview: confidence === 'low',
+            queryType: result.queryType
+        });
+    } catch (error) {
+        console.error('AI V2 chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة السؤال' });
+    }
+});
+
+// AI Feedback
+app.post('/api/ai/v2/feedback', authenticate, async (req, res) => {
+    try {
+        const { chatLogId, feedback, notes } = req.body;
+        if (!chatLogId || !feedback) {
+            return res.status(400).json({ error: 'معرف المحادثة والتقييم مطلوبان' });
+        }
+        
+        if (db && db.AIFeedback) {
+            await db.AIFeedback.create({
+                chat_log_id: chatLogId,
+                feedback: feedback,
+                user_id: String(req.user.id || req.user.username),
+                notes: notes || ''
+            });
+        }
+        
+        res.json({ success: true, message: 'تم حفظ التقييم' });
+    } catch (error) {
+        console.error('AI feedback error:', error);
+        res.status(500).json({ error: 'فشل في حفظ التقييم' });
+    }
+});
+
+// Unanswered Questions — List
+app.get('/api/ai/v2/unanswered', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { status, limit } = req.query;
+        const lim = parseInt(limit) || 100;
+        
+        let questions = [];
+        if (db && db.AIUnansweredQuestions) {
+            if (status) {
+                questions = await db.AIUnansweredQuestions.getByStatus(status, lim);
+            } else {
+                questions = await db.AIUnansweredQuestions.getAll(lim);
+            }
+        }
+        
+        res.json({ success: true, questions });
+    } catch (error) {
+        console.error('Unanswered questions error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأسئلة' });
+    }
+});
+
+// Unanswered Questions — Resolve
+app.post('/api/ai/v2/unanswered/:id/resolve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { resolution } = req.body;
+        const resolvedBy = req.user.name || req.user.username;
+        
+        if (db && db.AIUnansweredQuestions) {
+            await db.AIUnansweredQuestions.resolve(id, resolution, resolvedBy);
+        }
+        
+        res.json({ success: true, message: 'تم حل السؤال' });
+    } catch (error) {
+        console.error('Resolve unanswered error:', error);
+        res.status(500).json({ error: 'فشل في حل السؤال' });
+    }
+});
+
+// Unanswered Questions — Dismiss
+app.post('/api/ai/v2/unanswered/:id/dismiss', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (db && db.AIUnansweredQuestions) {
+            await db.AIUnansweredQuestions.dismiss(id);
+        }
+        
+        res.json({ success: true, message: 'تم تجاهل السؤال' });
+    } catch (error) {
+        console.error('Dismiss unanswered error:', error);
+        res.status(500).json({ error: 'فشل في تجاهل السؤال' });
+    }
+});
+
+// AI Knowledge — Upload text knowledge
+app.post('/api/ai/v2/knowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { title, content, source, category } = req.body;
+        if (!title || !content) {
+            return res.status(400).json({ error: 'العنوان والمحتوى مطلوبان' });
+        }
+        
+        // Store in ai_knowledge_chunks
+        if (db && db.AIKnowledgeChunks) {
+            const chunks = chunkDocument(content, 500, 50);
+            for (let i = 0; i < chunks.length; i++) {
+                const tokens = preprocessText(chunks[i]);
+                const tf = computeTF(tokens);
+                await db.AIKnowledgeChunks.create({
+                    title: title,
+                    content: chunks[i],
+                    source: source || '',
+                    category: category || 'عام',
+                    chunk_index: i,
+                    total_chunks: chunks.length,
+                    tokens_json: JSON.stringify(tokens),
+                    tf_json: JSON.stringify(tf)
+                });
+            }
+        }
+        
+        res.json({ success: true, message: 'تم إضافة المعرفة بنجاح' });
+    } catch (error) {
+        console.error('AI knowledge upload error:', error);
+        res.status(500).json({ error: 'فشل في رفع المعرفة' });
+    }
+});
+
+// AI Knowledge — List
+app.get('/api/ai/v2/knowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { category, search, limit, offset } = req.query;
+        const lim = parseInt(limit) || 100;
+        const off = parseInt(offset) || 0;
+        
+        let chunks = [];
+        let total = 0;
+        
+        if (db && db.AIKnowledgeChunks) {
+            if (search) {
+                chunks = await db.AIKnowledgeChunks.searchByTitleOrContent(search);
+                total = chunks.length;
+            } else if (category) {
+                chunks = await db.AIKnowledgeChunks.getByCategory(category);
+                total = chunks.length;
+            } else {
+                chunks = await db.AIKnowledgeChunks.getAll(lim, off);
+                total = await db.AIKnowledgeChunks.count();
+            }
+        }
+        
+        res.json({ success: true, chunks, total });
+    } catch (error) {
+        console.error('AI knowledge list error:', error);
+        res.status(500).json({ error: 'فشل في جلب المعرفة' });
+    }
+});
+
+// AI Knowledge — Delete
+app.delete('/api/ai/v2/knowledge/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (db && db.AIKnowledgeChunks) {
+            await db.AIKnowledgeChunks.delete(id);
+        }
+        
+        res.json({ success: true, message: 'تم حذف المعرفة' });
+    } catch (error) {
+        console.error('AI knowledge delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف المعرفة' });
+    }
+});
+
+// AI V2 Stats
+app.get('/api/ai/v2/stats', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 30;
+        let stats = {
+            totalChats: 0,
+            highConfidence: 0,
+            mediumConfidence: 0,
+            lowConfidence: 0,
+            pendingQuestions: 0,
+            knowledgeChunks: 0,
+            positiveFeedback: 0,
+            negativeFeedback: 0
+        };
+        
+        if (db && db.AIChatLogs) {
+            const chatStats = await db.AIChatLogs.getStats(days);
+            stats.totalChats = chatStats.total;
+            
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+            
+            const high = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['high', since.toISOString()]);
+            const medium = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['medium', since.toISOString()]);
+            const low = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['low', since.toISOString()]);
+            
+            stats.highConfidence = high ? high.count : 0;
+            stats.mediumConfidence = medium ? medium.count : 0;
+            stats.lowConfidence = low ? low.count : 0;
+        }
+        
+        if (db && db.AIUnansweredQuestions) {
+            stats.pendingQuestions = await db.AIUnansweredQuestions.countByStatus('pending');
+        }
+        
+        if (db && db.AIKnowledgeChunks) {
+            stats.knowledgeChunks = await db.AIKnowledgeChunks.count();
+        }
+        
+        if (db && db.AIFeedback) {
+            const fb = await db.AIFeedback.getStats(days);
+            stats.positiveFeedback = fb.positive;
+            stats.negativeFeedback = fb.negative;
+        }
+        
+        res.json({ success: true, stats });
+    } catch (error) {
+        console.error('AI V2 stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// RAG-based Operational AI Assistant — KB API v2
+// ============================================
+app.use('/api/rag', authenticate, kbApi.router);
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'المسار غير موجود' });
@@ -6433,11 +7036,29 @@ server.listen(PORT, async () => {
     // Initialize DB after server starts
     await initDatabase();
     
+    // Initialize RAG Engine
+    await initRAG();
+    
+    // Initialize new KB RAG index
+    try {
+        await kbApi.loadIndexFromFile();
+        if (!kbApi.ragIndex.isBuilt && db) {
+            await kbApi.loadIndexFromDB(db);
+        }
+        if (kbApi.ragIndex.isBuilt) {
+            console.log('✅ KB RAG index loaded');
+        }
+    } catch (err) {
+        console.error('⚠️ KB RAG index init warning:', err.message);
+    }
+    
     // Initialize AI Monitor
     if (aiMonitor) {
         aiMonitor.init({ db, wss, app });
         console.log('🤖 AI Monitor initialized');
     }
+
+    console.log('🤖 RAG-based Operational AI Assistant ready');
 });
 
 // Graceful shutdown

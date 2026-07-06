@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم المشرف — منصة الجنوب</title>
-    <link rel="stylesheet" href="css/app.css?v=30">
+    <link rel="stylesheet" href="css/app.css?v=34">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -152,6 +152,11 @@
             <!-- Admin Tools -->
             <div class="admin-tools">
                 <h3><i class="fas fa-tools"></i> أدوات المشرف</h3>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                    <button class="btn-refresh" onclick="location.href='admin-knowledge.html'" style="background:var(--primary);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;display:inline-flex;align-items:center;gap:8px;">
+                        <i class="fas fa-brain"></i> إدارة المعرفة (AI Assistant)
+                    </button>
+                </div>
                 <button id="clearAllBtn" class="btn-danger" onclick="clearAllScheduleData()">
                     <i class="fas fa-trash-alt"></i> مسح كل بيانات الجداول (IndexedDB + Server)
                 </button>
@@ -172,7 +177,7 @@
             if (!authToken) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML = '❌ يجب تسجيل الدخول أولاً<br><a href="index.html?v=30" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
+                document.getElementById('error').innerHTML = '❌ يجب تسجيل الدخول أولاً<br><a href="index.html?v=34" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
                 return;
             }
 
@@ -201,7 +206,7 @@
             } catch (e) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML = '❌ ' + e.message + '<br><a href="index.html?v=30" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
+                document.getElementById('error').innerHTML = '❌ ' + e.message + '<br><a href="index.html?v=34" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
             }
         }
 
@@ -592,5 +597,8 @@
             btn.disabled = false;
         }
     </script>
+    <!-- AI Assistant -->
+    <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+    <script src="/js/ai-assistant.js?v=2"></script>
 </body>
 </html>

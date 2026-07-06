@@ -1308,7 +1308,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 
   <!-- أزرار الإجراءات -->
   <div class="topbar-actions">
-    <button class="btn-back" onclick="window.location.href='index.html?v=30'" data-tooltip="العودة للصفحة الرئيسية">
+    <button class="btn-back" onclick="window.location.href='index.html?v=34'" data-tooltip="العودة للصفحة الرئيسية">
       <i class="fas fa-arrow-right"></i>
       <span>الرجوع للرئيسية</span>
     </button>
@@ -2750,16 +2750,9 @@ window.syncUpdate = function() {
 
     <script src="js/websocket-sync.js"></script>
 
-<!-- NANO AI Bot Assistant - disabled, replaced with simple help button -->
-<script>
-  // Hide nano-bot auto-popup after it loads
-  window.addEventListener('load', function() {
-    setTimeout(function() {
-      var nanoBot = document.getElementById('nano-bot-widget') || document.querySelector('.nano-bot-container');
-      if (nanoBot) nanoBot.style.display = 'none';
-    }, 1000);
-  });
-</script>
+<!-- AI Assistant -->
+<link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+<script src="/js/ai-assistant.js?v=2"></script>
 
 <!-- Simple Help Button -->
 <style>

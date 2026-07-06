@@ -248,7 +248,7 @@ tbody tr:hover { background: var(--g100); }
         </div>
     </div>
     <div class="actions">
-        <a href="index.html?v=30" class="btn-back-main">
+        <a href="index.html?v=34" class="btn-back-main">
             <i class="fas fa-arrow-right"></i> العودة للرئيسية
         </a>
         <button class="btn-back-main" onclick="toggleDarkMode()" style="padding: 8px 12px;">
@@ -397,7 +397,7 @@ tbody tr:hover { background: var(--g100); }
 <script>
 // ===== Auth =====
 const authToken = localStorage.getItem('authToken');
-if (!authToken) { window.location.href = 'index.html?v=30'; }
+if (!authToken) { window.location.href = 'index.html?v=34'; }
 const API_BASE = '';
 
 // ===== Dark Mode =====
@@ -815,6 +815,11 @@ function exportPDF() {
 loadShiftList();
 loadDailyReport();
 </script>
+
+<!-- RAG AI Assistant -->
+<!-- AI Assistant -->
+<link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+<script src="/js/ai-assistant.js?v=2"></script>
 
 </body>
 </html>

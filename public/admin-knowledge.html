@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة المعرفة — المساعد الذكي | منصة الجنوب</title>
+    <link rel="stylesheet" href="css/app.css?v=34">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .knowledge-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+        .header-bar h1 { font-size: 1.4rem; margin: 0; }
+        .btn-back { background: var(--gray-100); color: var(--gray-700); border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-back:hover { background: var(--gray-200); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); border-right: 4px solid var(--primary); text-align: center; }
+        .stat-card h3 { font-size: 0.85rem; color: var(--gray-500); margin: 0 0 8px; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--gray-900); }
+        .stat-card.success { border-color: var(--teal); }
+        .stat-card.warning { border-color: var(--gold); }
+        .stat-card.danger { border-color: var(--coral); }
+
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+        .panel h3 { margin: 0 0 16px; font-size: 1rem; color: var(--gray-900); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.85rem; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+            font-size: 0.9rem; font-family: inherit; background: var(--white); box-sizing: border-box;
+        }
+        .form-group textarea { resize: vertical; min-height: 120px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-50);
+        }
+
+        .btn-primary { background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary:hover { background: var(--primary-700); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-success { background: var(--teal); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-success:hover { background: #0d9488; }
+        .btn-danger { background: var(--coral); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: var(--gold); color: #1E293B; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-outline { background: transparent; border: 1px solid var(--gray-300); color: var(--gray-700); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-outline:hover { background: var(--gray-50); }
+
+        .document-list { display: flex; flex-direction: column; gap: 10px; }
+        .document-item { background: var(--gray-50); border-radius: var(--radius-md); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--gray-200); transition: all 0.2s; }
+        .document-item:hover { border-color: var(--primary-300); box-shadow: var(--shadow-sm); }
+        .document-info { flex: 1; min-width: 0; }
+        .document-title { font-weight: 600; color: var(--gray-900); font-size: 0.95rem; margin-bottom: 4px; }
+        .document-meta { font-size: 0.75rem; color: var(--gray-500); display: flex; gap: 12px; flex-wrap: wrap; }
+        .document-actions { display: flex; gap: 8px; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .status-badge.active { background: #d1fae5; color: #065f46; }
+        .status-badge.processing { background: #fef3c7; color: #92400e; }
+        .status-badge.error { background: #fee2e2; color: #991b1b; }
+        .status-badge.archived { background: #e2e8f0; color: #475569; }
+
+        .result-message { padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.85rem; display: none; }
+        .result-message.success { background: #d1fae5; color: #065f46; display: block; }
+        .result-message.error { background: #fee2e2; color: #991b1b; display: block; }
+        .result-message.info { background: #e0f2fe; color: #0369a1; display: block; }
+
+        .loading { text-align: center; padding: 20px; color: var(--gray-400); }
+        .empty-state { text-align: center; padding: 40px; color: var(--gray-400); }
+        .empty-state i { font-size: 3rem; margin-bottom: 12px; display: block; }
+
+        .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 16px; }
+        .tab-btn { padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 0.9rem; color: var(--gray-500); font-family: inherit; transition: all 0.2s; }
+        .tab-btn:hover { color: var(--primary); }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .file-upload-zone { border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--gray-50); }
+        .file-upload-zone:hover { border-color: var(--primary); background: var(--primary-50); }
+        .file-upload-zone.dragover { border-color: var(--primary); background: var(--primary-50); }
+        .file-upload-zone i { font-size: 2rem; color: var(--gray-400); margin-bottom: 8px; }
+        .file-upload-zone p { margin: 0; color: var(--gray-500); font-size: 0.9rem; }
+        .file-upload-zone .file-types { font-size: 0.75rem; color: var(--gray-400); margin-top: 4px; }
+
+        .upload-progress { margin-top: 12px; display: none; }
+        .upload-progress.active { display: block; }
+        .upload-progress-bar { height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
+        .upload-progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
+
+        /* Unanswered Questions Table */
+        .unanswered-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .unanswered-table th { text-align: right; padding: 10px 12px; background: var(--gray-50); color: var(--gray-700); font-weight: 600; border-bottom: 2px solid var(--gray-200); }
+        .unanswered-table td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+        .unanswered-table tr:hover { background: var(--gray-50); }
+
+        .unanswered-question { max-width: 300px; word-wrap: break-word; font-weight: 600; color: var(--gray-900); }
+        .unanswered-answer { max-width: 300px; word-wrap: break-word; color: var(--gray-600); font-size: 0.8rem; }
+
+        .status-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .status-pill.new { background: #FEE2E2; color: #991B1B; }
+        .status-pill.pending { background: #FEE2E2; color: #991B1B; }
+        .status-pill.reviewing { background: #FEF3C7; color: #92400E; }
+        .status-pill.resolved { background: #D1FAE5; color: #065F46; }
+        .status-pill.dismissed { background: #E2E8F0; color: #475569; }
+
+        .filters-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .filters-row select { padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: inherit; }
+
+        .resolution-input { width: 100%; padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 0.8rem; font-family: inherit; margin-bottom: 6px; }
+
+        .reindex-btn { background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; }
+        .reindex-btn:hover { background: linear-gradient(135deg, #7C3AED, #6D28D9); }
+        .reindex-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .reindex-btn.spinning i { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="knowledge-container">
+        <div class="header-bar">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="admin-dashboard.html" class="btn-back"><i class="fas fa-arrow-right"></i> العودة</a>
+                <h1><i class="fas fa-brain"></i> إدارة المعرفة — المساعد الذكي</h1>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="reindex-btn" id="reindexBtn" onclick="reindexKb()" title="إعادة بناء الفهرس">
+                    <i class="fas fa-sync-alt"></i> إعادة الفهرسة
+                </button>
+                <button class="btn-primary" onclick="loadAllData()"><i class="fas fa-sync-alt"></i> تحديث</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <h3>الوثائق</h3>
+                <div class="stat-value" id="totalDocs">0</div>
+            </div>
+            <div class="stat-card success">
+                <h3>القطع (Chunks)</h3>
+                <div class="stat-value" id="totalChunks">0</div>
+            </div>
+            <div class="stat-card warning">
+                <h3>الاستفسارات</h3>
+                <div class="stat-value" id="totalQueries">0</div>
+            </div>
+            <div class="stat-card danger">
+                <h3>حالة الفهرس</h3>
+                <div class="stat-value" id="indexStatus" style="font-size:1.2rem;line-height:2rem;">—</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('upload')"><i class="fas fa-upload"></i> رفع وثيقة</button>
+            <button class="tab-btn" onclick="switchTab('documents')"><i class="fas fa-file-alt"></i> الوثائق</button>
+            <button class="tab-btn" onclick="switchTab('unanswered')"><i class="fas fa-question-circle"></i> الأسئلة غير المجابة <span id="unansweredBadge" style="display:none;background:var(--coral);color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-right:4px;">0</span></button>
+            <button class="tab-btn" onclick="switchTab('test')"><i class="fas fa-vial"></i> اختبار المساعد</button>
+        </div>
+
+        <!-- Upload Tab -->
+        <div class="tab-content active" id="tab-upload">
+            <div class="two-col">
+                <div class="panel">
+                    <h3><i class="fas fa-cloud-upload-alt"></i> رفع ملف</h3>
+                    <div class="file-upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>اسحب الملف هنا أو اضغط للاختيار</p>
+                        <div class="file-types">PDF, Word, Excel, TXT, Markdown</div>
+                    </div>
+                    <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv" onchange="handleFileSelect(event)">
+                    <div class="form-group" style="margin-top:16px;">
+                        <label>العنوان (اختياري — يُستخرج من اسم الملف تلقائياً)</label>
+                        <input type="text" id="fileTitle" placeholder="عنوان الوثيقة">
+                    </div>
+                    <div class="form-group">
+                        <label>التصنيف</label>
+                        <select id="fileCategory">
+                            <option value="بروتوكول">بروتوكول</option>
+                            <option value="إجراء">إجراء</option>
+                            <option value="تعليمات">تعليمات</option>
+                            <option value="تقرير">تقرير</option>
+                            <option value="عام">عام</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الوصف (اختياري)</label>
+                        <input type="text" id="fileDescription" placeholder="وصف مختصر للوثيقة...">
+                    </div>
+                    <div id="filePreview" style="margin-top:12px;font-size:0.85rem;color:var(--gray-600);"></div>
+                    <div class="upload-progress" id="uploadProgress">
+                        <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadProgressFill"></div></div>
+                    </div>
+                    <button class="btn-primary" id="uploadFileBtn" onclick="uploadFileDocument()" style="margin-top:12px;" disabled>
+                        <i class="fas fa-upload"></i> رفع الملف
+                    </button>
+                    <div id="fileUploadResult" class="result-message"></div>
+                </div>
+
+                <div class="panel">
+                    <h3><i class="fas fa-info-circle"></i> معلومات</h3>
+                    <div style="font-size:0.85rem;color:var(--gray-600);line-height:1.8;">
+                        <p><strong>الملفات المدعومة:</strong></p>
+                        <ul style="margin-bottom:16px;">
+                            <li>PDF — الوثائق والبروتوكولات</li>
+                            <li>Word (DOCX/DOC) — التقارير والإجراءات</li>
+                            <li>Excel (XLSX/XLS) — الجداول والبيانات</li>
+                            <li>TXT / Markdown — الملاحظات النصية</li>
+                            <li>CSV — البيانات المنظمة</li>
+                        </ul>
+                        <p><strong>ملاحظات:</strong></p>
+                        <ul>
+                            <li>الحد الأقصى لحجم الملف: 20 ميجابايت</li>
+                            <li>يتم استخراج النص تلقائياً وتحليله</li>
+                            <li>يتم بناء الفهرس تلقائياً بعد الرفع</li>
+                            <li>الوثائق محمية بصلاحيات المستخدم</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents Tab -->
+        <div class="tab-content" id="tab-documents">
+            <div class="panel">
+                <h3><i class="fas fa-list"></i> قائمة الوثائق</h3>
+                <div id="documentsList">
+                    <div class="loading">جاري تحميل الوثائق...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unanswered Questions Tab -->
+        <div class="tab-content" id="tab-unanswered">
+            <div class="panel">
+                <h3><i class="fas fa-question-circle"></i> الأسئلة غير المجابة</h3>
+                <div class="filters-row">
+                    <label>التصفية حسب الحالة:</label>
+                    <select id="unansweredFilter" onchange="loadUnansweredQuestions()">
+                        <option value="">الكل</option>
+                        <option value="pending">جديد</option>
+                        <option value="reviewing">قيد المراجعة</option>
+                        <option value="resolved">محلول</option>
+                        <option value="dismissed">متجاهل</option>
+                    </select>
+                    <button class="btn-outline btn-sm" onclick="loadUnansweredQuestions()"><i class="fas fa-sync-alt"></i> تحديث</button>
+                </div>
+                <div id="unansweredTableContainer">
+                    <div class="loading">جاري تحميل الأسئلة...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Tab -->
+        <div class="tab-content" id="tab-test">
+            <div class="panel">
+                <h3><i class="fas fa-robot"></i> اختبار المساعد الذكي</h3>
+                <p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:12px;">اختبر المساعد بأسئلة من قاعدة المعرفة</p>
+                <div class="chat-test-messages" id="testMessages" style="min-height:100px;max-height:300px;overflow-y:auto;background:var(--gray-50);border-radius:8px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--gray-200);"></div>
+                <div class="chat-test-input" style="display:flex;gap:8px;">
+                    <input type="text" id="testInput" placeholder="اكتب سؤالاً..." onkeypress="if(event.key==='Enter') sendTestMessage()" style="flex:1;padding:8px 12px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit;">
+                    <button class="btn-primary" onclick="sendTestMessage()"><i class="fas fa-paper-plane"></i></button>
+                </div>
+                <div style="margin-top:12px;font-size:0.8rem;color:var(--gray-500);">
+                    <i class="fas fa-info-circle"></i> الإجابات تعتمد على الوثائق المرفوعة في قاعدة المعرفة
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var authToken = localStorage.getItem('authToken');
+        var selectedFile = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!authToken) {
+                alert('يجب تسجيل الدخول كمشرف');
+                location.href = 'index.html';
+                return;
+            }
+            loadAllData();
+            setupDragDrop();
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.closest('.tab-btn').classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            if (tabId === 'documents') loadDocuments();
+            if (tabId === 'unanswered') loadUnansweredQuestions();
+        }
+
+        async function loadAllData() {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadDocuments(),
+                    loadUnansweredQuestions()
+                ]);
+            } catch (e) {
+                console.error('Load all data error:', e);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/rag/stats', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('totalDocs').textContent = data.stats.documents || 0;
+                    document.getElementById('totalChunks').textContent = data.stats.chunks || 0;
+                    document.getElementById('totalQueries').textContent = data.stats.queries || 0;
+                    const statusEl = document.getElementById('indexStatus');
+                    statusEl.textContent = data.stats.indexBuilt ? '✅ مبني' : '⏳ غير مبني';
+                    statusEl.style.color = data.stats.indexBuilt ? 'var(--teal)' : 'var(--gold)';
+                }
+            } catch (e) {
+                console.error('Load stats error:', e);
+            }
+        }
+
+        async function loadDocuments() {
+            const container = document.getElementById('documentsList');
+            container.innerHTML = '<div class="loading">جاري تحميل الوثائق...</div>';
+            try {
+                const res = await fetch('/api/rag/documents', { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                if (data.success && data.documents && data.documents.length > 0) {
+                    renderDocuments(data.documents);
+                } else {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i> لا توجد وثائق حالياً</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div class="empty-state" style="color:var(--coral)"><i class="fas fa-exclamation-circle"></i> فشل في تحميل الوثائق</div>';
+            }
+        }
+
+        function renderDocuments(docs) {
+            const container = document.getElementById('documentsList');
+            container.innerHTML = '<div class="document-list">' + docs.map(doc => {
+                const size = doc.file_size ? formatFileSize(doc.file_size) : '-';
+                const date = doc.upload_date ? new Date(doc.upload_date).toLocaleDateString('ar-SA') : (doc.created_at ? new Date(doc.created_at).toLocaleDateString('ar-SA') : '-');
+                const category = doc.category || 'عام';
+                const docId = doc.doc_id || doc.id;
+                return `
+                <div class="document-item">
+                    <div class="document-info">
+                        <div class="document-title">${escapeHtml(doc.title || doc.original_name || 'وثيقة بدون عنوان')}</div>
+                        <div class="document-meta">
+                            <span><i class="fas fa-tag"></i> ${escapeHtml(category)}</span>
+                            <span><i class="fas fa-cubes"></i> ${doc.chunk_count || 0} قطعة</span>
+                            <span><i class="fas fa-calendar"></i> ${date}</span>
+                            <span><i class="fas fa-hdd"></i> ${size}</span>
+                            <span class="status-badge ${doc.status || 'active'}">${doc.status || 'active'}</span>
+                        </div>
+                    </div>
+                    <div class="document-actions">
+                        <button class="btn-success btn-sm" onclick="downloadDocument('${docId}')" title="تحميل">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn-danger btn-sm" onclick="deleteDocument('${docId}')" title="حذف">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `; }).join('') + '</div>';
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        async function downloadDocument(docId) {
+            try {
+                window.open('/api/rag/download/' + docId + '?token=' + encodeURIComponent(authToken), '_blank');
+            } catch (e) {
+                alert('❌ فشل في تحميل الملف');
+            }
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('هل أنت متأكد من حذف هذه الوثيقة؟')) return;
+            try {
+                const res = await fetch('/api/rag/documents/' + docId, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadDocuments();
+                    loadStats();
+                } else {
+                    alert('❌ ' + (data.error || 'فشل في الحذف'));
+                }
+            } catch (e) {
+                alert('❌ فشل في الحذف');
+            }
+        }
+
+        function setupDragDrop() {
+            const dropZone = document.getElementById('dropZone');
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            dropZone.addEventListener('dragenter', () => dropZone.classList.add('dragover'));
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', (e) => {
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length) handleFile(files[0]);
+            });
+        }
+
+        function handleFileSelect(event) {
+            if (event.target.files.length) {
+                handleFile(event.target.files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            selectedFile = file;
+            const preview = document.getElementById('filePreview');
+            const titleInput = document.getElementById('fileTitle');
+            const uploadBtn = document.getElementById('uploadFileBtn');
+            const allowedTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.csv'];
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (!allowedTypes.includes('.' + ext)) {
+                preview.innerHTML = '<div style="color:var(--coral);"><i class="fas fa-exclamation-circle"></i> نوع الملف غير مدعوم</div>';
+                uploadBtn.disabled = true;
+                return;
+            }
+            preview.innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-file" style="color:var(--primary);"></i>
+                    <div>
+                        <div style="font-weight:600;">${escapeHtml(file.name)}</div>
+                        <div style="font-size:0.75rem;color:var(--gray-400);">${formatFileSize(file.size)}</div>
+                    </div>
+                </div>
+            `;
+            if (!titleInput.value) {
+                titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+            }
+            uploadBtn.disabled = false;
+        }
+
+        async function uploadFileDocument() {
+            const title = document.getElementById('fileTitle').value.trim() || (selectedFile ? selectedFile.name.replace(/\.[^/.]+$/, '') : '');
+            const category = document.getElementById('fileCategory').value;
+            const description = document.getElementById('fileDescription').value.trim();
+            const resultDiv = document.getElementById('fileUploadResult');
+            const btn = document.getElementById('uploadFileBtn');
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('uploadProgressFill');
+
+            if (!selectedFile) {
+                resultDiv.className = 'result-message error';
+                resultDiv.textContent = 'يرجى اختيار ملف أولاً';
+                return;
+            }
+
+            btn.disabled = true;
+            resultDiv.className = 'result-message';
+            resultDiv.style.display = 'none';
+            progressDiv.classList.add('active');
+            progressFill.style.width = '30%';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                formData.append('category', category);
+                if (description) formData.append('description', description);
+
+                progressFill.style.width = '60%';
+
+                const res = await fetch('/api/rag/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                    body: formData
+                });
+
+                progressFill.style.width = '100%';
+
+                const data = await res.json();
+                if (data.success) {
+                    resultDiv.className = 'result-message success';
+                    resultDiv.textContent = `✅ تم رفع ومعالجة الملف بنجاح (${data.chunkCount || 0} قطعة)`;
+                    selectedFile = null;
+                    document.getElementById('fileTitle').value = '';
+                    document.getElementById('fileDescription').value = '';
+                    document.getElementById('filePreview').innerHTML = '';
+                    btn.disabled = true;
+                    loadStats();
+                    if (document.getElementById('tab-documents').classList.contains('active')) {
+                        loadDocuments();
+                    }
+                } else {
+                    resultDiv.className = 'result-message error';
+                    resultDiv.textContent = '❌ ' + (data.error || 'فشل في رفع الملف');
+                }
+            } catch (e) {
+                resultDiv.className = 'result-message error';
+                resultDiv.textContent = '❌ ' + e.message;
+            } finally {
+                btn.disabled = false;
+                setTimeout(() => { progressDiv.classList.remove('active'); progressFill.style.width = '0%'; }, 1000);
+            }
+        }
+
+        async function loadUnansweredQuestions() {
+            const container = document.getElementById('unansweredTableContainer');
+            const filter = document.getElementById('unansweredFilter').value;
+            container.innerHTML = '<div class="loading">جاري تحميل الأسئلة...</div>';
+            try {
+                const url = '/api/ai/v2/unanswered?limit=100' + (filter ? '&status=' + encodeURIComponent(filter) : '');
+                const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                if (data.success) {
+                    renderUnansweredQuestions(data.questions || []);
+                    updateUnansweredBadge(data.questions || []);
+                } else {
+                    container.innerHTML = '<div class="empty-state" style="color:var(--coral)"><i class="fas fa-exclamation-circle"></i> فشل في تحميل الأسئلة</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div class="empty-state" style="color:var(--coral)"><i class="fas fa-exclamation-circle"></i> فشل في الاتصال</div>';
+            }
+        }
+
+        function updateUnansweredBadge(questions) {
+            const pending = questions.filter(q => q.status === 'pending' || q.status === 'new').length;
+            const badge = document.getElementById('unansweredBadge');
+            if (pending > 0) {
+                badge.textContent = pending;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function renderUnansweredQuestions(questions) {
+            const container = document.getElementById('unansweredTableContainer');
+            if (!questions.length) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i> لا توجد أسئلة غير مجابة</div>';
+                return;
+            }
+            const rows = questions.map(q => {
+                const status = q.status || 'pending';
+                const statusLabel = status === 'pending' ? 'جديد' : status === 'reviewing' ? 'قيد المراجعة' : status === 'resolved' ? 'محلول' : status === 'dismissed' ? 'متجاهل' : status;
+                const date = q.created_at ? new Date(q.created_at).toLocaleString('ar-SA') : '-';
+                const user = q.user_name || q.user_id || 'غير معروف';
+                const resolution = q.resolution || '';
+                const resolvedBy = q.resolved_by || '';
+                return `
+                    <tr>
+                        <td><div class="unanswered-question">${escapeHtml(q.question)}</div></td>
+                        <td><span class="status-pill ${status}">${statusLabel}</span></td>
+                        <td>${escapeHtml(user)}</td>
+                        <td><div class="unanswered-answer">${escapeHtml(resolution || '—')}</div>${resolvedBy ? '<div style="font-size:0.7rem;color:var(--gray-400);margin-top:2px;">بواسطة: ' + escapeHtml(resolvedBy) + '</div>' : ''}</td>
+                        <td style="font-size:0.75rem;color:var(--gray-500);white-space:nowrap;">${date}</td>
+                        <td>
+                            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                ${status !== 'resolved' && status !== 'dismissed' ? `
+                                    <button class="btn-success btn-sm" onclick="resolveUnanswered(${q.id}, this)" title="حل">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn-warning btn-sm" onclick="reviewUnanswered(${q.id})" title="مراجعة">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-outline btn-sm" onclick="dismissUnanswered(${q.id})" title="تجاهل">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="overflow-x:auto;">
+                    <table class="unanswered-table">
+                        <thead>
+                            <tr>
+                                <th>السؤال</th>
+                                <th>الحالة</th>
+                                <th>المستخدم</th>
+                                <th>الحل</th>
+                                <th>التاريخ</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        async function resolveUnanswered(id, btn) {
+            const resolution = prompt('أدخل الحل / الإجابة للسؤال:');
+            if (resolution === null) return;
+            try {
+                btn.disabled = true;
+                const res = await fetch('/api/ai/v2/unanswered/' + id + '/resolve', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolution })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadUnansweredQuestions();
+                } else {
+                    alert('❌ ' + (data.error || 'فشل في الحل'));
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert('❌ فشل في الاتصال');
+                btn.disabled = false;
+            }
+        }
+
+        async function reviewUnanswered(id) {
+            try {
+                const res = await fetch('/api/ai/v2/unanswered/' + id + '/resolve', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolution: 'قيد المراجعة' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadUnansweredQuestions();
+                } else {
+                    alert('❌ ' + (data.error || 'فشل'));
+                }
+            } catch (e) {
+                alert('❌ فشل في الاتصال');
+            }
+        }
+
+        async function dismissUnanswered(id) {
+            if (!confirm('هل أنت متأكد من تجاهل هذا السؤال؟')) return;
+            try {
+                const res = await fetch('/api/ai/v2/unanswered/' + id + '/dismiss', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadUnansweredQuestions();
+                } else {
+                    alert('❌ ' + (data.error || 'فشل في التجاهل'));
+                }
+            } catch (e) {
+                alert('❌ فشل في الاتصال');
+            }
+        }
+
+        async function sendTestMessage() {
+            const input = document.getElementById('testInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const messagesDiv = document.getElementById('testMessages');
+            messagesDiv.innerHTML += `<div style="padding:8px 12px;border-radius:8px;font-size:0.85rem;max-width:80%;background:var(--primary);color:white;align-self:flex-end;word-wrap:break-word;">${escapeHtml(text)}</div>`;
+            input.value = '';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            try {
+                const res = await fetch('/api/rag/ask', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: text, topK: 5 })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    let answerHtml = '<div style="padding:8px 12px;border-radius:8px;font-size:0.85rem;max-width:90%;background:var(--gray-100);color:var(--gray-800);align-self:flex-start;word-wrap:break-word;">';
+                    answerHtml += escapeHtml(data.answer).replace(/\n/g, '<br>');
+                    if (data.sources && data.sources.length > 0) {
+                        answerHtml += '<div style="margin-top:8px;font-size:0.75rem;color:var(--gray-500);border-top:1px solid var(--gray-200);padding-top:6px;"><strong>المصادر:</strong> ' + data.sources.map((s, i) => `<span style="background:var(--primary-50);color:var(--primary);padding:2px 6px;border-radius:4px;margin-left:4px;">${i+1}</span>`).join(' ') + '</div>';
+                    }
+                    if (data.confidence !== undefined) {
+                        const confColor = data.confidence >= 65 ? 'var(--teal)' : data.confidence >= 35 ? 'var(--gold)' : 'var(--coral)';
+                        answerHtml += `<div style="margin-top:4px;font-size:0.7rem;color:${confColor};">الثقة: ${Math.round(data.confidence)}%</div>`;
+                    }
+                    if (data.queryTimeMs) {
+                        answerHtml += `<div style="margin-top:2px;font-size:0.7rem;color:var(--gray-400);">⏱️ ${data.queryTimeMs} ملي ثانية</div>`;
+                    }
+                    answerHtml += '</div>';
+                    messagesDiv.innerHTML += answerHtml;
+                } else {
+                    messagesDiv.innerHTML += `<div style="padding:8px 12px;border-radius:8px;font-size:0.85rem;max-width:80%;background:var(--gray-100);color:var(--coral);align-self:flex-start;">❌ خطأ: ${escapeHtml(data.error || 'فشل في الرد')}</div>`;
+                }
+            } catch (e) {
+                messagesDiv.innerHTML += `<div style="padding:8px 12px;border-radius:8px;font-size:0.85rem;max-width:80%;background:var(--gray-100);color:var(--coral);align-self:flex-start;">❌ فشل في الاتصال</div>`;
+            }
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function reindexKb() {
+            const btn = document.getElementById('reindexBtn');
+            btn.disabled = true;
+            btn.classList.add('spinning');
+            try {
+                // The backend rebuilds index automatically on upload/delete.
+                // We simulate a reindex by refreshing stats and documents.
+                await loadStats();
+                await loadDocuments();
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result-message success';
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = '✅ تم تحديث الفهرس والبيانات بنجاح';
+                document.querySelector('.header-bar').appendChild(resultDiv);
+                setTimeout(() => resultDiv.remove(), 3000);
+            } catch (e) {
+                alert('❌ فشل في تحديث الفهرس');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('spinning');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+<!-- AI Assistant -->
+<link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+<script src="/js/ai-assistant.js?v=2"></script>
+</body>
+</html>

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم المساعد الذكي - الأسئلة غير المجابة</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1E3A5F;
+            --primary-light: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            direction: rtl;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        
+        .header .subtitle {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+        
+        .header-actions a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.15);
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        
+        .header-actions a:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+        }
+        
+        .stat-card .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        
+        .stat-card .stat-icon.blue { background: #EFF6FF; color: var(--primary-light); }
+        .stat-card .stat-icon.green { background: #ECFDF5; color: var(--success); }
+        .stat-card .stat-icon.orange { background: #FFFBEB; color: var(--warning); }
+        .stat-card .stat-icon.red { background: #FEF2F2; color: var(--danger); }
+        
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        
+        .stat-card .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filters select, .filters input {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            font-family: inherit;
+        }
+        
+        .filters button {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            font-family: inherit;
+        }
+        
+        .filters button:hover {
+            background: var(--primary-light);
+        }
+        
+        /* Table */
+        .table-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #F8FAFC;
+            padding: 12px 16px;
+            text-align: right;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            vertical-align: top;
+        }
+        
+        tr:hover {
+            background: #FAFBFC;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-badge.pending {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        
+        .status-badge.resolved {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+        
+        .status-badge.dismissed {
+            background: #E2E8F0;
+            color: #475569;
+        }
+        
+        .score-bar {
+            width: 60px;
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 3px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        
+        .score-bar .fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--danger);
+        }
+        
+        .score-bar .fill.medium { background: var(--warning); }
+        .score-bar .fill.high { background: var(--success); }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .actions button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .actions .btn-resolve {
+            background: var(--success);
+            color: white;
+        }
+        
+        .actions .btn-resolve:hover {
+            background: #059669;
+        }
+        
+        .actions .btn-dismiss {
+            background: #E2E8F0;
+            color: #475569;
+        }
+        
+        .actions .btn-dismiss:hover {
+            background: #CBD5E1;
+        }
+        
+        .resolution-box {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #F0FDF4;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #065F46;
+        }
+        
+        .resolution-box .resolved-by {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+        
+        .loading i {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Resolve Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+        
+        .modal h3 {
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+        
+        .modal textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            min-height: 100px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .modal-actions button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .modal-actions .btn-cancel {
+            background: #E2E8F0;
+            color: #475569;
+        }
+        
+        .modal-actions .btn-save {
+            background: var(--success);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-robot"></i> لوحة تحكم المساعد الذكي</h1>
+            <div class="subtitle">إدارة الأسئلة غير المجابة والمعرفة التشغيلية</div>
+        </div>
+        <div class="header-actions">
+            <a href="/index.html"><i class="fas fa-home"></i> الرئيسية</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading"><i class="fas fa-spinner"></i> جاري التحميل...</div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <select id="statusFilter">
+                <option value="">جميع الحالات</option>
+                <option value="pending" selected>معلقة</option>
+                <option value="resolved">محلولة</option>
+                <option value="dismissed">متجاهلة</option>
+            </select>
+            <button onclick="loadQuestions()"><i class="fas fa-refresh"></i> تحديث</button>
+        </div>
+        
+        <!-- Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <i class="fas fa-question-circle"></i> الأسئلة
+            </div>
+            <div id="tableContainer">
+                <div class="loading"><i class="fas fa-spinner"></i> جاري التحميل...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resolve Modal -->
+    <div class="modal-overlay" id="resolveModal">
+        <div class="modal">
+            <h3>حل السؤال</h3>
+            <p id="modalQuestion" style="margin-bottom: 12px; color: #64748B; font-size: 14px;"></p>
+            <textarea id="resolutionInput" placeholder="اكتب الإجابة أو الحل هنا..."></textarea>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">إلغاء</button>
+                <button class="btn-save" onclick="confirmResolve()">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQuestionId = null;
+        const API_BASE = '/api/ai/v2';
+        
+        function getToken() {
+            return localStorage.getItem('authToken') || '';
+        }
+        
+        async function fetchWithAuth(url, options = {}) {
+            const token = getToken();
+            const res = await fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': token ? 'Bearer ' + token : ''
+                }
+            });
+            if (res.status === 401) {
+                alert('جلسة غير صالحة، يرجى تسجيل الدخول');
+                window.location.href = '/index.html';
+                return null;
+            }
+            return res;
+        }
+        
+        async function loadStats() {
+            try {
+                const res = await fetchWithAuth(`${API_BASE}/stats?days=30`);
+                if (!res) return;
+                const data = await res.json();
+                
+                if (!data.success) return;
+                
+                const stats = data.stats;
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-comments"></i></div>
+                        <div class="stat-value">${stats.totalChats}</div>
+                        <div class="stat-label">محادثات (30 يوم)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value">${stats.highConfidence}</div>
+                        <div class="stat-label">إجابات عالية الثقة</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange"><i class="fas fa-question-circle"></i></div>
+                        <div class="stat-value">${stats.pendingQuestions}</div>
+                        <div class="stat-label">أسئلة معلقة</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-book"></i></div>
+                        <div class="stat-value">${stats.knowledgeChunks}</div>
+                        <div class="stat-label">قطع المعرفة</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fas fa-thumbs-up"></i></div>
+                        <div class="stat-value">${stats.positiveFeedback}</div>
+                        <div class="stat-label">تقييمات إيجابية</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon red"><i class="fas fa-thumbs-down"></i></div>
+                        <div class="stat-value">${stats.negativeFeedback}</div>
+                        <div class="stat-label">تقييمات سلبية</div>
+                    </div>
+                `;
+            } catch (err) {
+                console.error('Stats error:', err);
+                document.getElementById('statsGrid').innerHTML = '<div class="stat-card"><div class="stat-label">تعذر تحميل الإحصائيات</div></div>';
+            }
+        }
+        
+        async function loadQuestions() {
+            const status = document.getElementById('statusFilter').value;
+            const container = document.getElementById('tableContainer');
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> جاري التحميل...</div>';
+            
+            try {
+                const res = await fetchWithAuth(`${API_BASE}/unanswered?status=${status}&limit=100`);
+                if (!res) return;
+                const data = await res.json();
+                
+                if (!data.success || !data.questions || data.questions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle"></i>
+                            <h3>لا توجد أسئلة ${status ? getStatusLabel(status) : ''}</h3>
+                            <p>جميع الأسئلة تمت معالجتها!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>السؤال</th>
+                                <th>المستخدم</th>
+                                <th>النقاط</th>
+                                <th>الحالة</th>
+                                <th>التاريخ</th>
+                                <th>الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.questions.map((q, i) => `
+                                <tr>
+                                    <td>${q.id}</td>
+                                    <td>
+                                        <div style="max-width: 300px; word-wrap: break-word;">${escapeHtml(q.question)}</div>
+                                        ${q.resolution ? `<div class="resolution-box">${escapeHtml(q.resolution)}<div class="resolved-by">تم الحل بواسطة: ${escapeHtml(q.resolved_by || '')} - ${formatDate(q.resolved_at)}</div></div>` : ''}
+                                    </td>
+                                    <td>${escapeHtml(q.user_name || q.user_id || 'مجهول')}</td>
+                                    <td>
+                                        <div class="score-bar">
+                                            <div class="fill ${getScoreClass(q.score)}" style="width: ${Math.round((q.score || 0) * 100)}%"></div>
+                                        </div>
+                                        <span style="font-size: 12px;">${Math.round((q.score || 0) * 100)}%</span>
+                                    </td>
+                                    <td><span class="status-badge ${q.status}">${getStatusLabel(q.status)}</span></td>
+                                    <td>${formatDate(q.created_at)}</td>
+                                    <td>
+                                        <div class="actions">
+                                            ${q.status === 'pending' ? `
+                                                <button class="btn-resolve" onclick="openResolveModal(${q.id}, '${escapeHtml(q.question).replace(/'/g, "\\'")}')">حل</button>
+                                                <button class="btn-dismiss" onclick="dismissQuestion(${q.id})">تجاهل</button>
+                                            ` : ''}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                console.error('Questions error:', err);
+                container.innerHTML = '<div class="loading">تعذر تحميل الأسئلة</div>';
+            }
+        }
+        
+        function getStatusLabel(status) {
+            const labels = { pending: 'معلقة', resolved: 'محلولة', dismissed: 'متجاهلة' };
+            return labels[status] || status;
+        }
+        
+        function getScoreClass(score) {
+            if (score >= 0.5) return 'high';
+            if (score >= 0.3) return 'medium';
+            return '';
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            if (isNaN(d)) return dateStr;
+            return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function openResolveModal(id, question) {
+            currentQuestionId = id;
+            document.getElementById('modalQuestion').textContent = question;
+            document.getElementById('resolutionInput').value = '';
+            document.getElementById('resolveModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('resolveModal').classList.remove('active');
+            currentQuestionId = null;
+        }
+        
+        async function confirmResolve() {
+            if (!currentQuestionId) return;
+            const resolution = document.getElementById('resolutionInput').value.trim();
+            
+            try {
+                const res = await fetchWithAuth(`${API_BASE}/unanswered/${currentQuestionId}/resolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolution })
+                });
+                if (!res) return;
+                
+                const data = await res.json();
+                if (data.success) {
+                    closeModal();
+                    loadQuestions();
+                    loadStats();
+                } else {
+                    alert('فشل في حل السؤال: ' + (data.error || ''));
+                }
+            } catch (err) {
+                console.error('Resolve error:', err);
+                alert('فشل في الاتصال');
+            }
+        }
+        
+        async function dismissQuestion(id) {
+            if (!confirm('هل أنت متأكد من تجاهل هذا السؤال؟')) return;
+            
+            try {
+                const res = await fetchWithAuth(`${API_BASE}/unanswered/${id}/dismiss`, {
+                    method: 'POST'
+                });
+                if (!res) return;
+                
+                const data = await res.json();
+                if (data.success) {
+                    loadQuestions();
+                    loadStats();
+                } else {
+                    alert('فشل في تجاهل السؤال: ' + (data.error || ''));
+                }
+            } catch (err) {
+                console.error('Dismiss error:', err);
+                alert('فشل في الاتصال');
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadQuestions();
+        });
+        
+        // Close modal on overlay click
+        document.getElementById('resolveModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+<!-- AI Assistant -->
+<link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+<script src="/js/ai-assistant.js?v=2"></script>
+</body>
+</html>
