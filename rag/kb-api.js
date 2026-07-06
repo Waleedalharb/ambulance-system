@@ -20,6 +20,98 @@ const logger = {
 };
 
 // ============================================
+// SEED SOP DATA (default for testing)
+// ============================================
+const SEED_SOP_DOCUMENT = `
+# بروتوكول تشغيلي تجريبي
+
+# الإجراء رقم: SOP-001
+## اسم الإجراء
+رفض المريض النقل
+
+## الوصف
+يطبق هذا الإجراء عندما يرفض المريض النقل بعد وصول الفرقة الإسعافية إلى الموقع.
+
+## خطوات التنفيذ
+1. تقوم الفرقة الإسعافية بتقييم الحالة وتقديم الرعاية اللازمة.
+2. يتم تدوين جميع الملاحظات الطبية والسريرية داخل البلاغ.
+3. يتم إشعار الطبيب المناوب بالحالة.
+4. يتواصل الطبيب مع المريض هاتفياً أو بالطريقة المعتمدة.
+5. يقوم الطبيب بشرح الحالة للمريض وتقديم النصائح الطبية المناسبة.
+6. إذا وافق المريض على النقل يتم استكمال إجراءات النقل.
+7. إذا أصر المريض على رفض النقل بعد استلام النصيحة الطبية يتم توثيق رفض النقل وفق النموذج المعتمد.
+8. يتم إغلاق البلاغ بعد اكتمال جميع إجراءات التوثيق.
+
+## ملاحظات
+لا يجوز إغلاق البلاغ قبل توثيق جميع الإجراءات.
+يجب تسجيل جميع الملاحظات الطبية داخل النظام.
+
+# الإجراء رقم: SOP-002
+## اسم الإجراء
+تصنيف البلاغات
+
+## الوصف
+تصنيف البلاغات حسب درجة الخطورة.
+
+## تصنيفات البلاغ
+• ألفا (Alpha)
+• برافو (Bravo)
+• تشارلي (Charlie)
+• دلتا (Delta)
+
+# الإجراء رقم: SOP-003
+## اسم الإجراء
+آلية نقل حالات دلتا
+
+## الوصف
+إجراء نقل الحالات المصنفة دلتا.
+
+## التعليمات
+إذا كانت الحالة مصنفة (دلتا):
+• يتم نقل المريض إلى أقرب منشأة صحية مناسبة.
+• يمنع تجاوز أقرب منشأة صحية إلى منشأة أبعد.
+• لا يتم تغيير جهة النقل إلا إذا وجد توجيه رسمي من القيادة أو التنسيق العملياتي.
+
+# الإجراء رقم: SOP-004
+## اسم الإجراء
+آلية نقل حالات تشارلي
+
+## الوصف
+إجراء نقل الحالات المصنفة تشارلي.
+
+## التعليمات
+إذا كانت الحالة مصنفة (تشارلي):
+
+إذا كان المريض مواطناً:
+• يتم النقل إلى مستشفى حكومي فقط.
+• يجب أن يكون المستشفى داخل القطاع.
+• لا يسمح بالنقل إلى قطاع آخر إلا بتوجيه رسمي.
+
+إذا كان المريض غير مواطن:
+• يتم النقل إلى مستشفى أهلي فقط.
+• يجب أن يكون المستشفى داخل القطاع.
+
+# الإجراء رقم: SOP-005
+## اسم الإجراء
+طلب النقل إلى مستشفى أهلي
+
+## الوصف
+إجراء طلب النقل إلى مستشفى أهلي.
+
+## التعليمات
+إذا كان المريض مواطناً وطلب النقل إلى مستشفى أهلي وكانت الحالة مصنفة:
+• ألفا
+• أو تشارلي
+
+فيجب اتباع الخطوات التالية:
+1. تقوم الفرقة بإشعار التنسيق العملياتي.
+2. يتواصل التنسيق مع المريض أو أحد ذويه.
+3. يتم التأكد من رغبتهم بالنقل إلى مستشفى أهلي.
+4. يتم توثيق المكالمة داخل البلاغ.
+5. يتم استكمال الإجراءات حسب التعليمات المعتمدة.
+`;
+
+// ============================================
 // CONFIGURATION
 // ============================================
 const KB_UPLOAD_DIR = path.join(process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, '..', 'data'), 'uploads', 'kb');
@@ -41,13 +133,21 @@ let indexLoaded = false;
 async function loadIndexFromDB(db) {
   try {
     if (!db) {
-      logger.info('No DB provided, RAG index will be empty');
+      logger.info('No DB provided, loading seed SOP data');
+      ragIndex.addDocument(SEED_SOP_DOCUMENT, 'seed-doc');
+      ragIndex.build();
+      indexLoaded = true;
+      logger.info(`Loaded seed SOP data: ${ragIndex.sops.length} SOPs`);
       return;
     }
     // Load full documents (not chunks) to parse into SOPs
     const docs = await db.all('SELECT id, doc_id, content FROM kb_documents WHERE content IS NOT NULL AND is_active = 1');
     if (!docs || docs.length === 0) {
-      logger.info('No KB documents found in DB');
+      logger.info('No KB documents found in DB, loading seed SOP data');
+      ragIndex.addDocument(SEED_SOP_DOCUMENT, 'seed-doc');
+      ragIndex.build();
+      indexLoaded = true;
+      logger.info(`Loaded seed SOP data: ${ragIndex.sops.length} SOPs`);
       return;
     }
     for (const doc of docs) {
@@ -57,7 +157,10 @@ async function loadIndexFromDB(db) {
     indexLoaded = true;
     logger.info(`Loaded ${docs.length} documents into SOP RAG index, found ${ragIndex.sops.length} SOPs`);
   } catch (err) {
-    logger.error('Failed to load RAG index from DB', err);
+    logger.error('Failed to load RAG index from DB, falling back to seed', err);
+    ragIndex.addDocument(SEED_SOP_DOCUMENT, 'seed-doc');
+    ragIndex.build();
+    indexLoaded = true;
   }
 }
 
@@ -79,6 +182,13 @@ async function loadIndexFromFile() {
   } catch (err) {
     if (err.code !== 'ENOENT') {
       logger.error('Failed to load index from file', err);
+    }
+    // Fallback to seed data if no file exists
+    if (!indexLoaded) {
+      logger.info('No index file, loading seed SOP data');
+      ragIndex.addDocument(SEED_SOP_DOCUMENT, 'seed-doc');
+      ragIndex.build();
+      indexLoaded = true;
     }
   }
 }
