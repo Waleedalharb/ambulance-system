@@ -2486,6 +2486,30 @@
     margin-top: 74px !important;
 }
 
+/* ============================================
+   Shift Button Styles
+   ============================================ */
+
+.qa-btn-active {
+    background: linear-gradient(135deg, #10B981, #059669) !important;
+    color: white !important;
+    border-color: #10B981 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.qa-btn-inactive {
+    background: linear-gradient(135deg, #F59E0B, #D97706) !important;
+    color: white !important;
+    border-color: #F59E0B !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5); }
+}
+
 /* المحتوى الرئيسي */
 .main-content {
     padding-top: var(--topbar-height) !important;
