@@ -4,6 +4,16 @@
 var currentUser = null;
 var authToken = localStorage.getItem('authToken') || null;
 
+// ============================================
+// إدارة المناوبات (Shift Management)
+// ============================================
+var currentShiftId = localStorage.getItem('currentShiftId') || null;
+var allShifts = [];
+var isViewingArchiveShift = false;
+var currentViewingShift = null;
+var viewingShiftId = null;
+var currentViewingShiftData = null;
+
 function getCurrentUserName() {
     return (currentUser && currentUser.name) || (currentUser && currentUser.username) || 'غير معروف';
 }
@@ -2167,12 +2177,13 @@ var el_distributionBtn=document.getElementById("distributionBtn");if(el_distribu
 var centersData = {};
 var reports = {};
 var lastKnownUpdate = 0;
-var currentShiftId = null;
-var allShifts = [];
-var isViewingArchiveShift = false;
-var currentViewingShift = null;
-var viewingShiftId = null;
-var currentViewingShiftData = null;
+// currentShiftId already declared at top of file
+currentShiftId = currentShiftId || null;
+allShifts = [];
+isViewingArchiveShift = false;
+currentViewingShift = null;
+viewingShiftId = null;
+currentViewingShiftData = null;
 var uploadedDocs = [];
 var filteredDocs = [];
 var currentDocsPage = 1;
@@ -2258,46 +2269,50 @@ function updateTotal() {
 }
 
 function updateShiftStatus() {
-    var status = document.getElementById('shiftStatus');
-    var btn = document.getElementById('newShiftBtn');
-    var btnDot = document.getElementById('newShiftDot');
-    var btnText = document.getElementById('newShiftText');
-    
-    if (status) status.style.display = 'none';
-    
-    if (!btn || !btnDot || !btnText) return;
-    
-    // Always show current time-based shift type
-    var currentType = getCurrentShiftType ? getCurrentShiftType() : 'صباح';
-    
-    // Update quick-action current shift button too
-    var currentShiftBtn = document.getElementById('currentShiftBtn');
-    var currentShiftDisplay = document.getElementById('currentShiftDisplay');
-    if (currentShiftDisplay) {
-        var nowTime = getSaudiTime ? getSaudiTime() : '';
-        currentShiftDisplay.innerHTML = '<span style="font-size:0.8rem; opacity:0.8;">' + nowTime + '</span><br><strong>' + (currentShiftId ? 'مناوبة نشطة' : currentType) + '</strong>';
-    }
-    if (currentShiftBtn) { currentShiftBtn.disabled = false; currentShiftBtn.style.cursor = 'pointer'; }
-    
-    // Enable the newShiftBtn so it's clickable (was disabled in HTML)
-    if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.opacity = '1'; }
-    
-    if (currentShiftId) {
-        var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
-        btn.className = 'btn btn-shift-status on';
-        btnDot.style.display = 'inline-block';
-        if (shift) {
-            btnText.textContent = '✅ ' + (shift.shiftType || 'مناوبة') + ' نشطة';
-        } else {
-            btnText.textContent = '✅ مناوبة نشطة';
+    try {
+        var status = document.getElementById('shiftStatus');
+        var btn = document.getElementById('newShiftBtn');
+        var btnDot = document.getElementById('newShiftDot');
+        var btnText = document.getElementById('newShiftText');
+        
+        if (status) status.style.display = 'none';
+        
+        if (!btn || !btnDot || !btnText) {
+            console.warn('[updateShiftStatus] Button elements not found in DOM');
+            return;
         }
-    } else {
-        btn.className = 'btn btn-shift-status off';
-        btnDot.style.display = 'inline-block';
-        btnText.textContent = 'مناوبة جديدة (' + currentType + ')';
+        
+        // Always show current time-based shift type
+        var currentType = (typeof getCurrentShiftType === 'function') ? getCurrentShiftType() : 'صباح';
+        
+        // Enable the button so it's clickable (was disabled in HTML)
+        btn.disabled = false;
+        btn.style.cursor = 'pointer';
+        btn.style.opacity = '1';
+        btn.style.display = 'inline-flex';
+        
+        if (currentShiftId) {
+            var shift = null;
+            if (Array.isArray(allShifts) && allShifts.length > 0) {
+                shift = allShifts.find(function(s) { return s.id === currentShiftId; });
+            }
+            btn.className = 'btn btn-shift-status on';
+            btnDot.style.display = 'inline-block';
+            if (shift) {
+                btnText.textContent = '✅ ' + (shift.shiftType || 'مناوبة') + ' نشطة';
+            } else {
+                btnText.textContent = '✅ مناوبة نشطة';
+            }
+        } else {
+            btn.className = 'btn btn-shift-status off';
+            btnDot.style.display = 'inline-block';
+            btnText.textContent = 'مناوبة جديدة (' + currentType + ')';
+        }
+        
+        updateShiftsHistoryWidget();
+    } catch (err) {
+        console.error('[updateShiftStatus] Error:', err);
     }
-    
-    updateShiftsHistoryWidget();
 }
 
 function updateShiftsHistoryWidget() {
@@ -2367,7 +2382,7 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=29';
+    var url = 'radio-completion.html?v=30';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
@@ -8300,7 +8315,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=29'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=30'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
