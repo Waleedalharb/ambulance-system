@@ -46,7 +46,7 @@ const aiMonitor = require('./ai-monitor');
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries;
 }
 
 // Helper: safe DB response
@@ -89,6 +89,41 @@ async function resolveShiftId(req, shiftDate, shiftType) {
     
     return null;
 }
+
+// ============================================
+// SYNC: JSON Shift → SQLite
+// ============================================
+async function syncShiftToDB(shift) {
+    if (!dbAvailable() || !db.Shifts) return;
+    try {
+        const existing = await db.get('SELECT id FROM shifts WHERE id = ?', [shift.id]);
+        if (existing) {
+            await db.run(
+                `UPDATE shifts SET shift_name = ?, shift_date = ?, shift_type = ?, total_reports = ?, rapid_locations = ?, centers_data = ?, vehicle_data = ?, fuel_data = ?, general_notes = ?, last_update = ? WHERE id = ?`,
+                [
+                    shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
+                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
+                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
+                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString(), shift.id
+                ]
+            );
+        } else {
+            await db.run(
+                `INSERT INTO shifts (id, shift_name, shift_date, shift_type, total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, last_update) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    shift.id, shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
+                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
+                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
+                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString()
+                ]
+            );
+        }
+        console.log('[SYNC] Shift synced to SQLite:', shift.id, shift.shiftType);
+    } catch (err) {
+        console.error('[SYNC] Failed to sync shift to SQLite:', err.message);
+    }
+}
+
 
 // ============================================
 // Logger (بسيط — يعمل حتى بدون winston)
@@ -286,8 +321,8 @@ function getSaudiDateTime() {
 function getCurrentShiftType() {
     const saudiTime = getSaudiDateTime();
     const hour = saudiTime.getHours();
-    // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
-    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+    // صباحية: 05:00 - 17:00 | ليلية: 17:00 - 05:00
+    return (hour >= 5 && hour < 17) ? 'صباحية' : 'ليلية';
 }
 
 function getCurrentShiftDate() {
@@ -337,7 +372,7 @@ async function autoArchiveIfShiftChanged() {
             if (!r.times || r.times.length === 0) return false;
             return r.times.some(t => {
                 const reportDate = t.substring(0, 10);
-                if (currentShiftType === 'ليل') {
+                if (currentShiftType === 'ليلية') {
                     // Night shift: data from shiftDate OR shiftDate+1
                     const shiftDateObj = new Date(currentShiftDate + 'T00:00:00');
                     const nextDayObj = new Date(shiftDateObj);
@@ -372,6 +407,7 @@ async function autoArchiveIfShiftChanged() {
             shifts.unshift(newShift);
             if (shifts.length > 50) shifts.pop();
             await writeShifts(shifts);
+            await syncShiftToDB(newShift);
             currentShiftId = newShift.id;
             return false;
         }
@@ -399,6 +435,7 @@ async function autoArchiveIfShiftChanged() {
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
+        await syncShiftToDB(newShift);
         
         // Clear current reports for new shift
         await writeData({});
@@ -1518,7 +1555,7 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         
         // Handle night shift after midnight (hour < 5) — date belongs to previous day
         let shiftDate = isoDate;
-        if (normalizedType === 'ليل' && hour < 5) {
+        if (shiftType === 'ليلية' && hour < 5) {
             const prevDay = new Date(saudiTime);
             prevDay.setDate(prevDay.getDate() - 1);
             const prevYear = prevDay.getFullYear();
@@ -1569,7 +1606,10 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         // ============================================
         const newShift = {
             id: Date.now(),
-            shiftName: `${normalizedType} - ${shiftDate}`,
+            shiftName: `${shiftType} - ${shiftDate}`,
+            shiftDate: shiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: shiftType,
             shiftDate: shiftDate,
             shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
             shiftType: normalizedType,
@@ -1590,6 +1630,7 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
+        await syncShiftToDB(newShift);
         
         // Set as current shift
         currentShiftId = newShift.id;
@@ -1597,17 +1638,17 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         // Broadcast to all clients
         broadcast({
             type: 'shift_started',
-            message: `تم بدء المناوبة ${normalizedType === 'صباح' ? 'الصباحية' : 'الليلية'}`,
+            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'}`,
             shiftId: newShift.id,
             shiftDate: shiftDate,
-            shiftType: normalizedType
+            shiftType: shiftType
         });
         
         res.json({ 
             success: true, 
             shiftId: newShift.id,
             shift: newShift,
-            message: `تم بدء المناوبة ${normalizedType === 'صباح' ? 'الصباحية' : 'الليلية'} بنجاح`
+            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'} بنجاح`
         });
     } catch (error) {
         console.error('Error starting new shift:', error);
@@ -1652,7 +1693,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
                 shiftName: `${shiftData.shiftType || 'صباح'} - ${shiftDate || isoDate}`,
                 shiftDate: shiftDate || isoDate,
                 shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-                shiftType: shiftData.shiftType || 'صباح',
+                shiftType: shiftData.shiftType || 'صباحية',
                 startTime: saudiTime.toISOString(),
                 savedReports: {},
                 totalReports: 0,
@@ -1710,6 +1751,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         }
         
         await writeShifts(shifts);
+        await syncShiftToDB(targetShift);
         if (targetShift) currentShiftId = targetShift.id;
 
         broadcast({
@@ -1914,6 +1956,7 @@ app.post('/api/report', authenticate, validateBody({
                     shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
                     shifts[shiftIndex].lastUpdate = new Date().toISOString();
                     await writeShifts(shifts);
+                    await syncShiftToDB(shifts[shiftIndex]);
                 }
             }
         } catch (shiftErr) {
@@ -1969,6 +2012,7 @@ app.post('/api/undo', authenticate, async (req, res) => {
                     shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
                     shifts[shiftIndex].lastUpdate = new Date().toISOString();
                     await writeShifts(shifts);
+                    await syncShiftToDB(shifts[shiftIndex]);
                 }
             }
         } catch (shiftErr) {
@@ -2141,11 +2185,11 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
                 const normalized = shift.shiftType.trim();
                 if (normalized === 'صباحية' || normalized === 'صباح' || normalized === 'morning' || normalized === 'day') {
                     console.log('[SHIFT-TYPE] Using stored shiftType (day):', normalized);
-                    return 'صباح';
+                    return 'صباحية';
                 }
                 if (normalized === 'ليلية' || normalized === 'ليل' || normalized === 'night' || normalized === 'evening') {
                     console.log('[SHIFT-TYPE] Using stored shiftType (night):', normalized);
-                    return 'ليل';
+                    return 'ليلية';
                 }
             }
             
@@ -2155,7 +2199,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
                 const startDate = new Date(shift.startTime);
                 const utcHour = startDate.getUTCHours();
                 const saudiHour = (utcHour + 3) % 24;
-                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليل' : 'صباح';
+                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليلية' : 'صباحية';
                 console.log('[SHIFT-TYPE] startTime:', shift.startTime, 'UTC hour:', utcHour, 'Saudi hour:', saudiHour, '→', derived);
                 return derived;
             }
@@ -2164,11 +2208,11 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             if (shift.shiftName) {
                 if (shift.shiftName.includes('ليل')) {
                     console.log('[SHIFT-TYPE] Derived from shiftName (night):', shift.shiftName);
-                    return 'ليل';
+                    return 'ليلية';
                 }
                 if (shift.shiftName.includes('صباح')) {
                     console.log('[SHIFT-TYPE] Derived from shiftName (day):', shift.shiftName);
-                    return 'صباح';
+                    return 'صباحية';
                 }
             }
             
@@ -2176,13 +2220,13 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             const now = new Date();
             const nowUtcHour = now.getUTCHours();
             const nowSaudiHour = (nowUtcHour + 3) % 24;
-            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليل' : 'صباح';
+            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليلية' : 'صباحية';
             console.log('[SHIFT-TYPE] Fallback current UTC:', nowUtcHour, 'Saudi:', nowSaudiHour, '→', fallback);
             return fallback;
         }
         
         const shiftType = getShiftType(shift);
-        const isNightShift = shiftType === 'ليل';
+        const isNightShift = shiftType === 'ليلية';
         console.log('[SHIFT-TYPE] Final:', shiftType, 'isNightShift:', isNightShift);
         
         if (!shiftDate) {
