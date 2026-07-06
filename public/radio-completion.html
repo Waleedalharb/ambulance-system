@@ -208,7 +208,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=28'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="location.href='index.html?v=29'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
@@ -787,6 +787,7 @@ function setReason(teamId, reason) {
 function setMissingPerson(teamId, personName) {
     if (!teamStatus[teamId]) return;
     teamStatus[teamId].missingPerson = personName;
+    renderAll();
 }
 
 function nameOfTeam(id) {
@@ -799,36 +800,48 @@ function nameOfTeam(id) {
 // DASHBOARD
 // ============================================
 function updateDashboard() {
-    var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
-    var total = 0;
-    Object.keys(teamStatus).forEach(function(k) {
-        // Only count teams that have paramedics (actual employees on shift)
-        var paramedics = teamStatus[k].paramedics || [];
-        if (paramedics.length === 0) return;
-        
-        var s = teamStatus[k].status;
-        if (counts[s] !== undefined) counts[s]++;
-        total++;
-    });
+    try {
+        var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
+        var total = 0;
+        Object.keys(teamStatus).forEach(function(k) {
+            // Only count teams that have paramedics (actual employees on shift)
+            var paramedics = (teamStatus[k] && teamStatus[k].paramedics) || [];
+            if (paramedics.length === 0) return;
+            
+            var s = teamStatus[k].status;
+            if (counts[s] !== undefined) counts[s]++;
+            total++;
+        });
 
-    document.getElementById('countReady').textContent = counts.ready;
-    document.getElementById('countMissing').textContent = counts.missing;
-    document.getElementById('countOffline').textContent = counts.offline;
-    document.getElementById('countPending').textContent = counts.pending;
+        var elCountReady = document.getElementById('countReady');
+        var elCountMissing = document.getElementById('countMissing');
+        var elCountOffline = document.getElementById('countOffline');
+        var elCountPending = document.getElementById('countPending');
+        if (elCountReady) elCountReady.textContent = counts.ready;
+        if (elCountMissing) elCountMissing.textContent = counts.missing;
+        if (elCountOffline) elCountOffline.textContent = counts.offline;
+        if (elCountPending) elCountPending.textContent = counts.pending;
 
-    var done = counts.ready + counts.missing + counts.offline;
-    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    var fill = document.getElementById('progressFill');
-    fill.style.width = pct + '%';
-    fill.textContent = pct + '% (' + done + '/' + total + ')';
-    fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
+        var done = counts.ready + counts.missing + counts.offline;
+        var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        var fill = document.getElementById('progressFill');
+        if (fill) {
+            fill.style.width = pct + '%';
+            fill.textContent = pct + '% (' + done + '/' + total + ')';
+            fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
+        }
 
-    var finishBtn = document.getElementById('finishBtn');
-    finishBtn.disabled = counts.pending > 0;
-    if (counts.pending > 0) {
-        finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + counts.pending + ' فريق';
-    } else {
-        finishBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> إنهاء التكميل';
+        var finishBtn = document.getElementById('finishBtn');
+        if (finishBtn) {
+            finishBtn.disabled = counts.pending > 0;
+            if (counts.pending > 0) {
+                finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + counts.pending + ' فريق';
+            } else {
+                finishBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> إنهاء التكميل';
+            }
+        }
+    } catch (err) {
+        console.error('[updateDashboard] Error updating dashboard:', err);
     }
 }
 

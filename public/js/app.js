@@ -1548,6 +1548,130 @@ function playUrgentAlertSound() {
 // ============================================
 // نافذة توزيع البلاغات المتطورة
 // ============================================
+// أنواع البلاغات
+// ============================================
+var REPORT_TYPE_DEFS = {
+    traffic:   { emoji: '🚗', label: 'حوادث مرورية', color: '#EF4444' },
+    medical:   { emoji: '🤒', label: 'حالات مرضية', color: '#3B82F6' },
+    injury:    { emoji: '🚨', label: 'إصابات', color: '#F97316' },
+    cardiac:   { emoji: '❤️', label: 'توقف قلب', color: '#DC2626' },
+    birth:     { emoji: '👶', label: 'ولادة', color: '#EC4899' },
+    fire:      { emoji: '🔥', label: 'حريق', color: '#F59E0B' },
+    death:     { emoji: '⚰️', label: 'وفاة', color: '#6B7280' },
+    transport: { emoji: '🚑', label: 'نقل مريض', color: '#10B981' },
+    other:     { emoji: '📦', label: 'حالات أخرى', color: '#8B5CF6' }
+};
+var selectedReportType = 'medical';
+
+function getReportTypeStorage() {
+    try {
+        return JSON.parse(localStorage.getItem('reportTypeStorage') || '{}');
+    } catch(e) { return {}; }
+}
+function setReportTypeStorage(data) {
+    try { localStorage.setItem('reportTypeStorage', JSON.stringify(data)); } catch(e) {}
+}
+function addReportTypeToStorage(center, unit, type) {
+    var storage = getReportTypeStorage();
+    var shiftKey = currentShiftId || 'current';
+    if (!storage[shiftKey]) storage[shiftKey] = {};
+    var unitKey = center + '|' + unit;
+    if (!storage[shiftKey][unitKey]) storage[shiftKey][unitKey] = {};
+    storage[shiftKey][unitKey][type] = (storage[shiftKey][unitKey][type] || 0) + 1;
+    setReportTypeStorage(storage);
+}
+function undoReportTypeFromStorage(center, unit) {
+    var storage = getReportTypeStorage();
+    var shiftKey = currentShiftId || 'current';
+    var unitKey = center + '|' + unit;
+    var types = storage[shiftKey] && storage[shiftKey][unitKey];
+    if (!types) return;
+    // Remove one from the most frequent type (or any type with count > 0)
+    for (var t in types) {
+        if (types[t] > 0) {
+            types[t]--;
+            if (types[t] === 0) delete types[t];
+            break;
+        }
+    }
+    setReportTypeStorage(storage);
+}
+function getUnitTypeBreakdown(center, unit) {
+    var storage = getReportTypeStorage();
+    var shiftKey = currentShiftId || 'current';
+    var unitKey = center + '|' + unit;
+    return (storage[shiftKey] && storage[shiftKey][unitKey]) || {};
+}
+function getShiftTypeBreakdown() {
+    var storage = getReportTypeStorage();
+    var shiftKey = currentShiftId || 'current';
+    var shiftData = storage[shiftKey] || {};
+    var totals = {};
+    for (var unitKey in shiftData) {
+        for (var type in shiftData[unitKey]) {
+            totals[type] = (totals[type] || 0) + shiftData[unitKey][type];
+        }
+    }
+    return totals;
+}
+function getSmartColorClass(count) {
+    if (count < 5) return 'smart-color-green';
+    if (count <= 10) return 'smart-color-yellow';
+    if (count <= 15) return 'smart-color-orange';
+    return 'smart-color-red';
+}
+function getSectorSmartColorClass(count) {
+    if (count < 5) return 'sector-smart-green';
+    if (count <= 10) return 'sector-smart-yellow';
+    if (count <= 15) return 'sector-smart-orange';
+    return 'sector-smart-red';
+}
+function getActivityBarWidth(count) {
+    // Max expected is ~20, so scale proportionally
+    return Math.min((count / 20) * 100, 100) + '%';
+}
+function getActivityBarColor(count) {
+    if (count < 5) return '#10B981';
+    if (count <= 10) return '#F59E0B';
+    if (count <= 15) return '#F97316';
+    return '#EF4444';
+}
+function getLastReportTime() {
+    var lastTime = null;
+    for (var key in reports) {
+        var r = reports[key];
+        if (r && r.times && r.times.length > 0) {
+            var t = new Date(r.times[r.times.length - 1]);
+            if (!lastTime || t > lastTime) lastTime = t;
+        }
+    }
+    return lastTime;
+}
+function getPeakHour() {
+    var hourCounts = {};
+    for (var key in reports) {
+        var r = reports[key];
+        if (r && r.times) {
+            for (var i = 0; i < r.times.length; i++) {
+                var h = new Date(r.times[i]).getHours();
+                hourCounts[h] = (hourCounts[h] || 0) + 1;
+            }
+        }
+    }
+    var maxHour = -1, maxCount = 0;
+    for (var h in hourCounts) {
+        if (hourCounts[h] > maxCount) {
+            maxCount = hourCounts[h];
+            maxHour = parseInt(h);
+        }
+    }
+    if (maxHour < 0) return '-';
+    return maxHour.toString().padStart(2, '0') + ':00';
+}
+
+// ============================================
+// نافذة توزيع البلاغات المتطورة
+// ============================================
 function renderAdvancedDistribution() {
     var container = document.getElementById('distributionContainer');
     if (!container) return;
@@ -1556,6 +1680,78 @@ function renderAdvancedDistribution() {
     
     var allReports = reports || {};
     
+    // ─── Part 2: Live Stats Dashboard ───
+    var totalReports = 0;
+    var typeBreakdown = getShiftTypeBreakdown();
+    var unitStats = {};
+    var sectorStats = {};
+    var lastTime = getLastReportTime();
+    
+    for (var key in allReports) {
+        var r = allReports[key];
+        if (r && r.count > 0) {
+            totalReports += r.count;
+            var parts = key.split('|');
+            var center = parts[0];
+            var unit = parts[1];
+            if (unit) unitStats[unit] = (unitStats[unit] || 0) + r.count;
+            if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
+        }
+    }
+    
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var mostActiveTeamCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    
+    var sortedSectors = Object.entries(sectorStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveCity = sortedSectors.length > 0 ? sortedSectors[0][0] : '-';
+    var mostActiveCityCount = sortedSectors.length > 0 ? sortedSectors[0][1] : 0;
+    
+    var statsHtml = '<div class="distribution-stats-dashboard">' +
+        '<div class="stats-dashboard-header">' +
+            '<i class="fas fa-chart-pie"></i>' +
+            '<h3 class="stats-dashboard-title">📊 لوحة الإحصائيات الحية</h3>' +
+        '</div>' +
+        '<div class="stats-dashboard-grid">' +
+            '<div class="stat-card">' +
+                '<div class="stat-card-icon">📊</div>' +
+                '<div class="stat-card-value">' + totalReports + '</div>' +
+                '<div class="stat-card-label">إجمالي البلاغات</div>' +
+            '</div>' +
+            '<div class="stat-card">' +
+                '<div class="stat-card-icon">🏆</div>' +
+                '<div class="stat-card-value">' + mostActiveTeam + '</div>' +
+                '<div class="stat-card-label">أكثر فرقة (' + mostActiveTeamCount + ')</div>' +
+            '</div>' +
+            '<div class="stat-card">' +
+                '<div class="stat-card-icon">📍</div>' +
+                '<div class="stat-card-value">' + mostActiveCity + '</div>' +
+                '<div class="stat-card-label">أكثر مدينة (' + mostActiveCityCount + ')</div>' +
+            '</div>' +
+            '<div class="stat-card time">' +
+                '<div class="stat-card-icon">🕐</div>' +
+                '<div class="stat-card-value">' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '</div>' +
+                '<div class="stat-card-label">آخر بلاغ</div>' +
+            '</div>';
+    
+    // Add type counts
+    for (var t in REPORT_TYPE_DEFS) {
+        var typeCount = typeBreakdown[t] || 0;
+        if (typeCount > 0) {
+            statsHtml += '<div class="stat-card">' +
+                '<div class="stat-card-icon">' + REPORT_TYPE_DEFS[t].emoji + '</div>' +
+                '<div class="stat-card-value">' + typeCount + '</div>' +
+                '<div class="stat-card-label">' + REPORT_TYPE_DEFS[t].label + '</div>' +
+            '</div>';
+        }
+    }
+    statsHtml += '</div></div>';
+    
+    var statsDiv = document.createElement('div');
+    statsDiv.innerHTML = statsHtml;
+    container.appendChild(statsDiv.firstElementChild);
+    
+    // ─── Sector cards ───
     for (var center in centersData) {
         var sectorDiv = document.createElement('div');
         sectorDiv.className = 'distribution-sector-card';
@@ -1571,7 +1767,9 @@ function renderAdvancedDistribution() {
             }
         }
         
-        var headerHtml = '<div class="distribution-sector-header">' +
+        var sectorColorClass = getSectorSmartColorClass(totalSectorReports);
+        
+        var headerHtml = '<div class="distribution-sector-header ' + sectorColorClass + '">' +
             '<span class="sector-name"><i class="fas fa-map-pin" style="color:var(--primary-500);"></i> ' + center + '</span>' +
             '<span class="sector-total">📊 ' + totalSectorReports + '</span>' +
             '</div>';
@@ -1583,11 +1781,35 @@ function renderAdvancedDistribution() {
             var info = allReports[key2] || { count: 0, times: [] };
             var isZero = info.count === 0;
             var location = unitLocationAddresses[unit2] || 'لم يتم تحديد موقع';
+            var smartColorClass = isZero ? '' : getSmartColorClass(info.count);
+            var types = getUnitTypeBreakdown(center, unit2);
             
-            gridHtml += '<div class="distribution-unit-item" id="unit-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' +
+            // Build type breakdown HTML
+            var typeBreakdownHtml = '';
+            var typeEntries = Object.entries(types).sort(function(a, b) { return b[1] - a[1]; });
+            if (typeEntries.length > 0) {
+                typeBreakdownHtml = '<div class="unit-type-breakdown">';
+                for (var ti = 0; ti < typeEntries.length; ti++) {
+                    var td = REPORT_TYPE_DEFS[typeEntries[ti][0]];
+                    typeBreakdownHtml += '<span class="type-tag">' + (td ? td.emoji : '📦') + ' ' + typeEntries[ti][1] + '</span>';
+                }
+                typeBreakdownHtml += '</div>';
+            }
+            
+            // Activity bar
+            var activityBarHtml = '';
+            if (info.count > 0) {
+                activityBarHtml = '<div class="activity-bar">' +
+                    '<div class="activity-bar-fill" style="width:' + getActivityBarWidth(info.count) + '; background:' + getActivityBarColor(info.count) + ';"></div>' +
+                    '</div>';
+            }
+            
+            gridHtml += '<div class="distribution-unit-item ' + smartColorClass + '" id="unit-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' +
                 (info.count > 0 ? '<span class="unit-badge">' + info.count + '</span>' : '') +
                 '<div class="unit-name">' + unit2 + '</div>' +
                 '<div class="unit-count ' + (isZero ? 'zero' : '') + '" id="count-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' + info.count + '</div>' +
+                activityBarHtml +
+                typeBreakdownHtml +
                 '<div class="unit-actions">' +
                 '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
                 (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:inline-flex;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:none;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>') +
@@ -2145,7 +2367,7 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=28';
+    var url = 'radio-completion.html?v=29';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
@@ -2214,13 +2436,13 @@ function switchArchiveTab(tabName) {
             renderArchiveReportsTab(container, data.reports, totalReports);
             break;
         case 'completion':
-            renderArchiveCompletionTab(container, data.completion, shift);
+            renderArchiveCompletionTab(container, data.completions, shift);
             break;
         case 'forms':
             renderArchiveFormsTab(container, data.forms);
             break;
         case 'audit':
-            renderArchiveAuditTab(container, data.auditLog);
+            renderArchiveAuditTab(container, data.audit_log);
             break;
         case 'files':
             renderArchiveFilesTab(container, data.files);
@@ -2309,12 +2531,14 @@ function renderArchiveReportsTab(container, reports, totalReports) {
 }
 
 function renderArchiveCompletionTab(container, completion, shift) {
-    if (!completion && !shift.centersData) {
+    // Treat empty arrays as falsy so shift.centersData can be used as fallback
+    var hasCompletion = completion && !(Array.isArray(completion) && completion.length === 0);
+    if (!hasCompletion && !shift.centersData) {
         container.innerHTML = '<div class="archive-tab-content"><div class="archive-empty"><i class="fas fa-inbox"></i><p>لا توجد بيانات تكميل لهذه المناوبة</p></div></div>';
         return;
     }
     
-    var data = completion || shift.centersData || {};
+    var data = (hasCompletion ? completion : null) || shift.centersData || {};
     var rows = '';
     var keys = Object.keys(data).sort();
     for (var i = 0; i < keys.length; i++) {
@@ -2661,6 +2885,38 @@ function calculateLiveReportStats() {
     var topCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
     var el_liveTopUnit = document.getElementById('liveTopUnit'); if (el_liveTopUnit) el_liveTopUnit.innerText = topUnit;
     var el_liveTopUnitCount = document.getElementById('liveTopUnitCount'); if (el_liveTopUnitCount) el_liveTopUnitCount.innerText = topCount;
+
+    // Type breakdown
+    var typeBreakdown = getShiftTypeBreakdown();
+    var typeListContainer = document.getElementById('liveTypeList');
+    if (typeListContainer) {
+        typeListContainer.innerHTML = '';
+        var typeEntries = Object.entries(typeBreakdown).sort(function(a, b) { return b[1] - a[1]; });
+        if (typeEntries.length === 0) {
+            typeListContainer.innerHTML = '<div class="distribution-empty"><i class="fas fa-inbox"></i><span>لا توجد بيانات</span></div>';
+        } else {
+            typeEntries.forEach(function(item, index) {
+                var td = REPORT_TYPE_DEFS[item[0]];
+                var percentage = total > 0 ? Math.round((item[1] / total) * 100) : 0;
+                var color = td ? td.color : '#3B82F6';
+                var div = document.createElement('div');
+                div.className = 'distribution-item';
+                div.innerHTML = '<div class="distribution-item-rank rank-other">' + (td ? td.emoji : '📦') + '</div>' +
+                    '<div class="distribution-item-info">' +
+                        '<div class="distribution-item-name">' + (td ? td.label : item[0]) + '</div>' +
+                        '<div class="distribution-item-bar-track">' +
+                            '<div class="distribution-item-bar-fill" style="width:' + percentage + '%; background:' + color + ';"></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="distribution-item-meta">' +
+                        '<span class="distribution-item-count">' + item[1] + '</span>' +
+                        '<span class="distribution-item-percent">' + percentage + '%</span>' +
+                    '</div>';
+                typeListContainer.appendChild(div);
+            });
+        }
+    }
+
     var listContainer = document.getElementById('liveUnitList');
     listContainer.innerHTML = '';
     if (sortedUnits.length === 0) {
@@ -2764,15 +3020,50 @@ function updateWorkforceStats() {
         return;
     }
     
-    var totalUnits = 0;
-    for (var center in centersData) {
-        totalUnits += centersData[center].length;
-    }
-    var totalStaff = totalUnits * 2 + Math.floor(Math.random() * 10);
-    var totalCars = totalUnits + Math.floor(Math.random() * 5);
-    var readiness = Math.floor(Math.random() * 30 + 70);
-    var missingCenters = Math.floor(Math.random() * 5);
+    // Fallback: count from actual centersData instead of random numbers
+    var totalStaff = 0;
+    var totalCars = 0;
+    var readyCenters = 0;
+    var missingCenters = 0;
+    var centerCount = 0;
     
+    // Count all centers that actually have data
+    for (var center in centersData) {
+        var units = centersData[center] || [];
+        for (var i = 0; i < units.length; i++) {
+            var unit = units[i];
+            // Default to 2 staff + 1 car per unit if no specific data
+            var staff = (unit && unit.staffCount) ? parseInt(unit.staffCount) : 2;
+            var cars = (unit && unit.carsCount) ? parseInt(unit.carsCount) : 1;
+            totalStaff += staff;
+            totalCars += cars;
+            centerCount++;
+            if (staff >= 2 && cars >= 1) {
+                readyCenters++;
+            } else {
+                missingCenters++;
+            }
+        }
+    }
+    
+    // If centersData is empty, try to count from the reports keys (actual active locations)
+    if (centerCount === 0) {
+        var activeLocations = {};
+        for (var key in reports) {
+            var parts = key.split('|');
+            if (parts.length >= 2) {
+                activeLocations[parts[1]] = true;
+            }
+        }
+        var activeKeys = Object.keys(activeLocations);
+        centerCount = activeKeys.length;
+        totalStaff = centerCount * 2;
+        totalCars = centerCount;
+        readyCenters = centerCount;
+        missingCenters = 0;
+    }
+    
+    var readiness = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
     updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters);
 }
 
@@ -2790,7 +3081,10 @@ function updateWorkforceFromShiftData(shiftData) {
         totalStaff += staff;
         totalCars += cars;
         centerCount++;
-        if (staff >= 2 && cars >= 1) {
+        // Rapid teams need 1+ staff, regular centers need 2+ staff
+        var isRapid = data.isRapid || center.indexOf('سريع') !== -1 || center.indexOf('rapid') !== -1;
+        var staffThreshold = isRapid ? 1 : 2;
+        if (staff >= staffThreshold && cars >= 1) {
             readyCenters++;
         } else {
             missingCenters++;
@@ -3123,6 +3417,15 @@ async function startNewShift() {
     
     if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (normalizedType === 'صباح' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
     try {
+        // Auto-generate and save report for the current shift before ending it
+        if (currentShiftId) {
+            try {
+                saveShiftReportToArchive();
+                showNotification('تقرير تلقائي', 'تم حفظ تقرير المناوبة السابقة في الأرشيف', 'success', 4000);
+            } catch (e) {
+                console.log('⚠️ فشل حفظ التقرير التلقائي:', e);
+            }
+        }
         var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: normalizedType }) });
         var result = await response.json();
         if (result.success) {
@@ -3163,8 +3466,13 @@ async function addReportToServer(center, unit) {
         return;
     }
     
+    // Ensure we have the latest selected type from the dropdown
+    var typeSelect = document.getElementById('reportTypeSelect');
+    if (typeSelect) selectedReportType = typeSelect.value;
+    var typeInfo = REPORT_TYPE_DEFS[selectedReportType] || REPORT_TYPE_DEFS.medical;
+    
     try {
-        var reportBody = { center: center.trim(), unit: unit.trim() };
+        var reportBody = { center: center.trim(), unit: unit.trim(), type: selectedReportType };
         if (currentShiftId) reportBody.shiftId = currentShiftId;
         var response = await fetch('/api/report', {
             method: 'POST',
@@ -3173,12 +3481,16 @@ async function addReportToServer(center, unit) {
         });
         var result = await response.json();
         if (result.success) {
+            // Store type locally for stats tracking
+            addReportTypeToStorage(center, unit, selectedReportType);
             await loadAllData();
             updateUnitCounter(center, unit);
             calculateLiveReportStats();
             updateWorkforceStats();
             updateDistributionIndicator();
             updateTotal();
+            
+            showNotification('بلاغ جديد', typeInfo.emoji + ' ' + typeInfo.label + ' — ' + unit + ' (' + center + ')', 'success', 2500);
             
             var distModal = document.getElementById('distributionModal');
             if (distModal.style.display === 'flex') {
@@ -3201,6 +3513,10 @@ async function undoLastReport(center, unit) {
         alert("⚠️ بيانات ناقصة");
         return;
     }
+    if (!currentShiftId) {
+        alert("⚠️ لا توجد مناوبة نشطة. الرجاء بدء مناوبة جديدة أولاً.");
+        return;
+    }
     
     try {
         var undoBody = { center: center.trim(), unit: unit.trim() };
@@ -3212,6 +3528,8 @@ async function undoLastReport(center, unit) {
         });
         var result = await response.json();
         if (result.success) {
+            // Remove one type count locally
+            undoReportTypeFromStorage(center, unit);
             await loadAllData();
             updateUnitCounter(center, unit);
             calculateLiveReportStats();
@@ -3228,6 +3546,223 @@ async function undoLastReport(center, unit) {
         }
     } catch (error) {
         alert("❌ فشل في التراجع");
+    }
+}
+
+// ============================================
+// تقرير المناوبة التلقائي
+// ============================================
+function generateShiftReport() {
+    var allReports = reports || {};
+    var totalReports = 0;
+    var typeBreakdown = getShiftTypeBreakdown();
+    var unitStats = {};
+    var sectorStats = {};
+    var lastTime = getLastReportTime();
+    var peakHour = getPeakHour();
+    
+    for (var key in allReports) {
+        var r = allReports[key];
+        if (r && r.count > 0) {
+            totalReports += r.count;
+            var parts = key.split('|');
+            var center = parts[0];
+            var unit = parts[1];
+            if (unit) unitStats[unit] = (unitStats[unit] || 0) + r.count;
+            if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
+        }
+    }
+    
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var mostActiveTeamCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    
+    var sortedSectors = Object.entries(sectorStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveCity = sortedSectors.length > 0 ? sortedSectors[0][0] : '-';
+    var mostActiveCityCount = sortedSectors.length > 0 ? sortedSectors[0][1] : 0;
+    
+    var shiftType = currentShiftId ? (allShifts.find(function(s) { return s.id === currentShiftId; }) || {}).shiftType || 'مناوبة' : 'مناوبة';
+    var shiftDate = getSaudiDate();
+    
+    var html = '<div class="shift-report-section shift-report-highlight">' +
+        '<h3><i class="fas fa-clipboard-list"></i> ملخص المناوبة</h3>' +
+        '<div class="shift-report-grid">' +
+            '<div class="shift-report-item"><span class="label">📅 التاريخ:</span><span class="value">' + shiftDate + '</span></div>' +
+            '<div class="shift-report-item"><span class="label">🌙 النوع:</span><span class="value">' + shiftType + '</span></div>' +
+            '<div class="shift-report-item"><span class="label">📊 إجمالي البلاغات:</span><span class="value">' + totalReports + '</span></div>' +
+            '<div class="shift-report-item"><span class="label">🕐 آخر بلاغ:</span><span class="value">' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '</span></div>' +
+        '</div>' +
+    '</div>';
+    
+    // Type breakdown
+    html += '<div class="shift-report-section">' +
+        '<h3><i class="fas fa-tags"></i> توزيع البلاغات حسب النوع</h3>' +
+        '<div class="shift-report-grid">';
+    for (var t in REPORT_TYPE_DEFS) {
+        var tc = typeBreakdown[t] || 0;
+        html += '<div class="shift-report-item"><span class="label">' + REPORT_TYPE_DEFS[t].emoji + ' ' + REPORT_TYPE_DEFS[t].label + ':</span><span class="value">' + tc + '</span></div>';
+    }
+    html += '</div></div>';
+    
+    // Sector breakdown
+    html += '<div class="shift-report-section">' +
+        '<h3><i class="fas fa-map-marker-alt"></i> توزيع البلاغات حسب المدينة/القطاع</h3>' +
+        '<div class="shift-report-grid">';
+    for (var i = 0; i < sortedSectors.length; i++) {
+        html += '<div class="shift-report-item"><span class="label">📍 ' + sortedSectors[i][0] + ':</span><span class="value">' + sortedSectors[i][1] + '</span></div>';
+    }
+    html += '</div></div>';
+    
+    // Team breakdown
+    html += '<div class="shift-report-section">' +
+        '<h3><i class="fas fa-ambulance"></i> توزيع البلاغات حسب الفرقة</h3>' +
+        '<div class="shift-report-grid">';
+    for (var i = 0; i < sortedUnits.length; i++) {
+        html += '<div class="shift-report-item"><span class="label">🚑 ' + sortedUnits[i][0] + ':</span><span class="value">' + sortedUnits[i][1] + '</span></div>';
+    }
+    html += '</div></div>';
+    
+    // Highlights
+    html += '<div class="shift-report-section shift-report-highlight">' +
+        '<h3><i class="fas fa-star"></i> أبرز الإحصائيات</h3>' +
+        '<div class="shift-report-grid">' +
+            '<div class="shift-report-item"><span class="label">🏆 أكثر فرقة:</span><span class="value">' + mostActiveTeam + ' (' + mostActiveTeamCount + ')</span></div>' +
+            '<div class="shift-report-item"><span class="label">📍 أكثر مدينة:</span><span class="value">' + mostActiveCity + ' (' + mostActiveCityCount + ')</span></div>' +
+            '<div class="shift-report-item"><span class="label">⏰ وقت الذروة:</span><span class="value">' + peakHour + '</span></div>' +
+        '</div>' +
+    '</div>';
+    
+    var body = document.getElementById('shiftReportBody');
+    if (body) body.innerHTML = html;
+    
+    var modal = document.getElementById('shiftReportModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function downloadShiftReport() {
+    var allReports = reports || {};
+    var totalReports = 0;
+    var typeBreakdown = getShiftTypeBreakdown();
+    var unitStats = {};
+    var sectorStats = {};
+    var lastTime = getLastReportTime();
+    var peakHour = getPeakHour();
+    
+    for (var key in allReports) {
+        var r = allReports[key];
+        if (r && r.count > 0) {
+            totalReports += r.count;
+            var parts = key.split('|');
+            var center = parts[0];
+            var unit = parts[1];
+            if (unit) unitStats[unit] = (unitStats[unit] || 0) + r.count;
+            if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
+        }
+    }
+    
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var mostActiveTeamCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    
+    var sortedSectors = Object.entries(sectorStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveCity = sortedSectors.length > 0 ? sortedSectors[0][0] : '-';
+    var mostActiveCityCount = sortedSectors.length > 0 ? sortedSectors[0][1] : 0;
+    
+    var shiftType = currentShiftId ? (allShifts.find(function(s) { return s.id === currentShiftId; }) || {}).shiftType || 'مناوبة' : 'مناوبة';
+    var shiftDate = getSaudiDate();
+    
+    var text = '📋 تقرير المناوبة\n';
+    text += '══════════════════════════\n';
+    text += '📅 التاريخ: ' + shiftDate + '\n';
+    text += '🌙 النوع: ' + shiftType + '\n';
+    text += '📊 إجمالي البلاغات: ' + totalReports + '\n';
+    text += '🕐 آخر بلاغ: ' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '\n\n';
+    
+    text += '🏷️ توزيع حسب النوع:\n';
+    for (var t in REPORT_TYPE_DEFS) {
+        text += '  ' + REPORT_TYPE_DEFS[t].emoji + ' ' + REPORT_TYPE_DEFS[t].label + ': ' + (typeBreakdown[t] || 0) + '\n';
+    }
+    text += '\n📍 توزيع حسب المدينة/القطاع:\n';
+    for (var i = 0; i < sortedSectors.length; i++) {
+        text += '  ' + sortedSectors[i][0] + ': ' + sortedSectors[i][1] + '\n';
+    }
+    text += '\n🚑 توزيع حسب الفرقة:\n';
+    for (var i = 0; i < sortedUnits.length; i++) {
+        text += '  ' + sortedUnits[i][0] + ': ' + sortedUnits[i][1] + '\n';
+    }
+    text += '\n⭐ أبرز الإحصائيات:\n';
+    text += '  🏆 أكثر فرقة: ' + mostActiveTeam + ' (' + mostActiveTeamCount + ')\n';
+    text += '  📍 أكثر مدينة: ' + mostActiveCity + ' (' + mostActiveCityCount + ')\n';
+    text += '  ⏰ وقت الذروة: ' + peakHour + '\n';
+    text += '══════════════════════════\n';
+    text += 'منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض\n';
+    
+    var blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'تقرير_المناوبة_' + shiftDate + '.txt';
+    link.click();
+    showNotification('تم التحميل', 'تم تحميل التقرير بنجاح', 'success', 3000);
+}
+
+function saveShiftReportToArchive() {
+    var allReports = reports || {};
+    var totalReports = 0;
+    var typeBreakdown = getShiftTypeBreakdown();
+    var unitStats = {};
+    var sectorStats = {};
+    var lastTime = getLastReportTime();
+    var peakHour = getPeakHour();
+    
+    for (var key in allReports) {
+        var r = allReports[key];
+        if (r && r.count > 0) {
+            totalReports += r.count;
+            var parts = key.split('|');
+            var center = parts[0];
+            var unit = parts[1];
+            if (unit) unitStats[unit] = (unitStats[unit] || 0) + r.count;
+            if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
+        }
+    }
+    
+    var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
+    var mostActiveTeamCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
+    
+    var sortedSectors = Object.entries(sectorStats).sort(function(a, b) { return b[1] - a[1]; });
+    var mostActiveCity = sortedSectors.length > 0 ? sortedSectors[0][0] : '-';
+    var mostActiveCityCount = sortedSectors.length > 0 ? sortedSectors[0][1] : 0;
+    
+    var shiftType = currentShiftId ? (allShifts.find(function(s) { return s.id === currentShiftId; }) || {}).shiftType || 'مناوبة' : 'مناوبة';
+    var shiftDate = getSaudiDate();
+    
+    var report = {
+        id: Date.now(),
+        date: shiftDate,
+        shiftType: shiftType,
+        shiftId: currentShiftId,
+        totalReports: totalReports,
+        typeBreakdown: typeBreakdown,
+        sectorStats: sectorStats,
+        unitStats: unitStats,
+        mostActiveTeam: mostActiveTeam,
+        mostActiveTeamCount: mostActiveTeamCount,
+        mostActiveCity: mostActiveCity,
+        mostActiveCityCount: mostActiveCityCount,
+        peakHour: peakHour,
+        lastReportTime: lastTime ? lastTime.toISOString() : null,
+        generatedAt: new Date().toISOString()
+    };
+    
+    try {
+        var archive = JSON.parse(localStorage.getItem('shiftReportArchive') || '[]');
+        archive.unshift(report);
+        if (archive.length > 50) archive = archive.slice(0, 50);
+        localStorage.setItem('shiftReportArchive', JSON.stringify(archive));
+        showNotification('تم الحفظ', 'تم حفظ التقرير في الأرشيف المحلي', 'success', 3000);
+    } catch (e) {
+        showNotification('خطأ', 'فشل في حفظ التقرير', 'error', 3000);
     }
 }
 
@@ -3932,31 +4467,60 @@ function updateStatusIcon(index) {
 }
 
 function calculateWorkforceStatsLocally() {
-    var centerRows = document.querySelectorAll('#centersTableBody tr');
     var totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
     var distribution = {}, carDistribution = {};
-    centerRows.forEach(function(tr) {
-        var centerName = tr.querySelector('td:nth-child(2)')?.innerText || '';
-        var isRapid = tr.classList.contains('rapid-team-row');
-        var staffInput = tr.querySelector('input[id^="staff_"], input[id^="rapid_staff_"]');
-        var carsInput = tr.querySelector('input[id^="cars_"], input[id^="rapid_cars_"]');
-        if (staffInput && carsInput) {
-            var staffCount = parseInt(staffInput.value) || 0;
-            var carsCount = parseInt(carsInput.value) || 0;
-            var backupParamedicInput = isRapid ? tr.querySelector('input[id^="backup_paramedic_rapid_"]') : tr.querySelector('input[id^="backup_paramedic_"]');
-            var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
-            if (hasBackupParamedic) {
-                staffCount = Math.max(staffCount, 1);
+    
+    try {
+        var centerRows = document.querySelectorAll('#centersTableBody tr');
+        centerRows.forEach(function(tr) {
+            var centerName = tr.querySelector('td:nth-child(2)')?.innerText || '';
+            var isRapid = tr.classList.contains('rapid-team-row');
+            var staffInput = tr.querySelector('input[id^="staff_"], input[id^="rapid_staff_"]');
+            var carsInput = tr.querySelector('input[id^="cars_"], input[id^="rapid_cars_"]');
+            if (staffInput && carsInput) {
+                var staffCount = parseInt(staffInput.value) || 0;
+                var carsCount = parseInt(carsInput.value) || 0;
+                var backupParamedicInput = isRapid ? tr.querySelector('input[id^="backup_paramedic_rapid_"]') : tr.querySelector('input[id^="backup_paramedic_"]');
+                var hasBackupParamedic = backupParamedicInput && backupParamedicInput.value.trim().length > 0;
+                if (hasBackupParamedic) {
+                    staffCount = Math.max(staffCount, 1);
+                }
+                totalStaff += staffCount; totalCars += carsCount; centerCount++;
+                distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
+                if (isRapid) {
+                    if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
+                } else {
+                    if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
+                }
             }
-            totalStaff += staffCount; totalCars += carsCount; centerCount++;
-            distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
-            if (isRapid) {
-                if ((staffCount >= 1 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
-            } else {
-                if ((staffCount >= 2 || hasBackupParamedic) && carsCount >= 1) readyCenters++; else missingCenters++;
+        });
+    } catch (e) {
+        console.error('[calculateWorkforceStatsLocally] DOM scan failed:', e);
+    }
+    
+    // Fallback: if DOM rows produced no data, try counting from centersData (actual data keys)
+    if (centerCount === 0) {
+        try {
+            for (var center in centersData) {
+                var units = centersData[center] || [];
+                for (var i = 0; i < units.length; i++) {
+                    var unit = units[i];
+                    var unitName = (typeof unit === 'string') ? unit : (unit.name || unit.displayName || String(unit));
+                    var staffCount = (unit && unit.staffCount) ? parseInt(unit.staffCount) : 2;
+                    var carsCount = (unit && unit.carsCount) ? parseInt(unit.carsCount) : 1;
+                    totalStaff += staffCount;
+                    totalCars += carsCount;
+                    centerCount++;
+                    distribution[unitName] = staffCount;
+                    carDistribution[unitName] = carsCount;
+                    if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
+                }
             }
+        } catch (e) {
+            console.error('[calculateWorkforceStatsLocally] Data fallback failed:', e);
         }
-    });
+    }
+    
     var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
     var elWorkforceStats = document.getElementById('workforceStats');
     if (elWorkforceStats) elWorkforceStats.style.display = 'block';
@@ -7736,7 +8300,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=28'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=29'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };

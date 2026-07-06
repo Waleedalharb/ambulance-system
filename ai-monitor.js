@@ -274,63 +274,100 @@ function _checkMemoryLeak() {
 }
 
 async function _performHealthCheck() {
-  if (_shuttingDown) return;
-  _stats.checksPerformed += 1;
-  const checkTime = new Date().toISOString();
-  _stats.lastCheckTime = checkTime;
+  try {
+    if (_shuttingDown) return;
+    _stats.checksPerformed += 1;
+    const checkTime = new Date().toISOString();
+    _stats.lastCheckTime = checkTime;
 
-  const mem = process.memoryUsage();
-  const heapStats = v8.getHeapStatistics();
-  const uptimeSec = Math.floor(process.uptime());
-  const dbPing = await _pingDatabase();
-  const wsCount = _countWsConnections();
+    const mem = process.memoryUsage();
+    const heapStats = v8.getHeapStatistics();
+    const uptimeSec = Math.floor(process.uptime());
+    const dbPing = await _pingDatabase();
+    const wsCount = _countWsConnections();
 
-  // Disk-space estimate: use freemem as rough proxy (no cross-platform fs stat)
-  const freeMem = os.freemem();
-  const totalMem = os.totalmem();
-  const diskEstimate = {
-    freeMemBytes: freeMem,
-    totalMemBytes: totalMem,
-    freePercent: totalMem > 0 ? parseFloat(((freeMem / totalMem) * 100).toFixed(2)) : 0,
-    note: 'Estimated from os.freemem / os.totalmem (process-level)',
-  };
+    // Disk-space estimate: use freemem as rough proxy (no cross-platform fs stat)
+    const freeMem = os.freemem();
+    const totalMem = os.totalmem();
+    const diskEstimate = {
+      freeMemBytes: freeMem,
+      totalMemBytes: totalMem,
+      freePercent: totalMem > 0 ? parseFloat(((freeMem / totalMem) * 100).toFixed(2)) : 0,
+      note: 'Estimated from os.freemem / os.totalmem (process-level)',
+    };
 
-  // Error rate in last 60 s
-  const oneMinuteAgo = Date.now() - 60000;
-  while (_errorLog.length > 0 && _errorLog[0] < oneMinuteAgo) {
-    _errorLog.shift();
+    // Error rate in last 60 s
+    const oneMinuteAgo = Date.now() - 60000;
+    while (_errorLog.length > 0 && _errorLog[0] < oneMinuteAgo) {
+      _errorLog.shift();
+    }
+    const errorRatePerMinute = _errorLog.length;
+
+    // Heap history for leak detection
+    _heapHistory.push({ timestamp: Date.now(), heapUsed: mem.heapUsed });
+    if (_heapHistory.length > HEAP_HISTORY_MAX) _heapHistory.shift();
+    const leakInfo = _checkMemoryLeak();
+
+    _currentHealth = {
+      checkTime,
+      uptimeSec,
+      memory: {
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        rss: mem.rss,
+        external: mem.external || 0,
+        heapLimit: heapStats.heap_size_limit,
+      },
+      dbPing,
+      wsConnections: wsCount,
+      disk: diskEstimate,
+      errorRatePerMinute,
+      memoryLeak: leakInfo,
+      responseTimeMs: _lastResponseTimeMs,
+    };
+
+    // ── Auto-healing & alerting ──
+    await _autoFixData();
+    await _evaluateAndHeal(_currentHealth);
+    await _evaluateAndHeal(_currentHealth);
+
+    return _currentHealth;
+  } catch (err) {
+    // Log the actual error with full details (not just "threw")
+    _log('error', 'HEALTH', 'Health check failed with exception', {
+      details: { error: err.message, stack: err.stack, type: err.constructor.name },
+      requiresAttention: true,
+    });
+
+    // Return a safe fallback response so callers don't crash
+    const safeFallback = {
+      checkTime: new Date().toISOString(),
+      uptimeSec: Math.floor(process.uptime()),
+      memory: {
+        heapUsed: 0,
+        heapTotal: 0,
+        rss: 0,
+        external: 0,
+        heapLimit: 0,
+      },
+      dbPing: { ok: false, ms: 0, error: 'Health check exception: ' + (err.message || 'unknown') },
+      wsConnections: 0,
+      disk: {
+        freeMemBytes: 0,
+        totalMemBytes: 0,
+        freePercent: 0,
+        note: 'Error state — health check threw',
+      },
+      errorRatePerMinute: 0,
+      memoryLeak: { leakDetected: false, growthRate: 0 },
+      responseTimeMs: 0,
+      healthCheckError: err.message || 'unknown',
+      healthCheckFailed: true,
+    };
+
+    _currentHealth = safeFallback;
+    return safeFallback;
   }
-  const errorRatePerMinute = _errorLog.length;
-
-  // Heap history for leak detection
-  _heapHistory.push({ timestamp: Date.now(), heapUsed: mem.heapUsed });
-  if (_heapHistory.length > HEAP_HISTORY_MAX) _heapHistory.shift();
-  const leakInfo = _checkMemoryLeak();
-
-  _currentHealth = {
-    checkTime,
-    uptimeSec,
-    memory: {
-      heapUsed: mem.heapUsed,
-      heapTotal: mem.heapTotal,
-      rss: mem.rss,
-      external: mem.external || 0,
-      heapLimit: heapStats.heap_size_limit,
-    },
-    dbPing,
-    wsConnections: wsCount,
-    disk: diskEstimate,
-    errorRatePerMinute,
-    memoryLeak: leakInfo,
-    responseTimeMs: _lastResponseTimeMs,
-  };
-
-  // ── Auto-healing & alerting ──
-  await _autoFixData();
-  await _evaluateAndHeal(_currentHealth);
-  await _evaluateAndHeal(_currentHealth);
-
-  return _currentHealth;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -647,7 +684,7 @@ async function init(options = {}) {
   // Kick off periodic health checks (every 30 s)
   _healthInterval = setInterval(() => {
     _performHealthCheck().catch((err) => {
-      _log('error', 'HEALTH', 'Health check threw', { details: { error: err.message } });
+      _log('error', 'HEALTH', 'Health check outer catch (should not reach here — inner try/catch failed)', { details: { error: err.message, stack: err.stack } });
     });
   }, 30000);
 

@@ -2834,6 +2834,251 @@ input[type="search"], textarea, select {
     min-height: 28px;
 }
 
+/* ===== Report Type Selector ===== */
+.report-type-selector select:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+/* ===== Distribution Stats Dashboard ===== */
+.distribution-stats-dashboard {
+    background: linear-gradient(135deg, var(--primary-50), var(--gray-50));
+    border: 1px solid var(--primary-100);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.stats-dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--primary-100);
+}
+
+.stats-dashboard-header i {
+    font-size: 1.1rem;
+    color: var(--primary-700);
+}
+
+.stats-dashboard-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary-700);
+    margin: 0;
+}
+
+.stats-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.stat-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-200);
+}
+
+.stat-card-icon {
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+}
+
+.stat-card-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--gray-800);
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.stat-card-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-500);
+}
+
+.stat-card.time .stat-card-value { font-size: 1rem; color: var(--primary-700); }
+
+/* Type breakdown inside unit cards */
+.unit-type-breakdown {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--gray-200);
+    font-size: 0.65rem;
+    color: var(--gray-600);
+    text-align: center;
+    line-height: 1.6;
+}
+
+.unit-type-breakdown .type-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--gray-100);
+    padding: 1px 5px;
+    border-radius: 10px;
+    margin: 1px 2px;
+    font-weight: 600;
+}
+
+/* Activity bar */
+.activity-bar {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+    background: var(--gray-100);
+}
+
+.activity-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease, background-color 0.5s ease;
+}
+
+/* Smart colors */
+.smart-color-green {
+    background: linear-gradient(135deg, #10B981, #34D399) !important;
+    border-color: #10B981 !important;
+}
+.smart-color-yellow {
+    background: linear-gradient(135deg, #F59E0B, #FCD34D) !important;
+    border-color: #F59E0B !important;
+}
+.smart-color-orange {
+    background: linear-gradient(135deg, #F97316, #FB923C) !important;
+    border-color: #F97316 !important;
+}
+.smart-color-red {
+    background: linear-gradient(135deg, #EF4444, #FCA5A5) !important;
+    border-color: #EF4444 !important;
+}
+
+.smart-color-green .unit-count,
+.smart-color-yellow .unit-count,
+.smart-color-orange .unit-count,
+.smart-color-red .unit-count {
+    color: var(--white) !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.smart-color-green .unit-name,
+.smart-color-yellow .unit-name,
+.smart-color-orange .unit-name,
+.smart-color-red .unit-name {
+    color: var(--white) !important;
+}
+
+/* Sector header smart colors */
+.sector-smart-green { background: linear-gradient(90deg, #ECFDF5, #D1FAE5) !important; color: #065F46 !important; }
+.sector-smart-yellow { background: linear-gradient(90deg, #FFFBEB, #FEF3C7) !important; color: #92400E !important; }
+.sector-smart-orange { background: linear-gradient(90deg, #FFF7ED, #FFEDD5) !important; color: #9A3412 !important; }
+.sector-smart-red { background: linear-gradient(90deg, #FEF2F2, #FEE2E2) !important; color: #991B1B !important; }
+
+/* ===== Shift Auto-Report Modal ===== */
+.shift-report-modal .modal-content {
+    max-width: 800px;
+    width: 95%;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.shift-report-header {
+    background: linear-gradient(135deg, var(--primary-700), var(--primary-500));
+    color: white;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.shift-report-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.shift-report-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+    background: var(--gray-50);
+}
+
+.shift-report-section {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.shift-report-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 0.9rem;
+    color: var(--primary-700);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shift-report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.shift-report-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+}
+
+.shift-report-item .label {
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.shift-report-item .value {
+    font-weight: 700;
+    color: var(--primary-700);
+}
+
+.shift-report-highlight {
+    background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+    border: 1px solid var(--primary-200);
+}
+
+.shift-report-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--gray-200);
+    background: var(--white);
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 /* ===== Analytics Modal ===== */
 #analyticsModal.modal {
     align-items: flex-start !important;

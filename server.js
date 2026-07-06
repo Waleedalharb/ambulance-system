@@ -1410,22 +1410,55 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
         try {
             if (dbAvailable()) {
                 if (db.Reports && db.Reports.getByShift) {
-                    response.reports = await db.Reports.getByShift(shiftId);
+                    const dbReports = await db.Reports.getByShift(shiftId);
+                    // Convert DB array to client-expected object format { "center|unit": { count, times } }
+                    if (Array.isArray(dbReports) && dbReports.length > 0) {
+                        const reportsObj = {};
+                        dbReports.forEach(r => {
+                            if (r.center && r.unit) {
+                                const key = `${r.center}|${r.unit}`;
+                                reportsObj[key] = {
+                                    count: r.count || 0,
+                                    times: r.times || []
+                                };
+                            }
+                        });
+                        response.reports = reportsObj;
+                    } else if (typeof dbReports === 'object' && !Array.isArray(dbReports) && Object.keys(dbReports).length > 0) {
+                        response.reports = dbReports;
+                    }
+                    // If DB returned empty array, keep shift.savedReports as fallback
                 }
                 if (db.ShiftCompletions && db.ShiftCompletions.getByShift) {
-                    response.completions = await db.ShiftCompletions.getByShift(shiftId);
+                    const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
+                    // Convert DB array to client-expected object format { "team": { staffCount, carsCount, ... } }
+                    if (Array.isArray(dbCompletions) && dbCompletions.length > 0) {
+                        const completionsObj = {};
+                        dbCompletions.forEach(c => {
+                            const teamKey = c.team || c.name || c.unit || c.center;
+                            if (teamKey) completionsObj[teamKey] = c;
+                        });
+                        if (Object.keys(completionsObj).length > 0) response.completions = completionsObj;
+                    } else if (typeof dbCompletions === 'object' && !Array.isArray(dbCompletions) && Object.keys(dbCompletions).length > 0) {
+                        response.completions = dbCompletions;
+                    }
+                    // If empty, keep response.completions = [] so client falls back to shift.centersData
                 }
                 if (db.ShiftForms && db.ShiftForms.getByShift) {
-                    response.forms = await db.ShiftForms.getByShift(shiftId);
+                    const dbForms = await db.ShiftForms.getByShift(shiftId);
+                    if (Array.isArray(dbForms) && dbForms.length > 0) response.forms = dbForms;
                 }
                 if (db.AuditLog && db.AuditLog.getByShift) {
-                    response.audit_log = await db.AuditLog.getByShift(shiftId);
+                    const dbAudit = await db.AuditLog.getByShift(shiftId);
+                    if (Array.isArray(dbAudit) && dbAudit.length > 0) response.audit_log = dbAudit;
                 }
                 if (db.OpsFiles && db.OpsFiles.getByShift) {
-                    response.files = await db.OpsFiles.getByShift(shiftId);
+                    const dbFiles = await db.OpsFiles.getByShift(shiftId);
+                    if (Array.isArray(dbFiles) && dbFiles.length > 0) response.files = dbFiles;
                 }
                 if (db.Timeline && db.Timeline.getByShift) {
-                    response.timeline = await db.Timeline.getByShift(shiftId);
+                    const dbTimeline = await db.Timeline.getByShift(shiftId);
+                    if (Array.isArray(dbTimeline) && dbTimeline.length > 0) response.timeline = dbTimeline;
                 }
             }
         } catch (dbErr) {
@@ -1739,6 +1772,23 @@ app.post('/api/report', authenticate, validateBody({
         if (allData[key].times.length > 10) allData[key].times.pop();
         await writeData(allData);
 
+        // Sync reports to shift record so archive shows correct data
+        try {
+            const shiftId = await resolveShiftId(req);
+            if (shiftId) {
+                const shifts = await readShifts();
+                const shiftIndex = shifts.findIndex(s => s.id === shiftId);
+                if (shiftIndex !== -1) {
+                    shifts[shiftIndex].savedReports = JSON.parse(JSON.stringify(allData));
+                    shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
+                    shifts[shiftIndex].lastUpdate = new Date().toISOString();
+                    await writeShifts(shifts);
+                }
+            }
+        } catch (shiftErr) {
+            console.warn('[Shift] Failed to sync reports to shift:', shiftErr.message);
+        }
+
         // Also save to SQLite with shift_id if available
         try {
             if (dbAvailable() && db.Reports) {
@@ -1776,6 +1826,23 @@ app.post('/api/undo', authenticate, async (req, res) => {
         allData[key].count--;
         allData[key].times.shift();
         await writeData(allData);
+
+        // Sync reports to shift record so archive shows correct data
+        try {
+            const shiftId = await resolveShiftId(req);
+            if (shiftId) {
+                const shifts = await readShifts();
+                const shiftIndex = shifts.findIndex(s => s.id === shiftId);
+                if (shiftIndex !== -1) {
+                    shifts[shiftIndex].savedReports = JSON.parse(JSON.stringify(allData));
+                    shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
+                    shifts[shiftIndex].lastUpdate = new Date().toISOString();
+                    await writeShifts(shifts);
+                }
+            }
+        } catch (shiftErr) {
+            console.warn('[Shift] Failed to sync reports to shift after undo:', shiftErr.message);
+        }
 
         broadcast({
             type: 'report_undone',
