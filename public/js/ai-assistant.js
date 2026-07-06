@@ -437,25 +437,10 @@
             el.className = 'ai-message bot';
             const time = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 
-            let confHtml = '';
-            if (confidence !== undefined && confidence !== null) {
-                let level = 'low';
-                if (confidence >= 65) level = 'high';
-                else if (confidence >= 35) level = 'medium';
-                const conf = CONFIDENCE_LABELS[level];
-                confHtml = `
-                    <div class="ai-confidence" style="background:${conf.bg};color:${conf.color}">
-                        <i class="fas fa-shield-alt"></i> ${conf.text} — ${confidence}%
-                    </div>
-                `;
-            }
-
-            // Format structured answer with proper line breaks and bold text
+            // Format structured answer
             let formattedText = this.formatText(text);
-            
-            // Convert markdown-style **text** to bold HTML
             formattedText = formattedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            
+
             // Add details button if sources exist with full content
             let detailsHtml = '';
             if (sources && sources.length > 0 && sources[0].fullContent) {
@@ -474,24 +459,9 @@
                 `;
             }
 
-            let sourcesHtml = '';
-            if (sources && sources.length > 0) {
-                const srcTags = sources.map((s, i) => {
-                    return `<span class="ai-source-tag" title="SOP">${i + 1}</span>`;
-                }).join('');
-                sourcesHtml = `
-                    <div class="ai-message-sources">
-                        <span class="ai-sources-label"><i class="fas fa-bookmark"></i> المصادر:</span>
-                        ${srcTags}
-                    </div>
-                `;
-            }
-
             el.innerHTML = `
                 <div class="ai-message-content">${formattedText}</div>
                 ${detailsHtml}
-                ${confHtml}
-                ${sourcesHtml}
                 <span class="ai-message-time">${time}</span>
             `;
             this.elements.messages.appendChild(el);

@@ -1,9 +1,10 @@
 /* ============================================
-   RAG ENGINE - TF-IDF + Cosine Similarity
-   منصة الجنوب - نظام إدارة العمليات الإسعافية
+   RAG ENGINE V2 - SOP-Based Operational AI
+   منصة الجنوب - المساعد التشغيلي الذكي
    ============================================
-   Pure JavaScript, no GPU, no external AI API
-   Supports future OpenAI integration via config
+   Each SOP is treated as a complete atomic unit.
+   No mixing between different SOPs.
+   Pure JavaScript, no external AI API.
    ============================================ */
 
 const fs = require('fs').promises;
@@ -19,18 +20,16 @@ const logger = {
 // CONFIGURATION
 // ============================================
 const RAG_CONFIG = {
-  topK: 5,              // number of chunks to retrieve
-  minSimilarity: 0.01,  // minimum cosine similarity threshold
-  maxContextLength: 3000, // max characters from retrieved chunks
-  enableOpenAI: false,  // future: set to true and provide OPENAI_API_KEY
+  // No more chunking - each SOP is a complete document
+  topK: 1,              // Only retrieve the single best SOP
+  minSimilarity: 0.05,  // Minimum similarity threshold
+  enableOpenAI: false,
   openAIKey: process.env.OPENAI_API_KEY || null,
   openAIModel: 'gpt-4o-mini',
-  // Template-based answer generation (no LLM)
-  useTemplates: true
 };
 
 // ============================================
-// TOKENIZATION (Arabic + English support)
+// TOKENIZATION (Arabic + English)
 // ============================================
 function tokenize(text) {
   if (!text) return [];
@@ -38,16 +37,58 @@ function tokenize(text) {
     .toLowerCase()
     .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // remove tashkeel
     .replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 0x0030))
-    .replace(/[^\w\u0600-\u06FF\u0750-\u077F]/g, ' ') // keep Arabic + alphanumeric
+    .replace(/[^\w\u0600-\u06FF\u0750-\u077F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-  const words = normalized.split(/\s+/).filter(w => w.length > 1);
-  return words;
+  return normalized.split(/\s+/).filter(w => w.length > 1);
 }
 
 // ============================================
-// TF-IDF VECTORIZATION
+// SOP PARSER - Extract SOPs from document
+// ============================================
+function parseSOPs(fullText) {
+  // SOPs are separated by headers like: # الإجراء رقم: SOP-XXX
+  const sopRegex = /#\s*الإجراء\s*رقم[:\s]*SOP[-\s]*(\d+)[\s\S]*?(?=#\s*الإجراء\s*رقم[:\s]*SOP-\d+|#\s*أمثلة|#\s*تعليمات|#\s*الهدف|$)/gi;
+  
+  const sops = [];
+  let match;
+  while ((match = sopRegex.exec(fullText)) !== null) {
+    const content = match[0].trim();
+    const sopNumber = match[1];
+    
+    // Extract SOP name
+    const nameMatch = content.match(/اسم\s*الإجراء[:\s]*(.+?)(?:\n|$)/i);
+    const sopName = nameMatch ? nameMatch[1].trim() : '';
+    
+    // Extract section keywords
+    const keywords = extractKeywords(content);
+    
+    sops.push({
+      id: `SOP-${sopNumber}`,
+      number: sopNumber,
+      name: sopName,
+      content: content,
+      keywords: keywords,
+      fullText: fullText // Keep reference to full document
+    });
+  }
+  
+  return sops;
+}
+
+function extractKeywords(content) {
+  const keywords = new Set();
+  const tokens = tokenize(content);
+  for (const token of tokens) {
+    if (token.length > 2) {
+      keywords.add(token);
+    }
+  }
+  return Array.from(keywords);
+}
+
+// ============================================
+// TF-IDF
 // ============================================
 function computeTF(tokens) {
   const tf = {};
@@ -66,8 +107,6 @@ function computeIDF(documents) {
   const idf = {};
   const N = documents.length;
   if (N === 0) return idf;
-
-  // Count document frequency for each term
   const df = {};
   for (const doc of documents) {
     const uniqueTokens = new Set(doc);
@@ -75,9 +114,8 @@ function computeIDF(documents) {
       df[token] = (df[token] || 0) + 1;
     }
   }
-
   for (const [term, freq] of Object.entries(df)) {
-    idf[term] = Math.log(N / (freq + 1)) + 1; // smoothed IDF
+    idf[term] = Math.log(N / (freq + 1)) + 1;
   }
   return idf;
 }
@@ -95,108 +133,111 @@ function vectorize(tfidf, vocabulary) {
   return vocabulary.map(term => tfidf[term] || 0);
 }
 
-// ============================================
-// COSINE SIMILARITY
-// ============================================
-function cosineSimilarity(vecA, vecB) {
-  if (vecA.length !== vecB.length) return 0;
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+function cosineSimilarity(v1, v2) {
+  let dot = 0, norm1 = 0, norm2 = 0;
+  for (let i = 0; i < v1.length; i++) {
+    dot += v1[i] * v2[i];
+    norm1 += v1[i] * v1[i];
+    norm2 += v2[i] * v2[i];
   }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  if (norm1 === 0 || norm2 === 0) return 0;
+  return dot / (Math.sqrt(norm1) * Math.sqrt(norm2));
 }
 
 // ============================================
-// INDEX MANAGEMENT
+// SOP-BASED RAG INDEX
 // ============================================
-class RAGIndex {
+class SOPRAGIndex {
   constructor() {
-    this.chunks = [];       // { id, docId, chunkIndex, content, tokens, tfidf }
-    this.vocabulary = [];   // sorted unique terms
-    this.idf = {};          // global IDF
+    this.sops = [];
+    this.vocabulary = [];
+    this.idf = {};
+    this.documents = [];
     this.isBuilt = false;
   }
 
-  addChunk(chunk) {
-    this.chunks.push(chunk);
-    this.isBuilt = false;
-  }
-
-  removeChunksByDocId(docId) {
-    this.chunks = this.chunks.filter(c => c.docId !== docId);
-    this.isBuilt = false;
+  addDocument(fullText, docId) {
+    const sops = parseSOPs(fullText);
+    for (const sop of sops) {
+      sop.docId = docId;
+      this.sops.push(sop);
+    }
   }
 
   build() {
-    if (this.chunks.length === 0) {
-      this.vocabulary = [];
-      this.idf = {};
-      this.isBuilt = true;
+    if (this.sops.length === 0) {
+      this.isBuilt = false;
       return;
     }
 
-    const documents = this.chunks.map(c => c.tokens);
-    this.idf = computeIDF(documents);
-    this.vocabulary = Object.keys(this.idf).sort();
+    // Build vocabulary from all SOPs
+    this.documents = this.sops.map(sop => tokenize(sop.content));
+    const allTokens = new Set();
+    for (const doc of this.documents) {
+      for (const token of doc) {
+        allTokens.add(token);
+      }
+    }
+    this.vocabulary = Array.from(allTokens).sort();
+    this.idf = computeIDF(this.documents);
 
-    for (const chunk of this.chunks) {
-      const tf = computeTF(chunk.tokens);
-      chunk.tfidf = computeTFIDF(tf, this.idf);
-      chunk.vector = vectorize(chunk.tfidf, this.vocabulary);
+    // Compute TF-IDF for each SOP
+    for (let i = 0; i < this.sops.length; i++) {
+      const tf = computeTF(this.documents[i]);
+      const tfidf = computeTFIDF(tf, this.idf);
+      this.sops[i].tfidf = tfidf;
+      this.sops[i].vector = vectorize(tfidf, this.vocabulary);
     }
 
     this.isBuilt = true;
-    logger.info(`RAG index built: ${this.chunks.length} chunks, ${this.vocabulary.length} terms`);
   }
 
-  query(queryText, topK = RAG_CONFIG.topK) {
-    if (!this.isBuilt) this.build();
-    if (this.chunks.length === 0) return [];
+  search(query, topK = 1) {
+    if (!this.isBuilt || this.sops.length === 0) {
+      return [];
+    }
 
-    const queryTokens = tokenize(queryText);
+    const queryTokens = tokenize(query);
     const queryTF = computeTF(queryTokens);
     const queryTFIDF = computeTFIDF(queryTF, this.idf);
     const queryVector = vectorize(queryTFIDF, this.vocabulary);
 
-    const results = [];
-    for (const chunk of this.chunks) {
-      const sim = cosineSimilarity(queryVector, chunk.vector);
-      if (sim >= RAG_CONFIG.minSimilarity) {
-        results.push({ ...chunk, similarity: sim });
+    // Calculate similarity with each SOP
+    const scores = [];
+    for (let i = 0; i < this.sops.length; i++) {
+      const similarity = cosineSimilarity(queryVector, this.sops[i].vector);
+      if (similarity > RAG_CONFIG.minSimilarity) {
+        scores.push({
+          sop: this.sops[i],
+          similarity: similarity
+        });
       }
     }
 
-    results.sort((a, b) => b.similarity - a.similarity);
-    return results.slice(0, topK);
+    // Sort by similarity descending
+    scores.sort((a, b) => b.similarity - a.similarity);
+    return scores.slice(0, topK);
   }
 
   serialize() {
     return {
-      chunks: this.chunks.map(c => ({
-        id: c.id,
-        docId: c.docId,
-        chunkIndex: c.chunkIndex,
-        content: c.content,
-        tokenCount: c.tokens.length
+      sops: this.sops.map(s => ({
+        id: s.id,
+        number: s.number,
+        name: s.name,
+        content: s.content,
+        docId: s.docId,
+        keywords: s.keywords
       })),
       vocabulary: this.vocabulary,
-      idf: this.idf
+      idf: this.idf,
+      isBuilt: this.isBuilt
     };
   }
 
   deserialize(data) {
-    this.chunks = (data.chunks || []).map(c => ({
-      id: c.id,
-      docId: c.docId,
-      chunkIndex: c.chunkIndex,
-      content: c.content,
-      tokens: tokenize(c.content),
+    this.sops = (data.sops || []).map(s => ({
+      ...s,
       tfidf: {},
       vector: []
     }));
@@ -208,24 +249,19 @@ class RAGIndex {
 }
 
 // ============================================
-// STRUCTURED ANSWER EXTRACTION
+// ANSWER EXTRACTION - Only from one SOP
 // ============================================
-
-function extractSOPInfo(content) {
-  // Extract SOP number and name
-  const sopMatch = content.match(/الإجراء\s*رقم[\s:]*SOP-?\s*(\d+)/i);
-  const nameMatch = content.match(/اسم\s*الإجراء[\s:]*(.+?)(?:\n|$)/i);
-  
+function extractSOPInfo(sop) {
   return {
-    sopNumber: sopMatch ? `SOP-${sopMatch[1]}` : null,
-    sopName: nameMatch ? nameMatch[1].trim() : null
+    sopNumber: sop.id,
+    sopName: sop.name || '',
+    content: sop.content
   };
 }
 
-function extractSteps(content) {
-  // Extract numbered steps
+function extractSteps(sop) {
   const steps = [];
-  const lines = content.split('\n');
+  const lines = sop.content.split('\n');
   for (const line of lines) {
     const stepMatch = line.match(/^\s*(\d+)[\.\-]\s*(.+)/);
     if (stepMatch) {
@@ -235,10 +271,9 @@ function extractSteps(content) {
   return steps;
 }
 
-function extractRules(content) {
-  // Extract bullet points
+function extractRules(sop) {
   const rules = [];
-  const lines = content.split('\n');
+  const lines = sop.content.split('\n');
   for (const line of lines) {
     const ruleMatch = line.match(/^\s*[•\-\*]\s*(.+)/);
     if (ruleMatch) {
@@ -248,132 +283,149 @@ function extractRules(content) {
   return rules;
 }
 
-function extractAnswer(content) {
-  // Extract answer from Q&A section
-  const answerMatch = content.match(/###\s*الإجابة\s*\n+([\s\S]+?)(?:\n---|\n###\s*سؤال|$)/i);
-  if (answerMatch) {
-    return answerMatch[1].trim();
-  }
-  
-  // Look for "وفقاً للإجراء" pattern
-  const accordMatch = content.match(/وفقاً\s*للإجراء\s+SOP-\d+[^\n]*/i);
-  if (accordMatch) {
-    return accordMatch[0].trim();
-  }
-  
-  return null;
-}
-
-function determineAnswerType(query, results) {
+function determineAnswerType(query, sop) {
   const q = query.toLowerCase();
+  const content = sop.content.toLowerCase();
   
   // Yes/No questions
-  if (q.match(/^(هل|هل\s+يمكن|هل\s+يسمح|هل\s+يحق)/)) {
+  if (q.match(/^(هل|هل\s+يمكن|هل\s+يسمح|هل\s+يحق|هل\s+يجوز)/)) {
     return 'yesno';
   }
   
   // Procedure/step questions
-  if (q.includes('كيف') || q.includes('ما\s*الخطوات') || q.includes('ماذا\s*أفعل') || q.includes('ما\s*الإجراء')) {
+  if (q.includes('كيف') || q.includes('ما\s*الخطوات') || q.includes('ماذا\s*أفعل') || q.includes('ما\s*الإجراء') || q.includes('خطوات')) {
     return 'procedure';
   }
   
   // Where/location questions
-  if (q.includes('أين') || q.includes('إلى\s*أين') || q.includes('مستشفى')) {
+  if (q.includes('أين') || q.includes('إلى\s*أين') || q.includes('مستشفى') || q.includes('منشأة')) {
     return 'location';
   }
   
-  // Check first result for classification keywords
-  if (results.length > 0) {
-    const content = results[0].content.toLowerCase();
-    if (content.includes('خطوات') || content.includes('تنفيذ')) return 'procedure';
-    if (content.includes('ينقل') || content.includes('مستشفى')) return 'location';
-    if (content.includes('لا') || content.includes('نعم') || content.includes('يمكن')) return 'yesno';
+  // What/definition questions
+  if (q.includes('ما\s*هو') || q.includes('ما\s*هي') || q.includes('تعريف')) {
+    return 'definition';
   }
+  
+  // Check SOP content for clues
+  if (content.includes('خطوات') || content.includes('تنفيذ')) return 'procedure';
+  if (content.includes('ينقل') || content.includes('مستشفى') || content.includes('منشأة')) return 'location';
+  if (content.includes('لا') || content.includes('يمنع') || content.includes('يسمح')) return 'yesno';
   
   return 'general';
 }
 
-function buildStructuredAnswer(query, results) {
-  if (!results || results.length === 0) {
-    return null;
-  }
+function extractAnswerFromSOP(query, sop, answerType) {
+  const content = sop.content;
+  const info = extractSOPInfo(sop);
   
-  const bestResult = results[0];
-  const content = bestResult.content;
-  const sopInfo = extractSOPInfo(content);
-  const answerType = determineAnswerType(query, results);
-  
-  // Build structured answer parts
   let answer = '';
   
-  // 1. Determine if it's a Yes/No question
-  if (answerType === 'yesno') {
-    const q = query.toLowerCase();
-    // Check if the content contains "لا" or prohibition
-    if (content.includes('لا يجوز') || content.includes('يمنع') || content.includes('لا يسمح') || content.includes('لا.')) {
-      answer = '**لا.**\n\n';
-    } else if (content.includes('نعم') || content.includes('يمكن') || content.includes('يسمح')) {
-      answer = '**نعم.**\n\n';
-    } else {
-      answer = '**لا.**\n\n';
-    }
-  }
-  
-  // 2. Try to extract answer from Q&A section first
-  const extractedAnswer = extractAnswer(content);
-  if (extractedAnswer) {
-    answer += extractedAnswer.replace(/^لا\./, '').replace(/^نعم\./, '').trim();
-    answer += '\n';
-  } else {
-    // 3. Extract steps if this is a procedure
-    const steps = extractSteps(content);
-    if (steps.length > 0 && answerType === 'procedure') {
-      answer += '\n';
-      for (let i = 0; i < steps.length; i++) {
-        answer += `${i + 1}. ${steps[i]}\n`;
-      }
-    } else {
-      // 4. Extract rules/bullets
-      const rules = extractRules(content);
-      if (rules.length > 0) {
-        for (const rule of rules) {
-          answer += `• ${rule}\n`;
-        }
+  switch (answerType) {
+    case 'yesno': {
+      // Check for prohibition indicators
+      const q = query.toLowerCase();
+      if (content.includes('لا يجوز') || content.includes('يمنع') || content.includes('لا يسمح') || 
+          content.includes('لا يسمح') || content.includes('لا يتم')) {
+        answer = 'لا، لا يجوز.';
+      } else if (content.includes('نعم') || content.includes('يمكن') || content.includes('يسمح') || content.includes('يجوز')) {
+        answer = 'نعم، يجوز.';
       } else {
-        // 5. Fallback: use first 2 sentences of content
-        const sentences = content.split(/[\.\n]/).filter(s => s.trim().length > 10);
-        if (sentences.length > 0) {
-          answer += sentences[0].trim() + '\n';
-          if (sentences.length > 1 && answer.length < 200) {
-            answer += sentences[1].trim() + '\n';
-          }
+        answer = 'لا.';
+      }
+      
+      // Add brief explanation from the relevant section
+      const lines = content.split('\n').filter(l => l.trim().length > 10);
+      // Find the most relevant line (contains keywords from query)
+      const queryWords = tokenize(query);
+      let bestLine = '';
+      let bestScore = 0;
+      for (const line of lines) {
+        const lineWords = tokenize(line);
+        let score = 0;
+        for (const qw of queryWords) {
+          if (lineWords.includes(qw)) score++;
         }
+        if (score > bestScore) {
+          bestScore = score;
+          bestLine = line;
+        }
+      }
+      if (bestLine && bestLine.length > 20) {
+        answer += '\n\n' + bestLine.trim();
+      }
+      break;
+    }
+    
+    case 'procedure': {
+      const steps = extractSteps(sop);
+      if (steps.length > 0) {
+        answer = steps.map((step, i) => `${i + 1}. ${step}`).join('\n');
+      } else {
+        // Extract all numbered items
+        const lines = content.split('\n').filter(l => l.match(/^\s*\d+[\.\-]/));
+        answer = lines.map((l, i) => l.trim()).join('\n');
+      }
+      break;
+    }
+    
+    case 'location': {
+      const rules = extractRules(sop);
+      // Find rules that mention location keywords
+      const locationRules = rules.filter(r => 
+        r.includes('مستشفى') || r.includes('منشأة') || r.includes('قطاع') || r.includes('نقل')
+      );
+      if (locationRules.length > 0) {
+        answer = locationRules.map(r => '• ' + r).join('\n');
+      } else {
+        answer = rules.map(r => '• ' + r).join('\n');
+      }
+      break;
+    }
+    
+    case 'definition': {
+      // Extract the description paragraph
+      const descMatch = content.match(/الوصف[:\s]*(.+?)(?:\n##|\n#\s*خطوات|$)/i);
+      if (descMatch) {
+        answer = descMatch[1].trim();
+      } else {
+        // Get first substantial paragraph
+        const lines = content.split('\n').filter(l => l.trim().length > 20);
+        answer = lines[0] || '';
+      }
+      break;
+    }
+    
+    default: {
+      // General answer - extract relevant rules/bullets
+      const rules = extractRules(sop);
+      if (rules.length > 0) {
+        answer = rules.map(r => '• ' + r).join('\n');
+      } else {
+        // Extract all substantial lines
+        const lines = content.split('\n').filter(l => l.trim().length > 15 && !l.includes('#'));
+        answer = lines.slice(0, 5).map(l => l.trim()).join('\n');
       }
     }
   }
   
   return {
     answer: answer.trim(),
-    sopInfo,
+    sopInfo: info,
     answerType
   };
 }
 
 // ============================================
-// TEMPLATE-BASED ANSWER GENERATION
+// ANSWER GENERATION
 // ============================================
 const EMS_TEMPLATES = {
-  greeting: [
-    'أهلاً بك! أنا المساعد التشغيلي الذكي لمنصة قطاع الجنوب. كيف يمكنني مساعدتك؟',
-    'مرحباً! أنا هنا للإجابة على استفساراتك التشغيلية بناءً على البروتوكولات والوثائق المتاحة.',
-    'أهلاً وسهلاً! اسألني عن أي بروتوكول أو إجراء تشغيلي.'
-  ],
   noResult: 'لم يتم العثور على إجراء رسمي يتعلق بهذا السؤال داخل قاعدة المعرفة الحالية.',
   
-  // Structured answer templates
   procedureIntro: '**الإجراء:** {sopName} ({sopNumber})\n\n**الخطوات:**\n\n',
   locationIntro: '**الإجابة:**\n\n',
-  yesnoIntro: '',
+  yesnoIntro: '**الإجابة:**\n\n',
+  definitionIntro: '**التعريف:**\n\n',
   generalIntro: '**الإجابة:**\n\n',
   
   reference: '\n\n**المرجع:**\n{sopNumber} – {sopName}.',
@@ -389,134 +441,133 @@ function generateAnswer(query, results) {
     };
   }
 
-  // Calculate average similarity for confidence
-  let totalSimilarity = 0;
-  const sources = [];
-  for (let i = 0; i < results.length; i++) {
-    const r = results[i];
-    totalSimilarity += r.similarity;
-    sources.push({
-      docId: r.docId,
-      chunkIndex: r.chunkIndex,
-      similarity: Math.round(r.similarity * 1000) / 1000,
-      excerpt: r.content.slice(0, 150) + (r.content.length > 150 ? '...' : ''),
-      fullContent: r.content  // Store full content for "Show Details" button
-    });
-    if (i >= 2) break; // Only keep top 3 sources for the response
-  }
-
-  const avgSimilarity = totalSimilarity / Math.min(results.length, 3);
-  const confidence = Math.round(avgSimilarity * 100);
+  // Get the best matching SOP (only one)
+  const bestResult = results[0];
+  const sop = bestResult.sop;
+  const similarity = bestResult.similarity;
+  const confidence = Math.round(similarity * 100);
   
-  // Build structured answer
-  const structured = buildStructuredAnswer(query, results);
+  // Determine answer type
+  const answerType = determineAnswerType(query, sop);
   
-  if (!structured || !structured.answer) {
+  // Extract answer from the SOP only
+  const extracted = extractAnswerFromSOP(query, sop, answerType);
+  
+  if (!extracted.answer) {
     return {
       answer: EMS_TEMPLATES.noResult,
-      sources,
-      confidence
+      sources: [],
+      confidence: 0
     };
   }
-
-  // Build the final answer based on type
-  let finalAnswer = '';
-  const answerType = structured.answerType;
-  const sopInfo = structured.sopInfo;
   
-  if (answerType === 'procedure' && sopInfo.sopNumber && sopInfo.sopName) {
+  // Build the final answer
+  let finalAnswer = '';
+  const sopInfo = extracted.sopInfo;
+  
+  // Choose template based on answer type
+  if (answerType === 'procedure') {
     finalAnswer = EMS_TEMPLATES.procedureIntro
       .replace('{sopName}', sopInfo.sopName)
       .replace('{sopNumber}', sopInfo.sopNumber);
-    finalAnswer += structured.answer;
+    finalAnswer += extracted.answer;
     finalAnswer += EMS_TEMPLATES.reference
       .replace('{sopNumber}', sopInfo.sopNumber)
       .replace('{sopName}', sopInfo.sopName);
-  } else if (answerType === 'location' || answerType === 'yesno') {
+  } else if (answerType === 'yesno') {
+    finalAnswer = EMS_TEMPLATES.yesnoIntro;
+    finalAnswer += extracted.answer;
+    finalAnswer += EMS_TEMPLATES.referenceShort
+      .replace('{sopNumber}', sopInfo.sopNumber);
+  } else if (answerType === 'location') {
     finalAnswer = EMS_TEMPLATES.locationIntro;
-    finalAnswer += structured.answer;
-    if (sopInfo.sopNumber) {
+    finalAnswer += extracted.answer;
+    if (sopInfo.sopName) {
+      finalAnswer += EMS_TEMPLATES.reference
+        .replace('{sopNumber}', sopInfo.sopNumber)
+        .replace('{sopName}', sopInfo.sopName);
+    } else {
       finalAnswer += EMS_TEMPLATES.referenceShort
         .replace('{sopNumber}', sopInfo.sopNumber);
     }
+  } else if (answerType === 'definition') {
+    finalAnswer = EMS_TEMPLATES.definitionIntro;
+    finalAnswer += extracted.answer;
+    if (sopInfo.sopName) {
+      finalAnswer += EMS_TEMPLATES.reference
+        .replace('{sopNumber}', sopInfo.sopNumber)
+        .replace('{sopName}', sopInfo.sopName);
+    }
   } else {
     finalAnswer = EMS_TEMPLATES.generalIntro;
-    finalAnswer += structured.answer;
-    if (sopInfo.sopNumber && sopInfo.sopName) {
+    finalAnswer += extracted.answer;
+    if (sopInfo.sopName) {
       finalAnswer += EMS_TEMPLATES.reference
         .replace('{sopNumber}', sopInfo.sopNumber)
         .replace('{sopName}', sopInfo.sopName);
     }
   }
   
-  // Add low confidence warning
-  if (confidence < 30) {
-    finalAnswer += '\n\n⚠️ تنبيه: مستوى الثقة منخفض. يُفضل مراجعة المشرف التشغيلي.';
-  }
-
-  return { 
-    answer: finalAnswer.trim(), 
-    sources, 
+  // Source info (only one SOP)
+  const sources = [{
+    docId: sop.docId,
+    sopNumber: sopInfo.sopNumber,
+    sopName: sopInfo.sopName,
+    similarity: Math.round(similarity * 1000) / 1000,
+    fullContent: sop.content
+  }];
+  
+  return {
+    answer: finalAnswer.trim(),
+    sources,
     confidence,
     answerType
   };
 }
 
 // ============================================
-// ANSWER WITH OPENAI (future enhancement)
+// SUGGESTED QUESTIONS
 // ============================================
-async function generateAnswerWithOpenAI(query, results) {
-  // Placeholder for future OpenAI integration
-  // When enabled, this function calls the OpenAI API with the retrieved context
-  // For now, falls back to template-based generation
-  return generateAnswer(query, results);
-}
-
-// ============================================
-// SUGGESTED QUESTIONS (based on available chunks)
-// ============================================
-function generateSuggestedQuestions(chunks, count = 5) {
-  if (!chunks || chunks.length === 0) return [];
-
+function generateSuggestedQuestions(sops, count = 5) {
+  if (!sops || sops.length === 0) return [];
+  
   const questions = [];
   const seen = new Set();
-
-  // Extract common keywords and form questions
-  const keywords = {};
-  for (const chunk of chunks) {
-    for (const token of chunk.tokens) {
-      if (token.length > 3) {
-        keywords[token] = (keywords[token] || 0) + 1;
-      }
+  
+  for (const sop of sops) {
+    const sopName = sop.name || '';
+    if (sopName.includes('نقل')) {
+      questions.push('ما هو إجراء نقل ' + sopName.replace('آلية نقل حالات ', '') + '؟');
+    }
+    if (sopName.includes('رفض')) {
+      questions.push('ماذا أفعل إذا ' + sopName + '؟');
+    }
+    if (sopName.includes('تصنيف')) {
+      questions.push('ما هي تصنيفات البلاغ؟');
+    }
+    if (sopName.includes('مستشفى')) {
+      questions.push('كيف يتم التعامل مع ' + sopName + '؟');
     }
   }
-
-  const topKeywords = Object.entries(keywords)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(e => e[0]);
-
-  const templates = [
-    'ما هو بروتوكول {kw}؟',
-    'كيف يتم التعامل مع {kw}؟',
-    'ما هي خطوات {kw}؟',
-    'شرح {kw}',
-    'ما المتطلبات الخاصة بـ {kw}؟'
+  
+  // Add some standard questions
+  const standard = [
+    'هل يمكن تجاوز أقرب مستشفى في حالة دلتا؟',
+    'ماذا أفعل إذا رفض المريض النقل؟',
+    'أين يتم نقل مريض غير مواطن حالته تشارلي؟',
+    'ما هي خطوات رفض المريض النقل؟',
+    'ما هو تصنيف البلاغ دلتا؟'
   ];
-
-  for (const kw of topKeywords) {
-    for (const tpl of templates) {
-      const q = tpl.replace('{kw}', kw);
-      if (!seen.has(q)) {
-        seen.add(q);
-        questions.push(q);
-        if (questions.length >= count) break;
-      }
+  
+  for (const q of standard) {
+    if (!seen.has(q)) {
+      seen.add(q);
+      questions.push(q);
     }
     if (questions.length >= count) break;
   }
-
-  return questions;
+  
+  return questions.slice(0, count);
 }
 
 // ============================================
@@ -524,15 +575,15 @@ function generateSuggestedQuestions(chunks, count = 5) {
 // ============================================
 module.exports = {
   RAG_CONFIG,
-  RAGIndex,
+  SOPRAGIndex,
   tokenize,
-  computeTF,
-  computeIDF,
-  computeTFIDF,
-  vectorize,
-  cosineSimilarity,
+  parseSOPs,
+  extractSOPInfo,
+  extractSteps,
+  extractRules,
+  determineAnswerType,
+  extractAnswerFromSOP,
   generateAnswer,
-  generateAnswerWithOpenAI,
   generateSuggestedQuestions,
   EMS_TEMPLATES
 };

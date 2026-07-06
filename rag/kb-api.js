@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 
 const { processDocument } = require('./document-processor');
-const { RAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
+const { SOPRAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
 
 const router = express.Router();
 
@@ -33,9 +33,9 @@ const KB_INDEX_PATH = path.join(__dirname, '..', 'data', 'kb-index.json');
 })();
 
 // ============================================
-// IN-MEMORY RAG INDEX (rebuilt on startup)
+// IN-MEMORY SOP RAG INDEX (rebuilt on startup)
 // ============================================
-const ragIndex = new RAGIndex();
+const ragIndex = new SOPRAGIndex();
 let indexLoaded = false;
 
 async function loadIndexFromDB(db) {
@@ -44,23 +44,18 @@ async function loadIndexFromDB(db) {
       logger.info('No DB provided, RAG index will be empty');
       return;
     }
-    const chunks = await db.all('SELECT id, document_id, doc_id, chunk_index, content, token_count FROM kb_chunks WHERE content IS NOT NULL');
-    if (!chunks || chunks.length === 0) {
-      logger.info('No KB chunks found in DB');
+    // Load full documents (not chunks) to parse into SOPs
+    const docs = await db.all('SELECT id, doc_id, content FROM kb_documents WHERE content IS NOT NULL AND is_active = 1');
+    if (!docs || docs.length === 0) {
+      logger.info('No KB documents found in DB');
       return;
     }
-    for (const c of chunks) {
-      ragIndex.addChunk({
-        id: c.id,
-        docId: c.document_id,
-        chunkIndex: c.chunk_index,
-        content: c.content,
-        tokens: require('./rag-engine').tokenize(c.content)
-      });
+    for (const doc of docs) {
+      ragIndex.addDocument(doc.content, doc.doc_id || ('doc-' + doc.id));
     }
     ragIndex.build();
     indexLoaded = true;
-    logger.info(`Loaded ${chunks.length} chunks into RAG index`);
+    logger.info(`Loaded ${docs.length} documents into SOP RAG index, found ${ragIndex.sops.length} SOPs`);
   } catch (err) {
     logger.error('Failed to load RAG index from DB', err);
   }
@@ -80,7 +75,7 @@ async function loadIndexFromFile() {
     const data = JSON.parse(await fs.readFile(KB_INDEX_PATH, 'utf8'));
     ragIndex.deserialize(data);
     indexLoaded = true;
-    logger.info('RAG index loaded from file');
+    logger.info('SOP RAG index loaded from file');
   } catch (err) {
     if (err.code !== 'ENOENT') {
       logger.error('Failed to load index from file', err);
@@ -182,29 +177,9 @@ router.post('/upload', kbUpload.single('file'), handleMulterError, async (req, r
 
     const dbDocId = result.id;
 
-    // 3. Save chunks and add to RAG index
-    const tokenize = require('./rag-engine').tokenize;
-    for (let i = 0; i < proc.chunks.length; i++) {
-      const chunk = proc.chunks[i];
-      const tokens = tokenize(chunk);
-      await db.run(
-        `INSERT INTO kb_chunks (document_id, doc_id, chunk_index, content, token_count) VALUES (?, ?, ?, ?, ?)`,
-        [dbDocId, dbDocId, i, chunk, tokens.length]
-      );
-    }
-
-    // Rebuild index from DB for this doc
-    ragIndex.removeChunksByDocId(dbDocId);
-    const freshChunks = await db.all('SELECT id, document_id, doc_id, chunk_index, content FROM kb_chunks WHERE document_id = ?', [dbDocId]);
-    for (const c of freshChunks) {
-      ragIndex.addChunk({
-        id: c.id,
-        docId: c.document_id,
-        chunkIndex: c.chunk_index,
-        content: c.content,
-        tokens: tokenize(c.content)
-      });
-    }
+    // 3. Save full document text to SOP RAG index (not chunks)
+    // The SOPRAGIndex will parse the full text into SOPs automatically
+    ragIndex.addDocument(proc.text, docId);
     ragIndex.build();
     await persistIndex();
 
@@ -212,7 +187,7 @@ router.post('/upload', kbUpload.single('file'), handleMulterError, async (req, r
       success: true,
       docId,
       originalName,
-      chunkCount: proc.chunks.length,
+      sopCount: ragIndex.sops.length,
       warning: proc.error || null
     });
   } catch (err) {
@@ -311,9 +286,9 @@ router.post('/ask', async (req, res) => {
     const db = req.app.locals.db;
     const startTime = Date.now();
 
-    // Retrieve from RAG index
-    const results = ragIndex.query(query, Math.min(topK || 5, 10));
-    const answerData = await generateAnswer(query, results);
+    // Retrieve from SOP RAG index (only one SOP)
+    const results = ragIndex.search(query, 1);
+    const answerData = generateAnswer(query, results);
     const queryTime = Date.now() - startTime;
 
     // Save to query log (if DB available)
@@ -345,9 +320,9 @@ router.post('/ask', async (req, res) => {
       query,
       answer: answerData.answer,
       sources: answerData.sources,
-      confidence: answerData.confidence,
+      answerType: answerData.answerType,
       queryTimeMs: queryTime,
-      chunksRetrieved: results.length
+      sopFound: results.length > 0 ? (results[0].sop.id + ' – ' + results[0].sop.name) : null
     });
   } catch (err) {
     logger.error('RAG query failed', err);
@@ -359,7 +334,8 @@ router.post('/ask', async (req, res) => {
 router.get('/suggest', async (req, res) => {
   try {
     const count = Math.min(parseInt(req.query.count) || 5, 10);
-    const questions = generateSuggestedQuestions(ragIndex.chunks, count);
+    // Generate suggestions from SOPs (not chunks)
+    const questions = generateSuggestedQuestions(ragIndex.sops, count);
     res.json({ success: true, questions });
   } catch (err) {
     logger.error('Suggest failed', err);
@@ -373,10 +349,10 @@ router.get('/stats', async (req, res) => {
     const db = req.app.locals.db;
     let stats = {
       documents: 0,
-      chunks: 0,
+      sops: ragIndex.sops ? ragIndex.sops.length : 0,
       queries: 0,
       indexBuilt: ragIndex.isBuilt,
-      vocabularySize: ragIndex.vocabulary.length
+      vocabularySize: ragIndex.vocabulary ? ragIndex.vocabulary.length : 0
     };
     if (db) {
       const docCount = await db.get('SELECT COUNT(*) as c FROM kb_documents');
