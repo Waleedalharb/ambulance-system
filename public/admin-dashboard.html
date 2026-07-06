@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم المشرف — منصة الجنوب</title>
-    <link rel="stylesheet" href="css/app.css?v=10">
+    <link rel="stylesheet" href="css/app.css?v=30">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -172,7 +172,7 @@
             if (!authToken) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML = '❌ يجب تسجيل الدخول أولاً<br><a href="index.html?v=10" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
+                document.getElementById('error').innerHTML = '❌ يجب تسجيل الدخول أولاً<br><a href="index.html?v=30" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
                 return;
             }
 
@@ -201,7 +201,7 @@
             } catch (e) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML = '❌ ' + e.message + '<br><a href="index.html?v=10" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
+                document.getElementById('error').innerHTML = '❌ ' + e.message + '<br><a href="index.html?v=30" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a>';
             }
         }
 
