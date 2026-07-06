@@ -11,6 +11,22 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
 
+// ============================================
+// AI PROVIDER CONFIGURATION (via Environment Variables)
+// ============================================
+// IMPORTANT: Set these on your server, NOT in code:
+//   OPENAI_API_KEY=sk-...
+//   GEMINI_API_KEY=AQ...
+//   AI_PROVIDER=openai (or gemini)
+//   AI_MODEL=gpt-4o-mini (or gemini-1.5-flash)
+// ============================================
+console.log('AI Provider Config:', {
+    provider: process.env.AI_PROVIDER || 'openai',
+    model: process.env.AI_MODEL || 'gpt-4o-mini',
+    openaiKeySet: !!process.env.OPENAI_API_KEY,
+    geminiKeySet: !!process.env.GEMINI_API_KEY
+});
+
 // SQLite Database Module (optional — falls back to JSON if unavailable)
 let db = null;
 try {

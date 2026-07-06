@@ -11,6 +11,9 @@ const multer = require('multer');
 
 const { processDocument } = require('./document-processor');
 const { SOPRAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
+const { getAgent } = require('./agent-layer');
+const { getAIProvider } = require('./ai-provider');
+const { SOPRAGIndex, generateAnswer, generateSuggestedQuestions, RAG_CONFIG } = require('./rag-engine');
 
 const router = express.Router();
 
@@ -379,7 +382,55 @@ router.get('/download/:id', async (req, res) => {
 });
 
 // ============================================
-// ROUTES: QUERY / CHAT
+// ROUTES: AI PROVIDER SETTINGS
+// ============================================
+
+// GET /api/rag/providers - List available AI providers
+router.get('/providers', async (req, res) => {
+  try {
+    const aiProvider = getAIProvider();
+    const providers = aiProvider.getAvailableProviders();
+    const activeProvider = aiProvider.getActiveProvider();
+    res.json({
+      success: true,
+      providers,
+      activeProvider,
+      models: providers.find(p => p.id === activeProvider)?.models || []
+    });
+  } catch (err) {
+    logger.error('Get providers failed', err);
+    res.status(500).json({ error: 'فشل في جلب مزودي الذكاء الاصطناعي' });
+  }
+});
+
+// POST /api/rag/providers/switch - Switch AI provider
+router.post('/providers/switch', async (req, res) => {
+  try {
+    const { provider, model } = req.body;
+    const aiProvider = getAIProvider();
+    aiProvider.setProvider(provider);
+    if (model) aiProvider.setModel(model);
+    res.json({ success: true, provider, model: aiProvider.model });
+  } catch (err) {
+    logger.error('Switch provider failed', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/rag/providers/test - Test AI provider connection
+router.post('/providers/test', async (req, res) => {
+  try {
+    const aiProvider = getAIProvider();
+    const result = await aiProvider.testConnection();
+    res.json({ success: true, result });
+  } catch (err) {
+    logger.error('Test provider failed', err);
+    res.status(500).json({ error: 'فشل في اختبار الاتصال: ' + err.message });
+  }
+});
+
+// ============================================
+// ROUTES: QUERY / CHAT (with Agent Layer)
 // ============================================
 
 // POST /api/rag/ask - Query the RAG
@@ -396,47 +447,69 @@ router.post('/ask', async (req, res) => {
     const db = req.app.locals.db;
     const startTime = Date.now();
 
-    // Retrieve from SOP RAG index (only one SOP)
-    const results = ragIndex.search(query, 1);
-    const answerData = generateAnswer(query, results);
+    // Step 1: Retrieve SOPs from RAG index (top 3 for context)
+    const searchResults = ragIndex.search(query, 3);
+    const retrievedSOPs = searchResults.map(r => r.sop);
+
+    // Step 2: Process through AI Agent
+    const agent = getAgent();
+    const result = await agent.processQuery(query, sessionId || ('anon-' + Date.now()), retrievedSOPs);
     const queryTime = Date.now() - startTime;
 
-    // Save to query log (if DB available)
+    // Step 3: Save to query log
     if (db) {
       try {
         await db.run(
           `INSERT INTO kb_queries (query, answer, sources, query_time) VALUES (?, ?, ?, ?)`,
-          [query, answerData.answer, JSON.stringify(answerData.sources || []), queryTime]
+          [query, result.answer, JSON.stringify(result.context || {}), queryTime]
         );
-      } catch (e) { /* ignore log errors */ }
+      } catch (e) { /* ignore */ }
     }
 
-    // Save to chat history if sessionId provided
+    // Step 4: Save to chat history
     if (sessionId && db) {
       try {
         let session = await db.get('SELECT id FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
         if (!session) {
-          await db.run('INSERT INTO kb_chat_sessions (session_id, user_id, title) VALUES (?, ?, ?)', [sessionId, req.user ? req.user.id : null, query.slice(0, 100)]);
+          await db.run('INSERT INTO kb_chat_sessions (session_id, user_id, title) VALUES (?, ?, ?)', 
+            [sessionId, req.user ? req.user.id : null, query.slice(0, 100)]);
           session = await db.get('SELECT id FROM kb_chat_sessions WHERE session_id = ?', [sessionId]);
         }
-        await db.run('INSERT INTO kb_chat_messages (session_id, role, content, sources) VALUES (?, ?, ?, ?)', [session.id, 'user', query, null]);
-        await db.run('INSERT INTO kb_chat_messages (session_id, role, content, sources) VALUES (?, ?, ?, ?)', [session.id, 'assistant', answerData.answer, JSON.stringify(answerData.sources || [])]);
+        await db.run('INSERT INTO kb_chat_messages (session_id, role, content, sources) VALUES (?, ?, ?, ?)', 
+          [session.id, 'user', query, null]);
+        await db.run('INSERT INTO kb_chat_messages (session_id, role, content, sources) VALUES (?, ?, ?, ?)', 
+          [session.id, 'assistant', result.answer, JSON.stringify(result.context || {})]);
         await db.run('UPDATE kb_chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [session.id]);
-      } catch (e) { /* ignore chat log errors */ }
+      } catch (e) { /* ignore */ }
     }
 
     res.json({
       success: true,
       query,
-      answer: answerData.answer,
-      sources: answerData.sources,
-      answerType: answerData.answerType,
+      answer: result.answer,
+      sessionId: result.sessionId,
+      context: result.context,
       queryTimeMs: queryTime,
-      sopFound: results.length > 0 ? (results[0].sop.id + ' – ' + results[0].sop.name) : null
+      sopFound: retrievedSOPs.length > 0 ? (retrievedSOPs[0].id + ' – ' + retrievedSOPs[0].name) : null
     });
   } catch (err) {
-    logger.error('RAG query failed', err);
-    res.status(500).json({ error: 'فشل في معالجة الاستفسار' });
+    logger.error('Agent query failed', err);
+    res.status(500).json({ error: 'فشل في معالجة الاستفسار: ' + err.message });
+  }
+});
+
+// POST /api/rag/clear-session - Clear conversation memory
+router.post('/clear-session', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (sessionId) {
+      const agent = getAgent();
+      agent.clearSession(sessionId);
+    }
+    res.json({ success: true, message: 'تم مسح سياق المحادثة' });
+  } catch (err) {
+    logger.error('Clear session failed', err);
+    res.status(500).json({ error: 'فشل في مسح الجلسة' });
   }
 });
 
