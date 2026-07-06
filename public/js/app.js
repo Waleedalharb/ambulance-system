@@ -2419,7 +2419,7 @@ function editSelectedArchiveShift() {
     // Redirect to radio-completion with date and type
     var shiftType = shift.shiftType || 'صباح';
     var shiftDate = shift.shiftDate || '';
-    var url = 'radio-completion.html?v=31';
+    var url = 'radio-completion.html?v=33';
     if (shiftDate) {
         url += '&date=' + encodeURIComponent(shiftDate) + '&type=' + encodeURIComponent(shiftType);
     }
@@ -3449,16 +3449,6 @@ async function startNewShift() {
         return;
     }
     
-    // Auto-save current shift data silently before starting new one
-    if (currentShiftId && typeof saveShiftData === 'function') {
-        try {
-            await saveShiftData(true);
-            console.log('✅ تم حفظ بيانات المناوبة الحالية تلقائياً قبل بدء الجديدة');
-        } catch (e) {
-            console.error('⚠️ فشل الحفظ التلقائي للمناوبة الحالية:', e);
-        }
-    }
-    
     var shiftType = await showShiftTypeDialog();
     if (!shiftType) return;
     
@@ -3467,38 +3457,59 @@ async function startNewShift() {
     if (shiftType === 'صباحية') normalizedType = 'صباح';
     if (shiftType === 'ليلية') normalizedType = 'ليل';
     
-    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم حفظ البلاغات الحالية في المناوبة السابقة، وبدء مناوبة ' + (normalizedType === 'صباح' ? 'صباحية' : 'ليلية') + ' جديدة.')) return;
+    if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم أرشفة المناوبة الحالية بالكامل، وبدء مناوبة ' + (normalizedType === 'صباح' ? 'صباحية' : 'ليلية') + ' جديدة.\n\nجميع البيانات التشغيلية ستبدأ من الصفر.')) return;
+    
     try {
-        // Auto-generate and save report for the current shift before ending it
-        if (currentShiftId) {
-            try {
-                saveShiftReportToArchive();
-                showNotification('تقرير تلقائي', 'تم حفظ تقرير المناوبة السابقة في الأرشيف', 'success', 4000);
-            } catch (e) {
-                console.log('⚠️ فشل حفظ التقرير التلقائي:', e);
-            }
-        }
-        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: normalizedType }) });
+        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftType: normalizedType }) });
         var result = await response.json();
         if (result.success) {
+            // ============================================
+            // STEP 1: Store new shift ID
+            // ============================================
             currentShiftId = result.shiftId;
-            // Persist to localStorage so it survives refreshes
             try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
-            alert('✅ تم بدء المناوبة ' + (normalizedType === 'صباح' ? 'الصباحية' : 'الليلية') + ' بنجاح');
-            await loadShifts();
-            await loadAllData();
+            
+            // ============================================
+            // STEP 2: Clear ALL operational data locally
+            // ============================================
+            reports = {};
+            centersData = {};
+            lastKnownUpdate = 0;
+            
+            // Clear report type stats (if using localStorage for types)
+            try {
+                var typeStorageKey = 'reportTypes_' + result.shiftId;
+                localStorage.removeItem('reportTypes_' + (currentShiftId || 'old'));
+            } catch(e) {}
+            
+            // ============================================
+            // STEP 3: Update UI to show zero state
+            // ============================================
+            updateTotal();
             calculateLiveReportStats();
             updateWorkforceStats();
             updateDistributionIndicator();
-            // إذا كان مربع التكميل مفتوح، حدثه تلقائياً بالمناوبة الجديدة
+            updateShiftStatus();
+            
+            // Close any open modals
+            var distributionModal = document.getElementById('distributionModal');
+            if (distributionModal) distributionModal.style.display = 'none';
             var shiftModal = document.getElementById('shiftModal');
-            if (shiftModal && shiftModal.style.display === 'flex') {
-                openShiftModal();
-            } else if (shiftModal) {
-                shiftModal.style.display = 'none';
-            }
-        } else { alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); }
-    } catch (error) { alert("❌ خطأ في الاتصال: " + error.message); }
+            if (shiftModal) shiftModal.style.display = 'none';
+            
+            // ============================================
+            // STEP 4: Reload data from server (should be empty)
+            // ============================================
+            await loadShifts();
+            await loadAllData();
+            
+            showNotification('مناوبة جديدة', 'تم بدء المناوبة ' + (normalizedType === 'صباح' ? 'الصباحية' : 'الليلية') + ' بنجاح. جميع البيانات تبدأ من الصفر.', 'success', 5000);
+        } else { 
+            alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); 
+        }
+    } catch (error) { 
+        alert("❌ خطأ في الاتصال: " + error.message); 
+    }
 }
 
 // ============================================
@@ -8352,7 +8363,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     setTimeout(checkForAlerts, 1000);
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
-    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=31'; };
+    btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=33'; };
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };

@@ -1494,6 +1494,46 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
             shiftDate = `${prevYear}-${prevMonth}-${prevDayNum}`;
         }
         
+        // ============================================
+        // STEP 1: Archive current shift data (if exists)
+        // ============================================
+        const shifts = await readShifts();
+        if (currentShiftId) {
+            const currentShiftIndex = shifts.findIndex(s => s.id === currentShiftId);
+            if (currentShiftIndex !== -1) {
+                // Read current operational data
+                const currentData = await readData();
+                const currentCenters = centersData;
+                
+                // Archive current data to the old shift
+                shifts[currentShiftIndex].savedReports = currentData || {};
+                shifts[currentShiftIndex].centersData = currentCenters || {};
+                shifts[currentShiftIndex].totalReports = Object.values(currentData || {}).reduce(
+                    (sum, r) => sum + (r.count || 0), 0
+                );
+                shifts[currentShiftIndex].lastUpdate = saudiTime.toISOString();
+                shifts[currentShiftIndex].autoArchived = true;
+                shifts[currentShiftIndex].archiveTime = saudiTime.toISOString();
+                
+                console.log(`[Shift Archive] Shift ${currentShiftId} archived with ${shifts[currentShiftIndex].totalReports} reports`);
+            }
+        }
+        
+        // ============================================
+        // STEP 2: Reset operational data files
+        // ============================================
+        // Clear ambulance-data.json (current reports)
+        await writeData({});
+        // Clear centersData
+        centersData = {};
+        // Reset other operational data
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-events.json'), JSON.stringify([], null, 2));
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-absences.json'), JSON.stringify([], null, 2));
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-notes.json'), JSON.stringify([], null, 2));
+        
+        // ============================================
+        // STEP 3: Create new shift
+        // ============================================
         const newShift = {
             id: Date.now(),
             shiftName: `${normalizedType} - ${shiftDate}`,
@@ -1514,13 +1554,21 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         };
         
         // Save to file
-        const shifts = await readShifts();
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
         
         // Set as current shift
         currentShiftId = newShift.id;
+        
+        // Broadcast to all clients
+        broadcast({
+            type: 'shift_started',
+            message: `تم بدء المناوبة ${normalizedType === 'صباح' ? 'الصباحية' : 'الليلية'}`,
+            shiftId: newShift.id,
+            shiftDate: shiftDate,
+            shiftType: normalizedType
+        });
         
         res.json({ 
             success: true, 
