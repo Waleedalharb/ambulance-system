@@ -390,11 +390,13 @@ router.get('/providers', async (req, res) => {
     const aiProvider = getAIProvider();
     const providers = aiProvider.getAvailableProviders();
     const activeProvider = aiProvider.getActiveProvider();
+    const status = aiProvider.getStatus();
     res.json({
       success: true,
       providers,
       activeProvider,
-      models: providers.find(p => p.id === activeProvider)?.models || []
+      models: providers.find(p => p.id === activeProvider)?.models || [],
+      status
     });
   } catch (err) {
     logger.error('Get providers failed', err);
@@ -509,6 +511,23 @@ router.post('/clear-session', async (req, res) => {
   } catch (err) {
     logger.error('Clear session failed', err);
     res.status(500).json({ error: 'فشل في مسح الجلسة' });
+  }
+});
+
+// GET /api/rag/status - Check AI system status
+router.get('/status', async (req, res) => {
+  try {
+    const aiProvider = getAIProvider();
+    const status = aiProvider.getStatus();
+    res.json({
+      success: true,
+      status,
+      indexLoaded,
+      sopCount: ragIndex.sops ? ragIndex.sops.length : 0
+    });
+  } catch (err) {
+    logger.error('Get status failed', err);
+    res.status(500).json({ error: 'فشل في جلب الحالة' });
   }
 });
 

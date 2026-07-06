@@ -162,6 +162,17 @@ class OperationalAgent {
   async processQuery(query, sessionId, retrievedSOPs = []) {
     const memory = this.sessionStore.get(sessionId);
     
+    // Check if AI provider is ready
+    if (!this.aiProvider.isReady()) {
+      const status = this.aiProvider.getStatus();
+      logger.error('AI provider not ready', status);
+      return {
+        success: false,
+        answer: `⚠️ لم يتم تهيئة خدمة الذكاء الاصطناعي.\n\nالحالة الحالية:\n- المزود المختار: ${status.provider}\n- OpenAI: ${status.openaiReady ? '✅' : '❌'}\n- Gemini: ${status.geminiReady ? '✅' : '❌'}\n\nيرجى التحقق من:\n1. إضافة مفتاح API في إعدادات Render (Environment Variables)\n2. إعادة تشغيل الخادم بعد إضافة المفتاح\n3. التأكد من صحة المفتاح`,
+        error: 'AI provider not initialized'
+      };
+    }
+    
     // Add user message
     memory.add('user', query);
     

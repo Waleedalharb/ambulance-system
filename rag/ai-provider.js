@@ -34,29 +34,53 @@ class AIProvider {
   _initClients() {
     // OpenAI
     const openaiKey = process.env.OPENAI_API_KEY;
-    if (openaiKey) {
+    if (openaiKey && openaiKey.startsWith('sk-')) {
       try {
         this.openaiClient = new OpenAI({ apiKey: openaiKey });
-        logger.info('OpenAI client initialized');
+        logger.info('✅ OpenAI client initialized');
       } catch (err) {
-        logger.error('Failed to initialize OpenAI client', err);
+        logger.error('❌ Failed to initialize OpenAI client', err);
       }
+    } else {
+      logger.warn('⚠️ OPENAI_API_KEY not set or invalid');
     }
 
     // Gemini
     const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
+    if (geminiKey && geminiKey.length > 10) {
       try {
         this.geminiClient = new GoogleGenerativeAI(geminiKey);
         this.geminiModel = this.geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        logger.info('Gemini client initialized');
+        logger.info('✅ Gemini client initialized');
       } catch (err) {
-        logger.error('Failed to initialize Gemini client', err);
+        logger.error('❌ Failed to initialize Gemini client', err);
       }
+    } else {
+      logger.warn('⚠️ GEMINI_API_KEY not set or invalid');
     }
   }
 
-  // Check which providers are available
+  // Check if provider is ready
+  isReady() {
+    if (this.provider === 'openai') return !!this.openaiClient;
+    if (this.provider === 'gemini') return !!this.geminiModel;
+    return false;
+  }
+
+  // Get provider status for debugging
+  getStatus() {
+    return {
+      provider: this.provider,
+      model: this.model,
+      openaiReady: !!this.openaiClient,
+      geminiReady: !!this.geminiClient,
+      envKeys: {
+        openai: !!process.env.OPENAI_API_KEY,
+        gemini: !!process.env.GEMINI_API_KEY
+      }
+    };
+  }
+
   getAvailableProviders() {
     const providers = [];
     if (this.openaiClient) providers.push({ id: 'openai', name: 'OpenAI', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'] });
