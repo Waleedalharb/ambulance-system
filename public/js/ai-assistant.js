@@ -573,4 +573,13 @@
     } else {
         window.aiAssistant = new AIAssistant();
     }
+
+    // Global toggle function for external buttons (topbar, sidebar, etc.)
+    window.toggleAIChatPanel = function() {
+        if (window.aiAssistant) {
+            window.aiAssistant.togglePanel();
+        } else {
+            console.warn('[AI Assistant] Not initialized yet');
+        }
+    };
 })();

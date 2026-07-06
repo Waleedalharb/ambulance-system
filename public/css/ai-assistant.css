@@ -741,3 +741,59 @@
 .dark-mode .ai-footer-note {
     color: #64748B;
 }
+
+/* ============================================
+   AI Assistant Button — Topbar Circular Style
+   ============================================ */
+
+.ai-topbar-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+    animation: ai-pulse 2s infinite;
+    position: relative;
+    padding: 0;
+    margin: 0 4px;
+}
+
+.ai-topbar-btn:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.4);
+    animation: none;
+}
+
+.ai-topbar-btn.active {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    animation: none;
+}
+
+@keyframes ai-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    }
+}
+
+/* Dark mode topbar button */
+.dark-mode .ai-topbar-btn {
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+}
+
+.dark-mode .ai-topbar-btn:hover {
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+}
