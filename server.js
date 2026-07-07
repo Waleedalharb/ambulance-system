@@ -1607,6 +1607,7 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         const newShift = {
             shiftDate: shiftDate,
             shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            id: Date.now(),
             shiftType: shiftType,
             shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
             startTime: saudiTime.toISOString(),
