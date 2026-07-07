@@ -18,8 +18,8 @@ const logger = {
 // ============================================
 class AIProvider {
   constructor(config = {}) {
-    this.provider = config.provider || process.env.AI_PROVIDER || 'openai';
-    this.model = config.model || process.env.AI_MODEL || 'gpt-4o-mini';
+    this.provider = config.provider || process.env.AI_PROVIDER || 'gemini';
+    this.model = config.model || process.env.AI_MODEL || 'gemini-1.5-flash-latest';
     this.temperature = config.temperature || parseFloat(process.env.AI_TEMPERATURE) || 0.3;
     this.maxTokens = config.maxTokens || parseInt(process.env.AI_MAX_TOKENS) || 1000;
     
