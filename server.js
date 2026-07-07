@@ -7040,15 +7040,6 @@ app.get('/api/ai/v2/stats', authenticate, authorize(['admin', 'director']), asyn
 // ============================================
 app.use('/api/rag', authenticate, kbApi.router);
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'المسار غير موجود' });
-});
-
-// AI Monitor error tracking middleware
-if (aiMonitor) {
-    app.use(aiMonitor.errorTrackingMiddleware());
-}
 
 // ============================================
 // API: CHAT MODULE
@@ -7445,7 +7436,15 @@ app.post('/api/chat/upload', authenticate, uploadChat.single('file'), handleMult
         res.status(500).json({ error: 'فشل في رفع الملف' });
     }
 });
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'المسار غير موجود' });
+});
 
+// AI Monitor error tracking middleware
+if (aiMonitor) {
+    app.use(aiMonitor.errorTrackingMiddleware());
+}
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('❌ Error:', err.stack || err.message);
