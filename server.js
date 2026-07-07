@@ -7295,7 +7295,7 @@ app.post('/api/chat/conversations/:id/messages', authenticate, async (req, res) 
         );
         message.read_by = [];
         // Broadcast to conversation subscribers
-        broadcastToConversation(convId, { type: 'chat_message', message });
+        broadcastToConversation(convId, { type: 'chat_message', conversationId: convId, message });
         res.json({ success: true, message });
     } catch (err) {
         console.error('Send message error:', err);

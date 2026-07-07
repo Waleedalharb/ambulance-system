@@ -230,7 +230,7 @@
         subscribe: function(conversationId) {
             if (!this.connected || !this.ws) return;
             this.ws.send(JSON.stringify({
-                type: 'subscribe',
+                type: 'chat_subscribe',
                 conversationId: conversationId
             }));
         }
