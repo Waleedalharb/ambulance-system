@@ -1544,7 +1544,6 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftType } = req.body;
-        const normalizedType = shiftType === 'صباحية' ? 'صباح' : shiftType === 'ليلية' ? 'ليل' : shiftType;
         const now = new Date();
         const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
         const year = saudiTime.getFullYear();
@@ -1609,9 +1608,10 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         // STEP 3: Create new shift
         // ============================================
         const newShift = {
+            id: Date.now(),
+            shiftName: `${shiftType} - ${shiftDate}`,
             shiftDate: shiftDate,
             shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-            id: Date.now(),
             shiftType: shiftType,
             shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
             startTime: saudiTime.toISOString(),
@@ -1692,7 +1692,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             const isoDate = `${year}-${month}-${day}`;
             const newShift = {
                 id: Date.now(),
-                shiftName: `${shiftData.shiftType || 'صباح'} - ${shiftDate || isoDate}`,
+                shiftName: `${shiftData.shiftType || 'صباحية'} - ${shiftDate || isoDate}`,
                 shiftDate: shiftDate || isoDate,
                 shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
                 shiftType: shiftData.shiftType || 'صباحية',
