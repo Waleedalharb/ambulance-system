@@ -99,21 +99,16 @@ async function testPhase2_CreateShift() {
   console.log('📋 PHASE 2: Create Test Shift');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // 2.1 Get current shift info
-  const info = await apiCall('GET', '/api/shift-info');
-  if (info.json) {
-    testShiftDate = info.json.shiftDate;
-    testShiftType = info.json.shiftType || 'صباحية';
-    console.log(`  Current shift: ${testShiftDate} ${testShiftType}`);
-  }
-
-  // 2.2 Start new shift manually (if admin token available)
+  // 2.1 Start new shift manually (if admin token available)
   const startRes = await apiCall('POST', '/api/start-new-shift', {
     shiftType: testShiftType
   });
 
   if (startRes.status === 200 && startRes.json?.success) {
     testShiftId = startRes.json.shiftId;
+    testShiftDate = startRes.json.shift?.shiftDate;
+    testShiftType = startRes.json.shift?.shiftType || testShiftType;
+    console.log(`  New shift: ${testShiftDate} ${testShiftType} (id=${testShiftId})`);
     logTest('Manual shift start', true, `shiftId=${testShiftId}`);
 
     // Verify shiftType is correct
@@ -329,42 +324,42 @@ async function testPhase7_VerifyArchive() {
   if (!data) return;
 
   // 7.2 Verify centersData
-  const centersMatch = JSON.stringify(data.centersData) === JSON.stringify(TEST_DATA.centersData);
+  const centersMatch = JSON.stringify(data.shift?.centersData) === JSON.stringify(TEST_DATA.centersData);
   logTest('Archive: centersData matches 100%', centersMatch,
-    `keys=${Object.keys(data.centersData || {}).length}`);
+    `keys=${Object.keys(data.shift?.centersData || {}).length}`);
 
   // 7.3 Verify rapidLocations
-  const rapidMatch = JSON.stringify(data.rapidLocations) === JSON.stringify(TEST_DATA.rapidLocations);
+  const rapidMatch = JSON.stringify(data.shift?.rapidLocations) === JSON.stringify(TEST_DATA.rapidLocations);
   logTest('Archive: rapidLocations matches 100%', rapidMatch,
-    `keys=${Object.keys(data.rapidLocations || {}).length}`);
+    `keys=${Object.keys(data.shift?.rapidLocations || {}).length}`);
 
   // 7.4 Verify vehicleData
-  const vehicleMatch = JSON.stringify(data.vehicleData) === JSON.stringify(TEST_DATA.vehicleData);
+  const vehicleMatch = JSON.stringify(data.shift?.vehicleData) === JSON.stringify(TEST_DATA.vehicleData);
   logTest('Archive: vehicleData matches 100%', vehicleMatch);
 
   // 7.5 Verify fuelData
-  const fuelMatch = JSON.stringify(data.fuelData) === JSON.stringify(TEST_DATA.fuelData);
+  const fuelMatch = JSON.stringify(data.shift?.fuelData) === JSON.stringify(TEST_DATA.fuelData);
   logTest('Archive: fuelData matches 100%', fuelMatch);
 
   // 7.6 Verify generalNotes
-  const notesMatch = data.generalNotes === TEST_DATA.generalNotes;
+  const notesMatch = data.shift?.generalNotes === TEST_DATA.generalNotes;
   logTest('Archive: generalNotes matches 100%', notesMatch,
-    `note length=${data.generalNotes?.length || 0}`);
+    `note length=${data.shift?.generalNotes?.length || 0}`);
 
-  // 7.7 Verify reports count
+  // 7.7 Verify reports count (use data.total from API response)
   const expectedReports = TEST_REPORTS.length;
-  const actualReports = data.totalReports || 0;
+  const actualReports = data.total || 0;
   logTest('Archive: report count matches', actualReports >= expectedReports,
     `expected=${expectedReports}, actual=${actualReports}`);
 
   // 7.8 Verify shiftType is correct
-  const typeCorrect = data.shiftType === testShiftType;
+  const typeCorrect = data.shift?.shiftType === testShiftType;
   logTest('Archive: shiftType is correct', typeCorrect,
-    `type=${data.shiftType}`);
+    `type=${data.shift?.shiftType}`);
 
   // 7.9 Verify autoArchived flag
-  logTest('Archive: has autoArchived flag', data.autoArchived !== undefined,
-    `autoArchived=${data.autoArchived}`);
+  logTest('Archive: has autoArchived flag', data.shift?.autoArchived !== undefined,
+    `autoArchived=${data.shift?.autoArchived}`);
 
   // Overall integrity
   const allMatch = centersMatch && rapidMatch && vehicleMatch && fuelMatch && notesMatch;
