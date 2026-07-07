@@ -788,7 +788,7 @@
         $('userList').addEventListener('click', function(e) {
             var item = e.target.closest('.user-item');
             if (!item) return;
-            var userId = parseInt(item.dataset.id);
+            var userId = item.dataset.id;
             startPrivateChat(userId);
         });
 
@@ -801,7 +801,7 @@
         $('groupUserList').addEventListener('click', function(e) {
             var item = e.target.closest('.user-item');
             if (!item) return;
-            var userId = parseInt(item.dataset.id);
+            var userId = item.dataset.id;
             var userName = item.dataset.name;
             toggleUserSelection(userId, userName);
         });
