@@ -50,7 +50,7 @@ class AIProvider {
     if (geminiKey && geminiKey.length > 10) {
       try {
         this.geminiClient = new GoogleGenerativeAI(geminiKey);
-        this.geminiModel = this.geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+        this.geminiModel = this.geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
         logger.info('✅ Gemini client initialized');
       } catch (err) {
         logger.error('❌ Failed to initialize Gemini client', err);
