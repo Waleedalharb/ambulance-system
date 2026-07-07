@@ -864,7 +864,7 @@ function handleMulterError(err, req, res, next) {
 // ============================================
 // بيانات قطاع الجنوب
 // ============================================
-const centersData = {
+let centersData = {
     "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
     "الخالدية": ["جنوب 2"],
     "منفوحة": ["جنوب 3"],
@@ -1605,14 +1605,9 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         // STEP 3: Create new shift
         // ============================================
         const newShift = {
-            id: Date.now(),
-            shiftName: `${shiftType} - ${shiftDate}`,
             shiftDate: shiftDate,
             shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
             shiftType: shiftType,
-            shiftDate: shiftDate,
-            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-            shiftType: normalizedType,
             shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
             startTime: saudiTime.toISOString(),
             totalReports: 0,
