@@ -1050,6 +1050,141 @@
             min-width: 150px;
             text-align: center;
         }
+
+        /* ==========================================
+           العرض الكلاسيكي - Classic View (Excel-like)
+           ========================================== */
+        .classic-view-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        .classic-grid {
+            display: grid;
+            grid-auto-rows: minmax(40px, auto);
+            min-width: max-content;
+        }
+
+        .classic-grid-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #F8FAFC;
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 10px 6px;
+            text-align: center;
+            border-bottom: 2px solid var(--border);
+            border-left: 1px solid var(--border);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .classic-grid-header:first-child {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            background: #F8FAFC;
+            border-left: 2px solid var(--border);
+            min-width: 180px;
+        }
+
+        .classic-grid-cell {
+            padding: 8px 6px;
+            text-align: center;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border);
+            border-left: 1px solid var(--border);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .classic-grid-cell:first-child {
+            position: sticky;
+            right: 0;
+            z-index: 9;
+            background: #FFFFFF;
+            border-left: 2px solid var(--border);
+            font-weight: 600;
+            text-align: right;
+            justify-content: flex-start;
+            padding-right: 12px;
+            min-width: 180px;
+        }
+
+        .classic-grid-cell:hover {
+            background: #F8FAFC;
+        }
+
+        .classic-grid-row:nth-child(even) .classic-grid-cell {
+            background: #FAFBFC;
+        }
+        .classic-grid-row:nth-child(even) .classic-grid-cell:first-child {
+            background: #FAFBFC;
+        }
+
+        /* Shift colors for classic view */
+        .classic-shift-D { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; } /* Day shift */
+        .classic-shift-D12 { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; }
+        .classic-shift-N { background: #E9D5FF !important; color: #6B21A8; font-weight: 600; } /* Night shift */
+        .classic-shift-N12 { background: #E9D5FF !important; color: #6B21A8; font-weight: 600; }
+        .classic-shift-WO { background: #D1FAE5 !important; color: #065F46; font-weight: 600; } /* Official */
+        .classic-shift-ME { background: #FEF3C7 !important; color: #92400E; font-weight: 600; } /* Mission */
+        .classic-shift-V { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Vacation */
+        .classic-shift-VC { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Compensatory */
+        .classic-shift-O12 { background: #E0F2FE !important; color: #0C4A6E; font-weight: 600; } /* Overlap */
+        .classic-shift-M { background: #F3E8FF !important; color: #6B21A8; font-weight: 600; } /* Morning */
+        .classic-shift-C { background: #FFEDD5 !important; color: #9A3412; font-weight: 600; } /* Training */
+        .classic-shift-R { background: #F1F5F9 !important; color: #475569; font-weight: 600; } /* Rest */
+
+        .classic-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 12px;
+            background: #F8FAFC;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .classic-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+        }
+
+        .classic-legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .classic-month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .classic-shift-code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+    
     </style>
 <base target="_blank">
 <base target="_blank">
@@ -1155,6 +1290,9 @@
                 </button>
                 <button class="view-btn" data-view="employee">
                     <i class="fas fa-user"></i> عرض حسب الموظف
+                </button>
+                <button class="view-btn" data-view="classic">
+                    <i class="fas fa-table"></i> عرض كلاسيكي
                 </button>
             </div>
 
@@ -2450,7 +2588,127 @@
                 case 'weekly': renderWeeklyView(); break;
                 case 'monthly': renderMonthlyView(); break;
                 case 'employee': renderEmployeeView(selectedEmployee); break;
+                case 'classic': renderClassicView(); break;
             }
+        }
+
+        // ==========================================
+        // العرض الكلاسيكي - Classic View (Excel-like Grid)
+        // ==========================================
+        function renderClassicView() {
+            var container = document.getElementById('mainViewArea');
+            var filtered = getFilteredEmployees();
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center" style="padding:40px; color:var(--text-muted);"><i class="fas fa-table" style="font-size:3rem; margin-bottom:16px; display:block;"></i>لا توجد بيانات لعرضها</div>';
+                return;
+            }
+            
+            // Gather all unique days from all employee schedules
+            var allDays = {};
+            for (var i = 0; i < filtered.length; i++) {
+                for (var s = 0; s < filtered[i].schedule.length; s++) {
+                    var sch = filtered[i].schedule[s];
+                    if (!allDays[sch.date]) {
+                        allDays[sch.date] = { date: sch.date, day: sch.day, dayNum: parseInt(sch.date.split('-')[2]) };
+                    }
+                }
+            }
+            var daysList = Object.values(allDays).sort(function(a, b) { return a.date.localeCompare(b.date); });
+            
+            if (daysList.length === 0) {
+                container.innerHTML = '<div class="text-center" style="padding:40px; color:var(--text-muted);">لا توجد أيام متاحة</div>';
+                return;
+            }
+            
+            // Determine month/year for title
+            var firstDate = daysList[0].date.split('-');
+            var year = parseInt(firstDate[0]);
+            var month = parseInt(firstDate[1]) - 1;
+            
+            var html = '<div class="classic-month-nav">' +
+                '<button class="month-nav-btn" onclick="changeClassicMonth(-1)"><i class="fas fa-chevron-right"></i></button>' +
+                '<div class="month-nav-title">' + ARABIC_MONTHS[month] + ' ' + year + '</div>' +
+                '<button class="month-nav-btn" onclick="changeClassicMonth(1)"><i class="fas fa-chevron-left"></i></button>' +
+                '</div>';
+            
+            // Build grid columns: 1 for employee name + 1 per day
+            var gridCols = '180px ';
+            for (var d = 0; d < daysList.length; d++) gridCols += 'minmax(50px, 1fr) ';
+            
+            html += '<div class="classic-view-container">' +
+                '<div class="classic-grid" style="grid-template-columns: ' + gridCols.trim() + ';">';
+            
+            // Header row
+            html += '<div class="classic-grid-header">الموظف / اليوم</div>';
+            for (var d = 0; d < daysList.length; d++) {
+                var dayName = daysList[d].day ? daysList[d].day.replace('ال', '') : '';
+                html += '<div class="classic-grid-header">' + daysList[d].dayNum + '<br><small style="font-weight:400; color:var(--text-muted);">' + dayName + '</small></div>';
+            }
+            
+            // Employee rows
+            for (var i = 0; i < filtered.length; i++) {
+                var emp = filtered[i];
+                html += '<div class="classic-grid-row" style="display:contents;">';
+                html += '<div class="classic-grid-cell" title="' + emp.jobTitle + ' | ' + (emp.team || '-') + '">' + emp.name + '</div>';
+                
+                // Build a map of date -> schedule entry for this employee
+                var empSchedule = {};
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    empSchedule[emp.schedule[s].date] = emp.schedule[s];
+                }
+                
+                for (var d = 0; d < daysList.length; d++) {
+                    var dayDate = daysList[d].date;
+                    var sch = empSchedule[dayDate];
+                    if (sch) {
+                        var shiftCode = sch.shiftCode || sch.shift || '';
+                        var safeCode = String(shiftCode).replace(/[^a-zA-Z0-9]/g, '');
+                        var cellClass = 'classic-grid-cell classic-shift-' + safeCode;
+                        var displayText = shiftCode;
+                        if (sch.status === 'إجازة') displayText = 'إجازة';
+                        else if (sch.status === 'راحة') displayText = 'راحة';
+                        html += '<div class="' + cellClass + '" title="' + (sch.shift || sch.status) + ' | ' + (sch.time || '') + '">' +
+                            '<span class="classic-shift-code">' + displayText + '</span></div>';
+                    } else {
+                        html += '<div class="classic-grid-cell">-</div>';
+                    }
+                }
+                html += '</div>';
+            }
+            
+            html += '</div></div>';
+            
+            // Legend
+            html += '<div class="classic-legend">' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#DBEAFE; border-color:#2563EB;"></div><span>D / D12 = دوام نهاري</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E9D5FF; border-color:#8B5CF6;"></div><span>N / N12 = دوام ليلي</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#D1FAE5; border-color:#10B981;"></div><span>WO = دوام رسمي</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FEE2E2; border-color:#EF4444;"></div><span>V / VC = إجازة</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#F1F5F9; border-color:#64748B;"></div><span>R = راحة</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FFEDD5; border-color:#F59E0B;"></div><span>C = تدريب</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FEF3C7; border-color:#D97706;"></div><span>ME = مكلف</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0F2FE; border-color:#0EA5E9;"></div><span>O12 = أوفر لاب</span></div>' +
+                '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        function changeClassicMonth(delta) {
+            // Find current month from employee data and shift it
+            var allDates = [];
+            for (var i = 0; i < employees.length; i++) {
+                for (var s = 0; s < employees[i].schedule.length; s++) {
+                    allDates.push(employees[i].schedule[s].date);
+                }
+            }
+            if (allDates.length === 0) return;
+            allDates.sort();
+            var currentDate = allDates[0].split('-');
+            var year = parseInt(currentDate[0]);
+            var month = parseInt(currentDate[1]);
+            // This is a simple visual change - in a full implementation you'd filter data by month
+            showToast('تصفية حسب الشهر قيد التطوير', 'info');
         }
 
         // ==========================================
@@ -3222,6 +3480,8 @@
         window.downloadDocument = downloadDocument;
         window.renderDailyTable = renderDailyTable;
         window.renderEmployeeTable = renderEmployeeTable;
+        window.renderClassicView = renderClassicView;
+        window.changeClassicMonth = changeClassicMonth;
         console.log('✅ جميع الدوال متاحة في window');
     </script>
 
