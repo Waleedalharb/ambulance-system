@@ -618,6 +618,14 @@ i, i.fas, i.far, i.fal, .fas, .far, .fal, [class^="fa-"], [class*=" fa-"] {
     margin-right: 4px;
 }
 
+.message-bubble .message-sender {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #0D9488;
+    margin-bottom: 4px;
+    direction: rtl;
+}
+
 /* Typing Indicator */
 .typing-indicator {
     display: flex;

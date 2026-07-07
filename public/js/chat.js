@@ -300,8 +300,11 @@
         }
         var content = escapeHtml(message.content).replace(/\n/g, '<br>');
 
+        var senderName = !isMine && message.sender_name ? '<div class="message-sender">' + escapeHtml(message.sender_name) + '</div>' : '';
+
         return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '">' +
             '<div class="message-bubble ' + bubbleClass + '">' +
+                senderName +
                 '<div class="message-content">' + content + '</div>' +
                 '<div class="message-time">' + readStatus + ' ' + time + '</div>' +
             '</div>' +

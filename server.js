@@ -7097,8 +7097,15 @@ app.get('/api/chat/conversations', authenticate, async (req, res) => {
                  WHERE p.conversation_id = ?`,
                 [conv.id]
             );
+            // Build title for private chats
+            let title = conv.title;
+            if (!title && conv.type === 'private') {
+                const other = participants.find(function(p) { return p.user_id !== userId; });
+                title = other ? (other.name || other.username) : 'محادثة خاصة';
+            }
             result.push({
                 ...conv,
+                title: title || conv.title,
                 unread_count: unreadRow ? unreadRow.count : 0,
                 last_message: lastMsg || null,
                 participants: participants || []
@@ -7172,7 +7179,13 @@ app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
                  WHERE p.conversation_id = ?`,
                 [existing.id]
             );
-            return res.json({ success: true, conversation: { ...existing, participants } });
+            // Build title for private chats
+            let title = existing.title;
+            if (!title && existing.type === 'private') {
+                const other = participants.find(function(p) { return p.user_id !== currentUserId; });
+                title = other ? (other.name || other.username) : 'محادثة خاصة';
+            }
+            return res.json({ success: true, conversation: { ...existing, title: title, participants } });
         }
         // Create new private conversation
         const convResult = await db.run(
@@ -7194,7 +7207,13 @@ app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
              WHERE p.conversation_id = ?`,
             [convResult.id]
         );
-        res.json({ success: true, conversation: { ...conversation, participants } });
+        // Build title for private chats
+        let title = conversation.title;
+        if (!title && conversation.type === 'private') {
+            const other = participants.find(function(p) { return p.user_id !== currentUserId; });
+            title = other ? (other.name || other.username) : 'محادثة خاصة';
+        }
+        res.json({ success: true, conversation: { ...conversation, title: title, participants } });
     } catch (err) {
         console.error('Private chat error:', err);
         res.status(500).json({ error: 'فشل في إنشاء المحادثة الخاصة' });
