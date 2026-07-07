@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>الدردشة – منصة إدارة العمليات الإسعافية</title>
+
+    <!-- Favicon & PWA -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1E3A5F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Chat Styles -->
+    <link rel="stylesheet" href="css/chat.css?v=1">
+</head>
+<body>
+    <!-- Auth Check -->
+    <script>
+        (function() {
+            var token = localStorage.getItem('authToken');
+            if (!token) {
+                location.href = 'index.html';
+            }
+        })();
+    </script>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Mobile Sidebar Toggle -->
+    <button id="mobileSidebarToggle" class="mobile-sidebar-toggle" title="القائمة">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Main Chat Layout -->
+    <div class="chat-layout" id="chatLayout">
+        <!-- Sidebar -->
+        <aside class="chat-sidebar" id="chatSidebar">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <img src="logo.png" alt="logo" class="sidebar-logo">
+                    <div class="sidebar-title">
+                        <span class="sidebar-title-main">المراسلات</span>
+                        <span class="sidebar-title-sub">نظام التواصل الداخلي</span>
+                    </div>
+                </div>
+                <div class="sidebar-actions">
+                    <button class="sidebar-action-btn" id="newChatBtn" title="محادثة جديدة">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="sidebar-action-btn" id="newGroupBtn" title="مجموعة جديدة">
+                        <i class="fas fa-users"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="sidebar-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="conversationSearch" placeholder="البحث في المحادثات..." autocomplete="off">
+            </div>
+
+            <!-- Conversation List -->
+            <div class="sidebar-list" id="conversationList">
+                <div class="sidebar-empty">
+                    <i class="fas fa-inbox"></i>
+                    <span>لا توجد محادثات</span>
+                </div>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-user-avatar" id="currentUserAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="sidebar-user-info">
+                        <span class="sidebar-user-name" id="currentUserName">جاري التحميل...</span>
+                        <span class="sidebar-user-status">
+                            <span class="status-dot online"></span>
+                            متصل
+                        </span>
+                    </div>
+                </div>
+                <button class="sidebar-action-btn" onclick="location.href='index.html'" title="الرئيسية">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Chat Area -->
+        <main class="chat-main" id="chatMain">
+            <!-- Empty State -->
+            <div class="chat-empty" id="chatEmpty">
+                <div class="chat-empty-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h2>مرحباً بك في نظام المراسلات</h2>
+                <p>اختر محادثة من القائمة أو ابدأ محادثة جديدة</p>
+                <button class="btn btn-primary" onclick="document.getElementById('newChatBtn').click()">
+                    <i class="fas fa-plus"></i> محادثة جديدة
+                </button>
+            </div>
+
+            <!-- Active Chat -->
+            <div class="chat-active" id="chatActive" style="display:none;">
+                <!-- Chat Header -->
+                <div class="chat-header" id="chatHeader">
+                    <button class="chat-header-back" id="chatHeaderBack" title="رجوع">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <div class="chat-header-avatar" id="chatHeaderAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="chatHeaderName">-</div>
+                        <div class="chat-header-status" id="chatHeaderStatus">
+                            <span class="status-dot online"></span>
+                            <span id="chatHeaderStatusText">متصل</span>
+                        </div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button class="chat-header-action" id="chatHeaderSearch" title="بحث">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button class="chat-header-action" id="chatHeaderInfo" title="معلومات">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages Area -->
+                <div class="chat-messages" id="chatMessages">
+                    <div class="messages-loader" id="messagesLoader" style="display:none;">
+                        <div class="spinner"></div>
+                        <span>جاري التحميل...</span>
+                    </div>
+                    <div class="messages-list" id="messagesList"></div>
+                    <div class="typing-indicator" id="typingIndicator" style="display:none;">
+                        <div class="typing-bubble">
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                        </div>
+                        <span class="typing-text" id="typingText">يكتب...</span>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="chat-input-area">
+                    <div class="chat-input-wrap">
+                        <button class="chat-input-btn attach-btn" id="attachBtn" title="إرفاق ملف">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <div class="chat-input-field">
+                            <textarea id="messageInput" placeholder="اكتب رسالتك..." rows="1" autocomplete="off"></textarea>
+                        </div>
+                        <button class="chat-input-btn send-btn" id="sendBtn" title="إرسال">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Chat Modal (User Search) -->
+    <div class="modal" id="newChatModal" style="display:none;">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> محادثة جديدة</h3>
+                <button class="modal-close" onclick="closeModal('newChatModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="user-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="userSearchInput" placeholder="البحث عن مستخدم..." autocomplete="off">
+                </div>
+                <div class="user-list" id="userList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Group Modal -->
+    <div class="modal" id="newGroupModal" style="display:none;">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-users"></i> مجموعة جديدة</h3>
+                <button class="modal-close" onclick="closeModal('newGroupModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>اسم المجموعة</label>
+                    <input type="text" id="groupTitleInput" placeholder="مثال: فريق الطوارئ">
+                </div>
+                <div class="form-group">
+                    <label>اختر الأعضاء</label>
+                    <div class="user-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="groupUserSearchInput" placeholder="البحث عن مستخدمين..." autocomplete="off">
+                    </div>
+                    <div class="user-list user-list-selectable" id="groupUserList"></div>
+                </div>
+                <div class="form-group">
+                    <label>المختارون (<span id="selectedCount">0</span>)</label>
+                    <div class="selected-users" id="selectedUsers"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newGroupModal')">إلغاء</button>
+                <button class="btn btn-primary" id="createGroupBtn">
+                    <i class="fas fa-check"></i> إنشاء المجموعة
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay for mobile sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay" style="display:none;"></div>
+
+    <!-- Chat Logic -->
+    <script src="js/chat.js?v=1"></script>
+</body>
+</html>
