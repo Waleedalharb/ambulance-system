@@ -1573,11 +1573,15 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
             if (currentShiftIndex !== -1) {
                 // Read current operational data
                 const currentData = await readData();
-                const currentCenters = centersData;
+                const currentShift = shifts[currentShiftIndex];
                 
                 // Archive current data to the old shift
                 shifts[currentShiftIndex].savedReports = currentData || {};
-                shifts[currentShiftIndex].centersData = currentCenters || {};
+                shifts[currentShiftIndex].centersData = currentShift.centersData || {};
+                shifts[currentShiftIndex].rapidLocations = currentShift.rapidLocations || {};
+                shifts[currentShiftIndex].vehicleData = currentShift.vehicleData || {};
+                shifts[currentShiftIndex].fuelData = currentShift.fuelData || {};
+                shifts[currentShiftIndex].generalNotes = currentShift.generalNotes || '';
                 shifts[currentShiftIndex].totalReports = Object.values(currentData || {}).reduce(
                     (sum, r) => sum + (r.count || 0), 0
                 );
@@ -1670,9 +1674,11 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         
         if (index !== -1) {
             // Update existing shift
-            shifts[index].rapidLocations = shiftData.rapidLocations || {};
-            shifts[index].centersData = shiftData.centersData || {};
-            shifts[index].generalNotes = shiftData.generalNotes || "";
+            shifts[index].rapidLocations = shiftData.rapidLocations || shifts[index].rapidLocations || {};
+            shifts[index].centersData = shiftData.centersData || shifts[index].centersData || {};
+            shifts[index].vehicleData = shiftData.vehicleData || shifts[index].vehicleData || {};
+            shifts[index].fuelData = shiftData.fuelData || shifts[index].fuelData || {};
+            shifts[index].generalNotes = shiftData.generalNotes || shifts[index].generalNotes || "";
             shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
             shifts[index].lastUpdate = new Date().toISOString();
             targetShift = shifts[index];
