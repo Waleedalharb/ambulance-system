@@ -7513,6 +7513,23 @@ async function initDatabase() {
         } catch (e) {
             console.error('❌ Failed to create frontend_errors table:', e.message);
         }
+
+        // Sync users from JSON to SQLite for chat module
+        try {
+            const usersJson = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            for (const u of usersJson) {
+                const existing = await db.get('SELECT id FROM users WHERE user_id = ?', [u.id]);
+                if (!existing) {
+                    await db.run(
+                        'INSERT INTO users (user_id, username, password, name, role, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+                        [u.id, u.username, u.password || '', u.name, u.role, u.isActive ? 1 : 0]
+                    );
+                }
+            }
+            console.log('✅ Users synced to SQLite for chat module');
+        } catch (e) {
+            console.error('❌ Failed to sync users to SQLite:', e.message);
+        }
     } catch (err) {
         console.error('❌ Failed to initialize database:', err.message);
         console.log('⚠️ Falling back to JSON file mode');
