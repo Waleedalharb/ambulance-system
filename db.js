@@ -456,6 +456,65 @@ const TABLE_SCHEMAS = [
     message TEXT NOT NULL,
     sources TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Chat Conversations
+  `CREATE TABLE IF NOT EXISTS chat_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL CHECK(type IN ('private', 'group')),
+    title TEXT,
+    created_by TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_archived INTEGER DEFAULT 0
+  );`,
+
+  // Chat Participants
+  `CREATE TABLE IF NOT EXISTS chat_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_admin INTEGER DEFAULT 0,
+    is_muted INTEGER DEFAULT 0,
+    last_read_at DATETIME,
+    UNIQUE(conversation_id, user_id)
+  );`,
+
+  // Chat Messages
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    sender_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT DEFAULT 'text' CHECK(type IN ('text', 'file', 'system', 'context')),
+    file_url TEXT,
+    context_type TEXT,
+    context_id TEXT,
+    reply_to INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    edited_at DATETIME,
+    is_deleted INTEGER DEFAULT 0
+  );`,
+
+  // Chat Message Reads
+  `CREATE TABLE IF NOT EXISTS chat_message_reads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(message_id, user_id)
+  );`,
+
+  // Chat Attachments
+  `CREATE TABLE IF NOT EXISTS chat_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime_type TEXT,
+    size INTEGER DEFAULT 0,
+    upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -882,6 +941,118 @@ const Timeline = {
   },
   async deleteAll() {
     return run('DELETE FROM timeline');
+  }
+};
+
+
+// ============================================
+// CRUD: CHAT CONVERSATIONS
+// ============================================
+const ChatConversations = {
+  async getAll() {
+    return all('SELECT * FROM chat_conversations ORDER BY updated_at DESC');
+  },
+  async getById(id) {
+    return get('SELECT * FROM chat_conversations WHERE id = ?', [id]);
+  },
+  async getByUser(user_id) {
+    return all(`SELECT c.* FROM chat_conversations c
+      JOIN chat_participants p ON c.id = p.conversation_id
+      WHERE p.user_id = ? AND c.is_archived = 0
+      ORDER BY c.updated_at DESC`, [user_id]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO chat_conversations (type, title, created_by) VALUES (?, ?, ?);`,
+      [data.type, data.title || null, data.created_by]
+    );
+    return result.id;
+  },
+  async update(id, data) {
+    return run('UPDATE chat_conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [data.title, id]);
+  },
+  async archive(id) {
+    return run('UPDATE chat_conversations SET is_archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM chat_conversations WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
+// CRUD: CHAT PARTICIPANTS
+// ============================================
+const ChatParticipants = {
+  async getAll(conversation_id) {
+    return all('SELECT * FROM chat_participants WHERE conversation_id = ?', [conversation_id]);
+  },
+  async getByConversationAndUser(conversation_id, user_id) {
+    return get('SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?', [conversation_id, user_id]);
+  },
+  async create(conversation_id, user_id, is_admin = 0) {
+    return run('INSERT INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);', [conversation_id, user_id, is_admin]);
+  },
+  async updateLastRead(conversation_id, user_id) {
+    return run('UPDATE chat_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?;', [conversation_id, user_id]);
+  },
+  async delete(conversation_id, user_id) {
+    return run('DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?', [conversation_id, user_id]);
+  }
+};
+
+// ============================================
+// CRUD: CHAT MESSAGES
+// ============================================
+const ChatMessages = {
+  async getByConversation(conversation_id, limit = 50, offset = 0) {
+    return all(`SELECT * FROM chat_messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?`, [conversation_id, limit, offset]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM chat_messages WHERE id = ?', [id]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO chat_messages (conversation_id, sender_id, content, type, file_url, context_type, context_id, reply_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.conversation_id, data.sender_id, data.content, data.type || 'text', data.file_url || null, data.context_type || null, data.context_id || null, data.reply_to || null]
+    );
+    return result.id;
+  },
+  async markDeleted(id) {
+    return run('UPDATE chat_messages SET is_deleted = 1 WHERE id = ?', [id]);
+  },
+  async getUnreadCount(conversation_id, user_id) {
+    const row = await get(`SELECT COUNT(*) as count FROM chat_messages m
+      LEFT JOIN chat_message_reads r ON m.id = r.message_id AND r.user_id = ?
+      WHERE m.conversation_id = ? AND m.sender_id != ? AND r.id IS NULL AND m.is_deleted = 0`, [user_id, conversation_id, user_id]);
+    return row ? row.count : 0;
+  }
+};
+
+// ============================================
+// CRUD: CHAT MESSAGE READS
+// ============================================
+const ChatMessageReads = {
+  async create(message_id, user_id) {
+    return run('INSERT OR IGNORE INTO chat_message_reads (message_id, user_id) VALUES (?, ?);', [message_id, user_id]);
+  },
+  async getByMessage(message_id) {
+    return all('SELECT user_id, read_at FROM chat_message_reads WHERE message_id = ?', [message_id]);
+  }
+};
+
+// ============================================
+// CRUD: CHAT ATTACHMENTS
+// ============================================
+const ChatAttachments = {
+  async create(data) {
+    const result = await run(
+      `INSERT INTO chat_attachments (message_id, filename, stored_name, mime_type, size) VALUES (?, ?, ?, ?, ?);`,
+      [data.message_id, data.filename, data.stored_name, data.mime_type || null, data.size || 0]
+    );
+    return result.id;
+  },
+  async getByMessage(message_id) {
+    return all('SELECT * FROM chat_attachments WHERE message_id = ?', [message_id]);
   }
 };
 
@@ -1886,6 +2057,13 @@ module.exports = {
   AIUnansweredQuestions,
   AIChatLogs,
   AIFeedback,
+
+  // Chat
+  ChatConversations,
+  ChatParticipants,
+  ChatMessages,
+  ChatMessageReads,
+  ChatAttachments,
 
   // Migration
   migrateAll

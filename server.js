@@ -232,6 +232,19 @@ function initWebSocket(server) {
         
         ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر' }));
         
+        ws.on('message', function(raw) {
+            try {
+                var msg = JSON.parse(raw);
+                if (msg.type === 'chat_typing') {
+                    broadcast({ type: 'chat_typing', conversationId: msg.conversationId, user: msg.user });
+                }
+                if (msg.type === 'chat_subscribe') {
+                    ws.chatConversations = ws.chatConversations || [];
+                    ws.chatConversations.push(msg.conversationId);
+                }
+            } catch(e) {}
+        });
+        
         ws.on('close', function() {
             console.log('🔴 WebSocket client disconnected');
             clients = clients.filter(function(c) { return c !== ws; });
@@ -511,6 +524,7 @@ async function ensureDataDir() {
         // مجلد رفع الملفات على Render Disk
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads'), { recursive: true });
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'chat'), { recursive: true });
         await initDefaultUsers();
         // Restore currentShiftId from shifts list on startup
         try {
@@ -860,6 +874,17 @@ function handleMulterError(err, req, res, next) {
     }
     next();
 }
+
+// ============================================
+// Chat Upload Multer
+// ============================================
+const uploadChat = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        cb(null, true);
+    }
+});
 
 // ============================================
 // بيانات قطاع الجنوب
@@ -7024,6 +7049,402 @@ app.use((req, res) => {
 if (aiMonitor) {
     app.use(aiMonitor.errorTrackingMiddleware());
 }
+
+// ============================================
+// API: CHAT MODULE
+// ============================================
+
+// Helper: broadcast to conversation subscribers
+function broadcastToConversation(conversationId, data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            if (client.chatConversations && client.chatConversations.includes(conversationId)) {
+                try {
+                    client.send(message);
+                } catch (e) {
+                    console.error('Broadcast to conversation error:', e.message);
+                }
+            }
+        }
+    });
+}
+
+// 1. GET /api/chat/conversations
+app.get('/api/chat/conversations', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const userId = req.user.id;
+        const conversations = await db.all(
+            `SELECT c.* FROM chat_conversations c
+             JOIN chat_participants p ON c.id = p.conversation_id
+             WHERE p.user_id = ? AND c.is_archived = 0
+             ORDER BY c.updated_at DESC`,
+            [userId]
+        );
+        const result = [];
+        for (const conv of conversations) {
+            // unread count
+            const unreadRow = await db.get(
+                `SELECT COUNT(*) as count FROM chat_messages m
+                 LEFT JOIN chat_message_reads r ON m.id = r.message_id AND r.user_id = ?
+                 WHERE m.conversation_id = ? AND m.sender_id != ? AND r.id IS NULL AND m.is_deleted = 0`,
+                [userId, conv.id, userId]
+            );
+            // last message
+            const lastMsg = await db.get(
+                `SELECT m.*, u.name as sender_name FROM chat_messages m
+                 LEFT JOIN users u ON m.sender_id = u.user_id
+                 WHERE m.conversation_id = ? AND m.is_deleted = 0
+                 ORDER BY m.created_at DESC LIMIT 1`,
+                [conv.id]
+            );
+            // participants
+            const participants = await db.all(
+                `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+                 LEFT JOIN users u ON p.user_id = u.user_id
+                 WHERE p.conversation_id = ?`,
+                [conv.id]
+            );
+            result.push({
+                ...conv,
+                unread_count: unreadRow ? unreadRow.count : 0,
+                last_message: lastMsg || null,
+                participants: participants || []
+            });
+        }
+        res.json({ success: true, conversations: result });
+    } catch (err) {
+        console.error('Chat conversations error:', err);
+        res.status(500).json({ error: 'فشل في جلب المحادثات' });
+    }
+});
+
+// 2. POST /api/chat/conversations — create group
+app.post('/api/chat/conversations', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const { title, participant_ids } = req.body;
+        if (!title || typeof title !== 'string' || title.trim() === '') {
+            return res.status(400).json({ error: 'عنوان المجموعة مطلوب' });
+        }
+        if (!Array.isArray(participant_ids) || participant_ids.length < 1) {
+            return res.status(400).json({ error: 'يجب إضافة مشارك واحد على الأقل' });
+        }
+        const convId = await db.run(
+            `INSERT INTO chat_conversations (type, title, created_by) VALUES (?, ?, ?);`,
+            ['group', title.trim(), req.user.id]
+        );
+        // Add creator as admin
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);`,
+            [convId.id, req.user.id, 1]
+        );
+        // Add participants
+        for (const pid of participant_ids) {
+            if (pid !== req.user.id) {
+                await db.run(
+                    `INSERT OR IGNORE INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);`,
+                    [convId.id, pid, 0]
+                );
+            }
+        }
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId.id]);
+        res.json({ success: true, conversation });
+    } catch (err) {
+        console.error('Create group chat error:', err);
+        res.status(500).json({ error: 'فشل في إنشاء المجموعة' });
+    }
+});
+
+// 3. POST /api/chat/conversations/private — start or find private chat
+app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const { user_id } = req.body;
+        if (!user_id) {
+            return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+        }
+        const currentUserId = req.user.id;
+        // Check if private conversation already exists
+        const existing = await db.get(
+            `SELECT c.* FROM chat_conversations c
+             JOIN chat_participants p1 ON c.id = p1.conversation_id
+             JOIN chat_participants p2 ON c.id = p2.conversation_id
+             WHERE c.type = 'private' AND p1.user_id = ? AND p2.user_id = ?`,
+            [currentUserId, user_id]
+        );
+        if (existing) {
+            const participants = await db.all(
+                `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+                 LEFT JOIN users u ON p.user_id = u.user_id
+                 WHERE p.conversation_id = ?`,
+                [existing.id]
+            );
+            return res.json({ success: true, conversation: { ...existing, participants } });
+        }
+        // Create new private conversation
+        const convResult = await db.run(
+            `INSERT INTO chat_conversations (type, created_by) VALUES (?, ?);`,
+            ['private', currentUserId]
+        );
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
+            [convResult.id, currentUserId]
+        );
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
+            [convResult.id, user_id]
+        );
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convResult.id]);
+        const participants = await db.all(
+            `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+             LEFT JOIN users u ON p.user_id = u.user_id
+             WHERE p.conversation_id = ?`,
+            [convResult.id]
+        );
+        res.json({ success: true, conversation: { ...conversation, participants } });
+    } catch (err) {
+        console.error('Private chat error:', err);
+        res.status(500).json({ error: 'فشل في إنشاء المحادثة الخاصة' });
+    }
+});
+
+// 4. GET /api/chat/conversations/:id/messages
+app.get('/api/chat/conversations/:id/messages', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = (page - 1) * limit;
+        const userId = req.user.id;
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية الوصول لهذه المحادثة' });
+        }
+        const messages = await db.all(
+            `SELECT m.*, u.name as sender_name FROM chat_messages m
+             LEFT JOIN users u ON m.sender_id = u.user_id
+             WHERE m.conversation_id = ? AND m.is_deleted = 0
+             ORDER BY m.created_at DESC LIMIT ? OFFSET ?`,
+            [convId, limit, offset]
+        );
+        // Add read_by for each message
+        for (const msg of messages) {
+            const reads = await db.all(
+                'SELECT user_id, read_at FROM chat_message_reads WHERE message_id = ?',
+                [msg.id]
+            );
+            msg.read_by = reads || [];
+        }
+        res.json({ success: true, messages, page, limit });
+    } catch (err) {
+        console.error('Get messages error:', err);
+        res.status(500).json({ error: 'فشل في جلب الرسائل' });
+    }
+});
+
+// 5. POST /api/chat/conversations/:id/messages
+app.post('/api/chat/conversations/:id/messages', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const { content, type, file_url, context_type, context_id, reply_to } = req.body;
+        const msgType = type || 'text';
+        if (!content && msgType !== 'file') {
+            return res.status(400).json({ error: 'محتوى الرسالة مطلوب' });
+        }
+        const userId = req.user.id;
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية الإرسال لهذه المحادثة' });
+        }
+        const result = await db.run(
+            `INSERT INTO chat_messages (conversation_id, sender_id, content, type, file_url, context_type, context_id, reply_to)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+            [convId, userId, content || '', msgType, file_url || null, context_type || null, context_id || null, reply_to || null]
+        );
+        await db.run(
+            'UPDATE chat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?;',
+            [convId]
+        );
+        const message = await db.get(
+            `SELECT m.*, u.name as sender_name FROM chat_messages m
+             LEFT JOIN users u ON m.sender_id = u.user_id
+             WHERE m.id = ?`,
+            [result.id]
+        );
+        message.read_by = [];
+        // Broadcast to conversation subscribers
+        broadcastToConversation(convId, { type: 'chat_message', message });
+        res.json({ success: true, message });
+    } catch (err) {
+        console.error('Send message error:', err);
+        res.status(500).json({ error: 'فشل في إرسال الرسالة' });
+    }
+});
+
+// 6. PUT /api/chat/messages/:id/read
+app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const messageId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const message = await db.get('SELECT * FROM chat_messages WHERE id = ?', [messageId]);
+        if (!message) {
+            return res.status(404).json({ error: 'الرسالة غير موجودة' });
+        }
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [message.conversation_id, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية' });
+        }
+        await db.run(
+            'INSERT OR IGNORE INTO chat_message_reads (message_id, user_id) VALUES (?, ?);',
+            [messageId, userId]
+        );
+        await db.run(
+            'UPDATE chat_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?;',
+            [message.conversation_id, userId]
+        );
+        res.json({ success: true, message: 'تم الت标记 كمقروء' });
+    } catch (err) {
+        console.error('Mark read error:', err);
+        res.status(500).json({ error: 'فشل في تحديث حالة القراءة' });
+    }
+});
+
+// 7. GET /api/chat/users
+app.get('/api/chat/users', authenticate, async (req, res) => {
+    try {
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const activeUsers = users.filter(u => u.isActive).map(u => ({ id: u.id, username: u.username, name: u.name, role: u.role }));
+        res.json({ success: true, users: activeUsers });
+    } catch (err) {
+        console.error('Chat users error:', err);
+        res.status(500).json({ error: 'فشل في جلب المستخدمين' });
+    }
+});
+
+// 8. DELETE /api/chat/conversations/:id — archive group (admin only)
+app.delete('/api/chat/conversations/:id', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (conversation.type !== 'group') {
+            return res.status(400).json({ error: 'يمكن أرشفة المجموعات فقط' });
+        }
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه أرشفة المجموعة' });
+        }
+        await db.run('UPDATE chat_conversations SET is_archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [convId]);
+        res.json({ success: true, message: 'تم أرشفة المحادثة' });
+    } catch (err) {
+        console.error('Archive conversation error:', err);
+        res.status(500).json({ error: 'فشل في أرشفة المحادثة' });
+    }
+});
+
+// 9. POST /api/chat/conversations/:id/participants — add participant (admin only)
+app.post('/api/chat/conversations/:id/participants', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const { user_id } = req.body;
+        if (!user_id) {
+            return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+        }
+        const userId = req.user.id;
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه إضافة مشاركين' });
+        }
+        await db.run(
+            'INSERT OR IGNORE INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);',
+            [convId, user_id, 0]
+        );
+        res.json({ success: true, message: 'تم إضافة المشارك' });
+    } catch (err) {
+        console.error('Add participant error:', err);
+        res.status(500).json({ error: 'فشل في إضافة المشارك' });
+    }
+});
+
+// 10. DELETE /api/chat/conversations/:id/participants/:user_id — remove participant (admin only, cannot remove creator)
+app.delete('/api/chat/conversations/:id/participants/:user_id', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const targetUserId = req.params.user_id;
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (targetUserId === conversation.created_by) {
+            return res.status(403).json({ error: 'لا يمكن إزالة منشئ المحادثة' });
+        }
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه إزالة مشاركين' });
+        }
+        await db.run(
+            'DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?;',
+            [convId, targetUserId]
+        );
+        res.json({ success: true, message: 'تم إزالة المشارك' });
+    } catch (err) {
+        console.error('Remove participant error:', err);
+        res.status(500).json({ error: 'فشل في إزالة المشارك' });
+    }
+});
+
+// 11. POST /api/chat/upload — file upload for chat
+app.post('/api/chat/upload', authenticate, uploadChat.single('file'), handleMulterError, async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'لم يتم رفع أي ملف' });
+        }
+        const originalName = req.file.originalname;
+        const ext = path.extname(originalName);
+        const storedName = 'chat-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10) + ext;
+        const destDir = path.join(STORAGE_PATH, 'uploads', 'chat');
+        const destPath = path.join(destDir, storedName);
+        await fs.rename(req.file.path, destPath);
+        const fileUrl = '/uploads/chat/' + storedName;
+        res.json({ success: true, fileUrl, filename: originalName, storedName, size: req.file.size });
+    } catch (err) {
+        console.error('Chat upload error:', err);
+        res.status(500).json({ error: 'فشل في رفع الملف' });
+    }
+});
 
 // Global error handler
 app.use((err, req, res, next) => {
