@@ -300,6 +300,35 @@ var rapidTeams = [
     { name: 'rapid_5', displayName: 'تدخل سريع 5' }
 ];
 
+// ============================================
+// TEAM → CENTER MAPPING (for Coverage & Archive)
+// ============================================
+var TEAM_CENTER_MAP = {
+    'rapid_1': 'المنصورة',
+    'rapid_2': 'الشفاء',
+    'rapid_3': 'المنصورة',
+    'جنوب 1': 'المنصورة',
+    'جنوب 2': 'الخالدية',
+    'جنوب 3': 'منفوحة',
+    'جنوب 4': 'الدار البيضاء',
+    'جنوب 5': 'الدار البيضاء',
+    'جنوب 6': 'الإسكان',
+    'جنوب 7': 'الحائر',
+    'جنوب 8': 'الشفاء',
+    'جنوب 9': 'عكاظ',
+    'جنوب 10': 'ديراب',
+    'جنوب 11': 'المنصورة',
+    'جنوب 12': 'المنصورة',
+    'جنوب 13': 'المنصورة',
+    'جنوب 14': 'المنصورة',
+    'جنوب 15': 'المنصورة',
+    'جنوب 16': 'المنصورة'
+};
+
+function getTeamCenter(teamId) {
+    return TEAM_CENTER_MAP[teamId] || 'غير محدد';
+}
+
 // teamStatus: { teamId: { status, reason, missingPerson, paramedics[] } }
 var teamStatus = {};
 var smartScheduleData = [];
@@ -747,11 +776,15 @@ function renderCard(name, teamId, type, status) {
         reasonsHtml += '<div class="reason-row">' + rowHtml + '</div>';
     });
 
+    var centerName = getTeamCenter(teamId);
+    var centerHtml = centerName !== 'غير محدد' ? '<div style="font-size:0.65rem; color:var(--muted); margin-top:2px;"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
+    
     return '<div class="team-card status-' + status.status + '" onclick="cycleStatus(\'' + teamId + '\')">' +
         '<div class="card-header">' +
             '<span class="card-type ' + type + '">' + (type === 'rapid' ? '⚡ سريع' : '🏥 مركز') + '</span>' +
         '</div>' +
         '<div class="card-name">' + name + '</div>' +
+        centerHtml +
         '<div class="card-status">' + STATUS_LABELS[status.status] + '</div>' +
         '<div class="paramedics">' + paramedicsHtml + '</div>' +
         '<div class="reason-bar">' + reasonsHtml + '</div>' +
@@ -853,15 +886,15 @@ function finishShift() {
     var content = document.getElementById('summaryContent');
 
     var html = '<table class="summary-table">' +
-        '<tr><th>الفرقة</th><th>الحالة</th><th>السبب</th><th>الكادر</th></tr>';
+        '<tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>السبب</th><th>الكادر</th></tr>';
 
     rapidTeams.forEach(function(t) {
         var s = teamStatus[t.name] || {};
-        html += summaryRow(t.displayName, s);
+        html += summaryRow(t.displayName, t.name, s);
     });
     centerList.forEach(function(c) {
         var s = teamStatus[c] || {};
-        html += summaryRow(c, s);
+        html += summaryRow(c, c, s);
     });
 
     html += '</table>';
@@ -896,10 +929,11 @@ function finishShift() {
     modal.classList.add('active');
 }
 
-function summaryRow(name, s) {
+function summaryRow(name, teamId, s) {
     var statusClass = 'badge-' + (s.status || 'pending');
     var statusText = STATUS_LABELS[s.status] || s.status;
     var paramedics = (s.paramedics || []).filter(function(n) { return n; }).join('، ') || '-';
+    var centerName = getTeamCenter(teamId);
 
     var reasonText = s.reason || '-';
     if (s.missingPerson) {
@@ -908,6 +942,7 @@ function summaryRow(name, s) {
 
     return '<tr>' +
         '<td>' + name + '</td>' +
+        '<td><small style="color:var(--muted);"><i class="fas fa-hospital"></i> ' + centerName + '</small></td>' +
         '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>' +
         '<td>' + reasonText + '</td>' +
         '<td>' + paramedics + '</td>' +
@@ -923,10 +958,17 @@ function saveToServer() {
     }
     
     var shiftId = getCurrentShiftId();
+    // Enrich teamStatus with center names before saving
+    var enrichedTeams = {};
+    Object.keys(teamStatus).forEach(function(teamId) {
+        enrichedTeams[teamId] = Object.assign({}, teamStatus[teamId]);
+        enrichedTeams[teamId].centerName = getTeamCenter(teamId);
+    });
+    
     var payload = {
         shiftType: getShiftType(),
         shiftDate: getShiftDate(),
-        teams: teamStatus,
+        teams: enrichedTeams,
         notes: document.getElementById('globalNotes').value.trim(),
         timestamp: new Date().toISOString()
     };
