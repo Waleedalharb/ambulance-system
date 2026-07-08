@@ -242,6 +242,10 @@ function initWebSocket(server) {
                     ws.chatConversations = ws.chatConversations || [];
                     ws.chatConversations.push(msg.conversationId);
                 }
+                if (msg.type === 'chat_presence') {
+                    // Broadcast presence to all connected clients
+                    broadcast({ type: 'chat_presence', userId: msg.userId, name: msg.name });
+                }
             } catch(e) {}
         });
         
@@ -7061,6 +7065,22 @@ function broadcastToConversation(conversationId, data) {
     });
 }
 
+// Helper: broadcast to ALL connected clients
+function broadcastToAll(data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(message);
+            } catch (e) {
+                console.error('Broadcast to all error:', e.message);
+            }
+        }
+    });
+}
+
+
+
 // 1. GET /api/chat/conversations
 app.get('/api/chat/conversations', authenticate, async (req, res) => {
     try {
@@ -7329,6 +7349,9 @@ app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
             'UPDATE chat_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?;',
             [message.conversation_id, userId]
         );
+        // Broadcast read receipt to conversation participants
+        broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId });
+        // Broadcast read receipt to conversation participants
         res.json({ success: true, message: 'تم الت标记 كمقروء' });
     } catch (err) {
         console.error('Mark read error:', err);
