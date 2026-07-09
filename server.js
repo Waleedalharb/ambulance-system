@@ -274,6 +274,15 @@ function initWebSocket(server) {
 
         ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر', user: ws.user }));
 
+        // Keep-Alive: send ping every 25 seconds to prevent Render timeout
+        var pingInterval = setInterval(function() {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            }
+        }, 25000);
+
+        ws.on('message', function(raw) {
+
         ws.on('message', function(raw) {
             try {
                 var msg = JSON.parse(raw);
@@ -325,6 +334,21 @@ function initWebSocket(server) {
         });
 
         ws.on('close', function() {
+            console.log('🔴 WebSocket client disconnected:', ws.user ? ws.user.name : 'unknown');
+            clearInterval(pingInterval);
+            // Remove from online users
+            if (ws.user && ws.user.id) {
+                onlineUsers.delete(ws.user.id);
+                // Broadcast user_offline to all connected clients
+                broadcast({
+                    type: 'user_offline',
+                    userId: ws.user.id,
+                    name: ws.user.name,
+                    onlineUsers: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
+                });
+            }
+            clients = clients.filter(function(c) { return c !== ws; });
+        });
             console.log('🔴 WebSocket client disconnected:', ws.user ? ws.user.name : 'unknown');
             // Remove from online users
             if (ws.user && ws.user.id) {
