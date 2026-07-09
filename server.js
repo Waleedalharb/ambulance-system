@@ -49,7 +49,7 @@ const aiMonitor = require('./ai-monitor');
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads && db.ShiftAuditLog && db.NotificationLog && db.ShiftRosterDrafts && db.ShiftChangeRequests;
 }
 
 // Helper: safe DB response
@@ -91,6 +91,17 @@ async function resolveShiftId(req, shiftDate, shiftType) {
     }
     
     return null;
+}
+
+// Helper: add entry to shift_audit_log
+async function addShiftAuditLog(data) {
+    if (!dbAvailable() || !db.ShiftAuditLog) return null;
+    try {
+        return await db.ShiftAuditLog.create(data);
+    } catch (e) {
+        console.error('addShiftAuditLog error:', e.message);
+        return null;
+    }
 }
 
 // ============================================
@@ -5762,7 +5773,16 @@ app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
     year: { required: true, type: 'number' }
 }), async (req, res) => {
     try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const id = await db.ShiftRoster.create(req.body);
+        await addShiftAuditLog({
+            roster_id: id, employee_id: req.body.employee_id, team_id: req.body.team_id || null,
+            shift_date: req.body.shift_date, old_shift_code: null, new_shift_code: req.body.shift_code,
+            old_team_id: null, new_team_id: req.body.team_id || null,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'add', reason: 'إضافة سجل مناوبة جديد'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: id, change_type: 'add' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true, id });
     } catch (error) {
         console.error('ShiftRoster POST error:', error);
@@ -5772,8 +5792,18 @@ app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
 
 app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
     try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const existing = await db.ShiftRoster.getById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
         const result = await db.ShiftRoster.update(req.params.id, req.body);
-        if (!result) return res.status(404).json({ error: 'السجل غير موجود' });
+        await addShiftAuditLog({
+            roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
+            shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: req.body.shift_code || existing.shift_code,
+            old_team_id: existing.team_id, new_team_id: req.body.team_id || existing.team_id,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'edit', reason: 'تحديث سجل المناوبة'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'edit' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true });
     } catch (error) {
         console.error('ShiftRoster PUT error:', error);
@@ -5783,7 +5813,18 @@ app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req,
 
 app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
     try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const existing = await db.ShiftRoster.getById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
         await db.ShiftRoster.delete(req.params.id);
+        await addShiftAuditLog({
+            roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
+            shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: null,
+            old_team_id: existing.team_id, new_team_id: null,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'delete', reason: 'حذف سجل المناوبة'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'delete' }], by_user: req.user.name || req.user.username } });
         res.json({ success: true });
     } catch (error) {
         console.error('ShiftRoster DELETE error:', error);
@@ -5921,6 +5962,510 @@ app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (r
     } catch (error) {
         console.error('ShiftRoster clear error:', error);
         res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Audit Log
+// ============================================
+app.get('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { employee_id, date_from, date_to, limit = 50 } = req.query;
+        let entries;
+        if (employee_id) {
+            entries = await db.ShiftAuditLog.getByEmployee(parseInt(employee_id), parseInt(limit));
+        } else if (date_from && date_to) {
+            entries = await db.ShiftAuditLog.getByDateRange(date_from, date_to, parseInt(limit));
+        } else {
+            entries = await db.ShiftAuditLog.getAll(parseInt(limit));
+        }
+        res.json({ success: true, entries });
+    } catch (error) {
+        console.error('AuditLog GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+app.post('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, change_type, reason } = req.body;
+        if (!shift_date) {
+            return res.status(400).json({ error: 'تاريخ المناوبة مطلوب' });
+        }
+        const id = await addShiftAuditLog({
+            roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code,
+            old_team_id, new_team_id, changed_by: req.user.username || req.user.name,
+            changed_by_name: req.user.name, change_type: change_type || 'edit', reason
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('AuditLog POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل التدقيق' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Bulk Update
+// ============================================
+app.post('/api/shift-roster/bulk-update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { changes } = req.body;
+        if (!Array.isArray(changes) || changes.length === 0) {
+            return res.status(400).json({ error: 'قائمة التغييرات مطلوبة' });
+        }
+        const updated = [];
+        const conflicts = [];
+        const auditRecords = [];
+        await db.beginTransaction();
+        try {
+            for (const change of changes) {
+                const { roster_id, employee_id, team_id, shift_date, shift_code, old_shift_code } = change;
+                if (!roster_id) {
+                    conflicts.push({ type: 'missing_id', message: 'معرف السجل مفقود', change });
+                    continue;
+                }
+                const existing = await db.ShiftRoster.getById(roster_id);
+                if (!existing) {
+                    conflicts.push({ type: 'not_found', message: 'السجل غير موجود', roster_id });
+                    continue;
+                }
+                await db.ShiftRoster.update(roster_id, {
+                    employee_id: employee_id !== undefined ? employee_id : existing.employee_id,
+                    team_id: team_id !== undefined ? team_id : existing.team_id,
+                    shift_date: shift_date || existing.shift_date,
+                    shift_code: shift_code || existing.shift_code,
+                    month: existing.month,
+                    year: existing.year
+                });
+                const auditId = await addShiftAuditLog({
+                    roster_id, employee_id: employee_id || existing.employee_id,
+                    team_id: team_id || existing.team_id, shift_date: shift_date || existing.shift_date,
+                    old_shift_code: old_shift_code || existing.shift_code,
+                    new_shift_code: shift_code || existing.shift_code,
+                    old_team_id: existing.team_id, new_team_id: team_id || existing.team_id,
+                    changed_by: req.user.username || req.user.name,
+                    changed_by_name: req.user.name,
+                    change_type: 'bulk', reason: 'تحديث جماعي'
+                });
+                updated.push({ roster_id, auditId });
+                auditRecords.push({ roster_id, auditId });
+            }
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        broadcast({
+            type: 'shift_roster_updated',
+            payload: { type: 'bulk', changes: updated, by_user: req.user.name || req.user.username }
+        });
+        res.json({ success: true, updated: updated.length, conflicts, audit_log: auditRecords });
+    } catch (error) {
+        console.error('BulkUpdate error:', error);
+        res.status(500).json({ error: 'فشل في التحديث الجماعي' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Swap
+// ============================================
+app.post('/api/shift-roster/swap', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id_1, roster_id_2, employee_id_1, employee_id_2, shift_date } = req.body;
+        if (!roster_id_1 || !roster_id_2) {
+            return res.status(400).json({ error: 'معرفا السجلان مطلوبان' });
+        }
+        const entry1 = await db.ShiftRoster.getById(roster_id_1);
+        const entry2 = await db.ShiftRoster.getById(roster_id_2);
+        if (!entry1 || !entry2) {
+            return res.status(404).json({ error: 'أحد السجلات غير موجود' });
+        }
+        await db.beginTransaction();
+        try {
+            await db.ShiftRoster.update(roster_id_1, {
+                employee_id: employee_id_2 || entry2.employee_id,
+                team_id: entry1.team_id,
+                shift_date: entry1.shift_date,
+                shift_code: entry1.shift_code,
+                month: entry1.month,
+                year: entry1.year
+            });
+            await db.ShiftRoster.update(roster_id_2, {
+                employee_id: employee_id_1 || entry1.employee_id,
+                team_id: entry2.team_id,
+                shift_date: entry2.shift_date,
+                shift_code: entry2.shift_code,
+                month: entry2.month,
+                year: entry2.year
+            });
+            await addShiftAuditLog({
+                roster_id: roster_id_1, employee_id: entry1.employee_id, team_id: entry1.team_id,
+                shift_date: entry1.shift_date, old_shift_code: entry1.shift_code, new_shift_code: entry2.shift_code,
+                old_team_id: entry1.team_id, new_team_id: entry2.team_id,
+                changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_2
+            });
+            await addShiftAuditLog({
+                roster_id: roster_id_2, employee_id: entry2.employee_id, team_id: entry2.team_id,
+                shift_date: entry2.shift_date, old_shift_code: entry2.shift_code, new_shift_code: entry1.shift_code,
+                old_team_id: entry2.team_id, new_team_id: entry1.team_id,
+                changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_1
+            });
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        broadcast({
+            type: 'shift_roster_swapped',
+            payload: { roster_id_1, roster_id_2, by_user: req.user.name || req.user.username }
+        });
+        res.json({ success: true, swapped: [{ roster_id: roster_id_1, old_employee_id: entry1.employee_id, new_employee_id: entry2.employee_id }, { roster_id: roster_id_2, old_employee_id: entry2.employee_id, new_employee_id: entry1.employee_id }] });
+    } catch (error) {
+        console.error('Swap error:', error);
+        res.status(500).json({ error: 'فشل في تبديل المناوبات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Validate
+// ============================================
+app.post('/api/shift-roster/validate', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { changes } = req.body;
+        if (!Array.isArray(changes)) {
+            return res.status(400).json({ error: 'قائمة التغييرات مطلوبة' });
+        }
+        const conflicts = [];
+        const shiftCodes = await db.ShiftCodes.getAll();
+        const validCodes = new Set(shiftCodes.map(sc => sc.code));
+        for (const change of changes) {
+            const { employee_id, shift_date, shift_code, team_id } = change;
+            if (!employee_id || !shift_date || !shift_code) {
+                conflicts.push({ type: 'missing_fields', message: 'بيانات ناقصة', employee_id, shift_date });
+                continue;
+            }
+            if (!validCodes.has(shift_code)) {
+                conflicts.push({ type: 'invalid_code', message: 'رمز المناوبة غير معروف: ' + shift_code, employee_id, shift_date });
+            }
+            const existing = await db.ShiftRoster.getByEmployeeAndDate(employee_id, shift_date);
+            if (existing) {
+                conflicts.push({ type: 'duplicate', message: 'يوجد سجل لهذا الموظف في هذا التاريخ', employee_id, shift_date });
+            }
+            if (team_id) {
+                const team = await db.Teams.getById(team_id);
+                if (!team) {
+                    conflicts.push({ type: 'invalid_team', message: 'الفريق غير موجود', employee_id, shift_date, team_id });
+                }
+            }
+        }
+        res.json({ success: true, valid: conflicts.length === 0, conflicts });
+    } catch (error) {
+        console.error('Validate error:', error);
+        res.status(500).json({ error: 'فشل في التحقق من الصحة' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Drafts (Undo/Redo)
+// ============================================
+app.get('/api/shift-roster/drafts', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { limit = 50 } = req.query;
+        const entries = await db.ShiftRosterDrafts.getByCreatedBy(req.user.username || req.user.name, parseInt(limit));
+        res.json({ success: true, drafts: entries });
+    } catch (error) {
+        console.error('Drafts GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسودات' });
+    }
+});
+
+app.post('/api/shift-roster/draft', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { draft_data_json, operation_type } = req.body;
+        if (!draft_data_json) {
+            return res.status(400).json({ error: 'بيانات المسودة مطلوبة' });
+        }
+        const id = await db.ShiftRosterDrafts.create({
+            draft_data_json: typeof draft_data_json === 'string' ? draft_data_json : JSON.stringify(draft_data_json),
+            operation_type: operation_type || 'edit',
+            created_by: req.user.username || req.user.name,
+            created_by_name: req.user.name
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Draft POST error:', error);
+        res.status(500).json({ error: 'فشل في حفظ المسودة' });
+    }
+});
+
+app.post('/api/shift-roster/undo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const drafts = await db.ShiftRosterDrafts.getPendingByCreatedBy(req.user.username || req.user.name);
+        if (!drafts || drafts.length === 0) {
+            return res.status(404).json({ error: 'لا توجد مسودات للتراجع' });
+        }
+        const lastDraft = drafts[0];
+        await db.ShiftRosterDrafts.markReverted(lastDraft.id);
+        res.json({ success: true, draft: lastDraft, message: 'تم التراجع عن آخر تغيير' });
+    } catch (error) {
+        console.error('Undo error:', error);
+        res.status(500).json({ error: 'فشل في التراجع' });
+    }
+});
+
+app.post('/api/shift-roster/redo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const allDrafts = await db.ShiftRosterDrafts.getByCreatedBy(req.user.username || req.user.name, 100);
+        const revertedDraft = allDrafts.find(d => d.reverted_at !== null && d.applied_at !== null);
+        if (!revertedDraft) {
+            return res.status(404).json({ error: 'لا يوجد تغيير لإعادة تطبيقه' });
+        }
+        res.json({ success: true, draft: revertedDraft, message: 'تم إعادة تطبيق المسودة' });
+    } catch (error) {
+        console.error('Redo error:', error);
+        res.status(500).json({ error: 'فشل في إعادة التطبيق' });
+    }
+});
+
+// ============================================
+// API: Notifications
+// ============================================
+app.post('/api/notifications/send', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { recipient_id, recipient_phone, message, type, roster_id, shift_date, old_value, new_value } = req.body;
+        if (!recipient_id || !message) {
+            return res.status(400).json({ error: 'معرف المستلم والرسالة مطلوبان' });
+        }
+        const id = await db.NotificationLog.create({
+            notification_type: type || 'shift_change',
+            recipient_id, recipient_phone: recipient_phone || null,
+            message, channel: 'in-app',
+            roster_id: roster_id || null, shift_date: shift_date || null,
+            old_value: old_value || null, new_value: new_value || null
+        });
+        await db.NotificationLog.markAsSent(id);
+        broadcast({
+            type: 'notification_new',
+            payload: { notification_id: id, recipient_id, message }
+        });
+        res.json({ success: true, id, message: 'تم إرسال الإشعار' });
+    } catch (error) {
+        console.error('Notification send error:', error);
+        res.status(500).json({ error: 'فشل في إرسال الإشعار' });
+    }
+});
+
+app.get('/api/notifications/log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { recipient_id, status, limit = 50 } = req.query;
+        let entries;
+        if (recipient_id) {
+            entries = await db.NotificationLog.getByRecipient(parseInt(recipient_id), parseInt(limit));
+        } else if (status) {
+            entries = await db.NotificationLog.getByStatus(status, parseInt(limit));
+        } else {
+            entries = await db.NotificationLog.getAll(parseInt(limit));
+        }
+        res.json({ success: true, notifications: entries });
+    } catch (error) {
+        console.error('Notification log GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل الإشعارات' });
+    }
+});
+
+app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        await db.NotificationLog.markAsRead(req.params.id);
+        res.json({ success: true, message: 'تم تحديد الإشعار كمقروء' });
+    } catch (error) {
+        console.error('Notification read error:', error);
+        res.status(500).json({ error: 'فشل في تحديث حالة الإشعار' });
+    }
+});
+
+app.post('/api/notifications/:id/delivered', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        await db.NotificationLog.markAsDelivered(req.params.id);
+        res.json({ success: true, message: 'تم تحديد الإشعار كمستلم' });
+    } catch (error) {
+        console.error('Notification delivered error:', error);
+        res.status(500).json({ error: 'فشل في تحديث حالة الإشعار' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Export
+// ============================================
+app.post('/api/shift-roster/export', authenticate, async (req, res) => {
+    try {
+        const { format, month, year, filters } = req.body;
+        if (!format || !month || !year) {
+            return res.status(400).json({ error: 'التنسيق والشهر والسنة مطلوبة' });
+        }
+        const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+        let data = roster;
+        if (filters && filters.team_id) {
+            data = data.filter(r => r.team_id === parseInt(filters.team_id));
+        }
+        if (filters && filters.employee_id) {
+            data = data.filter(r => r.employee_id === parseInt(filters.employee_id));
+        }
+        const filename = `shift-roster-${year}-${month}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+        res.json({ success: true, download_url: `/api/download/${filename}`, data, format });
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ error: 'فشل في تصدير البيانات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Stats
+// ============================================
+app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'الشهر والسنة مطلوبة' });
+        }
+        const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+        const shift_code_breakdown = {};
+        const team_coverage = {};
+        let conflicts_count = 0;
+        const seen = {};
+        for (const entry of roster) {
+            shift_code_breakdown[entry.shift_code] = (shift_code_breakdown[entry.shift_code] || 0) + 1;
+            team_coverage[entry.team_name || 'بدون فريق'] = (team_coverage[entry.team_name || 'بدون فريق'] || 0) + 1;
+            const key = `${entry.employee_id}-${entry.shift_date}`;
+            if (seen[key]) conflicts_count++;
+            seen[key] = true;
+        }
+        const employees_count = new Set(roster.map(r => r.employee_id)).size;
+        res.json({
+            success: true,
+            total_shifts: roster.length,
+            employees_count,
+            shift_code_breakdown,
+            team_coverage,
+            conflicts_count
+        });
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Employee Schedule
+// ============================================
+app.get('/api/shift-roster/employee-schedule/:employeeId', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employeeId = parseInt(req.params.employeeId);
+        const { month, year } = req.query;
+        if (req.user.role === 'user' && req.user.id !== employeeId) {
+            return res.status(403).json({ error: 'لا يمكنك عرض جدول موظف آخر' });
+        }
+        let schedule;
+        if (month && year) {
+            const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+            schedule = roster.filter(r => r.employee_id === employeeId);
+        } else {
+            schedule = await db.all('SELECT sr.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_roster sr JOIN employees e ON sr.employee_id = e.id LEFT JOIN teams t ON sr.team_id = t.id WHERE sr.employee_id = ? ORDER BY sr.shift_date DESC', [employeeId]);
+        }
+        const shiftCodes = await db.ShiftCodes.getAll();
+        const codeMap = {};
+        for (const sc of shiftCodes) { codeMap[sc.code] = sc.name; }
+        const result = schedule.map(s => ({
+            date: s.shift_date,
+            shift_code: s.shift_code,
+            shift_name: codeMap[s.shift_code] || s.shift_code,
+            team_name: s.team_name || 'بدون فريق',
+            team_id: s.team_id
+        }));
+        res.json({ success: true, schedule: result });
+    } catch (error) {
+        console.error('EmployeeSchedule error:', error);
+        res.status(500).json({ error: 'فشل في جلب جدول الموظف' });
+    }
+});
+
+// ============================================
+// API: Shift Change Requests
+// ============================================
+app.post('/api/shift-change-request', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, reason } = req.body;
+        if (!employee_id || !shift_date || !proposed_shift_code) {
+            return res.status(400).json({ error: 'معرف الموظف وتاريخ المناوبة والرمز المقترح مطلوبة' });
+        }
+        const id = await db.ShiftChangeRequests.create({
+            roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code,
+            requested_by: req.user.username || req.user.name,
+            requested_by_name: req.user.name,
+            status: 'pending', reason
+        });
+        broadcast({
+            type: 'shift_change_request',
+            payload: { request_id: id, employee_id, status: 'pending' }
+        });
+        res.json({ success: true, id, message: 'تم إرسال طلب التغيير' });
+    } catch (error) {
+        console.error('ShiftChangeRequest error:', error);
+        res.status(500).json({ error: 'فشل في إرسال طلب التغيير' });
+    }
+});
+
+app.get('/api/shift-change-request', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { status, limit = 50 } = req.query;
+        let entries;
+        if (status) {
+            entries = await db.ShiftChangeRequests.getByStatus(status, parseInt(limit));
+        } else {
+            entries = await db.ShiftChangeRequests.getAll(parseInt(limit));
+        }
+        res.json({ success: true, requests: entries });
+    } catch (error) {
+        console.error('ShiftChangeRequest GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات التغيير' });
+    }
+});
+
+app.post('/api/shift-change-request/:id/review', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { status } = req.body;
+        if (!['approved', 'denied', 'cancelled'].includes(status)) {
+            return res.status(400).json({ error: 'حالة غير صالحة' });
+        }
+        await db.ShiftChangeRequests.updateStatus(req.params.id, status, req.user.username || req.user.name);
+        const entry = await db.ShiftChangeRequests.getById(req.params.id);
+        broadcast({
+            type: 'shift_change_request',
+            payload: { request_id: req.params.id, employee_id: entry ? entry.employee_id : null, status }
+        });
+        res.json({ success: true, message: 'تم مراجعة الطلب' });
+    } catch (error) {
+        console.error('ShiftChangeRequest review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة الطلب' });
     }
 });
 
