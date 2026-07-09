@@ -7167,6 +7167,24 @@ app.get('/api/ai/v2/stats', authenticate, authorize(['admin', 'director']), asyn
 // ============================================
 app.use('/api/rag', authenticate, kbApi.router);
 
+// ============================================
+// AI Agent Chat API
+// ============================================
+const { getAgent } = require('./rag/agent-layer');
+app.post('/api/agent/chat', authenticate, async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        
+        const agent = getAgent(req.user.id);
+        const response = await agent.chat(message, req.user);
+        res.json({ success: true, response });
+    } catch (error) {
+        console.error('Agent chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة الرسالة' });
+    }
+});
+
 
 // ============================================
 // API: CHAT MODULE
