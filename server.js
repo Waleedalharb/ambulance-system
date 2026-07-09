@@ -49,7 +49,7 @@ const aiMonitor = require('./ai-monitor');
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads && db.ShiftAuditLog && db.NotificationLog && db.ShiftRosterDrafts && db.ShiftChangeRequests;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads && db.ShiftAuditLog && db.NotificationLog && db.ShiftRosterDrafts && db.ShiftChangeRequests && db.ShiftMetrics && db.ShiftKpiDaily && db.ShiftKpiWeekly && db.ShiftKpiMonthly && db.ShiftTimelineEvents && db.ShiftAlerts && db.ShiftComparisonSnapshots && db.ShiftReportsGenerated && db.ShiftAuditTrail;
 }
 
 // Helper: safe DB response
@@ -100,6 +100,17 @@ async function addShiftAuditLog(data) {
         return await db.ShiftAuditLog.create(data);
     } catch (e) {
         console.error('addShiftAuditLog error:', e.message);
+        return null;
+    }
+}
+
+// Helper: add entry to shift_audit_trail
+async function addShiftAuditTrail(data) {
+    if (!dbAvailable() || !db.ShiftAuditTrail) return null;
+    try {
+        return await db.ShiftAuditTrail.create(data);
+    } catch (e) {
+        console.error('addShiftAuditTrail error:', e.message);
         return null;
     }
 }
@@ -2070,6 +2081,995 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف المناوبة' });
+    }
+});
+
+// ============================================
+// API: Shift Archive & Analytics (New)
+// ============================================
+
+// Helper: calculate metrics for a single shift
+async function calculateShiftMetrics(shiftId, shiftsList) {
+    if (!dbAvailable()) return null;
+    const shift = shiftsList.find(s => s.id === shiftId) || await db.Shifts.getById(shiftId);
+    if (!shift) return null;
+
+    const reports = await db.Reports.getByShift(shiftId);
+    const completions = await db.ShiftCompletions.getByShift(shiftId);
+    const forms = await db.ShiftForms.getByShift(shiftId);
+    const timeline = await db.Timeline.getByShift(shiftId);
+    const audit = await db.AuditLog.getByShift(shiftId);
+    const files = await db.OpsFiles.getByShift(shiftId);
+
+    const totalReports = Array.isArray(reports) ? reports.length : 0;
+    const completedReports = Array.isArray(reports) ? reports.filter(r => r.status === 'completed').length : 0;
+    const pendingReports = Array.isArray(reports) ? reports.filter(r => r.status === 'pending').length : 0;
+    const suspendedReports = Array.isArray(reports) ? reports.filter(r => r.status === 'suspended').length : 0;
+    const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+
+    let staffCount = 0;
+    let teamCount = 0;
+    let vehicleCount = 0;
+    if (Array.isArray(completions) && completions.length > 0) {
+        teamCount = completions.length;
+        completions.forEach(c => {
+            try {
+                const td = JSON.parse(c.teams_data || '{}');
+                if (td.staffCount) staffCount += parseInt(td.staffCount) || 0;
+                if (td.carsCount) vehicleCount += parseInt(td.carsCount) || 0;
+                if (td.vehicles) vehicleCount += parseInt(td.vehicles) || 0;
+            } catch (e) {}
+        });
+    }
+
+    const notesCount = (Array.isArray(completions) ? completions.filter(c => c.notes && c.notes.trim()).length : 0) +
+                       (Array.isArray(timeline) ? timeline.length : 0);
+    const eventCount = Array.isArray(timeline) ? timeline.length : 0;
+    const totalForms = Array.isArray(forms) ? forms.length : 0;
+    const criticalCases = Array.isArray(forms) ? forms.filter(f => {
+        const name = (f.form_name || '').toLowerCase();
+        return name.includes('e-case') || name.includes('critical') || name.includes('حادث') || name.includes('طوارئ');
+    }).length : 0;
+
+    // data_completeness: percentage of fields filled in shift record
+    let filledFields = 0;
+    let totalFields = 0;
+    const shiftFields = ['shiftName', 'shiftDate', 'shiftType', 'shiftDay', 'startTime', 'totalReports', 'rapidLocations', 'centersData', 'vehicleData', 'fuelData', 'generalNotes'];
+    shiftFields.forEach(f => {
+        totalFields++;
+        const val = shift[f] || (shift[f.charAt(0).toLowerCase() + f.slice(1)]);
+        if (val !== undefined && val !== null && val !== '' && JSON.stringify(val) !== '{}') filledFields++;
+    });
+    const dataCompleteness = totalFields > 0 ? (filledFields / totalFields) * 100 : 0;
+
+    const avgResponseTime = 0; // no data source
+    const avgClosureTime = 0; // no data source
+
+    // health_score: weighted average
+    // data_completeness * 0.2 + completion_rate * 0.3 + (1/avg_response_time)*0.2 + notes_count * 0.1 + event_count * 0.2
+    // Adjusted: if avg_response_time is 0, we treat that component as 0
+    const responseComponent = avgResponseTime > 0 ? (1 / avgResponseTime) * 0.2 : 0;
+    const notesComponent = Math.min(notesCount * 2, 20); // cap at 20 points
+    const eventComponent = Math.min(eventCount * 2, 20); // cap at 20 points
+    let healthScore = (dataCompleteness * 0.2) + (completionRate * 0.3) + responseComponent + notesComponent + eventComponent;
+    healthScore = Math.min(100, Math.max(0, healthScore));
+
+    const metrics = {
+        shift_id: shiftId,
+        total_reports: totalReports,
+        completed_reports: completedReports,
+        pending_reports: pendingReports,
+        suspended_reports: suspendedReports,
+        total_completions: Array.isArray(completions) ? completions.length : 0,
+        total_forms: totalForms,
+        staff_count: staffCount,
+        team_count: teamCount,
+        vehicle_count: vehicleCount,
+        completion_rate: parseFloat(completionRate.toFixed(2)),
+        avg_response_time: avgResponseTime,
+        avg_closure_time: avgClosureTime,
+        critical_cases: criticalCases,
+        health_score: parseFloat(healthScore.toFixed(2)),
+        data_completeness: parseFloat(dataCompleteness.toFixed(2)),
+        notes_count: notesCount,
+        event_count: eventCount
+    };
+
+    // Save to SQLite
+    try {
+        const existing = await db.ShiftMetrics.getByShift(shiftId);
+        if (existing) {
+            await db.ShiftMetrics.update(existing.id, metrics);
+        } else {
+            await db.ShiftMetrics.create(metrics);
+        }
+    } catch (e) {
+        console.warn('Failed to save shift metrics:', e.message);
+    }
+
+    return metrics;
+}
+
+// Helper: calculate alerts for a shift
+async function calculateShiftAlerts(shiftId, metrics) {
+    if (!dbAvailable() || !db.ShiftAlerts) return [];
+    const alerts = [];
+    const m = metrics || await calculateShiftMetrics(shiftId, []);
+    if (!m) return alerts;
+
+    if (m.pending_reports > 5) {
+        alerts.push({ shift_id: shiftId, alert_type: 'high_pending', severity: 'warning', message: 'عدد البلاغات المعلقة مرتفع (' + m.pending_reports + ')' });
+    }
+    if (m.completion_rate < 50 && m.total_reports > 0) {
+        alerts.push({ shift_id: shiftId, alert_type: 'low_completion', severity: 'critical', message: 'نسبة الإنجاز منخفضة (' + m.completion_rate.toFixed(1) + '%)' });
+    }
+    if (m.staff_count < 3) {
+        alerts.push({ shift_id: shiftId, alert_type: 'staff_shortage', severity: 'critical', message: 'نقص في الكادر (' + m.staff_count + ')' });
+    }
+    if (m.total_reports > 30) {
+        alerts.push({ shift_id: shiftId, alert_type: 'workload_spike', severity: 'warning', message: 'ارتفاع في حجم البلاغات (' + m.total_reports + ')' });
+    }
+    if (m.avg_closure_time > 120) {
+        alerts.push({ shift_id: shiftId, alert_type: 'closure_delay', severity: 'warning', message: 'تأخر في إغلاق البلاغات' });
+    }
+    if (m.notes_count > 10) {
+        alerts.push({ shift_id: shiftId, alert_type: 'repeated_notes', severity: 'info', message: 'عدد الملاحظات مرتفع (' + m.notes_count + ')' });
+    }
+
+    const saved = [];
+    for (const alert of alerts) {
+        try {
+            const id = await db.ShiftAlerts.create(alert);
+            const savedAlert = { id, ...alert };
+            saved.push(savedAlert);
+            broadcast({
+                type: 'shift_alert_new',
+                alert_id: id,
+                shift_id: shiftId,
+                alert_type: alert.alert_type,
+                severity: alert.severity,
+                message: alert.message
+            });
+        } catch (e) {
+            console.warn('Alert creation error:', e.message);
+        }
+    }
+    return saved;
+}
+
+// GET /api/shifts/:id/detail - comprehensive shift data
+app.get('/api/shifts/:id/detail', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+
+        const result = {
+            shift: shift,
+            reports: shift.savedReports || {},
+            completions: [],
+            forms: [],
+            audit_trail: [],
+            timeline: [],
+            files: [],
+            metrics: null,
+            alerts: [],
+            staff: [],
+            vehicles: []
+        };
+
+        if (dbAvailable()) {
+            try {
+                const dbReports = await db.Reports.getByShift(shiftId);
+                if (Array.isArray(dbReports) && dbReports.length > 0) {
+                    const reportsObj = {};
+                    dbReports.forEach(r => {
+                        if (r.center && r.unit) {
+                            reportsObj[`${r.center}|${r.unit}`] = { count: r.count || 0, times: r.times || [] };
+                        }
+                    });
+                    result.reports = reportsObj;
+                }
+                const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
+                if (Array.isArray(dbCompletions)) result.completions = dbCompletions;
+                const dbForms = await db.ShiftForms.getByShift(shiftId);
+                if (Array.isArray(dbForms)) result.forms = dbForms;
+                const dbAudit = await db.ShiftAuditTrail.getByShift(shiftId, 100);
+                if (Array.isArray(dbAudit)) result.audit_trail = dbAudit;
+                const dbTimeline = await db.ShiftTimelineEvents.getByShift(shiftId, 100);
+                if (Array.isArray(dbTimeline)) result.timeline = dbTimeline;
+                const dbFiles = await db.OpsFiles.getByShift(shiftId);
+                if (Array.isArray(dbFiles)) result.files = dbFiles;
+                const dbMetrics = await db.ShiftMetrics.getByShift(shiftId);
+                if (dbMetrics) result.metrics = dbMetrics;
+                const dbAlerts = await db.ShiftAlerts.getByShift(shiftId, 50);
+                if (Array.isArray(dbAlerts)) result.alerts = dbAlerts;
+
+                // Extract staff/vehicles from completions
+                const staffSet = new Set();
+                const vehicleSet = new Set();
+                dbCompletions.forEach(c => {
+                    try {
+                        const td = JSON.parse(c.teams_data || '{}');
+                        if (td.assignedParamedics) {
+                            td.assignedParamedics.forEach(p => staffSet.add(p.name || p));
+                        }
+                        if (td.cars) {
+                            td.cars.forEach(v => vehicleSet.add(v.plate || v.name || v));
+                        }
+                    } catch (e) {}
+                });
+                result.staff = Array.from(staffSet);
+                result.vehicles = Array.from(vehicleSet);
+            } catch (dbErr) {
+                console.warn('[DB] Failed to load shift detail:', dbErr.message);
+            }
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error('Shift detail error:', error);
+        res.status(500).json({ error: 'فشل في جلب تفاصيل المناوبة' });
+    }
+});
+
+// GET /api/shifts/:id/timeline - timeline events
+app.get('/api/shifts/:id/timeline', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        if (!dbAvailable() || !db.ShiftTimelineEvents) {
+            return res.json({ success: true, events: [] });
+        }
+        const events = await db.ShiftTimelineEvents.getByShift(shiftId, parseInt(req.query.limit) || 50);
+        res.json({ success: true, events: events || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الأحداث الزمنية' });
+    }
+});
+
+// GET /api/shifts/:id/metrics - KPIs for shift
+app.get('/api/shifts/:id/metrics', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        if (!dbAvailable() || !db.ShiftMetrics) {
+            return res.json({ success: true, metrics: null });
+        }
+        let metrics = await db.ShiftMetrics.getByShift(shiftId);
+        if (!metrics) {
+            const shifts = await readShifts();
+            metrics = await calculateShiftMetrics(shiftId, shifts);
+        }
+        res.json({ success: true, metrics });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المؤشرات' });
+    }
+});
+
+// GET /api/shifts/:id/health-score - health score calculation
+app.get('/api/shifts/:id/health-score', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const metrics = await calculateShiftMetrics(shiftId, shifts);
+        if (!metrics) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        const components = {
+            data_completeness: metrics.data_completeness,
+            completion_rate: metrics.completion_rate,
+            notes_count: metrics.notes_count,
+            event_count: metrics.event_count,
+            staff_count: metrics.staff_count,
+            critical_cases: metrics.critical_cases
+        };
+        res.json({ success: true, health_score: metrics.health_score, components });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حساب مؤشر الصحة' });
+    }
+});
+
+// GET /api/shifts/daily-dashboard - daily KPIs
+app.get('/api/shifts/daily-dashboard', authenticate, async (req, res) => {
+    try {
+        const date = req.query.date || new Date().toISOString().split('T')[0];
+        if (!dbAvailable()) {
+            return res.json({ success: true, date, total_shifts: 0, total_reports: 0, completed_reports: 0, open_reports: 0, suspended_reports: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, completion_rate: 0, avg_response_time: 0, avg_closure_time: 0, top_center: null, top_report_type: null });
+        }
+        let kpi = await db.ShiftKpiDaily.getByDate(date);
+        if (!kpi) {
+            // Calculate from shifts
+            const shifts = await readShifts();
+            const dayShifts = shifts.filter(s => s.shiftDate === date);
+            let totalReports = 0, completedReports = 0, openReports = 0, suspendedReports = 0;
+            let totalStaff = 0, totalTeams = 0, totalVehicles = 0;
+            const centerCounts = {};
+            const typeCounts = {};
+            for (const s of dayShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    openReports += m.pending_reports;
+                    suspendedReports += m.suspended_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                if (s.savedReports) {
+                    Object.keys(s.savedReports).forEach(k => {
+                        const [center, unit] = k.split('|');
+                        if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
+                        if (unit) typeCounts[unit] = (typeCounts[unit] || 0) + (s.savedReports[k].count || 0);
+                    });
+                }
+            }
+            const topCenter = Object.entries(centerCounts).sort((a, b) => b[1] - a[1])[0];
+            const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                date,
+                total_shifts: dayShifts.length,
+                total_reports: totalReports,
+                completed_reports: completedReports,
+                open_reports: openReports,
+                suspended_reports: suspendedReports,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                avg_response_time: 0,
+                avg_closure_time: 0,
+                top_center: topCenter ? topCenter[0] : null,
+                top_report_type: topType ? topType[0] : null
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Daily dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات اليومية' });
+    }
+});
+
+// GET /api/shifts/weekly-dashboard - weekly KPIs
+app.get('/api/shifts/weekly-dashboard', authenticate, async (req, res) => {
+    try {
+        const weekStart = req.query.week_start;
+        const weekEnd = req.query.week_end;
+        if (!weekStart || !weekEnd) {
+            return res.status(400).json({ error: 'معايير التاريخ مطلوبة' });
+        }
+        if (!dbAvailable()) {
+            return res.json({ success: true, week_start: weekStart, week_end: weekEnd, total_shifts: 0, total_reports: 0, avg_daily_reports: 0, peak_day: null, peak_day_count: 0, lowest_day: null, lowest_day_count: 0, completion_rate: 0, total_operating_hours: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, avg_staff_per_shift: 0, comparison_last_week: 0 });
+        }
+        let kpi = await db.ShiftKpiWeekly.getByWeekStart(weekStart);
+        if (!kpi) {
+            const shifts = await readShifts();
+            const weekShifts = shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd);
+            let totalReports = 0, totalStaff = 0, totalTeams = 0, totalVehicles = 0, completedReports = 0;
+            const dayCounts = {};
+            for (const s of weekShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                dayCounts[s.shiftDate] = (dayCounts[s.shiftDate] || 0) + (s.totalReports || 0);
+            }
+            const days = Object.entries(dayCounts);
+            const peak = days.sort((a, b) => b[1] - a[1])[0];
+            const lowest = days.sort((a, b) => a[1] - b[1])[0];
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                week_start: weekStart,
+                week_end: weekEnd,
+                total_shifts: weekShifts.length,
+                total_reports: totalReports,
+                avg_daily_reports: weekShifts.length > 0 ? parseFloat((totalReports / weekShifts.length).toFixed(2)) : 0,
+                peak_day: peak ? peak[0] : null,
+                peak_day_count: peak ? peak[1] : 0,
+                lowest_day: lowest ? lowest[0] : null,
+                lowest_day_count: lowest ? lowest[1] : 0,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                total_operating_hours: weekShifts.length * 12,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                avg_staff_per_shift: weekShifts.length > 0 ? parseFloat((totalStaff / weekShifts.length).toFixed(2)) : 0,
+                comparison_last_week: 0
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Weekly dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات الأسبوعية' });
+    }
+});
+
+// GET /api/shifts/monthly-dashboard - monthly KPIs
+app.get('/api/shifts/monthly-dashboard', authenticate, async (req, res) => {
+    try {
+        const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
+        const year = parseInt(req.query.year) || new Date().getFullYear();
+        if (!dbAvailable()) {
+            return res.json({ success: true, month, year, total_shifts: 0, total_reports: 0, total_operating_hours: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, morning_shifts: 0, night_shifts: 0, completion_rate: 0, avg_performance: 0, comparison_last_month: 0, comparison_chart_data: null });
+        }
+        let kpi = await db.ShiftKpiMonthly.getByMonthYear(month, year);
+        if (!kpi) {
+            const shifts = await readShifts();
+            const monthShifts = shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            });
+            let totalReports = 0, totalStaff = 0, totalTeams = 0, totalVehicles = 0, completedReports = 0;
+            let morningShifts = 0, nightShifts = 0;
+            for (const s of monthShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                const st = (s.shiftType || '').toLowerCase();
+                if (st.includes('صباح') || st.includes('morning')) morningShifts++;
+                else if (st.includes('ليل') || st.includes('night')) nightShifts++;
+            }
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                month, year,
+                total_shifts: monthShifts.length,
+                total_reports: totalReports,
+                total_operating_hours: monthShifts.length * 12,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                morning_shifts: morningShifts,
+                night_shifts: nightShifts,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                avg_performance: parseFloat((completionRate * 0.6 + (morningShifts / Math.max(monthShifts.length, 1)) * 40).toFixed(2)),
+                comparison_last_month: 0,
+                comparison_chart_data: null
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Monthly dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات الشهرية' });
+    }
+});
+
+// GET /api/shifts/executive-dashboard - executive summary
+app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const todayShifts = shifts.filter(s => s.shiftDate === today);
+        const weekShifts = shifts.filter(s => s.shiftDate >= weekAgo);
+        const monthShifts = shifts.filter(s => s.shiftDate >= monthAgo);
+
+        const daily = { total_shifts: todayShifts.length, total_reports: 0, completion_rate: 0 };
+        const weekly = { total_shifts: weekShifts.length, total_reports: 0, completion_rate: 0 };
+        const monthly = { total_shifts: monthShifts.length, total_reports: 0, completion_rate: 0 };
+
+        const centerCounts = {};
+        const trends = [];
+
+        for (const s of monthShifts) {
+            const m = await calculateShiftMetrics(s.id, shifts);
+            if (m) {
+                monthly.total_reports += m.total_reports;
+            }
+            if (s.shiftDate >= weekAgo) {
+                weekly.total_reports += s.totalReports || 0;
+            }
+            if (s.shiftDate === today) {
+                daily.total_reports += s.totalReports || 0;
+            }
+            if (s.savedReports) {
+                Object.keys(s.savedReports).forEach(k => {
+                    const [center] = k.split('|');
+                    if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
+                });
+            }
+            trends.push({ date: s.shiftDate, reports: s.totalReports || 0, completion_rate: m ? m.completion_rate : 0 });
+        }
+
+        const topCenters = Object.entries(centerCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+
+        let alerts = [];
+        if (dbAvailable() && db.ShiftAlerts) {
+            alerts = await db.ShiftAlerts.getUnacknowledged(20);
+        }
+
+        const latestShifts = shifts.slice(0, 10);
+
+        res.json({ success: true, daily, weekly, monthly, top_centers: topCenters, trends: trends.slice(-30), alerts: alerts || [], latest_shifts: latestShifts });
+    } catch (error) {
+        console.error('Executive dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات التنفيذية' });
+    }
+});
+
+// GET /api/shifts/archive - paginated archive list with filters
+app.get('/api/shifts/archive', authenticate, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const shiftType = req.query.shift_type;
+        const center = req.query.center;
+        const supervisor = req.query.supervisor;
+        const status = req.query.status;
+        const sort = req.query.sort || 'date_desc';
+
+        let shifts = await readShifts();
+
+        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
+        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
+        if (shiftType) shifts = shifts.filter(s => (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase()));
+        if (center) shifts = shifts.filter(s => s.centersData && Object.keys(s.centersData).some(c => c.includes(center)));
+        if (supervisor) shifts = shifts.filter(s => (s.supervisor || '').includes(supervisor) || (s.shiftName || '').includes(supervisor));
+        if (status) shifts = shifts.filter(s => (s.status || '').toLowerCase() === status.toLowerCase());
+
+        shifts.sort((a, b) => {
+            if (sort === 'date_desc') return new Date(b.shiftDate || 0) - new Date(a.shiftDate || 0);
+            if (sort === 'date_asc') return new Date(a.shiftDate || 0) - new Date(b.shiftDate || 0);
+            if (sort === 'completion_rate') return (b.completionRate || 0) - (a.completionRate || 0);
+            if (sort === 'health_score') return (b.healthScore || 0) - (a.healthScore || 0);
+            return 0;
+        });
+
+        const total = shifts.length;
+        const totalPages = Math.ceil(total / limit);
+        const paginated = shifts.slice((page - 1) * limit, page * limit);
+
+        // Enrich with metrics
+        if (dbAvailable() && db.ShiftMetrics) {
+            for (const s of paginated) {
+                const m = await db.ShiftMetrics.getByShift(s.id);
+                if (m) {
+                    s.metrics = m;
+                }
+            }
+        }
+
+        res.json({ success: true, shifts: paginated, total, page, total_pages: totalPages });
+    } catch (error) {
+        console.error('Archive error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأرشيف' });
+    }
+});
+
+// GET /api/shifts/search - advanced search
+app.get('/api/shifts/search', authenticate, async (req, res) => {
+    try {
+        const q = (req.query.q || '').toLowerCase();
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const shiftType = req.query.shift_type;
+        const center = req.query.center;
+        const supervisor = req.query.supervisor;
+        const employee = req.query.employee;
+        const reportId = req.query.report_id;
+        const reportType = req.query.report_type;
+        const status = req.query.status;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let shifts = await readShifts();
+        let results = [];
+
+        for (const s of shifts) {
+            let match = true;
+            if (q) {
+                const haystack = JSON.stringify(s).toLowerCase();
+                match = haystack.includes(q);
+            }
+            if (match && dateFrom) match = s.shiftDate >= dateFrom;
+            if (match && dateTo) match = s.shiftDate <= dateTo;
+            if (match && shiftType) match = (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase());
+            if (match && center) match = s.centersData && Object.keys(s.centersData).some(c => c.includes(center));
+            if (match && supervisor) match = (s.supervisor || s.shiftName || '').includes(supervisor);
+            if (match && status) match = (s.status || '').toLowerCase() === status.toLowerCase();
+            if (match && employee) {
+                match = s.centersData && Object.values(s.centersData).some(c => {
+                    const ap = c.assignedParamedics || [];
+                    return ap.some(p => (p.name || '').includes(employee));
+                });
+            }
+            if (match && reportId) {
+                match = s.savedReports && Object.keys(s.savedReports).some(k => k.includes(reportId));
+            }
+            if (match && reportType) {
+                match = s.savedReports && Object.keys(s.savedReports).some(k => k.includes(reportType));
+            }
+            if (match) results.push(s);
+        }
+
+        results = results.slice(0, limit);
+
+        // Enrich with metrics
+        if (dbAvailable() && db.ShiftMetrics) {
+            for (const r of results) {
+                const m = await db.ShiftMetrics.getByShift(r.id);
+                if (m) r.metrics = m;
+            }
+        }
+
+        res.json({ success: true, results, total: results.length });
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: 'فشل في البحث' });
+    }
+});
+
+// POST /api/shifts/compare - compare two shifts
+app.post('/api/shifts/compare', authenticate, async (req, res) => {
+    try {
+        const { shift_a_id, shift_b_id } = req.body;
+        if (!shift_a_id || !shift_b_id) {
+            return res.status(400).json({ error: 'معرفات المناوبات مطلوبة' });
+        }
+        const shifts = await readShifts();
+        const shiftA = shifts.find(s => s.id === shift_a_id) || await db.Shifts.getById(shift_a_id);
+        const shiftB = shifts.find(s => s.id === shift_b_id) || await db.Shifts.getById(shift_b_id);
+        if (!shiftA || !shiftB) {
+            return res.status(404).json({ error: 'إحدى المناوبات غير موجودة' });
+        }
+
+        const metricsA = await calculateShiftMetrics(shift_a_id, shifts);
+        const metricsB = await calculateShiftMetrics(shift_b_id, shifts);
+
+        const diff = {};
+        if (metricsA && metricsB) {
+            diff.total_reports = metricsB.total_reports - metricsA.total_reports;
+            diff.completed_reports = metricsB.completed_reports - metricsA.completed_reports;
+            diff.completion_rate = parseFloat((metricsB.completion_rate - metricsA.completion_rate).toFixed(2));
+            diff.staff_count = metricsB.staff_count - metricsA.staff_count;
+            diff.health_score = parseFloat((metricsB.health_score - metricsA.health_score).toFixed(2));
+        }
+
+        const a = { shift: shiftA, metrics: metricsA };
+        const b = { shift: shiftB, metrics: metricsB };
+
+        res.json({ success: true, comparison: { a, b, diff } });
+    } catch (error) {
+        console.error('Compare error:', error);
+        res.status(500).json({ error: 'فشل في المقارنة' });
+    }
+});
+
+// GET /api/shifts/comparison/:id - get saved comparison
+app.get('/api/shifts/comparison/:id', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftComparisonSnapshots) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const comparison = await db.ShiftComparisonSnapshots.getById(req.params.id);
+        if (!comparison) {
+            return res.status(404).json({ error: 'المقارنة غير موجودة' });
+        }
+        res.json({ success: true, comparison });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المقارنة' });
+    }
+});
+
+// GET /api/shifts/alerts - smart alerts
+app.get('/api/shifts/alerts', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAlerts) {
+            return res.json({ success: true, alerts: [] });
+        }
+        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : null;
+        const severity = req.query.severity;
+        const acknowledged = req.query.acknowledged;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let alerts = [];
+        if (shiftId) {
+            alerts = await db.ShiftAlerts.getByShift(shiftId, limit);
+        } else if (severity) {
+            alerts = await db.all('SELECT * FROM shift_alerts WHERE severity = ? ORDER BY created_at DESC LIMIT ?', [severity, limit]);
+        } else if (acknowledged !== undefined) {
+            const ack = acknowledged === '1' || acknowledged === 'true' ? 1 : 0;
+            alerts = await db.all('SELECT * FROM shift_alerts WHERE is_acknowledged = ? ORDER BY created_at DESC LIMIT ?', [ack, limit]);
+        } else {
+            alerts = await db.ShiftAlerts.getAll(limit);
+        }
+        res.json({ success: true, alerts: alerts || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+// POST /api/shifts/alerts/:id/acknowledge - acknowledge alert
+app.post('/api/shifts/alerts/:id/acknowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAlerts) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const alertId = parseInt(req.params.id);
+        const acknowledgedBy = req.body.acknowledged_by || req.user.name;
+        await db.ShiftAlerts.acknowledge(alertId, acknowledgedBy);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تأكيد التنبيه' });
+    }
+});
+
+// POST /api/shifts/alerts/calculate - trigger alert calculation
+app.post('/api/shifts/alerts/calculate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = req.body.shift_id ? parseInt(req.body.shift_id) : null;
+        const shifts = await readShifts();
+        let generated = [];
+        if (shiftId) {
+            const metrics = await calculateShiftMetrics(shiftId, shifts);
+            generated = await calculateShiftAlerts(shiftId, metrics);
+        } else {
+            for (const s of shifts.slice(0, 10)) {
+                const metrics = await calculateShiftMetrics(s.id, shifts);
+                const alerts = await calculateShiftAlerts(s.id, metrics);
+                generated.push(...alerts);
+            }
+        }
+        res.json({ success: true, alerts_generated: generated });
+    } catch (error) {
+        console.error('Alert calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب التنبيهات' });
+    }
+});
+
+// GET /api/shifts/audit-trail - full audit trail
+app.get('/api/shifts/audit-trail', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAuditTrail) {
+            return res.json({ success: true, entries: [], total: 0 });
+        }
+        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : null;
+        const actorId = req.query.actor_id;
+        const actionType = req.query.action_type;
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let where = [];
+        let params = [];
+        if (shiftId) { where.push('shift_id = ?'); params.push(shiftId); }
+        if (actorId) { where.push('actor_id = ?'); params.push(actorId); }
+        if (actionType) { where.push('action_type = ?'); params.push(actionType); }
+        if (dateFrom) { where.push('created_at >= ?'); params.push(dateFrom); }
+        if (dateTo) { where.push('created_at <= ?'); params.push(dateTo + ' 23:59:59'); }
+
+        const sqlWhere = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+        const entries = await db.all(`SELECT * FROM shift_audit_trail ${sqlWhere} ORDER BY created_at DESC LIMIT ?`, [...params, limit]);
+        const totalRow = await db.get(`SELECT COUNT(*) as count FROM shift_audit_trail ${sqlWhere}`, params);
+        res.json({ success: true, entries: entries || [], total: totalRow ? totalRow.count : 0 });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+// POST /api/shifts/audit-trail - add audit entry
+app.post('/api/shifts/audit-trail', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAuditTrail) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const { shift_id, action_type, action_detail, old_data, new_data } = req.body;
+        if (!shift_id || !action_type) {
+            return res.status(400).json({ error: 'معرف المناوبة ونوع الإجراء مطلوبان' });
+        }
+        const id = await db.ShiftAuditTrail.create({
+            shift_id: parseInt(shift_id),
+            action_type,
+            actor_id: req.user.id,
+            actor_name: req.user.name,
+            actor_role: req.user.role,
+            action_detail: action_detail || '',
+            old_data: old_data || null,
+            new_data: new_data || null,
+            ip_address: req.ip || null,
+            user_agent: req.headers['user-agent'] || null
+        });
+        // Broadcast WebSocket event
+        broadcast({
+            type: 'shift_audit_trail_new',
+            shift_id: parseInt(shift_id),
+            entry: { id, shift_id, action_type, actor_name: req.user.name, created_at: new Date().toISOString() }
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Audit trail create error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل التدقيق' });
+    }
+});
+
+// POST /api/shifts/:id/metrics/calculate - recalculate metrics for a shift
+app.post('/api/shifts/:id/metrics/calculate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const metrics = await calculateShiftMetrics(shiftId, shifts);
+        if (!metrics) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        broadcast({
+            type: 'shift_detail_updated',
+            shift_id: shiftId,
+            field: 'metrics',
+            new_value: metrics
+        });
+        broadcast({
+            type: 'shift_metrics_calculated',
+            shift_id: shiftId,
+            metrics
+        });
+        res.json({ success: true, metrics });
+    } catch (error) {
+        console.error('Metrics calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب المؤشرات' });
+    }
+});
+
+// POST /api/shifts/metrics/calculate-all - batch recalculate
+app.post('/api/shifts/metrics/calculate-all', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const dateFrom = req.body.date_from;
+        const dateTo = req.body.date_to;
+        let shifts = await readShifts();
+        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
+        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
+
+        let count = 0;
+        for (const s of shifts) {
+            await calculateShiftMetrics(s.id, shifts);
+            count++;
+        }
+        res.json({ success: true, calculated_count: count });
+    } catch (error) {
+        console.error('Batch metrics calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب المؤشرات بالدفعة' });
+    }
+});
+
+// POST /api/shifts/export - export report
+app.post('/api/shifts/export', authenticate, async (req, res) => {
+    try {
+        const { shift_id, format, type } = req.body;
+        const shiftId = shift_id ? parseInt(shift_id) : null;
+        const shifts = await readShifts();
+        let data = {};
+        let filename = 'export';
+
+        if (type === 'detail' && shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            data = shift || {};
+            filename = `shift-detail-${shiftId}`;
+        } else if (type === 'daily') {
+            const date = req.body.date || new Date().toISOString().split('T')[0];
+            data = { date, shifts: shifts.filter(s => s.shiftDate === date) };
+            filename = `daily-report-${date}`;
+        } else if (type === 'weekly') {
+            const weekStart = req.body.week_start;
+            const weekEnd = req.body.week_end;
+            data = { weekStart, weekEnd, shifts: shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd) };
+            filename = `weekly-report-${weekStart}`;
+        } else if (type === 'monthly') {
+            const month = req.body.month;
+            const year = req.body.year;
+            data = { month, year, shifts: shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            }) };
+            filename = `monthly-report-${year}-${month}`;
+        }
+
+        const exportPath = path.join(STORAGE_PATH, 'exports', `${filename}-${Date.now()}.json`);
+        await fs.mkdir(path.join(STORAGE_PATH, 'exports'), { recursive: true });
+        await fs.writeFile(exportPath, JSON.stringify(data, null, 2));
+
+        const downloadUrl = `/api/download-export?file=${encodeURIComponent(path.basename(exportPath))}`;
+        res.json({ success: true, download_url: downloadUrl });
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ error: 'فشل في التصدير' });
+    }
+});
+
+// POST /api/shifts/reports/generate - generate report
+app.post('/api/shifts/reports/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftReportsGenerated) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const { type, date_from, date_to } = req.body;
+        if (!type) {
+            return res.status(400).json({ error: 'نوع التقرير مطلوب' });
+        }
+        const shifts = await readShifts();
+        let reportData = {};
+        let filename = '';
+
+        if (type === 'daily') {
+            const date = date_from || new Date().toISOString().split('T')[0];
+            reportData = { date, shifts: shifts.filter(s => s.shiftDate === date) };
+            filename = `daily-report-${date}.pdf`;
+        } else if (type === 'weekly') {
+            const weekStart = date_from;
+            const weekEnd = date_to;
+            reportData = { weekStart, weekEnd, shifts: shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd) };
+            filename = `weekly-report-${weekStart}.pdf`;
+        } else if (type === 'monthly') {
+            const month = parseInt(date_from);
+            const year = parseInt(date_to);
+            reportData = { month, year, shifts: shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            }) };
+            filename = `monthly-report-${year}-${month}.pdf`;
+        } else if (type === 'shift_detail') {
+            const shiftId = parseInt(req.body.shift_id);
+            reportData = { shift: shifts.find(s => s.id === shiftId) };
+            filename = `shift-detail-${shiftId}.pdf`;
+        }
+
+        const reportPath = path.join(STORAGE_PATH, 'reports', filename);
+        await fs.mkdir(path.join(STORAGE_PATH, 'reports'), { recursive: true });
+        await fs.writeFile(reportPath, JSON.stringify(reportData, null, 2));
+
+        const reportId = await db.ShiftReportsGenerated.create({
+            report_type: type,
+            report_date_from: date_from || null,
+            report_date_to: date_to || null,
+            shift_id: req.body.shift_id || null,
+            report_data: JSON.stringify(reportData),
+            file_path: reportPath,
+            file_format: 'pdf',
+            generated_by: req.user.name
+        });
+
+        broadcast({
+            type: 'shift_report_generated',
+            report_id: reportId,
+            type: type,
+            download_url: `/api/download-report/${reportId}`
+        });
+
+        res.json({ success: true, report_id: reportId, file_path: reportPath });
+    } catch (error) {
+        console.error('Report generation error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير' });
+    }
+});
+
+// GET /api/shifts/reports/:id - get generated report
+app.get('/api/shifts/reports/:id', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftReportsGenerated) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const report = await db.ShiftReportsGenerated.getById(req.params.id);
+        if (!report) {
+            return res.status(404).json({ error: 'التقرير غير موجود' });
+        }
+        res.json({ success: true, report });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التقرير' });
     }
 });
 
