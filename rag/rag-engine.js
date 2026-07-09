@@ -21,8 +21,8 @@ const logger = {
 // ============================================
 const RAG_CONFIG = {
   // No more chunking - each SOP is a complete document
-  topK: 1,              // Only retrieve the single best SOP
-  minSimilarity: 0.05,  // Minimum similarity threshold
+  topK: 3,              // Retrieve top 3 SOPs for better context
+  minSimilarity: 0.30,  // Minimum similarity threshold (raised from 0.05)
   enableOpenAI: false,
   openAIKey: process.env.OPENAI_API_KEY || null,
   openAIModel: 'gpt-4o-mini',
@@ -162,6 +162,13 @@ class SOPRAGIndex {
       sop.docId = docId;
       this.sops.push(sop);
     }
+  }
+
+  removeDocument(docId) {
+    // Remove all SOPs belonging to this document
+    this.sops = this.sops.filter(sop => sop.docId !== docId);
+    // Mark as needing rebuild
+    this.isBuilt = false;
   }
 
   build() {

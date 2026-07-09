@@ -353,6 +353,9 @@ router.delete('/documents/:id', async (req, res) => {
     await db.run('DELETE FROM kb_documents WHERE id = ?', [doc.id]);
 
     // Remove from index
+    ragIndex.removeDocument(req.params.id);
+    ragIndex.build();
+    await persistIndex();
     ragIndex.removeChunksByDocId(doc.id);
     ragIndex.build();
     await persistIndex();
@@ -452,9 +455,24 @@ router.post('/ask', async (req, res) => {
     const searchResults = ragIndex.search(query, 3);
     const retrievedSOPs = searchResults.map(r => r.sop);
 
-    // Step 2: Process through AI Agent
-    const agent = getAgent();
-    const result = await agent.processQuery(query, sessionId || ('anon-' + Date.now()), retrievedSOPs);
+    // Step 2: Generate answer from RAG (fallback if AI not ready)
+    let result;
+    const { generateAnswer } = require('./rag-engine');
+    const aiProvider = getAIProvider();
+    
+    if (aiProvider.isReady()) {
+      // Use AI-enhanced answer
+      const agent = getAgent();
+      result = await agent.processQuery(query, sessionId || ('anon-' + Date.now()), retrievedSOPs);
+      // Add sources and confidence from RAG
+      const ragResult = generateAnswer(query, searchResults);
+      result.sources = ragResult.sources;
+      result.confidence = ragResult.confidence;
+    } else {
+      // Fallback to pure RAG (no AI)
+      result = generateAnswer(query, searchResults);
+      result.sessionId = sessionId || ('anon-' + Date.now());
+    }
     const queryTime = Date.now() - startTime;
 
     // Step 3: Save to query log
@@ -489,6 +507,9 @@ router.post('/ask', async (req, res) => {
       query,
       answer: result.answer,
       sessionId: result.sessionId,
+      sources: result.sources || [],
+      confidence: result.confidence || 0,
+      context: result.context,
       context: result.context,
       queryTimeMs: queryTime,
       sopFound: retrievedSOPs.length > 0 ? (retrievedSOPs[0].id + ' – ' + retrievedSOPs[0].name) : null
@@ -623,6 +644,31 @@ router.post('/reindex', async (req, res) => {
     if (!db) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
 
     // Clear existing index
+    ragIndex.sops = [];
+    ragIndex.vocabulary = [];
+    ragIndex.idf = {};
+    ragIndex.isBuilt = false;
+
+    // Load full documents and rebuild SOP index
+    const docs = await db.all('SELECT id, doc_id, content FROM kb_documents WHERE content IS NOT NULL AND is_active = 1');
+    for (const doc of docs) {
+      ragIndex.addDocument(doc.content, doc.doc_id || ('doc-' + doc.id));
+    }
+    ragIndex.build();
+    await persistIndex();
+
+    res.json({ success: true, message: 'تم إعادة بناء الفهرس بنجاح', documents: docs.length, sops: ragIndex.sops.length });
+  } catch (err) {
+    logger.error('Reindex failed', err);
+    res.status(500).json({ error: 'فشل في إعادة بناء الفهرس' });
+  }
+});
+router.post('/reindex', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    if (!db) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+
+    // Clear existing index
     ragIndex.chunks = [];
     ragIndex.vocabulary = [];
     ragIndex.idf = {};
@@ -646,6 +692,41 @@ router.post('/reindex', async (req, res) => {
   } catch (err) {
     logger.error('Reindex failed', err);
     res.status(500).json({ error: 'فشل في إعادة بناء الفهرس' });
+  }
+});
+
+// POST /api/rag/reports/generate - Generate a report
+router.post('/reports/generate', async (req, res) => {
+  try {
+    const { type, data, sessionId } = req.body;
+    if (!type || !data) {
+      return res.status(400).json({ error: 'نوع التقرير والبيانات مطلوبة' });
+    }
+
+    const agent = getAgent();
+    const result = await agent.generateReport(type, data, sessionId);
+    res.json(result);
+  } catch (err) {
+    logger.error('Report generation failed', err);
+    res.status(500).json({ error: 'فشل في توليد التقرير: ' + err.message });
+  }
+});
+
+// GET /api/rag/reports/templates - List available report templates
+router.get('/reports/templates', async (req, res) => {
+  try {
+    const templates = [
+      { id: 'patientAssessment', name: 'تقرير تقييم حالة المريض', description: 'تقرير طبي شامل لتقييم حالة المريض' },
+      { id: 'patientTransfer', name: 'تقرير نقل المريض', description: 'تقرير نقل المريض من موقع الحادث إلى المستشفى' },
+      { id: 'refusalOfTransfer', name: 'تقرير رفض النقل', description: 'توثيق رفض المريض للنقل بعد تقديم النصيحة الطبية' },
+      { id: 'shiftReport', name: 'تقرير المناوبة', description: 'ملخص أحداث وبلاغات المناوبة' },
+      { id: 'incidentReport', name: 'تقرير الحادث', description: 'تقرير تفصيلي عن حادث أو بلاغ' },
+      { id: 'handoverReport', name: 'تقرير تسليم المناوبة', description: 'تقرير تسليم المناوبة بين الفرق' }
+    ];
+    res.json({ success: true, templates });
+  } catch (err) {
+    logger.error('Get templates failed', err);
+    res.status(500).json({ error: 'فشل في جلب القوالب' });
   }
 });
 

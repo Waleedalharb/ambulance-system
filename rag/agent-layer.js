@@ -10,7 +10,7 @@
    ============================================ */
 
 const { getAIProvider } = require('./ai-provider');
-const { RAG_CONFIG } = require('./rag-engine');
+const { RAG_CONFIG, generateAnswer } = require('./rag-engine');
 
 const logger = {
   info: (msg) => console.log(`[AGENT] ${new Date().toISOString()} INFO: ${msg}`),
@@ -309,6 +309,217 @@ class OperationalAgent {
   clearSession(sessionId) {
     this.sessionStore.delete(sessionId);
   }
+
+  // ============================================
+  // REPORT TEMPLATES - Medical & Operational
+  // ============================================
+  async generateReport(type, data, sessionId) {
+    const memory = this.sessionStore.get(sessionId || 'report-' + Date.now());
+    
+    const templates = {
+      patientAssessment: {
+        title: 'تقرير تقييم حالة المريض',
+        fields: ['patientName', 'age', 'gender', 'chiefComplaint', 'vitalSigns', 'assessment', 'plan'],
+        format: this._formatPatientAssessment.bind(this)
+      },
+      patientTransfer: {
+        title: 'تقرير نقل المريض',
+        fields: ['patientName', 'fromLocation', 'toHospital', 'classification', 'teamName', 'transportTime', 'condition'],
+        format: this._formatPatientTransfer.bind(this)
+      },
+      refusalOfTransfer: {
+        title: 'تقرير رفض النقل',
+        fields: ['patientName', 'reason', 'advisedBy', 'patientConsent', 'documentation'],
+        format: this._formatRefusalOfTransfer.bind(this)
+      },
+      shiftReport: {
+        title: 'تقرير المناوبة',
+        fields: ['shiftDate', 'teamName', 'shiftCode', 'incidents', 'notes'],
+        format: this._formatShiftReport.bind(this)
+      },
+      incidentReport: {
+        title: 'تقرير الحادث',
+        fields: ['incidentDate', 'location', 'description', 'actions', 'outcome'],
+        format: this._formatIncidentReport.bind(this)
+      },
+      handoverReport: {
+        title: 'تقرير تسليم المناوبة',
+        fields: ['fromTeam', 'toTeam', 'pendingCases', 'equipment', 'notes'],
+        format: this._formatHandoverReport.bind(this)
+      }
+    };
+
+    const template = templates[type];
+    if (!template) {
+      return { success: false, error: 'نوع التقرير غير معروف' };
+    }
+
+    // Check for missing required fields
+    const missingFields = template.fields.filter(f => !data[f]);
+    if (missingFields.length > 0) {
+      return {
+        success: false,
+        needsInfo: true,
+        missingFields,
+        message: `يرجى تزويد المعلومات التالية: ${missingFields.join(', ')}`
+      };
+    }
+
+    const report = template.format(data);
+    
+    // Save to memory
+    memory.add('assistant', report, { type: 'report', reportType: type });
+    
+    return {
+      success: true,
+      report,
+      type,
+      title: template.title
+    };
+  }
+
+  _formatPatientAssessment(data) {
+    return `═══════════════════════════════════════
+تقرير تقييم حالة المريض
+═══════════════════════════════════════
+
+التاريخ: ${new Date().toLocaleString('ar-SA')}
+
+─── معلومات المريض ───
+الاسم: ${data.patientName}
+العمر: ${data.age}
+الجنس: ${data.gender}
+
+─── الشكوى الرئيسية ───
+${data.chiefComplaint}
+
+─── العلامات الحيوية ───
+${data.vitalSigns}
+
+─── التقييم ───
+${data.assessment}
+
+─── الخطة العلاجية ───
+${data.plan}
+
+──────────────────────────────────────`;
+  }
+
+  _formatPatientTransfer(data) {
+    return `═══════════════════════════════════════
+تقرير نقل المريض
+═══════════════════════════════════════
+
+التاريخ: ${new Date().toLocaleString('ar-SA')}
+
+─── معلومات النقل ───
+اسم المريض: ${data.patientName}
+من: ${data.fromLocation}
+إلى: ${data.toHospital}
+تصنيف الحالة: ${data.classification}
+
+─── فريق الإسعاف ───
+${data.teamName}
+
+─── وقت النقل ───
+${data.transportTime}
+
+─── الحالة أثناء النقل ───
+${data.condition}
+
+──────────────────────────────────────`;
+  }
+
+  _formatRefusalOfTransfer(data) {
+    return `═══════════════════════════════════════
+تقرير رفض النقل
+═══════════════════════════════════════
+
+التاريخ: ${new Date().toLocaleString('ar-SA')}
+
+─── معلومات المريض ───
+الاسم: ${data.patientName}
+
+─── سبب الرفض ───
+${data.reason}
+
+─── النصيحة الطبية ───
+قدم النصيحة: ${data.advisedBy}
+
+──ـ موافقة المريض ───
+${data.patientConsent}
+
+─── التوثيق ───
+${data.documentation}
+
+──────────────────────────────────────`;
+  }
+
+  _formatShiftReport(data) {
+    return `═══════════════════════════════════════
+تقرير المناوبة
+═══════════════════════════════════════
+
+التاريخ: ${data.shiftDate}
+
+─── فريق المناوبة ───
+${data.teamName} | ${data.shiftCode}
+
+──ـ البلاغات والحوادث ───
+${data.incidents}
+
+─── ملاحظات ───
+${data.notes}
+
+──────────────────────────────────────`;
+  }
+
+  _formatIncidentReport(data) {
+    return `═══════════════════════════════════════
+تقرير الحادث
+═══════════════════════════════════════
+
+التاريخ: ${data.incidentDate}
+
+─── موقع الحادث ───
+${data.location}
+
+─── وصف الحادث ───
+${data.description}
+
+──ـ الإجراءات المتخذة ───
+${data.actions}
+
+─── النتيجة ───
+${data.outcome}
+
+──────────────────────────────────────`;
+  }
+
+  _formatHandoverReport(data) {
+    return `═══════════════════════════════════════
+تقرير تسليم المناوبة
+═══════════════════════════════════════
+
+التاريخ: ${new Date().toLocaleString('ar-SA')}
+
+──ـ من فريق ───
+${data.fromTeam}
+
+─── إلى فريق ───
+${data.toTeam}
+
+──ـ الحالات المعلقة ───
+${data.pendingCases}
+
+─── المعدات ───
+${data.equipment}
+
+─── ملاحظات ───
+${data.notes}
+
+──────────────────────────────────────`;
+  }
 }
 
 // Singleton
@@ -326,5 +537,13 @@ module.exports = {
   ConversationMemory,
   SessionStore,
   getAgent,
-  SYSTEM_PROMPT
+  SYSTEM_PROMPT,
+  REPORT_TEMPLATES: [
+    'patientAssessment',
+    'patientTransfer',
+    'refusalOfTransfer',
+    'shiftReport',
+    'incidentReport',
+    'handoverReport'
+  ]
 };
