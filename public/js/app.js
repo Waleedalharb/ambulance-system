@@ -437,11 +437,17 @@ function connectSSE() {
             return;
         }
         var sseUrl = '/api/sse?token=' + encodeURIComponent(token);
+        
+        // Close existing connection if any
+        if (sseSource) {
+            try { sseSource.close(); } catch(e) {}
+        }
+        
         sseSource = new EventSource(sseUrl);
         
         sseSource.onopen = function() {
             sseConnected = true;
-            console.log('✅ SSE connected to', sseUrl);
+            console.log('✅ SSE connected');
             // إيقاف fallback عند الاتصال الناجح
             if (wsFallbackInterval) {
                 clearInterval(wsFallbackInterval);
@@ -453,11 +459,7 @@ function connectSSE() {
         sseSource.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
-                // Respond to server ping to keep connection alive
-                if (data.type === 'ping') {
-                    // SSE لا يحتاج pong، الاتصال أحادي الاتجاه
-                    return;
-                }
+                console.log('📡 SSE received:', data.type);
                 handleSSEEvent(data);
             } catch(e) {
                 console.error('SSE parse error:', e);
@@ -466,11 +468,14 @@ function connectSSE() {
         
         sseSource.onerror = function(err) {
             sseConnected = false;
-            console.log('❌ SSE error/disconnected, will reconnect automatically');
-            // EventSource يعيد الاتصال تلقائياً، لكن نشغل fallback كاحتياط
-            if (!wsFallbackInterval) {
-                startFallbackInterval();
-            }
+            console.log('❌ SSE error, reconnecting...');
+            // Close and reconnect manually after delay
+            setTimeout(function() {
+                if (sseSource) {
+                    try { sseSource.close(); } catch(e) {}
+                }
+                connectSSE();
+            }, 3000);
         };
     } catch(e) {
         console.log('SSE not supported, using polling');

@@ -11,6 +11,9 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
 
+// Set timezone to Saudi Arabia (Riyadh)
+process.env.TZ = 'Asia/Riyadh';
+
 // ============================================
 // AI PROVIDER CONFIGURATION (via Environment Variables)
 // ============================================
@@ -823,15 +826,28 @@ app.get('/api/sse', authenticate, function(req, res) {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'X-Accel-Buffering': 'no' // Disable nginx buffering if behind proxy
     });
     // إرسال رسالة أولية للتأكد من الاتصال
     res.write('data: ' + JSON.stringify({ type: 'connected', message: 'متصل بـ SSE', user: req.user }) + '\n\n');
     var client = { res: res, user: req.user, id: Date.now() + Math.random() };
     sseClients.push(client);
     console.log('🟢 SSE client connected:', req.user.name, '(' + req.user.id + ')');
+    
+    // Keep-alive heartbeat every 15 seconds to prevent Render timeout
+    var heartbeatInterval = setInterval(function() {
+        try {
+            res.write(':heartbeat\n\n'); // Comment line keeps connection alive
+        } catch(e) {
+            clearInterval(heartbeatInterval);
+        }
+    }, 15000);
+    
     // إزالة العميل عند الإغلاق
     req.on('close', function() {
+        clearInterval(heartbeatInterval);
         sseClients = sseClients.filter(function(c) { return c !== client; });
         console.log('🔴 SSE client disconnected:', req.user.name);
     });
