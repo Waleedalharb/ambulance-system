@@ -57,18 +57,20 @@ const ChatIntegration = {
         return;
       }
 
-      const conversations = await res.json();
+      const data = await res.json();
+      const conversations = data.conversations || data || [];
 
       // Count unread messages across all conversations
       let unread = 0;
-      let latestMessage = null;
+      let latestUnreadMessage = null;
 
       conversations.forEach(conv => {
-        const unreadInConv = (conv.unreadCount || 0);
+        // Support both snake_case (API) and camelCase (fallback)
+        const unreadInConv = (conv.unread_count || conv.unreadCount || 0);
         unread += unreadInConv;
-        if (unreadInConv > 0 && conv.lastMessage) {
-          if (!latestMessage || new Date(conv.lastMessage.createdAt) > new Date(latestMessage.createdAt)) {
-            latestMessage = conv.lastMessage;
+        if (unreadInConv > 0 && conv.last_message) {
+          if (!latestUnreadMessage || new Date(conv.last_message.created_at) > new Date(latestUnreadMessage.created_at)) {
+            latestUnreadMessage = conv.last_message;
           }
         }
       });
@@ -77,15 +79,16 @@ const ChatIntegration = {
       this.renderBadge(unread);
 
       // Show browser notification for new messages
-      if (latestMessage && latestMessage.id !== this.lastNotifiedId) {
-        this.lastNotifiedId = latestMessage.id;
+      if (latestUnreadMessage && latestUnreadMessage.id !== this.lastNotifiedId) {
+        this.lastNotifiedId = latestUnreadMessage.id;
         this.showNotification(
           'رسالة جديدة',
-          latestMessage.content || 'لديك رسالة جديدة في الدردشة'
+          latestUnreadMessage.content || 'لديك رسالة جديدة في الدردشة'
         );
       }
     } catch (err) {
       // Silently fail if endpoint isn't ready
+      console.log('[ChatIntegration] updateBadge error:', err.message);
     }
   },
 
@@ -171,7 +174,7 @@ const ChatIntegration = {
         return;
       }
 
-      const res = await fetch('/api/chat/conversations?limit=5', {
+      const res = await fetch('/api/chat/conversations', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -180,22 +183,29 @@ const ChatIntegration = {
         return;
       }
 
-      const conversations = await res.json();
+      const data = await res.json();
+      const conversations = data.conversations || data || [];
 
       if (!conversations || conversations.length === 0) {
         list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">📭 لا توجد رسائل حديثة</p>';
         return;
       }
 
-      list.innerHTML = conversations.map(conv => {
-        const lastMsg = conv.lastMessage;
-        const unread = conv.unreadCount || 0;
-        const time = lastMsg ? this.formatTime(lastMsg.createdAt) : '';
+      // Sort by updated_at desc and take first 5
+      const sortedConvs = conversations
+        .filter(conv => conv.last_message)
+        .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+        .slice(0, 5);
+
+      list.innerHTML = sortedConvs.map(conv => {
+        const lastMsg = conv.last_message;
+        const unread = conv.unread_count || conv.unreadCount || 0;
+        const time = lastMsg ? this.formatTime(lastMsg.created_at) : '';
         const snippet = lastMsg ? (lastMsg.content || '').substring(0, 60) : 'لا توجد رسائل';
-        const sender = lastMsg ? (lastMsg.senderName || 'مستخدم') : '';
+        const sender = lastMsg ? (lastMsg.sender_name || 'مستخدم') : '';
 
         return `
-          <a href="chat.html?conv=${conv.id}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--gray-100); text-decoration:none; color:inherit; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
+          <a href="chat.html?conv=${conv.id}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--gray-200); text-decoration:none; color:inherit; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
               <span style="font-weight:600; font-size:0.8rem; color:var(--text);">${this.escapeHtml(conv.title || 'محادثة')}</span>
               ${unread > 0 ? `<span style="background:#EF4444; color:white; font-size:0.6rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 4px;">${unread}</span>` : ''}
@@ -228,6 +238,14 @@ const ChatIntegration = {
   },
 
   /**
+   * Public API for external modules to trigger badge update
+   * Called from websocket-sync.js when chat_message event arrives
+   */
+  updateBadgeFromWebSocket() {
+    this.updateBadge();
+  },
+
+  /**
    * Escape HTML to prevent XSS
    */
   escapeHtml(text) {
@@ -248,6 +266,13 @@ const ChatIntegration = {
   }
 };
 
+// Global helper for websocket-sync.js and other modules
+function updateChatBadge() {
+  if (typeof ChatIntegration !== 'undefined' && ChatIntegration.updateBadge) {
+    ChatIntegration.updateBadge();
+  }
+}
+
 // Auto-init when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Small delay to ensure auth systems are ready
@@ -260,5 +285,24 @@ document.addEventListener('click', (e) => {
   const btn = document.getElementById('chatToolbarBtn');
   if (panel && !panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
     panel.style.display = 'none';
+  }
+});
+
+// Listen for cross-tab chat updates via BroadcastChannel
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    const chatBC = new BroadcastChannel('chat_sync');
+    chatBC.onmessage = function(ev) {
+      if (ev.data && ev.data.type === 'chat_badge_update') {
+        ChatIntegration.updateBadge();
+      }
+    };
+  } catch(e) {}
+}
+
+// Also listen for storage events (fallback for older browsers)
+window.addEventListener('storage', function(e) {
+  if (e.key === 'chat_badge_trigger') {
+    ChatIntegration.updateBadge();
   }
 });

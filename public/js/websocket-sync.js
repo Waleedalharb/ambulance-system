@@ -18,14 +18,15 @@
             'shift_deleted': 'shift', 'ops_file_deleted': 'file', 'ops_files_uploaded': 'file',
             'audit_log_added': 'system', 'file_deleted': 'file', 'file_uploaded': 'file',
             'peak_mission': 'peak', 'peak_resolve': 'peak', 'control_notes_updated': 'system',
-            'vacations_updated': 'system', 'theme_uploaded': 'theme', 'user_login': 'user'
+            'vacations_updated': 'system', 'theme_uploaded': 'theme', 'user_login': 'user',
+            'chat_message': 'chat'
         };
         var titleMap = {
             'new_report': 'بلاغ جديد', 'shift_started': 'مناوبة جديدة', 'shift_updated': 'تحديث مناوبة',
             'shift_deleted': 'حذف مناوبة', 'ops_file_deleted': 'حذف ملف', 'ops_files_uploaded': 'رفع ملف',
             'audit_log_added': 'سجل عمليات', 'peak_mission': 'مهمة ذروة', 'peak_resolve': 'إنجاز مهمة',
             'control_notes_updated': 'تحديث ملاحظات', 'vacations_updated': 'تحديث إجازات',
-            'theme_uploaded': 'تحديث ثيم', 'user_login': 'دخول مستخدم'
+            'theme_uploaded': 'تحديث ثيم', 'user_login': 'دخول مستخدم', 'chat_message': 'رسالة جديدة'
         };
         var cat = catMap[type] || 'system';
         var title = titleMap[type] || (type ? type.replace(/_/g, ' ') : 'إشعار');
@@ -285,6 +286,34 @@
                     if (typeof loadAuditLog === 'function') loadAuditLog();
                     if (typeof renderAuditLog === 'function') renderAuditLog();
                     if (typeof loadData === 'function') loadData();
+                    break;
+
+    // ====== أنواع الدردشة ======
+                case 'chat_message':
+                    // Update chat badge if ChatIntegration is available (index.html)
+                    if (typeof ChatIntegration !== 'undefined' && ChatIntegration.updateBadge) {
+                        ChatIntegration.updateBadge();
+                    }
+                    // Also try to update badge directly
+                    if (typeof updateChatBadge === 'function') {
+                        updateChatBadge();
+                    }
+                    // Show toast notification for chat messages
+                    if (data.message && data.message.sender_name) {
+                        showSyncToast('رسالة جديدة من ' + data.message.sender_name + ': ' + (data.message.content || ''), 'chat_message');
+                    }
+                    break;
+                case 'chat_read':
+                    // Update badge when messages are read
+                    if (typeof ChatIntegration !== 'undefined' && ChatIntegration.updateBadge) {
+                        ChatIntegration.updateBadge();
+                    }
+                    if (typeof updateChatBadge === 'function') {
+                        updateChatBadge();
+                    }
+                    break;
+                case 'chat_typing':
+                    // Typing indicator - no badge update needed
                     break;
 
                 // ====== أنواع أخرى ======

@@ -218,7 +218,13 @@
                 this.typingCallbacks.forEach(function(cb) { cb(data); });
             } else if (data.type === 'chat_read') {
                 (this.readCallbacks || []).forEach(function(cb) { cb(data); });
-            } else if (data.type === 'chat_presence') {
+            } else if (data.type === 'chat_presence' || data.type === 'user_online' || data.type === 'user_offline') {
+                // Normalize to chat_presence format
+                if (data.type === 'user_online') {
+                    data = { userId: data.userId, name: data.name, status: 'online' };
+                } else if (data.type === 'user_offline') {
+                    data = { userId: data.userId, name: data.name, status: 'offline', timestamp: new Date().toISOString() };
+                }
                 (this.presenceCallbacks || []).forEach(function(cb) { cb(data); });
             }
         },
@@ -235,7 +241,8 @@
             if (!this.connected || !this.ws) return;
             this.ws.send(JSON.stringify({
                 type: 'chat_typing',
-                conversationId: conversationId
+                conversationId: conversationId,
+                user: chatState.currentUser ? { id: chatState.currentUser.id, name: chatState.currentUser.name } : null
             }));
         },
 
@@ -327,7 +334,18 @@
         var readStatus = '';
         if (isMine) {
             var readCount = message.read_by ? message.read_by.length : 0;
-            var isRead = readCount > 1; // More than just sender
+            var totalParticipants = chatState.currentConversation && chatState.currentConversation.participants
+                ? chatState.currentConversation.participants.length : 2;
+            // Read if at least one other participant has read (readCount > 0 means someone besides sender)
+            // Actually read_by includes the sender's own read too sometimes, so check:
+            var otherReaders = 0;
+            if (message.read_by) {
+                message.read_by.forEach(function(r) {
+                    var rId = r.user_id !== undefined ? r.user_id : r.userId;
+                    if (String(rId) !== String(message.sender_id)) otherReaders++;
+                });
+            }
+            var isRead = otherReaders > 0;
             var readClass = isRead ? 'read' : '';
             readStatus = '<span class="message-read ' + readClass + '">' + (isRead ? '<i class="fas fa-check-double"></i>' : '<i class="fas fa-check"></i>') + '</span>';
         }
@@ -560,6 +578,10 @@
 
     function handleTyping() {
         if (!chatState.currentConversation) return;
+        // Debounce: only send typing every 2 seconds max
+        var now = Date.now();
+        if (chatState.lastTypingSent && (now - chatState.lastTypingSent) < 2000) return;
+        chatState.lastTypingSent = now;
         ChatSocket.sendTyping(chatState.currentConversation.id);
     }
 
@@ -725,6 +747,7 @@
                 $('messagesList').innerHTML = renderMessagesList(chatState.messages);
                 scrollToBottom();
             }
+            // Still update conversation preview below
         }
 
         // Update conversation preview
@@ -751,6 +774,15 @@
                 return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
             });
             renderConversationList(chatState.conversations);
+
+            // Notify other pages (index.html, etc.) via BroadcastChannel or localStorage event
+            try {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    var bc = new BroadcastChannel('chat_sync');
+                    bc.postMessage({ type: 'chat_badge_update', unreadTotal: chatState.unreadTotal });
+                    bc.close();
+                }
+            } catch(e) {}
         } else {
             // New conversation - reload list
             loadConversations();
@@ -765,7 +797,11 @@
         var msg = chatState.messages.find(function(m) { return m.id === messageId; });
         if (msg) {
             if (!msg.read_by) msg.read_by = [];
-            var alreadyRead = msg.read_by.some(function(r) { return r.user_id === userId; });
+            // Normalize comparison: both to string to handle number/string mismatch
+            var alreadyRead = msg.read_by.some(function(r) {
+                var rId = r.user_id !== undefined ? r.user_id : r.userId;
+                return String(rId) === String(userId);
+            });
             if (!alreadyRead) {
                 msg.read_by.push({ user_id: userId, read_at: new Date().toISOString() });
                 // Re-render if this message is visible
@@ -787,6 +823,8 @@
     function onIncomingTyping(data) {
         if (!chatState.currentConversation) return;
         if (data.conversationId !== chatState.currentConversation.id) return;
+        // Don't show typing indicator for self
+        if (data.user && chatState.currentUser && data.user.id == chatState.currentUser.id) return;
 
         renderTypingIndicator(data.user ? data.user.name : 'يكتب');
 
@@ -796,33 +834,43 @@
     }
 
     function onIncomingPresence(data) {
-        // Update user online status in user list
         if (!data.userId) return;
+        var isOnline = data.status === 'online';
+        
+        // Update user online status in user list
         var userItem = document.querySelector('.user-item[data-id="' + data.userId + '"]');
         if (userItem) {
             var statusDot = userItem.querySelector('.user-item-avatar');
             if (statusDot) {
-                statusDot.classList.add('online');
+                statusDot.classList.toggle('online', isOnline);
             }
         }
+        
         // Update conversation avatar status
         chatState.conversations.forEach(function(conv) {
             if (conv.type === 'private') {
                 var other = conv.participants.find(function(p) { return p.user_id === data.userId; });
                 if (other) {
-                    conv.otherOnline = true;
-                    conv.otherLastSeen = new Date().toISOString();
+                    conv.otherOnline = isOnline;
+                    conv.otherLastSeen = data.timestamp || new Date().toISOString();
                 }
             }
         });
+        
         // Update header status if current conversation
         if (chatState.currentConversation && chatState.currentConversation.type === 'private') {
             var other = chatState.currentConversation.participants.find(function(p) {
                 return p.user_id !== chatState.currentUser.id;
             });
             if (other && other.user_id === data.userId) {
-                $('chatHeaderStatusText').textContent = 'متصل الآن';
-                $('chatHeaderStatusText').classList.add('online');
+                if (isOnline) {
+                    $('chatHeaderStatusText').textContent = 'متصل الآن';
+                    $('chatHeaderStatusText').classList.add('online');
+                } else {
+                    var lastSeen = data.timestamp ? formatTime(data.timestamp) : 'غير متصل';
+                    $('chatHeaderStatusText').textContent = 'آخر ظهور ' + lastSeen;
+                    $('chatHeaderStatusText').classList.remove('online');
+                }
             }
         }
     }

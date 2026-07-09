@@ -46,7 +46,7 @@ const aiMonitor = require('./ai-monitor');
 
 // Helper: check if DB is available
 function dbAvailable() {
-    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries;
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads;
 }
 
 // Helper: safe DB response
@@ -216,6 +216,9 @@ function validateBody(schema) {
 var clients = [];
 var wss = null; // Will be initialized after HTTP server starts
 
+// Online users tracking: { userId: { ws, user, lastSeen } }
+var onlineUsers = new Map();
+
 function initWebSocket(server) {
     wss = new WebSocket.Server({ server, path: '/ws' });
     wss.on('connection', function(ws, req) {
@@ -226,34 +229,117 @@ function initWebSocket(server) {
             ws.close(1008, 'Origin not allowed');
             return;
         }
-        
-        console.log('🟢 WebSocket client connected from', origin || 'unknown');
+
+        // Extract token from query string or headers
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['sec-websocket-protocol'];
+
+        // JWT Authentication for WebSocket
+        if (!token) {
+            console.log('🔴 WebSocket rejected: no token');
+            ws.close(1008, 'Authentication required');
+            return;
+        }
+
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            ws.user = decoded; // { id, username, name, role }
+            ws.isAuthenticated = true;
+            ws.chatConversations = [];
+            ws.lastSeen = Date.now();
+            console.log('🟢 WebSocket authenticated:', ws.user.name, '(' + ws.user.id + ')');
+        } catch (err) {
+            console.log('🔴 WebSocket rejected: invalid token');
+            ws.close(1008, 'Invalid token');
+            return;
+        }
+
         clients.push(ws);
-        
-        ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر' }));
-        
+
+        // Track online user
+        if (ws.user && ws.user.id) {
+            onlineUsers.set(ws.user.id, {
+                ws: ws,
+                user: ws.user,
+                lastSeen: Date.now()
+            });
+            // Broadcast user_online to all connected clients
+            broadcast({
+                type: 'user_online',
+                userId: ws.user.id,
+                name: ws.user.name,
+                onlineUsers: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
+            });
+        }
+
+        ws.send(JSON.stringify({ type: 'connected', message: 'متصل بالسيرفر', user: ws.user }));
+
         ws.on('message', function(raw) {
             try {
                 var msg = JSON.parse(raw);
+                ws.lastSeen = Date.now();
+
                 if (msg.type === 'chat_typing') {
-                    broadcast({ type: 'chat_typing', conversationId: msg.conversationId, user: msg.user });
+                    // Only broadcast to conversation subscribers
+                    broadcastToConversation(msg.conversationId, { type: 'chat_typing', conversationId: msg.conversationId, user: ws.user });
                 }
                 if (msg.type === 'chat_subscribe') {
                     ws.chatConversations = ws.chatConversations || [];
-                    ws.chatConversations.push(msg.conversationId);
+                    if (!ws.chatConversations.includes(msg.conversationId)) {
+                        ws.chatConversations.push(msg.conversationId);
+                    }
+                    // Send current online users list to the subscriber
+                    ws.send(JSON.stringify({
+                        type: 'online_users',
+                        users: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
+                    }));
+                }
+                if (msg.type === 'chat_unsubscribe') {
+                    if (ws.chatConversations) {
+                        ws.chatConversations = ws.chatConversations.filter(function(id) { return id !== msg.conversationId; });
+                    }
                 }
                 if (msg.type === 'chat_presence') {
+                    // Update presence timestamp
+                    if (ws.user && ws.user.id) {
+                        const entry = onlineUsers.get(ws.user.id);
+                        if (entry) {
+                            entry.lastSeen = Date.now();
+                        }
+                    }
                     // Broadcast presence to all connected clients
-                    broadcast({ type: 'chat_presence', userId: msg.userId, name: msg.name });
+                    broadcastToAll({
+                        type: 'chat_presence',
+                        userId: ws.user.id,
+                        name: ws.user.name,
+                        status: 'online',
+                        timestamp: new Date().toISOString()
+                    });
                 }
-            } catch(e) {}
+                if (msg.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                }
+            } catch(e) {
+                console.error('WebSocket message error:', e.message);
+            }
         });
-        
+
         ws.on('close', function() {
-            console.log('🔴 WebSocket client disconnected');
+            console.log('🔴 WebSocket client disconnected:', ws.user ? ws.user.name : 'unknown');
+            // Remove from online users
+            if (ws.user && ws.user.id) {
+                onlineUsers.delete(ws.user.id);
+                // Broadcast user_offline to all connected clients
+                broadcast({
+                    type: 'user_offline',
+                    userId: ws.user.id,
+                    name: ws.user.name,
+                    onlineUsers: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
+                });
+            }
             clients = clients.filter(function(c) { return c !== ws; });
         });
-        
+
         ws.on('error', function(err) {
             console.error('WebSocket error:', err);
         });
@@ -261,7 +347,7 @@ function initWebSocket(server) {
     console.log('🔌 WebSocket server attached to HTTP server on /ws');
 }
 
-// دالة لبث الرسائل لجميع المتصلين
+// دالة لبث الرسائل لجميع المتصلين (الكل)
 function broadcast(data) {
     var message = JSON.stringify(data);
     clients = clients.filter(function(client) {
@@ -275,6 +361,43 @@ function broadcast(data) {
             }
         }
         return false;
+    });
+}
+
+// Helper: broadcast to conversation subscribers only
+function broadcastToConversation(conversationId, data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN && client.chatConversations) {
+            if (client.chatConversations.includes(conversationId)) {
+                try {
+                    client.send(message);
+                } catch (e) {
+                    console.error('Broadcast to conversation error:', e.message);
+                }
+            }
+        }
+    });
+}
+
+// Helper: broadcast to ALL authenticated connected clients
+function broadcastToAll(data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(message);
+            } catch (e) {
+                console.error('Broadcast to all error:', e.message);
+            }
+        }
+    });
+}
+
+// Helper: get online users list
+function getOnlineUsers() {
+    return Array.from(onlineUsers.values()).map(function(u) {
+        return { id: u.user.id, name: u.user.name, role: u.user.role };
     });
 }
 
@@ -7049,38 +7172,8 @@ app.use('/api/rag', authenticate, kbApi.router);
 // API: CHAT MODULE
 // ============================================
 
-// Helper: broadcast to conversation subscribers
-function broadcastToConversation(conversationId, data) {
-    var message = JSON.stringify(data);
-    clients.forEach(function(client) {
-        if (client.readyState === WebSocket.OPEN) {
-            if (client.chatConversations && client.chatConversations.includes(conversationId)) {
-                try {
-                    client.send(message);
-                } catch (e) {
-                    console.error('Broadcast to conversation error:', e.message);
-                }
-            }
-        }
-    });
-}
-
-// Helper: broadcast to ALL connected clients
-function broadcastToAll(data) {
-    var message = JSON.stringify(data);
-    clients.forEach(function(client) {
-        if (client.readyState === WebSocket.OPEN) {
-            try {
-                client.send(message);
-            } catch (e) {
-                console.error('Broadcast to all error:', e.message);
-            }
-        }
-    });
-}
-
-
-
+// Note: broadcastToConversation and broadcastToAll are defined above in the WebSocket section
+// and are reused here for chat message delivery.
 // 1. GET /api/chat/conversations
 app.get('/api/chat/conversations', authenticate, async (req, res) => {
     try {
@@ -7371,6 +7464,17 @@ app.get('/api/chat/users', authenticate, async (req, res) => {
     }
 });
 
+// 7b. GET /api/chat/online — get currently online users
+app.get('/api/chat/online', authenticate, async (req, res) => {
+    try {
+        const online = getOnlineUsers();
+        res.json({ success: true, onlineUsers: online, count: online.length });
+    } catch (err) {
+        console.error('Chat online users error:', err);
+        res.status(500).json({ error: 'فشل في جلب المستخدمين المتصلين' });
+    }
+});
+
 // 8. DELETE /api/chat/conversations/:id — archive group (admin only)
 app.delete('/api/chat/conversations/:id', authenticate, async (req, res) => {
     try {
@@ -7478,6 +7582,54 @@ app.post('/api/chat/upload', authenticate, uploadChat.single('file'), handleMult
         res.status(500).json({ error: 'فشل في رفع الملف' });
     }
 });
+
+// 12. PUT /api/chat/conversations/:id/leave — leave a group conversation
+app.put('/api/chat/conversations/:id/leave', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (conversation.type !== 'group') {
+            return res.status(400).json({ error: 'يمكن مغادرة المجموعات فقط' });
+        }
+        // Cannot leave if you are the creator and only admin
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(404).json({ error: 'أنت لست مشاركاً في هذه المحادثة' });
+        }
+        // If creator, prevent leaving unless another admin exists
+        if (conversation.created_by === userId) {
+            const otherAdmin = await db.get(
+                'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id != ? AND is_admin = 1',
+                [convId, userId]
+            );
+            if (!otherAdmin) {
+                return res.status(403).json({ error: 'لا يمكن مغادرة المجموعة قبل تعيين مسؤول آخر' });
+            }
+        }
+        await db.run('DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?;', [convId, userId]);
+        // Broadcast system message
+        broadcastToConversation(convId, {
+            type: 'chat_conversation_update',
+            conversationId: convId,
+            event: 'user_left',
+            userId: userId,
+            userName: req.user.name
+        });
+        res.json({ success: true, message: 'تم مغادرة المحادثة' });
+    } catch (err) {
+        console.error('Leave conversation error:', err);
+        res.status(500).json({ error: 'فشل في مغادرة المحادثة' });
+    }
+});
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'المسار غير موجود' });
