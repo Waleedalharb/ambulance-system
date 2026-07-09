@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="لوحة تحكم شهرية - منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض">
+    <title>لوحة التحكم الشهرية | منصة الجنوب</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="/css/shift-dashboard.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        .month-display { font-weight: 700; font-size: 1.1rem; color: #1E293B; min-width: 180px; text-align: center; }
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="dashboard-page">
+    <div class="dashboard-top-bar">
+        <a href="/" class="dashboard-logo"><i class="fas fa-ambulance"></i><span>منصة الجنوب</span></a>
+        <div class="dashboard-top-bar-center"><div class="dashboard-live-clock" id="liveClock">--</div></div>
+        <div class="dashboard-top-bar-actions">
+            <a href="/" class="dashboard-btn"><i class="fas fa-home"></i> الرئيسية</a>
+            <a href="/shift-daily-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-day"></i> يومي</a>
+            <a href="/shift-weekly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-week"></i> أسبوعي</a>
+            <a href="/shift-archive.html" class="dashboard-btn"><i class="fas fa-archive"></i> الأرشيف</a>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="dashboard-title"><i class="fas fa-calendar-alt"></i> لوحة التحكم الشهرية</div>
+
+        <div class="filter-bar">
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:200px;">
+                <div class="month-display" id="monthDisplay">--</div>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn" onclick="changeMonth(1)"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:160px;">
+                <input type="month" id="monthInput" onchange="setMonthFromInput()" />
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn dashboard-btn-primary" onclick="loadMonthly()"><i class="fas fa-sync"></i> تحديث</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn" onclick="exportMonthlyPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn" onclick="exportMonthlyExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+            </div>
+        </div>
+
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="charts-grid">
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-bar"></i> البلاغات حسب اليوم</div></div>
+                <div class="chart-container"><canvas id="dailyBarChart"></canvas></div>
+            </div>
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-line"></i> الاتجاه مقابل الشهر الماضي</div></div>
+                <div class="chart-container"><canvas id="trendLineChart"></canvas></div>
+            </div>
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-pie"></i> أنواع المناوبات</div></div>
+                <div class="chart-container"><canvas id="shiftTypeChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="chart-section" style="padding:0; overflow:hidden;">
+            <div class="chart-header" style="padding:16px 20px; border-bottom:1px solid #E2E8F0;">
+                <div class="chart-title"><i class="fas fa-list"></i> ملخص المناوبات</div>
+            </div>
+            <div id="shiftsTableWrap">
+                <div class="spinner-container"><div class="spinner"></div><span>جاري التحميل...</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/shift-dashboard.js"></script>
+    <script src="/js/shift-charts.js"></script>
+    <script src="/js/shift-export.js"></script>
+    <script>
+    (function() {
+        'use strict';
+        var currentMonthDate = new Date();
+        var currentData = null;
+        DashUtils.initLiveClock('liveClock');
+        if (!DashUtils.checkAuth()) return;
+
+        function getCurrentMonthStr() {
+            return currentMonthDate.toISOString().slice(0, 7);
+        }
+
+        function updateMonthDisplay() {
+            var m = currentMonthDate.getMonth();
+            var y = currentMonthDate.getFullYear();
+            document.getElementById('monthDisplay').textContent = DashUtils.monthName(m) + ' ' + y;
+            document.getElementById('monthInput').value = getCurrentMonthStr();
+        }
+
+        function changeMonth(delta) {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() + delta);
+            updateMonthDisplay();
+            loadMonthly();
+        }
+
+        function setMonthFromInput() {
+            var val = document.getElementById('monthInput').value;
+            if (val) {
+                currentMonthDate = new Date(val + '-01');
+                updateMonthDisplay();
+                loadMonthly();
+            }
+        }
+
+        function loadMonthly() {
+            var month = currentMonthDate.getMonth() + 1;
+            var year = currentMonthDate.getFullYear();
+            DashUtils.showSpinner(document.getElementById('kpiGrid'));
+            var cacheKey = 'monthly_' + year + '_' + month;
+            var cached = DashUtils.cacheGet(cacheKey);
+            if (cached) { renderMonthly(cached); return; }
+
+            DashUtils.apiFetch('/api/shifts/monthly-dashboard?month=' + month + '&year=' + year)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success) {
+                        DashUtils.cacheSet(cacheKey, data, 300);
+                        renderMonthly(data);
+                    } else { DashUtils.showToast(data.error || 'فشل في تحميل البيانات', 'error'); }
+                }).catch(function() { DashUtils.showToast('فشل في تحميل البيانات الشهرية', 'error'); });
+        }
+
+        function renderMonthly(data) {
+            currentData = data;
+            var kpi = document.getElementById('kpiGrid');
+            kpi.innerHTML = '';
+            DashUtils.renderKpiCard(kpi, 'fa-calendar-check', DashUtils.formatNumber(data.total_shifts || 0), 'إجمالي المناوبات', 'blue');
+            DashUtils.renderKpiCard(kpi, 'fa-clipboard-list', DashUtils.formatNumber(data.total_reports || 0), 'إجمالي البلاغات', 'purple');
+            DashUtils.renderKpiCard(kpi, 'fa-clock', DashUtils.formatNumber(data.total_operating_hours || 0), 'ساعات التشغيل', 'gold');
+            DashUtils.renderKpiCard(kpi, 'fa-users', DashUtils.formatNumber(data.total_staff || 0), 'الموظفين', 'green');
+            DashUtils.renderKpiCard(kpi, 'fa-people-group', DashUtils.formatNumber(data.total_teams || 0), 'الفرق', 'blue');
+            DashUtils.renderKpiCard(kpi, 'fa-truck-medical', DashUtils.formatNumber(data.total_vehicles || 0), 'المركبات', 'purple');
+            DashUtils.renderKpiCard(kpi, 'fa-sun', DashUtils.formatNumber(data.morning_shifts || 0), 'مناوبات صباحية', 'gold');
+            DashUtils.renderKpiCard(kpi, 'fa-moon', DashUtils.formatNumber(data.night_shifts || 0), 'مناوبات ليلية', 'coral');
+            DashUtils.renderKpiCard(kpi, 'fa-percentage', DashUtils.formatPercent(data.completion_rate), 'نسبة الإنجاز', 'green');
+            DashUtils.renderKpiCard(kpi, 'fa-chart-line', DashUtils.formatPercent(data.avg_performance || 0), 'متوسط الأداء', 'purple');
+
+            renderDailyBarChart(data);
+            renderTrendLineChart(data);
+            renderShiftTypeChart(data);
+            renderShiftsTable(data.shifts || []);
+        }
+
+        function renderDailyBarChart(data) {
+            var labels = [];
+            var values = [];
+            if (data.reports_by_day) {
+                Object.keys(data.reports_by_day).sort().forEach(function(k) {
+                    labels.push(parseInt(k.split('-')[2], 10));
+                    values.push(data.reports_by_day[k]);
+                });
+            } else {
+                var daysInMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 0).getDate();
+                for (var i = 1; i <= daysInMonth; i++) { labels.push(i); values.push(0); }
+            }
+            ChartHelpers.createBarChart('dailyBarChart', labels, [ChartHelpers.makeDataset('البلاغات', values, ChartHelpers.colors.primary)]);
+        }
+
+        function renderTrendLineChart(data) {
+            var labels = [];
+            var currentValues = [];
+            var previousValues = [];
+            if (data.trend_comparison) {
+                Object.keys(data.trend_comparison).sort().forEach(function(k) {
+                    labels.push(parseInt(k.split('-')[2], 10));
+                    var item = data.trend_comparison[k];
+                    currentValues.push(item.current || 0);
+                    previousValues.push(item.previous || 0);
+                });
+            } else {
+                var daysInMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 0).getDate();
+                for (var i = 1; i <= daysInMonth; i++) { labels.push(i); currentValues.push(0); previousValues.push(0); }
+            }
+            ChartHelpers.createLineChart('trendLineChart', labels, [
+                ChartHelpers.makeDataset('الشهر الحالي', currentValues, ChartHelpers.colors.primary, 'line'),
+                ChartHelpers.makeDataset('الشهر الماضي', previousValues, ChartHelpers.colors.gray, 'line')
+            ]);
+        }
+
+        function renderShiftTypeChart(data) {
+            var labels = ['صباحية', 'ليلية', 'أخرى'];
+            var values = [data.morning_shifts || 0, data.night_shifts || 0, (data.total_shifts || 0) - (data.morning_shifts || 0) - (data.night_shifts || 0)];
+            ChartHelpers.createPieChart('shiftTypeChart', labels, values);
+        }
+
+        function renderShiftsTable(shifts) {
+            var wrap = document.getElementById('shiftsTableWrap');
+            if (!shifts.length) { DashUtils.showEmpty(wrap, 'لا توجد مناوبات هذا الشهر'); return; }
+            var html = '<div class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr>' +
+                '<th>التاريخ</th><th>النوع</th><th>المشرف</th><th>البلاغات</th><th>المنجزة</th><th>نسبة الإنجاز</th><th>إجراءات</th>' +
+                '</tr></thead><tbody>';
+            shifts.forEach(function(s) {
+                var rate = s.completion_rate || 0;
+                var badge = rate >= 80 ? 'badge-success' : rate >= 50 ? 'badge-warning' : 'badge-danger';
+                html += '<tr>' +
+                    '<td>' + DashUtils.formatDate(s.date) + '</td>' +
+                    '<td>' + (s.shift_type || '-') + '</td>' +
+                    '<td>' + (s.supervisor || '-') + '</td>' +
+                    '<td>' + DashUtils.formatNumber(s.total_reports || 0) + '</td>' +
+                    '<td>' + DashUtils.formatNumber(s.completed_reports || 0) + '</td>' +
+                    '<td><span class="dashboard-badge ' + badge + '">' + DashUtils.formatPercent(rate) + '</span></td>' +
+                    '<td><a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + s.id + '">عرض</a></td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+            wrap.innerHTML = html;
+        }
+
+        function exportMonthlyPDF() { ExportUtils.exportDashboardToPDF('monthlyDashboard', 'monthly_dashboard_' + getCurrentMonthStr()); }
+        function exportMonthlyExcel() { if (!currentData || !currentData.shifts) return; ExportUtils.exportShiftsToExcel(currentData.shifts); }
+
+        window.loadMonthly = loadMonthly;
+        window.changeMonth = changeMonth;
+        window.setMonthFromInput = setMonthFromInput;
+        window.exportMonthlyPDF = exportMonthlyPDF;
+        window.exportMonthlyExcel = exportMonthlyExcel;
+
+        updateMonthDisplay();
+        loadMonthly();
+    })();
+    </script>
+</body>
+</html>

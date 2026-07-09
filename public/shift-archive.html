@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="أرشيف المناوبات - منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض">
+    <title>أرشيف المناوبات | منصة الجنوب</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="/css/shift-dashboard.css">
+    <link rel="stylesheet" href="/css/shift-archive.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="dashboard-page">
+    <div class="dashboard-top-bar">
+        <a href="/" class="dashboard-logo"><i class="fas fa-ambulance"></i><span>منصة الجنوب</span></a>
+        <div class="dashboard-top-bar-center"><div class="dashboard-live-clock" id="liveClock">--</div></div>
+        <div class="dashboard-top-bar-actions">
+            <a href="/" class="dashboard-btn"><i class="fas fa-home"></i> الرئيسية</a>
+            <a href="/shift-daily-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-day"></i> يومي</a>
+            <a href="/shift-weekly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-week"></i> أسبوعي</a>
+            <a href="/shift-monthly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-alt"></i> شهري</a>
+            <a href="/shift-executive-dashboard.html" class="dashboard-btn"><i class="fas fa-chart-line"></i> تنفيذي</a>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="dashboard-title"><i class="fas fa-archive"></i> أرشيف المناوبات</div>
+
+        <!-- Search Bar -->
+        <div class="archive-search-bar">
+            <input type="text" id="searchInput" placeholder="بحث سريع: تاريخ، نوع، مركز، مشرف، موظف، رقم بلاغ..." onkeydown="if(event.key==='Enter'){applySearch()}" />
+            <i class="fas fa-search"></i>
+        </div>
+
+        <!-- Filter Tags -->
+        <div class="filter-tags" id="filterTags"></div>
+
+        <!-- Advanced Filters -->
+        <div class="filter-bar" id="filterBar">
+            <div class="filter-group">
+                <label>من تاريخ</label>
+                <input type="date" id="filterDateFrom" name="date_from" />
+            </div>
+            <div class="filter-group">
+                <label>إلى تاريخ</label>
+                <input type="date" id="filterDateTo" name="date_to" />
+            </div>
+            <div class="filter-group">
+                <label>نوع المناوبة</label>
+                <select id="filterShiftType" name="shift_type">
+                    <option value="">الكل</option>
+                    <option value="صباحية">صباحية</option>
+                    <option value="ليلية">ليلية</option>
+                    <option value="مسائية">مسائية</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>المركز</label>
+                <input type="text" id="filterCenter" name="center" placeholder="اسم المركز" />
+            </div>
+            <div class="filter-group">
+                <label>المشرف</label>
+                <input type="text" id="filterSupervisor" name="supervisor" placeholder="اسم المشرف" />
+            </div>
+            <div class="filter-group">
+                <label>الموظف</label>
+                <input type="text" id="filterEmployee" name="employee" placeholder="اسم الموظف" />
+            </div>
+            <div class="filter-group">
+                <label>الحالة</label>
+                <select id="filterStatus" name="status">
+                    <option value="">الكل</option>
+                    <option value="active">نشطة</option>
+                    <option value="completed">مكتملة</option>
+                    <option value="pending">معلقة</option>
+                </select>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <label>&nbsp;</label>
+                <button class="dashboard-btn dashboard-btn-primary" onclick="applySearch()"><i class="fas fa-search"></i> بحث</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <label>&nbsp;</label>
+                <button class="dashboard-btn" onclick="clearAllFilters()"><i class="fas fa-times"></i> مسح</button>
+            </div>
+        </div>
+
+        <!-- Sort Bar -->
+        <div class="sort-bar">
+            <label>ترتيب حسب:</label>
+            <select id="sortSelect" onchange="applySearch()">
+                <option value="date_desc">التاريخ (الأحدث)</option>
+                <option value="date_asc">التاريخ (الأقدم)</option>
+                <option value="completion_rate_desc">نسبة الإنجاز (الأعلى)</option>
+                <option value="completion_rate_asc">نسبة الإنجاز (الأقل)</option>
+                <option value="health_score_desc">درجة الصحة (الأعلى)</option>
+                <option value="health_score_asc">درجة الصحة (الأقل)</option>
+            </select>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions-bar hidden" id="bulkBar">
+            <div class="bulk-actions-count" id="bulkCount">تم اختيار 0</div>
+            <div class="bulk-actions-buttons">
+                <button class="dashboard-btn dashboard-btn-primary" onclick="compareSelected()"><i class="fas fa-balance-scale"></i> مقارنة</button>
+                <button class="dashboard-btn" onclick="exportSelectedExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                <button class="dashboard-btn dashboard-btn-danger" onclick="clearSelection()"><i class="fas fa-times"></i> إلغاء</button>
+            </div>
+        </div>
+
+        <!-- Results Grid -->
+        <div class="archive-grid" id="archiveGrid"></div>
+
+        <!-- Pagination -->
+        <div id="pagination"></div>
+    </div>
+
+    <script src="/js/shift-dashboard.js"></script>
+    <script src="/js/shift-charts.js"></script>
+    <script src="/js/shift-search.js"></script>
+    <script src="/js/shift-comparison.js"></script>
+    <script src="/js/shift-export.js"></script>
+    <script>
+    (function() {
+        'use strict';
+        var currentPage = 1;
+        var currentTotal = 0;
+        var selectedIds = new Set();
+        var currentShifts = [];
+        DashUtils.initLiveClock('liveClock');
+        if (!DashUtils.checkAuth()) return;
+
+        function applySearch() {
+            SearchFilters.syncFiltersFromForm('filterBar');
+            var q = document.getElementById('searchInput').value.trim();
+            if (q) SearchFilters.setFilter('q', q);
+            else SearchFilters.clearFilter('q');
+            var sort = document.getElementById('sortSelect').value;
+            if (sort) SearchFilters.setFilter('sort', sort);
+            currentPage = 1;
+            loadArchive();
+        }
+
+        function clearAllFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            document.getElementById('filterShiftType').value = '';
+            document.getElementById('filterCenter').value = '';
+            document.getElementById('filterSupervisor').value = '';
+            document.getElementById('filterEmployee').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('sortSelect').value = 'date_desc';
+            SearchFilters.clearAllFilters();
+            SearchFilters.renderFilterTags('filterTags', function() { applySearch(); });
+            currentPage = 1;
+            loadArchive();
+        }
+
+        function loadArchive() {
+            var url = SearchFilters.buildArchiveQuery(currentPage, 20);
+            DashUtils.showSpinner(document.getElementById('archiveGrid'));
+            DashUtils.apiFetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success) {
+                        currentShifts = data.shifts || [];
+                        currentTotal = data.total || 0;
+                        renderArchive(data.shifts);
+                        DashUtils.renderPagination(document.getElementById('pagination'), currentPage, data.total_pages || 1, function(p) { currentPage = p; loadArchive(); });
+                        SearchFilters.renderFilterTags('filterTags', function() { applySearch(); });
+                    } else { DashUtils.showToast(data.error || 'فشل في تحميل البيانات', 'error'); }
+                }).catch(function() { DashUtils.showToast('فشل في تحميل الأرشيف', 'error'); });
+        }
+
+        function renderArchive(shifts) {
+            var grid = document.getElementById('archiveGrid');
+            if (!shifts.length) { DashUtils.showEmpty(grid, 'لا توجد نتائج'); return; }
+            grid.innerHTML = '';
+            shifts.forEach(function(s) {
+                var rate = s.completion_rate || 0;
+                var health = s.health_score || 0;
+                var rateBadge = rate >= 80 ? 'badge-success' : rate >= 50 ? 'badge-warning' : 'badge-danger';
+                var healthBadge = health >= 80 ? 'badge-success' : health >= 50 ? 'badge-warning' : 'badge-danger';
+                var selected = selectedIds.has(s.id) ? 'selected' : '';
+                var html =
+                    '<div class="archive-card ' + selected + '" data-id="' + s.id + '" onclick="toggleSelect(' + s.id + ')">' +
+                    '<input type="checkbox" class="archive-card-checkbox" ' + (selectedIds.has(s.id) ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleSelect(' + s.id + ')" />' +
+                    '<div class="archive-card-header">' +
+                    '<div class="archive-card-title">' + (s.shift_type || 'مناوبة') + ' #' + (s.id || '-') + '</div>' +
+                    '<div class="archive-card-date">' + DashUtils.formatDate(s.date) + '</div>' +
+                    '</div>' +
+                    '<div class="archive-card-meta">' +
+                    '<div class="archive-card-meta-item"><i class="fas fa-user"></i> ' + (s.supervisor || '-') + '</div>' +
+                    '<div class="archive-card-meta-item"><i class="fas fa-hospital"></i> ' + (s.center || '-') + '</div>' +
+                    '<div class="archive-card-meta-item"><i class="fas fa-clipboard-list"></i> ' + DashUtils.formatNumber(s.total_reports || 0) + ' بلاغ</div>' +
+                    '</div>' +
+                    '<div class="archive-card-preview">' +
+                    '<div class="archive-card-preview-row"><span>البلاغات المنجزة</span><span>' + DashUtils.formatNumber(s.completed_reports || 0) + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>البلاغات المعلقة</span><span>' + DashUtils.formatNumber(s.pending_reports || 0) + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>الموظفين</span><span>' + DashUtils.formatNumber(s.staff_count || 0) + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>الفرق</span><span>' + DashUtils.formatNumber(s.team_count || 0) + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>المركبات</span><span>' + DashUtils.formatNumber(s.vehicle_count || 0) + '</span></div>' +
+                    '</div>' +
+                    '<div class="archive-card-actions">' +
+                    '<span class="dashboard-badge ' + rateBadge + '">إنجاز ' + DashUtils.formatPercent(rate) + '</span>' +
+                    '<span class="dashboard-badge ' + healthBadge + '">صحة ' + DashUtils.formatPercent(health) + '</span>' +
+                    '<a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + s.id + '">عرض</a>' +
+                    '</div>' +
+                    '</div>';
+                grid.insertAdjacentHTML('beforeend', html);
+            });
+            updateBulkBar();
+        }
+
+        function toggleSelect(id) {
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            var card = document.querySelector('.archive-card[data-id="' + id + '"]');
+            if (card) {
+                card.classList.toggle('selected', selectedIds.has(id));
+                var cb = card.querySelector('.archive-card-checkbox');
+                if (cb) cb.checked = selectedIds.has(id);
+            }
+            updateBulkBar();
+        }
+
+        function clearSelection() {
+            selectedIds.clear();
+            document.querySelectorAll('.archive-card').forEach(function(c) {
+                c.classList.remove('selected');
+                var cb = c.querySelector('.archive-card-checkbox');
+                if (cb) cb.checked = false;
+            });
+            updateBulkBar();
+        }
+
+        function updateBulkBar() {
+            var bar = document.getElementById('bulkBar');
+            if (selectedIds.size > 0) {
+                bar.classList.remove('hidden');
+                document.getElementById('bulkCount').textContent = 'تم اختيار ' + selectedIds.size;
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function compareSelected() {
+            var ids = Array.from(selectedIds);
+            if (ids.length !== 2) {
+                DashUtils.showToast('يرجى اختيار مناوبتين للمقارنة', 'warning');
+                return;
+            }
+            ComparisonModal.compare(ids[0], ids[1]);
+        }
+
+        function exportSelectedExcel() {
+            var selected = currentShifts.filter(function(s) { return selectedIds.has(s.id); });
+            if (!selected.length) { DashUtils.showToast('يرجى اختيار مناوبات للتصدير', 'warning'); return; }
+            ExportUtils.exportShiftsToExcel(selected);
+        }
+
+        window.applySearch = applySearch;
+        window.clearAllFilters = clearAllFilters;
+        window.toggleSelect = toggleSelect;
+        window.clearSelection = clearSelection;
+        window.compareSelected = compareSelected;
+        window.exportSelectedExcel = exportSelectedExcel;
+
+        loadArchive();
+    })();
+    </script>
+</body>
+</html>
