@@ -780,8 +780,15 @@ const loginLimiter = rateLimit({
 app.use('/api/auth/login', loginLimiter);
 
 function authenticate(req, res, next) {
+    // Try Authorization header first (standard API calls)
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    let token = authHeader && authHeader.split(' ')[1];
+    
+    // Fallback to query string (for SSE/EventSource which doesn't support custom headers)
+    if (!token && req.query && req.query.token) {
+        token = req.query.token;
+    }
+    
     if (!token) return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
