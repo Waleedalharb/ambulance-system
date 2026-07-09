@@ -712,6 +712,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// 3.5 Trust proxy (required for Render and other reverse proxies)
+app.set('trust proxy', 1);
+
 // 4. Static Files (BEFORE rate limiting — never rate-limit assets)
 const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -737,6 +740,8 @@ const globalLimiter = rateLimit({
     message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
     standardHeaders: true,
     legacyHeaders: false,
+    // Fix for Render/reverse proxy: skip X-Forwarded-For validation
+    validate: { xForwardedForHeader: false },
     skip: (req) => {
         // Never rate-limit health checks, static assets, or WebSocket upgrade
         if (req.path === '/health') return true;

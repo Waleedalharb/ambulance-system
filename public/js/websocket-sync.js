@@ -65,7 +65,13 @@
 
     function connect() {
         try {
-            ws = new WebSocket(wsProtocol + '//' + location.host + '/ws');
+            // Include auth token in WebSocket connection
+            var token = localStorage.getItem('authToken');
+            if (!token) {
+                console.log('Sync: no authToken, skipping WebSocket connect');
+                return;
+            }
+            ws = new WebSocket(wsProtocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
         } catch(e) {
             console.error('WebSocket creation failed:', e);
             scheduleReconnect();
