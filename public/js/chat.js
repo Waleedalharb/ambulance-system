@@ -768,6 +768,8 @@
                 conv.unread_count = (conv.unread_count || 0) + 1;
                 // Play notification sound for new messages in other conversations
                 playNotificationSound();
+                // Show browser notification
+                showBrowserNotification(msg.sender_name || 'رسالة جديدة', msg.content || '', msg.sender_id);
             }
             // Move to top
             chatState.conversations.sort(function(a, b) {
@@ -817,6 +819,29 @@
             var audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
             audio.volume = 0.3;
             audio.play().catch(function(){});
+        } catch(e) {}
+    }
+
+    function showBrowserNotification(title, body, senderId) {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        try {
+            var notif = new Notification(title, {
+                body: body.substring(0, 100),
+                icon: '/logo.png',
+                tag: 'chat-' + senderId,
+                requireInteraction: false
+            });
+            notif.onclick = function() {
+                window.focus();
+                // Open conversation with sender
+                var conv = chatState.conversations.find(function(c) {
+                    return c.type === 'private' && c.participants.some(function(p) {
+                        return p.user_id === senderId;
+                    });
+                });
+                if (conv) openConversation(conv.id);
+            };
         } catch(e) {}
     }
 
@@ -1005,6 +1030,17 @@
         ChatSocket.onTyping(onIncomingTyping);
         ChatSocket.onRead(onIncomingRead);
         ChatSocket.onPresence(onIncomingPresence);
+        
+        // Send offline status when closing page
+        window.addEventListener('beforeunload', function() {
+            if (ChatSocket.ws && ChatSocket.ws.readyState === WebSocket.OPEN) {
+                ChatSocket.ws.send(JSON.stringify({
+                    type: 'chat_presence',
+                    userId: chatState.currentUser ? chatState.currentUser.id : null,
+                    status: 'offline'
+                }));
+            }
+        });
     }
 
     // Start

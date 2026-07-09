@@ -7295,13 +7295,15 @@ app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
         }
         const currentUserId = req.user.id;
+        const targetUserId = String(user_id); // تحويل إلى string للمطابقة
+        
         // Check if private conversation already exists
         const existing = await db.get(
             `SELECT c.* FROM chat_conversations c
              JOIN chat_participants p1 ON c.id = p1.conversation_id
              JOIN chat_participants p2 ON c.id = p2.conversation_id
              WHERE c.type = 'private' AND p1.user_id = ? AND p2.user_id = ?`,
-            [currentUserId, user_id]
+            [currentUserId, targetUserId]
         );
         if (existing) {
             const participants = await db.all(
@@ -7329,7 +7331,7 @@ app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
         );
         await db.run(
             `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
-            [convResult.id, user_id]
+            [convResult.id, targetUserId]
         );
         const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convResult.id]);
         const participants = await db.all(
