@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="لوحة تحكم تنفيذية - منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض">
+    <title>لوحة التحكم التنفيذية | منصة الجنوب</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="/css/shift-dashboard.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .exec-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .exec-card { background: #fff; border-radius: 14px; border: 1px solid #E2E8F0; padding: 20px; box-shadow: 0 1px 3px rgba(148,163,184,0.08), 0 4px 12px rgba(148,163,184,0.12); transition: all 0.3s; }
+        .exec-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(148,163,184,0.15); }
+        .exec-card-title { font-size: 0.85rem; color: #64748B; margin-bottom: 8px; font-weight: 500; }
+        .exec-card-value { font-size: 1.8rem; font-weight: 800; color: #1E293B; }
+        .exec-card-sub { font-size: 0.8rem; color: #94A3B8; margin-top: 4px; }
+    </style>
+</head>
+<body class="dashboard-page">
+    <div class="dashboard-top-bar">
+        <a href="/" class="dashboard-logo"><i class="fas fa-ambulance"></i><span>منصة الجنوب</span></a>
+        <div class="dashboard-top-bar-center"><div class="dashboard-live-clock" id="liveClock">--</div></div>
+        <div class="dashboard-top-bar-actions">
+            <a href="/" class="dashboard-btn"><i class="fas fa-home"></i> الرئيسية</a>
+            <a href="/shift-daily-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-day"></i> يومي</a>
+            <a href="/shift-weekly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-week"></i> أسبوعي</a>
+            <a href="/shift-monthly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-alt"></i> شهري</a>
+            <a href="/shift-archive.html" class="dashboard-btn"><i class="fas fa-archive"></i> الأرشيف</a>
+        </div>
+    </div>
+
+    <div class="dashboard-container" id="execDashboard">
+        <div class="dashboard-title"><i class="fas fa-chart-line"></i> لوحة التحكم التنفيذية</div>
+
+        <div class="filter-bar">
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn dashboard-btn-primary" onclick="loadExecutive()"><i class="fas fa-sync"></i> تحديث</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:120px;">
+                <button class="dashboard-btn" onclick="exportExecPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:140px;">
+                <button class="dashboard-btn dashboard-btn-success" onclick="generateDailyReport()"><i class="fas fa-file-alt"></i> تقرير يومي</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:140px;">
+                <button class="dashboard-btn dashboard-btn-success" onclick="generateWeeklyReport()"><i class="fas fa-file-alt"></i> تقرير أسبوعي</button>
+            </div>
+            <div class="filter-group" style="flex:0; min-width:140px;">
+                <button class="dashboard-btn dashboard-btn-success" onclick="generateMonthlyReport()"><i class="fas fa-file-alt"></i> تقرير شهري</button>
+            </div>
+        </div>
+
+        <!-- Executive Summary Cards -->
+        <div class="exec-summary-grid" id="execSummary"></div>
+
+        <div class="charts-grid">
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-line"></i> الاتجاه (30 يوم)</div></div>
+                <div class="chart-container"><canvas id="trend30Chart"></canvas></div>
+            </div>
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-hospital"></i> top 5 المراكز</div></div>
+                <div class="chart-container"><canvas id="topCentersChart"></canvas></div>
+            </div>
+            <div class="chart-section">
+                <div class="chart-header"><div class="chart-title"><i class="fas fa-exclamation-triangle"></i> التنبيهات (7 أيام)</div></div>
+                <div class="chart-container"><canvas id="alertsChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Latest Shifts -->
+        <div class="chart-section" style="padding:0; overflow:hidden; margin-bottom:24px;">
+            <div class="chart-header" style="padding:16px 20px; border-bottom:1px solid #E2E8F0;">
+                <div class="chart-title"><i class="fas fa-list"></i> أحدث المناوبات</div>
+            </div>
+            <div id="latestShiftsWrap"></div>
+        </div>
+
+        <!-- Latest Alerts -->
+        <div class="chart-section" style="padding:0; overflow:hidden;">
+            <div class="chart-header" style="padding:16px 20px; border-bottom:1px solid #E2E8F0;">
+                <div class="chart-title"><i class="fas fa-bell"></i> أحدث التنبيهات</div>
+            </div>
+            <div id="latestAlertsWrap"></div>
+        </div>
+    </div>
+
+    <script src="/js/shift-dashboard.js"></script>
+    <script src="/js/shift-charts.js"></script>
+    <script src="/js/shift-export.js"></script>
+    <script>
+    (function() {
+        'use strict';
+        var currentData = null;
+        DashUtils.initLiveClock('liveClock');
+        if (!DashUtils.checkAuth()) return;
+
+        function loadExecutive() {
+            DashUtils.showSpinner(document.getElementById('execSummary'));
+            var cacheKey = 'exec_' + DashUtils.todayStr();
+            var cached = DashUtils.cacheGet(cacheKey);
+            if (cached) { renderExecutive(cached); return; }
+
+            DashUtils.apiFetch('/api/shifts/executive-dashboard')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success) {
+                        DashUtils.cacheSet(cacheKey, data, 300);
+                        renderExecutive(data);
+                    } else { DashUtils.showToast(data.error || 'فشل في تحميل البيانات', 'error'); }
+                }).catch(function() { DashUtils.showToast('فشل في تحميل البيانات التنفيذية', 'error'); });
+        }
+
+        function renderExecutive(data) {
+            currentData = data;
+            renderSummary(data);
+            renderTrend30Chart(data.trends || []);
+            renderTopCentersChart(data.top_centers || []);
+            renderAlertsChart(data.alerts || []);
+            renderLatestShifts(data.latest_shifts || []);
+            renderLatestAlerts(data.alerts || []);
+        }
+
+        function renderSummary(data) {
+            var container = document.getElementById('execSummary');
+            container.innerHTML = '';
+            var d = data.daily || {};
+            var w = data.weekly || {};
+            var m = data.monthly || {};
+            var items = [
+                { title: 'البلاغات اليوم', value: DashUtils.formatNumber(d.total_reports || 0), sub: 'نسبة الإنجاز: ' + DashUtils.formatPercent(d.completion_rate), icon: 'fa-clipboard-list', color: '#2563EB' },
+                { title: 'المناوبات اليوم', value: DashUtils.formatNumber(d.total_shifts || 0), sub: 'المراكز: ' + DashUtils.formatNumber(d.total_staff || 0), icon: 'fa-calendar-check', color: '#10B981' },
+                { title: 'البلاغات الأسبوعية', value: DashUtils.formatNumber(w.total_reports || 0), sub: 'متوسط يومي: ' + DashUtils.formatNumber(w.avg_daily_reports || 0), icon: 'fa-chart-bar', color: '#F59E0B' },
+                { title: 'البلاغات الشهرية', value: DashUtils.formatNumber(m.total_reports || 0), sub: 'المناوبات: ' + DashUtils.formatNumber(m.total_shifts || 0), icon: 'fa-chart-line', color: '#8B5CF6' },
+                { title: 'نسبة الإنجاز', value: DashUtils.formatPercent(m.completion_rate || d.completion_rate), sub: 'متوسط الأداء: ' + DashUtils.formatPercent(m.avg_performance || 0), icon: 'fa-percentage', color: '#0EA5E9' },
+                { title: 'التنبيهات المعلقة', value: DashUtils.formatNumber((data.alerts || []).filter(function(a) { return !a.is_acknowledged; }).length), sub: 'إجمالي: ' + DashUtils.formatNumber((data.alerts || []).length), icon: 'fa-exclamation-circle', color: '#EF4444' }
+            ];
+            items.forEach(function(item) {
+                container.insertAdjacentHTML('beforeend',
+                    '<div class="exec-card fade-in">' +
+                    '<div class="exec-card-title"><i class="fas ' + item.icon + '" style="color:' + item.color + '; margin-left:6px;"></i> ' + item.title + '</div>' +
+                    '<div class="exec-card-value">' + item.value + '</div>' +
+                    '<div class="exec-card-sub">' + item.sub + '</div>' +
+                    '</div>'
+                );
+            });
+        }
+
+        function renderTrend30Chart(trends) {
+            var labels = [];
+            var values = [];
+            if (trends.length) {
+                trends.forEach(function(t) {
+                    labels.push(DashUtils.formatDate(t.date));
+                    values.push(t.total_reports || 0);
+                });
+            } else {
+                labels = ['لا توجد بيانات']; values = [0];
+            }
+            ChartHelpers.createLineChart('trend30Chart', labels, [ChartHelpers.makeDataset('البلاغات', values, ChartHelpers.colors.primary, 'line')]);
+        }
+
+        function renderTopCentersChart(centers) {
+            var labels = [];
+            var values = [];
+            if (centers.length) {
+                centers.forEach(function(c) { labels.push(c.center || '-'); values.push(c.count || 0); });
+            } else {
+                labels = ['لا توجد بيانات']; values = [0];
+            }
+            ChartHelpers.createHorizontalBarChart('topCentersChart', labels, [ChartHelpers.makeDataset('البلاغات', values, ChartHelpers.colors.success)]);
+        }
+
+        function renderAlertsChart(alerts) {
+            var counts = { info: 0, warning: 0, critical: 0 };
+            alerts.forEach(function(a) { if (counts[a.severity] !== undefined) counts[a.severity]++; });
+            var labels = ['معلومات', 'تحذير', 'حرج'];
+            var values = [counts.info, counts.warning, counts.critical];
+            ChartHelpers.createPieChart('alertsChart', labels, values);
+        }
+
+        function renderLatestShifts(shifts) {
+            var wrap = document.getElementById('latestShiftsWrap');
+            if (!shifts.length) { wrap.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>لا توجد مناوبات</h3></div>'; return; }
+            var html = '<div class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr>' +
+                '<th>التاريخ</th><th>النوع</th><th>المشرف</th><th>البلاغات</th><th>نسبة الإنجاز</th><th>إجراءات</th>' +
+                '</tr></thead><tbody>';
+            shifts.forEach(function(s) {
+                var rate = s.completion_rate || 0;
+                var badge = rate >= 80 ? 'badge-success' : rate >= 50 ? 'badge-warning' : 'badge-danger';
+                html += '<tr>' +
+                    '<td>' + DashUtils.formatDate(s.date) + '</td>' +
+                    '<td>' + (s.shift_type || '-') + '</td>' +
+                    '<td>' + (s.supervisor || '-') + '</td>' +
+                    '<td>' + DashUtils.formatNumber(s.total_reports || 0) + '</td>' +
+                    '<td><span class="dashboard-badge ' + badge + '">' + DashUtils.formatPercent(rate) + '</span></td>' +
+                    '<td><a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + s.id + '">عرض</a></td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+            wrap.innerHTML = html;
+        }
+
+        function renderLatestAlerts(alerts) {
+            var wrap = document.getElementById('latestAlertsWrap');
+            if (!alerts.length) { wrap.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>لا توجد تنبيهات</h3></div>'; return; }
+            var html = '<div class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr>' +
+                '<th>النوع</th><th>الخطورة</th><th>الرسالة</th><th>المناوبة</th><th>التاريخ</th><th>إجراءات</th>' +
+                '</tr></thead><tbody>';
+            alerts.slice(0, 20).forEach(function(a) {
+                var severityBadge = a.severity === 'critical' ? 'badge-danger' : a.severity === 'warning' ? 'badge-warning' : 'badge-info';
+                html += '<tr>' +
+                    '<td>' + (a.alert_type || '-') + '</td>' +
+                    '<td><span class="dashboard-badge ' + severityBadge + '">' + (a.severity || '-') + '</span></td>' +
+                    '<td>' + (a.message || '-') + '</td>' +
+                    '<td>' + (a.shift_id || '-') + '</td>' +
+                    '<td>' + DashUtils.formatDateTime(a.created_at) + '</td>' +
+                    '<td>' + (a.is_acknowledged ? '<span class="dashboard-badge badge-success">تم التأكيد</span>' : '<button class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="ackAlert(' + a.id + ')">تأكيد</button>') + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+            wrap.innerHTML = html;
+        }
+
+        function ackAlert(id) {
+            DashUtils.apiFetch('/api/shifts/alerts/' + id + '/acknowledge', { method: 'POST', body: JSON.stringify({ acknowledged_by: (DashUtils.getUser() || {}).name || 'system' }) })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success) { DashUtils.showToast('تم تأكيد التنبيه', 'success'); loadExecutive(); }
+                    else { DashUtils.showToast('فشل في تأكيد التنبيه', 'error'); }
+                }).catch(function() { DashUtils.showToast('فشل في تأكيد التنبيه', 'error'); });
+        }
+
+        function generateDailyReport() {
+            ExportUtils.requestReport('daily', DashUtils.todayStr(), DashUtils.todayStr());
+        }
+        function generateWeeklyReport() {
+            var ws = DashUtils.getWeekStart();
+            ExportUtils.requestReport('weekly', ws, DashUtils.getWeekEnd(ws));
+        }
+        function generateMonthlyReport() {
+            var d = new Date();
+            ExportUtils.requestReport('monthly', DashUtils.getMonthStart(d), DashUtils.getMonthEnd(d));
+        }
+        function exportExecPDF() { ExportUtils.exportDashboardToPDF('execDashboard', 'executive_dashboard_' + DashUtils.todayStr()); }
+
+        window.loadExecutive = loadExecutive;
+        window.exportExecPDF = exportExecPDF;
+        window.generateDailyReport = generateDailyReport;
+        window.generateWeeklyReport = generateWeeklyReport;
+        window.generateMonthlyReport = generateMonthlyReport;
+        window.ackAlert = ackAlert;
+
+        loadExecutive();
+    })();
+    </script>
+</body>
+</html>
