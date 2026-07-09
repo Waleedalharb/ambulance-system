@@ -422,67 +422,63 @@ function testPushNotification(title, body) {
 }
 
 // ============================================
-// WebSocket - تحديث فوري
+// SSE + Polling - تحديث فوري ومستقر
 // ============================================
-var ws = null;
-var wsConnected = false;
-var wsFallbackInterval = null;
+var sseSource = null;
+var sseConnected = false;
+var wsFallbackInterval = null; // اسم متغير للتوافق مع الكود القديم
 
-function initWebSocket() {
+function connectSSE() {
     try {
-        var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         var token = localStorage.getItem('authToken');
-        var wsUrl = protocol + window.location.host + '/ws' + (token ? '?token=' + encodeURIComponent(token) : '');
-        ws = new WebSocket(wsUrl);
+        if (!token) {
+            console.log('🔴 SSE: no token, using polling only');
+            startFallbackInterval();
+            return;
+        }
+        var sseUrl = '/api/sse?token=' + encodeURIComponent(token);
+        sseSource = new EventSource(sseUrl);
         
-        ws.onopen = function() {
-            wsConnected = true;
-            console.log('✅ WebSocket connected to', wsUrl);
+        sseSource.onopen = function() {
+            sseConnected = true;
+            console.log('✅ SSE connected to', sseUrl);
             // إيقاف fallback عند الاتصال الناجح
             if (wsFallbackInterval) {
                 clearInterval(wsFallbackInterval);
                 wsFallbackInterval = null;
-                console.log('🛑 Fallback interval stopped - WebSocket active');
+                console.log('🛑 Fallback polling stopped - SSE active');
             }
         };
         
-        ws.onmessage = function(event) {
+        sseSource.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
                 // Respond to server ping to keep connection alive
                 if (data.type === 'ping') {
-                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                    // SSE لا يحتاج pong، الاتصال أحادي الاتجاه
                     return;
                 }
-                handleWebSocketMessage(data);
+                handleSSEEvent(data);
             } catch(e) {
-                console.error('WS parse error:', e);
+                console.error('SSE parse error:', e);
             }
         };
         
-        ws.onclose = function() {
-            wsConnected = false;
-            console.log('❌ WebSocket disconnected');
-            // Exponential backoff reconnect
-            var delay = Math.min(5000 + (Math.random() * 2000), 30000);
-            setTimeout(initWebSocket, delay);
-            // تشغيل fallback إذا لم يكن يعمل
+        sseSource.onerror = function(err) {
+            sseConnected = false;
+            console.log('❌ SSE error/disconnected, will reconnect automatically');
+            // EventSource يعيد الاتصال تلقائياً، لكن نشغل fallback كاحتياط
             if (!wsFallbackInterval) {
                 startFallbackInterval();
             }
         };
-        
-        ws.onerror = function(err) {
-            console.error('WebSocket error:', err);
-        };
     } catch(e) {
-        console.log('WebSocket not supported');
-        // تشغيل fallback لو WebSocket غير مدعوم
+        console.log('SSE not supported, using polling');
         startFallbackInterval();
     }
 }
 
-function handleWebSocketMessage(data) {
+function handleSSEEvent(data) {
     switch(data.type) {
         case 'new_report':
             showNotification('بلاغ جديد', data.message, 'info', 5000);
@@ -493,7 +489,7 @@ function handleWebSocketMessage(data) {
             applyGlobalTheme();
             break;
         case 'connected':
-            console.log('WS:', data.message);
+            console.log('SSE:', data.message);
             break;
     }
 }
@@ -503,18 +499,18 @@ function refreshReports() {
 }
 
 // ============================================
-// Fallback - تحديث دوري لو WebSocket غير متوفر
+// Fallback - تحديث دوري لو SSE غير متوفر
 // ============================================
 function startFallbackInterval() {
     if (wsFallbackInterval) return;
-    console.log('⏱️ Starting fallback polling (30s)');
+    console.log('⏱️ Starting fallback polling (3s)');
     wsFallbackInterval = setInterval(function() {
-        if (!wsConnected) {
+        if (!sseConnected) {
             console.log('🔄 Fallback: refreshing data...');
             loadAllData();
             applyGlobalTheme();
         }
-    }, 30000);
+    }, 3000);
 }
 
 // ============================================
@@ -4127,7 +4123,7 @@ async function saveShiftData(silent) {
                 } catch(e) {}
             } else {
                 // Auto-save: don't reload form to avoid race condition
-                // The WebSocket broadcast will update other UI elements
+                // The SSE broadcast will update other UI elements
                 // Form inputs keep their current values (user is still typing)
                 // Add audit log for auto-save (throttled — only log every 5 minutes to avoid spam)
                 try {
@@ -8356,7 +8352,7 @@ function getUniqueCenters() {
 // ربط الأحداث الرئيسية
 // ============================================
 document.addEventListener('DOMContentLoaded', async function() {
-    initWebSocket();
+    connectSSE();
     loadBrandLogo();
     initSoundSettings();
     var currentDateEl = document.getElementById("currentDate");
@@ -9588,10 +9584,10 @@ var coverageCircles = [];
 
 
 // ============================================
-// WebSocket - تحديث فوري
+// SSE - تحديث فوري
 // ============================================
-var ws = null;
-var wsConnected = false;
+var sseSource = null;
+var sseConnected = false;
 
 
 

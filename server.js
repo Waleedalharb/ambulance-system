@@ -371,9 +371,10 @@ function initWebSocket(server) {
     console.log('🔌 WebSocket server attached to HTTP server on /ws');
 }
 
-// دالة لبث الرسائل لجميع المتصلين (الكل)
+// دالة لبث الرسائل لجميع المتصلين (WebSocket + SSE)
 function broadcast(data) {
     var message = JSON.stringify(data);
+    // بث عبر WebSocket
     clients = clients.filter(function(client) {
         if (client.readyState === WebSocket.OPEN) {
             try {
@@ -386,6 +387,8 @@ function broadcast(data) {
         }
         return false;
     });
+    // بث عبر SSE
+    broadcastSSE(data);
 }
 
 // Helper: broadcast to conversation subscribers only
@@ -793,6 +796,46 @@ function authorize(roles) {
         next();
     };
 }
+
+// ============================================
+// SSE - تحديثات فورية عبر Server-Sent Events
+// ============================================
+var sseClients = []; // مصفوفة عملاء SSE
+
+// دالة لإضافة عميل SSE وإرسال التحديثات
+function broadcastSSE(data) {
+    var message = 'data: ' + JSON.stringify(data) + '\n\n';
+    sseClients = sseClients.filter(function(client) {
+        try {
+            client.res.write(message);
+            return true;
+        } catch (e) {
+            console.error('SSE broadcast error:', e.message);
+            return false;
+        }
+    });
+}
+
+// ============================================
+// API: SSE Endpoint
+// ============================================
+app.get('/api/sse', authenticate, function(req, res) {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    });
+    // إرسال رسالة أولية للتأكد من الاتصال
+    res.write('data: ' + JSON.stringify({ type: 'connected', message: 'متصل بـ SSE', user: req.user }) + '\n\n');
+    var client = { res: res, user: req.user, id: Date.now() + Math.random() };
+    sseClients.push(client);
+    console.log('🟢 SSE client connected:', req.user.name, '(' + req.user.id + ')');
+    // إزالة العميل عند الإغلاق
+    req.on('close', function() {
+        sseClients = sseClients.filter(function(c) { return c !== client; });
+        console.log('🔴 SSE client disconnected:', req.user.name);
+    });
+});
 
 // ============================================
 // Health Check (للـ Render Monitoring + Uptime)
@@ -7774,6 +7817,7 @@ server.listen(PORT, async () => {
     console.log(`📸 مجلد رفع الثيمات: ${path.join(STORAGE_PATH, 'uploads')}`);
     console.log(`🔒 Security: Helmet, Rate Limiting, CORS enabled`);
     console.log(`📡 WebSocket attached on path /ws`);
+    console.log(`📡 SSE endpoint available on /api/sse`);
     
     // Initialize DB after server starts
     await initDatabase();
@@ -7806,6 +7850,10 @@ server.listen(PORT, async () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('🛑 SIGTERM received. Shutting down gracefully...');
+    // إغلاق جميع اتصالات SSE
+    sseClients.forEach(function(client) {
+        try { client.res.end(); } catch(e) {}
+    });
     server.close(() => {
         console.log('✅ HTTP server closed');
         if (wss) {
@@ -7822,6 +7870,10 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
     console.log('🛑 SIGINT received. Shutting down gracefully...');
+    // إغلاق جميع اتصالات SSE
+    sseClients.forEach(function(client) {
+        try { client.res.end(); } catch(e) {}
+    });
     server.close(() => {
         console.log('✅ HTTP server closed');
         if (wss) {
