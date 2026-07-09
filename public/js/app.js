@@ -431,13 +431,13 @@ var wsFallbackInterval = null;
 function initWebSocket() {
     try {
         var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        var wsUrl = protocol + window.location.host + '/ws';
+        var token = localStorage.getItem('authToken');
+        var wsUrl = protocol + window.location.host + '/ws' + (token ? '?token=' + encodeURIComponent(token) : '');
         ws = new WebSocket(wsUrl);
         
         ws.onopen = function() {
             wsConnected = true;
             console.log('✅ WebSocket connected to', wsUrl);
-            showNotification('متصل', 'تم الاتصال بالتحديثات الفورية', 'success', 2000);
             // إيقاف fallback عند الاتصال الناجح
             if (wsFallbackInterval) {
                 clearInterval(wsFallbackInterval);
@@ -449,6 +449,11 @@ function initWebSocket() {
         ws.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
+                // Respond to server ping to keep connection alive
+                if (data.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                    return;
+                }
                 handleWebSocketMessage(data);
             } catch(e) {
                 console.error('WS parse error:', e);
@@ -458,8 +463,9 @@ function initWebSocket() {
         ws.onclose = function() {
             wsConnected = false;
             console.log('❌ WebSocket disconnected');
-            // إعادة الاتصال بعد 5 ثواني
-            setTimeout(initWebSocket, 5000);
+            // Exponential backoff reconnect
+            var delay = Math.min(5000 + (Math.random() * 2000), 30000);
+            setTimeout(initWebSocket, delay);
             // تشغيل fallback إذا لم يكن يعمل
             if (!wsFallbackInterval) {
                 startFallbackInterval();
