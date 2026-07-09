@@ -515,6 +515,75 @@ const TABLE_SCHEMAS = [
     mime_type TEXT,
     size INTEGER DEFAULT 0,
     upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Shift Audit Log
+  `CREATE TABLE IF NOT EXISTS shift_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    roster_id INTEGER,
+    employee_id INTEGER,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    old_shift_code TEXT,
+    new_shift_code TEXT,
+    old_team_id INTEGER,
+    new_team_id INTEGER,
+    changed_by TEXT NOT NULL,
+    changed_by_name TEXT,
+    change_type TEXT DEFAULT 'edit' CHECK(change_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Notification Log
+  `CREATE TABLE IF NOT EXISTS notification_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
+    recipient_id INTEGER NOT NULL,
+    recipient_name TEXT,
+    recipient_phone TEXT,
+    message TEXT NOT NULL,
+    channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read')),
+    roster_id INTEGER,
+    shift_date TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    sent_at DATETIME,
+    delivered_at DATETIME,
+    opened_at DATETIME,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Shift Roster Drafts
+  `CREATE TABLE IF NOT EXISTS shift_roster_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_data_json TEXT NOT NULL,
+    operation_type TEXT DEFAULT 'edit' CHECK(operation_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
+    created_by TEXT NOT NULL,
+    created_by_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    applied_at DATETIME,
+    reverted_at DATETIME
+  );`,
+
+  // Shift Change Requests
+  `CREATE TABLE IF NOT EXISTS shift_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    roster_id INTEGER,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    proposed_shift_code TEXT NOT NULL,
+    old_shift_code TEXT,
+    requested_by TEXT NOT NULL,
+    requested_by_name TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'cancelled')),
+    reason TEXT,
+    reviewed_by TEXT,
+    reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -527,6 +596,15 @@ async function initTables() {
   try {
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_date_team ON shift_roster(shift_date, team_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_employee ON shift_roster(employee_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_roster ON shift_audit_log(roster_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_employee ON shift_audit_log(employee_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_date ON shift_audit_log(shift_date);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_changed_by ON shift_audit_log(changed_by);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_recipient ON notification_log(recipient_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_status ON notification_log(status);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_created_by ON shift_roster_drafts(created_by);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_employee ON shift_change_requests(employee_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_status ON shift_change_requests(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_employee ON team_assignments(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_team ON team_assignments(team_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);`);
@@ -1486,6 +1564,141 @@ const AuditLog = {
 };
 
 // ============================================
+// CRUD: SHIFT AUDIT LOG
+// ============================================
+const ShiftAuditLog = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_audit_log ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_audit_log WHERE id = ?', [id]);
+  },
+  async getByEmployee(employee_id, limit = 50) {
+    return all('SELECT * FROM shift_audit_log WHERE employee_id = ? ORDER BY created_at DESC LIMIT ?', [employee_id, limit]);
+  },
+  async getByDateRange(date_from, date_to, limit = 50) {
+    return all('SELECT * FROM shift_audit_log WHERE shift_date >= ? AND shift_date <= ? ORDER BY created_at DESC LIMIT ?', [date_from, date_to, limit]);
+  },
+  async getByRoster(roster_id) {
+    return all('SELECT * FROM shift_audit_log WHERE roster_id = ? ORDER BY created_at DESC', [roster_id]);
+  },
+  async getByChangedBy(changed_by, limit = 50) {
+    return all('SELECT * FROM shift_audit_log WHERE changed_by = ? ORDER BY created_at DESC LIMIT ?', [changed_by, limit]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_audit_log (roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, changed_by, changed_by_name, change_type, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
+      data.roster_id || null, data.employee_id || null, data.team_id || null, data.shift_date,
+      data.old_shift_code || null, data.new_shift_code || null, data.old_team_id || null, data.new_team_id || null,
+      data.changed_by, data.changed_by_name || null, data.change_type || 'edit', data.reason || null
+    ]);
+    return result.id;
+  }
+};
+
+// ============================================
+// CRUD: NOTIFICATION LOG
+// ============================================
+const NotificationLog = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM notification_log ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM notification_log WHERE id = ?', [id]);
+  },
+  async getByRecipient(recipient_id, limit = 50) {
+    return all('SELECT * FROM notification_log WHERE recipient_id = ? ORDER BY created_at DESC LIMIT ?', [recipient_id, limit]);
+  },
+  async getByStatus(status, limit = 50) {
+    return all('SELECT * FROM notification_log WHERE status = ? ORDER BY created_at DESC LIMIT ?', [status, limit]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO notification_log (notification_type, recipient_id, recipient_name, recipient_phone, message, channel, status, roster_id, shift_date, old_value, new_value, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
+      data.notification_type || 'shift_change', data.recipient_id, data.recipient_name || null, data.recipient_phone || null,
+      data.message, data.channel || 'in-app', data.status || 'pending', data.roster_id || null, data.shift_date || null,
+      data.old_value || null, data.new_value || null, data.error_message || null
+    ]);
+    return result.id;
+  },
+  async markAsSent(id) {
+    return run('UPDATE notification_log SET status = ?, sent_at = CURRENT_TIMESTAMP WHERE id = ?', ['sent', id]);
+  },
+  async markAsDelivered(id) {
+    return run('UPDATE notification_log SET status = ?, delivered_at = CURRENT_TIMESTAMP WHERE id = ?', ['delivered', id]);
+  },
+  async markAsRead(id) {
+    return run('UPDATE notification_log SET status = ?, opened_at = CURRENT_TIMESTAMP WHERE id = ?', ['read', id]);
+  },
+  async markAsFailed(id, error_message) {
+    return run('UPDATE notification_log SET status = ?, error_message = ? WHERE id = ?', ['failed', error_message || null, id]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT ROSTER DRAFTS
+// ============================================
+const ShiftRosterDrafts = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_roster_drafts ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_roster_drafts WHERE id = ?', [id]);
+  },
+  async getByCreatedBy(created_by, limit = 50) {
+    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? ORDER BY created_at DESC LIMIT ?', [created_by, limit]);
+  },
+  async getPendingByCreatedBy(created_by) {
+    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? AND applied_at IS NULL AND reverted_at IS NULL ORDER BY created_at DESC', [created_by]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_roster_drafts (draft_data_json, operation_type, created_by, created_by_name) VALUES (?, ?, ?, ?);', [
+      data.draft_data_json, data.operation_type || 'edit', data.created_by, data.created_by_name || null
+    ]);
+    return result.id;
+  },
+  async markApplied(id) {
+    return run('UPDATE shift_roster_drafts SET applied_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  },
+  async markReverted(id) {
+    return run('UPDATE shift_roster_drafts SET reverted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM shift_roster_drafts WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT CHANGE REQUESTS
+// ============================================
+const ShiftChangeRequests = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_change_requests ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_change_requests WHERE id = ?', [id]);
+  },
+  async getByEmployee(employee_id, limit = 50) {
+    return all('SELECT * FROM shift_change_requests WHERE employee_id = ? ORDER BY created_at DESC LIMIT ?', [employee_id, limit]);
+  },
+  async getByStatus(status, limit = 50) {
+    return all('SELECT * FROM shift_change_requests WHERE status = ? ORDER BY created_at DESC LIMIT ?', [status, limit]);
+  },
+  async create(data) {
+    const result = await run('INSERT INTO shift_change_requests (roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, requested_by, requested_by_name, status, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
+      data.roster_id || null, data.employee_id, data.team_id || null, data.shift_date,
+      data.proposed_shift_code, data.old_shift_code || null, data.requested_by, data.requested_by_name || null,
+      data.status || 'pending', data.reason || null
+    ]);
+    return result.id;
+  },
+  async updateStatus(id, status, reviewed_by) {
+    return run('UPDATE shift_change_requests SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?;', [status, reviewed_by || null, id]);
+  },
+  async delete(id) {
+    return run('DELETE FROM shift_change_requests WHERE id = ?', [id]);
+  }
+};
+
+// ============================================
 // CRUD: SHIFT FORMS
 // ============================================
 const ShiftForms = {
@@ -2046,6 +2259,10 @@ module.exports = {
   Notifications,
   ShiftCompletions,
   AuditLog,
+  ShiftAuditLog,
+  NotificationLog,
+  ShiftRosterDrafts,
+  ShiftChangeRequests,
   ShiftForms,
   KBDocuments,
   KBChunks,
