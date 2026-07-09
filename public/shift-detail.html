@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="تفاصيل المناوبة - منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض">
+    <title>تفاصيل المناوبة | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Shared Dashboard Styles -->
+    <link rel="stylesheet" href="css/shift-dashboard.css">
+    <!-- Detail Page Styles -->
+    <link rel="stylesheet" href="css/shift-detail.css">
+</head>
+<body>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ==========================================
+         الشريط العلوي
+         ========================================== -->
+    <nav class="top-bar">
+        <div class="logo">
+            <img src="logo.png" alt="منصة الجنوب" style="width:36px;height:36px;border-radius:8px;object-fit:contain;margin-left:10px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;">
+                <span style="font-size:1.2rem;font-weight:700;">تفاصيل المناوبة</span>
+                <span style="font-size:0.7rem;color:#64748B;">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
+            </div>
+        </div>
+        <div class="top-bar-center">
+            <div class="live-clock" id="liveClock">--:--:--</div>
+        </div>
+        <div class="top-bar-actions">
+            <button class="btn" onclick="exportShiftDetailToPDF()">
+                <i class="fas fa-file-pdf"></i>
+                <span>تصدير PDF</span>
+            </button>
+            <button class="btn" onclick="exportShiftDetailToExcel()">
+                <i class="fas fa-file-excel"></i>
+                <span>تصدير Excel</span>
+            </button>
+            <button class="btn btn-primary" onclick="recalculateMetrics()">
+                <i class="fas fa-sync-alt"></i>
+                <span>إعادة الحساب</span>
+            </button>
+            <button class="btn" onclick="window.location.href='index.html'">
+                <i class="fas fa-home"></i>
+                <span>الرئيسية</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==========================================
+         الحاوية الرئيسية
+         ========================================== -->
+    <div class="container" id="shiftDetailContainer">
+
+        <!-- عنوان المناوبة -->
+        <div class="detail-toolbar">
+            <div class="detail-toolbar-left">
+                <div class="shift-title">
+                    <i class="fas fa-clipboard-list" style="color:var(--primary);"></i>
+                    <span id="shiftTitle">تفاصيل المناوبة</span>
+                    <span class="shift-badge badge badge-info" id="shiftBadge">غير محدد</span>
+                </div>
+            </div>
+            <div class="detail-toolbar-right">
+                <button class="btn btn-sm" onclick="calculateAlerts()">
+                    <i class="fas fa-bell"></i>
+                    <span>حساب التنبيهات</span>
+                </button>
+                <button class="btn btn-sm" onclick="window.location.href='shift-archive.html'">
+                    <i class="fas fa-archive"></i>
+                    <span>الأرشيف</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 1. لوحة المؤشرات الرئيسية (13 بطاقة) -->
+        <div class="section" id="kpiSection">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري تحميل المؤشرات...</span>
+            </div>
+        </div>
+
+        <!-- 2. بطاقة معلومات المناوبة -->
+        <div class="section" id="shiftInfoSection">
+            <div class="section-title">
+                <i class="fas fa-info-circle"></i>
+                معلومات المناوبة
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 3. الكادر / الفرق / المركبات -->
+        <div class="section" id="staffSection">
+            <div class="section-title">
+                <i class="fas fa-users"></i>
+                الكادر والفرق والمركبات
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 4. البلاغات (تبويبات) -->
+        <div class="section" id="reportsSection">
+            <div class="section-title">
+                <i class="fas fa-ambulance"></i>
+                البلاغات
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 5. التكميلات (Radio) -->
+        <div class="section" id="completionsSection">
+            <div class="section-title">
+                <i class="fas fa-clipboard-check"></i>
+                تكميلات المناوبة
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 6. النماذج -->
+        <div class="section" id="formsSection">
+            <div class="section-title">
+                <i class="fas fa-file-alt"></i>
+                النماذج المسجلة
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 7. الخط الزمني -->
+        <div class="section" id="timelineSection">
+            <div class="section-title">
+                <i class="fas fa-history"></i>
+                الخط الزمني للمناوبة
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 8. سجل التدقيق -->
+        <div class="section" id="auditTrailSection">
+            <div class="section-title">
+                <i class="fas fa-shield-alt"></i>
+                سجل التدقيق
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 9. الملفات والمرفقات -->
+        <div class="section" id="filesSection">
+            <div class="section-title">
+                <i class="fas fa-paperclip"></i>
+                الملفات والمرفقات
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 10. درجة الصحة العملياتية -->
+        <div class="section" id="healthScoreSection">
+            <div class="section-title">
+                <i class="fas fa-heartbeat"></i>
+                درجة الصحة العملياتية
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 11. الملاحظات -->
+        <div class="section" id="notesSection">
+            <div class="section-title">
+                <i class="fas fa-sticky-note"></i>
+                الملاحظات التشغيلية
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- 12. التنبيهات -->
+        <div class="section" id="alertsSection">
+            <div class="section-title">
+                <i class="fas fa-bell"></i>
+                التنبيهات الذكية
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>جاري التحميل...</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer spacer -->
+    <div style="height:40px;"></div>
+
+    <!-- ==========================================
+         Scripts
+         ========================================== -->
+    <script src="js/shift-charts.js"></script>
+    <script src="js/shift-timeline.js"></script>
+    <script src="js/shift-audit.js"></script>
+    <script src="js/shift-alerts.js"></script>
+    <script src="js/shift-export.js"></script>
+    <script src="js/shift-detail.js"></script>
+</body>
+</html>
