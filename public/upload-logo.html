@@ -363,7 +363,7 @@
                 sessionStorage.removeItem('brandLogo');
                 document.getElementById('currentLogoContainer').style.display = 'none';
                 showStatus('✅ تم حذف الشعار', 'success');
-                setTimeout(() => window.location.reload(), 1000);
+                document.getElementById('currentLogoContainer').style.display = 'none';
             } catch(e) {
                 showStatus('❌ فشل في حذف الشعار', 'error');
             }

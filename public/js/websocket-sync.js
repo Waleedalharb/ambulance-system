@@ -341,8 +341,17 @@
     ws.onclose = function() {
         wsConnected = false;
         console.log('Sync WebSocket closed, reconnecting in 5s...');
+        // إعادة الاتصال بدون reload
         setTimeout(function() {
-            location.reload();
+            try {
+                ws = new WebSocket(wsProtocol + '//' + location.host + '/ws');
+                ws.onopen = ws.onopen;
+                ws.onmessage = ws.onmessage;
+                ws.onerror = ws.onerror;
+                ws.onclose = ws.onclose;
+            } catch(e) {
+                console.error('Reconnect failed:', e);
+            }
         }, 5000);
     };
 })();
