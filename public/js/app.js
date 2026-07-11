@@ -151,7 +151,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function showSkeleton() {
+        var sk = document.getElementById('skeletonScreen');
+        if (sk) sk.style.display = 'flex';
+    }
+    function hideSkeleton() {
+        var sk = document.getElementById('skeletonScreen');
+        if (sk) sk.style.display = 'none';
+    }
+
     if (authToken) {
+        showSkeleton();
         fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -162,10 +172,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
                 loadAllData();
             } else {
+                hideSkeleton();
                 showLogin();
             }
         })
-        .catch(function() { showLogin(); });
+        .catch(function() { hideSkeleton(); showLogin(); });
     } else {
         // If currentUser exists but authToken is missing, clear inconsistent state
         if (localStorage.getItem('currentUser')) {
@@ -2405,8 +2416,11 @@ async function loadAllData() {
             renderAchievements();
             renderLeaderboard();
         }
+        // Hide skeleton loading screen when data is loaded
+        hideSkeleton();
     } catch (error) {
         console.error('خطأ في تحميل البيانات:', error);
+        hideSkeleton();
     }
 }
 

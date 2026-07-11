@@ -230,8 +230,89 @@ window.addEventListener('load', function() {
         padding: 4px 0;
     }
     </style>
+    <!-- Skeleton Loading CSS -->
+    <style>
+        .skeleton-container {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: #0F172A;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 16px;
+            font-family: Inter, sans-serif;
+        }
+        .skeleton-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .skeleton-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #1E3A5F 25%, #2A4A6F 50%, #1E3A5F 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+        }
+        .skeleton-title {
+            width: 250px;
+            height: 24px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #1E3A5F 25%, #2A4A6F 50%, #1E3A5F 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+        }
+        .skeleton-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .skeleton-stat-card {
+            height: 80px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #1E3A5F 25%, #2A4A6F 50%, #1E3A5F 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+        }
+        .skeleton-table {
+            height: 300px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #1E3A5F 25%, #2A4A6F 50%, #1E3A5F 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+        }
+        .skeleton-loading-text {
+            text-align: center;
+            color: #94A3B8;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
 </head>
 <body>
+<!-- Skeleton Loading Screen -->
+<div id="skeletonScreen" class="skeleton-container" style="display: none;">
+    <div class="skeleton-header">
+        <div class="skeleton-logo"></div>
+        <div class="skeleton-title"></div>
+    </div>
+    <div class="skeleton-stats">
+        <div class="skeleton-stat-card"></div>
+        <div class="skeleton-stat-card"></div>
+        <div class="skeleton-stat-card"></div>
+        <div class="skeleton-stat-card"></div>
+    </div>
+    <div class="skeleton-table"></div>
+    <div class="skeleton-loading-text">جاري تحميل البيانات...</div>
+</div>
 <div class="page-loading-overlay" id="pageLoadingOverlay">
     <div class="spinner"></div>
     <div class="loading-text">جاري تحميل البيانات...</div>
@@ -1809,7 +1890,7 @@ window.addEventListener('load', function() {
 <script src="js/websocket-sync.js"></script>
 <script src="js/frontend-monitor.js?v=3"></script>
 <script src="js/chat-integration.js"></script>
-<script src="js/app.js?v=42" defer></script>
+<script src="js/app.js?v=43" defer></script>
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
