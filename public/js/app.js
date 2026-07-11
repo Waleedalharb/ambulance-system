@@ -96,6 +96,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (loginScreen) loginScreen.style.display = 'none';
         document.body.style.overflow = '';
     }
+    function showSkeleton() {
+        var sk = document.getElementById('skeletonScreen');
+        if (sk) sk.style.display = 'flex';
+    }
+    function hideSkeleton() {
+        var sk = document.getElementById('skeletonScreen');
+        if (sk) sk.style.display = 'none';
+    }
 
     async function doLogin() {
         var username = loginUsername.value.trim();
@@ -149,15 +157,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loginPassword.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') doLogin();
         });
-    }
-
-    function showSkeleton() {
-        var sk = document.getElementById('skeletonScreen');
-        if (sk) sk.style.display = 'flex';
-    }
-    function hideSkeleton() {
-        var sk = document.getElementById('skeletonScreen');
-        if (sk) sk.style.display = 'none';
     }
 
     if (authToken) {
