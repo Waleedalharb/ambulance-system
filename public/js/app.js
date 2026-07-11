@@ -167,6 +167,11 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(function() { showLogin(); });
     } else {
+        // If currentUser exists but authToken is missing, clear inconsistent state
+        if (localStorage.getItem('currentUser')) {
+            localStorage.removeItem('currentUser');
+            currentUser = null;
+        }
         showLogin();
     }
     
