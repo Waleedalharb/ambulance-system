@@ -62,6 +62,39 @@
     var maxReconnectAttempts = 10;
     var reconnectDelay = 3000;
     var pingInterval = null;
+    var tokenRefreshInProgress = false;
+
+    // Token refresh: call /api/auth/refresh to get a new token
+    async function refreshToken() {
+        if (tokenRefreshInProgress) return false;
+        tokenRefreshInProgress = true;
+        try {
+            var token = localStorage.getItem('authToken');
+            if (!token) return false;
+            var resp = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+            if (resp.ok) {
+                var data = await resp.json();
+                if (data.success && data.token) {
+                    localStorage.setItem('authToken', data.token);
+                    console.log('✅ Token refreshed successfully');
+                    return true;
+                }
+            }
+            // If refresh failed, clear token and redirect to login
+            console.error('❌ Token refresh failed, clearing auth');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            return false;
+        } catch (e) {
+            console.error('Token refresh error:', e);
+            return false;
+        } finally {
+            tokenRefreshInProgress = false;
+        }
+    }
 
     function connect() {
         try {
@@ -82,6 +115,10 @@
             wsConnected = true;
             reconnectAttempts = 0;
             console.log('✅ Sync WebSocket connected');
+            // Update UI status indicator
+            if (typeof updateConnectionStatusUI === 'function') {
+                updateConnectionStatusUI(true);
+            }
             // Send presence ping every 20 seconds
             if (pingInterval) clearInterval(pingInterval);
             pingInterval = setInterval(function() {
@@ -321,7 +358,88 @@
                         if (typeof loadData === 'function') loadData();
                         if (typeof loadAllData === 'function') loadAllData();
                         break;
+                    case 'completion_updated':
+                    case 'team_status_changed':
+                        // Completion/Radio status updated — refresh workforce and distribution
+                        // Update readyTeamNames directly from WebSocket data for instant reflection
+                        if (data.teamId && data.status) {
+                            window.readyTeamNames = window.readyTeamNames || {};
+                            var tid = data.teamId;
+                            var isOperational = (/^rapid_[1-5]$/.test(tid) || /^جنوب [1-9]$/.test(tid) || /^جنوب 1[0-6]$/.test(tid));
+                            if (data.status === 'ready' && isOperational) {
+                                window.readyTeamNames[tid] = true;
+                                // Add name variants for distribution indicator matching
+                                if (/^rapid_[1-5]$/.test(tid)) {
+                                    var num = tid.replace('rapid_', '');
+                                    window.readyTeamNames['سريع ' + num] = true;
+                                    window.readyTeamNames['تدخل سريع ' + num] = true;
+                                    window.readyTeamNames['rapid ' + num] = true;
+                                }
+                                if (/^جنوب [1-9]$/.test(tid) || /^جنوب 1[0-6]$/.test(tid)) {
+                                    var num = tid.replace('جنوب ', '');
+                                    window.readyTeamNames['جنوب ' + num] = true;
+                                    window.readyTeamNames['south ' + num] = true;
+                                }
+                            } else {
+                                delete window.readyTeamNames[tid];
+                                // Remove name variants
+                                if (/^rapid_[1-5]$/.test(tid)) {
+                                    var num = tid.replace('rapid_', '');
+                                    delete window.readyTeamNames['سريع ' + num];
+                                    delete window.readyTeamNames['تدخل سريع ' + num];
+                                    delete window.readyTeamNames['rapid ' + num];
+                                }
+                                if (/^جنوب [1-9]$/.test(tid) || /^جنوب 1[0-6]$/.test(tid)) {
+                                    var num = tid.replace('جنوب ', '');
+                                    delete window.readyTeamNames['جنوب ' + num];
+                                    delete window.readyTeamNames['south ' + num];
+                                }
+                            }
+                        }
+                        if (typeof refreshReadyTeamNames === 'function') {
+                            refreshReadyTeamNames(function() {
+                                if (typeof updateWorkforceStats === 'function') updateWorkforceStats();
+                                if (typeof buildCentersTable === 'function') buildCentersTable();
+                                if (typeof calculateWorkforceStatsLocally === 'function') calculateWorkforceStatsLocally();
+                                if (typeof updateDistributionIndicator === 'function') updateDistributionIndicator();
+                                if (typeof renderAdvancedDistribution === 'function') renderAdvancedDistribution();
+                                if (typeof loadData === 'function') loadData();
+                                if (typeof loadAllData === 'function') loadAllData();
+                            });
+                        } else {
+                            if (typeof updateWorkforceStats === 'function') updateWorkforceStats();
+                            if (typeof buildCentersTable === 'function') buildCentersTable();
+                            if (typeof calculateWorkforceStatsLocally === 'function') calculateWorkforceStatsLocally();
+                            if (typeof updateDistributionIndicator === 'function') updateDistributionIndicator();
+                            if (typeof renderAdvancedDistribution === 'function') renderAdvancedDistribution();
+                            if (typeof loadData === 'function') loadData();
+                            if (typeof loadAllData === 'function') loadAllData();
+                        }
+                        break;
                     case 'password_changed':
+                        break;
+                    case 'user_online':
+                    case 'user_offline':
+                        // Update global online users list
+                        if (data.onlineUsers) {
+                            window.onlineUsersList = data.onlineUsers;
+                            if (typeof updateOnlineUsersUI === 'function') {
+                                updateOnlineUsersUI(data.onlineUsers);
+                            }
+                        }
+                        // Update specific user status if shown in chat/user list
+                        if (typeof updateUserStatusIndicator === 'function') {
+                            updateUserStatusIndicator(data.userId, data.type === 'user_online');
+                        }
+                        break;
+                    case 'online_users':
+                        // Full list of online users
+                        if (data.users) {
+                            window.onlineUsersList = data.users;
+                            if (typeof updateOnlineUsersUI === 'function') {
+                                updateOnlineUsersUI(data.users);
+                            }
+                        }
                         break;
                     default:
                         console.log('Sync: unknown type', data.type);
@@ -335,9 +453,25 @@
             console.error('Sync WebSocket error:', err);
         };
 
-        ws.onclose = function() {
+        ws.onclose = function(event) {
             wsConnected = false;
+            if (typeof updateConnectionStatusUI === 'function') {
+                updateConnectionStatusUI(false);
+            }
             if (pingInterval) clearInterval(pingInterval);
+            // If closed due to authentication failure (code 1008), try refreshing token first
+            if (event && event.code === 1008) {
+                console.log('🔴 WebSocket closed due to auth failure, attempting token refresh...');
+                refreshToken().then(function(success) {
+                    if (success) {
+                        reconnectAttempts = 0; // reset attempts on successful refresh
+                        setTimeout(connect, 1000);
+                    } else {
+                        scheduleReconnect();
+                    }
+                });
+                return;
+            }
             scheduleReconnect();
         };
     }
@@ -363,5 +497,12 @@
         }, 30000);
     }
 
+    // Notify server when tab/browser closes
+    window.addEventListener('beforeunload', function() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'logout', timestamp: Date.now() }));
+        }
+    });
+    
     connect();
 })();

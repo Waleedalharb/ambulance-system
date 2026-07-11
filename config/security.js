@@ -11,8 +11,8 @@ if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
     process.exit(1);
 }
 
-// Fallback for development only (randomly generated, survives process lifetime)
-const DEV_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');
+// Fallback for development only (stable, based on project path so it survives restarts)
+const DEV_FALLBACK_SECRET = crypto.createHash('sha256').update(__dirname || 'ems-south-platform').digest('hex');
 
 module.exports = {
     JWT_SECRET: JWT_SECRET || DEV_FALLBACK_SECRET,

@@ -43,6 +43,13 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .section-title { font-size:1.1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; }
 .section-title i { color:var(--gold); }
 
+/* Page Loading Overlay */
+.page-loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
+.page-loading-overlay.hidden { opacity: 0; pointer-events: none; }
+.page-loading-overlay .spinner { width: 50px; height: 50px; border: 4px solid #E2E8F0; border-top-color: #2563EB; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.page-loading-overlay .loading-text { color: #64748B; font-size: 1rem; font-weight: 600; }
+
 /* Cards Grid */
 .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 
@@ -202,16 +209,45 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 </head>
 <body>
 
+<div class="page-loading-overlay" id="pageLoadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">جاري تحميل البيانات...</div>
+</div>
+
+<!-- Session Check -->
+<script>
+(function() {
+    var token = localStorage.getItem('authToken');
+    if (!token && window.location.pathname.indexOf('login') === -1) {
+        window.location.href = 'login.html';
+        return;
+    }
+    window.addEventListener('load', function() {
+        var overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) setTimeout(function() { overlay.classList.add('hidden'); }, 300);
+    });
+})();
+</script>
+
 <div class="top-bar">
     <div style="display:flex; align-items:center; gap:1rem;">
         <h1>🎙️ تكميل سريع</h1>
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="location.href='index.html?v=34'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn btn-home" onclick="navigateToPage('index.html')"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
     </div>
 </div>
+
+<script>
+// Smooth navigation - preserve session
+function navigateToPage(url) {
+    var overlay = document.getElementById('pageLoadingOverlay');
+    if (overlay) overlay.style.display = 'flex';
+    setTimeout(function() { window.location.href = url; }, 100);
+}
+</script>
 
 <!-- Dashboard -->
 <div class="dashboard">
@@ -346,6 +382,72 @@ var REASONS = [
 var globalNotes = '';
 
 // ============================================
+// WEBSOCKET SYNC
+// ============================================
+var ws = null;
+var wsConnected = false;
+
+function initWebSocket() {
+    var token = localStorage.getItem('authToken');
+    if (!token) return;
+    var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(wsProtocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
+    ws.onopen = function() { wsConnected = true; };
+    ws.onclose = function(event) {
+        wsConnected = false;
+        if (event && event.code === 1008) {
+            // Auth failure - try refresh token then reconnect
+            console.log('🔴 Radio WS auth failed, refreshing token...');
+            fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            }).then(function(r) {
+                if (r.ok) return r.json();
+                throw new Error('refresh failed');
+            }).then(function(data) {
+                if (data.success && data.token) {
+                    localStorage.setItem('authToken', data.token);
+                    console.log('✅ Radio WS token refreshed, reconnecting...');
+                    setTimeout(initWebSocket, 1000);
+                } else {
+                    throw new Error('no token');
+                }
+            }).catch(function(e) {
+                console.error('❌ Radio WS token refresh failed:', e);
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('currentUser');
+                setTimeout(initWebSocket, 5000);
+            });
+            return;
+        }
+        setTimeout(initWebSocket, 5000);
+    };
+}
+
+function broadcastTeamStatus(teamId, status) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'team_status_changed',
+            teamId: teamId,
+            status: status,
+            shiftDate: getShiftDate(),
+            shiftType: getShiftType()
+        }));
+    }
+}
+
+function broadcastCompletionSaved() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'completion_saved',
+            shiftDate: getShiftDate(),
+            shiftType: getShiftType(),
+            teams: teamStatus
+        }));
+    }
+}
+
+// ============================================
 // SHIFT DETECTION (Saudi Time - Asia/Riyadh)
 // ============================================
 function getSaudiTime() {
@@ -435,6 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
     initStatuses();
     loadFromSmartSchedule();
+    initWebSocket();
     
     // Check for URL params (from archive edit)
     var urlParams = new URLSearchParams(window.location.search);
@@ -807,7 +910,11 @@ function cycleStatus(teamId) {
     }
 
     renderAll();
+    broadcastTeamStatus(teamId, nextStatus);
     showToast(nameOfTeam(teamId) + ' — ' + STATUS_LABELS[nextStatus], nextStatus === 'ready' ? 'success' : '');
+    
+    // Auto-save to server (silent) so changes reflect immediately in all systems
+    saveToServer(true);
 }
 
 function setReason(teamId, reason) {
@@ -829,6 +936,12 @@ function nameOfTeam(id) {
     return id;
 }
 
+var OPERATIONAL_TEAMS = ['rapid_1','rapid_2','rapid_3','rapid_4','rapid_5','جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','جنوب 6','جنوب 7','جنوب 8','جنوب 9','جنوب 10','جنوب 11','جنوب 12','جنوب 13','جنوب 14','جنوب 15','جنوب 16'];
+
+function isOperationalTeam(teamId) {
+    return OPERATIONAL_TEAMS.indexOf(teamId) !== -1;
+}
+
 // ============================================
 // DASHBOARD
 // ============================================
@@ -837,10 +950,9 @@ function updateDashboard() {
         var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
         var total = 0;
         Object.keys(teamStatus).forEach(function(k) {
-            // Only count teams that have paramedics (actual employees on shift)
+            if (!isOperationalTeam(k)) return;
             var paramedics = (teamStatus[k] && teamStatus[k].paramedics) || [];
             if (paramedics.length === 0) return;
-            
             var s = teamStatus[k].status;
             if (counts[s] !== undefined) counts[s]++;
             total++;
@@ -949,11 +1061,11 @@ function summaryRow(name, teamId, s) {
         '</tr>';
 }
 
-function saveToServer() {
+function saveToServer(silent) {
     var token = localStorage.getItem('authToken');
     if (!token) {
         console.error('[saveToServer] No auth token found');
-        showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
+        if (!silent) showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
         return;
     }
     
@@ -992,13 +1104,14 @@ function saveToServer() {
     .then(function(d) {
         console.log('[saveToServer] Response data:', d);
         if (d.success) {
-            showToast('✅ تم حفظ التكميل في السيرفر', 'success');
+            if (!silent) showToast('✅ تم حفظ التكميل في السيرفر', 'success');
+            broadcastCompletionSaved();
         } else {
-            showToast('⚠️ ' + (d.error || 'فشل في الحفظ'), 'error');
+            if (!silent) showToast('⚠️ ' + (d.error || 'فشل في الحفظ'), 'error');
         }
     }).catch(function(e) {
         console.error('[saveToServer] Error:', e);
-        showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
+        if (!silent) showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
     });
 }
 

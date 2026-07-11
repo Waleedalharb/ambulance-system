@@ -307,8 +307,6 @@ function initWebSocket(server) {
         }, 25000);
 
         ws.on('message', function(raw) {
-
-        ws.on('message', function(raw) {
             try {
                 var msg = JSON.parse(raw);
                 ws.lastSeen = Date.now();
@@ -353,6 +351,20 @@ function initWebSocket(server) {
                 if (msg.type === 'ping') {
                     ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
                 }
+                if (msg.type === 'logout') {
+                    // Client is closing tab/browser — mark as offline immediately
+                    console.log('👋 User logged out (tab close):', ws.user ? ws.user.name : 'unknown');
+                    if (ws.user && ws.user.id) {
+                        onlineUsers.delete(ws.user.id);
+                        broadcast({
+                            type: 'user_offline',
+                            userId: ws.user.id,
+                            name: ws.user.name,
+                            onlineUsers: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
+                        });
+                    }
+                    ws.close(1000, 'User logged out');
+                }
             } catch(e) {
                 console.error('WebSocket message error:', e.message);
             }
@@ -374,26 +386,25 @@ function initWebSocket(server) {
             }
             clients = clients.filter(function(c) { return c !== ws; });
         });
-            console.log('🔴 WebSocket client disconnected:', ws.user ? ws.user.name : 'unknown');
-            // Remove from online users
-            if (ws.user && ws.user.id) {
-                onlineUsers.delete(ws.user.id);
-                // Broadcast user_offline to all connected clients
-                broadcast({
-                    type: 'user_offline',
-                    userId: ws.user.id,
-                    name: ws.user.name,
-                    onlineUsers: Array.from(onlineUsers.values()).map(u => ({ id: u.user.id, name: u.user.name, role: u.user.role }))
-                });
-            }
-            clients = clients.filter(function(c) { return c !== ws; });
-        });
 
         ws.on('error', function(err) {
             console.error('WebSocket error:', err);
         });
     });
     console.log('🔌 WebSocket server attached to HTTP server on /ws');
+    
+    // Heartbeat: remove stale connections every 30 seconds
+    // Users who haven't sent any message in 60 seconds are considered offline
+    setInterval(function() {
+        var now = Date.now();
+        var staleThreshold = 60000; // 60 seconds
+        clients.forEach(function(client) {
+            if (client.lastSeen && (now - client.lastSeen) > staleThreshold) {
+                console.log('💀 Heartbeat timeout for:', client.user ? client.user.name : 'unknown');
+                client.terminate(); // Force close stale connection
+            }
+        });
+    }, 30000);
 }
 
 // دالة لبث الرسائل لجميع المتصلين (WebSocket + SSE)
@@ -817,7 +828,8 @@ function authenticate(req, res, next) {
         req.user = decoded;
         next();
     } catch (error) {
-        return res.status(403).json({ error: 'توكن غير صالح' });
+        res.setHeader('X-Token-Invalid', 'true');
+        return res.status(403).json({ error: 'توكن غير صالح', code: 'TOKEN_INVALID' });
     }
 }
 
@@ -1005,6 +1017,58 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
         res.json({ success: true, user });
     } catch (error) {
         res.json({ success: true, user: req.user });
+    }
+});
+
+// Token refresh endpoint - generates new token with extended expiry
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        if (!token) {
+            return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
+        }
+        
+        // Verify old token (even if expired, within 7 days grace period)
+        let decoded;
+        try {
+            decoded = jwt.verify(token, JWT_SECRET);
+        } catch (err) {
+            // If expired, try to decode without verification for grace period
+            if (err.name === 'TokenExpiredError') {
+                decoded = jwt.decode(token);
+                if (!decoded || !decoded.id) {
+                    return res.status(403).json({ error: 'توكن غير صالح' });
+                }
+                // Check if expired within last 7 days
+                const now = Math.floor(Date.now() / 1000);
+                if (decoded.exp && (now - decoded.exp) > (7 * 24 * 60 * 60)) {
+                    return res.status(403). json({ error: 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول من جديد' });
+                }
+            } else {
+                return res.status(403).json({ error: 'توكن غير صالح' });
+            }
+        }
+        
+        // Get user from database to ensure still active
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const user = users.find(u => u.id === decoded.id && u.isActive);
+        if (!user) {
+            return res.status(403).json({ error: 'المستخدم غير موجود أو غير نشط' });
+        }
+        
+        // Generate new token
+        const newToken = jwt.sign(
+            { id: user.id, username: user.username, name: user.name, role: user.role },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN }
+        );
+        
+        res.json({ success: true, token: newToken, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        res.status(500).json({ error: 'فشل في تجديد التوكن' });
     }
 });
 
@@ -1674,9 +1738,26 @@ app.get('/api/data', authenticate, async (req, res) => {
             } catch (e) { /* ignore */ }
         }
         
+        // Ensure centersData is never empty — protects dispatch display on new shifts
+        var safeCentersData = centersData;
+        if (!safeCentersData || Object.keys(safeCentersData).length === 0) {
+            safeCentersData = {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            };
+        }
+        
         res.json({
             data,
-            centers: centersData,
+            centers: safeCentersData,
             currentShiftId: currentShiftId,
             currentShift: {
                 type: shiftType,
@@ -1865,6 +1946,21 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         // STEP 2: Reset operational data files
         // ============================================
         // Clear ambulance-data.json (current reports)
+        await writeData({});
+        // Reset centersData to default (keep team-to-center mapping for dispatch)
+        centersData = {
+            "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+            "الخالدية": ["جنوب 2"],
+            "منفوحة": ["جنوب 3"],
+            "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+            "الإسكان": ["جنوب 6"],
+            "الحائر": ["جنوب 7"],
+            "ديراب": ["جنوب 10"],
+            "عكاظ": ["جنوب 9"],
+            "الشفاء": ["جنوب 8", "سريع 2"],
+            "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+        };
+        // Reset other operational data
         await writeData({});
         // Clear centersData
         centersData = {};
