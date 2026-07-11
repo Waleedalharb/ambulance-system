@@ -194,7 +194,15 @@
             if (typeof showNotification === 'function') {
                 showNotification('انتهت الجلسة', 'يرجى تسجيل الدخول من جديد', 'warning', 5000);
             }
-            setTimeout(function() { location.href = '/login.html'; }, 2000);
+            // Show login screen if on index.html, otherwise reload
+            var loginScreen = document.getElementById('loginScreen');
+            if (loginScreen) {
+                loginScreen.style.display = 'flex';
+                document.getElementById('mainContainer').style.display = 'none';
+                if (document.getElementById('sidebar')) document.getElementById('sidebar').style.display = 'none';
+            } else {
+                setTimeout(function() { location.href = '/index.html'; }, 2000);
+            }
             return false;
         } finally {
             isRefreshingToken = false;
@@ -218,6 +226,9 @@
             });
             throw err;
         }).then(async function(response) {
+            // Don't intercept auth endpoints to avoid infinite loops or double refresh
+            var urlStr = String(url);
+            if (urlStr.indexOf('/api/auth/refresh') !== -1 || urlStr.indexOf('/api/auth/me') !== -1) return response;
             // Detect TOKEN_INVALID and auto-refresh
             if (response.status === 403 && !_retried) {
                 try {
