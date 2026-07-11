@@ -163,32 +163,91 @@
         originalConsoleError.apply(console, args);
     };
 
-    // 5. Fetch errors — أخطاء الشبكة
+    // 5. Fetch errors — أخطاء الشبكة + Token Auto-Refresh
     var originalFetch = window.fetch;
+    var isRefreshingToken = false;
+    var tokenRefreshQueue = [];
+
+    async function doTokenRefresh() {
+        if (isRefreshingToken) return new Promise(function(resolve) { tokenRefreshQueue.push(resolve); });
+        isRefreshingToken = true;
+        try {
+            var token = localStorage.getItem('authToken');
+            if (!token) throw new Error('no token');
+            var resp = await originalFetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+            if (!resp.ok) throw new Error('refresh failed');
+            var data = await resp.json();
+            if (data.success && data.token) {
+                localStorage.setItem('authToken', data.token);
+                console.log('[FrontendMonitor] Token refreshed successfully');
+                return true;
+            }
+            throw new Error('no new token');
+        } catch (e) {
+            console.error('[FrontendMonitor] Token refresh failed:', e);
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            // Notify user to re-login
+            if (typeof showNotification === 'function') {
+                showNotification('انتهت الجلسة', 'يرجى تسجيل الدخول من جديد', 'warning', 5000);
+            }
+            setTimeout(function() { location.href = '/login.html'; }, 2000);
+            return false;
+        } finally {
+            isRefreshingToken = false;
+            // Flush queue
+            while (tokenRefreshQueue.length > 0) {
+                (tokenRefreshQueue.shift())();
+            }
+        }
+    }
+
     window.fetch = function() {
         var url = arguments[0];
-        var startTime = performance.now();
+        var options = arguments[1] || {};
+        var _retried = options._retried;
+
         return originalFetch.apply(window, arguments).catch(function(err) {
             enqueue({
                 type: 'fetch_error',
                 message: 'Fetch failed: ' + url + ' — ' + err.message,
-                file: null,
-                line: null,
-                column: null,
-                stack: null,
-                page: getPageInfo()
+                file: null, line: null, column: null, stack: null, page: getPageInfo()
             });
             throw err;
-        }).then(function(response) {
+        }).then(async function(response) {
+            // Detect TOKEN_INVALID and auto-refresh
+            if (response.status === 403 && !_retried) {
+                try {
+                    var clone = response.clone();
+                    var body = await clone.json();
+                    if (body && body.code === 'TOKEN_INVALID') {
+                        console.log('[FrontendMonitor] TOKEN_INVALID detected, refreshing...');
+                        var refreshed = await doTokenRefresh();
+                        if (refreshed) {
+                            // Retry original request with new token
+                            var newToken = localStorage.getItem('authToken');
+                            var newOptions = JSON.parse(JSON.stringify(options));
+                            newOptions._retried = true;
+                            if (newOptions.headers) {
+                                newOptions.headers['Authorization'] = 'Bearer ' + newToken;
+                            } else {
+                                newOptions.headers = { 'Authorization': 'Bearer ' + newToken };
+                            }
+                            return originalFetch(url, newOptions);
+                        }
+                    }
+                } catch (parseErr) {
+                    // Not JSON, ignore
+                }
+            }
             if (!response.ok && response.status >= 500) {
                 enqueue({
                     type: 'fetch_5xx',
                     message: 'Server error ' + response.status + ': ' + url,
-                    file: null,
-                    line: null,
-                    column: null,
-                    stack: null,
-                    page: getPageInfo()
+                    file: null, line: null, column: null, stack: null, page: getPageInfo()
                 });
             }
             return response;
