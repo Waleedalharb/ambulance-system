@@ -170,7 +170,7 @@
             if (trends.length) {
                 trends.forEach(function(t) {
                     labels.push(DashUtils.formatDate(t.date));
-                    values.push(t.total_reports || 0);
+                    values.push(t.reports || t.total_reports || 0);
                 });
             } else {
                 labels = ['لا توجد بيانات']; values = [0];
@@ -182,7 +182,7 @@
             var labels = [];
             var values = [];
             if (centers.length) {
-                centers.forEach(function(c) { labels.push(c.center || '-'); values.push(c.count || 0); });
+                centers.forEach(function(c) { labels.push(c.name || c.center || '-'); values.push(c.count || 0); });
             } else {
                 labels = ['لا توجد بيانات']; values = [0];
             }
@@ -201,18 +201,18 @@
             var wrap = document.getElementById('latestShiftsWrap');
             if (!shifts.length) { wrap.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>لا توجد مناوبات</h3></div>'; return; }
             var html = '<div class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr>' +
-                '<th>التاريخ</th><th>النوع</th><th>المشرف</th><th>البلاغات</th><th>نسبة الإنجاز</th><th>إجراءات</th>' +
+                '<th>التاريخ</th><th>النوع</th><th>المناوبة</th><th>البلاغات</th><th>الحالة</th><th>إجراءات</th>' +
                 '</tr></thead><tbody>';
             shifts.forEach(function(s) {
                 var rate = s.completion_rate || 0;
-                var badge = rate >= 80 ? 'badge-success' : rate >= 50 ? 'badge-warning' : 'badge-danger';
+                var badge = rate >= 80 ? 'badge-success' : rate >= 50 ? 'badge-warning' : 'badge-info';
                 html += '<tr>' +
-                    '<td>' + DashUtils.formatDate(s.date) + '</td>' +
-                    '<td>' + (s.shift_type || '-') + '</td>' +
-                    '<td>' + (s.supervisor || '-') + '</td>' +
-                    '<td>' + DashUtils.formatNumber(s.total_reports || 0) + '</td>' +
+                    '<td>' + DashUtils.formatDate(s.shiftDate || s.date || s.shift_date) + '</td>' +
+                    '<td>' + (s.shiftType || s.shift_type || '-') + '</td>' +
+                    '<td>' + (s.shiftName || s.shift_name || s.supervisor || '-') + '</td>' +
+                    '<td>' + DashUtils.formatNumber(s.totalReports || s.total_reports || 0) + '</td>' +
                     '<td><span class="dashboard-badge ' + badge + '">' + DashUtils.formatPercent(rate) + '</span></td>' +
-                    '<td><a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + s.id + '">عرض</a></td>' +
+                    '<td><a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + (s.id || s.shift_id) + '">عرض</a></td>' +
                     '</tr>';
             });
             html += '</tbody></table></div>';
@@ -227,13 +227,14 @@
                 '</tr></thead><tbody>';
             alerts.slice(0, 20).forEach(function(a) {
                 var severityBadge = a.severity === 'critical' ? 'badge-danger' : a.severity === 'warning' ? 'badge-warning' : 'badge-info';
+                var isAck = !!(a.is_acknowledged || a.acknowledged);
                 html += '<tr>' +
                     '<td>' + (a.alert_type || '-') + '</td>' +
                     '<td><span class="dashboard-badge ' + severityBadge + '">' + (a.severity || '-') + '</span></td>' +
                     '<td>' + (a.message || '-') + '</td>' +
                     '<td>' + (a.shift_id || '-') + '</td>' +
-                    '<td>' + DashUtils.formatDateTime(a.created_at) + '</td>' +
-                    '<td>' + (a.is_acknowledged ? '<span class="dashboard-badge badge-success">تم التأكيد</span>' : '<button class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="ackAlert(' + a.id + ')">تأكيد</button>') + '</td>' +
+                    '<td>' + DashUtils.formatDateTime(a.created_at || a.timestamp) + '</td>' +
+                    '<td>' + (isAck ? '<span class="dashboard-badge badge-success">تم التأكيد</span>' : '<button class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="ackAlert(' + (a.id || a.alert_id) + ')">تأكيد</button>') + '</td>' +
                     '</tr>';
             });
             html += '</tbody></table></div>';

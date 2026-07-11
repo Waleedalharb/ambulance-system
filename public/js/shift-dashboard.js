@@ -10,12 +10,12 @@
     // Auth & API Helpers
     // ==========================================
     function getToken() {
-        return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+        return localStorage.getItem('authToken') || sessionStorage.getItem('authToken') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     }
 
     function getUser() {
         try {
-            return JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+            return JSON.parse(localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser') || localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         } catch (e) {
             return {};
         }
@@ -99,6 +99,12 @@
 
     function formatDate(dateStr) {
         if (!dateStr) return '-';
+        // Handle Saudi format like "3/7/2026" → "2026-07-03"
+        var parts = dateStr.split('/');
+        if (parts.length === 3) {
+            var d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            if (!isNaN(d.getTime())) return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
         var d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
         return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -106,6 +112,7 @@
 
     function formatDateTime(dateStr) {
         if (!dateStr) return '-';
+        // Handle ISO or Saudi format
         var d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
         return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });

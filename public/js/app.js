@@ -34,6 +34,49 @@ function showNotification(title, message, type, duration) {
 }
 
 // ============================================
+// Online Status System — Real-time connection status
+// ============================================
+var onlineUsersList = [];
+
+function updateConnectionStatusUI(isConnected) {
+    var el = document.getElementById('connectionStatus');
+    var dot = document.getElementById('statusDot');
+    var text = document.getElementById('statusText');
+    if (!el) return;
+    if (isConnected) {
+        if (dot) dot.style.background = '#10B981';
+        if (text) text.textContent = 'متصل';
+        el.title = 'متصل بالسيرفر';
+    } else {
+        if (dot) dot.style.background = '#EF4444';
+        if (text) text.textContent = 'غير متصل';
+        el.title = 'انقطع الاتصال بالسيرفر';
+    }
+}
+
+function updateOnlineUsersUI(users) {
+    onlineUsersList = users || [];
+    // Update any UI elements that show online users count
+    var onlineCountEls = document.querySelectorAll('.online-users-count');
+    onlineCountEls.forEach(function(el) {
+        el.textContent = onlineUsersList.length;
+    });
+}
+
+function updateUserStatusIndicator(userId, isOnline) {
+    // Update status dot for a specific user in chat/user lists
+    var dots = document.querySelectorAll('[data-user-status="' + userId + '"]');
+    dots.forEach(function(dot) {
+        dot.style.background = isOnline ? '#10B981' : '#9CA3AF';
+        dot.title = isOnline ? 'متصل' : 'غير متصل';
+    });
+}
+
+function isUserOnline(userId) {
+    return onlineUsersList.some(function(u) { return u.id == userId; });
+}
+
+// ============================================
 // نظام تسجيل الدخول (من inline.js)
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -1689,9 +1732,59 @@ function getPeakHour() {
 // ============================================
 // نافذة توزيع البلاغات المتطورة
 // ============================================
-function renderAdvancedDistribution() {
+async function renderAdvancedDistribution() {
     var container = document.getElementById('distributionContainer');
     if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--gray-500);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:1rem;display:block;"></i>جاري تحميل البيانات...</div>';
+    
+    // ─── Fetch completion data: only ready teams ───
+    var readyTeams = {};
+    var teamParamedics = {};
+    var hasCompletion = false;
+    
+    try {
+        var shiftDate = '';
+        var shiftType = '';
+        try {
+            if (typeof getCurrentShiftDate === 'function') shiftDate = getCurrentShiftDate();
+            else shiftDate = new Date().toISOString().split('T')[0];
+        } catch(e) { shiftDate = new Date().toISOString().split('T')[0]; }
+        try {
+            if (typeof getCurrentShiftType === 'function') shiftType = getCurrentShiftType();
+            else shiftType = 'صباح';
+        } catch(e) { shiftType = 'صباح'; }
+        
+        var token = localStorage.getItem('authToken');
+        if (token) {
+            var response = await fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            var data = await response.json();
+            if (data.success && data.completion && data.completion.teams) {
+                hasCompletion = true;
+                for (var teamId in data.completion.teams) {
+                    var team = data.completion.teams[teamId];
+                    if (team.status === 'ready') {
+                        readyTeams[teamId] = true;
+                        teamParamedics[teamId] = team.paramedics || [];
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.log('[renderAdvancedDistribution] Could not fetch completion:', e);
+    }
+    
+    // If no completion saved yet, show message
+    if (!hasCompletion) {
+        container.innerHTML = '<div style="text-align:center; padding:3rem 1rem; color:var(--gray-500);">' +
+            '<i class="fas fa-clipboard-check" style="font-size:3rem; margin-bottom:1rem; display:block; color:var(--gray-300);"></i>' +
+            '<div style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">لم يتم تسجيل تكميل المناوبة</div>' +
+            '<div style="font-size:0.85rem;">الرجاء إكمال التكميل السريع أولاً لعرض الفرق الجاهزة.</div>' +
+            '</div>';
+        return;
+    }
+    
     container.innerHTML = '';
     container.className = 'distribution-advanced';
     
@@ -1768,7 +1861,7 @@ function renderAdvancedDistribution() {
     statsDiv.innerHTML = statsHtml;
     container.appendChild(statsDiv.firstElementChild);
     
-    // ─── Sector cards ───
+    // ─── Sector cards: ONLY ready teams ───
     for (var center in centersData) {
         var sectorDiv = document.createElement('div');
         sectorDiv.className = 'distribution-sector-card';
@@ -1776,9 +1869,17 @@ function renderAdvancedDistribution() {
         var totalSectorReports = 0;
         var sectorUnits = centersData[center] || [];
         
+        // Filter to ready teams only
+        var visibleUnits = [];
         for (var i = 0; i < sectorUnits.length; i++) {
-            var unit = sectorUnits[i];
-            var key = center + '|' + unit;
+            if (readyTeams[sectorUnits[i]]) {
+                visibleUnits.push(sectorUnits[i]);
+            }
+        }
+        if (visibleUnits.length === 0) continue;
+        
+        for (var i = 0; i < visibleUnits.length; i++) {
+            var key = center + '|' + visibleUnits[i];
             if (allReports[key] && allReports[key].count) {
                 totalSectorReports += allReports[key].count;
             }
@@ -1792,8 +1893,8 @@ function renderAdvancedDistribution() {
             '</div>';
         
         var gridHtml = '<div class="distribution-unit-grid">';
-        for (var j = 0; j < sectorUnits.length; j++) {
-            var unit2 = sectorUnits[j];
+        for (var j = 0; j < visibleUnits.length; j++) {
+            var unit2 = visibleUnits[j];
             var key2 = center + '|' + unit2;
             var info = allReports[key2] || { count: 0, times: [] };
             var isZero = info.count === 0;
@@ -1821,9 +1922,17 @@ function renderAdvancedDistribution() {
                     '</div>';
             }
             
+            // Paramedics names
+            var paramedics = teamParamedics[unit2] || [];
+            var paramedicsHtml = '';
+            if (paramedics.length > 0) {
+                paramedicsHtml = '<div style="font-size:0.65rem;color:var(--gray-500);margin-top:2px;text-align:center;">👤 ' + paramedics.join('، ') + '</div>';
+            }
+            
             gridHtml += '<div class="distribution-unit-item ' + smartColorClass + '" id="unit-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' +
                 (info.count > 0 ? '<span class="unit-badge">' + info.count + '</span>' : '') +
                 '<div class="unit-name">' + unit2 + '</div>' +
+                paramedicsHtml +
                 '<div class="unit-count ' + (isZero ? 'zero' : '') + '" id="count-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' + info.count + '</div>' +
                 activityBarHtml +
                 typeBreakdownHtml +
@@ -2237,7 +2346,35 @@ async function loadAllData() {
     try {
         var response = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + authToken } });
         var result = await response.json();
-        centersData = result.centers;
+        // Protect centersData: don't overwrite with empty from server
+        if (result.centers && Object.keys(result.centers).length > 0) {
+            centersData = result.centers;
+        } else if (Object.keys(centersData).length === 0) {
+            centersData = result.centers || {};
+        }
+        // Otherwise keep existing centersData (has team-to-center mapping)
+        
+        // Build default centersData if still empty (e.g. new shift, first load)
+        if (Object.keys(centersData).length === 0) {
+            centersData = {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            };
+        }
+        if (result.centers && Object.keys(result.centers).length > 0) {
+            centersData = result.centers;
+        } else if (Object.keys(centersData).length === 0) {
+            centersData = result.centers || {};
+        }
+        // Otherwise keep existing centersData (has team-to-center mapping)
         if (!isViewingArchiveShift) {
             reports = result.data;
             updateTotal();
@@ -3066,6 +3203,65 @@ function syncReportEntryData() {
 // مؤشرات القوى العاملة
 // ============================================
 function updateWorkforceStats() {
+    var token = localStorage.getItem('authToken');
+    var shiftDate = '';
+    var shiftType = '';
+    try {
+        if (typeof getShiftDate === 'function') shiftDate = getShiftDate();
+        else if (typeof getCurrentShiftDate === 'function') shiftDate = getCurrentShiftDate();
+        else shiftDate = new Date().toISOString().split('T')[0];
+    } catch(e) { shiftDate = new Date().toISOString().split('T')[0]; }
+    try {
+        if (typeof getShiftType === 'function') shiftType = getShiftType();
+        else if (typeof getCurrentShiftType === 'function') shiftType = getCurrentShiftType();
+        else shiftType = 'صباح';
+    } catch(e) { shiftType = 'صباح'; }
+
+    // Try to get accurate ready-team count from completion (source of truth)
+    if (token) {
+        fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.completion && data.completion.teams) {
+                updateWorkforceFromCompletion(data.completion.teams);
+            } else {
+                updateWorkforceStatsFallback();
+            }
+        })
+        .catch(function(e) {
+            console.log('[updateWorkforceStats] Completion fetch failed, using fallback:', e);
+            updateWorkforceStatsFallback();
+        });
+    } else {
+        updateWorkforceStatsFallback();
+    }
+}
+
+function updateWorkforceFromCompletion(teams) {
+    var totalStaff = 0;
+    var readyTeams = 0;
+    var totalOperational = 0;
+    
+    for (var teamId in teams) {
+        var team = teams[teamId];
+        // Only count operational teams (جنوب 1-16, سريع 1-5)
+        var isOperational = (/^rapid_[1-5]$/.test(teamId) || /^جنوب [1-9]$/.test(teamId) || /^جنوب 1[0-6]$/.test(teamId));
+        if (!isOperational) continue;
+        totalOperational++;
+        if (team.status === 'ready') {
+            totalStaff += parseInt(team.staffCount) || 2;
+            readyTeams++;
+        }
+    }
+    
+    var readiness = totalOperational > 0 ? Math.round((readyTeams / totalOperational) * 100) : 0;
+    var missingTeams = totalOperational - readyTeams;
+    updateWorkforceDisplay(totalStaff, readyTeams, readiness, missingTeams);
+}
+
+function updateWorkforceStatsFallback() {
     var shiftData = null;
     if (currentShiftId) {
         var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
@@ -3480,7 +3676,8 @@ async function startNewShift() {
             // STEP 2: Clear ALL operational data locally
             // ============================================
             reports = {};
-            centersData = {};
+            // Keep centersData — static team-to-center mapping, not shift-specific
+            // centersData = {};
             lastKnownUpdate = 0;
             
             // Clear report type stats (if using localStorage for types)
@@ -3497,6 +3694,10 @@ async function startNewShift() {
             updateWorkforceStats();
             updateDistributionIndicator();
             updateShiftStatus();
+            
+            // Hide distribution card on main page until teams are ready
+            var distributionIndicator = document.getElementById('distributionIndicator');
+            if (distributionIndicator) distributionIndicator.style.display = 'none';
             
             // Close any open modals
             var distributionModal = document.getElementById('distributionModal');

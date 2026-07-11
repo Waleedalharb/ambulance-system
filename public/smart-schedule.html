@@ -1132,6 +1132,65 @@
             background: #FAFBFC;
         }
 
+        /* Inline editing styles */
+        .classic-grid-cell.editable {
+            cursor: pointer;
+            position: relative;
+        }
+        .classic-grid-cell.editable:hover {
+            background: #E0F2FE !important;
+            border: 2px dashed var(--primary);
+        }
+        .classic-grid-cell.editing {
+            padding: 0 !important;
+            background: #FFFFFF !important;
+        }
+        .classic-grid-cell .inline-select {
+            width: 100%;
+            height: 100%;
+            min-height: 36px;
+            border: 2px solid var(--primary);
+            border-radius: 0;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            font-family: var(--font);
+            background: #FFFFFF;
+            color: var(--text);
+            outline: none;
+            cursor: pointer;
+        }
+        .classic-grid-cell .inline-select:focus {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .classic-grid-cell .inline-select option {
+            padding: 6px;
+            font-size: 0.85rem;
+        }
+        .classic-edit-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 12px;
+            text-align: center;
+            padding: 8px;
+            background: #F8FAFC;
+            border-radius: 8px;
+        }
+        .classic-edit-hint i {
+            color: var(--primary);
+            margin-left: 6px;
+        }
+        .cell-saving {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Shift colors for classic view */
+            background: #FAFBFC;
+        }
+        .classic-grid-row:nth-child(even) .classic-grid-cell:first-child {
+            background: #FAFBFC;
+        }
+
         /* Shift colors for classic view */
         .classic-shift-D { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; } /* Day shift */
         .classic-shift-D12 { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; }
@@ -2407,7 +2466,7 @@
         // التخزين المحلي - Storage
         // ==========================================
         var DB_NAME = 'SmartScheduleDB_v13';
-        var DB_VERSION = 2;  // BUMPED to force store creation
+        var DB_VERSION = 3;  // BUMPED to force store creation
         var db = null;
 
         function openDB() {
@@ -2732,6 +2791,355 @@
         }
 
         // ==========================================
+        // Inline Editing for Classic View
+        // ==========================================
+        var EDITABLE_SHIFT_CODES = [
+            { code: '', name: '— فارغ —' },
+            { code: 'D12', name: 'D12 — دوام 12 صباحاً' },
+            { code: 'D10', name: 'D10 — دوام 10 صباحاً' },
+            { code: 'D11', name: 'D11 — دوام 11 صباحاً' },
+            { code: 'D8', name: 'D8 — دوام 8 صباحاً' },
+            { code: 'D6', name: 'D6 — دوام 6 صباحاً' },
+            { code: 'N12', name: 'N12 — دوام 12 ليلاً' },
+            { code: 'N10', name: 'N10 — دوام 10 ليلاً' },
+            { code: 'N11', name: 'N11 — دوام 11 ليلاً' },
+            { code: 'N8', name: 'N8 — دوام 8 ليلاً' },
+            { code: 'N6', name: 'N6 — دوام 6 ليلاً' },
+            { code: 'LN8', name: 'LN8 — ليلية 8' },
+            { code: 'LN10', name: 'LN10 — ليلية 10' },
+            { code: 'O12', name: 'O12 — أوفرلاب 12' },
+            { code: 'O10', name: 'O10 — أوفرلاب 10' },
+            { code: 'O6', name: 'O6 — أوفرلاب 6' },
+            { code: 'M', name: 'M — مهمة' },
+            { code: 'C', name: 'C — تدريب' },
+            { code: 'ME', name: 'ME — مكلف' },
+            { code: 'F', name: 'F — مكلف' },
+            { code: 'CP8', name: 'CP8 — تكميلية 8' },
+            { code: 'CP24', name: 'CP24 — تكميلية 24' },
+            { code: 'CPD', name: 'CPD — تكميلية صباحية' },
+            { code: 'CPN', name: 'CPN — تكميلية ليلية' },
+            { code: 'V', name: 'V — إجازة' },
+            { code: 'VC', name: 'VC — إجازة مرضية' },
+            { code: 'E', name: 'E — إجازة' },
+            { code: 'EV', name: 'EV — إجازة استثنائية' },
+            { code: 'WO', name: 'WO — Weekend Off' }
+        ];
+
+        var _activeEditCell = null;
+
+        function editCell(cell, empId, dateStr) {
+            if (_activeEditCell) cancelEdit(_activeEditCell);
+            _activeEditCell = cell;
+
+            var currentCode = cell.getAttribute('data-shift-code') || '';
+            var selectHtml = '<select class="inline-select" onchange="onInlineShiftChange(this, \'' + empId + '\', \'' + dateStr + '\')" onblur="cancelEditCell(this)" onkeydown="if(event.key===\'Escape\')cancelEditCell(this)">';
+            for (var i = 0; i < EDITABLE_SHIFT_CODES.length; i++) {
+                var opt = EDITABLE_SHIFT_CODES[i];
+                var selected = opt.code === currentCode ? ' selected' : '';
+                selectHtml += '<option value="' + opt.code + '"' + selected + '>' + opt.name + '</option>';
+            }
+            selectHtml += '</select>';
+
+            cell.classList.add('editing');
+            cell.innerHTML = selectHtml;
+            var sel = cell.querySelector('select');
+            if (sel) {
+                sel.focus();
+                sel.selectedIndex = Math.max(0, EDITABLE_SHIFT_CODES.findIndex(function(o) { return o.code === currentCode; }));
+            }
+        }
+
+        function cancelEditCell(selectEl) {
+            var cell = selectEl.parentElement;
+            if (!cell) return;
+            cancelEdit(cell);
+        }
+
+        function cancelEdit(cell) {
+            if (!cell) return;
+            var shiftCode = cell.getAttribute('data-shift-code') || '';
+            var sch = cell.getAttribute('data-sch-status') || '';
+            var time = cell.getAttribute('data-sch-time') || '';
+
+            cell.classList.remove('editing');
+            _activeEditCell = null;
+
+            if (shiftCode) {
+                var safeCode = String(shiftCode).replace(/[^a-zA-Z0-9]/g, '');
+                cell.className = 'classic-grid-cell editable classic-shift-' + safeCode;
+                var displayText = shiftCode;
+                if (sch === 'إجازة') displayText = 'إجازة';
+                else if (sch === 'راحة') displayText = 'راحة';
+                cell.innerHTML = '<span class="classic-shift-code">' + displayText + '</span>';
+                cell.title = (shiftCode || sch) + ' | ' + time;
+            } else {
+                cell.className = 'classic-grid-cell editable';
+                cell.innerHTML = '-';
+                cell.title = '';
+            }
+        }
+
+        // ==========================================
+        // Shift Validation for Inline Editing
+        // ==========================================
+        function validateShiftChange(emp, dateStr, newCode) {
+            var warnings = [];
+            var oldEntry = null;
+            for (var s = 0; s < emp.schedule.length; s++) {
+                if (emp.schedule[s].date === dateStr) { oldEntry = emp.schedule[s]; break; }
+            }
+            var oldCode = oldEntry ? (oldEntry.shiftCode || oldEntry.shift || '') : '';
+
+            // 1. Warn when clearing a shift
+            if (!newCode && oldCode) {
+                warnings.push('سيتم حذف المناوبة لهذا اليوم');
+            }
+
+            // 2. Warn when changing vacation/rest to work
+            var restCodes = ['V', 'VC', 'E', 'EV', 'WO'];
+            if (restCodes.indexOf(oldCode) !== -1 && restCodes.indexOf(newCode) === -1 && newCode) {
+                warnings.push('تحويل من راحة/إجازة إلى دوام — تأكد من صحة التعديل');
+            }
+
+            // 3. Check next-day conflict: night shift followed by early morning
+            var nightCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
+            var earlyCodes = ['D6', 'D8', 'D10', 'D12', 'D11', 'O6', 'O10', 'O12', 'CPD', 'CP8'];
+            if (nightCodes.indexOf(newCode) !== -1) {
+                // Check if next day has early shift
+                var nextDate = new Date(dateStr);
+                nextDate.setDate(nextDate.getDate() + 1);
+                var nextDateStr = nextDate.toISOString().split('T')[0];
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    if (emp.schedule[s].date === nextDateStr) {
+                        var nextCode = emp.schedule[s].shiftCode || emp.schedule[s].shift || '';
+                        if (earlyCodes.indexOf(nextCode) !== -1) {
+                            warnings.push('تنبيه: مناوبة ليلية متبوعة بدوام مبكر في اليوم التالي (' + nextCode + ')');
+                        }
+                        break;
+                    }
+                }
+            }
+            if (earlyCodes.indexOf(newCode) !== -1) {
+                // Check if previous day had night shift
+                var prevDate = new Date(dateStr);
+                prevDate.setDate(prevDate.getDate() - 1);
+                var prevDateStr = prevDate.toISOString().split('T')[0];
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    if (emp.schedule[s].date === prevDateStr) {
+                        var prevCode = emp.schedule[s].shiftCode || emp.schedule[s].shift || '';
+                        if (nightCodes.indexOf(prevCode) !== -1) {
+                            warnings.push('تنبيه: دوام مبكر بعد مناوبة ليلية في اليوم السابق (' + prevCode + ')');
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // 4. Check for more than 7 consecutive work days
+            if (newCode && restCodes.indexOf(newCode) === -1) {
+                var consecutive = 0;
+                var checkDate = new Date(dateStr);
+                // Count backwards
+                for (var i = 1; i <= 10; i++) {
+                    var d = new Date(checkDate);
+                    d.setDate(d.getDate() - i);
+                    var dStr = d.toISOString().split('T')[0];
+                    var found = false;
+                    for (var s = 0; s < emp.schedule.length; s++) {
+                        if (emp.schedule[s].date === dStr) {
+                            var c = emp.schedule[s].shiftCode || emp.schedule[s].shift || '';
+                            if (restCodes.indexOf(c) === -1 && c) { consecutive++; found = true; }
+                            break;
+                        }
+                    }
+                    if (!found) break;
+                }
+                // Count forwards including current
+                for (var i = 0; i <= 10; i++) {
+                    var d = new Date(checkDate);
+                    d.setDate(d.getDate() + i);
+                    var dStr = d.toISOString().split('T')[0];
+                    var found = false;
+                    for (var s = 0; s < emp.schedule.length; s++) {
+                        if (emp.schedule[s].date === dStr) {
+                            var c = emp.schedule[s].shiftCode || emp.schedule[s].shift || '';
+                            if (dStr === dateStr) { consecutive++; found = true; }
+                            else if (restCodes.indexOf(c) === -1 && c) { consecutive++; found = true; }
+                            break;
+                        }
+                    }
+                    if (!found && i > 0) break;
+                }
+                if (consecutive > 7) {
+                    warnings.push('تنبيه: الموظف يعمل ' + consecutive + ' أيام متتالية — تأكد من صحة الجدول');
+                }
+            }
+
+            return { valid: true, warnings: warnings, oldCode: oldCode };
+        }
+
+        async function onInlineShiftChange(selectEl, empId, dateStr) {
+            var newCode = selectEl.value;
+            var cell = selectEl.parentElement;
+            if (!cell) return;
+
+            var oldCode = cell.getAttribute('data-shift-code') || '';
+            if (oldCode === newCode) {
+                cancelEdit(cell);
+                return;
+            }
+
+            // Find employee
+            var emp = null;
+            for (var i = 0; i < employees.length; i++) {
+                if (String(employees[i].id) === String(empId)) { emp = employees[i]; break; }
+            }
+            if (!emp) { cancelEdit(cell); return; }
+
+            // Run validations
+            var validation = validateShiftChange(emp, dateStr, newCode);
+            if (validation.warnings.length > 0) {
+                var confirmMsg = validation.warnings.join('\n') + '\n\nهل تريد المتابعة؟';
+                if (!confirm(confirmMsg)) {
+                    cancelEdit(cell);
+                    return;
+                }
+            }
+
+            // Determine status from code
+
+            // Determine status from code
+            var status = 'دوام';
+            if (newCode === 'V' || newCode === 'VC' || newCode === 'E' || newCode === 'EV') status = 'إجازة';
+            else if (newCode === 'WO') status = 'راحة';
+            else if (newCode === 'C') status = 'تدريب';
+            else if (newCode === 'ME' || newCode === 'F' || newCode.indexOf('CP') === 0) status = 'تكميل';
+            else if (!newCode) status = '';
+
+            // Show saving state
+            cell.classList.remove('editing');
+            cell.classList.add('cell-saving');
+            cell.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>';
+            _activeEditCell = null;
+
+            var token = localStorage.getItem('authToken');
+            if (!token) {
+                showToast('يجب تسجيل الدخول أولاً', 'error');
+                cancelEdit(cell);
+                return;
+            }
+
+            try {
+                var dateParts = dateStr.split('-');
+                var year = parseInt(dateParts[0]);
+                var month = parseInt(dateParts[1]);
+
+                // Find existing schedule entry and rosterId
+                var existingSch = null;
+                var rosterId = null;
+                for (var s = 0; s < emp.schedule.length; s++) {
+                    if (emp.schedule[s].date === dateStr) {
+                        existingSch = emp.schedule[s];
+                        rosterId = emp.schedule[s].rosterId || null;
+                        break;
+                    }
+                }
+
+                var response;
+                if (rosterId) {
+                    // Update existing
+                    response = await fetch('/api/shift-roster/' + rosterId, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            employee_id: emp.employeeDbId || emp.id,
+                            shift_date: dateStr,
+                            shift_code: newCode || '-',
+                            month: month,
+                            year: year
+                        })
+                    });
+                } else {
+                    // Create new
+                    response = await fetch('/api/shift-roster', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            employee_id: emp.employeeDbId || emp.id,
+                            shift_date: dateStr,
+                            shift_code: newCode || '-',
+                            month: month,
+                            year: year
+                        })
+                    });
+                }
+
+                var result = await response.json();
+                if (!response.ok || !result.success) {
+                    showToast('❌ فشل الحفظ: ' + (result.error || 'خطأ غير معروف'), 'error');
+                    cancelEdit(cell);
+                    return;
+                }
+
+                // Update local data
+                if (existingSch) {
+                    if (!newCode) {
+                        // Remove entry if empty
+                        emp.schedule = emp.schedule.filter(function(sch) { return sch.date !== dateStr; });
+                    } else {
+                        existingSch.shift = newCode;
+                        existingSch.shiftCode = newCode;
+                        existingSch.status = status;
+                        if (result.id) existingSch.rosterId = result.id;
+                    }
+                } else if (newCode) {
+                    emp.schedule.push({
+                        date: dateStr,
+                        day: '',
+                        shift: newCode,
+                        shiftCode: newCode,
+                        status: status,
+                        time: '',
+                        rosterId: result.id || null
+                    });
+                }
+
+                // Update cell visually
+                cell.classList.remove('cell-saving');
+                cell.setAttribute('data-shift-code', newCode);
+                cell.setAttribute('data-sch-status', status);
+                if (!newCode) {
+                    cell.className = 'classic-grid-cell editable';
+                    cell.innerHTML = '-';
+                    cell.title = '';
+                } else {
+                    var safeCode = String(newCode).replace(/[^a-zA-Z0-9]/g, '');
+                    cell.className = 'classic-grid-cell editable classic-shift-' + safeCode;
+                    var displayText = newCode;
+                    if (status === 'إجازة') displayText = 'إجازة';
+                    else if (status === 'راحة') displayText = 'راحة';
+                    cell.innerHTML = '<span class="classic-shift-code">' + displayText + '</span>';
+                    cell.title = newCode + ' | ' + status;
+                }
+
+                showToast('✅ تم حفظ التعديل', 'success');
+                updateStats();
+                renderCharts();
+
+            } catch (err) {
+                console.error('Inline edit save error:', err);
+                showToast('❌ خطأ في الاتصال', 'error');
+                cancelEdit(cell);
+            }
+        }
+
+        // ==========================================
         // العرض الكلاسيكي - Classic View (Excel-like Grid)
         // ==========================================
         function renderClassicView() {
@@ -2803,14 +3211,17 @@
                     if (sch) {
                         var shiftCode = sch.shiftCode || sch.shift || '';
                         var safeCode = String(shiftCode).replace(/[^a-zA-Z0-9]/g, '');
-                        var cellClass = 'classic-grid-cell classic-shift-' + safeCode;
+                        var cellClass = 'classic-grid-cell editable classic-shift-' + safeCode;
                         var displayText = shiftCode;
                         if (sch.status === 'إجازة') displayText = 'إجازة';
                         else if (sch.status === 'راحة') displayText = 'راحة';
-                        html += '<div class="' + cellClass + '" title="' + (sch.shift || sch.status) + ' | ' + (sch.time || '') + '">' +
+                        html += '<div class="' + cellClass + '" title="' + (sch.shift || sch.status) + ' | ' + (sch.time || '') + '"' +
+                            ' data-emp-id="' + emp.id + '" data-date="' + dayDate + '" data-shift-code="' + shiftCode + '" data-sch-status="' + (sch.status || '') + '" data-sch-time="' + (sch.time || '') + '"' +
+                            ' onclick="editCell(this, \'' + emp.id + '\', \'' + dayDate + '\')">' +
                             '<span class="classic-shift-code">' + displayText + '</span></div>';
                     } else {
-                        html += '<div class="classic-grid-cell">-</div>';
+                        html += '<div class="classic-grid-cell editable" data-emp-id="' + emp.id + '" data-date="' + dayDate + '" data-shift-code="" data-sch-status="" data-sch-time=""' +
+                            ' onclick="editCell(this, \'' + emp.id + '\', \'' + dayDate + '\')">-</div>';
                     }
                 }
                 html += '</div>';
@@ -2828,7 +3239,8 @@
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FFEDD5; border-color:#F59E0B;"></div><span>C = تدريب</span></div>' +
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FEF3C7; border-color:#D97706;"></div><span>ME = مكلف</span></div>' +
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0F2FE; border-color:#0EA5E9;"></div><span>O12 = أوفر لاب</span></div>' +
-                '</div>';
+                '</div>' +
+                '<div class="classic-edit-hint"><i class="fas fa-mouse-pointer"></i> انقر على أي خلية للتعديل مباشرة</div>';
             
             container.innerHTML = html;
         }
@@ -3534,39 +3946,87 @@
                 return;
             }
             try {
-                showToast('جاري تحميل البيانات من السيرفر...', 'info');
-                var response = await fetch('/api/shift-roster', {
+                showToast('جاري تحميل البيانات من النظام...', 'info');
+
+                // 1. Load employees
+                var empResponse = await fetch('/api/employees', {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
-                var data = await response.json();
-                if (!data.success || !data.roster || data.roster.length === 0) {
-                    showToast('لا توجد بيانات في السيرفر', 'info');
+                var empData = await empResponse.json();
+                if (!empData.success || !empData.employees || empData.employees.length === 0) {
+                    showToast('لا توجد موظفين في النظام', 'info');
                     return;
                 }
-                // Convert server format to employee format
-                var empMap = {};
-                data.roster.forEach(function(r) {
-                    var key = r.employee_code || r.employee_name;
-                    if (!empMap[key]) {
-                        empMap[key] = {
-                            id: r.employee_code || String(Date.now()),
-                            name: r.employee_name || '',
-                            jobTitle: r.job_title || '',
-                            phone: '',
-                            team: r.team_name || '',
-                            schedule: []
-                        };
-                    }
-                    empMap[key].schedule.push({
-                        day: r.day_name || '',
-                        date: r.shift_date,
-                        shift: r.shift_code,
-                        shiftCode: r.shift_code,
-                        time: '',
-                        location: r.team_name || '',
-                        status: (r.shift_code === 'V' || r.shift_code === 'VC') ? 'إجازة' : 'دوام'
-                    });
+
+                // 2. Load teams
+                var teamResponse = await fetch('/api/teams', {
+                    headers: { 'Authorization': 'Bearer ' + token }
                 });
+                var teamData = await teamResponse.json();
+                var teamsMap = {};
+                if (teamData.success && teamData.teams) {
+                    teamData.teams.forEach(function(t) { teamsMap[t.id] = t.name; });
+                }
+
+                // 3. Load team assignments
+                var assignResponse = await fetch('/api/team-assignments', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var assignData = await assignResponse.json();
+                var empTeamMap = {};
+                if (assignData.success && assignData.assignments) {
+                    assignData.assignments.forEach(function(a) {
+                        empTeamMap[a.employee_id] = teamsMap[a.team_id] || a.team_name || '';
+                    });
+                }
+
+                // 4. Build employees array
+                var empMap = {};
+                empData.employees.forEach(function(e) {
+                    var empId = e.id || e.employee_id || e.employee_code;
+                    empMap[empId] = {
+                        id: empId,
+                        employeeDbId: e.id,
+                        name: e.name || '',
+                        jobTitle: e.job_title || e.jobTitle || '',
+                        phone: e.phone || '',
+                        team: empTeamMap[e.id] || e.team || '',
+                        schedule: []
+                    };
+                });
+
+                // 5. Load shift roster
+                try {
+                    var rosterResponse = await fetch('/api/shift-roster', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var rosterData = await rosterResponse.json();
+                    if (rosterData.success && rosterData.roster && rosterData.roster.length > 0) {
+                        rosterData.roster.forEach(function(r) {
+                            var empId = r.employee_id;
+                            var emp = empMap[empId];
+                            if (!emp) return;
+                            var status = 'دوام';
+                            if (r.shift_code === 'V' || r.shift_code === 'VC' || r.shift_code === 'E' || r.shift_code === 'EV') status = 'إجازة';
+                            else if (r.shift_code === 'WO') status = 'راحة';
+                            else if (r.shift_code === 'C') status = 'تدريب';
+                            else if (r.shift_code === 'ME' || r.shift_code === 'F' || (r.shift_code && r.shift_code.indexOf('CP') === 0)) status = 'تكميل';
+                            emp.schedule.push({
+                                rosterId: r.id,
+                                day: r.day_name || '',
+                                date: r.shift_date,
+                                shift: r.shift_code,
+                                shiftCode: r.shift_code,
+                                time: '',
+                                location: r.team_name || emp.team || '',
+                                status: status
+                            });
+                        });
+                    }
+                } catch (rosterErr) {
+                    console.warn('Could not load shift roster:', rosterErr);
+                }
+
                 employees = Object.values(empMap);
                 saveToIndexedDB();
                 saveToLocalStorage();
@@ -3574,7 +4034,7 @@
                 renderCharts();
                 renderCurrentView();
                 populateLocationFilter();
-                showToast('✅ تم تحميل ' + employees.length + ' موظف من السيرفر', 'success');
+                showToast('✅ تم تحميل ' + employees.length + ' موظف من النظام', 'success');
             } catch (err) {
                 console.error('Load from server error:', err);
                 showToast('❌ خطأ في الاتصال بالسيرفر', 'error');

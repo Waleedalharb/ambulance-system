@@ -152,6 +152,11 @@
             var res = await fetch('/api/chat/users', { headers: { 'Authorization': 'Bearer ' + authToken } });
             if (!res.ok) throw new Error('Failed to load users');
             return res.json();
+        },
+        getOnlineUsers: async function() {
+            var res = await fetch('/api/chat/online', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!res.ok) throw new Error('Failed to load online users');
+            return res.json();
         }
     };
 
@@ -292,10 +297,19 @@
             var avatarIcon = conv.type === 'group' ? 'fa-users' : 'fa-user';
             var activeClass = isActive ? 'active' : '';
 
+            // Determine if other participant is online
+            var otherOnline = false;
+            if (conv.type === 'private' && window.onlineUsersList) {
+                var otherParticipant = conv.participants.find(function(p) { return p.user_id !== chatState.currentUser.id; });
+                if (otherParticipant) {
+                    otherOnline = window.onlineUsersList.some(function(u) { return u.id == otherParticipant.user_id; });
+                }
+            }
+            
             html += '<div class="conversation-item ' + activeClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
                 '<div class="conversation-avatar ' + (conv.type === 'group' ? 'group' : '') + '">' +
                     '<i class="fas ' + avatarIcon + '"></i>' +
-                    (conv.type === 'private' ? '<span class="avatar-status"></span>' : '') +
+                    (conv.type === 'private' ? '<span class="avatar-status ' + (otherOnline ? 'online' : 'offline') + '"></span>' : '') +
                 '</div>' +
                 '<div class="conversation-info">' +
                     '<div class="conversation-top">' +
@@ -871,7 +885,24 @@
             }
         }
         
-        // Update conversation avatar status
+        // Update conversation avatar status in the sidebar list
+        var convItems = document.querySelectorAll('.conversation-item');
+        convItems.forEach(function(item) {
+            var convId = parseInt(item.dataset.id);
+            var conv = chatState.conversations.find(function(c) { return c.id === convId; });
+            if (conv && conv.type === 'private') {
+                var other = conv.participants.find(function(p) { return p.user_id == data.userId; });
+                if (other) {
+                    var statusDot = item.querySelector('.avatar-status');
+                    if (statusDot) {
+                        statusDot.classList.toggle('online', isOnline);
+                        statusDot.classList.toggle('offline', !isOnline);
+                    }
+                }
+            }
+        });
+        
+        // Update conversation data
         chatState.conversations.forEach(function(conv) {
             if (conv.type === 'private') {
                 var other = conv.participants.find(function(p) { return p.user_id === data.userId; });
@@ -1018,10 +1049,23 @@
     }
 
     // ===== Init =====
+    async function loadOnlineUsers() {
+        try {
+            var data = await ChatAPI.getOnlineUsers();
+            if (data.success && data.onlineUsers) {
+                window.onlineUsersList = data.onlineUsers;
+                console.log('[chat] Loaded online users:', data.onlineUsers.length);
+            }
+        } catch (e) {
+            console.log('[chat] Failed to load online users:', e);
+        }
+    }
+    
     async function init() {
         bindEvents();
         await loadCurrentUser();
         await loadUsers();
+        await loadOnlineUsers();
         await loadConversations();
 
         // Connect WebSocket

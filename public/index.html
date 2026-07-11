@@ -50,6 +50,26 @@
     <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
     <link rel="stylesheet" href="css/app.css?v=40">
 <script src="js/shift-codes-config.js"></script>
+<script>
+// Session check - skip login if token exists
+(function() {
+    var token = localStorage.getItem('authToken');
+    if (!token) {
+        // No token, check if we're on index.html (not login)
+        if (window.location.pathname.indexOf('login') === -1 && window.location.pathname.indexOf('index') !== -1) {
+            window.location.href = 'login.html';
+        }
+    }
+})();
+
+// Page loading management
+window.addEventListener('load', function() {
+    var overlay = document.getElementById('pageLoadingOverlay');
+    if (overlay) {
+        setTimeout(function() { overlay.classList.add('hidden'); }, 300);
+    }
+});
+</script>
     <style>
     /* Paramedic display in shift completion */
     .paramedic-box {
@@ -189,6 +209,20 @@
         color: white;
         border-color: #0D9488;
     }
+
+    /* Skeleton Loading */
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 4px; }
+    @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .skeleton-text { height: 1em; margin-bottom: 0.5em; }
+    .skeleton-value { height: 2.5rem; width: 60%; margin: 0 auto; }
+    .skeleton-label { height: 0.8rem; width: 80%; margin: 0.5rem auto 0; }
+
+    /* Loading Overlay */
+    .page-loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
+    .page-loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .page-loading-overlay .spinner { width: 50px; height: 50px; border: 4px solid #E2E8F0; border-top-color: #2563EB; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .page-loading-overlay .loading-text { color: #64748B; font-size: 1rem; font-weight: 600; }
     </style>
         color: var(--gray-400);
         font-size: 0.65rem;
@@ -198,6 +232,10 @@
     </style>
 </head>
 <body>
+<div class="page-loading-overlay" id="pageLoadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">جاري تحميل البيانات...</div>
+</div>
 <!-- ===== شاشة تسجيل الدخول ===== -->
 <div id="loginScreen" style="position:fixed; inset:0; z-index:9999; background:linear-gradient(135deg, #0F172A, #1E3A5F); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; font-family:Inter, sans-serif;">
     <div style="text-align:center; margin-bottom:20px;">
@@ -243,7 +281,7 @@
                     <i class="fas fa-clock"></i>
                     <span id="currentShiftDisplay">جاري التحميل...</span>
                 </button>
-                <button class="qa-btn" title="تكميل النوبة" onclick="location.href='radio-completion.html?v=40'">
+                <button class="qa-btn" title="تكميل النوبة" onclick="navigateToPage('radio-completion.html?v=40')">
                     <i class="fas fa-clipboard-list"></i>
                     <span>تكميل</span>
                 </button>
@@ -251,7 +289,7 @@
                     <i class="fas fa-ambulance"></i>
                     <span>توزيع</span>
                 </button>
-                <button class="qa-btn" title="نظام الجداول" onclick="window.location.href='smart-schedule.html?v=40';">
+                <button class="qa-btn" title="نظام الجداول" onclick="navigateToPage('smart-schedule.html?v=40')">
                     <i class="fas fa-calendar-alt"></i>
                     <span>الجداول</span>
                 </button>
@@ -285,7 +323,7 @@
             <button class="operations-room-btn" id="changePasswordBtn" title="تغيير الرقم السري" onclick="showChangePasswordModal();" style="background: linear-gradient(135deg, #3B82F6, #1D4ED8); margin-right: 4px;">
                 <i class="fas fa-key"></i>
             </button>
-            <button class="operations-room-btn" id="opsRoomBtn" title="غرفة العمليات الذكية" onclick="window.location.href='operations-command.html?v=40';" style="background: linear-gradient(135deg, #1E3A5F, #10B981);">
+            <button class="operations-room-btn" id="opsRoomBtn" title="غرفة العمليات الذكية" onclick="navigateToPage('operations-command.html?v=40')" style="background: linear-gradient(135deg, #1E3A5F, #10B981);">
                 <i class="fas fa-rocket"></i>
                 <span>EOCC</span>
             </button>
@@ -393,10 +431,10 @@
                 <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
                 <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>
-            <button id="shiftBtn" class="btn btn-secondary" onclick="location.href='radio-completion.html?v=40'"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+            <button id="shiftBtn" class="btn btn-secondary" onclick="navigateToPage('radio-completion.html?v=40')"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
-            <button class="btn btn-info" onclick="window.location.href='smart-schedule.html?v=40'"><i class="fas fa-calendar-alt"></i> الجداول</button>
-            <button class="btn btn-daily-report" onclick="window.location.href='daily-report.html?v=40'"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
+            <button class="btn btn-info" onclick="navigateToPage('smart-schedule.html?v=40')"><i class="fas fa-calendar-alt"></i> الجداول</button>
+            <button class="btn btn-daily-report" onclick="navigateToPage('daily-report.html?v=40')"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
             <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
             <button id="controlBtn" class="btn btn-control"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
             <button id="formsBtn" class="btn btn-forms"><i class="fas fa-file-alt"></i> النماذج</button>
@@ -405,7 +443,10 @@
             <button id="analyticsBtn" class="btn" style="background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; font-weight:700;">
                 <i class="fas fa-tachometer-alt"></i> لوحة التحكم
             </button>
-            <button class="btn" onclick="window.location.href='admin-dashboard.html?v=40'" style="background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; font-weight:700;">
+            <button class="btn" onclick="navigateToPage('shift-executive-dashboard.html?v=40')" style="background:linear-gradient(135deg, #3B82F6, #1D4ED8); color:white; border:none; font-weight:700;">
+                <i class="fas fa-chart-line"></i> مؤشرات المناوبات
+            </button>
+            <button class="btn" onclick="navigateToPage('admin-dashboard.html?v=40')" style="background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; font-weight:700;">
                 <i class="fas fa-heartbeat"></i> مراقب النظام
             </button>
             <button id="achievementsBtn" class="btn" style="background:linear-gradient(135deg, #FFD700, #FFA500); color:#0F172A; border:none; font-weight:700;" title="الإنجازات">
@@ -473,7 +514,7 @@
                     <div class="wf-card-icon-wrap">
                         <i class="fas fa-user-md"></i>
                     </div>
-                    <div class="wf-card-value" id="wfTotalStaff">0</div>
+                    <div class="wf-card-value" id="wfTotalStaff"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
                 <div class="wf-card-label">إجمالي المسعفين</div>
                 <div class="wf-card-progress-wrap">
@@ -495,7 +536,7 @@
                     <div class="wf-card-icon-wrap">
                         <i class="fas fa-ambulance"></i>
                     </div>
-                    <div class="wf-card-value" id="wfTotalCars">0</div>
+                    <div class="wf-card-value" id="wfTotalCars"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
                 <div class="wf-card-label">إجمالي السيارات</div>
                 <div class="wf-card-progress-wrap">
@@ -517,7 +558,7 @@
                     <div class="wf-card-icon-wrap">
                         <i class="fas fa-shield-alt"></i>
                     </div>
-                    <div class="wf-card-value" id="wfReadiness">0%</div>
+                    <div class="wf-card-value" id="wfReadiness"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
                 <div class="wf-card-label">نسبة الجاهزية</div>
                 <div class="wf-card-progress-wrap">
@@ -539,7 +580,7 @@
                     <div class="wf-card-icon-wrap">
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
-                    <div class="wf-card-value" id="wfMissingCenters">0</div>
+                    <div class="wf-card-value" id="wfMissingCenters"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
                 <div class="wf-card-label">مراكز ناقصة</div>
                 <div class="wf-card-progress-wrap">
@@ -1690,21 +1731,22 @@
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); location.href='radio-completion.html?v=40';"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=40');"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='daily-report.html?v=40';"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='smart-schedule.html?v=40';"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('daily-report.html?v=40');"><i class="fas fa-file-medical-alt"></i> التقرير اليومي</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('smart-schedule.html?v=40');"><i class="fas fa-calendar-alt"></i> نظام الجداول</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('controlModal').style.display='flex'; loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('chartsModal').style.display='flex'; renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('analyticsModal').style.display='flex'; renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='admin-dashboard.html?v=40';"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('shift-executive-dashboard.html?v=40');"><i class="fas fa-chart-line"></i> مؤشرات المناوبات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-dashboard.html?v=40');"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('achievementsModal').style.display='flex'; renderAchievements();"><i class="fas fa-trophy"></i> الإنجازات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openShiftArchiveModal();"><i class="fas fa-archive"></i> أرشيف المناوبات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); toggleAIChatPanel();"><i class="fas fa-robot"></i> المساعد التشغيلي</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); window.location.href='admin-knowledge.html?v=40';"><i class="fas fa-book"></i> قاعدة المعرفة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-knowledge.html?v=40');"><i class="fas fa-book"></i> قاعدة المعرفة</button>
             </div>
         </div>
         <!-- الإعدادات -->
@@ -1722,7 +1764,7 @@
     </nav>
     <div class="sidebar-footer">
         <span>v3c</span>
-        <span>🟢 متصل</span>
+        <span id="connectionStatus" style="display:flex;align-items:center;gap:4px;font-size:0.7rem;"><span id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--gray-400);display:inline-block;"></span><span id="statusText">جاري الاتصال...</span></span>
     </div>
 </aside>
 
@@ -1736,6 +1778,13 @@
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
+<script>
+function navigateToPage(url) {
+    var overlay = document.getElementById('pageLoadingOverlay');
+    if (overlay) overlay.style.display = 'flex';
+    setTimeout(function() { window.location.href = url; }, 100);
+}
+</script>
 </body>
 </html><!-- ===== نافذة سجل العمليات ===== -->
 <div id="auditLogModal" class="modal" style="display:none; z-index:9999;">

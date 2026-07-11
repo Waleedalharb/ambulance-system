@@ -400,9 +400,10 @@ i, i.fas, i.far, i.fal, .fas, .far, .fal, [class^="fa-"], [class*=" fa-"] {
     height: 10px;
     border-radius: 50%;
     border: 2px solid var(--chat-sidebar);
-    background: var(--chat-online);
+    background: #94A3B8; /* Default: offline (gray) */
 }
 
+.conversation-avatar .avatar-status.online { background: var(--chat-online); }
 .conversation-avatar .avatar-status.offline { background: #94A3B8; }
 .conversation-avatar .avatar-status.away { background: #F59E0B; }
 .conversation-avatar .avatar-status.busy { background: #EF4444; }
