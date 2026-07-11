@@ -1770,6 +1770,42 @@ window.addEventListener('load', function() {
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
+<!-- Token Refresh Pre-Check — ensures valid token before app.js loads -->
+<script>
+(function() {
+    var token = localStorage.getItem('authToken');
+    if (token) {
+        // Check if token is valid by calling a lightweight endpoint
+        fetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+            if (r.status === 403 || r.status === 401) {
+                console.log('[TokenPreCheck] Token invalid, attempting refresh...');
+                return fetch('/api/auth/refresh', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                }).then(function(refreshR) {
+                    if (refreshR.ok) return refreshR.json();
+                    throw new Error('refresh failed');
+                }).then(function(data) {
+                    if (data.success && data.token) {
+                        localStorage.setItem('authToken', data.token);
+                        console.log('[TokenPreCheck] Token refreshed successfully');
+                    } else {
+                        throw new Error('no token');
+                    }
+                }).catch(function(e) {
+                    console.error('[TokenPreCheck] Token refresh failed:', e);
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('currentUser');
+                });
+            }
+        }).catch(function(e) {
+            console.error('[TokenPreCheck] Error:', e);
+        });
+    }
+})();
+</script>
 <script src="js/websocket-sync.js"></script>
 <script src="js/frontend-monitor.js?v=2"></script>
 <script src="js/chat-integration.js"></script>
