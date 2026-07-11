@@ -76,6 +76,16 @@ function isUserOnline(userId) {
     return onlineUsersList.some(function(u) { return u.id == userId; });
 }
 
+// Global skeleton loading helpers (used inside and outside DOMContentLoaded)
+function showSkeleton() {
+    var sk = document.getElementById('skeletonScreen');
+    if (sk) sk.style.display = 'flex';
+}
+function hideSkeleton() {
+    var sk = document.getElementById('skeletonScreen');
+    if (sk) sk.style.display = 'none';
+}
+
 // ============================================
 // نظام تسجيل الدخول (من inline.js)
 // ============================================
@@ -95,14 +105,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideLogin() {
         if (loginScreen) loginScreen.style.display = 'none';
         document.body.style.overflow = '';
-    }
-    function showSkeleton() {
-        var sk = document.getElementById('skeletonScreen');
-        if (sk) sk.style.display = 'flex';
-    }
-    function hideSkeleton() {
-        var sk = document.getElementById('skeletonScreen');
-        if (sk) sk.style.display = 'none';
     }
 
     async function doLogin() {
