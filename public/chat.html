@@ -18,7 +18,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <!-- Chat Styles -->
-    <link rel="stylesheet" href="css/chat.css?v=1">
+    <link rel="stylesheet" href="css/chat.css?v=2">
+<base target="_blank">
 </head>
 <body>
     <!-- Auth Check -->
@@ -31,7 +32,7 @@
         })();
     </script>
 
-    <!-- Toast Container -->
+    <!-- Toast Container (for in-page toast notifications) -->
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Mobile Sidebar Toggle -->
@@ -84,15 +85,20 @@
                     </div>
                     <div class="sidebar-user-info">
                         <span class="sidebar-user-name" id="currentUserName">جاري التحميل...</span>
-                        <span class="sidebar-user-status">
+                        <span class="sidebar-user-status" id="sidebarUserStatus">
                             <span class="status-dot online"></span>
                             متصل
                         </span>
                     </div>
                 </div>
-                <button class="sidebar-action-btn" onclick="location.href='index.html'" title="الرئيسية">
-                    <i class="fas fa-home"></i>
-                </button>
+                <div class="sidebar-footer-actions">
+                    <button class="sidebar-action-btn" id="soundToggleBtn" title="إعدادات الصوت" onclick="toggleSoundSettings()">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button class="sidebar-action-btn" onclick="location.href='index.html'" title="الرئيسية">
+                        <i class="fas fa-home"></i>
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -163,7 +169,7 @@
                         <div class="chat-input-field">
                             <textarea id="messageInput" placeholder="اكتب رسالتك..." rows="1" autocomplete="off"></textarea>
                         </div>
-                        <button class="chat-input-btn send-btn" id="sendBtn" title="إرسال">
+                        <button class="chat-input-btn send-btn" id="sendBtn" title="إرسال" disabled>
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -227,10 +233,27 @@
         </div>
     </div>
 
+    <!-- Sound Settings Panel -->
+    <div id="soundSettingsPanel" class="sound-settings-panel" style="display:none;">
+        <h3><i class="fas fa-volume-up"></i> إعدادات الصوت</h3>
+        <div class="sound-toggle-row">
+            <label>تفعيل أصوات الإشعارات</label>
+            <label class="sound-switch">
+                <input type="checkbox" id="soundMasterToggle" onchange="toggleSoundMaster(this)" checked>
+                <span class="sound-slider"></span>
+            </label>
+        </div>
+        <div class="sound-toggle-row">
+            <button class="btn btn-sm" onclick="document.getElementById('soundSettingsPanel').style.display='none'">
+                <i class="fas fa-times"></i> إغلاق
+            </button>
+        </div>
+    </div>
+
     <!-- Overlay for mobile sidebar -->
     <div class="sidebar-overlay" id="sidebarOverlay" style="display:none;"></div>
 
     <!-- Chat Logic -->
-    <script src="js/chat.js?v=1"></script>
+    <script src="js/chat.js?v=2"></script>
 </body>
 </html>

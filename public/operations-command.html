@@ -1264,6 +1264,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 </style>
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 
@@ -1772,7 +1773,34 @@ async function loadDashboardData() {
     }
   } catch (e) { 
     console.error('Failed to load dashboard:', e); 
-    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر: ' + e.message);
+    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر - عرض بيانات افتراضية');
+    // Offline fallback demo data
+    if (!dashboardData || !dashboardData.stats || dashboardData.stats.length === 0) {
+      dashboardData = {
+        stats: [
+          { label: 'المتاح', value: 18 },
+          { label: 'البلاغات', value: 7 },
+          { label: 'المشغولين', value: 12 },
+          { label: 'الوارد', value: 4 }
+        ],
+        directives: [
+          { id: 'd1', title: 'تفعيل خطة الطوارئ', status: 'urgent', date: '2026-07-12', from: 'المدير العام', pinned: true },
+          { id: 'd2', title: 'زيادة التمركز في أحياء الجنوب', status: 'normal', date: '2026-07-11', from: 'قسم العمليات', pinned: false }
+        ],
+        alerts: [
+          { level: 'high', message: 'توقع أمطار غزيرة على جنوب الرياض من الساعة 4 عصراً' },
+          { level: 'medium', message: 'صيانة دورية لطريق الخرج من الساعة 10 مساءً' }
+        ],
+        indicators: [
+          { label: 'معدل الاستجابة', value: 92, unit: '%', trend: 'up' },
+          { label: 'متوسط وقت الوصول', value: 8.5, unit: 'د', trend: 'down' }
+        ],
+        activities: [
+          { time: '11:30', action: 'بلاغ جديد - حادث مروري', actor: 'المنسق أحمد', type: 'new' },
+          { time: '11:15', action: 'وصول فرقة 12 إلى المستشفى', actor: 'السائق خالد', type: 'arrival' }
+        ]
+      };
+    }
   }
   renderDashboard();
 }
@@ -1798,7 +1826,14 @@ async function loadReferencesData() {
       const raw = await res.json();
       referencesData = (raw && (raw.data || raw.records || raw.references)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load references:', e); referencesData = []; }
+  } catch (e) { 
+    console.error('Failed to load references:', e); 
+    showToast('error', 'فشل تحميل المرجعيات', 'وضع عدم الاتصال');
+    referencesData = [
+      { id: 'r1', title: 'بروتوكول إدارة الكوارث', category: 'بروتوكولات', status: 'active', priority: 'high', updatedAt: '2026-07-10' },
+      { id: 'r2', title: 'دليل التواصل مع المستشفيات', category: 'توجيهات', status: 'active', priority: 'medium', updatedAt: '2026-07-08' }
+    ];
+  }
   renderReferences();
 }
 
@@ -1812,7 +1847,14 @@ async function loadHospitalsData() {
       const raw = await res.json();
       hospitalsData = (raw && (raw.data || raw.records || raw.hospitals)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load hospitals:', e); hospitalsData = []; }
+  } catch (e) { 
+    console.error('Failed to load hospitals:', e); 
+    showToast('error', 'فشل تحميل المستشفيات', 'وضع عدم الاتصال');
+    hospitalsData = [
+      { id: 'h1', name: 'مستشفى الملك فهد', type: 'حكومي', beds: 450, emergency: true, specialty: 'عام', phone: '011-461-2000', address: 'الرياض - العليا' },
+      { id: 'h2', name: 'مستشفى سليمان الحبيب', type: 'خاص', beds: 200, emergency: true, specialty: 'قلب', phone: '011-525-0000', address: 'الرياض - الورود' }
+    ];
+  }
   renderHospitals();
 }
 
@@ -1826,7 +1868,10 @@ async function loadFilesData() {
       const raw = await res.json();
       filesData = (raw && (raw.data || raw.records || raw.files)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load files:', e); filesData = []; }
+  } catch (e) { console.error('Failed to load files:', e); 
+    showToast('error', 'فشل تحميل المرفقات', 'وضع عدم الاتصال - لا توجد ملفات محلية');
+    filesData = []; 
+  }
   renderFiles();
 }
 
@@ -1840,7 +1885,15 @@ async function loadTimelineData() {
       const raw = await res.json();
       timelineData = (raw && (raw.data || raw.records || raw.timeline)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load timeline:', e); timelineData = []; }
+  } catch (e) { 
+    console.error('Failed to load timeline:', e); 
+    showToast('error', 'فشل تحميل الخط الزمني', 'وضع عدم الاتصال');
+    timelineData = [
+      { id: 't1', date: '2026-07-12', title: 'تفعيل خطة الطوارئ', type: 'directive', icon: 'fa-bullhorn' },
+      { id: 't2', date: '2026-07-11', title: 'صيانة طريق الخرج', type: 'alert', icon: 'fa-exclamation-triangle' },
+      { id: 't3', date: '2026-07-10', title: 'تدريب فرق الإسعاف', type: 'training', icon: 'fa-users' }
+    ];
+  }
   renderTimeline();
 }
 
@@ -1854,7 +1907,14 @@ async function loadAnnouncementsData() {
       const raw = await res.json();
       announcementsData = (raw && (raw.data || raw.records || raw.announcements)) || (Array.isArray(raw) ? raw : []);
     }
-  } catch (e) { console.error('Failed to load announcements:', e); announcementsData = []; }
+  } catch (e) { 
+    console.error('Failed to load announcements:', e); 
+    showToast('error', 'فشل تحميل الإعلانات', 'وضع عدم الاتصال');
+    announcementsData = [
+      { id: 'a1', title: 'تعميم عاجل: تفعيل خطة الأمطار', content: 'تفعيل خطة الطوارئ للأمطار الغزيرة المتوقعة', priority: 'urgent', date: '2026-07-12', author: 'مدير العمليات' },
+      { id: 'a2', title: 'تعليمات جديدة للتمركز', content: 'الرجاء الالتزام بمناطق التمركز المحددة', priority: 'normal', date: '2026-07-11', author: 'قسم التخطيط' }
+    ];
+  }
   renderAnnouncements();
 }
 
@@ -2289,30 +2349,68 @@ fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 /** معالجة الملفات المرفوعة **/
 async function handleFiles(fileList) {
-  if (!getAuthToken()) {
-    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً');
+  // Auth check
+  const token = getAuthToken();
+  if (!token || token === 'null' || token === 'undefined') {
+    showToast('error', 'غير مسجل', 'الرجاء تسجيل الدخول أولاً من الصفحة الرئيسية');
+    console.error('No auth token found');
     return;
   }
+
   const categorySelect = document.getElementById('fileCategorySelect');
   const category = categorySelect ? categorySelect.value : 'عام';
+
+  // File validation
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  const ALLOWED_TYPES = ['.pdf','.doc','.docx','.xls','.xlsx','.ppt','.pptx','.jpg','.jpeg','.png','.mp4','.zip'];
+
   let count = 0;
+  let skipped = 0;
+
   for (const file of Array.from(fileList)) {
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      showToast('error', 'حجم كبير', file.name + ' أكبر من 50 ميجابايت');
+      skipped++;
+      continue;
+    }
+
+    // Validate file type
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (!ALLOWED_TYPES.includes(ext)) {
+      showToast('error', 'نوع غير مدعوم', file.name + ' - الأنواع المسموحة: ' + ALLOWED_TYPES.join(', '));
+      skipped++;
+      continue;
+    }
+
+    // Show upload progress
+    showToast('info', 'جاري الرفع', 'رفع: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)');
+
     const formData = new FormData();
     formData.append('files', file);
     formData.append('uploader', (currentUser && currentUser.name) || 'مستخدم');
     formData.append('category', category);
+
     try {
       const res = await fetch('/api/ops-files', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + getAuthToken() },
+        headers: { 'Authorization': 'Bearer ' + token },
         body: formData
       });
+
       if (!res.ok) {
-        const errorText = await res.text();
+        const errorText = await res.text().catch(() => 'خطأ غير معروف');
         console.error('Upload failed:', res.status, errorText);
-        showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' (HTTP ' + res.status + ')');
+        if (res.status === 401) {
+          showToast('error', 'انتهت الجلسة', 'الرجاء تسجيل الدخول مرة أخرى');
+        } else if (res.status === 413) {
+          showToast('error', 'حجم كبير', 'الملف أكبر من الحد المسموح به في السيرفر');
+        } else {
+          showToast('error', 'فشل الرفع (' + res.status + ')', 'فشل رفع: ' + file.name);
+        }
         continue;
       }
+
       const result = await res.json();
       if (!result.success) {
         showToast('error', 'فشل الرفع', result.error || 'فشل رفع: ' + file.name);
@@ -2320,12 +2418,21 @@ async function handleFiles(fileList) {
       }
       count++;
     } catch (e) { 
-      console.error('Failed to upload file to server:', e); 
-      showToast('error', 'فشل الرفع', 'فشل رفع: ' + file.name + ' - ' + e.message);
+      console.error('Failed to upload file:', e); 
+      showToast('error', 'فشل الاتصال', 'تعذر الاتصال بالسيرفر - تأكد من الاتصال بالشبكة');
     }
   }
+
   await loadFilesData();
-  if (count > 0) showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح (' + category + ')');
+
+  // Summary
+  if (count > 0 && skipped === 0) {
+    showToast('success', 'تم الرفع', 'تم رفع ' + count + ' ملف/ملفات بنجاح ✅');
+  } else if (count > 0 && skipped > 0) {
+    showToast('warning', 'تم بجزئية', 'تم رفع ' + count + ' وتم تخطي ' + skipped);
+  } else if (count === 0 && skipped > 0) {
+    showToast('error', 'لم يتم الرفع', 'تم تخطي كل الملفات (' + skipped + ')');
+  }
 }
 
 async function submitAnnouncement() {
@@ -2628,8 +2735,6 @@ function updateClock() {
     if (dateEl) dateEl.textContent = '---';
   }
 }
-setInterval(updateClock, 1000);
-updateClock();
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Dark Mode Toggle - تبديل الوضع الداكن/الفاتح
@@ -2640,6 +2745,9 @@ updateClock();
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Start clock after DOM is ready
+  setInterval(updateClock, 1000);
+  updateClock();
   // Auth check
   if (!getAuthToken()) {
     showToast('warning', 'غير مسجل', 'الرجاء تسجيل الدخول من الصفحة الرئيسية');

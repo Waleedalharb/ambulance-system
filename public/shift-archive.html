@@ -243,6 +243,7 @@
         }
     </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body class="dashboard-page">
     <div class="dashboard-top-bar">
@@ -529,6 +530,46 @@
         if (!DashUtils.checkAuth()) return;
 
         // ==========================================
+        // SAUDI TIMEZONE DATE FORMATTER
+        // Forces all dates to display in Asia/Riyadh timezone
+        // regardless of the user's local browser timezone
+        // ==========================================
+        (function() {
+            var origFormatDateTime = DashUtils.formatDateTime;
+            DashUtils.formatDateTime = function(isoString) {
+                if (!isoString || isoString === '-') return '-';
+                try {
+                    var date = new Date(isoString);
+                    if (isNaN(date.getTime())) return origFormatDateTime ? origFormatDateTime(isoString) : String(isoString);
+                    // Format in Saudi timezone (Asia/Riyadh, UTC+3)
+                    return new Intl.DateTimeFormat('ar-SA', {
+                        timeZone: 'Asia/Riyadh',
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit',
+                        hour12: false
+                    }).format(date).replace(/[\/]/g, '-');
+                } catch(e) {
+                    return origFormatDateTime ? origFormatDateTime(isoString) : String(isoString);
+                }
+            };
+            // Also override formatDate to use Saudi timezone
+            var origFormatDate = DashUtils.formatDate;
+            DashUtils.formatDate = function(isoString) {
+                if (!isoString || isoString === '-') return '-';
+                try {
+                    var date = new Date(isoString);
+                    if (isNaN(date.getTime())) return origFormatDate ? origFormatDate(isoString) : String(isoString);
+                    return new Intl.DateTimeFormat('ar-SA', {
+                        timeZone: 'Asia/Riyadh',
+                        year: 'numeric', month: '2-digit', day: '2-digit'
+                    }).format(date).replace(/[\/]/g, '-');
+                } catch(e) {
+                    return origFormatDate ? origFormatDate(isoString) : String(isoString);
+                }
+            };
+        })();
+
+        // ==========================================
         // Active Shift & Save Status
         // ==========================================
         // Debug logging disabled in production
@@ -551,25 +592,31 @@
                 var cs = apiData && apiData.currentShift ? apiData.currentShift : null;
                 var shiftDate = cs && cs.date ? cs.date : getTodayDate();
                 var shiftType = cs && cs.type ? cs.type : getCurrentShiftType();
-                var shiftTypeAlt = shiftType === 'ليلية' ? 'ليل' : shiftType === 'ليل' ? 'ليلية' : shiftType;
-                showDebug('SHIFT-DATE-TYPE', { date: shiftDate, type: shiftType, alt: shiftTypeAlt, source: cs ? 'apiData.currentShift' : 'fallback' });
+                // Normalize shift type: صباحية→صباح, ليلية→ليل
+                var shiftTypeNorm = shiftType;
+                if (shiftTypeNorm === 'صباحية') shiftTypeNorm = 'صباح';
+                if (shiftTypeNorm === 'ليلية') shiftTypeNorm = 'ليل';
+                var shiftTypeAlt = shiftTypeNorm === 'ليل' ? 'ليلية' : shiftTypeNorm === 'صباح' ? 'صباحية' : shiftTypeNorm;
+                showDebug('SHIFT-DATE-TYPE', { date: shiftDate, type: shiftType, norm: shiftTypeNorm, alt: shiftTypeAlt, source: cs ? 'apiData.currentShift' : 'fallback' });
 
-                // Try BOTH type variations simultaneously
-                var url1 = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
-                var url2 = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeAlt);
-                showDebug('URLS', { url1: url1, url2: url2 });
-
-                // Try each URL separately
-                var tryUrls = [
-                    DashUtils.apiFetch(url1).then(function(r) { return r.json(); }),
-                    DashUtils.apiFetch(url2).then(function(r) { return r.json(); })
+                // Try ALL type variations simultaneously
+                var urls = [
+                    '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeNorm),
+                    '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeAlt),
+                    '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType)
                 ];
+                showDebug('URLS', urls);
+
+                // Try each URL separately — .catch so failures don't kill Promise.all
+                var tryUrls = urls.map(function(url) {
+                    return DashUtils.apiFetch(url).then(function(r) { return r.json(); }).catch(function() { return { success: false }; });
+                });
 
                 return Promise.all([
                     Promise.resolve(shiftData),
                     Promise.all(tryUrls).then(function(results) {
-                        // Return first successful result
-                        var success = results.find(function(r) { return r.success && r.completion && r.completion.teams; });
+                        // Return first successful result (has completion with teams)
+                        var success = results.find(function(r) { return r && r.success && r.completion && r.completion.teams; });
                         return success || { success: false };
                     }),
                     Promise.resolve(apiData)
@@ -705,12 +752,45 @@
             });
         }
 
-        function getTodayDate() {
+        function getSaudiTime() {
             var now = new Date();
-            return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+            var parts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Riyadh',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).formatToParts(now);
+            var y, m, d, h, min, s;
+            parts.forEach(function(p) {
+                if (p.type === 'year') y = p.value;
+                if (p.type === 'month') m = p.value;
+                if (p.type === 'day') d = p.value;
+                if (p.type === 'hour') h = p.value;
+                if (p.type === 'minute') min = p.value;
+                if (p.type === 'second') s = p.value;
+            });
+            return new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':' + s);
+        }
+        function getTodayDate() {
+            var st = getSaudiTime();
+            var y = st.getFullYear();
+            var mo = st.getMonth();
+            var d = st.getDate();
+            var hour = st.getHours();
+            // Night shift (17:00-04:59) belongs to the PREVIOUS day
+            if (hour < 5) {
+                d = d - 1;
+                if (d < 1) {
+                    mo = mo - 1;
+                    if (mo < 0) { mo = 11; y = y - 1; }
+                    var daysInMonth = [31, (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+                    d = daysInMonth[mo];
+                }
+            }
+            return y + '-' + String(mo + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
         }
         function getCurrentShiftType() {
-            var hour = new Date().getHours();
+            var hour = getSaudiTime().getHours();
             return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
         }
 
@@ -905,13 +985,19 @@
                 setSaveStatus('inactive', 'لا توجد مناوبة نشطة');
                 return;
             }
-            // API returns saveCount (number), not saveStatus (string)
+            // Check completion data as fallback for save status
+            var hasCompletion = activeCompletionData && activeCompletionData.teams && Object.keys(activeCompletionData.teams).length > 0;
+
             if (data.lastSaveFailed) {
                 setSaveStatus('error', 'فشل آخر عملية حفظ');
             } else if (data.isSaving) {
                 setSaveStatus('saving', 'يوجد تعديلات جارٍ حفظها');
             } else if (data.saveCount > 0) {
                 setSaveStatus('saved', 'آخر حفظ: ' + DashUtils.formatDateTime(data.lastSaved));
+            } else if (hasCompletion) {
+                // Completion data exists even if shift-status saveCount is 0
+                var savedTime = activeCompletionData.timestamp || activeCompletionData.savedAt || data.lastSaved;
+                setSaveStatus('saved', 'التكميل محفوظ' + (savedTime ? ': ' + DashUtils.formatDateTime(savedTime) : ''));
             } else {
                 setSaveStatus('saved', 'المناوبة نشطة — لم يتم الحفظ بعد');
             }

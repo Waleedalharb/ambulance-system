@@ -1,0 +1,10040 @@
+const express = require('express');
+const fs = require('fs').promises;
+const path = require('path');
+const multer = require('multer');
+const WebSocket = require('ws');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+const cors = require('cors');
+
+// Set timezone to Saudi Arabia (Riyadh)
+process.env.TZ = 'Asia/Riyadh';
+
+// ============================================
+// AI PROVIDER CONFIGURATION (via Environment Variables)
+// ============================================
+// IMPORTANT: Set these on your server, NOT in code:
+//   OPENAI_API_KEY=sk-...
+//   GEMINI_API_KEY=AQ...
+//   AI_PROVIDER=openai (or gemini)
+//   AI_MODEL=gpt-4o-mini (or gemini-1.5-flash)
+// ============================================
+console.log('AI Provider Config:', {
+    provider: process.env.AI_PROVIDER || 'openai',
+    model: process.env.AI_MODEL || 'gpt-4o-mini',
+    openaiKeySet: !!process.env.OPENAI_API_KEY,
+    geminiKeySet: !!process.env.GEMINI_API_KEY
+});
+
+// SQLite Database Module (optional — falls back to JSON if unavailable)
+let db = null;
+try {
+    db = require('./db.js');
+    console.log('✅ SQLite module loaded successfully');
+} catch (err) {
+    console.error('⚠️ SQLite module failed to load:', err.message);
+    console.log('📁 Falling back to JSON file mode');
+    db = null;
+}
+
+// AI Monitor Agent — System health, alerts & auto-healing
+const aiMonitor = require('./ai-monitor');
+
+// Auto-Fix Engine — Data integrity & self-healing
+// const autoFixEngine = require('./auto-fix-engine'); // disabled - file not tracked
+
+// Helper: check if DB is available
+function dbAvailable() {
+    return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads && db.ShiftAuditLog && db.NotificationLog && db.ShiftRosterDrafts && db.ShiftChangeRequests && db.ShiftMetrics && db.ShiftKpiDaily && db.ShiftKpiWeekly && db.ShiftKpiMonthly && db.ShiftTimelineEvents && db.ShiftAlerts && db.ShiftComparisonSnapshots && db.ShiftReportsGenerated && db.ShiftAuditTrail;
+}
+
+// Helper: safe DB response
+function dbResponse(res, promise, fallback) {
+    if (!dbAvailable()) {
+        return res.status(503).json({ 
+            error: 'قاعدة البيانات غير متوفرة', 
+            fallback: fallback !== undefined ? fallback : null 
+        });
+    }
+    promise.then(data => res.json(data)).catch(err => {
+        console.error('DB error:', err);
+        res.status(500).json({ error: 'خطأ في قاعدة البيانات' });
+    });
+}
+
+// Helper: resolve shift_id from request, currentShiftId, or date+type
+async function resolveShiftId(req, shiftDate, shiftType) {
+    let shiftId = req.body.shift_id || req.body.shiftId || null;
+    if (shiftId) return parseInt(shiftId);
+    
+    // Try currentShiftId global
+    if (currentShiftId) return currentShiftId;
+    
+    // Try to infer from shift_date + shift_type
+    if (shiftDate && shiftType) {
+        try {
+            if (dbAvailable() && db.Shifts) {
+                const shift = await db.get('SELECT id FROM shifts WHERE shift_date = ? AND shift_type = ? LIMIT 1', [shiftDate, shiftType]);
+                if (shift) return shift.id;
+            }
+            // Fallback to JSON
+            const shifts = await readShifts();
+            const shift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            if (shift) return shift.id;
+        } catch (e) {
+            console.warn('Could not resolve shift_id:', e.message);
+        }
+    }
+    
+    return null;
+}
+
+// Helper: add entry to shift_audit_log
+async function addShiftAuditLog(data) {
+    if (!dbAvailable() || !db.ShiftAuditLog) return null;
+    try {
+        return await db.ShiftAuditLog.create(data);
+    } catch (e) {
+        console.error('addShiftAuditLog error:', e.message);
+        return null;
+    }
+}
+
+// Helper: add entry to shift_audit_trail
+async function addShiftAuditTrail(data) {
+    if (!dbAvailable() || !db.ShiftAuditTrail) return null;
+    try {
+        return await db.ShiftAuditTrail.create(data);
+    } catch (e) {
+        console.error('addShiftAuditTrail error:', e.message);
+        return null;
+    }
+}
+
+// ============================================
+// SYNC: JSON Shift → SQLite
+// ============================================
+async function syncShiftToDB(shift) {
+    if (!dbAvailable() || !db.Shifts) return;
+    try {
+        const existing = await db.get('SELECT id FROM shifts WHERE id = ?', [shift.id]);
+        if (existing) {
+            await db.run(
+                `UPDATE shifts SET shift_name = ?, shift_date = ?, shift_type = ?, total_reports = ?, rapid_locations = ?, centers_data = ?, vehicle_data = ?, fuel_data = ?, general_notes = ?, last_update = ? WHERE id = ?`,
+                [
+                    shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
+                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
+                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
+                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString(), shift.id
+                ]
+            );
+        } else {
+            await db.run(
+                `INSERT INTO shifts (id, shift_name, shift_date, shift_type, total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, last_update) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    shift.id, shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
+                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
+                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
+                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString()
+                ]
+            );
+        }
+        console.log('[SYNC] Shift synced to SQLite:', shift.id, shift.shiftType);
+    } catch (err) {
+        console.error('[SYNC] Failed to sync shift to SQLite:', err.message);
+    }
+}
+
+
+// ============================================
+// Logger (بسيط — يعمل حتى بدون winston)
+// ============================================
+const logger = {
+  info: (...args) => console.log(`[${new Date().toISOString()}] [INFO]`, ...args),
+  error: (...args) => console.error(`[${new Date().toISOString()}] [ERROR]`, ...args),
+  warn: (...args) => console.warn(`[${new Date().toISOString()}] [WARN]`, ...args),
+  debug: (...args) => process.env.DEBUG === '1' && console.log(`[${new Date().toISOString()}] [DEBUG]`, ...args)
+};
+
+// RAG Engine for AI Assistant
+let ragEngine = null;
+let ragInstance = null;
+let ragInitialized = false;
+try {
+    ragEngine = require('./rag-engine');
+    ragInstance = new ragEngine.RAGEngine();
+    console.log('✅ RAG Engine initialized');
+} catch (err) {
+    console.error('⚠️ RAG Engine failed to load:', err.message);
+}
+
+// New RAG KB API (replaces Nano AI backend)
+const kbApi = require('./rag/kb-api');
+
+const securityConfig = require('./config/security');
+const app = express();
+app.locals.db = db;
+const PORT = process.env.PORT || 3002;
+
+const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ACCESS_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
+
+// ============================================
+// Validation Helper (بدون Zod — خفيف وفعال)
+// ============================================
+function validateBody(schema) {
+    return (req, res, next) => {
+        const errors = [];
+        for (const [field, rules] of Object.entries(schema)) {
+            const value = req.body[field];
+            // Required check
+            if (rules.required && (value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))) {
+                errors.push(`الحقل "${field}" مطلوب`);
+                continue;
+            }
+            if (value === undefined || value === null) continue;
+            // Type check
+            if (rules.type === 'string' && typeof value !== 'string') {
+                errors.push(`الحقل "${field}" يجب أن يكون نصاً`);
+            }
+            if (rules.type === 'number' && (typeof value !== 'number' || isNaN(value))) {
+                errors.push(`الحقل "${field}" يجب أن يكون رقماً`);
+            }
+            if (rules.type === 'boolean' && typeof value !== 'boolean') {
+                errors.push(`الحقل "${field}" يجب أن يكون boolean`);
+            }
+            if (rules.type === 'array' && !Array.isArray(value)) {
+                errors.push(`الحقل "${field}" يجب أن يكون مصفوفة`);
+            }
+            // Min/Max for strings
+            if (rules.type === 'string' && rules.minLength && value.length < rules.minLength) {
+                errors.push(`الحقل "${field}" يجب أن يكون ${rules.minLength} أحرف على الأقل`);
+            }
+            if (rules.type === 'string' && rules.maxLength && value.length > rules.maxLength) {
+                errors.push(`الحقل "${field}" يجب أن لا يتجاوز ${rules.maxLength} حرف`);
+            }
+            // Range for numbers
+            if (rules.type === 'number' && rules.min !== undefined && value < rules.min) {
+                errors.push(`الحقل "${field}" يجب أن يكون ${rules.min} على الأقل`);
+            }
+            if (rules.type === 'number' && rules.max !== undefined && value > rules.max) {
+                errors.push(`الحقل "${field}" يجب أن لا يتجاوز ${rules.max}`);
+            }
+            // Pattern (regex)
+            if (rules.pattern && !rules.pattern.test(value)) {
+                errors.push(`الحقل "${field}" غير صالح`);
+            }
+        }
+        if (errors.length > 0) {
+            return res.status(400).json({ error: 'بيانات غير صالحة', details: errors });
+        }
+        next();
+    };
+}
+
+// ============================================
+// WebSocket Server - تحديث فوري (uses same HTTP server for Render compatibility)
+// ============================================
+var clients = [];
+var wss = null; // Will be initialized after HTTP server starts
+
+// Online users tracking: { userId: { ws, user, lastSeen } }
+var onlineUsers = new Map();
+
+function initWebSocket(server) {
+    wss = new WebSocket.Server({ server, path: '/ws' });
+
+    wss.on('connection', function(ws, req) {
+        // Basic origin check for WebSocket
+        const origin = req.headers.origin;
+        const allowedOrigins = process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [];
+        if (process.env.NODE_ENV === 'production' && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+            ws.close(1008, 'Origin not allowed');
+            return;
+        }
+
+        // Extract token from query string or headers
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['sec-websocket-protocol'];
+
+        // JWT Authentication for WebSocket
+        if (!token) {
+            console.log('[WS] Connection rejected: no token');
+            ws.close(1008, 'Authentication required');
+            return;
+        }
+
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            ws.user = decoded;
+            ws.isAuthenticated = true;
+            ws.chatConversations = [];
+            ws.lastSeen = Date.now();
+            ws.isAlive = true;
+            console.log('[WS] Authenticated:', ws.user.name, '(' + ws.user.id + ')');
+        } catch (err) {
+            console.log('[WS] Connection rejected: invalid token');
+            ws.close(1008, 'Invalid token');
+            return;
+        }
+
+        clients.push(ws);
+
+        // Track online user (multi-tab aware)
+        var existingConnection = onlineUsers.get(ws.user.id);
+        if (existingConnection) {
+            existingConnection.connections = (existingConnection.connections || 1) + 1;
+            existingConnection.lastSeen = Date.now();
+            console.log('[WS] User', ws.user.name, 'has multiple connections (tab #' + existingConnection.connections + ')');
+        } else {
+            onlineUsers.set(ws.user.id, {
+                ws: ws,
+                user: ws.user,
+                lastSeen: Date.now(),
+                connections: 1
+            });
+            // Broadcast user_online to ALL connected clients
+            broadcastToAll({
+                type: 'user_online',
+                userId: ws.user.id,
+                name: ws.user.name,
+                role: ws.user.role,
+                timestamp: new Date().toISOString()
+            });
+            console.log('[WS] Broadcast user_online:', ws.user.name);
+        }
+
+        // Send welcome + online users list
+        ws.send(JSON.stringify({
+            type: 'connected',
+            message: 'متصل بالسيرفر',
+            user: ws.user,
+            onlineUsers: Array.from(onlineUsers.values()).map(function(u) {
+                return { id: u.user.id, name: u.user.name, role: u.user.role };
+            })
+        }));
+
+        ws.send(JSON.stringify({
+            type: 'online_users_list',
+            users: Array.from(onlineUsers.values()).map(function(u) {
+                return { id: u.user.id, name: u.user.name, role: u.user.role };
+            })
+        }));
+
+        // Server-initiated ping (keep-alive) — detect dead clients
+        ws.pingInterval = setInterval(function() {
+            if (ws.readyState === WebSocket.OPEN) {
+                if (!ws.isAlive) {
+                    console.log('[WS] Connection dead (no pong), terminating:', ws.user ? ws.user.name : 'unknown');
+                    ws.terminate();
+                    return;
+                }
+                ws.isAlive = false;
+                try {
+                    ws.ping();
+                } catch(e) {
+                    ws.terminate();
+                }
+            }
+        }, 30000);
+
+        // pong handler — client responded to our ping
+        ws.on('pong', function() {
+            ws.isAlive = true;
+            ws.lastSeen = Date.now();
+        });
+
+        // Message handler
+        ws.on('message', function(raw) {
+            try {
+                var msg = JSON.parse(raw);
+                ws.lastSeen = Date.now();
+                ws.isAlive = true;
+
+                if (msg.type === 'chat_typing') {
+                    broadcastToConversation(msg.conversationId, {
+                        type: 'chat_typing',
+                        conversationId: msg.conversationId,
+                        user: ws.user
+                    });
+                }
+                if (msg.type === 'chat_subscribe') {
+                    ws.chatConversations = ws.chatConversations || [];
+                    if (!ws.chatConversations.includes(msg.conversationId)) {
+                        ws.chatConversations.push(msg.conversationId);
+                    }
+                    // Send current online users to subscriber
+                    ws.send(JSON.stringify({
+                        type: 'online_users_list',
+                        users: Array.from(onlineUsers.values()).map(function(u) {
+                            return { id: u.user.id, name: u.user.name, role: u.user.role };
+                        })
+                    }));
+                }
+                if (msg.type === 'chat_unsubscribe') {
+                    if (ws.chatConversations) {
+                        ws.chatConversations = ws.chatConversations.filter(function(id) {
+                            return id !== msg.conversationId;
+                        });
+                    }
+                }
+                if (msg.type === 'chat_presence') {
+                    if (ws.user && ws.user.id) {
+                        var entry = onlineUsers.get(ws.user.id);
+                        if (entry) {
+                            entry.lastSeen = Date.now();
+                        }
+                    }
+                    ws.send(JSON.stringify({
+                        type: 'chat_presence_ack',
+                        userId: ws.user.id,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+                if (msg.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                }
+                if (msg.type === 'logout') {
+                    console.log('[WS] User logged out:', ws.user ? ws.user.name : 'unknown');
+                    handleUserDisconnect(ws, true);
+                    ws.close(1000, 'User logged out');
+                }
+            } catch(e) {
+                console.error('[WS] Message error:', e.message);
+            }
+        });
+
+        // Close handler
+        ws.on('close', function() {
+            console.log('[WS] Client disconnected:', ws.user ? ws.user.name : 'unknown');
+            clearInterval(ws.pingInterval);
+            handleUserDisconnect(ws, false);
+            clients = clients.filter(function(c) { return c !== ws; });
+        });
+
+        // Error handler
+        ws.on('error', function(err) {
+            console.error('[WS] Error:', err);
+        });
+    });
+
+    console.log('[WS] Server attached to HTTP server on /ws');
+
+    // Stale connection cleanup every 60 seconds
+    setInterval(function() {
+        var staleCount = 0;
+        clients.forEach(function(client) {
+            if (client.readyState === WebSocket.OPEN && !client.isAlive) {
+                staleCount++;
+                client.terminate();
+            }
+        });
+        if (staleCount > 0) {
+            console.log('[WS] Cleaned up', staleCount, 'stale connections');
+        }
+    }, 60000);
+}
+
+
+// دالة لبث الرسائل لجميع المتصلين (WebSocket + SSE)
+// Helper: handle user disconnection (logout or tab close)
+function handleUserDisconnect(ws, isLogout) {
+    if (!ws.user || !ws.user.id) return;
+
+    var entry = onlineUsers.get(ws.user.id);
+    if (!entry) return;
+
+    var remainingConnections = (entry.connections || 1) - 1;
+
+    if (remainingConnections <= 0 || isLogout) {
+        // No more connections or explicit logout → mark as offline
+        onlineUsers.delete(ws.user.id);
+        broadcastToAll({
+            type: 'user_offline',
+            userId: ws.user.id,
+            name: ws.user.name,
+            timestamp: new Date().toISOString()
+        });
+        console.log('[WS] Broadcast user_offline:', ws.user.name);
+    } else {
+        // Still has other tabs open → update connection count
+        entry.connections = remainingConnections;
+        entry.lastSeen = Date.now();
+        console.log('[WS] User', ws.user.name, 'still has', remainingConnections, 'connection(s)');
+    }
+}
+
+function broadcast(data) {
+    var message = JSON.stringify(data);
+    clients = clients.filter(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(message);
+                return true;
+            } catch (e) {
+                console.error('[WS] Broadcast error:', e.message);
+                return false;
+            }
+        }
+        return false;
+    });
+    // Also broadcast via SSE
+    broadcastSSE(data);
+}
+
+
+// Helper: broadcast to conversation subscribers only
+// CRITICAL FIX: Broadcast to ALL participants, not just subscribers
+function broadcastToConversation(conversationId, data) {
+    var message = JSON.stringify(data);
+
+    // Phase 1: Send to explicit subscribers (users who opened this conversation)
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            var isSubscribed = client.chatConversations && client.chatConversations.includes(conversationId);
+            if (isSubscribed) {
+                try {
+                    client.send(message);
+                } catch (e) {
+                    console.error('[WS] Broadcast to subscriber error:', e.message);
+                }
+            }
+        }
+    });
+
+    // Phase 2: Send to ALL authenticated clients who are participants but not subscribers
+    // This ensures ALL participants get the message via WebSocket for instant delivery
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated) {
+            var isSubscribed = client.chatConversations && client.chatConversations.includes(conversationId);
+            // Only send if not already sent as a subscriber (avoid duplicate)
+            if (!isSubscribed) {
+                try {
+                    client.send(message);
+                } catch (e) {
+                    console.error('[WS] Participant broadcast error:', e.message);
+                }
+            }
+        }
+    });
+}
+
+            }
+        }
+    });
+}
+
+// Helper: broadcast to ALL authenticated connected clients
+// Helper: broadcast to ALL authenticated connected clients
+function broadcastToAll(data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(message);
+            } catch (e) {
+                console.error('[WS] Broadcast to all error:', e.message);
+            }
+        }
+    });
+}
+
+        }
+    });
+}
+
+// Helper: get online users list
+// Helper: get online users list
+function getOnlineUsers() {
+    return Array.from(onlineUsers.values()).map(function(u) {
+        return { id: u.user.id, name: u.user.name, role: u.role };
+    });
+}
+
+
+// ============================================
+// مسار التخزين الرئيسي (Render Disk أو محلي)
+// ============================================
+// في Render: عيّن متغير البيئة RENDER_DISK_PATH = /data
+// أو استخدم المسار الافتراضي داخل المشروع (للتطوير المحلي)
+const STORAGE_PATH = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data');
+
+console.log('📂 مسار التخزين الرئيسي:', STORAGE_PATH);
+
+// ============================================
+// مسارات ملفات البيانات (على Render Disk)
+// ============================================
+const DATA_PATH = path.join(STORAGE_PATH, 'ambulance-data.json');
+const SHIFT_DATA_PATH = path.join(STORAGE_PATH, 'shift-data.json');
+const MONTHLY_TABLE_PATH = path.join(STORAGE_PATH, 'monthly-table.xlsx');
+const DOCS_PATH = path.join(STORAGE_PATH, 'docs.json');
+const AIR_PATH = path.join(STORAGE_PATH, 'air-ambulance.json');
+const IDENTITY_PATH = path.join(STORAGE_PATH, 'identity.pdf');
+const CONTROL_NOTES_PATH = path.join(STORAGE_PATH, 'control-notes.json');
+const VACATIONS_PATH = path.join(STORAGE_PATH, 'vacations.json');
+const PASSWORD_PATH = path.join(STORAGE_PATH, 'password.json');
+const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
+const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
+const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
+const SHIFT_EVENTS_PATH = path.join(STORAGE_PATH, 'shift-events.json');
+const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
+const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
+const PEAK_PLANS_PATH = path.join(STORAGE_PATH, 'peak-plans.json');
+const AUDIT_LOG_PATH = path.join(STORAGE_PATH, 'audit-log.json');
+const INCIDENTS_PATH = path.join(STORAGE_PATH, 'incidents.json');
+const SENIOR_SHIFTS_PATH = path.join(STORAGE_PATH, 'senior-shifts.json');
+const E_CASES_PATH = path.join(STORAGE_PATH, 'e-cases.json');
+const ESCALATIONS_PATH = path.join(STORAGE_PATH, 'escalations.json');
+const DAILY_REPORTS_PATH = path.join(STORAGE_PATH, 'daily-reports.json');
+const SCHEDULE_EMPLOYEES_PATH = path.join(STORAGE_PATH, 'schedule-employees.json');
+const SCHEDULE_FILES_PATH = path.join(STORAGE_PATH, 'schedule-files.json');
+const REPORT_ENTRY_PATH = path.join(STORAGE_PATH, 'report-entry.json');
+const DASHBOARD_PATH = path.join(STORAGE_PATH, 'dashboard.json');
+const HOSPITALS_PATH = path.join(STORAGE_PATH, 'hospitals.json');
+const REFERENCES_PATH = path.join(STORAGE_PATH, 'references.json');
+const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
+const UNIT_LOCATION_ADDRESSES_PATH = path.join(STORAGE_PATH, 'unit-location-addresses.json');
+const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
+
+let lastUpdateTime = Date.now();
+let currentShiftId = null;
+
+// ============================================
+// نظام النوبة التلقائي (Auto-Shift System)
+// ============================================
+function getSaudiDateTime() {
+    const now = new Date();
+    // Get UTC time first, then add Saudi offset (+3)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    return new Date(utc + (3 * 60 * 60 * 1000));
+}
+
+function getCurrentShiftType() {
+    const saudiTime = getSaudiDateTime();
+    const hour = saudiTime.getHours();
+    // صباحية: 05:00 - 17:00 | ليلية: 17:00 - 05:00
+    return (hour >= 5 && hour < 17) ? 'صباحية' : 'ليلية';
+}
+
+function getCurrentShiftDate() {
+    const saudiTime = getSaudiDateTime();
+    const year = saudiTime.getFullYear();
+    const month = saudiTime.getMonth();
+    const day = saudiTime.getDate();
+    const hour = saudiTime.getHours();
+    
+    let shiftDate = new Date(year, month, day);
+    
+    // Night shift runs from 17:00 to 05:00 next day
+    // If time is between 00:00 and 05:00, we are in the night shift that started yesterday
+    if (hour >= 0 && hour < 5) {
+        shiftDate.setDate(shiftDate.getDate() - 1);
+    }
+    
+    const shiftYear = shiftDate.getFullYear();
+    const shiftMonth = (shiftDate.getMonth() + 1).toString().padStart(2, '0');
+    const shiftDay = shiftDate.getDate().toString().padStart(2, '0');
+    return `${shiftYear}-${shiftMonth}-${shiftDay}`;
+}
+
+function getShiftKey() {
+    return getCurrentShiftDate() + ' ' + getCurrentShiftType();
+}
+
+async function autoArchiveIfShiftChanged() {
+    try {
+        const currentReports = await readData();
+        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
+        if (total === 0) return false; // No data to archive
+        
+        const shifts = await readShifts();
+        const currentShiftType = getCurrentShiftType();
+        const currentShiftDate = getCurrentShiftDate();
+        const shiftKey = getShiftKey();
+        
+        // Check if this shift is already archived
+        const existingShift = shifts.find(s => s.shiftDate === currentShiftDate && s.shiftType === currentShiftType);
+        if (existingShift) return false; // Already archived for this shift
+        
+        // FIX: Check if data has timestamps from the CURRENT shift
+        // If so, don't archive - just create a shift record for tracking
+        // Night shift spans two calendar days (e.g., starts 1st July 20:00, ends 2nd July 05:00)
+        const hasCurrentShiftData = Object.values(currentReports).some(r => {
+            if (!r.times || r.times.length === 0) return false;
+            return r.times.some(t => {
+                const reportDate = t.substring(0, 10);
+                if (currentShiftType === 'ليلية') {
+                    // Night shift: data from shiftDate OR shiftDate+1
+                    const shiftDateObj = new Date(currentShiftDate + 'T00:00:00');
+                    const nextDayObj = new Date(shiftDateObj);
+                    nextDayObj.setDate(nextDayObj.getDate() + 1);
+                    const nextDayStr = `${nextDayObj.getFullYear()}-${String(nextDayObj.getMonth()+1).padStart(2,'0')}-${String(nextDayObj.getDate()).padStart(2,'0')}`;
+                    return reportDate === currentShiftDate || reportDate === nextDayStr;
+                }
+                return reportDate === currentShiftDate;
+            });
+        });
+        
+        if (hasCurrentShiftData) {
+            // Data is from current shift, create record without archiving/clearing
+            const saudiTime = getSaudiDateTime();
+            const newShift = {
+                id: Date.now(),
+                shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
+                shiftDate: currentShiftDate,
+                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+                shiftType: currentShiftType,
+                startTime: saudiTime.toISOString(),
+                savedReports: {},
+                totalReports: 0,
+                rapidLocations: {},
+                centersData: {},
+                vehicleData: {},
+                fuelData: {},
+                generalNotes: "",
+                lastUpdate: saudiTime.toISOString(),
+                autoArchived: false
+            };
+            shifts.unshift(newShift);
+            if (shifts.length > 50) shifts.pop();
+            await writeShifts(shifts);
+            await syncShiftToDB(newShift);
+            currentShiftId = newShift.id;
+            return false;
+        }
+        
+        // Data is from previous shift, archive it properly
+        const saudiTime = getSaudiDateTime();
+        const newShift = {
+            id: Date.now(),
+            shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
+            shiftDate: currentShiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: currentShiftType,
+            startTime: saudiTime.toISOString(),
+            savedReports: JSON.parse(JSON.stringify(currentReports)),
+            totalReports: total,
+            rapidLocations: {},
+            centersData: {},
+            vehicleData: {},
+            fuelData: {},
+            generalNotes: "",
+            lastUpdate: saudiTime.toISOString(),
+            autoArchived: true
+        };
+        
+        shifts.unshift(newShift);
+        if (shifts.length > 50) shifts.pop();
+        await writeShifts(shifts);
+        await syncShiftToDB(newShift);
+        
+        // Clear current reports for new shift
+        await writeData({});
+        currentShiftId = newShift.id;
+        
+        broadcast({
+            type: 'shift_auto_archived',
+            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً',
+            shiftId: newShift.id,
+            shiftType: currentShiftType
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('Auto-archive error:', error);
+        return false;
+    }
+}
+
+// ============================================
+// التأكد من وجود مجلدات البيانات
+// ============================================
+async function initDefaultUsers() {
+    try {
+        await fs.access(USERS_PATH);
+    } catch {
+        const salt = await bcrypt.genSalt(12);
+        const employees = [
+            { id: 'emp-4252', username: '4252', name: 'سلطان ابراهيم يوسف اليوسف التميمي', role: 'admin' },
+            { id: 'emp-101353', username: '101353', name: 'هيثم حويكم هليل العنزي', role: 'admin' },
+            { id: 'emp-102462', username: '102462', name: 'وليد معلا الحربي', role: 'admin' },
+            { id: 'emp-11120', username: '11120', name: 'عوض عبدالعزيز عوض الاسمري', role: 'admin' },
+            { id: 'emp-102752', username: '102752', name: 'محمد نايف صنهات العتيبي', role: 'admin' },
+            { id: 'emp-10717', username: '10717', name: 'عطاالله خالد عطوي الرويلي', role: 'admin' },
+            { id: 'emp-101915', username: '101915', name: 'مبارك هذال مبارك ال بريك', role: 'admin' },
+            { id: 'emp-8323', username: '8323', name: 'تركي عتيق الله خيرالله المطيري', role: 'admin' },
+            { id: 'emp-10373', username: '10373', name: 'سامي صالح عناد العنزي', role: 'admin' },
+            { id: 'emp-6182', username: '6182', name: 'مشعل علي هديرس الحجيلي', role: 'admin' },
+            { id: 'emp-9666', username: '9666', name: 'راشد محمد راشد الخرعان', role: 'admin' },
+            { id: 'emp-11079', username: '11079', name: 'مبارك محسن مبارك العجمي', role: 'admin' },
+            { id: 'emp-8745', username: '8745', name: 'خالد محمد عبدالمجيد العياضي', role: 'admin' },
+            { id: 'emp-7454', username: '7454', name: 'عادل خليف دخيل المطيري', role: 'admin' },
+            { id: 'emp-692', username: '692', name: 'فواز حميد خلاف الظفيري', role: 'admin' },
+            { id: 'emp-61277', username: '61277', name: 'زياد سعيد جبران الشهراني', role: 'admin' },
+            { id: 'emp-8968', username: '8968', name: 'موسى علي احمد غروي', role: 'admin' },
+            { id: 'emp-61296', username: '61296', name: 'سامي منور عبدالله المطيري', role: 'admin' },
+            { id: 'emp-6263', username: '6263', name: 'عبدالرحمن نائف مضحي الحربي', role: 'admin' }
+        ];
+        const defaultUsers = [];
+        for (const emp of employees) {
+            const tempPassword = emp.username; // الرقم السري المؤقت = الكود
+            defaultUsers.push({
+                id: emp.id,
+                username: emp.username,
+                name: emp.name,
+                password: await bcrypt.hash(tempPassword, salt),
+                role: emp.role,
+                isActive: true
+            });
+        }
+        await fs.writeFile(USERS_PATH, JSON.stringify(defaultUsers, null, 2));
+        console.log('✅ تم إنشاء 19 مستخدم للموظفين');
+        console.log('⚠️  الرقم السري المؤقت لكل موظف = كود الموظف (الرقم)');
+        console.log('🔒 يجب على كل موظف تغيير رقمه السري بعد أول تسجيل دخول');
+    }
+}
+
+async function ensureDataDir() {
+    try {
+        // المجلد الرئيسي على Render Disk (أو محلي)
+        await fs.mkdir(STORAGE_PATH, { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'temp'), { recursive: true });
+        // مجلد رفع الملفات على Render Disk
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads'), { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
+        await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'chat'), { recursive: true });
+        await initDefaultUsers();
+        // Restore currentShiftId from shifts list on startup
+        try {
+            const shifts = await readShifts();
+            const shiftType = getCurrentShiftType();
+            const shiftDate = getCurrentShiftDate();
+            const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            if (currentShift) {
+                currentShiftId = currentShift.id;
+                console.log('✅ تم استعادة المناوبة الحالية: ' + currentShift.shiftName);
+            }
+        } catch (e) { /* ignore */ }
+        console.log('✅ تم التأكد من وجود مجلدات البيانات');
+    } catch (e) {
+        console.error('❌ خطأ في إنشاء مجلدات البيانات:', e.message);
+    }
+}
+ensureDataDir();
+
+// ============================================
+// Security & Performance Middleware
+// ============================================
+// 1. Security Headers (Helmet)
+app.use(helmet(HELMET_CONFIG));
+
+// 2. Gzip Compression
+app.use(compression());
+
+// 3. CORS
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// 3.5 Trust proxy (required for Render and other reverse proxies)
+app.set('trust proxy', 1);
+
+// 4. Static Files (BEFORE rate limiting — never rate-limit assets)
+const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0,
+    etag: true,
+    lastModified: true
+}));
+app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
+    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
+}));
+// ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
+// REMOVED: Static /uploads route — files must be downloaded via authenticated /api/download-operational/:id only
+// app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads'), { maxAge: ONE_YEAR }));
+
+// 5. Body Parser (reduced limits)
+app.use(express.json({ limit: JSON_LIMIT }));
+app.use(express.urlencoded({ limit: URLENCODED_LIMIT, extended: true }));
+
+// 6. Global Rate Limiting (skip static files & health check)
+const globalLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: RATE_LIMIT_MAX_REQUESTS,
+    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Fix for Render/reverse proxy: skip X-Forwarded-For validation
+    validate: { xForwardedForHeader: false },
+    skip: (req) => {
+        // Never rate-limit health checks, static assets, or WebSocket upgrade
+        if (req.path === '/health') return true;
+        if (req.path.startsWith('/sw.js')) return true;
+        if (req.path.startsWith('/manifest.json')) return true;
+        if (req.headers.upgrade === 'websocket') return true;
+        return false;
+    }
+});
+app.use(globalLimiter);
+
+// 7. Lighter rate limit for read-heavy API endpoints
+const apiReadLimiter = rateLimit({
+    windowMs: API_READ_LIMIT_WINDOW_MS,
+    max: API_READ_LIMIT_MAX,
+    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// 8. Login Rate Limiting (stricter)
+const loginLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: LOGIN_RATE_LIMIT_MAX,
+    message: { error: 'عدد محاولات تسجيل الدخول مرتفع جداً. الرجاء المحاولة لاحقاً.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+});
+app.use('/api/auth/login', loginLimiter);
+
+async function logAuthEvent(userId, username, actionType, detail, success, errorMessage, sessionId, req) {
+    try {
+        if (db && db.AuthLogs) {
+            await db.AuthLogs.create({
+                user_id: userId,
+                username: username,
+                action_type: actionType,
+                action_detail: detail,
+                ip_address: req?.ip || req?.headers['x-forwarded-for'] || 'unknown',
+                user_agent: req?.headers['user-agent'] || 'unknown',
+                session_id: sessionId,
+                success: success,
+                error_message: errorMessage
+            });
+        }
+    } catch (e) {
+        console.error('Auth log error:', e.message);
+    }
+}
+
+async function authenticate(req, res, next) {
+    // Try Authorization header first (standard API calls)
+    const authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.split(' ')[1];
+    
+    // Fallback to query string (for SSE/EventSource which doesn't support custom headers)
+    if (!token && req.query && req.query.token) {
+        token = req.query.token;
+    }
+    
+    if (!token) return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
+    
+    // Check blacklist
+    try {
+        if (db && db.TokenBlacklist) {
+            const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+            const isBlacklisted = await db.TokenBlacklist.isBlacklisted(tokenHash);
+            if (isBlacklisted) {
+                return res.status(403).json({ error: 'التوكن مُلغى، يرجى تسجيل الدخول مرة أخرى', code: 'TOKEN_REVOKED' });
+            }
+        }
+    } catch (e) { /* ignore blacklist check errors */ }
+    
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 60 });
+        
+        // Check if user is still active in database
+        if (db && db.Users && db.Users.getByUserId) {
+            try {
+                const user = await db.Users.getByUserId(decoded.id);
+                if (!user || !user.is_active) {
+                    return res.status(403).json({ error: 'المستخدم غير نشط', code: 'USER_INACTIVE' });
+                }
+            } catch (e) {
+                // ignore DB errors, continue with decoded token
+            }
+        }
+        
+        req.user = decoded;
+        
+        // Update session_last_active if db available
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const session = sessions && sessions.find(s => s.access_token_hash === tokenHash && s.is_active);
+                if (session) {
+                    await db.AuthSessions.update(session.id, { session_last_active: new Date().toISOString() });
+                }
+            }
+        } catch (e) { /* ignore session update errors */ }
+        
+        next();
+    } catch (error) {
+        res.setHeader('X-Token-Invalid', 'true');
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'انتهت صلاحية التوكن', code: 'TOKEN_EXPIRED', expiredAt: error.expiredAt });
+        }
+        return res.status(403).json({ error: 'توكن غير صالح', code: 'TOKEN_INVALID' });
+    }
+}
+
+function authorize(roles) {
+    return (req, res, next) => {
+        if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
+        if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'ليس لديك الصلاحية' });
+        next();
+    };
+}
+
+// ============================================
+// SSE - تحديثات فورية عبر Server-Sent Events
+// ============================================
+var sseClients = []; // مصفوفة عملاء SSE
+
+// دالة لإضافة عميل SSE وإرسال التحديثات
+function broadcastSSE(data) {
+    var message = 'data: ' + JSON.stringify(data) + '\n\n';
+    sseClients = sseClients.filter(function(client) {
+        try {
+            client.res.write(message);
+            return true;
+        } catch (e) {
+            console.error('SSE broadcast error:', e.message);
+            return false;
+        }
+    });
+}
+
+// ============================================
+// API: SSE Endpoint
+// ============================================
+app.get('/api/sse', authenticate, function(req, res) {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'X-Accel-Buffering': 'no' // Disable nginx buffering if behind proxy
+    });
+    // إرسال رسالة أولية للتأكد من الاتصال
+    res.write('data: ' + JSON.stringify({ type: 'connected', message: 'متصل بـ SSE', user: req.user }) + '\n\n');
+    var client = { res: res, user: req.user, id: Date.now() + Math.random() };
+    sseClients.push(client);
+    console.log('🟢 SSE client connected:', req.user.name, '(' + req.user.id + ')');
+    
+    // Keep-alive heartbeat every 15 seconds to prevent Render timeout
+    var heartbeatInterval = setInterval(function() {
+        try {
+            res.write(':heartbeat\n\n'); // Comment line keeps connection alive
+        } catch(e) {
+            clearInterval(heartbeatInterval);
+        }
+    }, 15000);
+    
+    // إزالة العميل عند الإغلاق
+    req.on('close', function() {
+        clearInterval(heartbeatInterval);
+        sseClients = sseClients.filter(function(c) { return c !== client; });
+        console.log('🔴 SSE client disconnected:', req.user.name);
+    });
+});
+
+// ============================================
+// Health Check (للـ Render Monitoring + Uptime)
+// ============================================
+app.get('/health', (req, res) => {
+    const mem = process.memoryUsage();
+    const health = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+        version: '2.0.0',
+        env: process.env.NODE_ENV || 'development',
+        memory: {
+            rss: Math.round(mem.rss / 1024 / 1024) + ' MB',
+            heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + ' MB',
+            external: Math.round(mem.external / 1024 / 1024) + ' MB'
+        },
+        checks: {
+            storage: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH,
+            jwt: !!process.env.JWT_SECRET,
+            websocket: !!wss
+        }
+    };
+    if (aiMonitor) {
+        health.aiMonitor = {
+            stats: aiMonitor.getStats(),
+            health: aiMonitor.getHealth(),
+            alerts: aiMonitor.getAlerts()
+        };
+    }
+    res.json(health);
+});
+
+// ============================================
+// API: AI Monitor
+// ============================================
+if (aiMonitor) {
+    app.get('/api/monitor/health', authenticate, authorize(['admin']), (req, res) => {
+        res.json(aiMonitor.getHealth());
+    });
+
+    app.get('/api/monitor/logs', authenticate, authorize(['admin']), (req, res) => {
+        const { level, category, since, limit } = req.query;
+        res.json(aiMonitor.getLogs({
+            level,
+            category,
+            since,
+            limit: limit ? parseInt(limit) : undefined
+        }));
+    });
+
+    app.get('/api/monitor/alerts', authenticate, authorize(['admin']), (req, res) => {
+        const { level, category } = req.query;
+        res.json(aiMonitor.getAlerts({ level, category }));
+    });
+
+    app.post('/api/monitor/alerts/:id/resolve', authenticate, authorize(['admin']), (req, res) => {
+        const success = aiMonitor.resolveAlert(req.params.id);
+        res.json({
+            success,
+            message: success ? 'تم حل التنبيه' : 'التنبيه غير موجود أو تم حله مسبقاً'
+        });
+    });
+
+    app.get('/api/monitor/stats', authenticate, authorize(['admin']), (req, res) => {
+        res.json(aiMonitor.getStats());
+    });
+
+    app.post('/api/monitor/force-check', authenticate, authorize(['admin']), async (req, res) => {
+        const health = await aiMonitor.forceCheck();
+        res.json(health);
+    });
+}
+
+// ============================================
+// API: المصادقة (JWT)
+// ============================================
+app.post('/api/auth/login', validateBody({
+    username: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    password: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبة' });
+        
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const user = users.find(u => u.username === username && u.isActive);
+        if (!user) {
+            await logAuthEvent(null, username, 'login', 'login attempt', false, 'اسم المستخدم أو كلمة المرور غير صحيحة', null, req);
+            return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        }
+        
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            await logAuthEvent(user.id, user.username, 'login', 'login attempt', false, 'اسم المستخدم أو كلمة المرور غير صحيحة', null, req);
+            return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        }
+        
+        const jti = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+        const tokenPayload = { id: user.id, username: user.username, name: user.name, role: user.role, jti };
+        const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN || '15m' });
+        const refreshToken = jwt.sign({ ...tokenPayload, type: 'refresh' }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN || '7d' });
+        
+        let sessionId = null;
+        try {
+            if (db && db.AuthSessions) {
+                const accessTokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+                const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+                const sessionExpires = new Date();
+                sessionExpires.setMinutes(sessionExpires.getMinutes() + 15);
+                const refreshExpires = new Date();
+                refreshExpires.setDate(refreshExpires.getDate() + 7);
+                const session = await db.AuthSessions.create({
+                    user_id: user.id,
+                    username: user.username,
+                    access_token_hash: accessTokenHash,
+                    refresh_token_hash: refreshTokenHash,
+                    ip_address: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+                    user_agent: req.headers['user-agent'] || 'unknown',
+                    session_expires: sessionExpires.toISOString(),
+                    refresh_expires: refreshExpires.toISOString(),
+                    expires_at: refreshExpires.toISOString(),
+                    is_active: true
+                });
+                sessionId = session?.id || null;
+            }
+        } catch (e) {
+            console.error('Session creation error:', e.message);
+        }
+        
+        await logAuthEvent(user.id, user.username, 'login', 'login successful', true, null, sessionId, req);
+        
+        // Broadcast login notification via WebSocket
+        broadcast({
+            type: 'user_login',
+            message: 'تسجيل دخول جديد: ' + user.name,
+            user: { id: user.id, name: user.name, role: user.role }
+        });
+        
+        // Audit log
+        await addAuditLogEntry('user_login', 'تسجيل دخول للنظام', 'auth', user.name, user.role, user.id);
+        
+        res.json({
+            success: true,
+            accessToken,
+            refreshToken,
+            user: { id: user.id, username: user.username, name: user.name, role: user.role }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل الدخول' });
+    }
+});
+
+app.get('/api/auth/me', authenticate, async (req, res) => {
+    try {
+        // If JWT doesn't have name (old token), get it from users.json
+        let user = req.user;
+        if (!user.name) {
+            const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            const fullUser = users.find(u => u.id === user.id || u.username === user.username);
+            if (fullUser) {
+                user = { ...user, name: fullUser.name };
+            }
+        }
+        
+        // Optional: check if session is still active in DB
+        let sessionValid = true;
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(user.id);
+                sessionValid = sessions && sessions.some(s => s.is_active);
+            }
+        } catch (e) { /* ignore session check errors */ }
+        
+        res.json({ success: true, user, sessionValid });
+    } catch (error) {
+        res.json({ success: true, user: req.user });
+    }
+});
+
+// Token refresh endpoint - exchanges refreshToken for a new accessToken
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+        const authHeader = req.headers['authorization'];
+        const tokenFromHeader = authHeader && authHeader.split(' ')[1];
+        const tokenToUse = refreshToken || tokenFromHeader;
+        
+        if (!tokenToUse) {
+            return res.status(401).json({ error: 'مطلوب refresh token' });
+        }
+        
+        // Check blacklist
+        try {
+            if (db && db.TokenBlacklist) {
+                const tokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const isBlacklisted = await db.TokenBlacklist.isBlacklisted(tokenHash);
+                if (isBlacklisted) {
+                    return res.status(403).json({ error: 'التوكن مُلغى، يرجى تسجيل الدخول مرة أخرى', code: 'TOKEN_REVOKED' });
+                }
+            }
+        } catch (e) { /* ignore */ }
+        
+        let decoded;
+        try {
+            decoded = jwt.verify(tokenToUse, JWT_SECRET, { clockTolerance: 60 });
+            if (decoded.type !== 'refresh') {
+                return res.status(403).json({ error: 'نوع التوكن غير صالح', code: 'TOKEN_INVALID' });
+            }
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({ error: 'انتهت صلاحية refresh token', code: 'TOKEN_EXPIRED' });
+            }
+            return res.status(403).json({ error: 'توكن غير صالح', code: 'TOKEN_INVALID' });
+        }
+        
+        // Verify session is active in DB
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const refreshTokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const activeSession = sessions && sessions.find(s => s.refresh_token_hash === refreshTokenHash && s.is_active);
+                if (!activeSession) {
+                    return res.status(403).json({ error: 'الجلسة غير نشطة أو منتهية', code: 'SESSION_INVALID' });
+                }
+            }
+        } catch (e) {
+            console.error('Session check error:', e.message);
+        }
+        
+        // Get user from database to ensure still active
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const user = users.find(u => u.id === decoded.id && u.isActive);
+        if (!user) {
+            return res.status(403).json({ error: 'المستخدم غير موجود أو غير نشط' });
+        }
+        
+        const tokenPayload = { id: user.id, username: user.username, name: user.name, role: user.role };
+        const newAccessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN || '15m' });
+        
+        // Update session with new access token hash and last active
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const refreshTokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const session = sessions && sessions.find(s => s.refresh_token_hash === refreshTokenHash && s.is_active);
+                if (session) {
+                    const newAccessTokenHash = crypto.createHash('sha256').update(newAccessToken).digest('hex');
+                    const sessionExpires = new Date();
+                    sessionExpires.setMinutes(sessionExpires.getMinutes() + 15);
+                    await db.AuthSessions.update(session.id, {
+                        access_token_hash: newAccessTokenHash,
+                        session_last_active: new Date().toISOString(),
+                        session_expires: sessionExpires.toISOString()
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Session update error:', e.message);
+        }
+        
+        res.json({ success: true, accessToken: newAccessToken, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        res.status(500).json({ error: 'فشل في تجديد التوكن' });
+    }
+});
+
+app.post('/api/auth/logout', authenticate, async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        let sessionToDeactivate = null;
+        
+        // Find the specific session by access token hash
+        if (token) {
+            try {
+                if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                    const sessions = await db.AuthSessions.getByUser(req.user.id);
+                    sessionToDeactivate = sessions && sessions.find(s => s.access_token_hash === tokenHash && s.is_active);
+                }
+            } catch (e) {
+                console.error('Session lookup error:', e.message);
+            }
+        }
+        
+        // Blacklist access token
+        if (token) {
+            try {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                if (db && db.TokenBlacklist) {
+                    await db.TokenBlacklist.add(tokenHash);
+                }
+            } catch (e) {
+                console.error('Token blacklist error:', e.message);
+            }
+        }
+        
+        // Blacklist refresh token and deactivate specific session
+        try {
+            if (db && db.AuthSessions && sessionToDeactivate) {
+                if (db && db.TokenBlacklist && sessionToDeactivate.refresh_token_hash) {
+                    await db.TokenBlacklist.add(sessionToDeactivate.refresh_token_hash);
+                }
+                await db.AuthSessions.update(sessionToDeactivate.id, { is_active: false });
+            }
+        } catch (e) {
+            console.error('Session deactivate error:', e.message);
+        }
+        
+        await logAuthEvent(req.user.id, req.user.username, 'logout', 'logout successful', true, null, sessionToDeactivate?.id || null, req);
+        
+        res.json({ success: true, message: 'تم تسجيل الخروج' });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل الخروج' });
+    }
+});
+
+// List active sessions (admin only)
+app.get('/api/auth/sessions', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!db || !db.AuthSessions) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        
+        let sessions = [];
+        if (db.all) {
+            sessions = await db.all(
+                'SELECT id, user_id, username, ip_address, user_agent, session_expires, refresh_expires, session_last_active, session_start, is_active FROM auth_sessions WHERE is_active = 1 ORDER BY session_last_active DESC'
+            );
+        }
+        
+        res.json({ success: true, sessions });
+    } catch (error) {
+        console.error('Sessions list error:', error);
+        res.status(500).json({ error: 'فشل في جلب الجلسات' });
+    }
+});
+
+app.post('/api/auth/change-password', authenticate, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'كلمة المرور الحالية والجديدة مطلوبة' });
+        }
+        if (newPassword.length < 4) {
+            return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون 4 أحرف على الأقل' });
+        }
+
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const userIndex = users.findIndex(u => u.username === req.user.username && u.isActive);
+        if (userIndex === -1) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+        const user = users[userIndex];
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) return res.status(401).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+
+        const salt = await bcrypt.genSalt(12);
+        users[userIndex].password = await bcrypt.hash(newPassword, salt);
+        await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2));
+
+        broadcast({ type: 'password_changed', message: 'تم تغيير كلمة المرور', username: user.username });
+        res.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'فشل في تغيير كلمة المرور' });
+    }
+});
+
+app.get('/api/users', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        res.json({ success: true, users: users.map(u => ({ id: u.id, username: u.username, name: u.name, role: u.role, isActive: u.isActive })) });
+    } catch (error) { res.status(500).json({ error: 'فشل في جلب المستخدمين' }); }
+});
+
+// ============================================
+// PWA routes
+// ============================================
+app.get('/manifest.json', function(req, res) {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+app.get('/sw.js', function(req, res) {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.sendFile(path.join(__dirname, 'sw.js'));
+});
+
+// ============================================
+// إعداد Multer لرفع الملفات (مع حماية أفضل)
+// ============================================
+const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+
+const upload = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype));
+        }
+    }
+});
+
+// ============================================
+// Multer مخصص لملفات Excel (أكثر مرونة)
+// ============================================
+const EXCEL_MIME_TYPES = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/octet-stream'
+];
+const EXCEL_EXTENSIONS = ['.xlsx', '.xls'];
+
+const uploadExcel = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        // السماح بأي ملف امتداده .xlsx أو .xls حتى لو MIME type غير واضح
+        if (EXCEL_EXTENSIONS.includes(ext)) {
+            cb(null, true);
+        } else if (EXCEL_MIME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح. يُسمح فقط بملفات Excel (.xlsx, .xls). نوع الملف المستلم: ' + file.mimetype + ', الامتداد: ' + ext));
+        }
+    }
+});
+
+// Multer error handler middleware
+function handleMulterError(err, req, res, next) {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: 'حجم الملف كبير جداً. الحد الأقصى 20 ميجابايت.' });
+        }
+        return res.status(400).json({ error: 'خطأ في رفع الملف: ' + err.message });
+    } else if (err) {
+        return res.status(400).json({ error: err.message });
+    }
+    next();
+}
+
+// ============================================
+// Chat Upload Multer
+// ============================================
+const uploadChat = multer({
+    dest: path.join(STORAGE_PATH, 'temp'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: function(req, file, cb) {
+        cb(null, true);
+    }
+});
+
+// ============================================
+// بيانات قطاع الجنوب
+// ============================================
+let centersData = {
+    "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+    "الخالدية": ["جنوب 2"],
+    "منفوحة": ["جنوب 3"],
+    "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+    "الإسكان": ["جنوب 6"],
+    "الحائر": ["جنوب 7"],
+    "ديراب": ["جنوب 10"],
+    "عكاظ": ["جنوب 9"],
+    "الشفاء": ["جنوب 8", "سريع 2"],
+    "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+};
+
+// ============================================
+// دوال قراءة وكتابة البيانات
+// ============================================
+async function readData() {
+    try {
+        const data = await fs.readFile(DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return {};
+        throw error;
+    }
+}
+
+async function writeData(data) {
+    await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2));
+    lastUpdateTime = Date.now();
+}
+
+async function readShifts() {
+    try {
+        const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShifts(data) {
+    await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readDocs() {
+    try {
+        const data = await fs.readFile(DOCS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeDocs(data) {
+    await fs.writeFile(DOCS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readAirRecords() {
+    try {
+        const data = await fs.readFile(AIR_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeAirRecords(data) {
+    await fs.writeFile(AIR_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الرقم السري
+// ============================================
+async function readPassword() {
+    try {
+        const data = await fs.readFile(PASSWORD_PATH, 'utf8');
+        const parsed = JSON.parse(data);
+        return parsed.password || '1234';
+    } catch (error) {
+        if (error.code === 'ENOENT') return '1234';
+        return '1234';
+    }
+}
+
+async function writePassword(password) {
+    await fs.writeFile(PASSWORD_PATH, JSON.stringify({ password, updatedAt: new Date().toISOString() }));
+}
+
+// ============================================
+// دوال وقت الذروة
+// ============================================
+async function readPeakData() {
+    try {
+        const data = await fs.readFile(PEAK_DATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return { missions: [], alerts: [], logs: [] };
+        return { missions: [], alerts: [], logs: [] };
+    }
+}
+
+async function writePeakData(data) {
+    await fs.writeFile(PEAK_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الثيمات العامة
+// ============================================
+async function readThemeSettings() {
+    try {
+        const data = await fs.readFile(THEME_SETTINGS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return { fileType: null, fileName: null };
+        return { fileType: null, fileName: null };
+    }
+}
+
+async function writeThemeSettings(data) {
+    await fs.writeFile(THEME_SETTINGS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال سجل الأحداث والغيابات والملاحظات للمناوبات
+// ============================================
+async function readShiftEvents() {
+    try {
+        const data = await fs.readFile(SHIFT_EVENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftEvents(data) {
+    await fs.writeFile(SHIFT_EVENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readShiftAbsences() {
+    try {
+        const data = await fs.readFile(SHIFT_ABSENCES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftAbsences(data) {
+    await fs.writeFile(SHIFT_ABSENCES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readShiftNotes() {
+    try {
+        const data = await fs.readFile(SHIFT_NOTES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeShiftNotes(data) {
+    await fs.writeFile(SHIFT_NOTES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readPeakPlans() {
+    try {
+        const data = await fs.readFile(PEAK_PLANS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writePeakPlans(data) {
+    await fs.writeFile(PEAK_PLANS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readAuditLog() {
+    try {
+        const data = await fs.readFile(AUDIT_LOG_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeAuditLog(data) {
+    await fs.writeFile(AUDIT_LOG_PATH, JSON.stringify(data, null, 2));
+}
+
+async function addAuditLogEntry(action, details, category, user, role, userId, shiftId = null) {
+    try {
+        const logs = await readAuditLog();
+        const newEntry = {
+            id: Date.now().toString(),
+            action,
+            details: details || '',
+            category: category || 'general',
+            user: user || 'غير معروف',
+            role: role || 'unknown',
+            userId: userId || null,
+            shift_id: shiftId,
+            timestamp: new Date().toISOString()
+        };
+        logs.unshift(newEntry);
+        if (logs.length > 500) logs.pop();
+        await writeAuditLog(logs);
+        
+        // Also save to SQLite audit_log if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                await db.AuditLog.create({
+                    shift_id: shiftId || null,
+                    user_id: userId || null,
+                    user_name: user || 'غير معروف',
+                    action: action,
+                    detail: details || '',
+                    type: category || 'general'
+                });
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log save failed in helper:', dbErr.message);
+        }
+        
+        broadcast({
+            type: 'audit_log_added',
+            message: 'تم إضافة سجل تدقيق جديد',
+            entry: newEntry
+        });
+        return newEntry;
+    } catch (error) {
+        console.error('Audit log error:', error);
+        return null;
+    }
+}
+
+// ============================================
+// دوال سجلات الحوادث
+// ============================================
+async function readIncidents() {
+    try {
+        const data = await fs.readFile(INCIDENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeIncidents(data) {
+    await fs.writeFile(INCIDENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال مناوبات كبار الضباط
+// ============================================
+async function readSeniorShifts() {
+    try {
+        const data = await fs.readFile(SENIOR_SHIFTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeSeniorShifts(data) {
+    await fs.writeFile(SENIOR_SHIFTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال حالات الطوارئ (E-Cases)
+// ============================================
+async function readECases() {
+    try {
+        const data = await fs.readFile(E_CASES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeECases(data) {
+    await fs.writeFile(E_CASES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال بلاغات التصعيد
+// ============================================
+async function readEscalations() {
+    try {
+        const data = await fs.readFile(ESCALATIONS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeEscalations(data) {
+    await fs.writeFile(ESCALATIONS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال التقارير اليومية
+// ============================================
+async function readDailyReports() {
+    try {
+        const data = await fs.readFile(DAILY_REPORTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+    }
+}
+
+async function writeDailyReports(data) {
+    await fs.writeFile(DAILY_REPORTS_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال الجدولة الذكية
+// ============================================
+async function readScheduleEmployees() {
+    try {
+        const data = await fs.readFile(SCHEDULE_EMPLOYEES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeScheduleEmployees(data) {
+    await fs.writeFile(SCHEDULE_EMPLOYEES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readScheduleFiles() {
+    try {
+        const data = await fs.readFile(SCHEDULE_FILES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeScheduleFiles(data) {
+    await fs.writeFile(SCHEDULE_FILES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال تسجيل البلاغات (Report Entry)
+// ============================================
+async function readReportEntry() {
+    try {
+        const data = await fs.readFile(REPORT_ENTRY_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeReportEntry(data) {
+    await fs.writeFile(REPORT_ENTRY_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// دوال غرفة العمليات (Operations Command)
+// ============================================
+async function readDashboard() {
+    try {
+        const data = await fs.readFile(DASHBOARD_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeDashboard(data) {
+    await fs.writeFile(DASHBOARD_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readHospitals() {
+    try {
+        const data = await fs.readFile(HOSPITALS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeHospitals(data) {
+    await fs.writeFile(HOSPITALS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readReferences() {
+    try {
+        const data = await fs.readFile(REFERENCES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeReferences(data) {
+    await fs.writeFile(REFERENCES_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readTimeline() {
+    try {
+        const data = await fs.readFile(TIMELINE_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeTimeline(data) {
+    await fs.writeFile(TIMELINE_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readAnnouncements() {
+    try {
+        const data = await fs.readFile(ANNOUNCEMENTS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
+}
+
+async function writeAnnouncements(data) {
+    await fs.writeFile(ANNOUNCEMENTS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readUnitLocations() {
+    try {
+        const data = await fs.readFile(UNIT_LOCATIONS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            // Default locations
+            return {
+                'جاكسو': { 'جنوب 12': [24.6234, 46.7256] },
+                'المنصورة': { 'جنوب 2': [24.6789, 46.7123], 'جنوب 16': [24.6812, 46.7198], 'سريع 4': [24.6756, 46.7089] },
+                'الشيخ زايد': { 'جنوب 3': [24.7234, 46.6845], 'جنوب 19': [24.7289, 46.6912] },
+                'حي الواحات': { 'جنوب 11': [24.7123, 46.7567] },
+                'المناخ': { 'جنوب 10': [24.6987, 46.7321] },
+                'المريوطية': { 'جنوب 8': [24.6543, 46.6789] },
+                'طرة': { 'جنوب 7': [24.6678, 46.7234] },
+                'مطرية': { 'جنوب 14': [24.6890, 46.7456] },
+                'البساتين': { 'جنوب 5': [24.7345, 46.7234] },
+                'الخليفة': { 'جنوب 13': [24.6456, 46.7123] },
+                'الشفاء': { 'جنوب 6': [24.7456, 46.6890], 'جنوب 17': [24.7512, 46.6945], 'سريع 2': [24.7398, 46.6834], 'سريع 3': [24.7489, 46.6876] },
+                'عكاظ': { 'جنوب 9': [24.6890, 46.7678] },
+                'الدار البيضاء': { 'جنوب 4': [24.7567, 46.7123], 'جنوب 15': [24.7623, 46.7189] },
+                'طريق الملك فهد': { 'جنوب 1': [24.7890, 46.6890], 'جنوب 18': [24.7956, 46.6956] },
+                'مستشفى الملك خالد': { 'سريع 1': [24.7345, 46.7012] }
+            };
+        }
+        return {};
+    }
+}
+
+async function writeUnitLocations(data) {
+    await fs.writeFile(UNIT_LOCATIONS_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readUnitLocationAddresses() {
+    try {
+        const data = await fs.readFile(UNIT_LOCATION_ADDRESSES_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return {
+                'جنوب 1': 'طريق الملك فهد، الرياض',
+                'جنوب 2': 'حي المنصورة، الرياض',
+                'جنوب 3': 'الخالدية، الرياض',
+                'جنوب 4': 'الدار البيضاء، الرياض',
+                'جنوب 5': 'البساتين، الرياض',
+                'جنوب 6': 'الشفاء، الرياض',
+                'جنوب 7': 'طرة، الرياض',
+                'جنوب 8': 'المريوطية، الرياض',
+                'جنوب 9': 'عكاظ، الرياض',
+                'جنوب 10': 'المناخ، الرياض',
+                'جنوب 11': 'حي الواحات، الرياض',
+                'جنوب 12': 'جاكسو، الرياض',
+                'جنوب 13': 'الخليفة، الرياض',
+                'جنوب 14': 'المطرية، الرياض',
+                'جنوب 15': 'الدار البيضاء، الرياض',
+                'جنوب 16': 'المنصورة، الرياض',
+                'جنوب 17': 'الشفاء، الرياض',
+                'جنوب 18': 'طريق الملك فهد، الرياض',
+                'جنوب 19': 'الخالدية، الرياض',
+                'سريع 1': 'مستشفى الملك خالد، الرياض',
+                'سريع 2': 'الشفاء، الرياض',
+                'سريع 3': 'الدار البيضاء، الرياض',
+                'سريع 4': 'المنصورة، الرياض'
+            };
+        }
+        return {};
+    }
+}
+
+async function writeUnitLocationAddresses(data) {
+    await fs.writeFile(UNIT_LOCATION_ADDRESSES_PATH, JSON.stringify(data, null, 2));
+}
+
+// ============================================
+// API: جلب البيانات
+// ============================================
+app.get('/api/data', authenticate, async (req, res) => {
+    try {
+        const data = await readData();
+        const shiftType = getCurrentShiftType();
+        const shiftDate = getCurrentShiftDate();
+        
+        // Find current shift ID from shifts list if not set in memory
+        if (!currentShiftId) {
+            try {
+                const shifts = await readShifts();
+                const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+                if (currentShift) currentShiftId = currentShift.id;
+            } catch (e) { /* ignore */ }
+        }
+        
+        // Ensure centersData is never empty — protects dispatch display on new shifts
+        var safeCentersData = centersData;
+        if (!safeCentersData || Object.keys(safeCentersData).length === 0) {
+            safeCentersData = {
+                "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+                "الخالدية": ["جنوب 2"],
+                "منفوحة": ["جنوب 3"],
+                "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+                "الإسكان": ["جنوب 6"],
+                "الحائر": ["جنوب 7"],
+                "ديراب": ["جنوب 10"],
+                "عكاظ": ["جنوب 9"],
+                "الشفاء": ["جنوب 8", "سريع 2"],
+                "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+            };
+        }
+        
+        res.json({
+            data,
+            centers: safeCentersData,
+            currentShiftId: currentShiftId,
+            currentShift: {
+                type: shiftType,
+                date: shiftDate,
+                key: shiftDate + ' ' + shiftType
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب البيانات' });
+    }
+});
+
+app.get('/api/current-shift', authenticate, async (req, res) => {
+    try {
+        const shiftType = getCurrentShiftType();
+        const shiftDate = getCurrentShiftDate();
+        const data = await readData();
+        const total = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
+        res.json({
+            success: true,
+            shift: {
+                type: shiftType,
+                date: shiftDate,
+                key: shiftDate + ' ' + shiftType,
+                totalReports: total
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب النوبة الحالية' });
+    }
+});
+
+app.get('/api/last-update', (req, res) => {
+    res.json({ lastUpdate: lastUpdateTime });
+});
+
+// ============================================
+// API: المناوبات
+// ============================================
+app.get('/api/shifts', authenticate, async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        res.json(shifts);
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المناوبات' });
+    }
+});
+
+// GET /api/shifts/archive - paginated archive list with filters
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shifts/archive', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const shiftType = req.query.shift_type;
+        const center = req.query.center;
+        const supervisor = req.query.supervisor;
+        const status = req.query.status;
+        const sort = req.query.sort || 'date_desc';
+
+        let shifts = await readShifts();
+
+        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
+        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
+        if (shiftType) shifts = shifts.filter(s => (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase()));
+        if (center) shifts = shifts.filter(s => s.centersData && Object.keys(s.centersData).some(c => c.includes(center)));
+        if (supervisor) shifts = shifts.filter(s => (s.supervisor || '').includes(supervisor) || (s.shiftName || '').includes(supervisor));
+        if (status) shifts = shifts.filter(s => (s.status || '').toLowerCase() === status.toLowerCase());
+
+        shifts.sort((a, b) => {
+            if (sort === 'date_desc') return new Date(b.shiftDate || 0) - new Date(a.shiftDate || 0);
+            if (sort === 'date_asc') return new Date(a.shiftDate || 0) - new Date(b.shiftDate || 0);
+            if (sort === 'completion_rate') return (b.completionRate || 0) - (a.completionRate || 0);
+            if (sort === 'health_score') return (b.healthScore || 0) - (a.healthScore || 0);
+            return 0;
+        });
+
+        const total = shifts.length;
+        const totalPages = Math.ceil(total / limit);
+        const paginated = shifts.slice((page - 1) * limit, page * limit);
+
+        // Enrich with metrics
+        if (dbAvailable() && db.ShiftMetrics) {
+            for (const s of paginated) {
+                const m = await db.ShiftMetrics.getByShift(s.id);
+                if (m) {
+                    s.metrics = m;
+                }
+            }
+        }
+
+        res.json({ success: true, shifts: paginated, total, page, total_pages: totalPages });
+    } catch (error) {
+        console.error('Archive error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأرشيف' });
+    }
+});
+
+app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const shiftId = parseInt(req.params.id);
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        
+        const response = {
+            shift: shift,
+            reports: shift.savedReports || {},
+            total: shift.totalReports || 0,
+            completions: [],
+            forms: [],
+            audit_log: [],
+            files: [],
+            timeline: []
+        };
+        
+        // Query related data from SQLite if available
+        try {
+            if (dbAvailable()) {
+                if (db.Reports && db.Reports.getByShift) {
+                    const dbReports = await db.Reports.getByShift(shiftId);
+                    // Convert DB array to client-expected object format { "center|unit": { count, times } }
+                    if (Array.isArray(dbReports) && dbReports.length > 0) {
+                        const reportsObj = {};
+                        dbReports.forEach(r => {
+                            if (r.center && r.unit) {
+                                const key = `${r.center}|${r.unit}`;
+                                reportsObj[key] = {
+                                    count: r.count || 0,
+                                    times: r.times || []
+                                };
+                            }
+                        });
+                        response.reports = reportsObj;
+                    } else if (typeof dbReports === 'object' && !Array.isArray(dbReports) && Object.keys(dbReports).length > 0) {
+                        response.reports = dbReports;
+                    }
+                    // If DB returned empty array, keep shift.savedReports as fallback
+                }
+                if (db.ShiftCompletions && db.ShiftCompletions.getByShift) {
+                    const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
+                    // Convert DB array to client-expected object format { "team": { staffCount, carsCount, ... } }
+                    if (Array.isArray(dbCompletions) && dbCompletions.length > 0) {
+                        const completionsObj = {};
+                        dbCompletions.forEach(c => {
+                            const teamKey = c.team || c.name || c.unit || c.center;
+                            if (teamKey) completionsObj[teamKey] = c;
+                        });
+                        if (Object.keys(completionsObj).length > 0) response.completions = completionsObj;
+                    } else if (typeof dbCompletions === 'object' && !Array.isArray(dbCompletions) && Object.keys(dbCompletions).length > 0) {
+                        response.completions = dbCompletions;
+                    }
+                    // If empty, keep response.completions = [] so client falls back to shift.centersData
+                }
+                if (db.ShiftForms && db.ShiftForms.getByShift) {
+                    const dbForms = await db.ShiftForms.getByShift(shiftId);
+                    if (Array.isArray(dbForms) && dbForms.length > 0) response.forms = dbForms;
+                }
+                if (db.AuditLog && db.AuditLog.getByShift) {
+                    const dbAudit = await db.AuditLog.getByShift(shiftId);
+                    if (Array.isArray(dbAudit) && dbAudit.length > 0) response.audit_log = dbAudit;
+                }
+                if (db.OpsFiles && db.OpsFiles.getByShift) {
+                    const dbFiles = await db.OpsFiles.getByShift(shiftId);
+                    if (Array.isArray(dbFiles) && dbFiles.length > 0) response.files = dbFiles;
+                }
+                if (db.Timeline && db.Timeline.getByShift) {
+                    const dbTimeline = await db.Timeline.getByShift(shiftId);
+                    if (Array.isArray(dbTimeline) && dbTimeline.length > 0) response.timeline = dbTimeline;
+                }
+            }
+        } catch (dbErr) {
+            console.warn('[DB] Failed to load related shift data:', dbErr.message);
+        }
+        
+        res.json(response);
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المناوبة' });
+    }
+});
+
+app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { shiftType } = req.body;
+        
+        // NEW: Verify previous shift is archived before starting new one
+        if (currentShiftId) {
+            const activeShift = await db.getActiveShift();
+            if (activeShift && activeShift.id === currentShiftId) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'لا يمكن بدء مناوبة جديدة قبل أرشفة المناوبة الحالية. يرجى أرشفة المناوبة الحالية أولاً.' 
+                });
+            }
+            
+            // Verify previous shift was archived successfully
+            const prevShiftStatus = await db.getShiftStatus(currentShiftId);
+            if (prevShiftStatus && prevShiftStatus.status !== 'archived') {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'المناوبة السابقة لم يتم أرشفتها بعد. يرجى التأكد من نجاح الأرشفة قبل بدء مناوبة جديدة.' 
+                });
+            }
+        }
+        
+        const now = new Date();
+        const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+        const year = saudiTime.getFullYear();
+        const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+        const day = saudiTime.getDate().toString().padStart(2, '0');
+        const isoDate = `${year}-${month}-${day}`;
+        const hour = saudiTime.getHours();
+        
+        // Handle night shift after midnight (hour < 5) — date belongs to previous day
+        let shiftDate = isoDate;
+        if (shiftType === 'ليلية' && hour < 5) {
+            const prevDay = new Date(saudiTime);
+            prevDay.setDate(prevDay.getDate() - 1);
+            const prevYear = prevDay.getFullYear();
+            const prevMonth = (prevDay.getMonth() + 1).toString().padStart(2, '0');
+            const prevDayNum = prevDay.getDate().toString().padStart(2, '0');
+            shiftDate = `${prevYear}-${prevMonth}-${prevDayNum}`;
+        }
+        
+        // ============================================
+        // STEP 1: Archive current shift data (if exists)
+        // ============================================
+        const shifts = await readShifts();
+        if (currentShiftId) {
+            const currentShiftIndex = shifts.findIndex(s => s.id === currentShiftId);
+            if (currentShiftIndex !== -1) {
+                // Read current operational data
+                const currentData = await readData();
+                const currentShift = shifts[currentShiftIndex];
+                
+                // Archive current data to the old shift
+                shifts[currentShiftIndex].savedReports = currentData || {};
+                shifts[currentShiftIndex].centersData = currentShift.centersData || {};
+                shifts[currentShiftIndex].rapidLocations = currentShift.rapidLocations || {};
+                shifts[currentShiftIndex].vehicleData = currentShift.vehicleData || {};
+                shifts[currentShiftIndex].fuelData = currentShift.fuelData || {};
+                shifts[currentShiftIndex].generalNotes = currentShift.generalNotes || '';
+                shifts[currentShiftIndex].totalReports = Object.values(currentData || {}).reduce(
+                    (sum, r) => sum + (r.count || 0), 0
+                );
+                shifts[currentShiftIndex].lastUpdate = saudiTime.toISOString();
+                shifts[currentShiftIndex].autoArchived = true;
+                shifts[currentShiftIndex].archiveTime = saudiTime.toISOString();
+                
+                console.log(`[Shift Archive] Shift ${currentShiftId} archived with ${shifts[currentShiftIndex].totalReports} reports`);
+            }
+        }
+        
+        // ============================================
+        // STEP 2: Reset operational data files
+        // ============================================
+        // Clear ambulance-data.json (current reports)
+        await writeData({});
+        // Reset centersData to default (keep team-to-center mapping for dispatch)
+        centersData = {
+            "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
+            "الخالدية": ["جنوب 2"],
+            "منفوحة": ["جنوب 3"],
+            "الدار البيضاء": ["جنوب 4", "جنوب 5", "سريع 1"],
+            "الإسكان": ["جنوب 6"],
+            "الحائر": ["جنوب 7"],
+            "ديراب": ["جنوب 10"],
+            "عكاظ": ["جنوب 9"],
+            "الشفاء": ["جنوب 8", "سريع 2"],
+            "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
+        };
+        // Reset other operational data
+        await writeData({});
+        // Clear centersData
+        centersData = {};
+        // Reset other operational data
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-events.json'), JSON.stringify([], null, 2));
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-absences.json'), JSON.stringify([], null, 2));
+        await fs.writeFile(path.join(STORAGE_PATH, 'shift-notes.json'), JSON.stringify([], null, 2));
+        
+        // ============================================
+        // STEP 3: Create new shift
+        // ============================================
+        const newShift = {
+            id: Date.now(),
+            shiftName: `${shiftType} - ${shiftDate}`,
+            shiftDate: shiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: shiftType,
+            shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
+            startTime: saudiTime.toISOString(),
+            totalReports: 0,
+            savedReports: {},
+            rapidLocations: {},
+            centersData: {},
+            vehicleData: {},
+            fuelData: {},
+            generalNotes: '',
+            lastUpdate: saudiTime.toISOString(),
+            autoArchived: false
+        };
+        
+        // Save to file
+        shifts.unshift(newShift);
+        if (shifts.length > 50) shifts.pop();
+        await writeShifts(shifts);
+        await syncShiftToDB(newShift);
+        
+        // Set as current shift
+        currentShiftId = newShift.id;
+        
+        // Broadcast to all clients
+        broadcast({
+            type: 'shift_started',
+            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'}`,
+            shiftId: newShift.id,
+            shiftDate: shiftDate,
+            shiftType: shiftType
+        });
+        
+        res.json({ 
+            success: true, 
+            shiftId: newShift.id,
+            shift: newShift,
+            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'} بنجاح`
+        });
+    } catch (error) {
+        console.error('Error starting new shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في بدء المناوبة: ' + error.message });
+    }
+});
+
+app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { shiftId, shiftData, shiftDate, shiftType } = req.body;
+        const shifts = await readShifts();
+        
+        let targetShift = null;
+        let index = -1;
+        
+        if (shiftId) {
+            // Find by ID (legacy/manual mode)
+            index = shifts.findIndex(s => s.id === shiftId);
+        } else if (shiftDate && shiftType) {
+            // Find by date + type (auto-shift mode)
+            index = shifts.findIndex(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+        }
+        
+        if (index !== -1) {
+            // Update existing shift
+            shifts[index].rapidLocations = shiftData.rapidLocations || shifts[index].rapidLocations || {};
+            shifts[index].centersData = shiftData.centersData || shifts[index].centersData || {};
+            shifts[index].vehicleData = shiftData.vehicleData || shifts[index].vehicleData || {};
+            shifts[index].fuelData = shiftData.fuelData || shifts[index].fuelData || {};
+            shifts[index].generalNotes = shiftData.generalNotes || shifts[index].generalNotes || "";
+            shifts[index].shiftType = shiftData.shiftType || shifts[index].shiftType;
+            shifts[index].lastUpdate = new Date().toISOString();
+            targetShift = shifts[index];
+        } else {
+            // Create new auto-shift record
+            const now = new Date();
+            const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+            const year = saudiTime.getFullYear();
+            const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+            const day = saudiTime.getDate().toString().padStart(2, '0');
+            const isoDate = `${year}-${month}-${day}`;
+            const newShift = {
+                id: Date.now(),
+                shiftName: `${shiftData.shiftType || 'صباحية'} - ${shiftDate || isoDate}`,
+                shiftDate: shiftDate || isoDate,
+                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+                shiftType: shiftData.shiftType || 'صباحية',
+                startTime: saudiTime.toISOString(),
+                savedReports: {},
+                totalReports: 0,
+                rapidLocations: shiftData.rapidLocations || {},
+                centersData: shiftData.centersData || {},
+                vehicleData: {},
+                fuelData: {},
+                generalNotes: shiftData.generalNotes || "",
+                lastUpdate: saudiTime.toISOString(),
+                autoArchived: false
+            };
+            shifts.unshift(newShift);
+            if (shifts.length > 50) shifts.pop();
+            targetShift = newShift;
+            index = 0;
+        }
+        
+        // Enrich centersData with assignedParamedics from database if available
+        // BUT do NOT overwrite user-entered staffCount - preserve manual input
+        try {
+            const shiftDateToUse = targetShift ? targetShift.shiftDate : (shiftDate || isoDate);
+            const teams = await db.Teams.getAll();
+            const centerParamedics = {};
+            for (const team of teams) {
+                if (!centerParamedics[team.center]) centerParamedics[team.center] = [];
+                const roster = await db.ShiftRoster.getByDateAndTeam(shiftDateToUse, team.id);
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+                for (const entry of roster) {
+                    centerParamedics[team.center].push({
+                        name: entry.employee_name,
+                        employeeCode: entry.employee_code,
+                        team: team.name,
+                        shiftCode: entry.shift_code,
+                        status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
+                    });
+                }
+            }
+            for (const center in targetShift.centersData) {
+                if (centerParamedics[center] && centerParamedics[center].length > 0) {
+                    // Only add assignedParamedics if not already present
+                    if (!targetShift.centersData[center].assignedParamedics || targetShift.centersData[center].assignedParamedics.length === 0) {
+                        targetShift.centersData[center].assignedParamedics = centerParamedics[center];
+                    }
+                    // Only update staffCount if user hasn't manually entered a value
+                    // If staffCount is empty or 0, use the database count
+                    const currentStaffCount = parseInt(targetShift.centersData[center].staffCount);
+                    if (isNaN(currentStaffCount) || currentStaffCount === 0) {
+                        targetShift.centersData[center].staffCount = centerParamedics[center].filter(p => p.status === 'حاضر').length;
+                    }
+                    // Otherwise, keep the user's manual input (staffCount already set by user)
+                }
+            }
+        } catch (e) {
+            console.warn('Could not enrich centersData with paramedics:', e.message);
+        }
+        
+        await writeShifts(shifts);
+        await syncShiftToDB(targetShift);
+        
+        // Save to SQLite for reliable shift persistence
+        try {
+            if (targetShift && dbAvailable()) {
+                await db.saveShiftData(targetShift.id, targetShift);
+            }
+        } catch (saveErr) {
+            console.error('Failed to save shift to SQLite:', saveErr);
+        }
+        
+        if (targetShift) currentShiftId = targetShift.id;
+
+        broadcast({
+            type: 'shift_updated',
+            message: 'تم تحديث بيانات المناوبة',
+            shiftId: targetShift ? targetShift.id : null
+        });
+
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تحديث المناوبة',
+                        message: 'تم تحديث بيانات المناوبة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('shift_updated', 'تم تحديث بيانات المناوبة', 'shifts', req.user.name, req.user.role, req.user.id);
+
+        res.json({ success: true, shiftId: targetShift ? targetShift.id : null });
+    } catch (error) {
+        console.error("خطأ في تحديث بيانات المناوبة:", error);
+        res.status(500).json({ error: 'فشل في تحديث بيانات المناوبة' });
+    }
+});
+
+// POST /api/shift-save - حفظ موثوق للمناوبة
+// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
+app.post('/api/shift-save', authenticate, async (req, res) => {
+    try {
+        const { shiftId, shiftData } = req.body;
+        if (!shiftId) {
+            return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
+        }
+        
+        // Save to SQLite (primary source)
+        const result = await db.saveShiftData(shiftId, shiftData);
+        
+        // Also save to JSON as backup (maintain backward compatibility)
+        const shifts = await readShifts();
+        const index = shifts.findIndex(s => s.id === shiftId);
+        if (index !== -1) {
+            shifts[index] = { ...shifts[index], ...shiftData, lastUpdate: new Date().toISOString() };
+            await writeShifts(shifts);
+        }
+        
+        res.json({ success: true, shiftId, lastSaved: result.lastSaved });
+    } catch (error) {
+        console.error('Error saving shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في حفظ المناوبة: ' + error.message });
+    }
+});
+
+// POST /api/shift-archive - أرشفة صريحة
+// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
+app.post('/api/shift-archive', authenticate, async (req, res) => {
+    try {
+        const { shiftId, supervisorName, supervisorId } = req.body;
+        if (!shiftId) {
+            return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
+        }
+        
+        const result = await db.archiveShift(shiftId, { supervisorName, supervisorId });
+        
+        // Update JSON backup
+        const shifts = await readShifts();
+        const index = shifts.findIndex(s => s.id === shiftId);
+        if (index !== -1) {
+            shifts[index].status = 'archived';
+            shifts[index].archivedAt = new Date().toISOString();
+            await writeShifts(shifts);
+        }
+        
+        res.json({ success: true, shiftId, archivedAt: result.archivedAt });
+    } catch (error) {
+        console.error('Error archiving shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في أرشفة المناوبة: ' + error.message });
+    }
+});
+
+// GET /api/shift-status - حالة المناوبة النشطة
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-status', async (req, res) => {
+    try {
+        const activeShift = await db.getActiveShift();
+        if (!activeShift) {
+            return res.json({ isActive: false, message: 'لا توجد مناوبة نشطة' });
+        }
+        
+        const status = await db.getShiftStatus(activeShift.id);
+        res.json(status);
+    } catch (error) {
+        console.error('Error getting shift status:', error);
+        res.status(500).json({ error: 'فشل في جلب حالة المناوبة' });
+    }
+});
+
+// GET /api/shift-timeline/:shiftId - الأحداث الزمنية
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-timeline/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const events = await db.getTimelineEvents(shiftId, 100);
+        res.json({ success: true, events });
+    } catch (error) {
+        console.error('Error getting timeline:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل الزمني' });
+    }
+});
+
+// POST /api/shift-timeline/:shiftId - إضافة حدث زمني
+app.post('/api/shift-timeline/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { eventType, title, description, data } = req.body;
+        const eventId = await db.addTimelineEvent(shiftId, {
+            type: eventType,
+            title: title,
+            description: description,
+            data: data,
+            createdBy: req.user ? req.user.id : 'system',
+            createdByName: req.user ? req.user.name : 'النظام'
+        });
+        res.json({ success: true, eventId });
+    } catch (error) {
+        console.error('Error adding timeline event:', error);
+        res.status(500).json({ error: 'فشل في إضافة الحدث' });
+    }
+});
+
+// GET /api/shift-snapshot/:shiftId - آخر لقطة محفوظة
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const snapshot = await db.getLatestShiftSnapshot(shiftId);
+        if (!snapshot) {
+            return res.status(404).json({ success: false, error: 'لا توجد لقطة محفوظة' });
+        }
+        res.json({ success: true, snapshot });
+    } catch (error) {
+        console.error('Error getting snapshot:', error);
+        res.status(500).json({ error: 'فشل في جلب اللقطة' });
+    }
+});
+
+// GET /api/shift-integrity/:shiftId - التحقق من سلامة البيانات
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-integrity/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const result = await db.verifyShiftIntegrity(shiftId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error verifying integrity:', error);
+        res.status(500).json({ error: 'فشل في التحقق من السلامة' });
+    }
+});
+
+app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const id = parseInt(req.params.id);
+        const filtered = shifts.filter(s => s.id !== id);
+        await writeShifts(filtered);
+
+        broadcast({
+            type: 'shift_deleted',
+            message: 'تم حذف المناوبة',
+            shiftId: id
+        });
+
+        // Audit log
+        await addAuditLogEntry('shift_deleted', 'تم حذف المناوبة: ' + id, 'shifts', req.user.name, req.user.role, req.user.id);
+
+        if (currentShiftId === id) {
+            currentShiftId = null;
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف المناوبة' });
+    }
+});
+
+// ============================================
+// API: Shift Archive & Analytics (New)
+// ============================================
+
+// Helper: calculate metrics for a single shift
+async function calculateShiftMetrics(shiftId, shiftsList) {
+    if (!dbAvailable()) return null;
+    const shift = shiftsList.find(s => s.id === shiftId) || await db.Shifts.getById(shiftId);
+    if (!shift) return null;
+
+    const reports = await db.Reports.getByShift(shiftId);
+    const completions = await db.ShiftCompletions.getByShift(shiftId);
+    const forms = await db.ShiftForms.getByShift(shiftId);
+    const timeline = await db.Timeline.getByShift(shiftId);
+    const audit = await db.AuditLog.getByShift(shiftId);
+    const files = await db.OpsFiles.getByShift(shiftId);
+
+    const totalReports = Array.isArray(reports) ? reports.length : 0;
+    const completedReports = Array.isArray(reports) ? reports.filter(r => r.status === 'completed').length : 0;
+    const pendingReports = Array.isArray(reports) ? reports.filter(r => r.status === 'pending').length : 0;
+    const suspendedReports = Array.isArray(reports) ? reports.filter(r => r.status === 'suspended').length : 0;
+    const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+
+    let staffCount = 0;
+    let teamCount = 0;
+    let vehicleCount = 0;
+    if (Array.isArray(completions) && completions.length > 0) {
+        teamCount = completions.length;
+        completions.forEach(c => {
+            try {
+                const td = JSON.parse(c.teams_data || '{}');
+                if (td.staffCount) staffCount += parseInt(td.staffCount) || 0;
+                if (td.carsCount) vehicleCount += parseInt(td.carsCount) || 0;
+                if (td.vehicles) vehicleCount += parseInt(td.vehicles) || 0;
+            } catch (e) {}
+        });
+    }
+
+    const notesCount = (Array.isArray(completions) ? completions.filter(c => c.notes && c.notes.trim()).length : 0) +
+                       (Array.isArray(timeline) ? timeline.length : 0);
+    const eventCount = Array.isArray(timeline) ? timeline.length : 0;
+    const totalForms = Array.isArray(forms) ? forms.length : 0;
+    const criticalCases = Array.isArray(forms) ? forms.filter(f => {
+        const name = (f.form_name || '').toLowerCase();
+        return name.includes('e-case') || name.includes('critical') || name.includes('حادث') || name.includes('طوارئ');
+    }).length : 0;
+
+    // data_completeness: percentage of fields filled in shift record
+    let filledFields = 0;
+    let totalFields = 0;
+    const shiftFields = ['shiftName', 'shiftDate', 'shiftType', 'shiftDay', 'startTime', 'totalReports', 'rapidLocations', 'centersData', 'vehicleData', 'fuelData', 'generalNotes'];
+    shiftFields.forEach(f => {
+        totalFields++;
+        const val = shift[f] || (shift[f.charAt(0).toLowerCase() + f.slice(1)]);
+        if (val !== undefined && val !== null && val !== '' && JSON.stringify(val) !== '{}') filledFields++;
+    });
+    const dataCompleteness = totalFields > 0 ? (filledFields / totalFields) * 100 : 0;
+
+    const avgResponseTime = 0; // no data source
+    const avgClosureTime = 0; // no data source
+
+    // health_score: weighted average
+    // data_completeness * 0.2 + completion_rate * 0.3 + (1/avg_response_time)*0.2 + notes_count * 0.1 + event_count * 0.2
+    // Adjusted: if avg_response_time is 0, we treat that component as 0
+    const responseComponent = avgResponseTime > 0 ? (1 / avgResponseTime) * 0.2 : 0;
+    const notesComponent = Math.min(notesCount * 2, 20); // cap at 20 points
+    const eventComponent = Math.min(eventCount * 2, 20); // cap at 20 points
+    let healthScore = (dataCompleteness * 0.2) + (completionRate * 0.3) + responseComponent + notesComponent + eventComponent;
+    healthScore = Math.min(100, Math.max(0, healthScore));
+
+    const metrics = {
+        shift_id: shiftId,
+        total_reports: totalReports,
+        completed_reports: completedReports,
+        pending_reports: pendingReports,
+        suspended_reports: suspendedReports,
+        total_completions: Array.isArray(completions) ? completions.length : 0,
+        total_forms: totalForms,
+        staff_count: staffCount,
+        team_count: teamCount,
+        vehicle_count: vehicleCount,
+        completion_rate: parseFloat(completionRate.toFixed(2)),
+        avg_response_time: avgResponseTime,
+        avg_closure_time: avgClosureTime,
+        critical_cases: criticalCases,
+        health_score: parseFloat(healthScore.toFixed(2)),
+        data_completeness: parseFloat(dataCompleteness.toFixed(2)),
+        notes_count: notesCount,
+        event_count: eventCount
+    };
+
+    // Save to SQLite
+    try {
+        const existing = await db.ShiftMetrics.getByShift(shiftId);
+        if (existing) {
+            await db.ShiftMetrics.update(existing.id, metrics);
+        } else {
+            await db.ShiftMetrics.create(metrics);
+        }
+    } catch (e) {
+        console.warn('Failed to save shift metrics:', e.message);
+    }
+
+    return metrics;
+}
+
+// Helper: calculate alerts for a shift
+async function calculateShiftAlerts(shiftId, metrics) {
+    if (!dbAvailable() || !db.ShiftAlerts) return [];
+    const alerts = [];
+    const m = metrics || await calculateShiftMetrics(shiftId, []);
+    if (!m) return alerts;
+
+    if (m.pending_reports > 5) {
+        alerts.push({ shift_id: shiftId, alert_type: 'high_pending', severity: 'warning', message: 'عدد البلاغات المعلقة مرتفع (' + m.pending_reports + ')' });
+    }
+    if (m.completion_rate < 50 && m.total_reports > 0) {
+        alerts.push({ shift_id: shiftId, alert_type: 'low_completion', severity: 'critical', message: 'نسبة الإنجاز منخفضة (' + m.completion_rate.toFixed(1) + '%)' });
+    }
+    if (m.staff_count < 3) {
+        alerts.push({ shift_id: shiftId, alert_type: 'staff_shortage', severity: 'critical', message: 'نقص في الكادر (' + m.staff_count + ')' });
+    }
+    if (m.total_reports > 30) {
+        alerts.push({ shift_id: shiftId, alert_type: 'workload_spike', severity: 'warning', message: 'ارتفاع في حجم البلاغات (' + m.total_reports + ')' });
+    }
+    if (m.avg_closure_time > 120) {
+        alerts.push({ shift_id: shiftId, alert_type: 'closure_delay', severity: 'warning', message: 'تأخر في إغلاق البلاغات' });
+    }
+    if (m.notes_count > 10) {
+        alerts.push({ shift_id: shiftId, alert_type: 'repeated_notes', severity: 'info', message: 'عدد الملاحظات مرتفع (' + m.notes_count + ')' });
+    }
+
+    const saved = [];
+    for (const alert of alerts) {
+        try {
+            const id = await db.ShiftAlerts.create(alert);
+            const savedAlert = { id, ...alert };
+            saved.push(savedAlert);
+            broadcast({
+                type: 'shift_alert_new',
+                alert_id: id,
+                shift_id: shiftId,
+                alert_type: alert.alert_type,
+                severity: alert.severity,
+                message: alert.message
+            });
+        } catch (e) {
+            console.warn('Alert creation error:', e.message);
+        }
+    }
+    return saved;
+}
+
+// GET /api/shifts/:id/detail - comprehensive shift data
+app.get('/api/shifts/:id/detail', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+
+        const result = {
+            shift: shift,
+            reports: shift.savedReports || {},
+            completions: [],
+            forms: [],
+            audit_trail: [],
+            timeline: [],
+            files: [],
+            metrics: null,
+            alerts: [],
+            staff: [],
+            vehicles: []
+        };
+
+        if (dbAvailable()) {
+            try {
+                const dbReports = await db.Reports.getByShift(shiftId);
+                if (Array.isArray(dbReports) && dbReports.length > 0) {
+                    const reportsObj = {};
+                    dbReports.forEach(r => {
+                        if (r.center && r.unit) {
+                            reportsObj[`${r.center}|${r.unit}`] = { count: r.count || 0, times: r.times || [] };
+                        }
+                    });
+                    result.reports = reportsObj;
+                }
+                const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
+                if (Array.isArray(dbCompletions)) result.completions = dbCompletions;
+                const dbForms = await db.ShiftForms.getByShift(shiftId);
+                if (Array.isArray(dbForms)) result.forms = dbForms;
+                const dbAudit = await db.ShiftAuditTrail.getByShift(shiftId, 100);
+                if (Array.isArray(dbAudit)) result.audit_trail = dbAudit;
+                const dbTimeline = await db.ShiftTimelineEvents.getByShift(shiftId, 100);
+                if (Array.isArray(dbTimeline)) result.timeline = dbTimeline;
+                const dbFiles = await db.OpsFiles.getByShift(shiftId);
+                if (Array.isArray(dbFiles)) result.files = dbFiles;
+                const dbMetrics = await db.ShiftMetrics.getByShift(shiftId);
+                if (dbMetrics) result.metrics = dbMetrics;
+                const dbAlerts = await db.ShiftAlerts.getByShift(shiftId, 50);
+                if (Array.isArray(dbAlerts)) result.alerts = dbAlerts;
+
+                // Extract staff/vehicles from completions
+                const staffSet = new Set();
+                const vehicleSet = new Set();
+                dbCompletions.forEach(c => {
+                    try {
+                        const td = JSON.parse(c.teams_data || '{}');
+                        if (td.assignedParamedics) {
+                            td.assignedParamedics.forEach(p => staffSet.add(p.name || p));
+                        }
+                        if (td.cars) {
+                            td.cars.forEach(v => vehicleSet.add(v.plate || v.name || v));
+                        }
+                    } catch (e) {}
+                });
+                result.staff = Array.from(staffSet);
+                result.vehicles = Array.from(vehicleSet);
+            } catch (dbErr) {
+                console.warn('[DB] Failed to load shift detail:', dbErr.message);
+            }
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error('Shift detail error:', error);
+        res.status(500).json({ error: 'فشل في جلب تفاصيل المناوبة' });
+    }
+});
+
+// GET /api/shifts/:id/timeline - timeline events
+app.get('/api/shifts/:id/timeline', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        if (!dbAvailable() || !db.ShiftTimelineEvents) {
+            return res.json({ success: true, events: [] });
+        }
+        const events = await db.ShiftTimelineEvents.getByShift(shiftId, parseInt(req.query.limit) || 50);
+        res.json({ success: true, events: events || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الأحداث الزمنية' });
+    }
+});
+
+// GET /api/shifts/:id/metrics - KPIs for shift
+app.get('/api/shifts/:id/metrics', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        if (!dbAvailable() || !db.ShiftMetrics) {
+            return res.json({ success: true, metrics: null });
+        }
+        let metrics = await db.ShiftMetrics.getByShift(shiftId);
+        if (!metrics) {
+            const shifts = await readShifts();
+            metrics = await calculateShiftMetrics(shiftId, shifts);
+        }
+        res.json({ success: true, metrics });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المؤشرات' });
+    }
+});
+
+// GET /api/shifts/:id/health-score - health score calculation
+app.get('/api/shifts/:id/health-score', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const metrics = await calculateShiftMetrics(shiftId, shifts);
+        if (!metrics) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        const components = {
+            data_completeness: metrics.data_completeness,
+            completion_rate: metrics.completion_rate,
+            notes_count: metrics.notes_count,
+            event_count: metrics.event_count,
+            staff_count: metrics.staff_count,
+            critical_cases: metrics.critical_cases
+        };
+        res.json({ success: true, health_score: metrics.health_score, components });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حساب مؤشر الصحة' });
+    }
+});
+
+// GET /api/shifts/daily-dashboard - daily KPIs
+app.get('/api/shifts/daily-dashboard', authenticate, async (req, res) => {
+    try {
+        const date = req.query.date || new Date().toISOString().split('T')[0];
+        if (!dbAvailable()) {
+            return res.json({ success: true, date, total_shifts: 0, total_reports: 0, completed_reports: 0, open_reports: 0, suspended_reports: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, completion_rate: 0, avg_response_time: 0, avg_closure_time: 0, top_center: null, top_report_type: null });
+        }
+        let kpi = await db.ShiftKpiDaily.getByDate(date);
+        if (!kpi) {
+            // Calculate from shifts
+            const shifts = await readShifts();
+            const dayShifts = shifts.filter(s => s.shiftDate === date);
+            let totalReports = 0, completedReports = 0, openReports = 0, suspendedReports = 0;
+            let totalStaff = 0, totalTeams = 0, totalVehicles = 0;
+            const centerCounts = {};
+            const typeCounts = {};
+            for (const s of dayShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    openReports += m.pending_reports;
+                    suspendedReports += m.suspended_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                if (s.savedReports) {
+                    Object.keys(s.savedReports).forEach(k => {
+                        const [center, unit] = k.split('|');
+                        if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
+                        if (unit) typeCounts[unit] = (typeCounts[unit] || 0) + (s.savedReports[k].count || 0);
+                    });
+                }
+            }
+            const topCenter = Object.entries(centerCounts).sort((a, b) => b[1] - a[1])[0];
+            const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                date,
+                total_shifts: dayShifts.length,
+                total_reports: totalReports,
+                completed_reports: completedReports,
+                open_reports: openReports,
+                suspended_reports: suspendedReports,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                avg_response_time: 0,
+                avg_closure_time: 0,
+                top_center: topCenter ? topCenter[0] : null,
+                top_report_type: topType ? topType[0] : null
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Daily dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات اليومية' });
+    }
+});
+
+// GET /api/shifts/weekly-dashboard - weekly KPIs
+app.get('/api/shifts/weekly-dashboard', authenticate, async (req, res) => {
+    try {
+        const weekStart = req.query.week_start;
+        const weekEnd = req.query.week_end;
+        if (!weekStart || !weekEnd) {
+            return res.status(400).json({ error: 'معايير التاريخ مطلوبة' });
+        }
+        if (!dbAvailable()) {
+            return res.json({ success: true, week_start: weekStart, week_end: weekEnd, total_shifts: 0, total_reports: 0, avg_daily_reports: 0, peak_day: null, peak_day_count: 0, lowest_day: null, lowest_day_count: 0, completion_rate: 0, total_operating_hours: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, avg_staff_per_shift: 0, comparison_last_week: 0 });
+        }
+        let kpi = await db.ShiftKpiWeekly.getByWeekStart(weekStart);
+        if (!kpi) {
+            const shifts = await readShifts();
+            const weekShifts = shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd);
+            let totalReports = 0, totalStaff = 0, totalTeams = 0, totalVehicles = 0, completedReports = 0;
+            const dayCounts = {};
+            for (const s of weekShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                dayCounts[s.shiftDate] = (dayCounts[s.shiftDate] || 0) + (s.totalReports || 0);
+            }
+            const days = Object.entries(dayCounts);
+            const peak = days.sort((a, b) => b[1] - a[1])[0];
+            const lowest = days.sort((a, b) => a[1] - b[1])[0];
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                week_start: weekStart,
+                week_end: weekEnd,
+                total_shifts: weekShifts.length,
+                total_reports: totalReports,
+                avg_daily_reports: weekShifts.length > 0 ? parseFloat((totalReports / weekShifts.length).toFixed(2)) : 0,
+                peak_day: peak ? peak[0] : null,
+                peak_day_count: peak ? peak[1] : 0,
+                lowest_day: lowest ? lowest[0] : null,
+                lowest_day_count: lowest ? lowest[1] : 0,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                total_operating_hours: weekShifts.length * 12,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                avg_staff_per_shift: weekShifts.length > 0 ? parseFloat((totalStaff / weekShifts.length).toFixed(2)) : 0,
+                comparison_last_week: 0
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Weekly dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات الأسبوعية' });
+    }
+});
+
+// GET /api/shifts/monthly-dashboard - monthly KPIs
+app.get('/api/shifts/monthly-dashboard', authenticate, async (req, res) => {
+    try {
+        const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
+        const year = parseInt(req.query.year) || new Date().getFullYear();
+        if (!dbAvailable()) {
+            return res.json({ success: true, month, year, total_shifts: 0, total_reports: 0, total_operating_hours: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, morning_shifts: 0, night_shifts: 0, completion_rate: 0, avg_performance: 0, comparison_last_month: 0, comparison_chart_data: null });
+        }
+        let kpi = await db.ShiftKpiMonthly.getByMonthYear(month, year);
+        if (!kpi) {
+            const shifts = await readShifts();
+            const monthShifts = shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            });
+            let totalReports = 0, totalStaff = 0, totalTeams = 0, totalVehicles = 0, completedReports = 0;
+            let morningShifts = 0, nightShifts = 0;
+            for (const s of monthShifts) {
+                const m = await calculateShiftMetrics(s.id, shifts);
+                if (m) {
+                    totalReports += m.total_reports;
+                    completedReports += m.completed_reports;
+                    totalStaff += m.staff_count;
+                    totalTeams += m.team_count;
+                    totalVehicles += m.vehicle_count;
+                }
+                const st = (s.shiftType || '').toLowerCase();
+                if (st.includes('صباح') || st.includes('morning')) morningShifts++;
+                else if (st.includes('ليل') || st.includes('night')) nightShifts++;
+            }
+            const completionRate = totalReports > 0 ? (completedReports / totalReports) * 100 : 0;
+            kpi = {
+                month, year,
+                total_shifts: monthShifts.length,
+                total_reports: totalReports,
+                total_operating_hours: monthShifts.length * 12,
+                total_staff: totalStaff,
+                total_teams: totalTeams,
+                total_vehicles: totalVehicles,
+                morning_shifts: morningShifts,
+                night_shifts: nightShifts,
+                completion_rate: parseFloat(completionRate.toFixed(2)),
+                avg_performance: parseFloat((completionRate * 0.6 + (morningShifts / Math.max(monthShifts.length, 1)) * 40).toFixed(2)),
+                comparison_last_month: 0,
+                comparison_chart_data: null
+            };
+        }
+        res.json({ success: true, ...kpi });
+    } catch (error) {
+        console.error('Monthly dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات الشهرية' });
+    }
+});
+
+// GET /api/shifts/executive-dashboard - executive summary
+app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
+    try {
+        const shifts = await readShifts();
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const todayShifts = shifts.filter(s => s.shiftDate === today);
+        const weekShifts = shifts.filter(s => s.shiftDate >= weekAgo);
+        const monthShifts = shifts.filter(s => s.shiftDate >= monthAgo);
+
+        const daily = { total_shifts: todayShifts.length, total_reports: 0, completion_rate: 0 };
+        const weekly = { total_shifts: weekShifts.length, total_reports: 0, completion_rate: 0 };
+        const monthly = { total_shifts: monthShifts.length, total_reports: 0, completion_rate: 0 };
+
+        const centerCounts = {};
+        const trends = [];
+
+        for (const s of monthShifts) {
+            const m = await calculateShiftMetrics(s.id, shifts);
+            if (m) {
+                monthly.total_reports += m.total_reports;
+            }
+            if (s.shiftDate >= weekAgo) {
+                weekly.total_reports += s.totalReports || 0;
+            }
+            if (s.shiftDate === today) {
+                daily.total_reports += s.totalReports || 0;
+            }
+            if (s.savedReports) {
+                Object.keys(s.savedReports).forEach(k => {
+                    const [center] = k.split('|');
+                    if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
+                });
+            }
+            trends.push({ date: s.shiftDate, reports: s.totalReports || 0, completion_rate: m ? m.completion_rate : 0 });
+        }
+
+        const topCenters = Object.entries(centerCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+
+        let alerts = [];
+        if (dbAvailable() && db.ShiftAlerts) {
+            alerts = await db.ShiftAlerts.getUnacknowledged(20);
+        }
+
+        const latestShifts = shifts.slice(0, 10);
+
+        res.json({ success: true, daily, weekly, monthly, top_centers: topCenters, trends: trends.slice(-30), alerts: alerts || [], latest_shifts: latestShifts });
+    } catch (error) {
+        console.error('Executive dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات التنفيذية' });
+    }
+});
+
+// GET /api/shifts/search - advanced search
+app.get('/api/shifts/search', authenticate, async (req, res) => {
+    try {
+        const q = (req.query.q || '').toLowerCase();
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const shiftType = req.query.shift_type;
+        const center = req.query.center;
+        const supervisor = req.query.supervisor;
+        const employee = req.query.employee;
+        const reportId = req.query.report_id;
+        const reportType = req.query.report_type;
+        const status = req.query.status;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let shifts = await readShifts();
+        let results = [];
+
+        for (const s of shifts) {
+            let match = true;
+            if (q) {
+                const haystack = JSON.stringify(s).toLowerCase();
+                match = haystack.includes(q);
+            }
+            if (match && dateFrom) match = s.shiftDate >= dateFrom;
+            if (match && dateTo) match = s.shiftDate <= dateTo;
+            if (match && shiftType) match = (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase());
+            if (match && center) match = s.centersData && Object.keys(s.centersData).some(c => c.includes(center));
+            if (match && supervisor) match = (s.supervisor || s.shiftName || '').includes(supervisor);
+            if (match && status) match = (s.status || '').toLowerCase() === status.toLowerCase();
+            if (match && employee) {
+                match = s.centersData && Object.values(s.centersData).some(c => {
+                    const ap = c.assignedParamedics || [];
+                    return ap.some(p => (p.name || '').includes(employee));
+                });
+            }
+            if (match && reportId) {
+                match = s.savedReports && Object.keys(s.savedReports).some(k => k.includes(reportId));
+            }
+            if (match && reportType) {
+                match = s.savedReports && Object.keys(s.savedReports).some(k => k.includes(reportType));
+            }
+            if (match) results.push(s);
+        }
+
+        results = results.slice(0, limit);
+
+        // Enrich with metrics
+        if (dbAvailable() && db.ShiftMetrics) {
+            for (const r of results) {
+                const m = await db.ShiftMetrics.getByShift(r.id);
+                if (m) r.metrics = m;
+            }
+        }
+
+        res.json({ success: true, results, total: results.length });
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: 'فشل في البحث' });
+    }
+});
+
+// POST /api/shifts/compare - compare two shifts
+app.post('/api/shifts/compare', authenticate, async (req, res) => {
+    try {
+        const { shift_a_id, shift_b_id } = req.body;
+        if (!shift_a_id || !shift_b_id) {
+            return res.status(400).json({ error: 'معرفات المناوبات مطلوبة' });
+        }
+        const shifts = await readShifts();
+        const shiftA = shifts.find(s => s.id === shift_a_id) || await db.Shifts.getById(shift_a_id);
+        const shiftB = shifts.find(s => s.id === shift_b_id) || await db.Shifts.getById(shift_b_id);
+        if (!shiftA || !shiftB) {
+            return res.status(404).json({ error: 'إحدى المناوبات غير موجودة' });
+        }
+
+        const metricsA = await calculateShiftMetrics(shift_a_id, shifts);
+        const metricsB = await calculateShiftMetrics(shift_b_id, shifts);
+
+        const diff = {};
+        if (metricsA && metricsB) {
+            diff.total_reports = metricsB.total_reports - metricsA.total_reports;
+            diff.completed_reports = metricsB.completed_reports - metricsA.completed_reports;
+            diff.completion_rate = parseFloat((metricsB.completion_rate - metricsA.completion_rate).toFixed(2));
+            diff.staff_count = metricsB.staff_count - metricsA.staff_count;
+            diff.health_score = parseFloat((metricsB.health_score - metricsA.health_score).toFixed(2));
+        }
+
+        const a = { shift: shiftA, metrics: metricsA };
+        const b = { shift: shiftB, metrics: metricsB };
+
+        res.json({ success: true, comparison: { a, b, diff } });
+    } catch (error) {
+        console.error('Compare error:', error);
+        res.status(500).json({ error: 'فشل في المقارنة' });
+    }
+});
+
+// GET /api/shifts/comparison/:id - get saved comparison
+app.get('/api/shifts/comparison/:id', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftComparisonSnapshots) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const comparison = await db.ShiftComparisonSnapshots.getById(req.params.id);
+        if (!comparison) {
+            return res.status(404).json({ error: 'المقارنة غير موجودة' });
+        }
+        res.json({ success: true, comparison });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المقارنة' });
+    }
+});
+
+// GET /api/shifts/alerts - smart alerts
+app.get('/api/shifts/alerts', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAlerts) {
+            return res.json({ success: true, alerts: [] });
+        }
+        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : null;
+        const severity = req.query.severity;
+        const acknowledged = req.query.acknowledged;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let alerts = [];
+        if (shiftId) {
+            alerts = await db.ShiftAlerts.getByShift(shiftId, limit);
+        } else if (severity) {
+            alerts = await db.all('SELECT * FROM shift_alerts WHERE severity = ? ORDER BY created_at DESC LIMIT ?', [severity, limit]);
+        } else if (acknowledged !== undefined) {
+            const ack = acknowledged === '1' || acknowledged === 'true' ? 1 : 0;
+            alerts = await db.all('SELECT * FROM shift_alerts WHERE is_acknowledged = ? ORDER BY created_at DESC LIMIT ?', [ack, limit]);
+        } else {
+            alerts = await db.ShiftAlerts.getAll(limit);
+        }
+        res.json({ success: true, alerts: alerts || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+// POST /api/shifts/alerts/:id/acknowledge - acknowledge alert
+app.post('/api/shifts/alerts/:id/acknowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAlerts) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const alertId = parseInt(req.params.id);
+        const acknowledgedBy = req.body.acknowledged_by || req.user.name;
+        await db.ShiftAlerts.acknowledge(alertId, acknowledgedBy);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تأكيد التنبيه' });
+    }
+});
+
+// POST /api/shifts/alerts/calculate - trigger alert calculation
+app.post('/api/shifts/alerts/calculate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = req.body.shift_id ? parseInt(req.body.shift_id) : null;
+        const shifts = await readShifts();
+        let generated = [];
+        if (shiftId) {
+            const metrics = await calculateShiftMetrics(shiftId, shifts);
+            generated = await calculateShiftAlerts(shiftId, metrics);
+        } else {
+            for (const s of shifts.slice(0, 10)) {
+                const metrics = await calculateShiftMetrics(s.id, shifts);
+                const alerts = await calculateShiftAlerts(s.id, metrics);
+                generated.push(...alerts);
+            }
+        }
+        res.json({ success: true, alerts_generated: generated });
+    } catch (error) {
+        console.error('Alert calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب التنبيهات' });
+    }
+});
+
+// GET /api/shifts/audit-trail - full audit trail
+app.get('/api/shifts/audit-trail', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAuditTrail) {
+            return res.json({ success: true, entries: [], total: 0 });
+        }
+        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : null;
+        const actorId = req.query.actor_id;
+        const actionType = req.query.action_type;
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const limit = parseInt(req.query.limit) || 50;
+
+        let where = [];
+        let params = [];
+        if (shiftId) { where.push('shift_id = ?'); params.push(shiftId); }
+        if (actorId) { where.push('actor_id = ?'); params.push(actorId); }
+        if (actionType) { where.push('action_type = ?'); params.push(actionType); }
+        if (dateFrom) { where.push('created_at >= ?'); params.push(dateFrom); }
+        if (dateTo) { where.push('created_at <= ?'); params.push(dateTo + ' 23:59:59'); }
+
+        const sqlWhere = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+        const entries = await db.all(`SELECT * FROM shift_audit_trail ${sqlWhere} ORDER BY created_at DESC LIMIT ?`, [...params, limit]);
+        const totalRow = await db.get(`SELECT COUNT(*) as count FROM shift_audit_trail ${sqlWhere}`, params);
+        res.json({ success: true, entries: entries || [], total: totalRow ? totalRow.count : 0 });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+// POST /api/shifts/audit-trail - add audit entry
+app.post('/api/shifts/audit-trail', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftAuditTrail) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const { shift_id, action_type, action_detail, old_data, new_data } = req.body;
+        if (!shift_id || !action_type) {
+            return res.status(400).json({ error: 'معرف المناوبة ونوع الإجراء مطلوبان' });
+        }
+        const id = await db.ShiftAuditTrail.create({
+            shift_id: parseInt(shift_id),
+            action_type,
+            actor_id: req.user.id,
+            actor_name: req.user.name,
+            actor_role: req.user.role,
+            action_detail: action_detail || '',
+            old_data: old_data || null,
+            new_data: new_data || null,
+            ip_address: req.ip || null,
+            user_agent: req.headers['user-agent'] || null
+        });
+        // Broadcast WebSocket event
+        broadcast({
+            type: 'shift_audit_trail_new',
+            shift_id: parseInt(shift_id),
+            entry: { id, shift_id, action_type, actor_name: req.user.name, created_at: new Date().toISOString() }
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Audit trail create error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل التدقيق' });
+    }
+});
+
+// POST /api/shifts/:id/metrics/calculate - recalculate metrics for a shift
+app.post('/api/shifts/:id/metrics/calculate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const shifts = await readShifts();
+        const metrics = await calculateShiftMetrics(shiftId, shifts);
+        if (!metrics) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        broadcast({
+            type: 'shift_detail_updated',
+            shift_id: shiftId,
+            field: 'metrics',
+            new_value: metrics
+        });
+        broadcast({
+            type: 'shift_metrics_calculated',
+            shift_id: shiftId,
+            metrics
+        });
+        res.json({ success: true, metrics });
+    } catch (error) {
+        console.error('Metrics calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب المؤشرات' });
+    }
+});
+
+// POST /api/shifts/metrics/calculate-all - batch recalculate
+app.post('/api/shifts/metrics/calculate-all', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const dateFrom = req.body.date_from;
+        const dateTo = req.body.date_to;
+        let shifts = await readShifts();
+        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
+        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
+
+        let count = 0;
+        for (const s of shifts) {
+            await calculateShiftMetrics(s.id, shifts);
+            count++;
+        }
+        res.json({ success: true, calculated_count: count });
+    } catch (error) {
+        console.error('Batch metrics calculation error:', error);
+        res.status(500).json({ error: 'فشل في حساب المؤشرات بالدفعة' });
+    }
+});
+
+// POST /api/shifts/export - export report
+app.post('/api/shifts/export', authenticate, async (req, res) => {
+    try {
+        const { shift_id, format, type } = req.body;
+        const shiftId = shift_id ? parseInt(shift_id) : null;
+        const shifts = await readShifts();
+        let data = {};
+        let filename = 'export';
+
+        if (type === 'detail' && shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            data = shift || {};
+            filename = `shift-detail-${shiftId}`;
+        } else if (type === 'daily') {
+            const date = req.body.date || new Date().toISOString().split('T')[0];
+            data = { date, shifts: shifts.filter(s => s.shiftDate === date) };
+            filename = `daily-report-${date}`;
+        } else if (type === 'weekly') {
+            const weekStart = req.body.week_start;
+            const weekEnd = req.body.week_end;
+            data = { weekStart, weekEnd, shifts: shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd) };
+            filename = `weekly-report-${weekStart}`;
+        } else if (type === 'monthly') {
+            const month = req.body.month;
+            const year = req.body.year;
+            data = { month, year, shifts: shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            }) };
+            filename = `monthly-report-${year}-${month}`;
+        }
+
+        const exportPath = path.join(STORAGE_PATH, 'exports', `${filename}-${Date.now()}.json`);
+        await fs.mkdir(path.join(STORAGE_PATH, 'exports'), { recursive: true });
+        await fs.writeFile(exportPath, JSON.stringify(data, null, 2));
+
+        const downloadUrl = `/api/download-export?file=${encodeURIComponent(path.basename(exportPath))}`;
+        res.json({ success: true, download_url: downloadUrl });
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ error: 'فشل في التصدير' });
+    }
+});
+
+// POST /api/shifts/reports/generate - generate report
+app.post('/api/shifts/reports/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftReportsGenerated) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const { type, date_from, date_to } = req.body;
+        if (!type) {
+            return res.status(400).json({ error: 'نوع التقرير مطلوب' });
+        }
+        const shifts = await readShifts();
+        let reportData = {};
+        let filename = '';
+
+        if (type === 'daily') {
+            const date = date_from || new Date().toISOString().split('T')[0];
+            reportData = { date, shifts: shifts.filter(s => s.shiftDate === date) };
+            filename = `daily-report-${date}.pdf`;
+        } else if (type === 'weekly') {
+            const weekStart = date_from;
+            const weekEnd = date_to;
+            reportData = { weekStart, weekEnd, shifts: shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd) };
+            filename = `weekly-report-${weekStart}.pdf`;
+        } else if (type === 'monthly') {
+            const month = parseInt(date_from);
+            const year = parseInt(date_to);
+            reportData = { month, year, shifts: shifts.filter(s => {
+                if (!s.shiftDate) return false;
+                const d = new Date(s.shiftDate);
+                return d.getMonth() + 1 === month && d.getFullYear() === year;
+            }) };
+            filename = `monthly-report-${year}-${month}.pdf`;
+        } else if (type === 'shift_detail') {
+            const shiftId = parseInt(req.body.shift_id);
+            reportData = { shift: shifts.find(s => s.id === shiftId) };
+            filename = `shift-detail-${shiftId}.pdf`;
+        }
+
+        const reportPath = path.join(STORAGE_PATH, 'reports', filename);
+        await fs.mkdir(path.join(STORAGE_PATH, 'reports'), { recursive: true });
+        await fs.writeFile(reportPath, JSON.stringify(reportData, null, 2));
+
+        const reportId = await db.ShiftReportsGenerated.create({
+            report_type: type,
+            report_date_from: date_from || null,
+            report_date_to: date_to || null,
+            shift_id: req.body.shift_id || null,
+            report_data: JSON.stringify(reportData),
+            file_path: reportPath,
+            file_format: 'pdf',
+            generated_by: req.user.name
+        });
+
+        broadcast({
+            type: 'shift_report_generated',
+            report_id: reportId,
+            type: type,
+            download_url: `/api/download-report/${reportId}`
+        });
+
+        res.json({ success: true, report_id: reportId, file_path: reportPath });
+    } catch (error) {
+        console.error('Report generation error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير' });
+    }
+});
+
+// GET /api/shifts/reports/:id - get generated report
+app.get('/api/shifts/reports/:id', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable() || !db.ShiftReportsGenerated) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const report = await db.ShiftReportsGenerated.getById(req.params.id);
+        if (!report) {
+            return res.status(404).json({ error: 'التقرير غير موجود' });
+        }
+        res.json({ success: true, report });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التقرير' });
+    }
+});
+
+// ============================================
+// API: التقرير اليومي
+// ============================================
+app.get('/api/daily-report', authenticate, async (req, res) => {
+    try {
+        const shiftId = req.query.shiftId ? parseInt(req.query.shiftId) : null;
+        let shift, shiftReports = [];
+        let allShifts = [];
+
+        if (db && db.Shifts) {
+            // SQLite mode
+            if (shiftId) {
+                shift = await db.Shifts.getById(shiftId);
+                shiftReports = shift ? await db.Shifts.getShiftReports(shiftId) : [];
+            } else {
+                allShifts = await db.Shifts.getAll();
+                shift = allShifts[0] || null;
+                shiftReports = shift ? await db.Shifts.getShiftReports(shift.id) : [];
+            }
+        } else {
+            // JSON fallback mode
+            allShifts = await readShifts();
+            shift = shiftId ? allShifts.find(s => s.id === shiftId) : allShifts[allShifts.length - 1];
+            if (shift && shift.savedReports) {
+                for (let key in shift.savedReports) {
+                    const parts = key.split('|');
+                    if (parts.length === 2) {
+                        const count = shift.savedReports[key].count || 0;
+                        shiftReports.push({ center: parts[0], unit: parts[1], count: count });
+                    }
+                }
+            }
+        }
+
+        if (!shift) {
+            return res.status(404).json({ error: 'لا توجد مناوبات متاحة' });
+        }
+
+        // Calculate center totals and unit ranking
+        const centerBreakdown = {};
+        const unitRanking = [];
+        let totalReports = 0;
+
+        shiftReports.forEach(r => {
+            const count = r.count || 0;
+            totalReports += count;
+            centerBreakdown[r.center] = (centerBreakdown[r.center] || 0) + count;
+            unitRanking.push({ center: r.center, unit: r.unit, count: count });
+        });
+
+        unitRanking.sort((a, b) => b.count - a.count);
+
+        // Get previous shift for comparison
+        if (allShifts.length === 0) {
+            allShifts = (db && db.Shifts) ? await db.Shifts.getAll() : await readShifts();
+        }
+        const currentIndex = allShifts.findIndex(s => s.id === shift.id);
+        const prevShift = currentIndex >= 0 && allShifts.length > currentIndex + 1 ? allShifts[currentIndex + 1] : null;
+        let prevTotal = 0;
+        if (prevShift) {
+            if (db && db.Shifts) {
+                const prevReports = await db.Shifts.getShiftReports(prevShift.id);
+                prevTotal = prevReports.reduce((sum, r) => sum + (r.count || 0), 0);
+            } else if (prevShift.savedReports) {
+                for (let key in prevShift.savedReports) {
+                    prevTotal += (prevShift.savedReports[key].count || 0);
+                }
+            }
+        }
+
+        res.json({
+            shift: {
+                id: shift.id,
+                name: shift.shift_name || shift.name || 'نوبة',
+                type: shift.shift_type || shift.type || '—',
+                date: shift.shift_date || shift.date || '—',
+                totalReports: totalReports
+            },
+            centerBreakdown: centerBreakdown,
+            topUnits: unitRanking.slice(0, 10),
+            previousShift: prevShift ? {
+                id: prevShift.id,
+                name: prevShift.shift_name || prevShift.name || 'نوبة',
+                type: prevShift.shift_type || prevShift.type || '—',
+                totalReports: prevTotal
+            } : null,
+            comparison: {
+                current: totalReports,
+                previous: prevTotal,
+                difference: totalReports - prevTotal,
+                percentChange: prevTotal > 0 ? ((totalReports - prevTotal) / prevTotal * 100).toFixed(1) : null
+            }
+        });
+    } catch (error) {
+        console.error('Daily report error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير اليومي' });
+    }
+});
+
+// ============================================
+// API: البلاغات
+// ============================================
+app.post('/api/report', authenticate, validateBody({
+    center: { required: true, type: 'string', minLength: 1, maxLength: 100 },
+    unit: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
+    const { center, unit } = req.body;
+    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
+
+    const key = `${center}|${unit}`;
+    const now = new Date();
+    const offset = 3;
+    const saudiTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    const year = saudiTime.getUTCFullYear();
+    const month = (saudiTime.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = saudiTime.getUTCDate().toString().padStart(2, '0');
+    const hours = saudiTime.getUTCHours().toString().padStart(2, '0');
+    const minutes = saudiTime.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = saudiTime.getUTCSeconds().toString().padStart(2, '0');
+    const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    try {
+        // Auto-archive if shift changed
+        await autoArchiveIfShiftChanged();
+        
+        const allData = await readData();
+        if (!allData[key]) allData[key] = { count: 0, times: [] };
+        allData[key].count++;
+        allData[key].times.unshift(timestamp);
+        if (allData[key].times.length > 10) allData[key].times.pop();
+        await writeData(allData);
+
+        // Sync reports to shift record so archive shows correct data
+        try {
+            const shiftId = await resolveShiftId(req);
+            if (shiftId) {
+                const shifts = await readShifts();
+                const shiftIndex = shifts.findIndex(s => s.id === shiftId);
+                if (shiftIndex !== -1) {
+                    shifts[shiftIndex].savedReports = JSON.parse(JSON.stringify(allData));
+                    shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
+                    shifts[shiftIndex].lastUpdate = new Date().toISOString();
+                    await writeShifts(shifts);
+                    await syncShiftToDB(shifts[shiftIndex]);
+                }
+            }
+        } catch (shiftErr) {
+            console.warn('[Shift] Failed to sync reports to shift:', shiftErr.message);
+        }
+
+        // Also save to SQLite with shift_id if available
+        try {
+            if (dbAvailable() && db.Reports) {
+                const shiftId = await resolveShiftId(req);
+                await db.Reports.create(center, unit, allData[key].count, shiftId);
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite report save failed, using JSON fallback:', dbErr.message);
+        }
+
+        // بث البلاغ الجديد لجميع المتصلين
+        broadcast({
+            type: 'new_report',
+            center: center,
+            unit: unit,
+            message: 'بلاغ جديد: ' + unit + ' في ' + center
+        });
+
+        res.json({ success: true, newCount: allData[key].count });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تسجيل البلاغ' });
+    }
+});
+
+app.post('/api/undo', authenticate, async (req, res) => {
+    const { center, unit } = req.body;
+    if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
+
+    const key = `${center}|${unit}`;
+    try {
+        const allData = await readData();
+        if (!allData[key] || allData[key].count === 0) {
+            return res.status(400).json({ error: 'لا يوجد بلاغات للحذف' });
+        }
+        allData[key].count--;
+        allData[key].times.shift();
+        await writeData(allData);
+
+        // Sync reports to shift record so archive shows correct data
+        try {
+            const shiftId = await resolveShiftId(req);
+            if (shiftId) {
+                const shifts = await readShifts();
+                const shiftIndex = shifts.findIndex(s => s.id === shiftId);
+                if (shiftIndex !== -1) {
+                    shifts[shiftIndex].savedReports = JSON.parse(JSON.stringify(allData));
+                    shifts[shiftIndex].totalReports = Object.values(allData).reduce((sum, r) => sum + (r.count || 0), 0);
+                    shifts[shiftIndex].lastUpdate = new Date().toISOString();
+                    await writeShifts(shifts);
+                    await syncShiftToDB(shifts[shiftIndex]);
+                }
+            }
+        } catch (shiftErr) {
+            console.warn('[Shift] Failed to sync reports to shift after undo:', shiftErr.message);
+        }
+
+        broadcast({
+            type: 'report_undone',
+            message: 'تم التراجع عن بلاغ: ' + unit + ' في ' + center,
+            center: center,
+            unit: unit
+        });
+
+        res.json({ success: true, newCount: allData[key].count });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+// ============================================
+// API: إحصائيات القوى العاملة
+// ============================================
+app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+
+        const centersData = shift.centersData || {};
+        let totalStaff = 0;
+        let totalCars = 0;
+        let missingCenters = 0;
+        let readyCenters = 0;
+        let centerCount = 0;
+        let readyVehicles = 0;
+        let maintenanceVehicles = 0;
+        let brokenVehicles = 0;
+        let lowFuel = 0;
+        const distribution = {};
+        const carDistribution = {};
+        const vehicleStatus = {};
+        const fuelStatus = {};
+        const paramedicDistribution = {};
+
+        // Pre-fetch paramedics from database for this shift date
+        const shiftDate = shift.shiftDate;
+        let dbParamedics = {};
+        try {
+            const teams = await db.Teams.getAll();
+            for (const team of teams) {
+                if (!dbParamedics[team.center]) dbParamedics[team.center] = [];
+                const roster = await db.ShiftRoster.getByDateAndTeam(shiftDate, team.id);
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+                for (const entry of roster) {
+                    dbParamedics[team.center].push({
+                        name: entry.employee_name,
+                        shiftCode: entry.shift_code,
+                        status: absentCodes.includes(entry.shift_code) ? 'غائب' : 'حاضر'
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch paramedics from DB for stats:', e.message);
+        }
+
+        for (let center in centersData) {
+            const cData = centersData[center];
+            let staffCount = parseInt(cData?.staffCount) || 0;
+            
+            // If assignedParamedics exists in JSON, calculate present count from actual roster
+            const assignedParamedics = cData?.assignedParamedics;
+            if (Array.isArray(assignedParamedics) && assignedParamedics.length > 0) {
+                const absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+                staffCount = assignedParamedics.filter(p => {
+                    const code = p.shiftCode ? p.shiftCode.toString().toUpperCase() : (p.shift_code ? p.shift_code.toString().toUpperCase() : '');
+                    return code && !absentCodes.includes(code);
+                }).length;
+                paramedicDistribution[center] = assignedParamedics;
+            } else if (dbParamedics[center] && dbParamedics[center].length > 0) {
+                // Fallback to database paramedics
+                staffCount = dbParamedics[center].filter(p => p.status === 'حاضر').length;
+                paramedicDistribution[center] = dbParamedics[center];
+            }
+            
+            const carsCount = parseInt(cData?.carsCount) || 0;
+            const vehStatus = cData?.vehicleStatus || '';
+            const fuelLvl = cData?.fuelLevel || '';
+            totalStaff += staffCount;
+            totalCars += carsCount;
+            centerCount++;
+            if (staffCount >= 2 && carsCount >= 1) {
+                readyCenters++;
+            } else {
+                missingCenters++;
+            }
+            if (vehStatus === 'ready') readyVehicles++;
+            else if (vehStatus === 'maintenance') maintenanceVehicles++;
+            else if (vehStatus === 'broken') brokenVehicles++;
+            if (fuelLvl === 'low') lowFuel++;
+            distribution[center] = staffCount;
+            carDistribution[center] = carsCount;
+            vehicleStatus[center] = vehStatus;
+            fuelStatus[center] = fuelLvl;
+        }
+
+        const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
+        res.json({
+            totalStaff,
+            totalCars,
+            missingCenters,
+            readyCenters,
+            centerCount,
+            readinessRate,
+            readyVehicles,
+            maintenanceVehicles,
+            brokenVehicles,
+            lowFuel,
+            distribution,
+            carDistribution,
+            vehicleStatus,
+            fuelStatus,
+            paramedicDistribution
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في جلب إحصائيات القوى العاملة' });
+    }
+});
+
+// ============================================
+// API: Paramedic display for shift completion
+// ============================================
+
+/**
+ * Check if a database table exists in SQLite.
+ */
+async function tableExists(tableName) {
+    try {
+        const row = await db.get(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name=?;`,
+            [tableName]
+        );
+        return !!row;
+    } catch (err) {
+        return false;
+    }
+}
+
+app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const teamName = decodeURIComponent(req.params.teamName);
+        
+        // Get shift data to find the date
+        const shifts = await readShifts();
+        const shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            return res.status(404).json({ error: 'المناوبة غير موجودة' });
+        }
+        
+        const shiftDate = shift.shiftDate;
+        
+        // Robust shift type detection: derive from startTime, not stored shiftType
+        function getShiftType(shift) {
+            // Method 1: Use explicit shiftType if it's valid
+            if (shift.shiftType) {
+                const normalized = shift.shiftType.trim();
+                if (normalized === 'صباحية' || normalized === 'صباح' || normalized === 'morning' || normalized === 'day') {
+                    console.log('[SHIFT-TYPE] Using stored shiftType (day):', normalized);
+                    return 'صباحية';
+                }
+                if (normalized === 'ليلية' || normalized === 'ليل' || normalized === 'night' || normalized === 'evening') {
+                    console.log('[SHIFT-TYPE] Using stored shiftType (night):', normalized);
+                    return 'ليلية';
+                }
+            }
+            
+            // Method 2: Derive from startTime (most reliable)
+            // Convert UTC to Saudi Arabia time (UTC+3) before checking hour
+            if (shift.startTime) {
+                const startDate = new Date(shift.startTime);
+                const utcHour = startDate.getUTCHours();
+                const saudiHour = (utcHour + 3) % 24;
+                const derived = (saudiHour >= 17 || saudiHour < 5) ? 'ليلية' : 'صباحية';
+                console.log('[SHIFT-TYPE] startTime:', shift.startTime, 'UTC hour:', utcHour, 'Saudi hour:', saudiHour, '→', derived);
+                return derived;
+            }
+            
+            // Method 3: Derive from shiftName
+            if (shift.shiftName) {
+                if (shift.shiftName.includes('ليل')) {
+                    console.log('[SHIFT-TYPE] Derived from shiftName (night):', shift.shiftName);
+                    return 'ليلية';
+                }
+                if (shift.shiftName.includes('صباح')) {
+                    console.log('[SHIFT-TYPE] Derived from shiftName (day):', shift.shiftName);
+                    return 'صباحية';
+                }
+            }
+            
+            // Method 4: Fallback to current time (Saudi Arabia UTC+3)
+            const now = new Date();
+            const nowUtcHour = now.getUTCHours();
+            const nowSaudiHour = (nowUtcHour + 3) % 24;
+            const fallback = (nowSaudiHour >= 17 || nowSaudiHour < 5) ? 'ليلية' : 'صباحية';
+            console.log('[SHIFT-TYPE] Fallback current UTC:', nowUtcHour, 'Saudi:', nowSaudiHour, '→', fallback);
+            return fallback;
+        }
+        
+        const shiftType = getShiftType(shift);
+        const isNightShift = shiftType === 'ليلية';
+        console.log('[SHIFT-TYPE] Final:', shiftType, 'isNightShift:', isNightShift);
+        
+        if (!shiftDate) {
+            return res.json({ paramedics: [], shiftDate: null, teamName, shiftType });
+        }
+        
+        // Convert Arabic date to ISO format (e.g., "١/٧/٢٠٢٦" → "2026-07-01")
+        let isoDate = shiftDate;
+        if (shiftDate && typeof shiftDate === 'string') {
+            // Try to parse Arabic date format
+            const arabicNumerals = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+            let normalized = shiftDate;
+            for (let i = 0; i < 10; i++) {
+                normalized = normalized.split(arabicNumerals[i]).join(String(i));
+            }
+            // Try parsing DD/MM/YYYY or D/M/YYYY
+            const match = normalized.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (match) {
+                const day = match[1].padStart(2, '0');
+                const month = match[2].padStart(2, '0');
+                const year = match[3];
+                isoDate = `${year}-${month}-${day}`;
+            } else {
+                // Try YYYY-MM-DD
+                const isoMatch = normalized.match(/(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) isoDate = normalized;
+            }
+        }
+        
+        // Check if new employee tables exist
+        const hasTeams = await tableExists('teams');
+        const hasEmployees = await tableExists('employees');
+        const hasShiftRoster = await tableExists('shift_roster');
+        const hasTeamAssignments = await tableExists('team_assignments');
+        
+        if (!hasTeams || !hasEmployees || !hasShiftRoster || !hasTeamAssignments) {
+            return res.json({ 
+                paramedics: [], 
+                source: 'legacy', 
+                shiftDate, 
+                teamName,
+                message: 'جداول المسعفين غير موجودة' 
+            });
+        }
+        
+        // Query paramedics for this team and date using ISO date
+        const paramedics = await db.all(`
+            SELECT 
+                e.employee_code,
+                e.name,
+                e.phone,
+                e.job_title,
+                sr.shift_code,
+                sc.name as shift_name,
+                sc.status as shift_status
+            FROM employees e
+            JOIN team_assignments ta ON e.id = ta.employee_id
+            JOIN teams t ON t.id = ta.team_id
+            LEFT JOIN shift_roster sr ON sr.employee_id = e.id 
+                AND sr.shift_date = ? 
+                AND sr.team_id = t.id
+            LEFT JOIN shift_codes sc ON sc.code = sr.shift_code
+            WHERE t.name = ? 
+              AND e.is_active = 1
+              AND (ta.end_date IS NULL OR ta.end_date >= ?)
+            ORDER BY e.name
+        `, [isoDate, teamName, isoDate]);
+        
+        
+        // Define shift code categories for proper filtering
+        const dayOnlyCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'CPD', 'CP8'];
+        const nightOnlyCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
+        const sharedCodes = ['CP24', 'M', 'ME', 'F', 'O12', 'O10', 'O6'];
+        const offCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+        
+        const validCodes = isNightShift 
+            ? [...nightOnlyCodes, ...sharedCodes] 
+            : [...dayOnlyCodes, ...sharedCodes];
+        
+        // Filter paramedics: show working codes for this shift + all off codes (to show as absent)
+        const filteredParamedics = paramedics.filter(p => {
+            if (!p.shift_code) return false;
+            const codeUpper = p.shift_code.toUpperCase();
+            return validCodes.includes(codeUpper) || offCodes.includes(codeUpper);
+        });
+        
+        // Map paramedics with accurate status using database shift_status
+        const paramedicsWithStatus = filteredParamedics.map(p => {
+            const codeUpper = p.shift_code ? p.shift_code.toUpperCase() : '';
+            const isOff = offCodes.includes(codeUpper);
+            // Use actual shift_status from database for accurate display
+            const actualStatus = p.shift_status || '';
+            const displayStatus = isOff ? 'غائب' : 'حاضر';
+            return {
+                ...p,
+                status: displayStatus,
+                actualStatus: actualStatus
+            };
+        });
+        
+        res.json({ paramedics: paramedicsWithStatus, shiftDate, teamName, shiftType });
+    } catch (error) {
+        console.error('[API] Error in shift-completion:', error);
+        res.json({ paramedics: [], source: 'fallback', error: error.message });
+    }
+});
+
+// ============================================
+// API: Save Radio Completion (Shift Quick Log)
+// ============================================
+app.post('/api/shift-completion', authenticate, async (req, res) => {
+    try {
+        const { shiftType, shiftDate, teams, notes, timestamp } = req.body;
+        if (!shiftType || !shiftDate || !teams) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        
+        const shiftId = await resolveShiftId(req, shiftDate, shiftType);
+        
+        const completionData = {
+            id: Date.now().toString(),
+            shiftType,
+            shiftDate,
+            shift_id: shiftId,
+            teams,
+            notes: notes || '',
+            timestamp: timestamp || new Date().toISOString(),
+            createdBy: req.user ? req.user.name || req.user.username || 'مستخدم' : 'مستخدم'
+        };
+        
+        // Save to a JSON file as backup (Render free tier SQLite is ephemeral)
+        const fs = require('fs').promises;
+        const path = require('path');
+        const completionsDir = path.join(__dirname, 'data', 'completions');
+        try {
+            await fs.mkdir(completionsDir, { recursive: true });
+        } catch (e) {}
+        const filePath = path.join(completionsDir, `completion_${shiftDate}_${shiftType}.json`);
+        await fs.writeFile(filePath, JSON.stringify(completionData, null, 2));
+        
+        // Also try to save to SQLite if available
+        if (dbAvailable()) {
+            try {
+                if (db.ShiftCompletions) {
+                    await db.ShiftCompletions.create({
+                        shift_type: shiftType,
+                        shift_date: shiftDate,
+                        teams_data: JSON.stringify(teams),
+                        notes: notes || '',
+                        created_by: completionData.createdBy,
+                        created_at: completionData.timestamp,
+                        shift_id: shiftId
+                    });
+                } else {
+                    // Fallback inline SQL for older db.js without ShiftCompletions namespace
+                    await db.exec(`
+                        CREATE TABLE IF NOT EXISTS shift_completions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            shift_type TEXT NOT NULL,
+                            shift_date TEXT NOT NULL,
+                            shift_id INTEGER,
+                            teams_data TEXT NOT NULL,
+                            notes TEXT,
+                            created_by TEXT,
+                            created_at TEXT
+                        )
+                    `);
+                    try {
+                        await db.exec(`ALTER TABLE shift_completions ADD COLUMN notes TEXT`);
+                    } catch (alterErr) {}
+                    try {
+                        await db.exec(`ALTER TABLE shift_completions ADD COLUMN shift_id INTEGER`);
+                    } catch (alterErr) {}
+                    await db.run(
+                        'INSERT INTO shift_completions (shift_type, shift_date, shift_id, teams_data, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [shiftType, shiftDate, shiftId, JSON.stringify(teams), notes || '', completionData.createdBy, completionData.timestamp]
+                    );
+                }
+            } catch (dbErr) {
+                console.log('[DB] SQLite save failed, using JSON fallback:', dbErr.message);
+            }
+        }
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تكميل جديد',
+                        message: 'تم حفظ تكميل جديد للمناوبة ' + shiftDate + ' ' + shiftType,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('shift_completion_saved', 'تم حفظ تكميل للمناوبة: ' + shiftDate + ' ' + shiftType, 'shifts', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, message: 'تم حفظ التكميل', id: completionData.id });
+    } catch (error) {
+        console.error('[API] Error saving shift-completion:', error);
+        res.status(500).json({ error: 'فشل في حفظ التكميل' });
+    }
+});
+
+// ============================================
+// API: Get Radio Completion (latest for shift date + type)
+// ============================================
+app.get('/api/completion/latest', authenticate, async (req, res) => {
+    try {
+        const { shiftDate, shiftType } = req.query;
+        if (!shiftDate || !shiftType) {
+            return res.status(400).json({ error: 'shiftDate and shiftType required' });
+        }
+        
+        const fs = require('fs').promises;
+        const path = require('path');
+        const completionsDir = path.join(__dirname, 'data', 'completions');
+        const filePath = path.join(completionsDir, `completion_${shiftDate}_${shiftType}.json`);
+        
+        try {
+            const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+            res.json({ success: true, completion: data, shift_id: data.shift_id || null });
+        } catch (e) {
+            // Try SQLite fallback
+            if (dbAvailable()) {
+                try {
+                    const row = await db.get(
+                        'SELECT * FROM shift_completions WHERE shift_date = ? AND shift_type = ? ORDER BY created_at DESC LIMIT 1',
+                        [shiftDate, shiftType]
+                    );
+                    if (row) {
+                        res.json({ 
+                            success: true, 
+                            completion: {
+                                shiftDate: row.shift_date,
+                                shiftType: row.shift_type,
+                                shift_id: row.shift_id || null,
+                                teams: JSON.parse(row.teams_data),
+                                notes: row.notes || '',
+                                timestamp: row.created_at,
+                                createdBy: row.created_by
+                            },
+                            shift_id: row.shift_id || null
+                        });
+                        return;
+                    }
+                } catch (dbErr) {}
+            }
+            res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
+        }
+    } catch (error) {
+        console.error('[API] Error getting shift-completion:', error);
+        res.status(500).json({ error: 'فشل في جلب التكميل' });
+    }
+});
+
+// ============================================
+// API: المستندات (التحديثات التشغيلية)
+// ============================================
+app.get('/api/docs', authenticate, async (req, res) => {
+    try {
+        const docs = await readDocs();
+        res.json({ success: true, docs });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التحديثات' });
+    }
+});
+
+app.post('/api/upload-doc', authenticate, async (req, res) => {
+    try {
+        const { filename, fileData, description, fileType, category, priority } = req.body;
+        if (!filename || !fileData) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const docs = await readDocs();
+        const newDoc = {
+            id: Date.now().toString(),
+            filename: filename,
+            fileData: fileData,
+            fileType: fileType || 'application/octet-stream',
+            description: description || '',
+            category: category || 'أخرى',
+            priority: priority || 'normal',
+            uploader: req.body.uploader || 'المشرف',
+            uploadDate: new Date().toISOString()
+        };
+        docs.push(newDoc);
+        await writeDocs(docs);
+        
+        broadcast({
+            type: 'doc_uploaded',
+            message: 'تم رفع مستند جديد: ' + newDoc.filename,
+            doc: { id: newDoc.id, filename: newDoc.filename, category: newDoc.category }
+        });
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'مستند جديد',
+                        message: 'تم رفع مستند جديد: ' + newDoc.filename,
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('doc_uploaded', 'تم رفع مستند: ' + newDoc.filename, 'files', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, doc: newDoc });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في رفع التحديث' });
+    }
+});
+
+app.get('/api/download-doc/:id', authenticate, async (req, res) => {
+    try {
+        const docs = await readDocs();
+        const doc = docs.find(d => d.id === req.params.id);
+        if (!doc) {
+            return res.status(404).json({ error: 'التحديث غير موجود' });
+        }
+        const buffer = Buffer.from(doc.fileData, 'base64');
+        res.setHeader('Content-Type', doc.fileType);
+        res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تحميل التحديث' });
+    }
+});
+
+app.delete('/api/delete-doc/:id', authenticate, async (req, res) => {
+    try {
+        const docs = await readDocs();
+        const filtered = docs.filter(d => d.id !== req.params.id);
+        await writeDocs(filtered);
+        
+        broadcast({
+            type: 'doc_deleted',
+            message: 'تم حذف مستند',
+            docId: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف التحديث' });
+    }
+});
+
+// ============================================
+// API: هوية القطاع
+// ============================================
+app.get('/api/get-identity', authenticate, async (req, res) => {
+    try {
+        await fs.access(IDENTITY_PATH);
+        res.json({ exists: true });
+    } catch (error) {
+        res.json({ exists: false });
+    }
+});
+
+app.post('/api/upload-identity', authenticate, async (req, res) => {
+    try {
+        const { fileData, filename } = req.body;
+        if (!fileData) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const buffer = Buffer.from(fileData, 'base64');
+        await fs.writeFile(IDENTITY_PATH, buffer);
+        
+        broadcast({
+            type: 'identity_uploaded',
+            message: 'تم تحديث هوية القطاع'
+        });
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'تحديث هوية القطاع',
+                        message: 'تم تحديث هوية القطاع',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('identity_uploaded', 'تم تحديث هوية القطاع', 'files', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, message: 'تم رفع هوية القطاع بنجاح' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في رفع هوية القطاع' });
+    }
+});
+
+app.get('/api/download-identity', authenticate, async (req, res) => {
+    try {
+        const data = await fs.readFile(IDENTITY_PATH);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="identity.pdf"');
+        res.send(data);
+    } catch (error) {
+        res.status(404).json({ error: 'لا توجد هوية محفوظة' });
+    }
+});
+
+// ============================================
+// API: الإسعاف الجوي
+// ============================================
+app.get('/api/air-ambulance', authenticate, async (req, res) => {
+    try {
+        const records = await readAirRecords();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجلات الإسعاف الجوي' });
+    }
+});
+
+app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
+    try {
+        const { reportNumber, dateTime, pickupLocation, destinationHospital, diagnosis, reason, patientName, patientAge, unit, paramedic } = req.body;
+        if (!reportNumber || !unit || !dateTime || !destinationHospital) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readAirRecords();
+        const newRecord = {
+            id: Date.now().toString(),
+            reportNumber,
+            unit,
+            hospital: destinationHospital,
+            dateTime,
+            notes: `pickup: ${pickupLocation}, diagnosis: ${diagnosis}, reason: ${reason}, patient: ${patientName}, age: ${patientAge}, paramedic: ${paramedic}`,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeAirRecords(records);
+
+        broadcast({
+            type: 'air_ambulance_saved',
+            message: 'بلاغ إسعاف جوي جديد: ' + reportNumber,
+            record: newRecord
+        });
+
+        // Audit log
+        await addAuditLogEntry('air_ambulance_saved', 'بلاغ إسعاف جوي جديد: ' + reportNumber, 'air_ambulance', req.user.name, req.user.role, req.user.id);
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ بلاغ الإسعاف الجوي' });
+    }
+});
+
+app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readAirRecords();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeAirRecords(filtered);
+
+        broadcast({
+            type: 'air_ambulance_deleted',
+            message: 'تم حذف بلاغ إسعاف جوي',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        await writeAirRecords([]);
+
+        broadcast({
+            type: 'air_ambulance_cleared',
+            message: 'تم حذف جميع بلاغات الإسعاف الجوي'
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
+    }
+});
+
+// ============================================
+// API: الحوادث
+// ============================================
+app.get('/api/incidents', authenticate, async (req, res) => {
+    try {
+        const records = await readIncidents();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الحوادث' });
+    }
+});
+
+app.post('/api/incidents', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readIncidents();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeIncidents(records);
+
+        broadcast({
+            type: 'incident_added',
+            message: 'تم إضافة حادث جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ الحادث' });
+    }
+});
+
+app.delete('/api/incidents/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readIncidents();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeIncidents(filtered);
+
+        broadcast({
+            type: 'incident_deleted',
+            message: 'تم حذف حادث',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الحادث' });
+    }
+});
+
+// ============================================
+// API: مناوبات كبار الضباط
+// ============================================
+app.get('/api/senior-shifts', authenticate, async (req, res) => {
+    try {
+        const records = await readSeniorShifts();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب مناوبات كبار الضباط' });
+    }
+});
+
+app.post('/api/senior-shifts', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readSeniorShifts();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeSeniorShifts(records);
+
+        broadcast({
+            type: 'senior_shift_added',
+            message: 'تم إضافة مناوبة كبار الضباط',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ مناوبة كبار الضباط' });
+    }
+});
+
+app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readSeniorShifts();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeSeniorShifts(filtered);
+
+        broadcast({
+            type: 'senior_shift_deleted',
+            message: 'تم حذف مناوبة كبار الضباط',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف مناوبة كبار الضباط' });
+    }
+});
+
+// ============================================
+// API: حالات الطوارئ (E-Cases)
+// ============================================
+app.get('/api/e-cases', authenticate, async (req, res) => {
+    try {
+        const records = await readECases();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب حالات الطوارئ' });
+    }
+});
+
+app.post('/api/e-cases', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readECases();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeECases(records);
+
+        broadcast({
+            type: 'e_case_added',
+            message: 'تم إضافة حالة طوارئ جديدة',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ حالة الطوارئ' });
+    }
+});
+
+app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readECases();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeECases(filtered);
+
+        broadcast({
+            type: 'e_case_deleted',
+            message: 'تم حذف حالة طوارئ',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف حالة الطوارئ' });
+    }
+});
+
+// ============================================
+// API: بلاغات التصعيد
+// ============================================
+app.get('/api/escalations', authenticate, async (req, res) => {
+    try {
+        const records = await readEscalations();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بلاغات التصعيد' });
+    }
+});
+
+app.post('/api/escalations', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readEscalations();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeEscalations(records);
+
+        broadcast({
+            type: 'escalation_added',
+            message: 'تم إضافة بلاغ تصعيد جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ بلاغ التصعيد' });
+    }
+});
+
+app.delete('/api/escalations/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readEscalations();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeEscalations(filtered);
+
+        broadcast({
+            type: 'escalation_deleted',
+            message: 'تم حذف بلاغ تصعيد',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف بلاغ التصعيد' });
+    }
+});
+
+// ============================================
+// API: التقارير اليومية
+// ============================================
+app.get('/api/daily-reports', authenticate, async (req, res) => {
+    try {
+        const records = await readDailyReports();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التقارير اليومية' });
+    }
+});
+
+app.post('/api/daily-reports', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readDailyReports();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeDailyReports(records);
+
+        broadcast({
+            type: 'daily_report_added',
+            message: 'تم إضافة تقرير يومي جديد',
+            record: newRecord
+        });
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ التقرير اليومي' });
+    }
+});
+
+app.delete('/api/daily-reports/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readDailyReports();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeDailyReports(filtered);
+
+        broadcast({
+            type: 'daily_report_deleted',
+            message: 'تم حذف تقرير يومي',
+            recordId: req.params.id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف التقرير اليومي' });
+    }
+});
+
+// ============================================
+// API: ملاحظات التحكم والتنسيق
+// ============================================
+app.get('/api/control-notes', authenticate, async (req, res) => {
+    try {
+        const data = await fs.readFile(CONTROL_NOTES_PATH, 'utf8');
+        const parsed = JSON.parse(data);
+        res.json({ success: true, notes: parsed.notes || '' });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.json({ success: true, notes: '' });
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الملاحظات' });
+        }
+    }
+});
+
+app.post('/api/save-control-notes', authenticate, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
+        
+        broadcast({
+            type: 'control_notes_updated',
+            message: 'تم تحديث ملاحظات التحكم والتنسيق'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملاحظات' });
+    }
+});
+
+app.delete('/api/control-notes', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes: '', updatedAt: new Date().toISOString() }));
+        
+        broadcast({
+            type: 'control_notes_cleared',
+            message: 'تم مسح ملاحظات التحكم والتنسيق'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في مسح الملاحظات' });
+    }
+});
+
+// ============================================
+// API: إجازات التحكم والتنسيق
+// ============================================
+app.get('/api/vacations', authenticate, async (req, res) => {
+    try {
+        const data = await fs.readFile(VACATIONS_PATH, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.json([]);
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الإجازات' });
+        }
+    }
+});
+
+app.post('/api/save-vacations', authenticate, async (req, res) => {
+    try {
+        const { vacations } = req.body;
+        await fs.writeFile(VACATIONS_PATH, JSON.stringify(vacations, null, 2));
+        
+        broadcast({
+            type: 'vacations_updated',
+            message: 'تم تحديث إجازات التحكم والتنسيق'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الإجازات' });
+    }
+});
+
+app.delete('/api/vacations', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await fs.writeFile(VACATIONS_PATH, JSON.stringify([]));
+        
+        broadcast({
+            type: 'vacations_cleared',
+            message: 'تم مسح الإجازات'
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في مسح الإجازات' });
+    }
+});
+
+// ============================================
+// API: الرقم السري (Secured - requires authentication)
+// ============================================
+// ⚠️  This endpoint returns a sensitive PIN. It requires admin/director auth.
+// Consider removing this endpoint entirely and handling PIN verification server-side.
+app.get('/api/get-password', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const password = await readPassword();
+        res.json({ success: true, password });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الرقم السري' });
+    }
+});
+
+app.post('/api/change-password', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ error: 'الرقم السري القديم والجديد مطلوبان' });
+        }
+        const currentPassword = await readPassword();
+
+        if (oldPassword !== currentPassword) {
+            return res.status(400).json({ error: 'الرقم السري القديم غير صحيح' });
+        }
+
+        if (newPassword.length < 4) {
+            return res.status(400).json({ error: 'الرقم السري الجديد يجب أن يكون 4 أحرف على الأقل' });
+        }
+        if (newPassword.length > 50) {
+            return res.status(400).json({ error: 'الرقم السري طويل جداً' });
+        }
+
+        await writePassword(newPassword);
+
+        broadcast({
+            type: 'password_changed',
+            message: 'تم تغيير الرقم السري'
+        });
+
+        res.json({ success: true, message: 'تم تغيير الرقم السري بنجاح' });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تغيير الرقم السري' });
+    }
+});
+
+// ============================================
+// API: وقت الذروة (Server-based)
+// ============================================
+app.get('/api/peak-data', authenticate, async (req, res) => {
+    try {
+        const data = await readPeakData();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات وقت الذروة' });
+    }
+});
+
+app.post('/api/peak-mission', authenticate, async (req, res) => {
+    try {
+        const { location, unit, startTime, endTime, priority, notes, lat, lng } = req.body;
+        if (!location || !unit || !startTime || !endTime) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+
+        const data = await readPeakData();
+        const mission = {
+            id: Date.now().toString(),
+            location,
+            lat: lat || null,
+            lng: lng || null,
+            unit,
+            startTime,
+            endTime,
+            priority: priority || 'عالية',
+            notes: notes || '',
+            status: 'نشط',
+            createdAt: new Date().toISOString()
+        };
+
+        data.missions.unshift(mission);
+        if (data.missions.length > 100) data.missions.pop();
+
+        data.logs.unshift({
+            id: Date.now().toString(),
+            icon: '🟡',
+            action: 'مهمة جديدة',
+            details: unit + ' في ' + location,
+            priority: priority || 'عادي',
+            time: new Date().toLocaleTimeString('ar-SA'),
+            date: new Date().toISOString()
+        });
+        if (data.logs.length > 50) data.logs.pop();
+
+        data.alerts.unshift({
+            id: Date.now().toString(),
+            title: 'تمركز مطلوب لـ ' + unit,
+            details: 'المطلوب تمركز ' + unit + ' في ' + location + ' (' + startTime + ' - ' + endTime + ')',
+            priority: priority || 'عالية',
+            unit: unit,
+            location: location,
+            startTime: startTime,
+            endTime: endTime,
+            notes: notes || '',
+            lat: lat || null,
+            lng: lng || null,
+            radius: 5000,
+            missionId: mission.id,
+            status: 'نشط',
+            createdAt: new Date().toISOString()
+        });
+        if (data.alerts.length > 50) data.alerts.pop();
+
+        await writePeakData(data);
+
+        broadcast({
+            type: 'peak_mission_added',
+            message: 'مهمة جديدة في وقت الذروة: ' + unit + ' في ' + location,
+            mission: mission
+        });
+
+        res.json({ success: true, mission });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ المهمة' });
+    }
+});
+
+app.post('/api/peak-resolve', authenticate, async (req, res) => {
+    try {
+        const { alertId } = req.body;
+        if (!alertId) {
+            return res.status(400).json({ error: 'معرف التنبيه مطلوب' });
+        }
+
+        const data = await readPeakData();
+        const alert = data.alerts.find(a => a.id === alertId);
+        if (alert) {
+            alert.status = 'منتهي';
+            data.logs.unshift({
+                id: Date.now().toString(),
+                icon: '✅',
+                action: 'تم التنفيذ',
+                details: alert.details,
+                priority: alert.priority || 'عادي',
+                time: new Date().toLocaleTimeString('ar-SA'),
+                date: new Date().toISOString()
+            });
+            if (data.logs.length > 50) data.logs.pop();
+            await writePeakData(data);
+
+            broadcast({
+                type: 'peak_alert_resolved',
+                message: 'تم إنهاء تنبيه وقت الذروة',
+                alertId: alertId
+            });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إنهاء التنبيه' });
+    }
+});
+
+app.delete('/api/peak-mission/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const id = req.params.id;
+        const data = await readPeakData();
+        const mission = data.missions.find(m => m.id === id);
+        if (!mission) {
+            return res.status(404).json({ error: 'المهمة غير موجودة' });
+        }
+        data.missions = data.missions.filter(m => m.id !== id);
+        data.alerts = data.alerts.filter(a => a.missionId !== id);
+        data.logs.unshift({
+            id: Date.now().toString(),
+            icon: '🔴',
+            action: 'مهمة محذوفة',
+            details: mission.unit + ' في ' + mission.location,
+            priority: mission.priority || 'عادي',
+            time: new Date().toLocaleTimeString('ar-SA'),
+            date: new Date().toISOString()
+        });
+        if (data.logs.length > 50) data.logs.pop();
+        await writePeakData(data);
+
+        broadcast({
+            type: 'peak_mission_deleted',
+            message: 'تم حذف مهمة وقت الذروة: ' + mission.unit + ' في ' + mission.location,
+            missionId: id
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف المهمة' });
+    }
+});
+
+// ============================================
+// API: الثيمات العامة (لجميع المستخدمين)
+// ============================================
+
+// رفع الثيم (خلفية أو شعار)
+app.post('/api/upload-theme', authenticate, upload.single('file'), handleMulterError, async (req, res) => {
+    try {
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'لا يوجد ملف' });
+        }
+
+        const type = req.body.type || 'background'; // 'background' أو 'logo'
+        const uploadsDir = path.join(STORAGE_PATH, 'uploads');
+        
+        // تحديد البادئة حسب النوع
+        const prefix = type === 'logo' ? 'logo.' : 'header-bg.';
+        
+        // حذف الملفات القديمة من نفس النوع
+        const files = await fs.readdir(uploadsDir);
+        for (const f of files) {
+            if (f.startsWith(prefix)) {
+                await fs.unlink(path.join(uploadsDir, f));
+            }
+        }
+
+        // إعادة تسمية الملف الجديد
+        const ext = file.originalname.split('.').pop();
+        const newFileName = `${prefix}${ext}`;
+        const newPath = path.join(uploadsDir, newFileName);
+        await fs.rename(file.path, newPath);
+
+        // حفظ الإعدادات
+        const currentSettings = await readThemeSettings();
+        if (type === 'logo') {
+            currentSettings.logoFileName = newFileName;
+            currentSettings.logoFileType = file.mimetype;
+        } else {
+            currentSettings.fileType = file.mimetype;
+            currentSettings.fileName = newFileName;
+        }
+        currentSettings.updatedAt = new Date().toISOString();
+        await writeThemeSettings(currentSettings);
+
+        // بث تحديث الثيم لجميع المتصلين
+        broadcast({
+            type: 'theme_updated',
+            message: 'تم تحديث الثيم'
+        });
+
+        res.json({ success: true, message: 'تم رفع الملف بنجاح', fileName: newFileName });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في رفع الملف' });
+    }
+});
+
+// جلب الثيم الحالي (الخلفية + الشعار)
+app.get('/api/theme-settings', async (req, res) => {
+    try {
+        const data = await readThemeSettings();
+        // التأكد من وجود جميع الحقول
+        res.json({
+            fileType: data.fileType || null,
+            fileName: data.fileName || null,
+            logoFileName: data.logoFileName || null,
+            logoFileType: data.logoFileType || null,
+            updatedAt: data.updatedAt || null
+        });
+    } catch (error) {
+        res.json({ 
+            fileType: null, 
+            fileName: null,
+            logoFileName: null,
+            logoFileType: null,
+            updatedAt: null
+        });
+    }
+});
+
+// حذف جميع الثيمات (الخلفية + الشعار)
+app.delete('/api/remove-theme', authenticate, async (req, res) => {
+    try {
+        const uploadsDir = path.join(STORAGE_PATH, 'uploads');
+        const files = await fs.readdir(uploadsDir);
+        for (const f of files) {
+            if (f.startsWith('header-bg.') || f.startsWith('logo.')) {
+                await fs.unlink(path.join(uploadsDir, f));
+            }
+        }
+        await writeThemeSettings({ 
+            fileType: null, 
+            fileName: null,
+            logoFileName: null,
+            logoFileType: null,
+            updatedAt: new Date().toISOString()
+        });
+
+        broadcast({
+            type: 'theme_removed',
+            message: 'تم إزالة الثيمات'
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إزالة الثيمات' });
+    }
+});
+
+// ============================================
+// API: غرفة العمليات (Operations Command)
+// ============================================
+
+// Dashboard
+app.get('/api/dashboard', authenticate, async (req, res) => {
+    try {
+        const data = await readDashboard();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب لوحة المعلومات' });
+    }
+});
+
+app.post('/api/dashboard', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeDashboard(data);
+        broadcast({
+            type: 'dashboard_updated',
+            message: 'تم تحديث لوحة المعلومات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ لوحة المعلومات' });
+    }
+});
+
+// Hospitals
+app.get('/api/hospitals', authenticate, async (req, res) => {
+    try {
+        const data = await readHospitals();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المستشفيات' });
+    }
+});
+
+app.post('/api/hospitals', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeHospitals(data);
+        broadcast({
+            type: 'hospitals_updated',
+            message: 'تم تحديث قائمة المستشفيات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ المستشفيات' });
+    }
+});
+
+// References
+app.get('/api/references', authenticate, async (req, res) => {
+    try {
+        const data = await readReferences();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب المراجع' });
+    }
+});
+
+app.post('/api/references', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeReferences(data);
+        broadcast({
+            type: 'references_updated',
+            message: 'تم تحديث المراجع'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ المراجع' });
+    }
+});
+
+// Timeline
+app.get('/api/timeline', authenticate, async (req, res) => {
+    try {
+        const data = await readTimeline();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الخط الزمني' });
+    }
+});
+
+app.post('/api/timeline', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeTimeline(data);
+        
+        // Also try to sync to SQLite with shift_id
+        try {
+            if (dbAvailable() && db.Timeline) {
+                const shiftId = await resolveShiftId(req);
+                if (Array.isArray(data) && shiftId) {
+                    for (const item of data) {
+                        if (item.title && item.date) {
+                            await db.Timeline.create({
+                                title: item.title,
+                                desc: item.desc || '',
+                                type: item.type || 'event',
+                                date: item.date,
+                                time: item.time || '',
+                                shift_id: shiftId
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite timeline sync failed:', dbErr.message);
+        }
+        
+        broadcast({
+            type: 'timeline_updated',
+            message: 'تم تحديث الخط الزمني'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الخط الزمني' });
+    }
+});
+
+// Announcements
+app.get('/api/announcements', authenticate, async (req, res) => {
+    try {
+        const data = await readAnnouncements();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الإعلانات' });
+    }
+});
+
+app.post('/api/announcements', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { data } = req.body;
+        if (!data) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeAnnouncements(data);
+        broadcast({
+            type: 'announcements_updated',
+            message: 'تم تحديث الإعلانات'
+        });
+        
+        // Audit log
+        await addAuditLogEntry('announcements_updated', 'تم تحديث الإعلانات', 'announcements', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الإعلانات' });
+    }
+});
+
+app.delete('/api/announcements/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const data = await readAnnouncements();
+        const filtered = data.filter(item => item.id !== req.params.id);
+        await writeAnnouncements(filtered);
+        broadcast({
+            type: 'announcement_deleted',
+            message: 'تم حذف إعلان',
+            id: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الإعلان' });
+    }
+});
+
+// Add single announcement (for EOCC UI)
+app.post('/api/announcements/add', authenticate, authorize(['admin']), validateBody({
+    title: { required: true, type: 'string', minLength: 1, maxLength: 500 },
+    body: { required: true, type: 'string', minLength: 1, maxLength: 5000 },
+    pinned: { type: 'boolean' },
+    urgent: { type: 'boolean' }
+}), async (req, res) => {
+    try {
+        const { title, body, date, pinned, urgent } = req.body;
+        if (!title || !body) {
+            return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
+        }
+        const data = await readAnnouncements();
+        const newAnnouncement = {
+            id: Date.now().toString(),
+            title,
+            body,
+            date: date || new Date().toISOString().split('T')[0],
+            pinned: !!pinned,
+            urgent: !!urgent
+        };
+        data.unshift(newAnnouncement);
+        await writeAnnouncements(data);
+        broadcast({
+            type: 'announcement_added',
+            message: 'تم إضافة إعلان جديد: ' + title,
+            announcement: newAnnouncement
+        });
+        res.json({ success: true, announcement: newAnnouncement });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في إضافة الإعلان' });
+    }
+});
+
+// Unit Locations API
+app.get('/api/unit-locations', authenticate, async (req, res) => {
+    try {
+        const locations = await readUnitLocations();
+        const addresses = await readUnitLocationAddresses();
+        res.json({ success: true, locations, addresses });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب مواقع الفرق' });
+    }
+});
+
+app.post('/api/unit-locations', authenticate, async (req, res) => {
+    try {
+        const { center, unit, lat, lng, address } = req.body;
+        if (!center || !unit || lat === undefined || lng === undefined) {
+            return res.status(400).json({ error: 'بيانات ناقصة: center, unit, lat, lng مطلوبة' });
+        }
+        const locations = await readUnitLocations();
+        // Remove unit from any other center first (to avoid duplicates)
+        for (const c in locations) {
+            if (c !== center && locations[c][unit]) {
+                delete locations[c][unit];
+            }
+        }
+        if (!locations[center]) locations[center] = {};
+        locations[center][unit] = [parseFloat(lat), parseFloat(lng)];
+        await writeUnitLocations(locations);
+
+        // Save address if provided
+        if (address) {
+            const addresses = await readUnitLocationAddresses();
+            addresses[unit] = address;
+            await writeUnitLocationAddresses(addresses);
+        }
+
+        const addresses = await readUnitLocationAddresses();
+        broadcast({
+            type: 'unit_location_updated',
+            message: 'تم تحديث موقع ' + unit + ' في ' + center,
+            center, unit, lat, lng
+        });
+        res.json({ success: true, locations, addresses });
+    } catch (error) {
+        console.error('Unit location update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الموقع' });
+    }
+});
+
+app.post('/api/unit-location-addresses', authenticate, async (req, res) => {
+    try {
+        const { unit, address } = req.body;
+        if (!unit || !address) {
+            return res.status(400).json({ error: 'بيانات ناقصة: unit و address مطلوبان' });
+        }
+        const addresses = await readUnitLocationAddresses();
+        addresses[unit] = address;
+        await writeUnitLocationAddresses(addresses);
+        broadcast({
+            type: 'unit_location_updated',
+            message: 'تم تحديث عنوان ' + unit,
+            unit, address
+        });
+        res.json({ success: true, addresses });
+    } catch (error) {
+        console.error('Unit location address update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث العنوان' });
+    }
+});
+
+app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const data = await readData();
+        const shifts = await readShifts();
+        let users = [];
+        try {
+            users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            if (!Array.isArray(users)) users = [];
+        } catch (e) { users = []; }
+        let auditLog = [];
+        try { auditLog = await readAuditLog(); } catch (e) { auditLog = []; }
+        let reports = [];
+        try { reports = await readReportEntry(); } catch (e) { reports = []; }
+        
+        // Ensure data is object
+        const safeData = data || {};
+        const safeShifts = Array.isArray(shifts) ? shifts : [];
+        const safeUsers = Array.isArray(users) ? users : [];
+        
+        // Calculate stats
+        const totalReports = Object.values(safeData).reduce((sum, r) => sum + (r && r.count ? r.count : 0), 0);
+        const activeCenters = Object.keys(safeData).filter(k => safeData[k] && safeData[k].count > 0).length;
+        const totalShifts = safeShifts.length;
+        const totalUsers = safeUsers.filter(u => u && u.isActive).length;
+        
+        // Hourly distribution
+        const hourlyDistribution = {};
+        for (let i = 0; i < 24; i++) hourlyDistribution[i] = 0;
+        // Fill from report timestamps
+        for (let key in safeData) {
+            const report = safeData[key];
+            if (report && report.times && Array.isArray(report.times)) {
+                for (const timeStr of report.times) {
+                    try {
+                        const hour = parseInt(timeStr.split(' ')[1].split(':')[0]);
+                        if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                            hourlyDistribution[hour] += 1;
+                        }
+                    } catch (e) { /* ignore malformed timestamps */ }
+                }
+            }
+        }
+        
+        // Center performance - use actual center names from centersData
+        const centerStats = {};
+        const centerNames = Object.keys(centersData);
+        for (let i = 0; i < centerNames.length; i++) {
+            const center = centerNames[i];
+            let centerReports = 0;
+            for (let key in safeData) {
+                const parts = key.split('|');
+                if (parts.length === 2 && parts[0] === center) {
+                    centerReports += (safeData[key] && safeData[key].count ? safeData[key].count : 0);
+                }
+            }
+            centerStats[center] = centerReports;
+        }
+        
+        // Last 7 days stats
+        const last7Days = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            const dayShifts = safeShifts.filter(s => s && s.shiftDate === dateStr);
+            const dayReports = dayShifts.reduce((sum, s) => sum + (s && s.totalReports ? s.totalReports : 0), 0);
+            last7Days.push({ date: dateStr, reports: dayReports });
+        }
+        
+        // Top 10 units
+        const unitStats = [];
+        for (let key in safeData) {
+            if (safeData[key] && safeData[key].count > 0) {
+                unitStats.push({ key, count: safeData[key].count });
+            }
+        }
+        unitStats.sort((a, b) => b.count - a.count);
+        
+        res.json({
+            success: true,
+            stats: {
+                totalReports,
+                activeCenters,
+                totalShifts,
+                totalUsers,
+                hourlyDistribution,
+                last7Days,
+                centerStats,
+                topUnits: unitStats.slice(0, 10)
+            }
+        });
+    } catch (error) {
+        console.error('Admin stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات: ' + error.message });
+    }
+});
+
+app.get('/api/admin/daily-report', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const saudiTime = getSaudiDateTime();
+        const year = saudiTime.getFullYear();
+        const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
+        const day = saudiTime.getDate().toString().padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
+        const shiftType = getCurrentShiftType();
+        
+        const data = await readData();
+        const shifts = await readShifts();
+        const auditLog = await readAuditLog();
+        
+        // Today's shift
+        const todayShift = shifts.find(s => s.shiftDate === today && s.shiftType === shiftType);
+        
+        // Calculate metrics
+        const totalReports = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
+        const activeUnits = Object.keys(data).filter(k => data[k].count > 0).length;
+        const totalUnits = Object.keys(data).length;
+        
+        // Center breakdown
+        const centerBreakdown = {};
+        for (let key in data) {
+            const parts = key.split('|');
+            if (parts.length === 2) {
+                const center = parts[0];
+                if (!centerBreakdown[center]) centerBreakdown[center] = 0;
+                centerBreakdown[center] += data[key].count;
+            }
+        }
+        
+        // Recent audit entries (last 20)
+        const recentAudit = auditLog.slice(0, 20);
+        
+        res.json({
+            success: true,
+            report: {
+                date: today,
+                shiftType,
+                totalReports,
+                activeUnits,
+                totalUnits,
+                centerBreakdown,
+                recentAudit,
+                shiftData: todayShift || null
+            }
+        });
+    } catch (error) {
+        console.error('Daily report error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء التقرير' });
+    }
+});
+
+// ============================================
+// API: AI Monitor — System Health & Alerts
+// ============================================
+app.get('/api/admin/monitor/health', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        res.json({ success: true, health: aiMonitor.getHealth() });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب حالة النظام' });
+    }
+});
+
+app.get('/api/admin/monitor/stats', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        res.json({ success: true, stats: aiMonitor.getStats() });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+app.get('/api/admin/monitor/alerts', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.level) filter.level = req.query.level;
+        if (req.query.category) filter.category = req.query.category;
+        res.json({ success: true, alerts: aiMonitor.getAlerts(filter) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+app.post('/api/admin/monitor/alerts/:id/resolve', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const success = aiMonitor.resolveAlert(req.params.id);
+        if (success) {
+            res.json({ success: true, message: 'تم حل التنبيه' });
+        } else {
+            res.status(404).json({ error: 'التنبيه غير موجود أو تم حله مسبقاً' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حل التنبيه' });
+    }
+});
+
+app.get('/api/admin/monitor/logs', authenticate, authorize(['admin']), (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.level) filter.level = req.query.level;
+        if (req.query.category) filter.category = req.query.category;
+        if (req.query.limit) filter.limit = parseInt(req.query.limit);
+        res.json({ success: true, logs: aiMonitor.getLogs(filter) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب السجلات' });
+    }
+});
+
+app.post('/api/admin/monitor/force-check', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const health = await aiMonitor.forceCheck();
+        res.json({ success: true, health });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تشغيل فحص النظام' });
+    }
+});
+
+// ============================================
+// API: Auto-Fix Engine — الإصلاح التلقائي (disabled - module not available)
+// ============================================
+/*
+app.post('/api/admin/auto-fix', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await autoFixEngine.runAll(
+            () => currentShiftId,
+            (id) => { currentShiftId = id; }
+        );
+        broadcast({
+            type: 'auto_fix_complete',
+            message: `تم تشغيل الإصلاح التلقائي — ${result.totalFixed} إصلاح`,
+            result
+        });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Auto-fix error:', error);
+        res.status(500).json({ error: 'فشل في تشغيل الإصلاح التلقائي' });
+    }
+});
+
+app.get('/api/admin/auto-fix/logs', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        res.json({ success: true, logs: autoFixEngine.getFixLogs(limit) });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل الإصلاحات' });
+    }
+});
+*/
+
+// ============================================
+// API: Frontend Errors — أخطاء المتصفح
+// ============================================
+app.post('/api/frontend-errors', async (req, res) => {
+    try {
+        const { errors, sessionId } = req.body;
+        if (!errors || !Array.isArray(errors)) {
+            return res.status(400).json({ error: 'Invalid payload' });
+        }
+        for (const err of errors) {
+            await db.run(
+                `INSERT INTO frontend_errors (timestamp, type, message, file, line, column, stack, page_url, page_path, user_agent, screen, session_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    err.page ? err.page.timestamp : new Date().toISOString(),
+                    err.type,
+                    err.message ? err.message.substring(0, 1000) : '',
+                    err.file,
+                    err.line,
+                    err.column,
+                    err.stack ? err.stack.substring(0, 2000) : null,
+                    err.page ? err.page.url : null,
+                    err.page ? err.page.path : null,
+                    err.page ? err.page.userAgent : null,
+                    err.page ? err.page.screen : null,
+                    sessionId || null
+                ]
+            );
+        }
+        res.json({ success: true, count: errors.length });
+    } catch (error) {
+        console.error('Frontend error logging failed:', error.message);
+        res.status(500).json({ error: 'Failed to log errors' });
+    }
+});
+
+app.get('/api/admin/frontend-errors', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const rows = await db.all(
+            `SELECT * FROM frontend_errors ORDER BY timestamp DESC LIMIT ?`,
+            [limit]
+        );
+        res.json({ success: true, errors: rows || [] });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب أخطاء المتصفح' });
+    }
+});
+
+
+// ============================================
+// API: البيانات الجغرافية للمراكز
+// ============================================
+const centerGeoData = {
+    "جنوب 1": {
+        center: [24.7136, 46.6753],
+        radius: 5000,
+        boundaries: { north: 24.7500, south: 24.6800, east: 46.7200, west: 46.6300 },
+        address: "طريق الملك فهد، الرياض"
+    },
+    "جنوب 2": {
+        center: [24.7000, 46.6600],
+        radius: 4000,
+        boundaries: { north: 24.7300, south: 24.6700, east: 46.6900, west: 46.6300 },
+        address: "حي المنصورة، الرياض"
+    },
+    "جنوب 3": {
+        center: [24.6850, 46.6450],
+        radius: 3500,
+        boundaries: { north: 24.7100, south: 24.6600, east: 46.6700, west: 46.6200 },
+        address: "الخالدية، الرياض"
+    },
+    "جنوب 4": {
+        center: [24.7200, 46.6900],
+        radius: 4500,
+        boundaries: { north: 24.7550, south: 24.6900, east: 46.7300, west: 46.6500 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 5": {
+        center: [24.7300, 46.7000],
+        radius: 4000,
+        boundaries: { north: 24.7600, south: 24.7000, east: 46.7350, west: 46.6700 },
+        address: "الدار البيضاء، الرياض"
+    },
+    "جنوب 6": {
+        center: [24.6700, 46.6400],
+        radius: 3500,
+        boundaries: { north: 24.7000, south: 24.6400, east: 46.6700, west: 46.6100 },
+        address: "الإسكان، الرياض"
+    },
+    "جنوب 7": {
+        center: [24.6500, 46.6200],
+        radius: 4000,
+        boundaries: { north: 24.6800, south: 24.6200, east: 46.6500, west: 46.5900 },
+        address: "الحائر، الرياض"
+    },
+    "جنوب 8": {
+        center: [24.6900, 46.6700],
+        radius: 3500,
+        boundaries: { north: 24.7200, south: 24.6600, east: 46.7000, west: 46.6400 },
+        address: "الشفاء، الرياض"
+    },
+    "جنوب 9": {
+        center: [24.7050, 46.6800],
+        radius: 3000,
+        boundaries: { north: 24.7300, south: 24.6800, east: 46.7100, west: 46.6500 },
+        address: "عكاظ، الرياض"
+    },
+    "جنوب 10": {
+        center: [24.6600, 46.6100],
+        radius: 4500,
+        boundaries: { north: 24.6900, south: 24.6300, east: 46.6400, west: 46.5800 },
+        address: "ديراب، الرياض"
+    },
+    "سريع 1": {
+        center: [24.7100, 46.6850],
+        radius: 8000,
+        boundaries: { north: 24.7700, south: 24.6600, east: 46.7500, west: 46.6200 },
+        address: "مستشفى الملك خالد، الرياض"
+    },
+    "سريع 2": {
+        center: [24.6900, 46.6600],
+        radius: 7000,
+        boundaries: { north: 24.7400, south: 24.6400, east: 46.7100, west: 46.6100 },
+        address: "الشفاء، الرياض"
+    }
+};
+
+app.get('/api/center-geo', authenticate, (req, res) => {
+    res.json({ success: true, data: centerGeoData });
+});
+
+app.post('/api/locate-report', authenticate, validateBody({
+    lat: { required: true, type: 'number', min: -90, max: 90 },
+    lng: { required: true, type: 'number', min: -180, max: 180 }
+}), (req, res) => {
+    const { lat, lng } = req.body;
+
+    let foundCenter = null;
+    let minDistance = Infinity;
+
+    for (let center in centerGeoData) {
+        const data = centerGeoData[center];
+        const centerLat = data.center[0];
+        const centerLng = data.center[1];
+
+        const distance = getDistance(lat, lng, centerLat, centerLng);
+
+        if (distance < data.radius && distance < minDistance) {
+            minDistance = distance;
+            foundCenter = center;
+        }
+    }
+
+    res.json({
+        success: true,
+        center: foundCenter,
+        distance: minDistance,
+        location: foundCenter ? centerGeoData[foundCenter].address : 'غير معروف'
+    });
+});
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c * 1000;
+}
+
+// ============================================
+// API: الجدول الشهري
+// ============================================
+app.post('/api/upload-monthly-table', authenticate, uploadExcel.single('file'), handleMulterError, async (req, res) => {
+    try {
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'لا يوجد ملف' });
+        }
+        await fs.copyFile(file.path, MONTHLY_TABLE_PATH);
+        await fs.unlink(file.path);
+        
+        broadcast({
+            type: 'monthly_table_uploaded',
+            message: 'تم رفع جدول شهري جديد'
+        });
+        
+        res.json({ success: true, message: 'تم حفظ الجدول الشهري بنجاح' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ الجدول: ' + error.message });
+    }
+});
+
+app.get('/api/get-monthly-table', authenticate, async (req, res) => {
+    try {
+        const data = await fs.readFile(MONTHLY_TABLE_PATH);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.send(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
+        } else {
+            res.status(500).json({ error: 'فشل في جلب الجدول' });
+        }
+    }
+});
+
+app.get('/api/check-monthly-table', authenticate, async (req, res) => {
+    try {
+        await fs.access(MONTHLY_TABLE_PATH);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.json({ exists: true });
+    } catch (error) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.json({ exists: false });
+    }
+});
+
+app.delete('/api/monthly-table', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        await fs.unlink(MONTHLY_TABLE_PATH);
+
+        broadcast({
+            type: 'monthly_table_deleted',
+            message: 'تم حذف الجدول الشهري'
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ error: 'لا يوجد جدول شهري محفوظ' });
+        }
+        res.status(500).json({ error: 'فشل في حذف الجدول الشهري' });
+    }
+});
+
+// ============================================
+// API: تصدير Excel
+// ============================================
+app.get('/api/export', authenticate, async (req, res) => {
+    try {
+        const reports = await readData();
+        const safeReports = (reports && typeof reports === 'object') ? reports : {};
+        let rows = [
+            ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
+            ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
+            [],
+            ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
+        ];
+        for (let center in centersData) {
+            for (let unit of centersData[center]) {
+                let key = `${center}|${unit}`;
+                let record = safeReports[key] || { count: 0, times: [] };
+                let timesStr = (record.times && record.times.length) ? record.times.join(" ؛ ") : "لا يوجد بلاغات";
+                rows.push([center, unit, record.count, timesStr]);
+            }
+        }
+        let total = Object.values(safeReports).reduce((sum, r) => sum + (r.count || 0), 0);
+        rows.push([], ["الإجمالي الكلي", "", total, ""]);
+        let csv = rows.map(row => row.map(cell => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+        const fileName = `بلاغات_${new Date().toISOString().slice(0,10)}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+        res.status(200).send("\uFEFF" + csv);
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تصدير البيانات' });
+    }
+});
+
+// ============================================
+// API: غرفة العمليات التشغيلية
+// ============================================
+
+const OPS_UPLOAD_DIR = path.join(STORAGE_PATH, 'uploads', 'operational');
+const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
+const ANNOUNCEMENTS_PATH = path.join(STORAGE_PATH, 'announcements.json');
+
+// التأكد من وجود المجلد والملف
+async function ensureOpsDir() {
+    try {
+        await fs.mkdir(OPS_UPLOAD_DIR, { recursive: true });
+        try {
+            await fs.access(OPS_METADATA_PATH);
+        } catch {
+            await fs.writeFile(OPS_METADATA_PATH, JSON.stringify([]));
+        }
+    } catch (e) {}
+}
+ensureOpsDir();
+
+// قراءة الميتاداتا
+async function readOpsMetadata() {
+    try {
+        const data = await fs.readFile(OPS_METADATA_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return [];
+    }
+}
+
+// كتابة الميتاداتا
+async function writeOpsMetadata(data) {
+    await fs.writeFile(OPS_METADATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// رفع الملفات — مع فلترة الأنواع وحدود
+const opsUpload = multer({
+    dest: OPS_UPLOAD_DIR,
+    limits: { fileSize: OPS_MAX_FILE_SIZE, files: 10 },
+    fileFilter: function (req, file, cb) {
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.ms-powerpoint'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مسموح: ' + file.mimetype), false);
+        }
+    }
+});
+
+app.post('/api/upload-operational', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
+    try {
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'لا يوجد ملفات' });
+        }
+        
+        const metadata = await readOpsMetadata();
+        const results = [];
+        
+        for (const file of files) {
+            const safeOriginalName = path.basename(file.originalname);
+            const ext = path.extname(safeOriginalName);
+            const newFilename = `${Date.now()}-${safeOriginalName}`;
+            const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
+            await fs.rename(file.path, newPath);
+            
+            const entry = {
+                id: Date.now() + Math.random().toString(36).substr(2, 4),
+                filename: file.originalname,
+                storedName: newFilename,
+                size: file.size,
+                mimeType: file.mimetype,
+                uploadDate: new Date().toISOString(),
+                uploader: req.body.uploader || 'المشرف',
+                category: req.body.category || 'عام',
+                note: req.body.note || '',
+                icon: file.mimetype.startsWith('image/') ? '🖼️' :
+                      file.mimetype === 'application/pdf' ? '📄' :
+                      file.mimetype.includes('word') ? '📝' :
+                      file.mimetype.includes('excel') ? '📊' : '📎'
+            };
+            metadata.unshift(entry);
+            results.push(entry);
+        }
+        
+        await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_files_uploaded',
+            message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+            count: results.length,
+            files: results.map(f => ({ id: f.id, filename: f.filename, category: f.category }))
+        });
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'ملفات تشغيلية جديدة',
+                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('ops_files_uploaded', 'تم رفع ملفات تشغيلية: ' + results.length, 'files', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, count: results.length, files: results });
+    } catch (error) {
+        console.error('خطأ في رفع الملفات:', error);
+        res.status(500).json({ error: 'فشل في رفع الملفات' });
+    }
+});
+
+// جلب الملفات
+app.get('/api/operational-files', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        res.json({ success: true, files: metadata });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+// GET /api/ops-files - alias for operations-command.html compatibility
+app.get('/api/ops-files', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const typeMap = {
+            'application/pdf': 'pdf',
+            'image/jpeg': 'img', 'image/png': 'img', 'image/gif': 'img', 'image/webp': 'img',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'word',
+            'application/msword': 'word',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'excel',
+            'application/vnd.ms-excel': 'excel',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'ppt',
+            'application/vnd.ms-powerpoint': 'ppt'
+        };
+        const files = metadata.map(f => ({
+            id: f.id,
+            name: f.filename,
+            type: typeMap[f.mimeType] || 'pdf',
+            size: f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : (f.size/1024).toFixed(0)+' KB',
+            date: f.uploadDate ? f.uploadDate.split('T')[0] : '',
+            url: '/api/download-operational/' + f.id
+        }));
+        res.json({ success: true, files });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+// POST /api/ops-files - alias for upload (multipart form-data)
+app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
+    try {
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'لا يوجد ملفات' });
+        }
+        const shiftId = await resolveShiftId(req);
+        const metadata = await readOpsMetadata();
+        const results = [];
+        for (const file of files) {
+            const safeOriginalName = path.basename(file.originalname);
+            const ext = path.extname(safeOriginalName);
+            const newFilename = `${Date.now()}-${safeOriginalName}`;
+            const newPath = path.join(OPS_UPLOAD_DIR, newFilename);
+            await fs.rename(file.path, newPath);
+            const entry = {
+                id: Date.now() + Math.random().toString(36).substr(2, 4),
+                filename: file.originalname,
+                storedName: newFilename,
+                size: file.size,
+                mimeType: file.mimetype,
+                uploadDate: new Date().toISOString(),
+                uploader: req.body.uploader || 'مستخدم',
+                category: req.body.category || 'عام',
+                note: req.body.note || '',
+                shift_id: shiftId,
+                icon: file.mimetype.startsWith('image/') ? '🖼️' :
+                      file.mimetype === 'application/pdf' ? '📄' :
+                      file.mimetype.includes('word') ? '📝' :
+                      file.mimetype.includes('excel') ? '📊' : '📎'
+            };
+            metadata.unshift(entry);
+            results.push(entry);
+            
+            // Also save to SQLite ops_files if available
+            try {
+                if (dbAvailable() && db.OpsFiles) {
+                    await db.OpsFiles.create({
+                        id: entry.id,
+                        filename: entry.filename,
+                        storedName: entry.storedName,
+                        size: entry.size,
+                        mimeType: entry.mimeType,
+                        uploadDate: entry.uploadDate,
+                        uploader: entry.uploader,
+                        category: entry.category,
+                        note: entry.note,
+                        shift_id: shiftId
+                    });
+                }
+            } catch (dbErr) {
+                console.log('[DB] SQLite ops_files save failed:', dbErr.message);
+            }
+        }
+        await writeOpsMetadata(metadata);
+        broadcast({
+            type: 'ops_files_uploaded',
+            message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+            count: results.length
+        });
+        
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'ملفات تشغيلية جديدة',
+                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('ops_files_uploaded', 'تم رفع ملفات تشغيلية: ' + results.length, 'files', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, count: results.length, files: results });
+    } catch (error) {
+        console.error('خطأ في رفع الملفات:', error);
+        res.status(500).json({ error: 'فشل في رفع الملفات' });
+    }
+});
+
+// DELETE /api/ops-files/:id - alias for delete
+app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const filePath = path.join(OPS_UPLOAD_DIR, entry.storedName);
+        try { await fs.unlink(filePath); } catch (e) {}
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        broadcast({
+            type: 'ops_files_deleted',
+            message: 'تم حذف ملف: ' + entry.filename,
+            id: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الملف' });
+    }
+});
+
+// تحميل ملف
+app.get('/api/download-operational/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const entry = metadata.find(f => f.id === req.params.id);
+        if (!entry) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        // Path traversal check
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        // Check file exists before download
+        try {
+            await fs.access(filePath);
+        } catch {
+            return res.status(404).json({ error: 'الملف غير موجود على القرص' });
+        }
+        const safeFilename = path.basename(entry.filename).replace(/[^\w\.\-]/g, '_');
+        res.download(filePath, safeFilename);
+    } catch (error) {
+        console.error('Download error:', error);
+        res.status(500).json({ error: 'فشل في تحميل الملف' });
+    }
+});
+
+// Alias: DELETE /api/ops-files/:id → same as /api/delete-operational/:id
+app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        try {
+            await fs.unlink(filePath);
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                console.error('Failed to delete file:', e);
+                return res.status(500).json({ error: 'فشل في حذف الملف من القرص' });
+            }
+        }
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_file_deleted',
+            message: 'تم حذف ملف تشغيلي',
+            id: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف الملف' });
+    }
+});
+
+// حذف ملف (legacy endpoint — kept for backward compatibility)
+app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
+    try {
+        const metadata = await readOpsMetadata();
+        const index = metadata.findIndex(f => f.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'الملف غير موجود' });
+        }
+        const entry = metadata[index];
+        const safeName = path.basename(entry.storedName);
+        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
+        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
+            return res.status(400).json({ error: 'مسار الملف غير صالح' });
+        }
+        try {
+            await fs.unlink(filePath);
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                console.error('Failed to delete file:', e);
+                return res.status(500).json({ error: 'فشل في حذف الملف من القرص' });
+            }
+        }
+        metadata.splice(index, 1);
+        await writeOpsMetadata(metadata);
+        
+        broadcast({
+            type: 'ops_file_deleted',
+            message: 'تم حذف ملف تشغيلي',
+            id: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف الملف' });
+    }
+});
+
+// ============================================
+// API: الجدولة الذكية (Smart Schedule)
+// ============================================
+app.get('/api/schedule/employees', authenticate, async (req, res) => {
+    try {
+        const employees = await readScheduleEmployees();
+        res.json({ success: true, employees });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب بيانات الموظفين' });
+    }
+});
+
+app.post('/api/schedule/employees', authenticate, async (req, res) => {
+    try {
+        const employees = Array.isArray(req.body) ? req.body : req.body.employees;
+        if (!employees || !Array.isArray(employees)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeScheduleEmployees(employees);
+        broadcast({
+            type: 'schedule_employees_updated',
+            message: 'تم تحديث بيانات الموظفين'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ بيانات الموظفين' });
+    }
+});
+
+app.get('/api/schedule/files', authenticate, async (req, res) => {
+    try {
+        const files = await readScheduleFiles();
+        res.json({ success: true, files });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملفات' });
+    }
+});
+
+app.post('/api/schedule/files', authenticate, async (req, res) => {
+    try {
+        const files = Array.isArray(req.body) ? req.body : req.body.files;
+        if (!files || !Array.isArray(files)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        await writeScheduleFiles(files);
+        broadcast({
+            type: 'schedule_files_updated',
+            message: 'تم تحديث الملفات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملفات' });
+    }
+});
+
+app.delete('/api/schedule/employees', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await writeScheduleEmployees([]);
+        broadcast({
+            type: 'schedule_employees_cleared',
+            message: 'تم حذف جميع بيانات الموظفين'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف بيانات الموظفين' });
+    }
+});
+
+// ============================================
+// Health Check & Monitoring
+// ============================================
+app.get('/health', async (req, res) => {
+    const health = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: process.env.npm_package_version || '2.0.0',
+        env: process.env.NODE_ENV || 'development'
+    };
+    res.status(200).json(health);
+});
+
+// Disk usage endpoint for monitoring (admin only)
+app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execAsync = util.promisify(exec);
+        
+        let diskInfo = { total: 'N/A', used: 'N/A', available: 'N/A', percent: 'N/A' };
+        
+        try {
+            // Try df command (Linux/Unix)
+            const { stdout } = await execAsync(`df -h "${STORAGE_PATH}"`);
+            const lines = stdout.trim().split('\n');
+            if (lines.length >= 2) {
+                const parts = lines[1].split(/\s+/);
+                diskInfo = {
+                    total: parts[1] || 'N/A',
+                    used: parts[2] || 'N/A',
+                    available: parts[3] || 'N/A',
+                    percent: parts[4] || 'N/A'
+                };
+            }
+        } catch (e) {
+            // Fallback: calculate directory size manually
+            let totalSize = 0;
+            async function calcDir(dirPath) {
+                const entries = await fs.readdir(dirPath, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dirPath, entry.name);
+                    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+                    if (entry.isDirectory()) {
+                        await calcDir(fullPath);
+                    } else {
+                        const stat = await fs.stat(fullPath);
+                        totalSize += stat.size;
+                    }
+                }
+            }
+            await calcDir(STORAGE_PATH);
+            const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+            const sizeGB = (totalSize / 1024 / 1024 / 1024).toFixed(2);
+            diskInfo = {
+                total: '10 GB (Render Disk)',
+                used: `${sizeMB} MB (${sizeGB} GB)`,
+                available: `${(10 - parseFloat(sizeGB)).toFixed(2)} GB`,
+                percent: `${((parseFloat(sizeGB) / 10) * 100).toFixed(1)}%`
+            };
+        }
+        
+        res.json({ success: true, disk: diskInfo, storagePath: STORAGE_PATH });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب معلومات القرص' });
+    }
+});
+
+// ============================================
+// API: سجل الأحداث والغيابات والملاحظات للمناوبات
+// ============================================
+
+// Shift Events
+app.get('/api/shift-events/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const events = await readShiftEvents();
+        const filtered = events.filter(e => e.shiftId === shiftId);
+        res.json({ success: true, events: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الأحداث' });
+    }
+});
+
+app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { type, description, timestamp } = req.body;
+        if (!type || !description) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const events = await readShiftEvents();
+        const newEvent = {
+            id: Date.now().toString(),
+            shiftId,
+            type,
+            description,
+            timestamp: timestamp || new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        };
+        events.unshift(newEvent);
+        await writeShiftEvents(events);
+        broadcast({
+            type: 'shift_event_added',
+            message: 'تم إضافة حدث جديد للمناوبة',
+            event: newEvent
+        });
+        
+        // Audit log
+        await addAuditLogEntry('shift_event_added', 'تم إضافة حدث جديد للمناوبة', 'shifts', req.user.name, req.user.role, req.user.id);
+        
+        res.json({ success: true, event: newEvent });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الحدث' });
+    }
+});
+
+app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, eventId } = req.params;
+        const events = await readShiftEvents();
+        const filtered = events.filter(e => !(e.shiftId === parseInt(shiftId) && e.id === eventId));
+        await writeShiftEvents(filtered);
+        broadcast({
+            type: 'shift_event_deleted',
+            message: 'تم حذف حدث من المناوبة',
+            shiftId: parseInt(shiftId),
+            eventId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الحدث' });
+    }
+});
+
+// Shift Absences
+app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const absences = await readShiftAbsences();
+        const filtered = absences.filter(a => a.shiftId === shiftId);
+        res.json({ success: true, absences: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الغيابات' });
+    }
+});
+
+app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { absences } = req.body;
+        if (!absences || !Array.isArray(absences)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const allAbsences = await readShiftAbsences();
+        const filtered = allAbsences.filter(a => a.shiftId !== shiftId);
+        const newAbsences = absences.map((a, i) => ({ ...a, shiftId, id: a.id ? String(a.id) : (Date.now() + i).toString() }));
+        await writeShiftAbsences([...filtered, ...newAbsences]);
+        broadcast({
+            type: 'shift_absence_added',
+            message: 'تم تحديث سجل الغياب'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الغياب' });
+    }
+});
+
+app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, absenceId } = req.params;
+        const absences = await readShiftAbsences();
+        const filtered = absences.filter(a => !(a.shiftId === parseInt(shiftId) && a.id === absenceId));
+        await writeShiftAbsences(filtered);
+        broadcast({
+            type: 'shift_absence_deleted',
+            message: 'تم حذف غياب من المناوبة',
+            shiftId: parseInt(shiftId),
+            absenceId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الغياب' });
+    }
+});
+
+// Shift Notes
+app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const notes = await readShiftNotes();
+        const filtered = notes.filter(n => n.shiftId === shiftId);
+        res.json({ success: true, notes: filtered });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب الملاحظات' });
+    }
+});
+
+app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { notes } = req.body;
+        if (!notes || !Array.isArray(notes)) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const allNotes = await readShiftNotes();
+        const filtered = allNotes.filter(n => n.shiftId !== shiftId);
+        const newNotes = notes.map((n, i) => ({ ...n, shiftId, id: n.id ? String(n.id) : (Date.now() + i).toString() }));
+        await writeShiftNotes([...filtered, ...newNotes]);
+        broadcast({
+            type: 'shift_note_added',
+            message: 'تم تحديث سجل الملاحظات'
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ الملاحظة' });
+    }
+});
+
+app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) => {
+    try {
+        const { shiftId, noteId } = req.params;
+        const notes = await readShiftNotes();
+        const filtered = notes.filter(n => !(n.shiftId === parseInt(shiftId) && n.id === noteId));
+        await writeShiftNotes(filtered);
+        broadcast({
+            type: 'shift_note_deleted',
+            message: 'تم حذف ملاحظة من المناوبة',
+            shiftId: parseInt(shiftId),
+            noteId
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف الملاحظة' });
+    }
+});
+
+// ============================================
+// API: خطط وقت الذروة
+// ============================================
+app.get('/api/peak-plans', authenticate, async (req, res) => {
+    try {
+        const plans = await readPeakPlans();
+        res.json({ success: true, plans });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب خطط الذروة' });
+    }
+});
+
+app.post('/api/peak-plans', authenticate, async (req, res) => {
+    try {
+        const { title, description, location, units, startTime, endTime, priority } = req.body;
+        if (!title || !location) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const plans = await readPeakPlans();
+        const newPlan = {
+            id: Date.now().toString(),
+            title,
+            description: description || '',
+            location,
+            units: units || [],
+            startTime: startTime || '',
+            endTime: endTime || '',
+            priority: priority || 'عادي',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            createdBy: req.user.username || 'unknown'
+        };
+        plans.unshift(newPlan);
+        await writePeakPlans(plans);
+        broadcast({
+            type: 'peak_plan_added',
+            message: 'تم إضافة خطة ذروة جديدة: ' + title,
+            plan: newPlan
+        });
+        res.json({ success: true, plan: newPlan });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ خطة الذروة' });
+    }
+});
+
+app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        const plans = await readPeakPlans();
+        const plan = plans.find(p => p.id === id);
+        if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
+        Object.assign(plan, updates);
+        await writePeakPlans(plans);
+        broadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan });
+        res.json({ success: true, plan });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في تحديث خطة الذروة' });
+    }
+});
+
+app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
+    try {
+        const plans = await readPeakPlans();
+        const filtered = plans.filter(p => p.id !== req.params.id);
+        await writePeakPlans(filtered);
+        broadcast({
+            type: 'peak_plan_deleted',
+            message: 'تم حذف خطة ذروة',
+            planId: req.params.id
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف خطة الذروة' });
+    }
+});
+
+// ============================================
+// API: سجل التدقيق
+// ============================================
+app.get('/api/audit-log', authenticate, async (req, res) => {
+    try {
+        const logs = await readAuditLog();
+        // Also try to include SQLite audit logs if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                const dbLogs = await db.AuditLog.getAll();
+                // Merge and sort by timestamp desc, deduplicate by action+timestamp
+                const seen = new Set(logs.map(l => l.timestamp + '|' + l.action + '|' + l.user));
+                for (const dbLog of dbLogs) {
+                    const key = (dbLog.created_at || '') + '|' + (dbLog.action || '') + '|' + (dbLog.user_name || '');
+                    if (!seen.has(key)) {
+                        logs.push({
+                            id: dbLog.id ? dbLog.id.toString() : Date.now().toString(),
+                            action: dbLog.action,
+                            details: dbLog.detail || '',
+                            category: dbLog.type || 'general',
+                            user: dbLog.user_name || 'غير معروف',
+                            role: 'unknown',
+                            userId: dbLog.user_id || null,
+                            shift_id: dbLog.shift_id || null,
+                            timestamp: dbLog.created_at || new Date().toISOString()
+                        });
+                    }
+                }
+                logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                if (logs.length > 500) logs.length = 500;
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log read failed:', dbErr.message);
+        }
+        res.json({ success: true, logs });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+app.post('/api/audit-log', authenticate, async (req, res) => {
+    try {
+        const { action, details, category, user, shift_id } = req.body;
+        if (!action) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const shiftId = await resolveShiftId(req);
+        const logs = await readAuditLog();
+        // Use client-provided user name as override if present, otherwise JWT
+        var displayUser = user || req.user.name || req.user.username || 'غير معروف';
+        const newEntry = {
+            id: Date.now().toString(),
+            action,
+            details: details || '',
+            category: category || 'general',
+            user: displayUser,
+            role: req.user.role || 'unknown',
+            userId: req.user.id || req.user.userId || null,
+            shift_id: shiftId,
+            timestamp: new Date().toISOString()
+        };
+        logs.unshift(newEntry);
+        if (logs.length > 500) logs.pop();
+        await writeAuditLog(logs);
+        
+        // Also save to SQLite audit_log if available
+        try {
+            if (dbAvailable() && db.AuditLog) {
+                await db.AuditLog.create({
+                    shift_id: shiftId,
+                    user_id: req.user.id || req.user.userId || null,
+                    user_name: displayUser,
+                    action: action,
+                    detail: details || '',
+                    type: category || 'general'
+                });
+            }
+        } catch (dbErr) {
+            console.log('[DB] SQLite audit_log save failed:', dbErr.message);
+        }
+        
+        broadcast({
+            type: 'audit_log_added',
+            message: 'تم إضافة سجل تدقيق جديد',
+            entry: newEntry
+        });
+        res.json({ success: true, entry: newEntry });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حفظ سجل التدقيق' });
+    }
+});
+
+// ============================================
+// API: Notifications
+// ============================================
+app.get('/api/notifications', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (!userId) {
+            return res.status(400).json({ error: 'لا يمكن تحديد المستخدم' });
+        }
+        let notifications = [];
+        if (dbAvailable() && db.Notifications) {
+            notifications = await db.Notifications.getByUser(userId.toString(), 50);
+        }
+        res.json({ success: true, notifications });
+    } catch (error) {
+        console.error('[API] Error fetching notifications:', error);
+        res.status(500).json({ error: 'فشل في جلب الإشعارات' });
+    }
+});
+
+app.post('/api/notifications', authenticate, async (req, res) => {
+    try {
+        const { user_id, title, message, type } = req.body;
+        if (!user_id || !title) {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const targetUserId = user_id.toString();
+        const currentUserId = req.user.id || req.user.username || req.user.userId;
+        const currentRole = req.user.role;
+        if (currentRole !== 'admin' && currentRole !== 'director') {
+            if (targetUserId !== (currentUserId ? currentUserId.toString() : '')) {
+                return res.status(403).json({ error: 'ليس لديك الصلاحية لإرسال إشعارات لهذا المستخدم' });
+            }
+        }
+        let notificationId = null;
+        if (dbAvailable() && db.Notifications) {
+            notificationId = await db.Notifications.create({
+                user_id: targetUserId,
+                title,
+                message: message || '',
+                type: type || 'info'
+            });
+        }
+        broadcast({
+            type: 'notification_created',
+            message: 'تم إنشاء إشعار جديد',
+            notification: { id: notificationId, user_id: targetUserId, title, message, type }
+        });
+        res.json({ success: true, id: notificationId });
+    } catch (error) {
+        console.error('[API] Error creating notification:', error);
+        res.status(500).json({ error: 'فشل في إنشاء الإشعار' });
+    }
+});
+
+app.post('/api/notifications/read', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (!userId) {
+            return res.status(400).json({ error: 'لا يمكن تحديد المستخدم' });
+        }
+        if (dbAvailable() && db.Notifications) {
+            await db.Notifications.markAllAsRead(userId.toString());
+        }
+        res.json({ success: true, message: 'تم تحديد جميع الإشعارات كمقروءة' });
+    } catch (error) {
+        console.error('[API] Error marking all notifications as read:', error);
+        res.status(500).json({ error: 'فشل في تحديث الإشعارات' });
+    }
+});
+
+app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
+    try {
+        const notificationId = parseInt(req.params.id);
+        if (isNaN(notificationId)) {
+            return res.status(400).json({ error: 'معرف الإشعار غير صالح' });
+        }
+        const userId = req.user.id || req.user.username || req.user.userId;
+        if (dbAvailable() && db.Notifications) {
+            const notification = await db.Notifications.getById(notificationId);
+            if (!notification) {
+                return res.status(404).json({ error: 'الإشعار غير موجود' });
+            }
+            if (notification.user_id !== (userId ? userId.toString() : '')) {
+                return res.status(403).json({ error: 'ليس لديك الصلاحية' });
+            }
+            await db.Notifications.markAsRead(notificationId);
+        }
+        res.json({ success: true, message: 'تم تحديد الإشعار كمقروء' });
+    } catch (error) {
+        console.error('[API] Error marking notification as read:', error);
+        res.status(500).json({ error: 'فشل في تحديث الإشعار' });
+    }
+});
+
+// ============================================
+// API: تسجيل البلاغات (Report Entry)
+// ============================================
+app.get('/api/report-entry', authenticate, async (req, res) => {
+    try {
+        const records = await readReportEntry();
+        res.json({ success: true, records });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب البلاغات' });
+    }
+});
+
+app.post('/api/report-entry', authenticate, async (req, res) => {
+    try {
+        const record = req.body;
+        if (!record || typeof record !== 'object') {
+            return res.status(400).json({ error: 'بيانات ناقصة' });
+        }
+        const records = await readReportEntry();
+        const newRecord = {
+            id: Date.now().toString(),
+            ...record,
+            createdAt: new Date().toISOString()
+        };
+        records.unshift(newRecord);
+        await writeReportEntry(records);
+
+        broadcast({
+            type: 'report_entry_added',
+            message: 'تم تسجيل بلاغ جديد',
+            record: newRecord
+        });
+
+        // Create notifications for admin/director
+        try {
+            if (dbAvailable() && db.Notifications) {
+                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
+                for (const admin of admins) {
+                    await db.Notifications.create({
+                        user_id: admin.id.toString(),
+                        title: 'بلاغ جديد',
+                        message: 'تم تسجيل بلاغ جديد في النظام',
+                        type: 'info'
+                    });
+                }
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+        
+        // Audit log
+        await addAuditLogEntry('report_entry_added', 'تم تسجيل بلاغ جديد', 'reports', req.user.name, req.user.role, req.user.id);
+
+        res.json({ success: true, record: newRecord });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'فشل في حفظ البلاغ' });
+    }
+});
+
+app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
+    try {
+        const records = await readReportEntry();
+        const filtered = records.filter(r => r.id !== req.params.id);
+        await writeReportEntry(filtered);
+
+        broadcast({
+            type: 'report_entry_deleted',
+            message: 'تم حذف بلاغ',
+            recordId: req.params.id
+        });
+
+        // Audit log
+        await addAuditLogEntry('report_entry_deleted', 'تم حذف بلاغ: ' + req.params.id, 'reports', req.user.name, req.user.role, req.user.id);
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await writeReportEntry([]);
+
+        broadcast({
+            type: 'report_entry_cleared',
+            message: 'تم حذف جميع البلاغات'
+        });
+
+        // Audit log
+        await addAuditLogEntry('report_entry_cleared', 'تم حذف جميع البلاغات', 'reports', req.user.name, req.user.role, req.user.id);
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
+    }
+});
+
+// ============================================
+// API: Employees
+// ============================================
+app.get('/api/employees', authenticate, async (req, res) => {
+    try {
+        const employees = await db.Employees.getAll();
+        res.json({ success: true, employees });
+    } catch (error) {
+        console.error('Employees GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسعفين' });
+    }
+});
+
+app.get('/api/employees/:id', authenticate, async (req, res) => {
+    try {
+        const employee = await db.Employees.getById(req.params.id);
+        if (!employee) return res.status(404).json({ error: 'المسعف غير موجود' });
+        res.json({ success: true, employee });
+    } catch (error) {
+        console.error('Employee GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسعف' });
+    }
+});
+
+app.post('/api/employees', authenticate, authorize(['admin']), validateBody({
+    employee_code: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    name: { required: true, type: 'string', minLength: 1, maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const id = await db.Employees.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Employee POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة المسعف' });
+    }
+});
+
+app.put('/api/employees/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.Employees.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'المسعف غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Employee PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث المسعف' });
+    }
+});
+
+app.delete('/api/employees/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.Employees.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Employee DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف المسعف' });
+    }
+});
+
+// ============================================
+// API: Teams
+// ============================================
+app.get('/api/teams', authenticate, async (req, res) => {
+    try {
+        const teams = await db.Teams.getAll();
+        res.json({ success: true, teams });
+    } catch (error) {
+        console.error('Teams GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الفرق' });
+    }
+});
+
+app.get('/api/teams/:id', authenticate, async (req, res) => {
+    try {
+        const team = await db.Teams.getById(req.params.id);
+        if (!team) return res.status(404).json({ error: 'الفريق غير موجود' });
+        res.json({ success: true, team });
+    } catch (error) {
+        console.error('Team GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الفريق' });
+    }
+});
+
+app.post('/api/teams', authenticate, authorize(['admin']), validateBody({
+    name: { required: true, type: 'string', minLength: 1, maxLength: 100 },
+    center: { required: true, type: 'string', minLength: 1, maxLength: 100 }
+}), async (req, res) => {
+    try {
+        const id = await db.Teams.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Team POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة الفريق' });
+    }
+});
+
+app.put('/api/teams/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.Teams.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'الفريق غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Team PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الفريق' });
+    }
+});
+
+app.delete('/api/teams/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.Teams.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Team DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف الفريق' });
+    }
+});
+
+// ============================================
+// API: Shift Codes
+// ============================================
+app.get('/api/shift-codes', authenticate, async (req, res) => {
+    try {
+        const codes = await db.ShiftCodes.getAll();
+        res.json({ success: true, codes });
+    } catch (error) {
+        console.error('ShiftCodes GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب رموز المناوبات' });
+    }
+});
+
+app.get('/api/shift-codes/:id', authenticate, async (req, res) => {
+    try {
+        const code = await db.ShiftCodes.getById(req.params.id);
+        if (!code) return res.status(404).json({ error: 'الرمز غير موجود' });
+        res.json({ success: true, code });
+    } catch (error) {
+        console.error('ShiftCode GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الرمز' });
+    }
+});
+
+app.post('/api/shift-codes', authenticate, authorize(['admin']), validateBody({
+    code: { required: true, type: 'string', minLength: 1, maxLength: 20 },
+    name: { required: true, type: 'string', minLength: 1, maxLength: 200 }
+}), async (req, res) => {
+    try {
+        const id = await db.ShiftCodes.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('ShiftCode POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة رمز المناوبة' });
+    }
+});
+
+app.put('/api/shift-codes/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.ShiftCodes.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'الرمز غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftCode PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث رمز المناوبة' });
+    }
+});
+
+app.delete('/api/shift-codes/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftCodes.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftCode DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف رمز المناوبة' });
+    }
+});
+
+// ============================================
+// API: Shift Roster
+// ============================================
+app.get('/api/shift-roster', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (month && year) {
+            const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+            res.json({ success: true, roster });
+        } else {
+            const roster = await db.ShiftRoster.getAll();
+            res.json({ success: true, roster });
+        }
+    } catch (error) {
+        console.error('ShiftRoster GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب جدول المناوبات' });
+    }
+});
+
+app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
+    try {
+        const entry = await db.ShiftRoster.getById(req.params.id);
+        if (!entry) return res.status(404).json({ error: 'السجل غير موجود' });
+        res.json({ success: true, entry });
+    } catch (error) {
+        console.error('ShiftRoster GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل' });
+    }
+});
+
+app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
+    employee_id: { required: true, type: 'number' },
+    shift_date: { required: true, type: 'string', minLength: 1 },
+    shift_code: { required: true, type: 'string', minLength: 1 },
+    month: { required: true, type: 'number' },
+    year: { required: true, type: 'number' }
+}), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const id = await db.ShiftRoster.create(req.body);
+        await addShiftAuditLog({
+            roster_id: id, employee_id: req.body.employee_id, team_id: req.body.team_id || null,
+            shift_date: req.body.shift_date, old_shift_code: null, new_shift_code: req.body.shift_code,
+            old_team_id: null, new_team_id: req.body.team_id || null,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'add', reason: 'إضافة سجل مناوبة جديد'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: id, change_type: 'add' }], by_user: req.user.name || req.user.username } });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('ShiftRoster POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل المناوبة' });
+    }
+});
+
+app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const existing = await db.ShiftRoster.getById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
+        const result = await db.ShiftRoster.update(req.params.id, req.body);
+        await addShiftAuditLog({
+            roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
+            shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: req.body.shift_code || existing.shift_code,
+            old_team_id: existing.team_id, new_team_id: req.body.team_id || existing.team_id,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'edit', reason: 'تحديث سجل المناوبة'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'edit' }], by_user: req.user.name || req.user.username } });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftRoster PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث سجل المناوبة' });
+    }
+});
+
+app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const existing = await db.ShiftRoster.getById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'السجل غير موجود' });
+        await db.ShiftRoster.delete(req.params.id);
+        await addShiftAuditLog({
+            roster_id: req.params.id, employee_id: existing.employee_id, team_id: existing.team_id,
+            shift_date: existing.shift_date, old_shift_code: existing.shift_code, new_shift_code: null,
+            old_team_id: existing.team_id, new_team_id: null,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: 'delete', reason: 'حذف سجل المناوبة'
+        });
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: req.params.id, change_type: 'delete' }], by_user: req.user.name || req.user.username } });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ShiftRoster DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف سجل المناوبة' });
+    }
+});
+
+// ============================================
+// API: Bulk Import Shift Roster from Excel
+// ============================================
+app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { employees, roster, month, year } = req.body;
+        console.log('[IMPORT DEBUG] Request body keys:', Object.keys(req.body || {}));
+        console.log('[IMPORT DEBUG] employees type:', typeof employees, 'isArray:', Array.isArray(employees), 'length:', employees ? employees.length : 'null');
+        console.log('[IMPORT DEBUG] roster type:', typeof roster, 'isArray:', Array.isArray(roster), 'length:', roster ? roster.length : 'null');
+        console.log('[IMPORT DEBUG] month:', month, 'year:', year);
+        if (!employees || !Array.isArray(employees) || !roster || !Array.isArray(roster)) {
+            return res.status(400).json({ 
+                error: 'بيانات الاستيراد غير صالحة',
+                details: {
+                    hasEmployees: !!employees,
+                    employeesIsArray: Array.isArray(employees),
+                    hasRoster: !!roster,
+                    rosterIsArray: Array.isArray(roster),
+                    month: month,
+                    year: year
+                }
+            });
+        }
+
+        await db.beginTransaction();
+        let empCount = 0;
+        let rosterCount = 0;
+        let teamCount = 0;
+        let assignmentCount = 0;
+
+        try {
+            // Ensure teams exist (insert if not present, using existing logic)
+            const allTeams = await db.Teams.getAll();
+            const teamMap = {};
+            for (const t of allTeams) { teamMap[t.name] = t.id; }
+
+            // Process employees: create or update
+            const employeeIdMap = {};
+            for (const emp of employees) {
+                const existing = await db.Employees.getByCode(emp.employee_code);
+                let empId;
+                if (existing) {
+                    await db.Employees.update(existing.id, emp);
+                    empId = existing.id;
+                } else {
+                    empId = await db.Employees.create(emp);
+                    empCount++;
+                }
+                employeeIdMap[emp.employee_code] = empId;
+
+                // Create team assignments if team provided
+                if (emp.team_name && teamMap[emp.team_name]) {
+                    const existingAssignments = await db.TeamAssignments.getByEmployee(empId);
+                    const alreadyAssigned = existingAssignments.find(a => a.team_id === teamMap[emp.team_name]);
+                    if (!alreadyAssigned) {
+                        await db.TeamAssignments.create({
+                            employee_id: empId,
+                            team_id: teamMap[emp.team_name],
+                            assigned_date: new Date().toISOString().split('T')[0],
+                            is_primary: 1
+                        });
+                        assignmentCount++;
+                    }
+                }
+            }
+
+            // Delete existing roster for same month/year to avoid duplicates
+            await db.ShiftRoster.deleteByMonthYear(month, year);
+
+            // Insert roster entries
+            for (const entry of roster) {
+                const empId = employeeIdMap[entry.employee_code];
+                if (!empId) continue;
+                let teamId = null;
+                if (entry.team_name && teamMap[entry.team_name]) {
+                    teamId = teamMap[entry.team_name];
+                }
+                await db.ShiftRoster.create({
+                    employee_id: empId,
+                    team_id: teamId,
+                    shift_date: entry.shift_date,
+                    shift_code: entry.shift_code,
+                    month: month,
+                    year: year
+                });
+                rosterCount++;
+            }
+
+            await db.commitTransaction();
+            res.json({ success: true, empCount, rosterCount, assignmentCount, teamCount });
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+    } catch (error) {
+        console.error('ShiftRoster import error:', error);
+        res.status(500).json({ error: 'فشل في استيراد جدول المناوبات' });
+    }
+});
+
+// ============================================
+// API: Clear All Shift Roster Data
+// ============================================
+app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.ShiftRoster.deleteAll();
+        res.json({ success: true, message: 'تم حذف جميع بيانات الجدول بنجاح' });
+    } catch (error) {
+        console.error('ShiftRoster clear-all error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
+// API: Clear Shift Roster by Date Range
+// ============================================
+app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'تاريخ البداية والنهاية مطلوب' });
+        }
+        const result = await db.run(
+            'DELETE FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+            [startDate, endDate]
+        );
+        res.json({ success: true, deleted: result.changes, message: `تم حذف ${result.changes} سجل من الجدول` });
+    } catch (error) {
+        console.error('ShiftRoster clear error:', error);
+        res.status(500).json({ error: 'فشل في حذف بيانات الجدول' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Audit Log
+// ============================================
+app.get('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { employee_id, date_from, date_to, limit = 50 } = req.query;
+        let entries;
+        if (employee_id) {
+            entries = await db.ShiftAuditLog.getByEmployee(parseInt(employee_id), parseInt(limit));
+        } else if (date_from && date_to) {
+            entries = await db.ShiftAuditLog.getByDateRange(date_from, date_to, parseInt(limit));
+        } else {
+            entries = await db.ShiftAuditLog.getAll(parseInt(limit));
+        }
+        res.json({ success: true, entries });
+    } catch (error) {
+        console.error('AuditLog GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+app.post('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, change_type, reason } = req.body;
+        if (!shift_date) {
+            return res.status(400).json({ error: 'تاريخ المناوبة مطلوب' });
+        }
+        const id = await addShiftAuditLog({
+            roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code,
+            old_team_id, new_team_id, changed_by: req.user.username || req.user.name,
+            changed_by_name: req.user.name, change_type: change_type || 'edit', reason
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('AuditLog POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة سجل التدقيق' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Bulk Update
+// ============================================
+app.post('/api/shift-roster/bulk-update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { changes } = req.body;
+        if (!Array.isArray(changes) || changes.length === 0) {
+            return res.status(400).json({ error: 'قائمة التغييرات مطلوبة' });
+        }
+        const updated = [];
+        const conflicts = [];
+        const auditRecords = [];
+        await db.beginTransaction();
+        try {
+            for (const change of changes) {
+                const { roster_id, employee_id, team_id, shift_date, shift_code, old_shift_code } = change;
+                if (!roster_id) {
+                    conflicts.push({ type: 'missing_id', message: 'معرف السجل مفقود', change });
+                    continue;
+                }
+                const existing = await db.ShiftRoster.getById(roster_id);
+                if (!existing) {
+                    conflicts.push({ type: 'not_found', message: 'السجل غير موجود', roster_id });
+                    continue;
+                }
+                await db.ShiftRoster.update(roster_id, {
+                    employee_id: employee_id !== undefined ? employee_id : existing.employee_id,
+                    team_id: team_id !== undefined ? team_id : existing.team_id,
+                    shift_date: shift_date || existing.shift_date,
+                    shift_code: shift_code || existing.shift_code,
+                    month: existing.month,
+                    year: existing.year
+                });
+                const auditId = await addShiftAuditLog({
+                    roster_id, employee_id: employee_id || existing.employee_id,
+                    team_id: team_id || existing.team_id, shift_date: shift_date || existing.shift_date,
+                    old_shift_code: old_shift_code || existing.shift_code,
+                    new_shift_code: shift_code || existing.shift_code,
+                    old_team_id: existing.team_id, new_team_id: team_id || existing.team_id,
+                    changed_by: req.user.username || req.user.name,
+                    changed_by_name: req.user.name,
+                    change_type: 'bulk', reason: 'تحديث جماعي'
+                });
+                updated.push({ roster_id, auditId });
+                auditRecords.push({ roster_id, auditId });
+            }
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        broadcast({
+            type: 'shift_roster_updated',
+            payload: { type: 'bulk', changes: updated, by_user: req.user.name || req.user.username }
+        });
+        res.json({ success: true, updated: updated.length, conflicts, audit_log: auditRecords });
+    } catch (error) {
+        console.error('BulkUpdate error:', error);
+        res.status(500).json({ error: 'فشل في التحديث الجماعي' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Swap
+// ============================================
+app.post('/api/shift-roster/swap', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id_1, roster_id_2, employee_id_1, employee_id_2, shift_date } = req.body;
+        if (!roster_id_1 || !roster_id_2) {
+            return res.status(400).json({ error: 'معرفا السجلان مطلوبان' });
+        }
+        const entry1 = await db.ShiftRoster.getById(roster_id_1);
+        const entry2 = await db.ShiftRoster.getById(roster_id_2);
+        if (!entry1 || !entry2) {
+            return res.status(404).json({ error: 'أحد السجلات غير موجود' });
+        }
+        await db.beginTransaction();
+        try {
+            await db.ShiftRoster.update(roster_id_1, {
+                employee_id: employee_id_2 || entry2.employee_id,
+                team_id: entry1.team_id,
+                shift_date: entry1.shift_date,
+                shift_code: entry1.shift_code,
+                month: entry1.month,
+                year: entry1.year
+            });
+            await db.ShiftRoster.update(roster_id_2, {
+                employee_id: employee_id_1 || entry1.employee_id,
+                team_id: entry2.team_id,
+                shift_date: entry2.shift_date,
+                shift_code: entry2.shift_code,
+                month: entry2.month,
+                year: entry2.year
+            });
+            await addShiftAuditLog({
+                roster_id: roster_id_1, employee_id: entry1.employee_id, team_id: entry1.team_id,
+                shift_date: entry1.shift_date, old_shift_code: entry1.shift_code, new_shift_code: entry2.shift_code,
+                old_team_id: entry1.team_id, new_team_id: entry2.team_id,
+                changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_2
+            });
+            await addShiftAuditLog({
+                roster_id: roster_id_2, employee_id: entry2.employee_id, team_id: entry2.team_id,
+                shift_date: entry2.shift_date, old_shift_code: entry2.shift_code, new_shift_code: entry1.shift_code,
+                old_team_id: entry2.team_id, new_team_id: entry1.team_id,
+                changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                change_type: 'swap', reason: 'تبديل مع سجل ' + roster_id_1
+            });
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        broadcast({
+            type: 'shift_roster_swapped',
+            payload: { roster_id_1, roster_id_2, by_user: req.user.name || req.user.username }
+        });
+        res.json({ success: true, swapped: [{ roster_id: roster_id_1, old_employee_id: entry1.employee_id, new_employee_id: entry2.employee_id }, { roster_id: roster_id_2, old_employee_id: entry2.employee_id, new_employee_id: entry1.employee_id }] });
+    } catch (error) {
+        console.error('Swap error:', error);
+        res.status(500).json({ error: 'فشل في تبديل المناوبات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Validate
+// ============================================
+app.post('/api/shift-roster/validate', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { changes } = req.body;
+        if (!Array.isArray(changes)) {
+            return res.status(400).json({ error: 'قائمة التغييرات مطلوبة' });
+        }
+        const conflicts = [];
+        const shiftCodes = await db.ShiftCodes.getAll();
+        const validCodes = new Set(shiftCodes.map(sc => sc.code));
+        for (const change of changes) {
+            const { employee_id, shift_date, shift_code, team_id } = change;
+            if (!employee_id || !shift_date || !shift_code) {
+                conflicts.push({ type: 'missing_fields', message: 'بيانات ناقصة', employee_id, shift_date });
+                continue;
+            }
+            if (!validCodes.has(shift_code)) {
+                conflicts.push({ type: 'invalid_code', message: 'رمز المناوبة غير معروف: ' + shift_code, employee_id, shift_date });
+            }
+            const existing = await db.ShiftRoster.getByEmployeeAndDate(employee_id, shift_date);
+            if (existing) {
+                conflicts.push({ type: 'duplicate', message: 'يوجد سجل لهذا الموظف في هذا التاريخ', employee_id, shift_date });
+            }
+            if (team_id) {
+                const team = await db.Teams.getById(team_id);
+                if (!team) {
+                    conflicts.push({ type: 'invalid_team', message: 'الفريق غير موجود', employee_id, shift_date, team_id });
+                }
+            }
+        }
+        res.json({ success: true, valid: conflicts.length === 0, conflicts });
+    } catch (error) {
+        console.error('Validate error:', error);
+        res.status(500).json({ error: 'فشل في التحقق من الصحة' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Drafts (Undo/Redo)
+// ============================================
+app.get('/api/shift-roster/drafts', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { limit = 50 } = req.query;
+        const entries = await db.ShiftRosterDrafts.getByCreatedBy(req.user.username || req.user.name, parseInt(limit));
+        res.json({ success: true, drafts: entries });
+    } catch (error) {
+        console.error('Drafts GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المسودات' });
+    }
+});
+
+app.post('/api/shift-roster/draft', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { draft_data_json, operation_type } = req.body;
+        if (!draft_data_json) {
+            return res.status(400).json({ error: 'بيانات المسودة مطلوبة' });
+        }
+        const id = await db.ShiftRosterDrafts.create({
+            draft_data_json: typeof draft_data_json === 'string' ? draft_data_json : JSON.stringify(draft_data_json),
+            operation_type: operation_type || 'edit',
+            created_by: req.user.username || req.user.name,
+            created_by_name: req.user.name
+        });
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Draft POST error:', error);
+        res.status(500).json({ error: 'فشل في حفظ المسودة' });
+    }
+});
+
+app.post('/api/shift-roster/undo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const drafts = await db.ShiftRosterDrafts.getPendingByCreatedBy(req.user.username || req.user.name);
+        if (!drafts || drafts.length === 0) {
+            return res.status(404).json({ error: 'لا توجد مسودات للتراجع' });
+        }
+        const lastDraft = drafts[0];
+        await db.ShiftRosterDrafts.markReverted(lastDraft.id);
+        res.json({ success: true, draft: lastDraft, message: 'تم التراجع عن آخر تغيير' });
+    } catch (error) {
+        console.error('Undo error:', error);
+        res.status(500).json({ error: 'فشل في التراجع' });
+    }
+});
+
+app.post('/api/shift-roster/redo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const allDrafts = await db.ShiftRosterDrafts.getByCreatedBy(req.user.username || req.user.name, 100);
+        const revertedDraft = allDrafts.find(d => d.reverted_at !== null && d.applied_at !== null);
+        if (!revertedDraft) {
+            return res.status(404).json({ error: 'لا يوجد تغيير لإعادة تطبيقه' });
+        }
+        res.json({ success: true, draft: revertedDraft, message: 'تم إعادة تطبيق المسودة' });
+    } catch (error) {
+        console.error('Redo error:', error);
+        res.status(500).json({ error: 'فشل في إعادة التطبيق' });
+    }
+});
+
+// ============================================
+// API: Notifications
+// ============================================
+app.post('/api/notifications/send', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { recipient_id, recipient_phone, message, type, roster_id, shift_date, old_value, new_value } = req.body;
+        if (!recipient_id || !message) {
+            return res.status(400).json({ error: 'معرف المستلم والرسالة مطلوبان' });
+        }
+        const id = await db.NotificationLog.create({
+            notification_type: type || 'shift_change',
+            recipient_id, recipient_phone: recipient_phone || null,
+            message, channel: 'in-app',
+            roster_id: roster_id || null, shift_date: shift_date || null,
+            old_value: old_value || null, new_value: new_value || null
+        });
+        await db.NotificationLog.markAsSent(id);
+        broadcast({
+            type: 'notification_new',
+            payload: { notification_id: id, recipient_id, message }
+        });
+        res.json({ success: true, id, message: 'تم إرسال الإشعار' });
+    } catch (error) {
+        console.error('Notification send error:', error);
+        res.status(500).json({ error: 'فشل في إرسال الإشعار' });
+    }
+});
+
+app.get('/api/notifications/log', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { recipient_id, status, limit = 50 } = req.query;
+        let entries;
+        if (recipient_id) {
+            entries = await db.NotificationLog.getByRecipient(parseInt(recipient_id), parseInt(limit));
+        } else if (status) {
+            entries = await db.NotificationLog.getByStatus(status, parseInt(limit));
+        } else {
+            entries = await db.NotificationLog.getAll(parseInt(limit));
+        }
+        res.json({ success: true, notifications: entries });
+    } catch (error) {
+        console.error('Notification log GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل الإشعارات' });
+    }
+});
+
+app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        await db.NotificationLog.markAsRead(req.params.id);
+        res.json({ success: true, message: 'تم تحديد الإشعار كمقروء' });
+    } catch (error) {
+        console.error('Notification read error:', error);
+        res.status(500).json({ error: 'فشل في تحديث حالة الإشعار' });
+    }
+});
+
+app.post('/api/notifications/:id/delivered', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        await db.NotificationLog.markAsDelivered(req.params.id);
+        res.json({ success: true, message: 'تم تحديد الإشعار كمستلم' });
+    } catch (error) {
+        console.error('Notification delivered error:', error);
+        res.status(500).json({ error: 'فشل في تحديث حالة الإشعار' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Export
+// ============================================
+app.post('/api/shift-roster/export', authenticate, async (req, res) => {
+    try {
+        const { format, month, year, filters } = req.body;
+        if (!format || !month || !year) {
+            return res.status(400).json({ error: 'التنسيق والشهر والسنة مطلوبة' });
+        }
+        const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+        let data = roster;
+        if (filters && filters.team_id) {
+            data = data.filter(r => r.team_id === parseInt(filters.team_id));
+        }
+        if (filters && filters.employee_id) {
+            data = data.filter(r => r.employee_id === parseInt(filters.employee_id));
+        }
+        const filename = `shift-roster-${year}-${month}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+        res.json({ success: true, download_url: `/api/download/${filename}`, data, format });
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ error: 'فشل في تصدير البيانات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Stats
+// ============================================
+app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'الشهر والسنة مطلوبة' });
+        }
+        const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+        const shift_code_breakdown = {};
+        const team_coverage = {};
+        let conflicts_count = 0;
+        const seen = {};
+        for (const entry of roster) {
+            shift_code_breakdown[entry.shift_code] = (shift_code_breakdown[entry.shift_code] || 0) + 1;
+            team_coverage[entry.team_name || 'بدون فريق'] = (team_coverage[entry.team_name || 'بدون فريق'] || 0) + 1;
+            const key = `${entry.employee_id}-${entry.shift_date}`;
+            if (seen[key]) conflicts_count++;
+            seen[key] = true;
+        }
+        const employees_count = new Set(roster.map(r => r.employee_id)).size;
+        res.json({
+            success: true,
+            total_shifts: roster.length,
+            employees_count,
+            shift_code_breakdown,
+            team_coverage,
+            conflicts_count
+        });
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Employee Schedule
+// ============================================
+app.get('/api/shift-roster/employee-schedule/:employeeId', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employeeId = parseInt(req.params.employeeId);
+        const { month, year } = req.query;
+        if (req.user.role === 'user' && req.user.id !== employeeId) {
+            return res.status(403).json({ error: 'لا يمكنك عرض جدول موظف آخر' });
+        }
+        let schedule;
+        if (month && year) {
+            const roster = await db.ShiftRoster.getByMonthYear(parseInt(month), parseInt(year));
+            schedule = roster.filter(r => r.employee_id === employeeId);
+        } else {
+            schedule = await db.all('SELECT sr.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_roster sr JOIN employees e ON sr.employee_id = e.id LEFT JOIN teams t ON sr.team_id = t.id WHERE sr.employee_id = ? ORDER BY sr.shift_date DESC', [employeeId]);
+        }
+        const shiftCodes = await db.ShiftCodes.getAll();
+        const codeMap = {};
+        for (const sc of shiftCodes) { codeMap[sc.code] = sc.name; }
+        const result = schedule.map(s => ({
+            date: s.shift_date,
+            shift_code: s.shift_code,
+            shift_name: codeMap[s.shift_code] || s.shift_code,
+            team_name: s.team_name || 'بدون فريق',
+            team_id: s.team_id
+        }));
+        res.json({ success: true, schedule: result });
+    } catch (error) {
+        console.error('EmployeeSchedule error:', error);
+        res.status(500).json({ error: 'فشل في جلب جدول الموظف' });
+    }
+});
+
+// ============================================
+// API: Shift Change Requests
+// ============================================
+app.post('/api/shift-change-request', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, reason } = req.body;
+        if (!employee_id || !shift_date || !proposed_shift_code) {
+            return res.status(400).json({ error: 'معرف الموظف وتاريخ المناوبة والرمز المقترح مطلوبة' });
+        }
+        const id = await db.ShiftChangeRequests.create({
+            roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code,
+            requested_by: req.user.username || req.user.name,
+            requested_by_name: req.user.name,
+            status: 'pending', reason
+        });
+        broadcast({
+            type: 'shift_change_request',
+            payload: { request_id: id, employee_id, status: 'pending' }
+        });
+        res.json({ success: true, id, message: 'تم إرسال طلب التغيير' });
+    } catch (error) {
+        console.error('ShiftChangeRequest error:', error);
+        res.status(500).json({ error: 'فشل في إرسال طلب التغيير' });
+    }
+});
+
+app.get('/api/shift-change-request', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { status, limit = 50 } = req.query;
+        let entries;
+        if (status) {
+            entries = await db.ShiftChangeRequests.getByStatus(status, parseInt(limit));
+        } else {
+            entries = await db.ShiftChangeRequests.getAll(parseInt(limit));
+        }
+        res.json({ success: true, requests: entries });
+    } catch (error) {
+        console.error('ShiftChangeRequest GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات التغيير' });
+    }
+});
+
+app.post('/api/shift-change-request/:id/review', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const { status } = req.body;
+        if (!['approved', 'denied', 'cancelled'].includes(status)) {
+            return res.status(400).json({ error: 'حالة غير صالحة' });
+        }
+        await db.ShiftChangeRequests.updateStatus(req.params.id, status, req.user.username || req.user.name);
+        const entry = await db.ShiftChangeRequests.getById(req.params.id);
+        broadcast({
+            type: 'shift_change_request',
+            payload: { request_id: req.params.id, employee_id: entry ? entry.employee_id : null, status }
+        });
+        res.json({ success: true, message: 'تم مراجعة الطلب' });
+    } catch (error) {
+        console.error('ShiftChangeRequest review error:', error);
+        res.status(500).json({ error: 'فشل في مراجعة الطلب' });
+    }
+});
+
+// ============================================
+// API: DESTROY DATABASE - Delete physical DB file
+// ⚠️ WARNING: This deletes database.db and data/ folder completely
+// ============================================
+app.post('/api/admin/destroy-db', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const fsSync = require('fs');
+        const path = require('path');
+        
+        // 1. Close DB connection
+        if (db && db.closeDb) {
+            await db.closeDb();
+            console.log('[DESTROY] Database connection closed');
+        }
+        
+        // 2. Delete database.db file
+        const dbFile = path.join(__dirname, 'database.db');
+        const dbWal = path.join(__dirname, 'database.db-shm');
+        const dbJournal = path.join(__dirname, 'database.db-wal');
+        
+        let deletedFiles = [];
+        [dbFile, dbWal, dbJournal].forEach(f => {
+            if (fsSync.existsSync(f)) {
+                fsSync.unlinkSync(f);
+                deletedFiles.push(path.basename(f));
+            }
+        });
+        
+        // 3. Delete data/ directory recursively
+        const dataDir = path.join(__dirname, 'data');
+        if (fsSync.existsSync(dataDir)) {
+            fsSync.rmSync(dataDir, { recursive: true, force: true });
+            deletedFiles.push('data/');
+        }
+        
+        console.log('[DESTROY] Deleted:', deletedFiles);
+        
+        // 4. Re-initialize fresh database
+        if (db && db.init) {
+            await db.init(false);
+            console.log('[DESTROY] Fresh database initialized');
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'تم حذف قاعدة البيانات بالكامل وإعادة إنشائها', 
+            deleted: deletedFiles 
+        });
+    } catch (error) {
+        console.error('[DESTROY] Error:', error);
+        res.status(500).json({ error: 'فشل في حذف قاعدة البيانات: ' + error.message });
+    }
+});
+
+// ============================================
+// API: Team Assignments
+// ============================================
+app.get('/api/team-assignments', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getAll();
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.get('/api/team-assignments/employee/:employeeId', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getByEmployee(req.params.employeeId);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.get('/api/team-assignments/team/:teamId', authenticate, async (req, res) => {
+    try {
+        const assignments = await db.TeamAssignments.getActiveByTeam(req.params.teamId);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('TeamAssignments GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التعيينات' });
+    }
+});
+
+app.post('/api/team-assignments', authenticate, authorize(['admin']), validateBody({
+    employee_id: { required: true, type: 'number' },
+    team_id: { required: true, type: 'number' }
+}), async (req, res) => {
+    try {
+        const id = await db.TeamAssignments.create(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('TeamAssignments POST error:', error);
+        res.status(500).json({ error: 'فشل في إضافة التعيين' });
+    }
+});
+
+app.put('/api/team-assignments/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const result = await db.TeamAssignments.update(req.params.id, req.body);
+        if (!result) return res.status(404).json({ error: 'التعيين غير موجود' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('TeamAssignments PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث التعيين' });
+    }
+});
+
+app.delete('/api/team-assignments/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        await db.TeamAssignments.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('TeamAssignments DELETE error:', error);
+        res.status(500).json({ error: 'فشل في حذف التعيين' });
+    }
+});
+
+// ============================================
+// Smart Scheduling Engine
+// ============================================
+
+const DAY_SHIFT_CODES = ['D12', 'D10', 'D11', 'D8', 'D6'];
+const NIGHT_SHIFT_CODES = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10'];
+const ABSENT_CODES = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+
+async function buildLeaveMap(year, month) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+    
+    const leaveRequests = await db.LeaveRequests.getActiveForDateRange(startDate, endDate);
+    
+    const leaveMap = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        leaveMap[dateStr] = new Set();
+    }
+    
+    for (const lr of leaveRequests) {
+        const start = new Date(lr.start_date);
+        const end = new Date(lr.end_date);
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const curr = new Date(dateStr);
+            if (curr >= start && curr <= end) {
+                leaveMap[dateStr].add(lr.employee_id);
+            }
+        }
+    }
+    return leaveMap;
+}
+
+async function generateNormalSchedule(year, month, leaveMap) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const schedule = [];
+    const alerts = [];
+    
+    const dayShiftCode = 'D12';
+    const nightShiftCode = 'N12';
+    const cycleLength = 8;
+    
+    // Pre-fetch team assignments for all employees
+    const teamAssignments = {};
+    for (const emp of employees) {
+        const assignments = await db.TeamAssignments.getByEmployee(emp.id);
+        const primary = assignments.find(a => a.is_primary) || assignments[0];
+        teamAssignments[emp.id] = primary ? primary.team_id : null;
+    }
+    
+    for (let i = 0; i < employees.length; i++) {
+        const emp = employees[i];
+        const startOffset = (i * 2) % cycleLength;
+        const teamId = teamAssignments[emp.id];
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            
+            if (leaveMap[dateStr].has(emp.id)) {
+                schedule.push({
+                    employee_id: emp.id,
+                    team_id: teamId,
+                    shift_date: dateStr,
+                    shift_code: 'V',
+                    shift_hours: 0,
+                    mode: 'normal',
+                    is_override: 0
+                });
+                continue;
+            }
+            
+            const dayInCycle = (d - 1 + startOffset) % cycleLength;
+            let shiftCode, shiftHours;
+            
+            if (dayInCycle < 2) {
+                shiftCode = dayShiftCode;
+                shiftHours = 12;
+            } else if (dayInCycle < 4) {
+                shiftCode = nightShiftCode;
+                shiftHours = 12;
+            } else {
+                shiftCode = 'WO';
+                shiftHours = 0;
+            }
+            
+            schedule.push({
+                employee_id: emp.id,
+                team_id: teamId,
+                shift_date: dateStr,
+                shift_code: shiftCode,
+                shift_hours: shiftHours,
+                mode: 'normal',
+                is_override: 0
+            });
+        }
+    }
+    
+    // Validate coverage and generate alerts
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayAssignments = schedule.filter(s => s.shift_date === dateStr && DAY_SHIFT_CODES.includes(s.shift_code));
+        const nightAssignments = schedule.filter(s => s.shift_date === dateStr && NIGHT_SHIFT_CODES.includes(s.shift_code));
+        const onLeave = leaveMap[dateStr].size;
+        const available = employees.length - onLeave;
+        
+        if (dayAssignments.length < 2) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'day',
+                severity: dayAssignments.length === 0 ? 'red' : 'yellow',
+                message: `النوبة الصباحية: ${dayAssignments.length}/2 مسعفين`,
+                recommendation: 'تعيين مسعفين إضافيين أو تفعيل الوضع البديل'
+            });
+        }
+        if (nightAssignments.length < 2) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'night',
+                severity: nightAssignments.length === 0 ? 'red' : 'yellow',
+                message: `النوبة الليلية: ${nightAssignments.length}/2 مسعفين`,
+                recommendation: 'تعيين مسعفين إضافيين أو تفعيل الوضع البديل'
+            });
+        }
+        if (available < 8) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'all',
+                severity: 'red',
+                message: `نقص حاد: ${available} متاح من ${employees.length}`,
+                recommendation: 'تفعيل الوضع البديل (8 ساعات) أو نقل موظفين'
+            });
+        }
+    }
+    
+    return { schedule, alerts };
+}
+
+async function generateAlternativeSchedule(year, month, leaveMap) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const schedule = [];
+    const alerts = [];
+    
+    const dayShiftCode = 'D8';
+    const nightShiftCode = 'N8';
+    
+    // Pre-fetch team assignments
+    const teamAssignments = {};
+    for (const emp of employees) {
+        const assignments = await db.TeamAssignments.getByEmployee(emp.id);
+        const primary = assignments.find(a => a.is_primary) || assignments[0];
+        teamAssignments[emp.id] = primary ? primary.team_id : null;
+    }
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const availableEmployees = employees.filter(e => !leaveMap[dateStr].has(e.id));
+        
+        // 3 day + 3 night = 6 slots, rest off
+        const daySlots = Math.min(3, availableEmployees.length);
+        const nightSlots = Math.min(3, Math.max(0, availableEmployees.length - daySlots));
+        
+        // Rotate start index to distribute shifts fairly
+        const startIdx = (d - 1) % Math.max(availableEmployees.length, 1);
+        
+        for (let i = 0; i < availableEmployees.length; i++) {
+            const emp = availableEmployees[i];
+            const teamId = teamAssignments[emp.id];
+            const rotatedIdx = (i + startIdx) % availableEmployees.length;
+            let shiftCode, shiftHours;
+            
+            if (rotatedIdx < daySlots) {
+                shiftCode = dayShiftCode;
+                shiftHours = 8;
+            } else if (rotatedIdx < daySlots + nightSlots) {
+                shiftCode = nightShiftCode;
+                shiftHours = 8;
+            } else {
+                shiftCode = 'WO';
+                shiftHours = 0;
+            }
+            
+            schedule.push({
+                employee_id: emp.id,
+                team_id: teamId,
+                shift_date: dateStr,
+                shift_code: shiftCode,
+                shift_hours: shiftHours,
+                mode: 'alternative',
+                is_override: 0
+            });
+        }
+        
+        if (availableEmployees.length < 6) {
+            alerts.push({
+                alert_date: dateStr,
+                shift_type: 'all',
+                severity: 'red',
+                message: `نقص حاد في الوضع البديل: ${availableEmployees.length} متاح`,
+                recommendation: 'نقل موظفين من فرق أخرى أو طلب تعيينات طارئة'
+            });
+        }
+    }
+    
+    return { schedule, alerts };
+}
+
+async function analyzeTeamStaffing(dateStr, schedule) {
+    const teams = await db.Teams.getActive();
+    const assignments = await db.TeamAssignments.getAll();
+    const dayAssignments = schedule.filter(s => s.shift_date === dateStr && DAY_SHIFT_CODES.includes(s.shift_code));
+    const nightAssignments = schedule.filter(s => s.shift_date === dateStr && NIGHT_SHIFT_CODES.includes(s.shift_code));
+    
+    const teamStatus = [];
+    
+    for (const team of teams) {
+        const teamEmps = assignments.filter(a => a.team_id === team.id).map(a => a.employee_id);
+        const dayCount = dayAssignments.filter(s => teamEmps.includes(s.employee_id)).length;
+        const nightCount = nightAssignments.filter(s => teamEmps.includes(s.employee_id)).length;
+        
+        let status = 'green';
+        if (dayCount < 2 || nightCount < 2) status = 'yellow';
+        if (dayCount < 1 || nightCount < 1) status = 'red';
+        
+        teamStatus.push({
+            team_id: team.id,
+            team_name: team.name,
+            center: team.center,
+            day_count: dayCount,
+            night_count: nightCount,
+            status: status,
+            recommendation: status === 'red' ? 'نقل مسعف من فريق آخر' : status === 'yellow' ? 'مراقبة التغطية' : 'تغطية كافية'
+        });
+    }
+    
+    return teamStatus;
+}
+
+async function generateRecommendations(year, month) {
+    const leaveMap = await buildLeaveMap(year, month);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const employees = await db.Employees.getActive();
+    const recommendations = [];
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const available = employees.length - leaveMap[dateStr].size;
+        const onLeave = leaveMap[dateStr].size;
+        
+        if (available < 8) {
+            recommendations.push({
+                date: dateStr,
+                type: 'alternative_mode',
+                severity: 'red',
+                message: `نقص حاد: ${available} متاح، ${onLeave} في إجازة`,
+                action: 'تفعيل الوضع البديل (8 ساعات) مع 3 مسعفين لكل نوبة'
+            });
+        } else if (onLeave >= 2) {
+            recommendations.push({
+                date: dateStr,
+                type: 'monitor',
+                severity: 'yellow',
+                message: `إجازات متعددة: ${onLeave} موظفين`,
+                action: 'مراقبة التغطية وإعداد خطة بديلة'
+            });
+        }
+    }
+    
+    return recommendations;
+}
+
+// ============================================
+// API: Smart Shift Schedule
+// ============================================
+
+app.post('/api/shift-schedule/generate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { year, month, mode = 'normal' } = req.body;
+        if (!year || !month) {
+            return res.status(400).json({ error: 'السنة والشهر مطلوبة' });
+        }
+        
+        const y = parseInt(year);
+        const m = parseInt(month);
+        const leaveMap = await buildLeaveMap(y, m);
+        
+        let result;
+        if (mode === 'alternative') {
+            result = await generateAlternativeSchedule(y, m, leaveMap);
+        } else {
+            result = await generateNormalSchedule(y, m, leaveMap);
+        }
+        
+        // Save to database
+        await db.beginTransaction();
+        try {
+            await db.ShiftScheduleAuto.deleteByMonthYear(m, y);
+            for (const entry of result.schedule) {
+                await db.ShiftScheduleAuto.create(entry);
+            }
+            const daysInMonth = new Date(y, m, 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                await db.run('DELETE FROM staffing_alerts WHERE alert_date = ? AND resolved = 0', [dateStr]);
+            }
+            for (const alert of result.alerts) {
+                await db.StaffingAlerts.create(alert);
+            }
+            await db.commitTransaction();
+        } catch (err) {
+            await db.rollbackTransaction();
+            throw err;
+        }
+        
+        broadcast({
+            type: 'schedule_generated',
+            message: `تم إنشاء جدول ${mode === 'alternative' ? 'الوضع البديل' : 'الوضع العادي'} لشهر ${m}/${y}`,
+            year: y,
+            month: m,
+            mode
+        });
+        
+        res.json({ success: true, schedule: result.schedule, alerts: result.alerts, mode });
+    } catch (error) {
+        console.error('Schedule generation error:', error);
+        res.status(500).json({ error: 'فشل في إنشاء الجدول' });
+    }
+});
+
+app.get('/api/shift-schedule/month', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'الشهر والسنة مطلوبة' });
+        }
+        
+        const schedule = await db.ShiftScheduleAuto.getByMonthYear(parseInt(month), parseInt(year));
+        const alerts = await db.StaffingAlerts.getActive();
+        
+        const byDate = {};
+        for (const entry of schedule) {
+            if (!byDate[entry.shift_date]) {
+                byDate[entry.shift_date] = { day: [], night: [], off: [], leave: [] };
+            }
+            if (DAY_SHIFT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].day.push(entry);
+            } else if (NIGHT_SHIFT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].night.push(entry);
+            } else if (ABSENT_CODES.includes(entry.shift_code)) {
+                byDate[entry.shift_date].leave.push(entry);
+            } else {
+                byDate[entry.shift_date].off.push(entry);
+            }
+        }
+        
+        res.json({ success: true, schedule, byDate, alerts });
+    } catch (error) {
+        console.error('Schedule month GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب الجدول' });
+    }
+});
+
+app.post('/api/shift-schedule/update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id, employee_id, team_id, shift_date, shift_code, shift_hours, mode, is_override } = req.body;
+        if (!id) {
+            return res.status(400).json({ error: 'معرف السجل مطلوب' });
+        }
+        
+        const existing = await db.ShiftScheduleAuto.getById(id);
+        if (!existing) {
+            return res.status(404).json({ error: 'السجل غير موجود' });
+        }
+        
+        await db.ShiftScheduleAuto.update(id, {
+            employee_id: employee_id !== undefined ? employee_id : existing.employee_id,
+            team_id: team_id !== undefined ? team_id : existing.team_id,
+            shift_date: shift_date || existing.shift_date,
+            shift_code: shift_code || existing.shift_code,
+            shift_hours: shift_hours !== undefined ? shift_hours : existing.shift_hours,
+            mode: mode || existing.mode,
+            is_override: is_override !== undefined ? is_override : existing.is_override
+        });
+        
+        broadcast({
+            type: 'schedule_updated',
+            message: 'تم تحديث جدول المناوبات',
+            entry: { id, shift_date, shift_code }
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Schedule update error:', error);
+        res.status(500).json({ error: 'فشل في تحديث الجدول' });
+    }
+});
+
+app.get('/api/staffing-levels', authenticate, async (req, res) => {
+    try {
+        const { date } = req.query;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        const schedule = await db.ShiftScheduleAuto.getByDate(targetDate);
+        const employees = await db.Employees.getActive();
+        const leaveRequests = await db.LeaveRequests.getActiveForDate(targetDate);
+        const onLeave = leaveRequests.length;
+        const available = employees.length - onLeave;
+        
+        const dayShift = schedule.filter(s => DAY_SHIFT_CODES.includes(s.shift_code));
+        const nightShift = schedule.filter(s => NIGHT_SHIFT_CODES.includes(s.shift_code));
+        
+        let daySeverity = 'green';
+        if (dayShift.length < 2) daySeverity = 'red';
+        else if (dayShift.length < 3) daySeverity = 'yellow';
+        
+        let nightSeverity = 'green';
+        if (nightShift.length < 2) nightSeverity = 'red';
+        else if (nightShift.length < 3) nightSeverity = 'yellow';
+        
+        let overallSeverity = 'green';
+        if (available < 8) overallSeverity = 'red';
+        else if (available < 10) overallSeverity = 'yellow';
+        
+        const teamStatus = await analyzeTeamStaffing(targetDate, schedule);
+        
+        res.json({
+            success: true,
+            date: targetDate,
+            available,
+            onLeave,
+            total: employees.length,
+            day: { count: dayShift.length, severity: daySeverity },
+            night: { count: nightShift.length, severity: nightSeverity },
+            overall: overallSeverity,
+            teams: teamStatus
+        });
+    } catch (error) {
+        console.error('Staffing levels error:', error);
+        res.status(500).json({ error: 'فشل في جلب مستويات التغطية' });
+    }
+});
+
+// ============================================
+// API: Leave Requests
+// ============================================
+
+app.get('/api/leave-requests', authenticate, async (req, res) => {
+    try {
+        const { status, employee_id } = req.query;
+        let requests;
+        if (status) {
+            requests = await db.LeaveRequests.getByStatus(status);
+        } else if (employee_id) {
+            requests = await db.LeaveRequests.getByEmployee(employee_id);
+        } else {
+            requests = await db.LeaveRequests.getAll();
+        }
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error('Leave requests GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب طلبات الإجازة' });
+    }
+});
+
+app.post('/api/leave-requests', authenticate, validateBody({
+    employee_id: { required: true, type: 'number' },
+    start_date: { required: true, type: 'string', minLength: 1 },
+    end_date: { required: true, type: 'string', minLength: 1 },
+    type: { required: true, type: 'string', minLength: 1 }
+}), async (req, res) => {
+    try {
+        const { employee_id, start_date, end_date, type, reason } = req.body;
+        
+        const start = new Date(start_date);
+        const end = new Date(end_date);
+        const daysInRange = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            daysInRange.push(d.toISOString().split('T')[0]);
+        }
+        
+        for (const dateStr of daysInRange) {
+            const activeLeave = await db.LeaveRequests.getActiveForDate(dateStr);
+            const otherLeave = activeLeave.filter(lr => lr.employee_id !== employee_id && lr.status !== 'cancelled');
+            if (otherLeave.length >= 2) {
+                return res.status(400).json({ 
+                    error: 'لا يمكن قبول الإجازة', 
+                    message: `يوجد ${otherLeave.length} موظفين في إجازة بتاريخ ${dateStr}. الحد الأقصى 2.`,
+                    date: dateStr
+                });
+            }
+        }
+        
+        const id = await db.LeaveRequests.create({
+            employee_id,
+            start_date,
+            end_date,
+            type,
+            reason,
+            status: 'pending'
+        });
+        
+        broadcast({
+            type: 'leave_request_submitted',
+            message: 'تم تقديم طلب إجازة جديد',
+            requestId: id
+        });
+        
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Leave request POST error:', error);
+        res.status(500).json({ error: 'فشل في تقديم طلب الإجازة' });
+    }
+});
+
+app.put('/api/leave-requests/:id', authenticate, async (req, res) => {
+    try {
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status !== 'pending' && req.user.role !== 'admin' && req.user.role !== 'director') {
+            return res.status(403).json({ error: 'لا يمكن تعديل طلب تمت معالجته' });
+        }
+        
+        const data = { ...req.body, approved_by: null, approved_at: null };
+        await db.LeaveRequests.update(req.params.id, data);
+        
+        broadcast({
+            type: 'leave_request_updated',
+            message: 'تم تحديث طلب الإجازة',
+            requestId: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث طلب الإجازة' });
+    }
+});
+
+app.delete('/api/leave-requests/:id', authenticate, async (req, res) => {
+    try {
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status === 'approved' && req.user.role !== 'admin' && req.user.role !== 'director') {
+            return res.status(403).json({ error: 'لا يمكن إلغاء إجازة معتمدة' });
+        }
+        
+        await db.LeaveRequests.delete(req.params.id);
+        
+        broadcast({
+            type: 'leave_request_cancelled',
+            message: 'تم إلغاء طلب الإجازة',
+            requestId: req.params.id
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request DELETE error:', error);
+        res.status(500).json({ error: 'فشل في إلغاء طلب الإجازة' });
+    }
+});
+
+app.post('/api/leave-requests/:id/approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status || !['approved', 'denied'].includes(status)) {
+            return res.status(400).json({ error: 'الحالة يجب أن تكون approved أو denied' });
+        }
+        
+        const existing = await db.LeaveRequests.getById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'الطلب غير موجود' });
+        }
+        
+        if (existing.status !== 'pending') {
+            return res.status(400).json({ error: 'الطلب تمت معالجته مسبقاً' });
+        }
+        
+        await db.LeaveRequests.updateStatus(req.params.id, status, req.user.id);
+        
+        broadcast({
+            type: 'leave_request_resolved',
+            message: `تم ${status === 'approved' ? 'قبول' : 'رفض'} طلب الإجازة`,
+            requestId: req.params.id,
+            status
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Leave request approve error:', error);
+        res.status(500).json({ error: 'فشل في معالجة طلب الإجازة' });
+    }
+});
+
+// ============================================
+// API: Staffing Alerts
+// ============================================
+
+app.get('/api/staffing-alerts', authenticate, async (req, res) => {
+    try {
+        const alerts = await db.StaffingAlerts.getActive();
+        res.json({ success: true, alerts });
+    } catch (error) {
+        console.error('Staffing alerts GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب التنبيهات' });
+    }
+});
+
+app.get('/api/staffing-recommendations', authenticate, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        const now = new Date();
+        const m = month ? parseInt(month) : now.getMonth() + 1;
+        const y = year ? parseInt(year) : now.getFullYear();
+        
+        const recommendations = await generateRecommendations(y, m);
+        res.json({ success: true, recommendations });
+    } catch (error) {
+        console.error('Recommendations error:', error);
+        res.status(500).json({ error: 'فشل في جلب التوصيات' });
+    }
+});
+
+// ============================================
+// RAG AI Assistant - Knowledge Base Routes
+// ============================================
+
+async function initRAG() {
+    try {
+        if (!dbAvailable() || !db.KBChunks) return;
+        const chunks = await db.KBChunks.getAllWithEmbeddings();
+        if (chunks.length > 0) {
+            await ragInstance.loadDocuments(chunks);
+            ragInitialized = true;
+            console.log(`✅ RAG Engine initialized with ${chunks.length} chunks`);
+        } else {
+            console.log('ℹ️ RAG Engine: no chunks found yet');
+        }
+        
+        // Seed default AI knowledge if ai_knowledge_chunks is empty
+        try {
+            if (db.AIKnowledgeChunks) {
+                const count = await db.AIKnowledgeChunks.count();
+                if (count === 0) {
+                    console.log('[AI] Seeding default operational knowledge...');
+                    const defaults = [
+                        { title: 'تسجيل البلاغات', content: 'لتسجيل بلاغ جديد: 1) اذهب إلى صفحة تسجيل البلاغات. 2) اضغط على زر + أمام الفرقة المطلوبة. 3) يتم التسجيل تلقائياً مع الوقت والتاريخ. 4) يمكن التراجع عن آخر بلاغ بالضغط على زر تراجع. 5) الإجمالي يُحدّث تلقائياً لجميع المستخدمين.', source: 'دليل المستخدم', category: 'البلاغات' },
+                        { title: 'تكميل النوبة', content: 'خطوات تكميل النوبة: 1) اضغط على "تكميل النوبة" من الصفحة الرئيسية. 2) أدخل بيانات المسعفين المتواجدين في كل فرقة. 3) حدد حالة كل سيارة (جاهزة/صيانة/غير جاهزة). 4) أدخل بيانات الوقود. 5) أضف أي ملاحظات عامة. 6) اضغط حفظ.', source: 'دليل المستخدم', category: 'المناوبات' },
+                        { title: 'الإسعاف الجوي', content: 'بلاغ الإسعاف الجوي: يُستخدم للحالات التي تتطلب نقلاً جوياً للمستشفى. يجب تحديد المستشفى الوجهة بدقة وإدخال ملاحظات الحالة. يتم تسجيل البلاغ وتتبعه من قبل الإشراف.', source: 'البروتوكولات التشغيلية', category: 'الإسعاف الجوي' },
+                        { title: 'حالات توقف القلب والتنفس', content: 'نموذج E-Case: يُستخدم لتسجيل حالات توقف القلب والتنفس (Cardiac Arrest). يجب تسجيل: زمن الاستجابة، الإجراءات المتخذة (CPR، صدمات)، الأدوية المستخدمة، النتيجة النهائية (استعادة نبض/وفاة). الملاحظات تساعد في مراجعات الجودة.', source: 'البروتوكولات الطبية', category: 'النماذج الإسعافية' },
+                        { title: 'بلاغ التصعيد', content: 'بلاغ التصعيد: للحالات التي تتطلب تدخلاً إضافياً من جهات أخرى (الدفاع المدني، المرور، الشرطة). يجب تحديد الجهات المشاركة وتفاصيل الحالة. الوصف التفصيلي يساعد في التحقيقات المستقبلية.', source: 'البروتوكولات التشغيلية', category: 'البلاغات' },
+                        { title: 'الجداول التشغيلية', content: 'نظام الجداول: يمكن استيراد الجداول من Excel مباشرة. يدعم النظام تصدير الجداول كـ PDF أو Excel. يمكن إنشاء QR Code للمشاركة السريعة. يدعم OCR لتحويل صور الجداول إلى بيانات.', source: 'دليل المستخدم', category: 'الجداول' },
+                        { title: 'غرفة العمليات', content: 'غرفة العمليات (Operations Command): مركز إدارة الملفات والبروتوكولات. يمكن رفع الملفات بالسحب والإفلات. تصنيف الملفات: عاجل/عام/تقرير/بروتوكول. البروتوكولات التشغيلية تُراجع بشكل دوري.', source: 'دليل المستخدم', category: 'العمليات' },
+                        { title: 'التحقق من صحة البيانات', content: 'التوقيع الرقمي: يُستخدم لتأكيد صحة بيانات المناوبة من قبل كبار المسعفين. يجب مراجعة بيانات التكميل قبل التوقيع. التوقيع الرقمي يُربط بالمناوبة الحالية.', source: 'دليل المستخدم', category: 'الجودة' },
+                        { title: 'الفرق والمراكز', content: 'الفرق الإسعافية: يتكون القطاع من فرق إسعافية (جنوب 1 إلى جنوب 19) وفرق سريعة (سريع 1 إلى سريع 4). كل فرقة تابعة لمركز إسعافي محدد. يمكن مراجعة بيانات الفرق في قسم الإدارة.', source: 'دليل المستخدم', category: 'الفرق' },
+                        { title: 'الإشعارات والتنبيهات', content: 'الإشعارات: تظهر فوراً عند حدوث أحداث مهمة. يمكن تخصيص الصوت من الإعدادات. شريط التنبيهات يظهر التنبيهات العاجلة فور وصولها. مؤشرات القوى العاملة تساعد في تحديد المراكز الناقصة.', source: 'دليل المستخدم', category: 'الإشعارات' }
+                    ];
+                    for (const item of defaults) {
+                        const ch = chunkDocument(item.content, 500, 50);
+                        for (let i = 0; i < ch.length; i++) {
+                            const tokens = preprocessText(ch[i]);
+                            const tf = computeTF(tokens);
+                            await db.AIKnowledgeChunks.create({
+                                title: item.title,
+                                content: ch[i],
+                                source: item.source,
+                                category: item.category,
+                                chunk_index: i,
+                                total_chunks: ch.length,
+                                tokens_json: JSON.stringify(tokens),
+                                tf_json: JSON.stringify(tf)
+                            });
+                        }
+                    }
+                    console.log(`[AI] Seeded ${defaults.length} default knowledge items`);
+                }
+            }
+        } catch (seedErr) {
+            console.error('[AI] Failed to seed default knowledge:', seedErr.message);
+        }
+    } catch (err) {
+        console.error('RAG init error:', err.message);
+    }
+}
+
+// Upload knowledge document (admin only)
+app.post('/api/kb/upload', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { title, content, category, fileType, fileName, fileSize } = req.body;
+        if (!title || !content) {
+            return res.status(400).json({ error: 'العنوان والمحتوى مطلوبان' });
+        }
+        
+        const docId = await db.KBDocuments.create({
+            title,
+            content,
+            category: category || 'عام',
+            file_type: fileType || 'text',
+            original_name: fileName || null,
+            file_size: fileSize || 0,
+            status: 'processing',
+            created_by: req.user.username
+        });
+        
+        res.json({ success: true, id: docId, message: 'تم رفع الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB upload error:', error);
+        res.status(500).json({ error: 'فشل في رفع الوثيقة' });
+    }
+});
+
+// List knowledge documents
+app.get('/api/kb/documents', authenticate, async (req, res) => {
+    try {
+        const docs = await db.KBDocuments.getAll();
+        res.json({ success: true, documents: docs });
+    } catch (error) {
+        console.error('KB documents error:', error);
+        res.status(500).json({ error: 'فشل في جلب الوثائق' });
+    }
+});
+
+// Delete knowledge document (admin only)
+app.delete('/api/kb/documents/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        await db.KBChunks.deleteByDocumentId(id);
+        await db.KBDocuments.delete(id);
+        
+        // Re-initialize RAG
+        await initRAG();
+        
+        res.json({ success: true, message: 'تم حذف الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف الوثيقة' });
+    }
+});
+
+// Process document into chunks (admin only)
+app.post('/api/kb/process/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!ragEngine) {
+            return res.status(503).json({ error: 'محرك RAG غير متوفر' });
+        }
+        
+        const id = parseInt(req.params.id);
+        const doc = await db.KBDocuments.getById(id);
+        if (!doc) {
+            return res.status(404).json({ error: 'الوثيقة غير موجودة' });
+        }
+        
+        // Delete old chunks
+        await db.KBChunks.deleteByDocumentId(id);
+        
+        // Chunk document
+        const chunks = ragEngine.chunkDocument(doc.content, 500, 50);
+        
+        // Process each chunk
+        const allTokens = [];
+        const chunkEmbeddings = [];
+        
+        for (let i = 0; i < chunks.length; i++) {
+            const tokens = ragEngine.preprocessText(chunks[i]);
+            allTokens.push(tokens);
+        }
+        
+        const idf = ragEngine.computeIDF(allTokens);
+        
+        for (let i = 0; i < chunks.length; i++) {
+            const tf = ragEngine.computeTF(allTokens[i]);
+            const tfidf = ragEngine.normalizeVector(ragEngine.computeTFIDF(tf, idf));
+            chunkEmbeddings.push(tfidf);
+        }
+        
+        // Save chunks
+        for (let i = 0; i < chunks.length; i++) {
+            await db.KBChunks.create({
+                document_id: id,
+                chunk_index: i,
+                content: chunks[i],
+                embedding: chunkEmbeddings[i],
+                token_count: allTokens[i].length
+            });
+        }
+        
+        await db.KBDocuments.updateChunkCount(id, chunks.length);
+        
+        // Re-initialize RAG
+        await initRAG();
+        
+        res.json({ success: true, chunkCount: chunks.length, message: 'تم معالجة الوثيقة بنجاح' });
+    } catch (error) {
+        console.error('KB process error:', error);
+        res.status(500).json({ error: 'فشل في معالجة الوثيقة' });
+    }
+});
+
+// AI Chat endpoint
+app.post('/api/ai/chat', authenticate, async (req, res) => {
+    try {
+        const { message, sessionId } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        }
+        
+        const session_id = sessionId || req.user.username + '-' + Date.now();
+        
+        // Save user message
+        await db.KBChatHistory.create({
+            user_id: req.user.username,
+            session_id,
+            role: 'user',
+            message
+        });
+        
+        // Initialize RAG if not already done
+        if (!ragInitialized) {
+            await initRAG();
+        }
+        
+        // Query RAG
+        let retrieved = [];
+        if (ragInstance && ragInitialized && ragInstance.isInitialized) {
+            retrieved = await ragInstance.query(message, 5);
+        }
+        
+        // Generate answer
+        let result;
+        if (ragInstance) {
+            result = await ragInstance.generateAnswer(message, retrieved, {
+                user: req.user.username,
+                role: req.user.role
+            });
+        } else {
+            result = {
+                answer: 'المساعد الذكي غير متوفر حالياً. يرجى التحقق من إعدادات النظام أو الاتصال بالمسؤول.',
+                followUp: '',
+                sources: [],
+                confidence: 0,
+                queryType: 'unavailable'
+            };
+        }
+        
+        // Save assistant response
+        await db.KBChatHistory.create({
+            user_id: req.user.username,
+            session_id,
+            role: 'assistant',
+            message: result.answer,
+            sources: result.sources
+        });
+        
+        res.json({
+            success: true,
+            answer: result.answer,
+            followUp: result.followUp,
+            sources: result.sources,
+            confidence: result.confidence,
+            queryType: result.queryType,
+            sessionId: session_id
+        });
+    } catch (error) {
+        console.error('AI chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة السؤال' });
+    }
+});
+
+// AI Chat history
+app.get('/api/ai/history', authenticate, async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+        if (!sessionId) {
+            return res.status(400).json({ error: 'معرف الجلسة مطلوب' });
+        }
+        const history = await db.KBChatHistory.getBySession(sessionId, 50);
+        res.json({ success: true, history: history.reverse() });
+    } catch (error) {
+        console.error('AI history error:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل' });
+    }
+});
+
+// AI Stats
+app.get('/api/ai/stats', authenticate, async (req, res) => {
+    try {
+        const docs = await db.KBDocuments.getAll();
+        const chunks = await db.KBChunks.getAll();
+        const totalDocs = docs.length;
+        const totalChunks = chunks.length;
+        const activeDocs = docs.filter(d => d.status === 'active').length;
+        
+        res.json({
+            success: true,
+            stats: {
+                totalDocuments: totalDocs,
+                activeDocuments: activeDocs,
+                totalChunks: totalChunks,
+                ragInitialized: ragInitialized
+            }
+        });
+    } catch (error) {
+        console.error('AI stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// AI Assistant V2 — Unanswered Questions, Feedback, Knowledge Management
+// ============================================
+
+// AI Chat V2 (uses ai_chat_logs with confidence tracking)
+app.post('/api/ai/v2/chat', authenticate, async (req, res) => {
+    try {
+        const { message, pageContext } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        }
+        
+        const userId = req.user.id || req.user.username;
+        const userName = req.user.name || req.user.username;
+        
+        // Initialize RAG if not already done
+        if (!ragInitialized) {
+            await initRAG();
+        }
+        
+        // Query RAG
+        let retrieved = [];
+        if (ragInitialized && ragInstance.isInitialized) {
+            retrieved = await ragInstance.query(message, 5);
+        }
+        
+        // Generate answer
+        const result = await ragInstance.generateAnswer(message, retrieved, {
+            user: userName,
+            role: req.user.role
+        });
+        
+        // Determine confidence level
+        let confidence = 'low';
+        if (result.confidence >= 65) confidence = 'high';
+        else if (result.confidence >= 35) confidence = 'medium';
+        
+        // Log to ai_chat_logs
+        try {
+            if (db && db.AIChatLogs) {
+                await db.AIChatLogs.create({
+                    query: message,
+                    answer: result.answer,
+                    confidence: confidence,
+                    user_id: String(userId),
+                    user_name: userName,
+                    page_context: pageContext || '',
+                    sources_json: JSON.stringify(result.sources || [])
+                });
+            }
+        } catch (logErr) {
+            console.error('[AI] Failed to log chat:', logErr.message);
+        }
+        
+        // Log unanswered if low confidence
+        if (confidence === 'low' && db && db.AIUnansweredQuestions) {
+            try {
+                await db.AIUnansweredQuestions.create({
+                    question: message,
+                    user_id: String(userId),
+                    user_name: userName,
+                    score: result.confidence / 100,
+                    page_context: pageContext || ''
+                });
+            } catch (uerr) {
+                console.error('[AI] Failed to log unanswered:', uerr.message);
+            }
+        }
+        
+        res.json({
+            success: true,
+            answer: result.answer,
+            followUp: result.followUp,
+            sources: result.sources,
+            confidence: confidence,
+            bestScore: result.confidence / 100,
+            requiresReview: confidence === 'low',
+            queryType: result.queryType
+        });
+    } catch (error) {
+        console.error('AI V2 chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة السؤال' });
+    }
+});
+
+// AI Feedback
+app.post('/api/ai/v2/feedback', authenticate, async (req, res) => {
+    try {
+        const { chatLogId, feedback, notes } = req.body;
+        if (!chatLogId || !feedback) {
+            return res.status(400).json({ error: 'معرف المحادثة والتقييم مطلوبان' });
+        }
+        
+        if (db && db.AIFeedback) {
+            await db.AIFeedback.create({
+                chat_log_id: chatLogId,
+                feedback: feedback,
+                user_id: String(req.user.id || req.user.username),
+                notes: notes || ''
+            });
+        }
+        
+        res.json({ success: true, message: 'تم حفظ التقييم' });
+    } catch (error) {
+        console.error('AI feedback error:', error);
+        res.status(500).json({ error: 'فشل في حفظ التقييم' });
+    }
+});
+
+// Unanswered Questions — List
+app.get('/api/ai/v2/unanswered', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { status, limit } = req.query;
+        const lim = parseInt(limit) || 100;
+        
+        let questions = [];
+        if (db && db.AIUnansweredQuestions) {
+            if (status) {
+                questions = await db.AIUnansweredQuestions.getByStatus(status, lim);
+            } else {
+                questions = await db.AIUnansweredQuestions.getAll(lim);
+            }
+        }
+        
+        res.json({ success: true, questions });
+    } catch (error) {
+        console.error('Unanswered questions error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأسئلة' });
+    }
+});
+
+// Unanswered Questions — Resolve
+app.post('/api/ai/v2/unanswered/:id/resolve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { resolution } = req.body;
+        const resolvedBy = req.user.name || req.user.username;
+        
+        if (db && db.AIUnansweredQuestions) {
+            await db.AIUnansweredQuestions.resolve(id, resolution, resolvedBy);
+        }
+        
+        res.json({ success: true, message: 'تم حل السؤال' });
+    } catch (error) {
+        console.error('Resolve unanswered error:', error);
+        res.status(500).json({ error: 'فشل في حل السؤال' });
+    }
+});
+
+// Unanswered Questions — Dismiss
+app.post('/api/ai/v2/unanswered/:id/dismiss', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (db && db.AIUnansweredQuestions) {
+            await db.AIUnansweredQuestions.dismiss(id);
+        }
+        
+        res.json({ success: true, message: 'تم تجاهل السؤال' });
+    } catch (error) {
+        console.error('Dismiss unanswered error:', error);
+        res.status(500).json({ error: 'فشل في تجاهل السؤال' });
+    }
+});
+
+// AI Knowledge — Upload text knowledge
+app.post('/api/ai/v2/knowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { title, content, source, category } = req.body;
+        if (!title || !content) {
+            return res.status(400).json({ error: 'العنوان والمحتوى مطلوبان' });
+        }
+        
+        // Store in ai_knowledge_chunks
+        if (db && db.AIKnowledgeChunks) {
+            const chunks = chunkDocument(content, 500, 50);
+            for (let i = 0; i < chunks.length; i++) {
+                const tokens = preprocessText(chunks[i]);
+                const tf = computeTF(tokens);
+                await db.AIKnowledgeChunks.create({
+                    title: title,
+                    content: chunks[i],
+                    source: source || '',
+                    category: category || 'عام',
+                    chunk_index: i,
+                    total_chunks: chunks.length,
+                    tokens_json: JSON.stringify(tokens),
+                    tf_json: JSON.stringify(tf)
+                });
+            }
+        }
+        
+        res.json({ success: true, message: 'تم إضافة المعرفة بنجاح' });
+    } catch (error) {
+        console.error('AI knowledge upload error:', error);
+        res.status(500).json({ error: 'فشل في رفع المعرفة' });
+    }
+});
+
+// AI Knowledge — List
+app.get('/api/ai/v2/knowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { category, search, limit, offset } = req.query;
+        const lim = parseInt(limit) || 100;
+        const off = parseInt(offset) || 0;
+        
+        let chunks = [];
+        let total = 0;
+        
+        if (db && db.AIKnowledgeChunks) {
+            if (search) {
+                chunks = await db.AIKnowledgeChunks.searchByTitleOrContent(search);
+                total = chunks.length;
+            } else if (category) {
+                chunks = await db.AIKnowledgeChunks.getByCategory(category);
+                total = chunks.length;
+            } else {
+                chunks = await db.AIKnowledgeChunks.getAll(lim, off);
+                total = await db.AIKnowledgeChunks.count();
+            }
+        }
+        
+        res.json({ success: true, chunks, total });
+    } catch (error) {
+        console.error('AI knowledge list error:', error);
+        res.status(500).json({ error: 'فشل في جلب المعرفة' });
+    }
+});
+
+// AI Knowledge — Delete
+app.delete('/api/ai/v2/knowledge/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (db && db.AIKnowledgeChunks) {
+            await db.AIKnowledgeChunks.delete(id);
+        }
+        
+        res.json({ success: true, message: 'تم حذف المعرفة' });
+    } catch (error) {
+        console.error('AI knowledge delete error:', error);
+        res.status(500).json({ error: 'فشل في حذف المعرفة' });
+    }
+});
+
+// AI V2 Stats
+app.get('/api/ai/v2/stats', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 30;
+        let stats = {
+            totalChats: 0,
+            highConfidence: 0,
+            mediumConfidence: 0,
+            lowConfidence: 0,
+            pendingQuestions: 0,
+            knowledgeChunks: 0,
+            positiveFeedback: 0,
+            negativeFeedback: 0
+        };
+        
+        if (db && db.AIChatLogs) {
+            const chatStats = await db.AIChatLogs.getStats(days);
+            stats.totalChats = chatStats.total;
+            
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+            
+            const high = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['high', since.toISOString()]);
+            const medium = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['medium', since.toISOString()]);
+            const low = await db.get('SELECT COUNT(*) as count FROM ai_chat_logs WHERE confidence = ? AND created_at >= ?', ['low', since.toISOString()]);
+            
+            stats.highConfidence = high ? high.count : 0;
+            stats.mediumConfidence = medium ? medium.count : 0;
+            stats.lowConfidence = low ? low.count : 0;
+        }
+        
+        if (db && db.AIUnansweredQuestions) {
+            stats.pendingQuestions = await db.AIUnansweredQuestions.countByStatus('pending');
+        }
+        
+        if (db && db.AIKnowledgeChunks) {
+            stats.knowledgeChunks = await db.AIKnowledgeChunks.count();
+        }
+        
+        if (db && db.AIFeedback) {
+            const fb = await db.AIFeedback.getStats(days);
+            stats.positiveFeedback = fb.positive;
+            stats.negativeFeedback = fb.negative;
+        }
+        
+        res.json({ success: true, stats });
+    } catch (error) {
+        console.error('AI V2 stats error:', error);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// RAG-based Operational AI Assistant — KB API v2
+// ============================================
+app.use('/api/rag', authenticate, kbApi.router);
+
+// ============================================
+// AI Agent Chat API
+// ============================================
+const { getAgent } = require('./rag/agent-layer');
+app.post('/api/agent/chat', authenticate, async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ error: 'الرسالة مطلوبة' });
+        
+        const agent = getAgent(req.user.id);
+        const response = await agent.chat(message, req.user);
+        res.json({ success: true, response });
+    } catch (error) {
+        console.error('Agent chat error:', error);
+        res.status(500).json({ error: 'فشل في معالجة الرسالة' });
+    }
+});
+
+
+// ============================================
+// API: CHAT MODULE
+// ============================================
+
+// Note: broadcastToConversation and broadcastToAll are defined above in the WebSocket section
+// and are reused here for chat message delivery.
+// 1. GET /api/chat/conversations
+app.get('/api/chat/conversations', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const userId = req.user.id;
+        const conversations = await db.all(
+            `SELECT c.* FROM chat_conversations c
+             JOIN chat_participants p ON c.id = p.conversation_id
+             WHERE p.user_id = ? AND c.is_archived = 0
+             ORDER BY c.updated_at DESC`,
+            [userId]
+        );
+        const result = [];
+        for (const conv of conversations) {
+            // unread count
+            const unreadRow = await db.get(
+                `SELECT COUNT(*) as count FROM chat_messages m
+                 LEFT JOIN chat_message_reads r ON m.id = r.message_id AND r.user_id = ?
+                 WHERE m.conversation_id = ? AND m.sender_id != ? AND r.id IS NULL AND m.is_deleted = 0`,
+                [userId, conv.id, userId]
+            );
+            // last message
+            const lastMsg = await db.get(
+                `SELECT m.*, u.name as sender_name FROM chat_messages m
+                 LEFT JOIN users u ON m.sender_id = u.user_id
+                 WHERE m.conversation_id = ? AND m.is_deleted = 0
+                 ORDER BY m.created_at DESC LIMIT 1`,
+                [conv.id]
+            );
+            // participants
+            const participants = await db.all(
+                `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+                 LEFT JOIN users u ON p.user_id = u.user_id
+                 WHERE p.conversation_id = ?`,
+                [conv.id]
+            );
+            // Build title for private chats
+            let title = conv.title;
+            if (!title && conv.type === 'private') {
+                const other = participants.find(function(p) { return p.user_id !== userId; });
+                title = other ? (other.name || other.username) : 'محادثة خاصة';
+            }
+            result.push({
+                ...conv,
+                title: title || conv.title,
+                unread_count: unreadRow ? unreadRow.count : 0,
+                last_message: lastMsg || null,
+                participants: participants || []
+            });
+        }
+        res.json({ success: true, conversations: result });
+    } catch (err) {
+        console.error('Chat conversations error:', err);
+        res.status(500).json({ error: 'فشل في جلب المحادثات' });
+    }
+});
+
+// 2. POST /api/chat/conversations — create group
+app.post('/api/chat/conversations', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const { title, participant_ids } = req.body;
+        if (!title || typeof title !== 'string' || title.trim() === '') {
+            return res.status(400).json({ error: 'عنوان المجموعة مطلوب' });
+        }
+        if (!Array.isArray(participant_ids) || participant_ids.length < 1) {
+            return res.status(400).json({ error: 'يجب إضافة مشارك واحد على الأقل' });
+        }
+        const convId = await db.run(
+            `INSERT INTO chat_conversations (type, title, created_by) VALUES (?, ?, ?);`,
+            ['group', title.trim(), req.user.id]
+        );
+        // Add creator as admin
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);`,
+            [convId.id, req.user.id, 1]
+        );
+        // Add participants
+        for (const pid of participant_ids) {
+            if (pid !== req.user.id) {
+                await db.run(
+                    `INSERT OR IGNORE INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);`,
+                    [convId.id, pid, 0]
+                );
+            }
+        }
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId.id]);
+        res.json({ success: true, conversation });
+    } catch (err) {
+        console.error('Create group chat error:', err);
+        res.status(500).json({ error: 'فشل في إنشاء المجموعة' });
+    }
+});
+
+// 3. POST /api/chat/conversations/private — start or find private chat
+app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const { user_id } = req.body;
+        if (!user_id) {
+            return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+        }
+        const currentUserId = req.user.id;
+        const targetUserId = String(user_id); // تحويل إلى string للمطابقة
+        
+        // Check if private conversation already exists
+        const existing = await db.get(
+            `SELECT c.* FROM chat_conversations c
+             JOIN chat_participants p1 ON c.id = p1.conversation_id
+             JOIN chat_participants p2 ON c.id = p2.conversation_id
+             WHERE c.type = 'private' AND p1.user_id = ? AND p2.user_id = ?`,
+            [currentUserId, targetUserId]
+        );
+        if (existing) {
+            const participants = await db.all(
+                `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+                 LEFT JOIN users u ON p.user_id = u.user_id
+                 WHERE p.conversation_id = ?`,
+                [existing.id]
+            );
+            // Build title for private chats
+            let title = existing.title;
+            if (!title && existing.type === 'private') {
+                const other = participants.find(function(p) { return p.user_id !== currentUserId; });
+                title = other ? (other.name || other.username) : 'محادثة خاصة';
+            }
+            return res.json({ success: true, conversation: { ...existing, title: title, participants } });
+        }
+        // Create new private conversation
+        const convResult = await db.run(
+            `INSERT INTO chat_conversations (type, created_by) VALUES (?, ?);`,
+            ['private', currentUserId]
+        );
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
+            [convResult.id, currentUserId]
+        );
+        await db.run(
+            `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
+            [convResult.id, targetUserId]
+        );
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convResult.id]);
+        const participants = await db.all(
+            `SELECT p.*, u.username, u.name, u.role FROM chat_participants p
+             LEFT JOIN users u ON p.user_id = u.user_id
+             WHERE p.conversation_id = ?`,
+            [convResult.id]
+        );
+        // Build title for private chats
+        let title = conversation.title;
+        if (!title && conversation.type === 'private') {
+            const other = participants.find(function(p) { return p.user_id !== currentUserId; });
+            title = other ? (other.name || other.username) : 'محادثة خاصة';
+        }
+        res.json({ success: true, conversation: { ...conversation, title: title, participants } });
+    } catch (err) {
+        console.error('Private chat error:', err);
+        res.status(500).json({ error: 'فشل في إنشاء المحادثة الخاصة' });
+    }
+});
+
+// 4. GET /api/chat/conversations/:id/messages
+app.get('/api/chat/conversations/:id/messages', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = (page - 1) * limit;
+        const userId = req.user.id;
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية الوصول لهذه المحادثة' });
+        }
+        const messages = await db.all(
+            `SELECT m.*, u.name as sender_name FROM chat_messages m
+             LEFT JOIN users u ON m.sender_id = u.user_id
+             WHERE m.conversation_id = ? AND m.is_deleted = 0
+             ORDER BY m.created_at DESC LIMIT ? OFFSET ?`,
+            [convId, limit, offset]
+        );
+        // Add read_by for each message
+        for (const msg of messages) {
+            const reads = await db.all(
+                'SELECT user_id, read_at FROM chat_message_reads WHERE message_id = ?',
+                [msg.id]
+            );
+            msg.read_by = reads || [];
+        }
+        res.json({ success: true, messages, page, limit });
+    } catch (err) {
+        console.error('Get messages error:', err);
+        res.status(500).json({ error: 'فشل في جلب الرسائل' });
+    }
+});
+
+// 5. POST /api/chat/conversations/:id/messages
+app.post('/api/chat/conversations/:id/messages', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const { content, type, file_url, context_type, context_id, reply_to } = req.body;
+        const msgType = type || 'text';
+        if (!content && msgType !== 'file') {
+            return res.status(400).json({ error: 'محتوى الرسالة مطلوب' });
+        }
+        const userId = req.user.id;
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية الإرسال لهذه المحادثة' });
+        }
+        const result = await db.run(
+            `INSERT INTO chat_messages (conversation_id, sender_id, content, type, file_url, context_type, context_id, reply_to)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+            [convId, userId, content || '', msgType, file_url || null, context_type || null, context_id || null, reply_to || null]
+        );
+        await db.run(
+            'UPDATE chat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?;',
+            [convId]
+        );
+        const message = await db.get(
+            `SELECT m.*, u.name as sender_name FROM chat_messages m
+             LEFT JOIN users u ON m.sender_id = u.user_id
+             WHERE m.id = ?`,
+            [result.id]
+        );
+        message.read_by = [];
+        // Broadcast to conversation subscribers
+        // ENHANCED: Broadcast chat message to ALL participants (not just subscribers)
+        var chatBroadcastData = { type: 'chat_message', conversationId: convId, message: message };
+        broadcastToConversation(convId, chatBroadcastData);
+        // Also broadcast via SSE for maximum delivery guarantee
+        broadcastSSE(chatBroadcastData);
+        res.json({ success: true, message });
+    } catch (err) {
+        console.error('Send message error:', err);
+        res.status(500).json({ error: 'فشل في إرسال الرسالة' });
+    }
+});
+
+// 6. PUT /api/chat/messages/:id/read
+app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const messageId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const message = await db.get('SELECT * FROM chat_messages WHERE id = ?', [messageId]);
+        if (!message) {
+            return res.status(404).json({ error: 'الرسالة غير موجودة' });
+        }
+        // Verify participant
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [message.conversation_id, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'ليس لديك صلاحية' });
+        }
+        await db.run(
+            'INSERT OR IGNORE INTO chat_message_reads (message_id, user_id) VALUES (?, ?);',
+            [messageId, userId]
+        );
+        await db.run(
+            'UPDATE chat_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?;',
+            [message.conversation_id, userId]
+        );
+        // Broadcast read receipt to conversation participants
+        // ENHANCED: Broadcast read receipt with timestamp
+        var readReceiptData = {
+            type: 'chat_read',
+            messageId: messageId,
+            userId: userId,
+            readAt: new Date().toISOString()
+        };
+        broadcastToConversation(message.conversation_id, readReceiptData);
+        res.json({ success: true, message: 'تم الت标记 كمقروء' });
+    } catch (err) {
+        console.error('Mark read error:', err);
+        res.status(500).json({ error: 'فشل في تحديث حالة القراءة' });
+    }
+});
+
+// 7. GET /api/chat/users
+app.get('/api/chat/users', authenticate, async (req, res) => {
+    try {
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const activeUsers = users.filter(u => u.isActive).map(u => ({ id: u.id, username: u.username, name: u.name, role: u.role }));
+        res.json({ success: true, users: activeUsers });
+    } catch (err) {
+        console.error('Chat users error:', err);
+        res.status(500).json({ error: 'فشل في جلب المستخدمين' });
+    }
+});
+
+// 7b. GET /api/chat/online — get currently online users
+app.get('/api/chat/online', authenticate, async (req, res) => {
+    try {
+        const online = getOnlineUsers();
+        res.json({ success: true, onlineUsers: online, count: online.length });
+    } catch (err) {
+        console.error('Chat online users error:', err);
+        res.status(500).json({ error: 'فشل في جلب المستخدمين المتصلين' });
+    }
+});
+
+// 8. DELETE /api/chat/conversations/:id — archive group (admin only)
+app.delete('/api/chat/conversations/:id', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (conversation.type !== 'group') {
+            return res.status(400).json({ error: 'يمكن أرشفة المجموعات فقط' });
+        }
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه أرشفة المجموعة' });
+        }
+        await db.run('UPDATE chat_conversations SET is_archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [convId]);
+        res.json({ success: true, message: 'تم أرشفة المحادثة' });
+    } catch (err) {
+        console.error('Archive conversation error:', err);
+        res.status(500).json({ error: 'فشل في أرشفة المحادثة' });
+    }
+});
+
+// 9. POST /api/chat/conversations/:id/participants — add participant (admin only)
+app.post('/api/chat/conversations/:id/participants', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const { user_id } = req.body;
+        if (!user_id) {
+            return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+        }
+        const userId = req.user.id;
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه إضافة مشاركين' });
+        }
+        await db.run(
+            'INSERT OR IGNORE INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);',
+            [convId, user_id, 0]
+        );
+        res.json({ success: true, message: 'تم إضافة المشارك' });
+    } catch (err) {
+        console.error('Add participant error:', err);
+        res.status(500).json({ error: 'فشل في إضافة المشارك' });
+    }
+});
+
+// 10. DELETE /api/chat/conversations/:id/participants/:user_id — remove participant (admin only, cannot remove creator)
+app.delete('/api/chat/conversations/:id/participants/:user_id', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const targetUserId = req.params.user_id;
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (targetUserId === conversation.created_by) {
+            return res.status(403).json({ error: 'لا يمكن إزالة منشئ المحادثة' });
+        }
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ? AND is_admin = 1',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(403).json({ error: 'فقط المسؤول يمكنه إزالة مشاركين' });
+        }
+        await db.run(
+            'DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?;',
+            [convId, targetUserId]
+        );
+        res.json({ success: true, message: 'تم إزالة المشارك' });
+    } catch (err) {
+        console.error('Remove participant error:', err);
+        res.status(500).json({ error: 'فشل في إزالة المشارك' });
+    }
+});
+
+// 11. POST /api/chat/upload — file upload for chat
+app.post('/api/chat/upload', authenticate, uploadChat.single('file'), handleMulterError, async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'لم يتم رفع أي ملف' });
+        }
+        const originalName = req.file.originalname;
+        const ext = path.extname(originalName);
+        const storedName = 'chat-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10) + ext;
+        const destDir = path.join(STORAGE_PATH, 'uploads', 'chat');
+        const destPath = path.join(destDir, storedName);
+        await fs.rename(req.file.path, destPath);
+        const fileUrl = '/uploads/chat/' + storedName;
+        res.json({ success: true, fileUrl, filename: originalName, storedName, size: req.file.size });
+    } catch (err) {
+        console.error('Chat upload error:', err);
+        res.status(500).json({ error: 'فشل في رفع الملف' });
+    }
+});
+
+// 12. PUT /api/chat/conversations/:id/leave — leave a group conversation
+app.put('/api/chat/conversations/:id/leave', authenticate, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not available' });
+        const convId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const conversation = await db.get('SELECT * FROM chat_conversations WHERE id = ?', [convId]);
+        if (!conversation) {
+            return res.status(404).json({ error: 'المحادثة غير موجودة' });
+        }
+        if (conversation.type !== 'group') {
+            return res.status(400).json({ error: 'يمكن مغادرة المجموعات فقط' });
+        }
+        // Cannot leave if you are the creator and only admin
+        const participant = await db.get(
+            'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id = ?',
+            [convId, userId]
+        );
+        if (!participant) {
+            return res.status(404).json({ error: 'أنت لست مشاركاً في هذه المحادثة' });
+        }
+        // If creator, prevent leaving unless another admin exists
+        if (conversation.created_by === userId) {
+            const otherAdmin = await db.get(
+                'SELECT * FROM chat_participants WHERE conversation_id = ? AND user_id != ? AND is_admin = 1',
+                [convId, userId]
+            );
+            if (!otherAdmin) {
+                return res.status(403).json({ error: 'لا يمكن مغادرة المجموعة قبل تعيين مسؤول آخر' });
+            }
+        }
+        await db.run('DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?;', [convId, userId]);
+        // Broadcast system message
+        broadcastToConversation(convId, {
+            type: 'chat_conversation_update',
+            conversationId: convId,
+            event: 'user_left',
+            userId: userId,
+            userName: req.user.name
+        });
+        res.json({ success: true, message: 'تم مغادرة المحادثة' });
+    } catch (err) {
+        console.error('Leave conversation error:', err);
+        res.status(500).json({ error: 'فشل في مغادرة المحادثة' });
+    }
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'المسار غير موجود' });
+});
+
+// AI Monitor error tracking middleware
+if (aiMonitor) {
+    app.use(aiMonitor.errorTrackingMiddleware());
+}
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('❌ Error:', err.stack || err.message);
+    if (err.status === 413 || err.message && err.message.includes('file size')) {
+        return res.status(413).json({ error: 'حجم الملف كبير جداً' });
+    }
+    res.status(err.status || 500).json({ error: 'خطأ في الخادم' });
+});
+
+// ============================================
+// تشغيل الخادم + WebSocket + Graceful Shutdown
+// ============================================
+const server = require('http').createServer(app);
+
+// Initialize WebSocket on same HTTP server
+initWebSocket(server);
+
+// Initialize SQLite Database + Migrate JSON data
+async function initDatabase() {
+    if (!db) {
+        console.log('📁 SQLite not available — using JSON file mode');
+        return;
+    }
+    try {
+        console.log('🗄️ Initializing SQLite database...');
+        await db.init(true); // init + migrate
+        console.log('✅ SQLite database ready');
+        
+        // Create frontend_errors table for Smart AI Monitor
+        try {
+            await db.run(`CREATE TABLE IF NOT EXISTS frontend_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                type TEXT,
+                message TEXT,
+                file TEXT,
+                line INTEGER,
+                column INTEGER,
+                stack TEXT,
+                page_url TEXT,
+                page_path TEXT,
+                user_agent TEXT,
+                screen TEXT,
+                session_id TEXT
+            )`);
+            console.log('✅ frontend_errors table ready');
+        } catch (e) {
+            console.error('❌ Failed to create frontend_errors table:', e.message);
+        }
+
+        // Sync users from JSON to SQLite for chat module
+        try {
+            const usersJson = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+            for (const u of usersJson) {
+                const existing = await db.get('SELECT id FROM users WHERE user_id = ?', [u.id]);
+                if (!existing) {
+                    await db.run(
+                        'INSERT INTO users (user_id, username, password, name, role, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+                        [u.id, u.username, u.password || '', u.name, u.role, u.isActive ? 1 : 0]
+                    );
+                }
+            }
+            console.log('✅ Users synced to SQLite for chat module');
+        } catch (e) {
+            console.error('❌ Failed to sync users to SQLite:', e.message);
+        }
+    } catch (err) {
+        console.error('❌ Failed to initialize database:', err.message);
+        console.log('⚠️ Falling back to JSON file mode');
+    }
+}
+
+server.listen(PORT, async () => {
+    console.log(`🚑 الخادم يعمل على المنفذ ${PORT}`);
+    console.log(`📁 مسار بيانات البلاغات: ${DATA_PATH}`);
+    console.log(`📁 مسار بيانات المناوبات: ${SHIFT_DATA_PATH}`);
+    console.log(`📁 مسار التحديثات التشغيلية: ${DOCS_PATH}`);
+    console.log(`📁 مسار الإسعاف الجوي: ${AIR_PATH}`);
+    console.log(`📁 مسار هوية القطاع: ${IDENTITY_PATH}`);
+    console.log(`📁 مسار الرقم السري: ${PASSWORD_PATH}`);
+    console.log(`📁 مسار بيانات وقت الذروة: ${PEAK_DATA_PATH}`);
+    console.log(`📁 مسار إعدادات الثيمات: ${THEME_SETTINGS_PATH}`);
+    console.log(`🗺️ تم تحميل البيانات الجغرافية لـ ${Object.keys(centerGeoData).length} مركز`);
+    console.log(`📸 مجلد رفع الثيمات: ${path.join(STORAGE_PATH, 'uploads')}`);
+    console.log(`🔒 Security: Helmet, Rate Limiting, CORS enabled`);
+    console.log(`📡 WebSocket attached on path /ws`);
+    console.log(`📡 SSE endpoint available on /api/sse`);
+    
+    // Initialize DB after server starts
+    await initDatabase();
+    
+    // Initialize RAG Engine
+    await initRAG();
+    
+    // Initialize new KB RAG index
+    try {
+        await kbApi.loadIndexFromFile();
+        if (!kbApi.ragIndex.isBuilt && db) {
+            await kbApi.loadIndexFromDB(db);
+        }
+        if (kbApi.ragIndex.isBuilt) {
+            console.log('✅ KB RAG index loaded');
+        }
+    } catch (err) {
+        console.error('⚠️ KB RAG index init warning:', err.message);
+    }
+    
+    // Initialize AI Monitor
+    if (aiMonitor) {
+        aiMonitor.init({ db, wss, app });
+        console.log('🤖 AI Monitor initialized');
+    }
+
+    console.log('🤖 RAG-based Operational AI Assistant ready');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received. Shutting down gracefully...');
+    // إغلاق جميع اتصالات SSE
+    sseClients.forEach(function(client) {
+        try { client.res.end(); } catch(e) {}
+    });
+    server.close(() => {
+        console.log('✅ HTTP server closed');
+        if (wss) {
+            wss.clients.forEach(client => client.close());
+            wss.close(() => {
+                console.log('✅ WebSocket server closed');
+                process.exit(0);
+            });
+        } else {
+            process.exit(0);
+        }
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received. Shutting down gracefully...');
+    // إغلاق جميع اتصالات SSE
+    sseClients.forEach(function(client) {
+        try { client.res.end(); } catch(e) {}
+    });
+    server.close(() => {
+        console.log('✅ HTTP server closed');
+        if (wss) {
+            wss.clients.forEach(client => client.close());
+            wss.close(() => {
+                console.log('✅ WebSocket server closed');
+                process.exit(0);
+            });
+        } else {
+            process.exit(0);
+        }
+    });
+});

@@ -1,5 +1,23 @@
 [
   {
+    "id": 1783835406053,
+    "shiftName": "صباح - 2026-07-12",
+    "shiftDate": "2026-07-12",
+    "shiftTime": "١١:٥٠:٠٦ ص",
+    "shiftType": "صباح",
+    "shiftDay": "الأحد",
+    "startTime": "2026-07-12T08:50:06.042Z",
+    "totalReports": 0,
+    "savedReports": {},
+    "rapidLocations": {},
+    "centersData": {},
+    "vehicleData": {},
+    "fuelData": {},
+    "generalNotes": "",
+    "lastUpdate": "2026-07-12T08:50:06.042Z",
+    "autoArchived": false
+  },
+  {
     "id": 1783803164801,
     "shiftName": "ليلية - 2026-07-11 ١١:٥٢:٤٤ م",
     "shiftDate": "2026-07-11",

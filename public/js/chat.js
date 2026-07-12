@@ -1,6 +1,7 @@
 // ============================================
-// Chat Module — منصة الجنوب
-// Vanilla JS, modular functions, RTL
+// Chat Module — منصة الجنوب (Enhanced v2)
+// Features: Instant WebSocket, Toast Notifications, Read Receipts,
+//           Real-time Online Status, Sound Alerts, Smart Filtering
 // ============================================
 
 (function() {
@@ -16,11 +17,29 @@
     // ===== Sound / Notification State =====
     var audioContextUnlocked = false;
     var notificationPermission = false;
+    var soundSettings = {
+        enabled: true,
+        volume: 0.3
+    };
+
+    // Load sound settings
+    (function loadSoundSettings() {
+        try {
+            var saved = localStorage.getItem('chat_sound_settings');
+            if (saved) {
+                var parsed = JSON.parse(saved);
+                soundSettings.enabled = parsed.enabled !== false;
+                soundSettings.volume = parsed.volume || 0.3;
+            }
+        } catch(e) {}
+    })();
+
     var chatState = {
         conversations: [],
         currentConversation: null,
         messages: [],
         users: [],
+        onlineUsers: [], // Array of user IDs
         unreadTotal: 0,
         isTyping: false,
         currentUser: null,
@@ -83,20 +102,205 @@
         };
     }
 
-    // ===== Toast =====
-    function showToast(message, type) {
-        type = type || 'info';
-        var container = $('toastContainer');
-        var toast = document.createElement('div');
-        toast.className = 'toast ' + type;
-        var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-        toast.innerHTML = '<i class="fas ' + icon + '"></i> ' + escapeHtml(message);
-        container.appendChild(toast);
-        setTimeout(function() {
-            toast.classList.add('toast-exit');
-            setTimeout(function() { toast.remove(); }, 300);
-        }, 3000);
+    // ===== Sound System (Web Audio API) =====
+    var audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            var AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                audioCtx = new AudioContext();
+            }
+        }
+        return audioCtx;
     }
+
+    function unlockAudio() {
+        if (audioContextUnlocked) return;
+        audioContextUnlocked = true;
+        var ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume();
+        }
+    }
+
+    // Unlock audio on first user interaction
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    function playNotificationSound() {
+        if (!soundSettings.enabled) return;
+        if (!audioContextUnlocked) return;
+        
+        try {
+            var ctx = getAudioContext();
+            if (!ctx) return;
+            var now = ctx.currentTime;
+
+            // Two-tone notification (WhatsApp-like)
+            var osc1 = ctx.createOscillator();
+            var gain1 = ctx.createGain();
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(830, now);
+            osc1.frequency.setValueAtTime(660, now + 0.08);
+            gain1.gain.setValueAtTime(soundSettings.volume, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc1.start(now);
+            osc1.stop(now + 0.25);
+
+            var osc2 = ctx.createOscillator();
+            var gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1047, now + 0.12);
+            osc2.frequency.setValueAtTime(830, now + 0.2);
+            gain2.gain.setValueAtTime(soundSettings.volume * 0.8, now + 0.12);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc2.start(now + 0.12);
+            osc2.stop(now + 0.4);
+        } catch(e) {
+            console.log('[Chat] Sound error:', e.message);
+        }
+    }
+
+    function playSentSound() {
+        if (!soundSettings.enabled) return;
+        if (!audioContextUnlocked) return;
+        try {
+            var ctx = getAudioContext();
+            if (!ctx) return;
+            var now = ctx.currentTime;
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            gain.gain.setValueAtTime(soundSettings.volume * 0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        } catch(e) {}
+    }
+
+    // ===== Toast Notification System =====
+    var ToastSystem = {
+        container: null,
+        stack: [],
+        maxStack: 5,
+        duration: 6000,
+
+        init: function() {
+            this.container = document.createElement('div');
+            this.container.id = 'chatToastContainer';
+            this.container.className = 'chat-toast-container';
+            this.container.setAttribute('dir', 'rtl');
+            document.body.appendChild(this.container);
+        },
+
+        show: function(data) {
+            if (!this.container) this.init();
+
+            var senderName = data.senderName || 'مستخدم';
+            var senderId = data.senderId || '';
+            var conversationId = data.conversationId;
+            var messageContent = data.content || '';
+            var messageId = data.messageId;
+            var timestamp = data.timestamp || new Date().toISOString();
+
+            // Smart filter: Don't show if viewing this conversation
+            if (chatState.currentConversation &&
+                String(chatState.currentConversation.id) === String(conversationId)) {
+                return;
+            }
+
+            // Smart filter: Don't show own messages
+            if (senderId && chatState.currentUser && String(senderId) === String(chatState.currentUser.id)) {
+                return;
+            }
+
+            // Limit stack
+            if (this.stack.length >= this.maxStack) {
+                var oldest = this.stack.shift();
+                this._remove(oldest.el);
+            }
+
+            var toast = this._createElement(senderName, messageContent, timestamp, conversationId);
+            this.container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(function() {
+                toast.classList.add('chat-toast-visible');
+            });
+
+            var obj = { el: toast, conversationId: conversationId, messageId: messageId };
+            this.stack.push(obj);
+
+            // Play sound
+            playNotificationSound();
+
+            // Auto remove
+            setTimeout(function() {
+                ToastSystem._remove(toast);
+            }, this.duration);
+        },
+
+        _createElement: function(senderName, content, timestamp, conversationId) {
+            var toast = document.createElement('div');
+            toast.className = 'chat-toast';
+            toast.dataset.conversationId = conversationId;
+
+            var initials = senderName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2);
+            var colors = ['#0D9488', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
+            var color = colors[senderName.charCodeAt(0) % colors.length];
+            var time = formatTime(timestamp);
+            var preview = escapeHtml(content).substring(0, 60);
+            if (content.length > 60) preview += '...';
+
+            toast.innerHTML =
+                '<div class="chat-toast-avatar" style="background:' + color + '"><span>' + initials + '</span></div>' +
+                '<div class="chat-toast-body">' +
+                    '<div class="chat-toast-header">' +
+                        '<span class="chat-toast-name">' + escapeHtml(senderName) + '</span>' +
+                        '<span class="chat-toast-time">' + time + '</span>' +
+                    '</div>' +
+                    '<div class="chat-toast-preview">' + preview + '</div>' +
+                '</div>' +
+                '<button class="chat-toast-close" title="إغلاق">&times;</button>';
+
+            // Click to open conversation
+            toast.addEventListener('click', function(e) {
+                if (e.target.closest('.chat-toast-close')) return;
+                window.openConversation(conversationId);
+                ToastSystem._remove(toast);
+            });
+
+            toast.querySelector('.chat-toast-close').addEventListener('click', function(e) {
+                e.stopPropagation();
+                ToastSystem._remove(toast);
+            });
+
+            return toast;
+        },
+
+        _remove: function(el) {
+            if (!el || !el.parentNode) return;
+            el.classList.remove('chat-toast-visible');
+            el.classList.add('chat-toast-hiding');
+            setTimeout(function() {
+                if (el.parentNode) el.parentNode.removeChild(el);
+                ToastSystem.stack = ToastSystem.stack.filter(function(t) { return t.el !== el; });
+            }, 300);
+        },
+
+        clearAll: function() {
+            this.stack.forEach(function(t) { ToastSystem._remove(t.el); });
+            this.stack = [];
+        }
+    };
 
     // ===== API =====
     var ChatAPI = {
@@ -130,6 +334,16 @@
             if (!res.ok) throw new Error('Failed to mark read');
             return res.json();
         },
+        markConversationRead: async function(convId) {
+            // Mark all messages in conversation as read
+            if (!chatState.messages || chatState.messages.length === 0) return;
+            var unreadMessages = chatState.messages.filter(function(m) {
+                return m.sender_id !== chatState.currentUser.id && !isMessageReadByMe(m);
+            });
+            for (var i = 0; i < unreadMessages.length; i++) {
+                try { await ChatAPI.markRead(unreadMessages[i].id); } catch(e) {}
+            }
+        },
         createGroup: async function(title, participantIds) {
             var res = await fetch('/api/chat/conversations', {
                 method: 'POST',
@@ -160,33 +374,58 @@
         }
     };
 
-    // ===== WebSocket =====
+    // ===== Check if message is read by current user =====
+    function isMessageReadByMe(message) {
+        if (!message.read_by || !Array.isArray(message.read_by)) return false;
+        if (!chatState.currentUser) return false;
+        return message.read_by.some(function(r) {
+            var rId = r.user_id !== undefined ? r.user_id : r.userId;
+            return String(rId) === String(chatState.currentUser.id);
+        });
+    }
+
+    // ===== WebSocket (Enhanced) =====
     var ChatSocket = {
         ws: null,
         connected: false,
+        reconnectAttempts: 0,
+        maxReconnectDelay: 30000,
+        heartbeatInterval: null,
         messageCallbacks: [],
         typingCallbacks: [],
+        readCallbacks: [],
+        presenceCallbacks: [],
 
         connect: function() {
             var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             var wsUrl = protocol + '//' + location.host + '/ws';
+            // Include token in the WebSocket protocol header for auth
             try {
-                this.ws = new WebSocket(wsUrl);
+                this.ws = new WebSocket(wsUrl, authToken);
                 var self = this;
 
                 this.ws.onopen = function() {
                     self.connected = true;
-                    console.log('Chat WS: connected');
+                    self.reconnectAttempts = 0;
+                    console.log('[ChatSocket] Connected');
+                    
                     // Subscribe to current conversation if any
                     if (chatState.currentConversation) {
                         self.subscribe(chatState.currentConversation.id);
                     }
-                    // Subscribe to ALL conversations for real-time delivery
+                    // Subscribe to all conversations for instant delivery
                     chatState.conversations.forEach(function(conv) {
                         self.subscribe(conv.id);
                     });
-                    // Send presence ping
+                    
+                    // Start heartbeat
+                    self.startHeartbeat();
+                    
+                    // Send presence
                     self.sendPresence();
+                    
+                    // Update connection status indicator
+                    updateConnectionStatus(true);
                 };
 
                 this.ws.onmessage = function(event) {
@@ -194,27 +433,67 @@
                         var data = JSON.parse(event.data);
                         self.handleMessage(data);
                     } catch (e) {
-                        console.error('Chat WS parse error:', e);
+                        console.error('[ChatSocket] Parse error:', e);
                     }
                 };
 
                 this.ws.onerror = function(err) {
-                    console.error('Chat WS error:', err);
+                    console.error('[ChatSocket] Error:', err);
+                    updateConnectionStatus(false);
                 };
 
                 this.ws.onclose = function() {
                     self.connected = false;
-                    console.log('Chat WS: closed, reconnecting in 5s...');
-                    setTimeout(function() { self.connect(); }, 5000);
+                    self.stopHeartbeat();
+                    updateConnectionStatus(false);
+                    
+                    // Exponential backoff reconnect
+                    var delay = Math.min(1000 * Math.pow(2, self.reconnectAttempts), self.maxReconnectDelay);
+                    self.reconnectAttempts++;
+                    console.log('[ChatSocket] Disconnected, reconnecting in', delay, 'ms (attempt', self.reconnectAttempts, ')');
+                    setTimeout(function() { self.connect(); }, delay);
                 };
             } catch (e) {
-                console.error('Chat WS init error:', e);
+                console.error('[ChatSocket] Init error:', e);
+            }
+        },
+
+        startHeartbeat: function() {
+            this.stopHeartbeat();
+            var self = this;
+            this.heartbeatInterval = setInterval(function() {
+                if (self.connected && self.ws && self.ws.readyState === WebSocket.OPEN) {
+                    self.ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 25000);
+        },
+
+        stopHeartbeat: function() {
+            if (this.heartbeatInterval) {
+                clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
             }
         },
 
         handleMessage: function(data) {
+            // Heartbeat response
+            if (data.type === 'pong' || data.type === 'ping') {
+                return;
+            }
             if (data.type === 'connected') {
-                console.log('Chat WS:', data.message);
+                console.log('[ChatSocket]:', data.message);
+                // Update online users list from server
+                if (data.onlineUsers) {
+                    chatState.onlineUsers = data.onlineUsers.map(function(u) { return u.id; });
+                    updateAllOnlineStatuses();
+                }
+                return;
+            }
+            if (data.type === 'online_users_list') {
+                if (data.users) {
+                    chatState.onlineUsers = data.users.map(function(u) { return u.id; });
+                    updateAllOnlineStatuses();
+                }
                 return;
             }
             if (data.type === 'chat_message') {
@@ -222,15 +501,26 @@
             } else if (data.type === 'chat_typing') {
                 this.typingCallbacks.forEach(function(cb) { cb(data); });
             } else if (data.type === 'chat_read') {
-                (this.readCallbacks || []).forEach(function(cb) { cb(data); });
-            } else if (data.type === 'chat_presence' || data.type === 'user_online' || data.type === 'user_offline') {
-                // Normalize to chat_presence format
-                if (data.type === 'user_online') {
-                    data = { userId: data.userId, name: data.name, status: 'online' };
-                } else if (data.type === 'user_offline') {
-                    data = { userId: data.userId, name: data.name, status: 'offline', timestamp: new Date().toISOString() };
+                this.readCallbacks.forEach(function(cb) { cb(data); });
+            } else if (data.type === 'user_online') {
+                // Add to online users
+                if (data.userId && !chatState.onlineUsers.includes(data.userId)) {
+                    chatState.onlineUsers.push(data.userId);
                 }
-                (this.presenceCallbacks || []).forEach(function(cb) { cb(data); });
+                this.presenceCallbacks.forEach(function(cb) {
+                    cb({ userId: data.userId, name: data.name, status: 'online', timestamp: data.timestamp });
+                });
+            } else if (data.type === 'user_offline') {
+                // Remove from online users
+                chatState.onlineUsers = chatState.onlineUsers.filter(function(id) {
+                    return id !== data.userId;
+                });
+                this.presenceCallbacks.forEach(function(cb) {
+                    cb({ userId: data.userId, name: data.name, status: 'offline', timestamp: data.timestamp });
+                });
+            } else if (data.type === 'chat_presence_ack') {
+                // Server acknowledged our presence - we're online
+                return;
             }
         },
 
@@ -240,6 +530,14 @@
 
         onTyping: function(callback) {
             this.typingCallbacks.push(callback);
+        },
+
+        onRead: function(callback) {
+            this.readCallbacks.push(callback);
+        },
+
+        onPresence: function(callback) {
+            this.presenceCallbacks.push(callback);
         },
 
         sendTyping: function(conversationId) {
@@ -259,6 +557,14 @@
             }));
         },
 
+        unsubscribe: function(conversationId) {
+            if (!this.connected || !this.ws) return;
+            this.ws.send(JSON.stringify({
+                type: 'chat_unsubscribe',
+                conversationId: conversationId
+            }));
+        },
+
         sendPresence: function() {
             if (!this.connected || !this.ws) return;
             this.ws.send(JSON.stringify({
@@ -268,16 +574,24 @@
             }));
         },
 
-        onRead: function(callback) {
-            this.readCallbacks = this.readCallbacks || [];
-            this.readCallbacks.push(callback);
-        },
-
-        onPresence: function(callback) {
-            this.presenceCallbacks = this.presenceCallbacks || [];
-            this.presenceCallbacks.push(callback);
+        sendLogout: function() {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ type: 'logout' }));
+            }
         }
     };
+
+    // ===== Connection Status Indicator =====
+    function updateConnectionStatus(isConnected) {
+        var statusEl = $('sidebarUserStatus');
+        if (!statusEl) return;
+        
+        if (isConnected) {
+            statusEl.innerHTML = '<span class="status-dot online"></span> متصل';
+        } else {
+            statusEl.innerHTML = '<span class="status-dot offline" style="background:#EF4444"></span> جاري الاتصال...';
+        }
+    }
 
     // ===== UI Components =====
     function renderConversationList(conversations) {
@@ -297,15 +611,17 @@
             var avatarIcon = conv.type === 'group' ? 'fa-users' : 'fa-user';
             var activeClass = isActive ? 'active' : '';
 
-            // Determine if other participant is online
+            // Check if other participant is online (for private chats)
             var otherOnline = false;
-            if (conv.type === 'private' && window.onlineUsersList) {
-                var otherParticipant = conv.participants.find(function(p) { return p.user_id !== chatState.currentUser.id; });
+            if (conv.type === 'private') {
+                var otherParticipant = conv.participants.find(function(p) {
+                    return p.user_id !== (chatState.currentUser ? chatState.currentUser.id : null);
+                });
                 if (otherParticipant) {
-                    otherOnline = window.onlineUsersList.some(function(u) { return u.id == otherParticipant.user_id; });
+                    otherOnline = chatState.onlineUsers.includes(otherParticipant.user_id);
                 }
             }
-            
+
             html += '<div class="conversation-item ' + activeClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
                 '<div class="conversation-avatar ' + (conv.type === 'group' ? 'group' : '') + '">' +
                     '<i class="fas ' + avatarIcon + '"></i>' +
@@ -334,51 +650,85 @@
             conversations.forEach(function(c) { total += (c.unread_count || 0); });
         }
         chatState.unreadTotal = total;
-        // Update document title
         if (total > 0) {
-            document.title = '(' + total + ') المراسلات – منصة إدارة العمليات الإسعافية';
+            document.title = '(' + total + ') المراسلات \u2013 منصة إدارة العمليات الإسعافية';
         } else {
-            document.title = 'الدردشة – منصة إدارة العمليات الإسعافية';
+            document.title = 'الدردشة \u2013 منصة إدارة العمليات الإسعافية';
         }
+    }
+
+    // ===== Read Receipt Status =====
+    function getReadStatusHtml(message, isMine) {
+        if (!isMine) return '';
+
+        var readCount = 0;
+        var totalParticipants = (chatState.currentConversation && chatState.currentConversation.participants
+            ? chatState.currentConversation.participants.length : 2);
+        var otherReaders = 0;
+
+        if (message.read_by && Array.isArray(message.read_by)) {
+            message.read_by.forEach(function(r) {
+                var rId = r.user_id !== undefined ? r.user_id : r.userId;
+                if (String(rId) !== String(message.sender_id)) otherReaders++;
+            });
+            readCount = message.read_by.length;
+        }
+
+        // Check if message has temp- prefix (not yet confirmed by server)
+        var isTemp = message.id && String(message.id).startsWith('temp-');
+
+        var statusClass = '';
+        var icon = '';
+        var title = '';
+
+        if (isTemp) {
+            // Sending...
+            icon = '<i class="fas fa-clock"></i>';
+            statusClass = 'sending';
+            title = 'جاري الإرسال...';
+        } else if (otherReaders === 0) {
+            // Sent (single checkmark)
+            icon = '<i class="fas fa-check"></i>';
+            statusClass = 'sent';
+            title = 'تم الإرسال';
+        } else if (otherReaders < totalParticipants - 1) {
+            // Delivered to some (double checkmark gray)
+            icon = '<i class="fas fa-check-double"></i>';
+            statusClass = 'delivered';
+            title = 'تم التسليم';
+        } else {
+            // Read by all (double checkmark blue)
+            icon = '<i class="fas fa-check-double"></i>';
+            statusClass = 'read';
+            title = 'تم القراءة';
+        }
+
+        return '<span class="message-read-status ' + statusClass + '" title="' + title + '">' + icon + '</span>';
     }
 
     function renderMessageBubble(message, isMine) {
         var bubbleClass = isMine ? 'sent' : 'received';
         var time = formatTime(message.created_at);
-        var readStatus = '';
-        if (isMine) {
-            var readCount = message.read_by ? message.read_by.length : 0;
-            var totalParticipants = chatState.currentConversation && chatState.currentConversation.participants
-                ? chatState.currentConversation.participants.length : 2;
-            // Read if at least one other participant has read (readCount > 0 means someone besides sender)
-            // Actually read_by includes the sender's own read too sometimes, so check:
-            var otherReaders = 0;
-            if (message.read_by) {
-                message.read_by.forEach(function(r) {
-                    var rId = r.user_id !== undefined ? r.user_id : r.userId;
-                    if (String(rId) !== String(message.sender_id)) otherReaders++;
-                });
-            }
-            var isRead = otherReaders > 0;
-            var readClass = isRead ? 'read' : '';
-            readStatus = '<span class="message-read ' + readClass + '">' + (isRead ? '<i class="fas fa-check-double"></i>' : '<i class="fas fa-check"></i>') + '</span>';
-        }
+        var readStatus = getReadStatusHtml(message, isMine);
         var content = escapeHtml(message.content).replace(/\n/g, '<br>');
 
-        var senderName = !isMine && message.sender_name ? '<div class="message-sender">' + escapeHtml(message.sender_name) + '</div>' : '';
+        var senderName = !isMine && message.sender_name
+            ? '<div class="message-sender">' + escapeHtml(message.sender_name) + '</div>' : '';
 
-        return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '">' +
+        return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '" data-message-id="' + message.id + '">' +
             '<div class="message-bubble ' + bubbleClass + '">' +
                 senderName +
                 '<div class="message-content">' + content + '</div>' +
-                '<div class="message-time">' + readStatus + ' ' + time + '</div>' +
+                '<div class="message-meta">' +
+                    '<span class="message-time">' + time + '</span>' +
+                    readStatus +
+                '</div>' +
             '</div>' +
         '</div>';
     }
 
     function renderTypingIndicator(userName) {
-        userName = userName || 'يكتب';
-        $('typingText').textContent = userName + '...';
+        $('typingText').textContent = (userName || 'يكتب') + '...';
         $('typingIndicator').style.display = 'flex';
     }
 
@@ -401,8 +751,11 @@
             var selectedClass = isSelected ? 'selected' : '';
             var checkHtml = selectable ? '<div class="user-item-check"><i class="fas fa-check"></i></div>' : '';
 
+            // Check online status
+            var isOnline = chatState.onlineUsers.includes(user.id);
+
             html += '<div class="user-item ' + selectedClass + '" data-id="' + user.id + '" data-name="' + escapeHtml(user.name || user.username) + '">' +
-                '<div class="user-item-avatar"><i class="fas fa-user"></i></div>' +
+                '<div class="user-item-avatar ' + (isOnline ? 'online' : '') + '"><i class="fas fa-user"></i></div>' +
                 '<div class="user-item-info">' +
                     '<div class="user-item-name">' + escapeHtml(user.name || user.username) + '</div>' +
                     '<div class="user-item-role">' + escapeHtml(user.role || 'مستخدم') + '</div>' +
@@ -420,7 +773,7 @@
             var data = await ChatAPI.getConversations();
             chatState.conversations = data.conversations || [];
             renderConversationList(chatState.conversations);
-            // Subscribe to all conversations via WebSocket
+            // Subscribe to all conversations
             chatState.conversations.forEach(function(conv) {
                 ChatSocket.subscribe(conv.id);
             });
@@ -451,7 +804,9 @@
         $('chatHeaderAvatar').style.background = conv.type === 'group'
             ? 'linear-gradient(135deg, #3B82F6, #60A5FA)'
             : 'linear-gradient(135deg, #0D9488, #14B8A6)';
-        $('chatHeaderStatusText').textContent = conv.type === 'group' ? conv.participants.length + ' عضو' : 'متصل';
+
+        // Update header status
+        updateChatHeaderStatus(conv);
 
         // Subscribe to WS
         ChatSocket.subscribe(convId);
@@ -461,14 +816,45 @@
 
         // Mark unread as read
         if (conv.unread_count > 0) {
-            markConversationRead(conv);
+            try {
+                await ChatAPI.markConversationRead(convId);
+                conv.unread_count = 0;
+                renderConversationList(chatState.conversations);
+            } catch(e) {
+                console.error('markConversationRead error:', e);
+            }
         }
 
         // On mobile, close sidebar
         if (window.innerWidth <= 768) {
             closeSidebar();
         }
+
+        // Notify toast system about current conversation
+        ToastSystem.currentConversationId = convId;
     };
+
+    function updateChatHeaderStatus(conv) {
+        if (!conv) return;
+        var statusText = $('chatHeaderStatusText');
+        
+        if (conv.type === 'group') {
+            statusText.textContent = (conv.participants ? conv.participants.length : 0) + ' عضو';
+            statusText.classList.remove('online');
+        } else {
+            // Private chat - check if other participant is online
+            var other = conv.participants.find(function(p) {
+                return p.user_id !== (chatState.currentUser ? chatState.currentUser.id : null);
+            });
+            if (other && chatState.onlineUsers.includes(other.user_id)) {
+                statusText.textContent = 'متصل الآن';
+                statusText.classList.add('online');
+            } else {
+                statusText.textContent = 'غير متصل';
+                statusText.classList.remove('online');
+            }
+        }
+    }
 
     async function loadMessages(convId, page) {
         if (chatState.isLoadingMessages) return;
@@ -478,18 +864,16 @@
         try {
             var data = await ChatAPI.getMessages(convId, page);
             var newMessages = data.messages || [];
-            chatState.hasMoreMessages = data.hasMore === true;
+            chatState.hasMoreMessages = newMessages.length >= (data.limit || 50);
 
             if (page === 1) {
-                chatState.messages = newMessages;
+                chatState.messages = newMessages.reverse(); // Oldest first
                 $('messagesList').innerHTML = renderMessagesList(chatState.messages);
                 scrollToBottom();
             } else {
-                // Prepend older messages
                 var oldScrollHeight = $('chatMessages').scrollHeight;
-                chatState.messages = newMessages.concat(chatState.messages);
+                chatState.messages = newMessages.reverse().concat(chatState.messages);
                 $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                // Restore scroll position
                 var newScrollHeight = $('chatMessages').scrollHeight;
                 $('chatMessages').scrollTop = newScrollHeight - oldScrollHeight;
             }
@@ -517,7 +901,7 @@
                 html += '<div class="date-divider">' + formatDateDivider(msg.created_at) + '</div>';
                 lastDate = msgDate;
             }
-            var isMine = msg.sender_id === currentUserId;
+            var isMine = String(msg.sender_id) === String(currentUserId);
             html += renderMessageBubble(msg, isMine);
         });
 
@@ -529,25 +913,6 @@
         container.scrollTop = container.scrollHeight;
     }
 
-    async function markConversationRead(conv) {
-        if (!conv || !conv.last_message) return;
-        try {
-            await ChatAPI.markRead(conv.last_message.id);
-            conv.unread_count = 0;
-            renderConversationList(chatState.conversations);
-        } catch (e) {
-            console.error('markConversationRead:', e);
-        }
-    }
-
-    async function markMessageRead(messageId) {
-        try {
-            await ChatAPI.markRead(messageId);
-        } catch (e) {
-            console.error('markMessageRead:', e);
-        }
-    }
-
     // ===== Sending Messages =====
     async function sendMessage() {
         var input = $('messageInput');
@@ -555,9 +920,11 @@
         if (!content || !chatState.currentConversation) return;
 
         var convId = chatState.currentConversation.id;
+        var tempId = 'temp-' + Date.now();
         var tempMsg = {
-            id: 'temp-' + Date.now(),
+            id: tempId,
             sender_id: chatState.currentUser ? chatState.currentUser.id : null,
+            sender_name: chatState.currentUser ? chatState.currentUser.name : null,
             content: content,
             created_at: new Date().toISOString(),
             read_by: []
@@ -571,28 +938,47 @@
         input.style.height = 'auto';
         $('sendBtn').disabled = true;
 
+        // Play sent sound
+        playSentSound();
+
         try {
             var data = await ChatAPI.sendMessage(convId, { content: content, type: 'text' });
             if (data.success && data.message) {
                 // Replace temp message with real one
-                var idx = chatState.messages.findIndex(function(m) { return m.id === tempMsg.id; });
+                var idx = chatState.messages.findIndex(function(m) { return m.id === tempId; });
                 if (idx !== -1) {
                     chatState.messages[idx] = data.message;
                     $('messagesList').innerHTML = renderMessagesList(chatState.messages);
                 }
+                
+                // The server will broadcast the message to all participants
+                // But also update the conversation list immediately
+                conv.last_message = {
+                    content: data.message.content,
+                    sender_id: data.message.sender_id,
+                    created_at: data.message.created_at,
+                    sender_name: data.message.sender_name
+                };
+                conv.updated_at = data.message.created_at;
+                chatState.conversations.sort(function(a, b) {
+                    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+                });
+                renderConversationList(chatState.conversations);
             }
         } catch (e) {
             console.error('sendMessage:', e);
             showToast('تعذر إرسال الرسالة', 'error');
-            // Remove temp message
-            chatState.messages = chatState.messages.filter(function(m) { return m.id !== tempMsg.id; });
-            $('messagesList').innerHTML = renderMessagesList(chatState.messages);
+            // Mark as failed
+            var failIdx = chatState.messages.findIndex(function(m) { return m.id === tempId; });
+            if (failIdx !== -1) {
+                chatState.messages[failIdx]._failed = true;
+                $('messagesList').innerHTML = renderMessagesList(chatState.messages);
+            }
         }
     }
 
     function handleTyping() {
         if (!chatState.currentConversation) return;
-        // Debounce: only send typing every 2 seconds max
         var now = Date.now();
         if (chatState.lastTypingSent && (now - chatState.lastTypingSent) < 2000) return;
         chatState.lastTypingSent = now;
@@ -642,6 +1028,10 @@
 
     function filterUsers(query, listId, selectable) {
         query = (query || '').toLowerCase().trim();
+        if (!query) {
+            renderUserList(chatState.users, listId, selectable);
+            return;
+        }
         var filtered = chatState.users.filter(function(u) {
             var name = (u.name || u.username || '').toLowerCase();
             return name.indexOf(query) !== -1;
@@ -690,7 +1080,6 @@
         try {
             var data = await ChatAPI.startPrivateChat(userId);
             if (data.success && data.conversation) {
-                // Add to list if not exists
                 var exists = chatState.conversations.some(function(c) { return c.id === data.conversation.id; });
                 if (!exists) {
                     chatState.conversations.unshift(data.conversation);
@@ -744,54 +1133,106 @@
         $('sidebarOverlay').style.display = 'none';
     }
 
+    // ===== Update all online statuses across the UI =====
+    function updateAllOnlineStatuses() {
+        // Update conversation list
+        renderConversationList(chatState.conversations);
+        
+        // Update current conversation header
+        if (chatState.currentConversation) {
+            updateChatHeaderStatus(chatState.currentConversation);
+        }
+        
+        // Update user lists if modals are open
+        if ($('userList') && $('userList').children.length > 0) {
+            renderUserList(chatState.users, 'userList', false);
+        }
+        if ($('groupUserList') && $('groupUserList').children.length > 0) {
+            renderUserList(chatState.users, 'groupUserList', true);
+        }
+    }
+
     // ===== WebSocket Handlers =====
     function onIncomingMessage(data) {
         var msg = data.message;
         var convId = data.conversationId;
         if (!msg || !convId) return;
 
-        // Prevent duplicates: check if message already exists
-        var existingIdx = chatState.messages.findIndex(function(m) {
-            return m.id === msg.id || (m.id && m.id.toString().startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id);
-        });
-        if (existingIdx !== -1) {
-            // Replace temp message with real one, or just update if same id
-            chatState.messages[existingIdx] = msg;
-            if (chatState.currentConversation && chatState.currentConversation.id === convId) {
-                $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                scrollToBottom();
-            }
-            // Still update conversation preview below
-        }
+        var isMine = chatState.currentUser && String(msg.sender_id) === String(chatState.currentUser.id);
 
-        // Update conversation preview
+        // Update conversation list preview
         var conv = chatState.conversations.find(function(c) { return c.id === convId; });
         if (conv) {
-            conv.last_message = { content: msg.content, sender_id: msg.sender_id, created_at: msg.created_at, sender_name: msg.sender_name };
+            conv.last_message = {
+                content: msg.content,
+                sender_id: msg.sender_id,
+                created_at: msg.created_at,
+                sender_name: msg.sender_name
+            };
             conv.updated_at = msg.created_at;
+
+            // If this is the current conversation, add message to view
             if (chatState.currentConversation && chatState.currentConversation.id === convId) {
+                // Check for duplicate
+                var existingIdx = chatState.messages.findIndex(function(m) {
+                    return String(m.id) === String(msg.id);
+                });
                 if (existingIdx === -1) {
-                    // Truly new message, add it
-                    chatState.messages.push(msg);
+                    // Check if this replaces a temp message
+                    var tempIdx = chatState.messages.findIndex(function(m) {
+                        return String(m.id).startsWith('temp-') &&
+                            m.content === msg.content &&
+                            String(m.sender_id) === String(msg.sender_id);
+                    });
+                    if (tempIdx !== -1) {
+                        chatState.messages[tempIdx] = msg;
+                    } else {
+                        chatState.messages.push(msg);
+                    }
                     $('messagesList').innerHTML = renderMessagesList(chatState.messages);
                     scrollToBottom();
                 }
-                // Mark as read
-                markMessageRead(msg.id);
+
+                // Auto-mark as read if not mine
+                if (!isMine) {
+                    try {
+                        ChatAPI.markRead(msg.id);
+                        // Optimistically add read_by
+                        if (!msg.read_by) msg.read_by = [];
+                        var alreadyRead = msg.read_by.some(function(r) {
+                            var rId = r.user_id !== undefined ? r.user_id : r.userId;
+                            return String(rId) === String(chatState.currentUser.id);
+                        });
+                        if (!alreadyRead) {
+                            msg.read_by.push({ user_id: chatState.currentUser.id, read_at: new Date().toISOString() });
+                            $('messagesList').innerHTML = renderMessagesList(chatState.messages);
+                        }
+                    } catch(e) {}
+                }
             } else {
-                conv.unread_count = (conv.unread_count || 0) + 1;
-                // Play notification sound for new messages in other conversations
-                playNotificationSound();
-                // Show browser notification
-                showBrowserNotification(msg.sender_name || 'رسالة جديدة', msg.content || '', msg.sender_id);
+                // Not viewing this conversation - increment unread
+                if (!isMine) {
+                    conv.unread_count = (conv.unread_count || 0) + 1;
+                    
+                    // Show toast notification
+                    ToastSystem.show({
+                        senderName: msg.sender_name || 'مستخدم',
+                        senderId: msg.sender_id,
+                        conversationId: convId,
+                        content: msg.content,
+                        messageId: msg.id,
+                        timestamp: msg.created_at
+                    });
+                }
             }
+
             // Move to top
             chatState.conversations.sort(function(a, b) {
                 return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
             });
             renderConversationList(chatState.conversations);
 
-            // Notify other pages (index.html, etc.) via BroadcastChannel or localStorage event
+            // Notify other pages via BroadcastChannel
             try {
                 if (typeof BroadcastChannel !== 'undefined') {
                     var bc = new BroadcastChannel('chat_sync');
@@ -808,18 +1249,19 @@
     function onIncomingRead(data) {
         var messageId = data.messageId;
         var userId = data.userId;
+        var readAt = data.readAt || new Date().toISOString();
         if (!messageId) return;
-        // Find message and add read receipt
-        var msg = chatState.messages.find(function(m) { return m.id === messageId; });
+
+        // Find message and update read_by
+        var msg = chatState.messages.find(function(m) { return String(m.id) === String(messageId); });
         if (msg) {
             if (!msg.read_by) msg.read_by = [];
-            // Normalize comparison: both to string to handle number/string mismatch
             var alreadyRead = msg.read_by.some(function(r) {
                 var rId = r.user_id !== undefined ? r.user_id : r.userId;
                 return String(rId) === String(userId);
             });
             if (!alreadyRead) {
-                msg.read_by.push({ user_id: userId, read_at: new Date().toISOString() });
+                msg.read_by.push({ user_id: userId, read_at: readAt });
                 // Re-render if this message is visible
                 if (chatState.currentConversation) {
                     $('messagesList').innerHTML = renderMessagesList(chatState.messages);
@@ -828,107 +1270,35 @@
         }
     }
 
-    function playNotificationSound() {
-        try {
-            var audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
-            audio.volume = 0.3;
-            audio.play().catch(function(){});
-        } catch(e) {}
-    }
-
-    function showBrowserNotification(title, body, senderId) {
-        if (!('Notification' in window)) return;
-        if (Notification.permission !== 'granted') return;
-        try {
-            var notif = new Notification(title, {
-                body: body.substring(0, 100),
-                icon: '/logo.png',
-                tag: 'chat-' + senderId,
-                requireInteraction: false
-            });
-            notif.onclick = function() {
-                window.focus();
-                // Open conversation with sender
-                var conv = chatState.conversations.find(function(c) {
-                    return c.type === 'private' && c.participants.some(function(p) {
-                        return p.user_id === senderId;
-                    });
-                });
-                if (conv) openConversation(conv.id);
-            };
-        } catch(e) {}
-    }
-
     function onIncomingTyping(data) {
         if (!chatState.currentConversation) return;
         if (data.conversationId !== chatState.currentConversation.id) return;
-        // Don't show typing indicator for self
         if (data.user && chatState.currentUser && data.user.id == chatState.currentUser.id) return;
 
         renderTypingIndicator(data.user ? data.user.name : 'يكتب');
 
-        // Hide after 3 seconds
         if (chatState.typingTimeout) clearTimeout(chatState.typingTimeout);
         chatState.typingTimeout = setTimeout(hideTypingIndicator, 3000);
     }
 
     function onIncomingPresence(data) {
         if (!data.userId) return;
+        
         var isOnline = data.status === 'online';
         
-        // Update user online status in user list
-        var userItem = document.querySelector('.user-item[data-id="' + data.userId + '"]');
-        if (userItem) {
-            var statusDot = userItem.querySelector('.user-item-avatar');
-            if (statusDot) {
-                statusDot.classList.toggle('online', isOnline);
+        // Update online users array
+        if (isOnline) {
+            if (!chatState.onlineUsers.includes(data.userId)) {
+                chatState.onlineUsers.push(data.userId);
             }
-        }
-        
-        // Update conversation avatar status in the sidebar list
-        var convItems = document.querySelectorAll('.conversation-item');
-        convItems.forEach(function(item) {
-            var convId = parseInt(item.dataset.id);
-            var conv = chatState.conversations.find(function(c) { return c.id === convId; });
-            if (conv && conv.type === 'private') {
-                var other = conv.participants.find(function(p) { return p.user_id == data.userId; });
-                if (other) {
-                    var statusDot = item.querySelector('.avatar-status');
-                    if (statusDot) {
-                        statusDot.classList.toggle('online', isOnline);
-                        statusDot.classList.toggle('offline', !isOnline);
-                    }
-                }
-            }
-        });
-        
-        // Update conversation data
-        chatState.conversations.forEach(function(conv) {
-            if (conv.type === 'private') {
-                var other = conv.participants.find(function(p) { return p.user_id === data.userId; });
-                if (other) {
-                    conv.otherOnline = isOnline;
-                    conv.otherLastSeen = data.timestamp || new Date().toISOString();
-                }
-            }
-        });
-        
-        // Update header status if current conversation
-        if (chatState.currentConversation && chatState.currentConversation.type === 'private') {
-            var other = chatState.currentConversation.participants.find(function(p) {
-                return p.user_id !== chatState.currentUser.id;
+        } else {
+            chatState.onlineUsers = chatState.onlineUsers.filter(function(id) {
+                return id !== data.userId;
             });
-            if (other && other.user_id === data.userId) {
-                if (isOnline) {
-                    $('chatHeaderStatusText').textContent = 'متصل الآن';
-                    $('chatHeaderStatusText').classList.add('online');
-                } else {
-                    var lastSeen = data.timestamp ? formatTime(data.timestamp) : 'غير متصل';
-                    $('chatHeaderStatusText').textContent = 'آخر ظهور ' + lastSeen;
-                    $('chatHeaderStatusText').classList.remove('online');
-                }
-            }
         }
+        
+        // Update all UI elements
+        updateAllOnlineStatuses();
     }
 
     async function loadCurrentUser() {
@@ -959,12 +1329,36 @@
         renderConversationList(filtered);
     }
 
+    // ===== Toast (in-page) =====
+    function showToast(message, type) {
+        type = type || 'info';
+        var container = $('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+        var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+        toast.innerHTML = '<i class="fas ' + icon + '"></i> ' + escapeHtml(message);
+        container.appendChild(toast);
+        setTimeout(function() {
+            toast.classList.add('toast-exit');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
+    }
+
+    // ===== Sound Settings Panel =====
+    function toggleSoundSettings() {
+        var panel = $('soundSettingsPanel');
+        panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    window.toggleSoundMaster = function(checkbox) {
+        soundSettings.enabled = checkbox.checked;
+        localStorage.setItem('chat_sound_settings', JSON.stringify(soundSettings));
+    };
+
     // ===== Event Listeners =====
     function bindEvents() {
-        // Send button
         $('sendBtn').addEventListener('click', sendMessage);
 
-        // Enter to send, Shift+Enter for new line
         $('messageInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -972,7 +1366,6 @@
             }
         });
 
-        // Auto-resize textarea
         $('messageInput').addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
@@ -980,17 +1373,15 @@
             handleTyping();
         });
 
-        // Scroll pagination
         $('chatMessages').addEventListener('scroll', debounce(handleMessagesScroll, 200));
 
-        // New chat / group buttons
         $('newChatBtn').addEventListener('click', openNewChatModal);
         $('newGroupBtn').addEventListener('click', openNewGroupModal);
 
-        // Mobile toggle
         $('mobileSidebarToggle').addEventListener('click', openSidebar);
         $('chatHeaderBack').addEventListener('click', function() {
             chatState.currentConversation = null;
+            ToastSystem.currentConversationId = null;
             $('chatActive').style.display = 'none';
             $('chatEmpty').style.display = 'flex';
             renderConversationList(chatState.conversations);
@@ -998,12 +1389,10 @@
         });
         $('sidebarOverlay').addEventListener('click', closeSidebar);
 
-        // User search in new chat modal
         $('userSearchInput').addEventListener('input', function() {
             filterUsers(this.value, 'userList', false);
         });
 
-        // Click user in new chat modal
         $('userList').addEventListener('click', function(e) {
             var item = e.target.closest('.user-item');
             if (!item) return;
@@ -1011,12 +1400,10 @@
             startPrivateChat(userId);
         });
 
-        // Group user search
         $('groupUserSearchInput').addEventListener('input', function() {
             filterUsers(this.value, 'groupUserList', true);
         });
 
-        // Click user in group modal
         $('groupUserList').addEventListener('click', function(e) {
             var item = e.target.closest('.user-item');
             if (!item) return;
@@ -1025,18 +1412,21 @@
             toggleUserSelection(userId, userName);
         });
 
-        // Create group
         $('createGroupBtn').addEventListener('click', createGroup);
 
-        // Conversation search
         $('conversationSearch').addEventListener('input', function() {
             handleConversationSearch(this.value);
         });
 
-        // Attach button (placeholder)
         $('attachBtn').addEventListener('click', function() {
             showToast('سيتم دعم إرفاق الملفات قريباً', 'info');
         });
+
+        // Sound settings
+        var soundToggleBtn = document.getElementById('soundToggleBtn');
+        if (soundToggleBtn) {
+            soundToggleBtn.addEventListener('click', toggleSoundSettings);
+        }
 
         // Close modal on backdrop click
         document.querySelectorAll('.modal').forEach(function(modal) {
@@ -1053,14 +1443,31 @@
         try {
             var data = await ChatAPI.getOnlineUsers();
             if (data.success && data.onlineUsers) {
-                window.onlineUsersList = data.onlineUsers;
-                console.log('[chat] Loaded online users:', data.onlineUsers.length);
+                chatState.onlineUsers = data.onlineUsers.map(function(u) { return u.id; });
+                updateAllOnlineStatuses();
+                console.log('[chat] Online users loaded:', data.onlineUsers.length);
             }
         } catch (e) {
             console.log('[chat] Failed to load online users:', e);
         }
     }
-    
+
+    // Check for target conversation from URL or sessionStorage
+    function getTargetConversationId() {
+        // From URL ?conv=xxx
+        var urlParams = new URLSearchParams(window.location.search);
+        var convId = urlParams.get('conv');
+        if (convId) return parseInt(convId);
+        
+        // From sessionStorage (set by toast click from other pages)
+        var stored = sessionStorage.getItem('chat_target_conversation');
+        if (stored) {
+            sessionStorage.removeItem('chat_target_conversation');
+            return parseInt(stored);
+        }
+        return null;
+    }
+
     async function init() {
         bindEvents();
         await loadCurrentUser();
@@ -1074,17 +1481,34 @@
         ChatSocket.onTyping(onIncomingTyping);
         ChatSocket.onRead(onIncomingRead);
         ChatSocket.onPresence(onIncomingPresence);
-        
-        // Send offline status when closing page
+
+        // Handle target conversation
+        var targetConvId = getTargetConversationId();
+        if (targetConvId) {
+            setTimeout(function() {
+                var conv = chatState.conversations.find(function(c) { return c.id === targetConvId; });
+                if (conv) {
+                    openConversation(targetConvId);
+                }
+            }, 300);
+        }
+
+        // Send offline on page unload
         window.addEventListener('beforeunload', function() {
-            if (ChatSocket.ws && ChatSocket.ws.readyState === WebSocket.OPEN) {
-                ChatSocket.ws.send(JSON.stringify({
-                    type: 'chat_presence',
-                    userId: chatState.currentUser ? chatState.currentUser.id : null,
-                    status: 'offline'
-                }));
-            }
+            ChatSocket.sendLogout();
         });
+
+        // Request browser notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        // Periodic presence ping
+        setInterval(function() {
+            if (ChatSocket.connected) {
+                ChatSocket.sendPresence();
+            }
+        }, 30000);
     }
 
     // Start
