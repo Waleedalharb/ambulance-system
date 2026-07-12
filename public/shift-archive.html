@@ -27,7 +27,222 @@
         ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
         .fade-in { animation: fadeIn 0.5s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Save Status Indicator */
+        .save-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            width: fit-content;
+            transition: all 0.3s ease;
+        }
+        .save-status-indicator.saved { background: #D1FAE5; color: #059669; border: 1px solid #A7F3D0; }
+        .save-status-indicator.saving { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+        .save-status-indicator.error { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
+        .save-status-indicator.inactive { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+
+        /* Active Shift Section */
+        .active-shift-section {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+            animation: fadeIn 0.5s ease;
+        }
+        .active-shift-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .active-shift-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .active-shift-title .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.active { background: #10B981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        .status-dot.inactive { background: #94A3B8; }
+        .active-shift-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .active-shift-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .active-shift-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .active-shift-card:hover { border-color: #CBD5E1; transform: translateY(-1px); }
+        .active-shift-card .value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #1E293B;
+            margin-bottom: 4px;
+        }
+        .active-shift-card .label {
+            font-size: 0.75rem;
+            color: #64748B;
+        }
+        .active-shift-card .integrity-ok { color: #059669; }
+        .active-shift-card .integrity-fail { color: #DC2626; }
+
+        /* Shift Detail Modal Tabs */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid #E2E8F0;
+            margin-bottom: 16px;
+            overflow-x: auto;
+        }
+        .tab-nav button {
+            padding: 10px 16px;
+            border: none;
+            background: none;
+            color: #64748B;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab-nav button:hover { color: #2563EB; }
+        .tab-nav button.active { color: #2563EB; border-bottom-color: #2563EB; }
+        .tab-panel { display: none; animation: fadeIn 0.3s ease; }
+        .tab-panel.active { display: block; }
+
+        /* Summary Cards in Modal */
+        .summary-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+        .summary-card .value { font-size: 1.3rem; font-weight: 800; color: #1E293B; }
+        .summary-card .label { font-size: 0.75rem; color: #64748B; }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-right: 24px;
+            border-right: 2px solid #E2E8F0;
+            margin-right: 8px;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 20px;
+            padding-right: 24px;
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute;
+            right: -31px;
+            top: 2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #CBD5E1;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 0 0 2px #CBD5E1;
+        }
+        .timeline-dot.start { background: #2563EB; box-shadow: 0 0 0 2px #2563EB; }
+        .timeline-dot.save { background: #10B981; box-shadow: 0 0 0 2px #10B981; }
+        .timeline-dot.report { background: #8B5CF6; box-shadow: 0 0 0 2px #8B5CF6; }
+        .timeline-dot.team { background: #F59E0B; box-shadow: 0 0 0 2px #F59E0B; }
+        .timeline-dot.end { background: #EF4444; box-shadow: 0 0 0 2px #EF4444; }
+        .timeline-time {
+            font-size: 0.75rem;
+            color: #94A3B8;
+            margin-bottom: 4px;
+        }
+        .timeline-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 2px;
+        }
+        .timeline-desc {
+            font-size: 0.85rem;
+            color: #64748B;
+        }
+
+        /* Lists in Tabs */
+        .tab-list { list-style: none; padding: 0; margin: 0; }
+        .tab-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid #F1F5F9;
+            transition: background 0.2s;
+        }
+        .tab-list-item:hover { background: #F8FAFC; }
+        .tab-list-item:last-child { border-bottom: none; }
+        .tab-list-meta { font-size: 0.8rem; color: #94A3B8; }
+
+        /* Snapshot Modal */
+        .snapshot-view {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #E2E8F0;
+            max-height: 60vh;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Section Titles */
+        .section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title i { color: #2563EB; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .active-shift-header { flex-direction: column; align-items: flex-start; }
+            .active-shift-cards { grid-template-columns: repeat(2, 1fr); }
+            .summary-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
+<base target="_blank">
 </head>
 <body class="dashboard-page">
     <div class="dashboard-top-bar">
@@ -44,6 +259,93 @@
 
     <div class="dashboard-container">
         <div class="dashboard-title"><i class="fas fa-archive"></i> أرشيف المناوبات</div>
+
+        <!-- Save Status Indicator -->
+        <div id="saveStatusIndicator" class="save-status-indicator inactive">
+            <i class="fas fa-circle"></i>
+            <span id="saveStatusText">لا توجد مناوبة نشطة</span>
+        </div>
+
+
+        <!-- Active Shift Section -->
+        <div id="activeShiftSection" class="active-shift-section" style="display:none;">
+            <div class="active-shift-header">
+                <div class="active-shift-title">
+                    <span class="status-dot active" id="activeShiftDot"></span>
+                    <span id="activeShiftTitle">مناوبة نشطة</span>
+                </div>
+                <div class="active-shift-actions">
+                    <button class="dashboard-btn dashboard-btn-primary" id="btnViewSnapshot" onclick="viewActiveSnapshot()">
+                        <i class="fas fa-eye"></i> استعراض آخر نسخة محفوظة
+                    </button>
+                    <button class="dashboard-btn dashboard-btn-success" id="btnArchiveShift" onclick="archiveActiveShift()">
+                        <i class="fas fa-archive"></i> أرشفة المناوبة
+                    </button>
+                </div>
+            </div>
+            <div class="active-shift-cards" id="activeShiftCards"></div>
+
+            <!-- Completion Details Section -->
+            <div id="completionDetailsSection" style="display:none; margin-top:24px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                    <h3 style="font-size:1.1rem; font-weight:700; color:var(--text);"><i class="fas fa-clipboard-check" style="color:var(--primary); margin-left:8px;"></i> تفاصيل التكميل</h3>
+                    <span id="completionNotesBadge" style="display:none; background:var(--yellow-light); color:var(--yellow); padding:4px 12px; border-radius:12px; font-size:0.8rem; font-weight:600;"><i class="fas fa-sticky-note"></i> يوجد ملاحظات</span>
+                </div>
+
+                <!-- Completion Notes -->
+                <div id="completionNotes" style="display:none; background:var(--yellow-light); border-right:4px solid var(--yellow); padding:16px; border-radius:12px; margin-bottom:20px;">
+                    <div style="font-weight:700; margin-bottom:8px; color:var(--yellow);"><i class="fas fa-sticky-note"></i> ملاحظات التكميل</div>
+                    <div id="completionNotesText" style="white-space:pre-wrap; line-height:1.6;"></div>
+                </div>
+
+                <!-- Rapid Teams -->
+                <div id="rapidTeamsSection" style="display:none; margin-bottom:24px;">
+                    <h4 style="font-size:1rem; font-weight:700; margin-bottom:12px; color:var(--text); display:flex; align-items:center; gap:8px;"><i class="fas fa-bolt" style="color:var(--yellow);"></i> فرق التدخل السريع</h4>
+                    <div class="completion-grid" id="rapidTeamsGrid"></div>
+                </div>
+
+                <!-- Operational Teams (South) -->
+                <div id="southTeamsSection" style="display:none; margin-bottom:24px;">
+                    <h4 style="font-size:1rem; font-weight:700; margin-bottom:12px; color:var(--text); display:flex; align-items:center; gap:8px;"><i class="fas fa-hospital" style="color:var(--primary);"></i> مراكز الإسعاف</h4>
+                    <div class="completion-grid" id="southTeamsGrid"></div>
+                </div>
+
+                <!-- Special Teams -->
+                <div id="specialTeamsSection" style="display:none; margin-bottom:24px;">
+                    <h4 style="font-size:1rem; font-weight:700; margin-bottom:12px; color:var(--text); display:flex; align-items:center; gap:8px;"><i class="fas fa-users" style="color:var(--purple);"></i> الفرق الخاصة والدعم</h4>
+                    <div class="completion-grid" id="specialTeamsGrid"></div>
+                </div>
+            </div>
+
+            <!-- Completion Team Card Styles -->
+            <style>
+            .completion-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+            .comp-card { background:var(--card); border:2px solid var(--border); border-radius:14px; padding:14px; transition:all 0.2s; }
+            .comp-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+            .comp-card.status-ready { border-color:var(--green); background:var(--green-light); }
+            .comp-card.status-missing { border-color:var(--yellow); background:var(--yellow-light); }
+            .comp-card.status-offline { border-color:var(--red); background:var(--red-light); }
+            .comp-card.status-pending { border-color:var(--gray); background:var(--gray-light); }
+            .comp-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+            .comp-type { font-size:0.65rem; font-weight:700; padding:2px 10px; border-radius:8px; text-transform:uppercase; }
+            .comp-type.rapid { background:var(--yellow-light); color:#92400E; }
+            .comp-type.center { background:#DBEAFE; color:#1E40AF; }
+            .comp-type.special { background:#F3E8FF; color:#7C3AED; }
+            .comp-name { font-size:1rem; font-weight:700; }
+            .comp-center { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+            .comp-status { font-size:0.75rem; font-weight:700; padding:4px 14px; border-radius:20px; display:inline-block; margin-top:8px; }
+            .comp-card.status-ready .comp-status { background:var(--green); color:#fff; }
+            .comp-card.status-missing .comp-status { background:var(--yellow); color:#fff; }
+            .comp-card.status-offline .comp-status { background:var(--red); color:#fff; }
+            .comp-card.status-pending .comp-status { background:var(--gray); color:#fff; }
+            .comp-paramedics { font-size:0.8rem; margin-top:10px; }
+            .comp-paramedics .name-tag { display:inline-block; background:rgba(255,255,255,0.7); padding:3px 10px; border-radius:8px; margin:3px 2px; font-size:0.75rem; }
+            .comp-reason { font-size:0.75rem; margin-top:8px; padding:6px 10px; border-radius:8px; background:rgba(255,255,255,0.5); }
+            .comp-reason .label { font-weight:700; color:var(--muted); }
+            .section-divider { height:1px; background:var(--border); margin:24px 0; }
+            :root { --purple:#8B5CF6; }
+            </style>
+        </div>
 
         <!-- Search Bar -->
         <div class="archive-search-bar">
@@ -82,8 +384,21 @@
                 <input type="text" id="filterSupervisor" name="supervisor" placeholder="اسم المشرف" />
             </div>
             <div class="filter-group">
-                <label>الموظف</label>
-                <input type="text" id="filterEmployee" name="employee" placeholder="اسم الموظف" />
+                <label>الفرقة</label>
+                <input type="text" id="filterTeam" name="team" placeholder="اسم الفرقة" />
+            </div>
+            <div class="filter-group">
+                <label>رقم البلاغ</label>
+                <input type="text" id="filterReportId" name="report_id" placeholder="رقم البلاغ" />
+            </div>
+            <div class="filter-group">
+                <label>حالة البلاغ</label>
+                <select id="filterReportStatus" name="report_status">
+                    <option value="">الكل</option>
+                    <option value="open">مفتوح</option>
+                    <option value="completed">مكتمل</option>
+                    <option value="pending">معلق</option>
+                </select>
             </div>
             <div class="filter-group">
                 <label>الحالة</label>
@@ -134,6 +449,66 @@
         <div id="pagination"></div>
     </div>
 
+    <!-- Shift Detail Modal -->
+    <div id="shiftDetailModal" class="dashboard-modal-overlay">
+        <div class="dashboard-modal-content" style="max-width: 1000px;">
+            <div class="dashboard-modal-header">
+                <div class="dashboard-modal-title" id="modalShiftTitle">
+                    <i class="fas fa-clipboard-list"></i> تفاصيل المناوبة
+                </div>
+                <button class="dashboard-modal-close" onclick="closeShiftDetail()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="dashboard-modal-body">
+                <!-- Summary Cards -->
+                <div class="section-title"><i class="fas fa-chart-pie"></i> ملخص المناوبة</div>
+                <div class="summary-cards-grid" id="modalSummaryCards"></div>
+
+                <!-- Tabs -->
+                <div class="tab-nav">
+                    <button class="active" onclick="switchTab('overview', this)">نظرة عامة</button>
+                    <button onclick="switchTab('teams', this)">توزيع الفرق</button>
+                    <button onclick="switchTab('reports', this)">البلاغات</button>
+                    <button onclick="switchTab('forms', this)">النماذج</button>
+                    <button onclick="switchTab('notes', this)">الملاحظات</button>
+                    <button onclick="switchTab('timeline', this)">السجل الزمني</button>
+                </div>
+
+                <div id="tab-overview" class="tab-panel active">
+                    <div id="overviewContent">جاري التحميل...</div>
+                </div>
+                <div id="tab-teams" class="tab-panel">
+                    <div id="teamsContent">جاري التحميل...</div>
+                </div>
+                <div id="tab-reports" class="tab-panel">
+                    <div id="reportsContent">جاري التحميل...</div>
+                </div>
+                <div id="tab-forms" class="tab-panel">
+                    <div id="formsContent">جاري التحميل...</div>
+                </div>
+                <div id="tab-notes" class="tab-panel">
+                    <div id="notesContent">جاري التحميل...</div>
+                </div>
+                <div id="tab-timeline" class="tab-panel">
+                    <div id="timelineContent">جاري التحميل...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Snapshot Modal -->
+    <div id="snapshotModal" class="dashboard-modal-overlay">
+        <div class="dashboard-modal-content" style="max-width: 700px;">
+            <div class="dashboard-modal-header">
+                <div class="dashboard-modal-title"><i class="fas fa-camera"></i> نسخة محفوظة</div>
+                <button class="dashboard-modal-close" onclick="DashUtils.closeModal('snapshotModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="dashboard-modal-body">
+                <div id="snapshotContent" class="snapshot-view">جاري التحميل...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth-manager.js"></script>
     <script src="/js/shift-dashboard.js"></script>
     <script src="/js/shift-charts.js"></script>
     <script src="/js/shift-search.js"></script>
@@ -146,9 +521,736 @@
         var currentTotal = 0;
         var selectedIds = new Set();
         var currentShifts = [];
+        var activeShiftData = null;
+        var activeCompletionData = null; // Stores full completion details from /api/completion/latest
+        var currentModalShiftId = null;
+
         DashUtils.initLiveClock('liveClock');
         if (!DashUtils.checkAuth()) return;
 
+        // ==========================================
+        // Active Shift & Save Status
+        // ==========================================
+        // Debug logging disabled in production
+        function showDebug(label, obj) {
+            // No-op — debugging removed for production
+        }
+        function loadActiveShift() {
+            showDebug('INFO', 'جاري تحميل بيانات المناوبة النشطة...');
+
+            // Fetch shift-status AND /api/data first (to get correct date/type from currentShift)
+            Promise.all([
+                DashUtils.apiFetch('/api/shift-status').then(function(r) { return r.json(); }),
+                DashUtils.apiFetch('/api/data').then(function(r) { return r.json(); }).catch(function() { return null; })
+            ])
+            .then(function(initialResults) {
+                var shiftData = initialResults[0];
+                var apiData = initialResults[1];
+
+                // Extract date/type from apiData.currentShift (where the REAL shift info is)
+                var cs = apiData && apiData.currentShift ? apiData.currentShift : null;
+                var shiftDate = cs && cs.date ? cs.date : getTodayDate();
+                var shiftType = cs && cs.type ? cs.type : getCurrentShiftType();
+                var shiftTypeAlt = shiftType === 'ليلية' ? 'ليل' : shiftType === 'ليل' ? 'ليلية' : shiftType;
+                showDebug('SHIFT-DATE-TYPE', { date: shiftDate, type: shiftType, alt: shiftTypeAlt, source: cs ? 'apiData.currentShift' : 'fallback' });
+
+                // Try BOTH type variations simultaneously
+                var url1 = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
+                var url2 = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftTypeAlt);
+                showDebug('URLS', { url1: url1, url2: url2 });
+
+                // Try each URL separately
+                var tryUrls = [
+                    DashUtils.apiFetch(url1).then(function(r) { return r.json(); }),
+                    DashUtils.apiFetch(url2).then(function(r) { return r.json(); })
+                ];
+
+                return Promise.all([
+                    Promise.resolve(shiftData),
+                    Promise.all(tryUrls).then(function(results) {
+                        // Return first successful result
+                        var success = results.find(function(r) { return r.success && r.completion && r.completion.teams; });
+                        return success || { success: false };
+                    }),
+                    Promise.resolve(apiData)
+                ]);
+            })
+            .then(function(results) {
+                var shiftData = results[0];
+                var completionData = results[1];
+                var apiData = results[2];
+                showDebug('SHIFT-STATUS', shiftData);
+                showDebug('COMPLETION-DATA', completionData);
+                showDebug('API-DATA', apiData);
+
+                if (shiftData && shiftData.isActive) {
+                    // ===== 1. Workforce stats — will be calculated from completion data =====
+                    var wfStaffCount = 0;
+                    var wfCarCount = 0;
+                    var wfReadiness = 0;
+
+                    // ===== 2. Team status from completion data =====
+                    // ONLY count operational teams: جنوب 1-16 and سريع 1-4
+                    // EXCLUDE: قائد_ميداني, تحكم_تنسيق, دعم_لوجستي, جنوب 17-19
+                    var realReadyCount = 0;
+                    var realMissingCount = 0;
+                    var realOfflineCount = 0;
+                    var realTeamCount = 0;
+
+                    function isOperationalTeam(teamId) {
+                        // Check if it's a rapid team (سريع 1-4)
+                        if (teamId.indexOf('سريع') !== -1 || teamId.indexOf('rapid') !== -1) {
+                            var rapidNum = parseInt(teamId.replace(/\D/g, ''));
+                            return rapidNum >= 1 && rapidNum <= 4;
+                        }
+                        // Check if it's a south team (جنوب 1-16)
+                        if (teamId.indexOf('جنوب') !== -1) {
+                            var southNum = parseInt(teamId.replace(/\D/g, ''));
+                            return southNum >= 1 && southNum <= 16;
+                        }
+                        // Exclude: قائد, تحكم, دعم, and any other non-operational teams
+                        return false;
+                    }
+
+                    if (completionData && completionData.completion && completionData.completion.teams) {
+                        var teams = completionData.completion.teams;
+                        Object.keys(teams).forEach(function(teamId) {
+                            var team = teams[teamId];
+                            var status = team.status || 'pending';
+
+                            // Only count operational teams (not قائد, تحكم, دعم, etc.)
+                            if (isOperationalTeam(teamId)) {
+                                realTeamCount++;
+
+                                // Count by status
+                                if (status === 'ready' || status === 'جاهز') realReadyCount++;
+                                else if (status === 'missing' || status === 'ناقص') realMissingCount++;
+                                else if (status === 'offline' || status === 'خارج الخدمة') realOfflineCount++;
+                            }
+                        });
+                    }
+
+                    // ===== 3. Report counts from apiData or shiftData =====
+                    var reportCount = shiftData.metrics && shiftData.metrics.total_reports ? shiftData.metrics.total_reports : 0;
+                    if (apiData && apiData.data) {
+                        var totalFromDist = 0;
+                        Object.keys(apiData.data).forEach(function(key) {
+                            totalFromDist += (apiData.data[key].count || 0);
+                        });
+                        if (totalFromDist > reportCount) reportCount = totalFromDist;
+                    }
+
+                    // Count staff and vehicles ONLY for READY operational teams
+                    // Staff = paramedics in READY teams only (missing/offline excluded)
+                    // Vehicles = count of READY teams only (each ready team = 1 vehicle)
+                    var realStaffCount = 0;
+                    var realVehicleCount = 0; // Only count ready teams as vehicles
+                    if (completionData && completionData.completion && completionData.completion.teams) {
+                        Object.keys(completionData.completion.teams).forEach(function(teamId) {
+                            if (isOperationalTeam(teamId)) {
+                                var team = completionData.completion.teams[teamId];
+                                var isReady = (team.status === 'ready' || team.status === 'جاهز');
+                                if (isReady) {
+                                    var paramedics = team.paramedics || [];
+                                    if (Array.isArray(paramedics)) {
+                                        realStaffCount += paramedics.length;
+                                    }
+                                    realVehicleCount++; // Each ready team = 1 vehicle
+                                }
+                            }
+                        });
+                    }
+
+                    // ===== 4. Merge all metrics =====
+                    shiftData.metrics = shiftData.metrics || {};
+                    shiftData.metrics.total_reports = reportCount;
+                    // Use dashboard if available and non-zero, else use completion counts
+                    shiftData.metrics.staff_count = wfStaffCount || realStaffCount || shiftData.metrics.staff_count || 0;
+                    shiftData.metrics.vehicle_count = wfCarCount || realVehicleCount || shiftData.metrics.vehicle_count || 0;
+                    shiftData.metrics.team_count = realTeamCount || shiftData.metrics.team_count || 0;
+                    shiftData.metrics.ready_count = realReadyCount;
+                    shiftData.metrics.missing_count = realMissingCount;
+                    shiftData.metrics.offline_count = realOfflineCount;
+
+                    // Calculate completion rate
+                    if (shiftData.metrics.total_reports > 0 && shiftData.metrics.completed_reports > 0) {
+                        shiftData.metrics.completion_rate = Math.round((shiftData.metrics.completed_reports / shiftData.metrics.total_reports) * 100);
+                    }
+                    // Health score: use dashboard readiness if available, else calculate from teams
+                    if (wfReadiness > 0) {
+                        shiftData.metrics.health_score = Math.round(wfReadiness);
+                    } else if (realTeamCount > 0) {
+                        shiftData.metrics.health_score = Math.round((realReadyCount / realTeamCount) * 100);
+                    }
+
+                    showDebug('MERGED-METRICS', shiftData.metrics);
+
+                    // Store completion data globally for detailed view
+                    activeCompletionData = completionData && completionData.completion ? completionData.completion : null;
+
+                    activeShiftData = shiftData;
+                    renderActiveShift(shiftData);
+                    renderCompletionDetails(); // Render team cards
+                    updateSaveStatus(shiftData);
+                } else {
+                    showDebug('WARN', 'isActive=false أو لا توجد مناوبة نشطة');
+                    hideActiveShift();
+                    setSaveStatus('inactive', 'لا توجد مناوبة نشطة');
+                }
+            })
+            .catch(function(err) {
+                showDebug('ERROR', err.message || String(err));
+                hideActiveShift();
+                setSaveStatus('inactive', 'لا توجد مناوبة نشطة');
+            });
+        }
+
+        function getTodayDate() {
+            var now = new Date();
+            return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        }
+        function getCurrentShiftType() {
+            var hour = new Date().getHours();
+            return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+        }
+
+        function calculateHealthScore(metrics) {
+            var score = 0;
+            var factors = 0;
+            if (metrics.completion_rate > 0) { score += Math.min(metrics.completion_rate, 100); factors++; }
+            if (metrics.staff_count > 0) { score += 25; factors++; }
+            if (metrics.team_count > 0) { score += 25; factors++; }
+            if (metrics.vehicle_count > 0) { score += 25; factors++; }
+            if (metrics.data_completeness > 0) { score += Math.min(metrics.data_completeness, 100); factors++; }
+            return factors > 0 ? Math.round(score / factors) : 0;
+        }
+
+        function renderActiveShift(data) {
+            var section = document.getElementById('activeShiftSection');
+            var cards = document.getElementById('activeShiftCards');
+            var title = document.getElementById('activeShiftTitle');
+            var dot = document.getElementById('activeShiftDot');
+
+            if (!data.isActive) {
+                hideActiveShift();
+                return;
+            }
+
+            section.style.display = 'block';
+            title.textContent = 'مناوبة نشطة #' + (data.shiftId || '-');
+            dot.className = 'status-dot active';
+
+            var integrityClass = data.dataIntegrity === true ? 'integrity-ok' : data.dataIntegrity === false ? 'integrity-fail' : 'integrity-ok';
+            var integrityIcon = data.dataIntegrity === false ? 'fa-exclamation-circle' : 'fa-check-circle';
+            var integrityText = data.dataIntegrity === false ? 'تالفة' : 'سليمة';
+
+            var metrics = data.metrics || {};
+            // API returns snake_case keys, map them properly
+            var totalReports = metrics.total_reports || metrics.totalReports || 0;
+            var completedReports = metrics.completed_reports || metrics.completedReports || 0;
+            var pendingReports = metrics.pending_reports || metrics.pendingReports || 0;
+            var staffCount = metrics.staff_count || metrics.staffCount || 0;
+            var teamCount = metrics.team_count || metrics.teamCount || metrics.activeTeams || 0;
+            var vehicleCount = metrics.vehicle_count || metrics.vehicleCount || 0;
+            var completionRate = metrics.completion_rate || metrics.completionRate || 0;
+            var healthScore = metrics.health_score || metrics.healthScore || 0;
+
+            // Status counts from completion data
+            var readyCount = metrics.ready_count || 0;
+            var missingCount = metrics.missing_count || 0;
+            var offlineCount = metrics.offline_count || 0;
+
+            cards.innerHTML =
+                '<div class="active-shift-card"><div class="value">' + (data.isActive ? 'نشطة' : 'غير نشطة') + '</div><div class="label">حالة المناوبة</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + (data.lastSaved ? DashUtils.formatDateTime(data.lastSaved) : '-') + '</div><div class="label">آخر عملية حفظ</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(data.saveCount || 0) + '</div><div class="label">عدد عمليات الحفظ</div></div>' +
+                '<div class="active-shift-card"><div class="value ' + integrityClass + '"><i class="fas ' + integrityIcon + '"></i> ' + integrityText + '</div><div class="label">سلامة البيانات</div></div>' +
+                '<div class="active-shift-card"><div class="value" style="color:var(--green)">' + DashUtils.formatNumber(readyCount) + '</div><div class="label">✅ جاهز</div></div>' +
+                '<div class="active-shift-card"><div class="value" style="color:var(--yellow)">' + DashUtils.formatNumber(missingCount) + '</div><div class="label">⚠️ ناقص</div></div>' +
+                '<div class="active-shift-card"><div class="value" style="color:var(--red)">' + DashUtils.formatNumber(offlineCount) + '</div><div class="label">🔴 خارج الخدمة</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(totalReports) + '</div><div class="label">البلاغات</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(teamCount) + '</div><div class="label">الفرق العاملة</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(staffCount) + '</div><div class="label">الموظفين</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(vehicleCount) + '</div><div class="label">المركبات</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatNumber(completedReports) + '</div><div class="label">البلاغات المنجزة</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatPercent(completionRate) + '</div><div class="label">نسبة الإنجاز</div></div>' +
+                '<div class="active-shift-card"><div class="value">' + DashUtils.formatPercent(healthScore) + '</div><div class="label">درجة الصحة</div></div>';
+        }
+
+        function renderCompletionDetails() {
+            var section = document.getElementById('completionDetailsSection');
+            if (!section) return;
+
+            if (!activeCompletionData || !activeCompletionData.teams) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            var teams = activeCompletionData.teams;
+
+            // Show notes if present
+            var notes = activeCompletionData.notes || '';
+            var notesEl = document.getElementById('completionNotes');
+            var notesText = document.getElementById('completionNotesText');
+            var notesBadge = document.getElementById('completionNotesBadge');
+            if (notes && notes.trim()) {
+                notesEl.style.display = 'block';
+                notesText.textContent = notes;
+                notesBadge.style.display = 'inline-block';
+            } else {
+                notesEl.style.display = 'none';
+                notesBadge.style.display = 'none';
+            }
+
+            // Categorize teams
+            var rapidTeams = [];
+            var southTeams = [];
+            var specialTeams = [];
+
+            Object.keys(teams).forEach(function(teamId) {
+                var team = teams[teamId];
+                team.id = teamId;
+
+                if (teamId.indexOf('سريع') !== -1 || teamId.indexOf('rapid') !== -1) {
+                    rapidTeams.push(team);
+                } else if (teamId.indexOf('جنوب') !== -1) {
+                    southTeams.push(team);
+                } else {
+                    specialTeams.push(team);
+                }
+            });
+
+            // Sort teams by number
+            function sortByNumber(a, b) {
+                var numA = parseInt(a.id.replace(/\D/g, '')) || 0;
+                var numB = parseInt(b.id.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            }
+            rapidTeams.sort(sortByNumber);
+            southTeams.sort(sortByNumber);
+
+            // Render each category
+            renderTeamCategory('rapidTeamsSection', 'rapidTeamsGrid', rapidTeams, 'rapid');
+            renderTeamCategory('southTeamsSection', 'southTeamsGrid', southTeams, 'center');
+            renderTeamCategory('specialTeamsSection', 'specialTeamsGrid', specialTeams, 'special');
+        }
+
+        function renderTeamCategory(sectionId, gridId, teamList, typeClass) {
+            var section = document.getElementById(sectionId);
+            var grid = document.getElementById(gridId);
+            if (!section || !grid) return;
+
+            if (teamList.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            var statusLabels = {
+                'ready': '✅ جاهز',
+                'missing': '⚠️ ناقص',
+                'offline': '🔴 خارج الخدمة',
+                'pending': '⏳ باقي'
+            };
+            var statusKeys = {
+                'ready': 'ready',
+                'missing': 'missing',
+                'offline': 'offline',
+                'pending': 'pending',
+                'جاهز': 'ready',
+                'ناقص': 'missing',
+                'خارج الخدمة': 'offline'
+            };
+
+            grid.innerHTML = teamList.map(function(team) {
+                var sKey = statusKeys[team.status] || 'pending';
+                var label = statusLabels[sKey] || team.status;
+                var paramedics = team.paramedics || [];
+                var paramedicsHtml = paramedics.length > 0
+                    ? paramedics.map(function(p) { return '<span class="name-tag">' + p + '</span>'; }).join('')
+                    : '<span style="color:var(--muted); font-size:0.75rem;">لا يوجد مسعفين مسندين</span>';
+
+                var reasonHtml = '';
+                if (team.reason) {
+                    reasonHtml += '<div class="comp-reason"><span class="label">السبب:</span> ' + team.reason + '</div>';
+                }
+                if (team.missingPerson) {
+                    reasonHtml += '<div class="comp-reason"><span class="label">الشخص الناقص:</span> ' + team.missingPerson + '</div>';
+                }
+
+                return '<div class="comp-card status-' + sKey + '">' +
+                    '<div class="comp-header">' +
+                    '<div><div class="comp-name">' + team.id + '</div>' +
+                    '<div class="comp-center">' + (team.centerName || 'غير محدد') + '</div></div>' +
+                    '<span class="comp-type ' + typeClass + '">' + (typeClass === 'rapid' ? 'سريع' : typeClass === 'center' ? 'مركز' : 'خاص') + '</span>' +
+                    '</div>' +
+                    '<span class="comp-status">' + label + '</span>' +
+                    '<div class="comp-paramedics">' + paramedicsHtml + '</div>' +
+                    reasonHtml +
+                    '</div>';
+            }).join('');
+        }
+
+        function hideActiveShift() {
+            document.getElementById('activeShiftSection').style.display = 'none';
+            var compSection = document.getElementById('completionDetailsSection');
+            if (compSection) compSection.style.display = 'none';
+            activeShiftData = null;
+            activeCompletionData = null;
+        }
+
+        function updateSaveStatus(data) {
+            if (!data || !data.isActive) {
+                setSaveStatus('inactive', 'لا توجد مناوبة نشطة');
+                return;
+            }
+            // API returns saveCount (number), not saveStatus (string)
+            if (data.lastSaveFailed) {
+                setSaveStatus('error', 'فشل آخر عملية حفظ');
+            } else if (data.isSaving) {
+                setSaveStatus('saving', 'يوجد تعديلات جارٍ حفظها');
+            } else if (data.saveCount > 0) {
+                setSaveStatus('saved', 'آخر حفظ: ' + DashUtils.formatDateTime(data.lastSaved));
+            } else {
+                setSaveStatus('saved', 'المناوبة نشطة — لم يتم الحفظ بعد');
+            }
+        }
+
+        function setSaveStatus(type, message) {
+            var el = document.getElementById('saveStatusIndicator');
+            var text = document.getElementById('saveStatusText');
+            el.className = 'save-status-indicator ' + type;
+            var icon = type === 'saved' ? 'fa-check-circle' : type === 'saving' ? 'fa-spinner fa-spin' : type === 'error' ? 'fa-exclamation-circle' : 'fa-circle';
+            if (text) {
+                text.textContent = message;
+            } else {
+                el.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
+            }
+        }
+
+        function viewActiveSnapshot() {
+            if (!activeShiftData || !activeShiftData.shiftId) {
+                DashUtils.showToast('لا توجد مناوبة نشطة', 'warning');
+                return;
+            }
+            viewSnapshot(activeShiftData.shiftId);
+        }
+
+        function archiveActiveShift() {
+            if (!activeShiftData || !activeShiftData.shiftId) {
+                DashUtils.showToast('لا توجد مناوبة نشطة', 'warning');
+                return;
+            }
+            var user = DashUtils.getUser();
+            var payload = {
+                shiftId: activeShiftData.shiftId,
+                supervisorName: user.name || user.fullName || 'مشرف',
+                supervisorId: user.id || user.userId || ''
+            };
+            if (!confirm('هل أنت متأكد من أرشفة المناوبة الحالية؟')) return;
+            DashUtils.apiFetch('/api/shift-archive', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.success) {
+                    DashUtils.showToast('تم أرشفة المناوبة بنجاح', 'success');
+                    loadActiveShift();
+                    loadArchive();
+                } else {
+                    DashUtils.showToast(data.error || 'فشل في أرشفة المناوبة', 'error');
+                }
+            })
+            .catch(function() {
+                DashUtils.showToast('فشل في الاتصال بالخادم', 'error');
+            });
+        }
+
+        // ==========================================
+        // Snapshot Viewer
+        // ==========================================
+        function viewSnapshot(shiftId) {
+            DashUtils.openModal('snapshotModal');
+            document.getElementById('snapshotContent').textContent = 'جاري التحميل...';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot) {
+                        document.getElementById('snapshotContent').textContent = JSON.stringify(data.snapshot, null, 2);
+                    } else {
+                        document.getElementById('snapshotContent').textContent = 'لا توجد بيانات متاحة';
+                    }
+                })
+                .catch(function() {
+                    document.getElementById('snapshotContent').textContent = 'فشل في تحميل النسخة المحفوظة';
+                });
+        }
+
+        // ==========================================
+        // Shift Detail Modal with Tabs
+        // ==========================================
+        function openShiftDetail(shiftId) {
+            currentModalShiftId = shiftId;
+            var shift = currentShifts.find(function(s) { return s.id == shiftId; });
+            var title = shift ? ('مناوبة ' + (shift.shift_type || '') + ' #' + shift.id) : 'تفاصيل المناوبة';
+            document.getElementById('modalShiftTitle').innerHTML = '<i class="fas fa-clipboard-list"></i> ' + title;
+            DashUtils.openModal('shiftDetailModal');
+
+            // Reset tabs
+            switchTab('overview', document.querySelector('.tab-nav button'));
+
+            // Load summary + integrity
+            loadModalSummary(shiftId, shift);
+            loadModalOverview(shiftId);
+            loadModalTeams(shiftId);
+            loadModalReports(shiftId);
+            loadModalForms(shiftId);
+            loadModalNotes(shiftId);
+            loadModalTimeline(shiftId);
+        }
+
+        function closeShiftDetail() {
+            DashUtils.closeModal('shiftDetailModal');
+            currentModalShiftId = null;
+        }
+
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+            document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+            var panel = document.getElementById('tab-' + tabName);
+            if (panel) panel.classList.add('active');
+            if (btn) btn.classList.add('active');
+        }
+        window.switchTab = switchTab;
+
+        function loadModalSummary(shiftId, shift) {
+            var container = document.getElementById('modalSummaryCards');
+            container.innerHTML = '';
+
+            // Use shift data if available, otherwise fetch integrity
+            var s = shift || {};
+            var cards = [
+                { icon: 'fa-clipboard-list', value: DashUtils.formatNumber(s.total_reports || 0), label: 'البلاغات' },
+                { icon: 'fa-users', value: DashUtils.formatNumber(s.team_count || s.staff_count || 0), label: 'الفرق العاملة' },
+                { icon: 'fa-check-circle', value: DashUtils.formatNumber(s.completed_reports || 0), label: 'البلاغات المكتملة' },
+                { icon: 'fa-file-alt', value: DashUtils.formatNumber(s.form_count || 0), label: 'النماذج' },
+                { icon: 'fa-clock', value: (s.duration || '-'), label: 'مدة المناوبة' },
+                { icon: 'fa-save', value: (s.last_saved ? DashUtils.formatDateTime(s.last_saved) : '-'), label: 'آخر حفظ' }
+            ];
+
+            cards.forEach(function(c) {
+                container.insertAdjacentHTML('beforeend',
+                    '<div class="summary-card">' +
+                    '<div class="value">' + c.value + '</div>' +
+                    '<div class="label">' + c.label + '</div>' +
+                    '</div>'
+                );
+            });
+
+            // Load integrity check asynchronously
+            DashUtils.apiFetch('/api/shift-integrity/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success) {
+                        var valid = data.valid;
+                        var integrityCard = container.querySelector('.summary-card:last-child');
+                        // Add integrity card
+                        container.insertAdjacentHTML('beforeend',
+                            '<div class="summary-card">' +
+                            '<div class="value" style="color:' + (valid ? '#059669' : '#DC2626') + '">' +
+                            '<i class="fas ' + (valid ? 'fa-check-circle' : 'fa-exclamation-circle') + '"></i> ' + (valid ? 'سليمة' : 'تالفة') +
+                            '</div>' +
+                            '<div class="label">سلامة البيانات</div>' +
+                            '</div>'
+                        );
+                    }
+                })
+                .catch(function() {});
+        }
+
+        function loadModalOverview(shiftId) {
+            var container = document.getElementById('overviewContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot) {
+                        var snap = data.snapshot;
+                        var html = '<div class="dashboard-table-wrap"><table class="dashboard-table">';
+                        html += '<thead><tr><th>المعيار</th><th>القيمة</th></tr></thead><tbody>';
+                        var fields = [
+                            ['معرف المناوبة', snap.shiftId || snap.id || shiftId],
+                            ['نوع المناوبة', snap.shiftType || snap.shift_type || '-'],
+                            ['المشرف', snap.supervisor || '-'],
+                            ['المركز', snap.center || '-'],
+                            ['تاريخ البدء', snap.startTime ? DashUtils.formatDateTime(snap.startTime) : '-'],
+                            ['تاريخ الانتهاء', snap.endTime ? DashUtils.formatDateTime(snap.endTime) : '-'],
+                            ['إجمالي البلاغات', DashUtils.formatNumber(snap.totalReports || snap.total_reports || 0)],
+                            ['البلاغات المكتملة', DashUtils.formatNumber(snap.completedReports || snap.completed_reports || 0)],
+                            ['البلاغات المعلقة', DashUtils.formatNumber(snap.pendingReports || snap.pending_reports || 0)],
+                            ['عدد الفرق', DashUtils.formatNumber(snap.teamCount || snap.team_count || 0)],
+                            ['عدد المركبات', DashUtils.formatNumber(snap.vehicleCount || snap.vehicle_count || 0)],
+                            ['عدد الموظفين', DashUtils.formatNumber(snap.staffCount || snap.staff_count || 0)]
+                        ];
+                        fields.forEach(function(f) {
+                            html += '<tr><td>' + f[0] + '</td><td>' + f[1] + '</td></tr>';
+                        });
+                        html += '</tbody></table></div>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>لا توجد بيانات عامة</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>فشل في تحميل البيانات</h3></div>';
+                });
+        }
+
+        function loadModalTeams(shiftId) {
+            var container = document.getElementById('teamsContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot && data.snapshot.teams && data.snapshot.teams.length) {
+                        var html = '<ul class="tab-list">';
+                        data.snapshot.teams.forEach(function(t) {
+                            html += '<li class="tab-list-item">' +
+                                '<div><strong>' + (t.name || t.teamName || 'فرقة') + '</strong><div class="tab-list-meta">' + (t.status || '') + '</div></div>' +
+                                '<div class="tab-list-meta">' + (t.members ? t.members.length + ' أعضاء' : '') + '</div>' +
+                                '</li>';
+                        });
+                        html += '</ul>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا توجد فرق مسجلة</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>فشل في تحميل الفرق</h3></div>';
+                });
+        }
+
+        function loadModalReports(shiftId) {
+            var container = document.getElementById('reportsContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot && data.snapshot.reports && data.snapshot.reports.length) {
+                        var html = '<ul class="tab-list">';
+                        data.snapshot.reports.forEach(function(r) {
+                            var statusBadge = r.status === 'completed' ? '<span class="dashboard-badge badge-success">مكتمل</span>' :
+                                r.status === 'pending' ? '<span class="dashboard-badge badge-warning">معلق</span>' :
+                                '<span class="dashboard-badge badge-info">' + (r.status || 'مفتوح') + '</span>';
+                            html += '<li class="tab-list-item">' +
+                                '<div><strong>#' + (r.id || r.reportId || '-') + '</strong> ' + (r.type || r.category || '') +
+                                '<div class="tab-list-meta">' + (r.location || '') + '</div></div>' +
+                                '<div>' + statusBadge + '</div>' +
+                                '</li>';
+                        });
+                        html += '</ul>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-list"></i><h3>لا توجد بلاغات</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-list"></i><h3>فشل في تحميل البلاغات</h3></div>';
+                });
+        }
+
+        function loadModalForms(shiftId) {
+            var container = document.getElementById('formsContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot && data.snapshot.forms && data.snapshot.forms.length) {
+                        var html = '<ul class="tab-list">';
+                        data.snapshot.forms.forEach(function(f) {
+                            html += '<li class="tab-list-item">' +
+                                '<div><strong>' + (f.title || f.name || f.type || 'نموذج') + '</strong>' +
+                                '<div class="tab-list-meta">' + (f.createdAt ? DashUtils.formatDateTime(f.createdAt) : '') + '</div></div>' +
+                                '<div class="tab-list-meta">' + (f.status || '') + '</div>' +
+                                '</li>';
+                        });
+                        html += '</ul>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><h3>لا توجد نماذج</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><h3>فشل في تحميل النماذج</h3></div>';
+                });
+        }
+
+        function loadModalNotes(shiftId) {
+            var container = document.getElementById('notesContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-snapshot/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.snapshot && data.snapshot.notes && data.snapshot.notes.length) {
+                        var html = '<ul class="tab-list">';
+                        data.snapshot.notes.forEach(function(n) {
+                            html += '<li class="tab-list-item" style="align-items:flex-start; flex-direction:column;">' +
+                                '<div style="margin-bottom:6px;">' + (n.text || n.content || '') + '</div>' +
+                                '<div class="tab-list-meta">' + (n.author || '') + ' &middot; ' + (n.createdAt ? DashUtils.formatDateTime(n.createdAt) : '') + '</div>' +
+                                '</li>';
+                        });
+                        html += '</ul>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-sticky-note"></i><h3>لا توجد ملاحظات</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-sticky-note"></i><h3>فشل في تحميل الملاحظات</h3></div>';
+                });
+        }
+
+        function loadModalTimeline(shiftId) {
+            var container = document.getElementById('timelineContent');
+            container.innerHTML = '<div class="spinner-container"><div class="spinner"></div></div>';
+            DashUtils.apiFetch('/api/shift-timeline/' + shiftId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.events && data.events.length) {
+                        var html = '<div class="timeline">';
+                        data.events.forEach(function(e) {
+                            var type = e.type || 'generic';
+                            var dotClass = 'timeline-dot';
+                            if (type === 'start') dotClass += ' start';
+                            else if (type === 'save') dotClass += ' save';
+                            else if (type === 'report_added' || type === 'report_closed') dotClass += ' report';
+                            else if (type === 'team_modified' || type === 'team_status_changed') dotClass += ' team';
+                            else if (type === 'end') dotClass += ' end';
+
+                            html += '<div class="timeline-item">' +
+                                '<div class="' + dotClass + '"></div>' +
+                                '<div class="timeline-time">' + (e.time ? DashUtils.formatDateTime(e.time) : '') + '</div>' +
+                                '<div class="timeline-title">' + (e.title || e.event || '') + '</div>' +
+                                '<div class="timeline-desc">' + (e.description || e.detail || '') + '</div>' +
+                                '</div>';
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-history"></i><h3>لا توجد أحداث مسجلة</h3></div>';
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-history"></i><h3>فشل في تحميل السجل الزمني</h3></div>';
+                });
+        }
+
+        // ==========================================
+        // Archive Search & Filters (Existing)
+        // ==========================================
         function applySearch() {
             SearchFilters.syncFiltersFromForm('filterBar');
             var q = document.getElementById('searchInput').value.trim();
@@ -167,7 +1269,9 @@
             document.getElementById('filterShiftType').value = '';
             document.getElementById('filterCenter').value = '';
             document.getElementById('filterSupervisor').value = '';
-            document.getElementById('filterEmployee').value = '';
+            document.getElementById('filterTeam').value = '';
+            document.getElementById('filterReportId').value = '';
+            document.getElementById('filterReportStatus').value = '';
             document.getElementById('filterStatus').value = '';
             document.getElementById('sortSelect').value = 'date_desc';
             SearchFilters.clearAllFilters();
@@ -178,7 +1282,8 @@
 
         function loadArchive() {
             var url = SearchFilters.buildArchiveQuery(currentPage, 20);
-            DashUtils.showSpinner(document.getElementById('archiveGrid'));
+            var grid = document.getElementById('archiveGrid');
+            DashUtils.showSpinner(grid);
             DashUtils.apiFetch(url)
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
@@ -188,8 +1293,14 @@
                         renderArchive(data.shifts);
                         DashUtils.renderPagination(document.getElementById('pagination'), currentPage, data.total_pages || 1, function(p) { currentPage = p; loadArchive(); });
                         SearchFilters.renderFilterTags('filterTags', function() { applySearch(); });
-                    } else { DashUtils.showToast(data.error || 'فشل في تحميل البيانات', 'error'); }
-                }).catch(function() { DashUtils.showToast('فشل في تحميل الأرشيف', 'error'); });
+                    } else {
+                        grid.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B;"><i class="fas fa-exclamation-circle" style="font-size:2rem;margin-bottom:12px;display:block;"></i>' + (data.error || 'فشل في تحميل البيانات') + '</div>';
+                        DashUtils.showToast(data.error || 'فشل في تحميل البيانات', 'error');
+                    }
+                }).catch(function(err) {
+                    grid.innerHTML = '<div style="text-align:center;padding:40px;color:#64748B;"><i class="fas fa-exclamation-circle" style="font-size:2rem;margin-bottom:12px;display:block;"></i>فشل في تحميل الأرشيف</div>';
+                    DashUtils.showToast('فشل في تحميل الأرشيف', 'error');
+                });
         }
 
         function renderArchive(shifts) {
@@ -220,11 +1331,14 @@
                     '<div class="archive-card-preview-row"><span>الموظفين</span><span>' + DashUtils.formatNumber(s.staff_count || 0) + '</span></div>' +
                     '<div class="archive-card-preview-row"><span>الفرق</span><span>' + DashUtils.formatNumber(s.team_count || 0) + '</span></div>' +
                     '<div class="archive-card-preview-row"><span>المركبات</span><span>' + DashUtils.formatNumber(s.vehicle_count || 0) + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>مدة المناوبة</span><span>' + (s.duration || '-') + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>آخر حفظ</span><span>' + (s.last_saved ? DashUtils.formatDateTime(s.last_saved) : '-') + '</span></div>' +
+                    '<div class="archive-card-preview-row"><span>سلامة البيانات</span><span>' + (s.data_integrity !== false ? '<i class="fas fa-check-circle" style="color:#059669"></i> سليمة' : '<i class="fas fa-exclamation-circle" style="color:#DC2626"></i> تالفة') + '</span></div>' +
                     '</div>' +
                     '<div class="archive-card-actions">' +
                     '<span class="dashboard-badge ' + rateBadge + '">إنجاز ' + DashUtils.formatPercent(rate) + '</span>' +
                     '<span class="dashboard-badge ' + healthBadge + '">صحة ' + DashUtils.formatPercent(health) + '</span>' +
-                    '<a class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" href="/shift-detail.html?id=' + s.id + '">عرض</a>' +
+                    '<button class="dashboard-btn dashboard-btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="event.stopPropagation(); openShiftDetail(' + s.id + ')">عرض التفاصيل</button>' +
                     '</div>' +
                     '</div>';
                 grid.insertAdjacentHTML('beforeend', html);
@@ -279,14 +1393,25 @@
             ExportUtils.exportShiftsToExcel(selected);
         }
 
+        // Expose globals
         window.applySearch = applySearch;
         window.clearAllFilters = clearAllFilters;
         window.toggleSelect = toggleSelect;
         window.clearSelection = clearSelection;
         window.compareSelected = compareSelected;
         window.exportSelectedExcel = exportSelectedExcel;
+        window.viewActiveSnapshot = viewActiveSnapshot;
+        window.archiveActiveShift = archiveActiveShift;
+        window.openShiftDetail = openShiftDetail;
+        window.closeShiftDetail = closeShiftDetail;
+        window.viewSnapshot = viewSnapshot;
 
+        // Initialize
+        loadActiveShift();
         loadArchive();
+
+        // Refresh active shift every 30 seconds
+        setInterval(loadActiveShift, 30000);
     })();
     </script>
 </body>

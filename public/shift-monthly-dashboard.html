@@ -28,6 +28,7 @@
         .fade-in { animation: fadeIn 0.5s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
+<base target="_blank">
 </head>
 <body class="dashboard-page">
     <div class="dashboard-top-bar">
@@ -37,7 +38,7 @@
             <a href="/" class="dashboard-btn"><i class="fas fa-home"></i> الرئيسية</a>
             <a href="/shift-daily-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-day"></i> يومي</a>
             <a href="/shift-weekly-dashboard.html" class="dashboard-btn"><i class="fas fa-calendar-week"></i> أسبوعي</a>
-            <a href="/shift-archive.html" class="dashboard-btn"><i class="fas fa-archive"></i> الأرشيف</a>
+            <a href="javascript:void(0)" onclick="loadArchiveInline()" class="dashboard-btn"><i class="fas fa-archive"></i> الأرشيف</a>
         </div>
     </div>
 
@@ -249,5 +250,50 @@
         loadMonthly();
     })();
     </script>
+
+<!-- ===== SPA Archive Navigation ===== -->
+<div id="archiveView" style="display:none; position:fixed; inset:0; z-index:9998; background:#F8FAFC; overflow-y:auto;">
+    <div style="position:sticky; top:0; z-index:10; background:linear-gradient(135deg, #1E293B 0%, #334155 100%); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+        <h2 style="color:#fff; margin:0; font-size:1.1rem; display:flex; align-items:center; gap:10px;"><i class="fas fa-archive" style="color:#FBBF24;"></i> أرشيف المناوبات</h2>
+        <button onclick="showMainView()" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:8px 20px; border-radius:10px; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i> العودة
+        </button>
+    </div>
+    <div id="archiveViewContent" style="padding:20px;"></div>
+</div>
+<script>
+function loadArchiveInline() {
+    var view = document.getElementById('archiveView');
+    var content = document.getElementById('archiveViewContent');
+    view.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    content.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;"><div style="width:50px;height:50px;border:4px solid #E2E8F0;border-top-color:#2563EB;border-radius:50%;animation:spin 1s linear infinite;"></div><div style="margin-top:20px;color:#64748B;">جاري تحميل الأرشيف...</div></div>';
+    fetch('/shift-archive-inline.html')
+        .then(function(r){return r.text();})
+        .then(function(html){
+            var scripts=[];var match;var scriptRegex=/<script[^>]*>([\s\S]*?)<\/script>/gi;
+            while((match=scriptRegex.exec(html))!==null){scripts.push(match[1]);}
+            var cleanHtml=html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'');
+            content.innerHTML=cleanHtml;
+            scripts.forEach(function(code){
+                try{var s=document.createElement('script');s.textContent=code;document.head.appendChild(s);document.head.removeChild(s);}
+                catch(e){console.error('[Archive] Script error:',e);}
+            });
+        })
+        .catch(function(e){
+            content.innerHTML='<div style="text-align:center;padding:60px;color:#DC2626;"><i class="fas fa-exclamation-triangle" style="font-size:3rem;margin-bottom:20px;"></i><h3>فشل في تحميل الأرشيف</h3><p>يرجى المحاولة مرة أخرى</p><button onclick="showMainView()" style="margin-top:20px;padding:10px 30px;background:#2563EB;color:#fff;border:none;border-radius:10px;cursor:pointer;">العودة</button></div>';
+        });
+}
+function showMainView(){
+    // If opened from another page in history, go back
+    if(history.length>1){history.back();return;}
+    // Otherwise just hide the archive overlay
+    document.getElementById('archiveView').style.display='none';
+    document.body.style.overflow='';
+    window.scrollTo(0,0);
+}
+</script>
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+
 </body>
 </html>

@@ -109,13 +109,18 @@ const TABLE_SCHEMAS = [
     shift_type TEXT,
     shift_day TEXT,
     start_time TEXT,
+    end_time TEXT,
+    status TEXT DEFAULT 'active' CHECK(status IN ('active', 'archived', 'closed')),
+    archived_at DATETIME,
+    supervisor_name TEXT,
     total_reports INTEGER DEFAULT 0,
     rapid_locations TEXT,
     centers_data TEXT,
     vehicle_data TEXT,
     fuel_data TEXT,
     general_notes TEXT,
-    last_update TEXT
+    last_update TEXT,
+    data_json TEXT
   );`,
   `CREATE TABLE IF NOT EXISTS shift_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -517,7 +522,21 @@ const TABLE_SCHEMAS = [
     upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
 
-  // Shift Audit Log
+  // Shift Snapshots (continuous save during active shift)
+  `CREATE TABLE IF NOT EXISTS shift_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    snapshot_data TEXT NOT NULL,
+    snapshot_type TEXT DEFAULT 'auto' CHECK(snapshot_type IN ('auto', 'manual', 'pre_archive')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_data_integrity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    integrity_status TEXT DEFAULT 'unknown' CHECK(integrity_status IN ('unknown', 'valid', 'corrupted', 'incomplete')),
+    integrity_details TEXT,
+    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
   `CREATE TABLE IF NOT EXISTS shift_audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     roster_id INTEGER,
@@ -724,6 +743,48 @@ const TABLE_SCHEMAS = [
     ip_address TEXT,
     user_agent TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Authentication Sessions
+  `CREATE TABLE IF NOT EXISTS auth_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT,
+    access_token_hash TEXT,
+    refresh_token_hash TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+    session_last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+    session_expires DATETIME,
+    refresh_expires DATETIME,
+    is_active INTEGER DEFAULT 1,
+    logout_time DATETIME,
+    logout_reason TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS auth_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    username TEXT,
+    action_type TEXT NOT NULL CHECK(action_type IN ('login', 'logout', 'refresh', 'token_invalid', 'session_expired', 'access_denied', 'password_change', 'session_revoked')),
+    action_detail TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    session_id INTEGER,
+    success INTEGER DEFAULT 1,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS token_blacklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    token_type TEXT DEFAULT 'access' CHECK(token_type IN ('access', 'refresh')),
+    user_id TEXT,
+    session_id INTEGER,
+    reason TEXT,
+    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME
   );`
 ];
 
@@ -793,7 +854,18 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_comparison_snapshots ON shift_comparison_snapshots(shift_a_id, shift_b_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_shift_id ON shift_audit_trail(shift_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_actor ON shift_audit_trail(actor_id);`);
-    logger.info('Indexes created successfully');
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_shift_id ON shift_snapshots(shift_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_created ON shift_snapshots(created_at)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_data_integrity_shift ON shift_data_integrity(shift_id)`);
+    // Auth indexes
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_active ON auth_sessions(is_active)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(access_token_hash)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_user ON auth_logs(user_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_action ON auth_logs(action_type)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_hash ON token_blacklist(token_hash)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)`);
   } catch (idxErr) {
     logger.warn('Some indexes may already exist: ' + idxErr.message);
   }
@@ -836,7 +908,9 @@ async function runMigrations() {
     `ALTER TABLE shift_roster ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE shift_roster ADD COLUMN updated_by TEXT`,
     `ALTER TABLE shift_roster ADD COLUMN version INTEGER DEFAULT 1`,
-    `ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL`
+    `ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL`,
+    `ALTER TABLE shifts ADD COLUMN status TEXT DEFAULT 'active' CHECK(status IN ('active', 'archived', 'closed'))`,
+    `ALTER TABLE shifts ADD COLUMN archived_at DATETIME`
   ];
 
   for (const sql of columnMigrations) {
@@ -1290,6 +1364,106 @@ async function runMigrations() {
     logger.warn('shift_audit_trail table creation warning: ' + err.message);
   }
 
+  // Create shift_snapshots table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+      snapshot_data TEXT NOT NULL,
+      snapshot_type TEXT DEFAULT 'auto' CHECK(snapshot_type IN ('auto', 'manual', 'pre_archive')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_shift_id ON shift_snapshots(shift_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_created ON shift_snapshots(created_at)`);
+    logger.info('shift_snapshots table created');
+  } catch (err) {
+    logger.warn('shift_snapshots table creation warning: ' + err.message);
+  }
+
+  // Create shift_data_integrity table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_data_integrity (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+      integrity_status TEXT DEFAULT 'unknown' CHECK(integrity_status IN ('unknown', 'valid', 'corrupted', 'incomplete')),
+      integrity_details TEXT,
+      checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_data_integrity_shift ON shift_data_integrity(shift_id)`);
+    logger.info('shift_data_integrity table created');
+  } catch (err) {
+    logger.warn('shift_data_integrity table creation warning: ' + err.message);
+  }
+
+  // Create auth_sessions table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS auth_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      role TEXT,
+      access_token_hash TEXT,
+      refresh_token_hash TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+      session_last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+      session_expires DATETIME,
+      refresh_expires DATETIME,
+      is_active INTEGER DEFAULT 1,
+      logout_time DATETIME,
+      logout_reason TEXT
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_active ON auth_sessions(is_active)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(access_token_hash)`);
+    logger.info('auth_sessions table created');
+  } catch (err) {
+    logger.warn('auth_sessions table creation warning: ' + err.message);
+  }
+
+  // Create auth_logs table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS auth_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      username TEXT,
+      action_type TEXT NOT NULL CHECK(action_type IN ('login', 'logout', 'refresh', 'token_invalid', 'session_expired', 'access_denied', 'password_change', 'session_revoked')),
+      action_detail TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      session_id INTEGER,
+      success INTEGER DEFAULT 1,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_user ON auth_logs(user_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_action ON auth_logs(action_type)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at)`);
+    logger.info('auth_logs table created');
+  } catch (err) {
+    logger.warn('auth_logs table creation warning: ' + err.message);
+  }
+
+  // Create token_blacklist table
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS token_blacklist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      token_type TEXT DEFAULT 'access' CHECK(token_type IN ('access', 'refresh')),
+      user_id TEXT,
+      session_id INTEGER,
+      reason TEXT,
+      blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_hash ON token_blacklist(token_hash)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)`);
+    logger.info('token_blacklist table created');
+  } catch (err) {
+    logger.warn('token_blacklist table creation warning: ' + err.message);
+  }
+
   logger.info('Migrations complete');
 }
 
@@ -1377,6 +1551,9 @@ const Users = {
   },
   async getById(id) {
     return get('SELECT * FROM users WHERE id = ?', [id]);
+  },
+  async getByUserId(user_id) {
+    return get('SELECT * FROM users WHERE user_id = ?', [user_id]);
   },
   async getByUsername(username) {
     return get('SELECT * FROM users WHERE username = ?', [username]);
@@ -2456,6 +2633,100 @@ const ShiftAuditTrail = {
 };
 
 // ============================================
+// CRUD: AUTH SESSIONS
+// ============================================
+const AuthSessions = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM auth_sessions ORDER BY session_start DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM auth_sessions WHERE id = ?', [id]);
+  },
+  async getByUser(user_id, limit = 50) {
+    return all('SELECT * FROM auth_sessions WHERE user_id = ? ORDER BY session_start DESC LIMIT ?', [user_id, limit]);
+  },
+  async getActiveByUser(user_id) {
+    return all('SELECT * FROM auth_sessions WHERE user_id = ? AND is_active = 1 ORDER BY session_last_active DESC', [user_id]);
+  },
+  async getByTokenHash(token_hash) {
+    return get('SELECT * FROM auth_sessions WHERE access_token_hash = ? OR refresh_token_hash = ?', [token_hash, token_hash]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO auth_sessions (user_id, username, role, access_token_hash, refresh_token_hash, ip_address, user_agent, session_expires, refresh_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.user_id, data.username, data.role || null, data.access_token_hash || null, data.refresh_token_hash || null, data.ip_address || null, data.user_agent || null, data.session_expires || null, data.refresh_expires || null]
+    );
+    return result.id;
+  },
+  async updateLastActive(id) {
+    return run('UPDATE auth_sessions SET session_last_active = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  },
+  async update(id, data) {
+    const fields = [];
+    const values = [];
+    if (data.access_token_hash !== undefined) { fields.push('access_token_hash = ?'); values.push(data.access_token_hash); }
+    if (data.refresh_token_hash !== undefined) { fields.push('refresh_token_hash = ?'); values.push(data.refresh_token_hash); }
+    if (data.session_expires !== undefined) { fields.push('session_expires = ?'); values.push(data.session_expires); }
+    if (data.refresh_expires !== undefined) { fields.push('refresh_expires = ?'); values.push(data.refresh_expires); }
+    if (data.session_last_active !== undefined) { fields.push('session_last_active = ?'); values.push(data.session_last_active); }
+    if (data.is_active !== undefined) { fields.push('is_active = ?'); values.push(data.is_active ? 1 : 0); }
+    if (data.logout_time !== undefined) { fields.push('logout_time = ?'); values.push(data.logout_time); }
+    if (data.logout_reason !== undefined) { fields.push('logout_reason = ?'); values.push(data.logout_reason); }
+    if (fields.length === 0) return 0;
+    values.push(id);
+    return run(`UPDATE auth_sessions SET ${fields.join(', ')} WHERE id = ?`, values);
+  },
+  async deactivate(id, reason) {
+    return run('UPDATE auth_sessions SET is_active = 0, logout_time = CURRENT_TIMESTAMP, logout_reason = ? WHERE id = ?', [reason || null, id]);
+  },
+  async deactivateAllByUser(user_id, reason) {
+    return run('UPDATE auth_sessions SET is_active = 0, logout_time = CURRENT_TIMESTAMP, logout_reason = ? WHERE user_id = ? AND is_active = 1', [reason || 'user_logged_out', user_id]);
+  }
+};
+
+// ============================================
+// CRUD: AUTH LOGS
+// ============================================
+const AuthLogs = {
+  async getAll(limit = 100) {
+    return all('SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getByUser(user_id, limit = 100) {
+    return all('SELECT * FROM auth_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?', [user_id, limit]);
+  },
+  async getByAction(action_type, limit = 100) {
+    return all('SELECT * FROM auth_logs WHERE action_type = ? ORDER BY created_at DESC LIMIT ?', [action_type, limit]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO auth_logs (user_id, username, action_type, action_detail, ip_address, user_agent, session_id, success, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.user_id || null, data.username || null, data.action_type, data.action_detail || null, data.ip_address || null, data.user_agent || null, data.session_id || null, data.success !== undefined ? (data.success ? 1 : 0) : 1, data.error_message || null]
+    );
+    return result.id;
+  }
+};
+
+// ============================================
+// CRUD: TOKEN BLACKLIST
+// ============================================
+const TokenBlacklist = {
+  async isBlacklisted(token_hash) {
+    const row = await get('SELECT id FROM token_blacklist WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > datetime(\'now\'))', [token_hash]);
+    return !!row;
+  },
+  async add(token_hash, data = {}) {
+    const result = await run(
+      `INSERT INTO token_blacklist (token_hash, token_type, user_id, session_id, reason, expires_at) VALUES (?, ?, ?, ?, ?, ?);`,
+      [token_hash, data.token_type || 'access', data.user_id || null, data.session_id || null, data.reason || 'logout', data.expires_at || null]
+    );
+    return result.id;
+  },
+  async cleanup() {
+    return run('DELETE FROM token_blacklist WHERE expires_at IS NOT NULL AND expires_at < datetime(\'now\')');
+  }
+};
+
+// ============================================
 // CRUD: KNOWLEDGE BASE
 // ============================================
 const KBDocuments = {
@@ -2745,6 +3016,398 @@ const AIFeedback = {
 };
 
 // ============================================
+// CRUD: SHIFT SNAPSHOTS
+// ============================================
+const ShiftSnapshots = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_snapshots ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_snapshots WHERE id = ?', [id]);
+  },
+  async getByShift(shift_id, limit = 50) {
+    return all('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY created_at DESC LIMIT ?', [shift_id, limit]);
+  },
+  async getLatestByShift(shift_id) {
+    return get('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY created_at DESC LIMIT 1', [shift_id]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO shift_snapshots (shift_id, snapshot_data, snapshot_type) VALUES (?, ?, ?);',
+      [data.shift_id, data.snapshot_data, data.snapshot_type || 'auto']
+    );
+    return result.id;
+  },
+  async deleteByShift(shift_id) {
+    return run('DELETE FROM shift_snapshots WHERE shift_id = ?', [shift_id]);
+  }
+};
+
+// ============================================
+// CRUD: SHIFT DATA INTEGRITY
+// ============================================
+const ShiftDataIntegrity = {
+  async getByShift(shift_id) {
+    return get('SELECT * FROM shift_data_integrity WHERE shift_id = ? ORDER BY checked_at DESC LIMIT 1', [shift_id]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO shift_data_integrity (shift_id, integrity_status, integrity_details) VALUES (?, ?, ?);',
+      [data.shift_id, data.integrity_status || 'unknown', data.integrity_details || null]
+    );
+    return result.id;
+  }
+};
+
+// ============================================
+// RELIABLE SHIFT SAVE SYSTEM
+// ============================================
+
+/**
+ * Save complete shift data to SQLite (primary source) and JSON (backup)
+ * This is the core reliable save function
+ */
+async function saveShiftData(shiftId, data) {
+  try {
+    // 1. Save to SQLite as primary source
+    await run(
+      `UPDATE shifts SET
+        shift_name = ?,
+        shift_date = ?,
+        shift_time = ?,
+        shift_type = ?,
+        shift_day = ?,
+        start_time = ?,
+        end_time = ?,
+        status = ?,
+        supervisor_name = ?,
+        total_reports = ?,
+        rapid_locations = ?,
+        centers_data = ?,
+        vehicle_data = ?,
+        fuel_data = ?,
+        general_notes = ?,
+        last_update = ?,
+        data_json = ?
+      WHERE id = ?;`,
+      [
+        data.shiftName || null,
+        data.shiftDate || null,
+        data.shiftTime || null,
+        data.shiftType || null,
+        data.shiftDay || null,
+        data.startTime || null,
+        data.endTime || null,
+        data.status || 'active',
+        data.supervisorName || null,
+        data.totalReports || 0,
+        data.rapidLocations ? JSON.stringify(data.rapidLocations) : null,
+        data.centersData ? JSON.stringify(data.centersData) : null,
+        data.vehicleData ? JSON.stringify(data.vehicleData) : null,
+        data.fuelData ? JSON.stringify(data.fuelData) : null,
+        data.generalNotes || '',
+        new Date().toISOString(),
+        JSON.stringify(data),
+        shiftId
+      ]
+    );
+
+    // 2. Save snapshot for continuous tracking
+    await ShiftSnapshots.create({
+      shift_id: shiftId,
+      snapshot_data: JSON.stringify(data),
+      snapshot_type: data.snapshotType || 'auto'
+    });
+
+    // 3. Update metrics
+    await calculateAndUpdateMetrics(shiftId, data);
+
+    // 4. Verify integrity
+    await verifyShiftIntegrity(shiftId);
+
+    return { success: true, shiftId, lastSaved: new Date().toISOString() };
+  } catch (err) {
+    logger.error('Failed to save shift data', err);
+    throw new Error(`Save failed: ${err.message}`);
+  }
+}
+
+/**
+ * Get shift data from SQLite (primary source)
+ */
+async function getShiftData(shiftId) {
+  try {
+    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
+    if (!shift) return null;
+    
+    // Parse JSON data if available
+    if (shift.data_json) {
+      try {
+        const parsed = JSON.parse(shift.data_json);
+        return { ...shift, ...parsed, data_json: undefined };
+      } catch (e) {
+        logger.warn('Failed to parse shift data_json, returning raw');
+      }
+    }
+    return shift;
+  } catch (err) {
+    logger.error('Failed to get shift data', err);
+    throw err;
+  }
+}
+
+/**
+ * Get the currently active shift
+ */
+async function getActiveShift() {
+  try {
+    const shift = await get('SELECT * FROM shifts WHERE status = ? ORDER BY id DESC LIMIT 1', ['active']);
+    if (!shift) return null;
+    
+    if (shift.data_json) {
+      try {
+        const parsed = JSON.parse(shift.data_json);
+        return { ...shift, ...parsed, data_json: undefined };
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    return shift;
+  } catch (err) {
+    logger.error('Failed to get active shift', err);
+    throw err;
+  }
+}
+
+/**
+ * Archive a shift - mark it as archived and immutable
+ */
+async function archiveShift(shiftId, archiveData = {}) {
+  try {
+    // 1. Verify shift exists
+    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
+    if (!shift) {
+      throw new Error(`Shift ${shiftId} not found`);
+    }
+    if (shift.status === 'archived') {
+      throw new Error(`Shift ${shiftId} is already archived`);
+    }
+
+    // 2. Save final snapshot before archiving
+    const latestSnapshot = await ShiftSnapshots.getLatestByShift(shiftId);
+    if (!latestSnapshot) {
+      // Create a snapshot if none exists
+      await ShiftSnapshots.create({
+        shift_id: shiftId,
+        snapshot_data: shift.data_json || JSON.stringify(shift),
+        snapshot_type: 'pre_archive'
+      });
+    }
+
+    // 3. Update shift status
+    await run(
+      'UPDATE shifts SET status = ?, archived_at = ?, end_time = ? WHERE id = ?;',
+      ['archived', new Date().toISOString(), archiveData.endTime || new Date().toISOString(), shiftId]
+    );
+
+    // 4. Add archive event to timeline
+    await ShiftTimelineEvents.create({
+      shift_id: shiftId,
+      event_type: 'end',
+      event_title: 'إنهاء المناوبة وأرشفتها',
+      event_description: `تم إنهاء المناوبة وأرشفتها بواسطة ${archiveData.supervisorName || 'النظام'}`,
+      event_data: JSON.stringify({ archived_at: new Date().toISOString() }),
+      created_by: archiveData.supervisorId || 'system',
+      created_by_name: archiveData.supervisorName || 'النظام'
+    });
+
+    // 5. Final integrity check
+    await verifyShiftIntegrity(shiftId);
+
+    return { success: true, shiftId, archivedAt: new Date().toISOString() };
+  } catch (err) {
+    logger.error('Failed to archive shift', err);
+    throw new Error(`Archive failed: ${err.message}`);
+  }
+}
+
+/**
+ * Add a timeline event for a shift
+ */
+async function addTimelineEvent(shiftId, event) {
+  try {
+    return await ShiftTimelineEvents.create({
+      shift_id: shiftId,
+      event_type: event.type || 'note_added',
+      event_title: event.title || 'حدث جديد',
+      event_description: event.description || null,
+      event_data: event.data ? JSON.stringify(event.data) : null,
+      created_by: event.createdBy || 'system',
+      created_by_name: event.createdByName || 'النظام'
+    });
+  } catch (err) {
+    logger.error('Failed to add timeline event', err);
+    throw err;
+  }
+}
+
+/**
+ * Get timeline events for a shift
+ */
+async function getTimelineEvents(shiftId, limit = 100) {
+  try {
+    return await ShiftTimelineEvents.getByShift(shiftId, limit);
+  } catch (err) {
+    logger.error('Failed to get timeline events', err);
+    throw err;
+  }
+}
+
+/**
+ * Calculate and update metrics for a shift
+ */
+async function calculateAndUpdateMetrics(shiftId, data) {
+  try {
+    const metrics = {
+      shift_id: shiftId,
+      total_reports: data.savedReports ? Object.keys(data.savedReports).length : 0,
+      completed_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'completed').length : 0,
+      pending_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'pending').length : 0,
+      suspended_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'suspended').length : 0,
+      total_completions: data.teamsData ? Object.keys(data.teamsData).length : 0,
+      total_forms: data.forms ? data.forms.length : 0,
+      staff_count: data.staffCount || 0,
+      team_count: data.teamCount || 0,
+      vehicle_count: data.vehicleCount || 0,
+      completion_rate: data.completionRate || 0,
+      notes_count: data.notes ? data.notes.length : 0,
+      event_count: data.events ? data.events.length : 0,
+      health_score: data.healthScore || 100,
+      data_completeness: data.dataCompleteness || 100
+    };
+
+    const existing = await ShiftMetrics.getByShift(shiftId);
+    if (existing) {
+      await ShiftMetrics.update(existing.id, metrics);
+    } else {
+      await ShiftMetrics.create(metrics);
+    }
+    return metrics;
+  } catch (err) {
+    logger.error('Failed to calculate metrics', err);
+    // Don't throw - metrics are secondary
+    return null;
+  }
+}
+
+/**
+ * Verify data integrity of a shift
+ */
+async function verifyShiftIntegrity(shiftId) {
+  try {
+    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
+    if (!shift) {
+      return { valid: false, reason: 'Shift not found' };
+    }
+
+    const checks = {
+      hasData: !!shift.data_json,
+      hasStartTime: !!shift.start_time,
+      hasShiftType: !!shift.shift_type,
+      hasSnapshot: !!(await ShiftSnapshots.getLatestByShift(shiftId)),
+      hasMetrics: !!(await ShiftMetrics.getByShift(shiftId))
+    };
+
+    const allValid = Object.values(checks).every(v => v === true);
+    const integrityStatus = allValid ? 'valid' : 'incomplete';
+    const integrityDetails = JSON.stringify(checks);
+
+    await ShiftDataIntegrity.create({
+      shift_id: shiftId,
+      integrity_status: integrityStatus,
+      integrity_details: integrityDetails
+    });
+
+    return { valid: allValid, checks, shiftId };
+  } catch (err) {
+    logger.error('Failed to verify integrity', err);
+    return { valid: false, reason: err.message };
+  }
+}
+
+/**
+ * Get latest saved snapshot for a shift
+ */
+async function getLatestShiftSnapshot(shiftId) {
+  try {
+    const snapshot = await ShiftSnapshots.getLatestByShift(shiftId);
+    if (!snapshot) return null;
+    try {
+      return JSON.parse(snapshot.snapshot_data);
+    } catch (e) {
+      return snapshot;
+    }
+  } catch (err) {
+    logger.error('Failed to get latest snapshot', err);
+    throw err;
+  }
+}
+
+/**
+ * Get shift status with save info
+ */
+async function getShiftStatus(shiftId) {
+  try {
+    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
+    if (!shift) return null;
+
+    let latestSnapshot = null;
+    let integrity = null;
+    let metrics = null;
+    let timelineCount = null;
+    let saveCount = 0;
+
+    try {
+      latestSnapshot = await ShiftSnapshots.getLatestByShift(shiftId);
+    } catch (e) { /* ignore */ }
+
+    try {
+      integrity = await ShiftDataIntegrity.getByShift(shiftId);
+    } catch (e) { /* ignore */ }
+
+    try {
+      metrics = await ShiftMetrics.getByShift(shiftId);
+    } catch (e) { /* ignore */ }
+
+    try {
+      timelineCount = await get('SELECT COUNT(*) as count FROM shift_timeline_events WHERE shift_id = ?', [shiftId]);
+    } catch (e) { /* ignore */ }
+
+    try {
+      const sc = await get('SELECT COUNT(*) as count FROM shift_snapshots WHERE shift_id = ?', [shiftId]);
+      saveCount = sc ? sc.count : 0;
+    } catch (e) { /* ignore */ }
+
+    return {
+      shiftId: shift.id,
+      isActive: shift.status === 'active',
+      status: shift.status || 'unknown',
+      lastSaved: latestSnapshot ? latestSnapshot.created_at : shift.last_update,
+      saveCount: saveCount,
+      dataIntegrity: integrity ? integrity.integrity_status : 'unknown',
+      integrityDetails: integrity ? integrity.integrity_details : null,
+      metrics: metrics || {},
+      timelineEventCount: timelineCount ? timelineCount.count : 0,
+      startTime: shift.start_time,
+      endTime: shift.end_time
+    };
+  } catch (err) {
+    logger.error('Failed to get shift status', err);
+    throw err;
+  }
+}
+
+// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -2977,6 +3640,18 @@ module.exports = {
   beginTransaction,
   commitTransaction,
   rollbackTransaction,
+  // Reliable Shift Save System
+  saveShiftData,
+  getShiftData,
+  getActiveShift,
+  archiveShift,
+  addTimelineEvent,
+  getTimelineEvents,
+  calculateAndUpdateMetrics,
+  verifyShiftIntegrity,
+  getLatestShiftSnapshot,
+  getShiftStatus,
+
   // CRUD namespaces
   Reports,
   Shifts,
@@ -3011,6 +3686,11 @@ module.exports = {
   ShiftComparisonSnapshots,
   ShiftReportsGenerated,
   ShiftAuditTrail,
+  ShiftSnapshots,
+  ShiftDataIntegrity,
+  AuthSessions,
+  AuthLogs,
+  TokenBlacklist,
   KBDocuments,
   KBChunks,
   KBChatSessions,

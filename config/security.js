@@ -17,6 +17,8 @@ const DEV_FALLBACK_SECRET = crypto.createHash('sha256').update(__dirname || 'ems
 module.exports = {
     JWT_SECRET: JWT_SECRET || DEV_FALLBACK_SECRET,
     JWT_EXPIRES_IN: '24h',
+    JWT_ACCESS_EXPIRES_IN: '15m',
+    JWT_REFRESH_EXPIRES_IN: '7d',
     
     // Rate limiting configuration
     RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes

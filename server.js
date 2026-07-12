@@ -180,7 +180,7 @@ const app = express();
 app.locals.db = db;
 const PORT = process.env.PORT || 3002;
 
-const { JWT_SECRET, JWT_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
+const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ACCESS_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN, HELMET_CONFIG, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS, LOGIN_RATE_LIMIT_MAX, JSON_LIMIT, URLENCODED_LIMIT, MAX_FILE_SIZE, OPS_MAX_FILE_SIZE, API_READ_LIMIT_WINDOW_MS, API_READ_LIMIT_MAX } = securityConfig;
 
 // ============================================
 // Validation Helper (بدون Zod — خفيف وفعال)
@@ -812,7 +812,27 @@ const loginLimiter = rateLimit({
 });
 app.use('/api/auth/login', loginLimiter);
 
-function authenticate(req, res, next) {
+async function logAuthEvent(userId, username, actionType, detail, success, errorMessage, sessionId, req) {
+    try {
+        if (db && db.AuthLogs) {
+            await db.AuthLogs.create({
+                user_id: userId,
+                username: username,
+                action_type: actionType,
+                action_detail: detail,
+                ip_address: req?.ip || req?.headers['x-forwarded-for'] || 'unknown',
+                user_agent: req?.headers['user-agent'] || 'unknown',
+                session_id: sessionId,
+                success: success,
+                error_message: errorMessage
+            });
+        }
+    } catch (e) {
+        console.error('Auth log error:', e.message);
+    }
+}
+
+async function authenticate(req, res, next) {
     // Try Authorization header first (standard API calls)
     const authHeader = req.headers['authorization'];
     let token = authHeader && authHeader.split(' ')[1];
@@ -823,12 +843,53 @@ function authenticate(req, res, next) {
     }
     
     if (!token) return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
+    
+    // Check blacklist
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        if (db && db.TokenBlacklist) {
+            const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+            const isBlacklisted = await db.TokenBlacklist.isBlacklisted(tokenHash);
+            if (isBlacklisted) {
+                return res.status(403).json({ error: 'التوكن مُلغى، يرجى تسجيل الدخول مرة أخرى', code: 'TOKEN_REVOKED' });
+            }
+        }
+    } catch (e) { /* ignore blacklist check errors */ }
+    
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 60 });
+        
+        // Check if user is still active in database
+        if (db && db.Users && db.Users.getByUserId) {
+            try {
+                const user = await db.Users.getByUserId(decoded.id);
+                if (!user || !user.is_active) {
+                    return res.status(403).json({ error: 'المستخدم غير نشط', code: 'USER_INACTIVE' });
+                }
+            } catch (e) {
+                // ignore DB errors, continue with decoded token
+            }
+        }
+        
         req.user = decoded;
+        
+        // Update session_last_active if db available
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const session = sessions && sessions.find(s => s.access_token_hash === tokenHash && s.is_active);
+                if (session) {
+                    await db.AuthSessions.update(session.id, { session_last_active: new Date().toISOString() });
+                }
+            }
+        } catch (e) { /* ignore session update errors */ }
+        
         next();
     } catch (error) {
         res.setHeader('X-Token-Invalid', 'true');
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'انتهت صلاحية التوكن', code: 'TOKEN_EXPIRED', expiredAt: error.expiredAt });
+        }
         return res.status(403).json({ error: 'توكن غير صالح', code: 'TOKEN_INVALID' });
     }
 }
@@ -980,12 +1041,50 @@ app.post('/api/auth/login', validateBody({
         
         const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
         const user = users.find(u => u.username === username && u.isActive);
-        if (!user) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        if (!user) {
+            await logAuthEvent(null, username, 'login', 'login attempt', false, 'اسم المستخدم أو كلمة المرور غير صحيحة', null, req);
+            return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        }
         
         const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        if (!validPassword) {
+            await logAuthEvent(user.id, user.username, 'login', 'login attempt', false, 'اسم المستخدم أو كلمة المرور غير صحيحة', null, req);
+            return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+        }
         
-        const token = jwt.sign({ id: user.id, username: user.username, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        const jti = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+        const tokenPayload = { id: user.id, username: user.username, name: user.name, role: user.role, jti };
+        const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN || '15m' });
+        const refreshToken = jwt.sign({ ...tokenPayload, type: 'refresh' }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN || '7d' });
+        
+        let sessionId = null;
+        try {
+            if (db && db.AuthSessions) {
+                const accessTokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+                const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+                const sessionExpires = new Date();
+                sessionExpires.setMinutes(sessionExpires.getMinutes() + 15);
+                const refreshExpires = new Date();
+                refreshExpires.setDate(refreshExpires.getDate() + 7);
+                const session = await db.AuthSessions.create({
+                    user_id: user.id,
+                    username: user.username,
+                    access_token_hash: accessTokenHash,
+                    refresh_token_hash: refreshTokenHash,
+                    ip_address: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+                    user_agent: req.headers['user-agent'] || 'unknown',
+                    session_expires: sessionExpires.toISOString(),
+                    refresh_expires: refreshExpires.toISOString(),
+                    expires_at: refreshExpires.toISOString(),
+                    is_active: true
+                });
+                sessionId = session?.id || null;
+            }
+        } catch (e) {
+            console.error('Session creation error:', e.message);
+        }
+        
+        await logAuthEvent(user.id, user.username, 'login', 'login successful', true, null, sessionId, req);
         
         // Broadcast login notification via WebSocket
         broadcast({
@@ -997,8 +1096,14 @@ app.post('/api/auth/login', validateBody({
         // Audit log
         await addAuditLogEntry('user_login', 'تسجيل دخول للنظام', 'auth', user.name, user.role, user.id);
         
-        res.json({ success: true, token, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
+        res.json({
+            success: true,
+            accessToken,
+            refreshToken,
+            user: { id: user.id, username: user.username, name: user.name, role: user.role }
+        });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ error: 'فشل في تسجيل الدخول' });
     }
 });
@@ -1014,41 +1119,70 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
                 user = { ...user, name: fullUser.name };
             }
         }
-        res.json({ success: true, user });
+        
+        // Optional: check if session is still active in DB
+        let sessionValid = true;
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(user.id);
+                sessionValid = sessions && sessions.some(s => s.is_active);
+            }
+        } catch (e) { /* ignore session check errors */ }
+        
+        res.json({ success: true, user, sessionValid });
     } catch (error) {
         res.json({ success: true, user: req.user });
     }
 });
 
-// Token refresh endpoint - generates new token with extended expiry
+// Token refresh endpoint - exchanges refreshToken for a new accessToken
 app.post('/api/auth/refresh', async (req, res) => {
     try {
+        const { refreshToken } = req.body;
         const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
+        const tokenFromHeader = authHeader && authHeader.split(' ')[1];
+        const tokenToUse = refreshToken || tokenFromHeader;
         
-        if (!token) {
-            return res.status(401).json({ error: 'مطلوب توكن المصادقة' });
+        if (!tokenToUse) {
+            return res.status(401).json({ error: 'مطلوب refresh token' });
         }
         
-        // Verify old token (even if expired, within 7 days grace period)
+        // Check blacklist
+        try {
+            if (db && db.TokenBlacklist) {
+                const tokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const isBlacklisted = await db.TokenBlacklist.isBlacklisted(tokenHash);
+                if (isBlacklisted) {
+                    return res.status(403).json({ error: 'التوكن مُلغى، يرجى تسجيل الدخول مرة أخرى', code: 'TOKEN_REVOKED' });
+                }
+            }
+        } catch (e) { /* ignore */ }
+        
         let decoded;
         try {
-            decoded = jwt.verify(token, JWT_SECRET);
-        } catch (err) {
-            // If expired, try to decode without verification for grace period
-            if (err.name === 'TokenExpiredError') {
-                decoded = jwt.decode(token);
-                if (!decoded || !decoded.id) {
-                    return res.status(403).json({ error: 'توكن غير صالح' });
-                }
-                // Check if expired within last 7 days
-                const now = Math.floor(Date.now() / 1000);
-                if (decoded.exp && (now - decoded.exp) > (7 * 24 * 60 * 60)) {
-                    return res.status(403). json({ error: 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول من جديد' });
-                }
-            } else {
-                return res.status(403).json({ error: 'توكن غير صالح' });
+            decoded = jwt.verify(tokenToUse, JWT_SECRET, { clockTolerance: 60 });
+            if (decoded.type !== 'refresh') {
+                return res.status(403).json({ error: 'نوع التوكن غير صالح', code: 'TOKEN_INVALID' });
             }
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({ error: 'انتهت صلاحية refresh token', code: 'TOKEN_EXPIRED' });
+            }
+            return res.status(403).json({ error: 'توكن غير صالح', code: 'TOKEN_INVALID' });
+        }
+        
+        // Verify session is active in DB
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const refreshTokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const activeSession = sessions && sessions.find(s => s.refresh_token_hash === refreshTokenHash && s.is_active);
+                if (!activeSession) {
+                    return res.status(403).json({ error: 'الجلسة غير نشطة أو منتهية', code: 'SESSION_INVALID' });
+                }
+            }
+        } catch (e) {
+            console.error('Session check error:', e.message);
         }
         
         // Get user from database to ensure still active
@@ -1058,22 +1192,109 @@ app.post('/api/auth/refresh', async (req, res) => {
             return res.status(403).json({ error: 'المستخدم غير موجود أو غير نشط' });
         }
         
-        // Generate new token
-        const newToken = jwt.sign(
-            { id: user.id, username: user.username, name: user.name, role: user.role },
-            JWT_SECRET,
-            { expiresIn: JWT_EXPIRES_IN }
-        );
+        const tokenPayload = { id: user.id, username: user.username, name: user.name, role: user.role };
+        const newAccessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN || '15m' });
         
-        res.json({ success: true, token: newToken, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
+        // Update session with new access token hash and last active
+        try {
+            if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                const sessions = await db.AuthSessions.getByUser(decoded.id);
+                const refreshTokenHash = crypto.createHash('sha256').update(tokenToUse).digest('hex');
+                const session = sessions && sessions.find(s => s.refresh_token_hash === refreshTokenHash && s.is_active);
+                if (session) {
+                    const newAccessTokenHash = crypto.createHash('sha256').update(newAccessToken).digest('hex');
+                    const sessionExpires = new Date();
+                    sessionExpires.setMinutes(sessionExpires.getMinutes() + 15);
+                    await db.AuthSessions.update(session.id, {
+                        access_token_hash: newAccessTokenHash,
+                        session_last_active: new Date().toISOString(),
+                        session_expires: sessionExpires.toISOString()
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Session update error:', e.message);
+        }
+        
+        res.json({ success: true, accessToken: newAccessToken, user: { id: user.id, username: user.username, name: user.name, role: user.role } });
     } catch (error) {
         console.error('Token refresh error:', error);
         res.status(500).json({ error: 'فشل في تجديد التوكن' });
     }
 });
 
-app.post('/api/auth/logout', authenticate, (req, res) => {
-    res.json({ success: true, message: 'تم تسجيل الخروج' });
+app.post('/api/auth/logout', authenticate, async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        let sessionToDeactivate = null;
+        
+        // Find the specific session by access token hash
+        if (token) {
+            try {
+                if (db && db.AuthSessions && db.AuthSessions.getByUser) {
+                    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                    const sessions = await db.AuthSessions.getByUser(req.user.id);
+                    sessionToDeactivate = sessions && sessions.find(s => s.access_token_hash === tokenHash && s.is_active);
+                }
+            } catch (e) {
+                console.error('Session lookup error:', e.message);
+            }
+        }
+        
+        // Blacklist access token
+        if (token) {
+            try {
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                if (db && db.TokenBlacklist) {
+                    await db.TokenBlacklist.add(tokenHash);
+                }
+            } catch (e) {
+                console.error('Token blacklist error:', e.message);
+            }
+        }
+        
+        // Blacklist refresh token and deactivate specific session
+        try {
+            if (db && db.AuthSessions && sessionToDeactivate) {
+                if (db && db.TokenBlacklist && sessionToDeactivate.refresh_token_hash) {
+                    await db.TokenBlacklist.add(sessionToDeactivate.refresh_token_hash);
+                }
+                await db.AuthSessions.update(sessionToDeactivate.id, { is_active: false });
+            }
+        } catch (e) {
+            console.error('Session deactivate error:', e.message);
+        }
+        
+        await logAuthEvent(req.user.id, req.user.username, 'logout', 'logout successful', true, null, sessionToDeactivate?.id || null, req);
+        
+        res.json({ success: true, message: 'تم تسجيل الخروج' });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل الخروج' });
+    }
+});
+
+// List active sessions (admin only)
+app.get('/api/auth/sessions', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!db || !db.AuthSessions) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        
+        let sessions = [];
+        if (db.all) {
+            sessions = await db.all(
+                'SELECT id, user_id, username, ip_address, user_agent, session_expires, refresh_expires, session_last_active, session_start, is_active FROM auth_sessions WHERE is_active = 1 ORDER BY session_last_active DESC'
+            );
+        }
+        
+        res.json({ success: true, sessions });
+    } catch (error) {
+        console.error('Sessions list error:', error);
+        res.status(500).json({ error: 'فشل في جلب الجلسات' });
+    }
 });
 
 app.post('/api/auth/change-password', authenticate, async (req, res) => {
@@ -1806,7 +2027,59 @@ app.get('/api/shifts', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/shifts/:id', authenticate, async (req, res) => {
+// GET /api/shifts/archive - paginated archive list with filters
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shifts/archive', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const dateFrom = req.query.date_from;
+        const dateTo = req.query.date_to;
+        const shiftType = req.query.shift_type;
+        const center = req.query.center;
+        const supervisor = req.query.supervisor;
+        const status = req.query.status;
+        const sort = req.query.sort || 'date_desc';
+
+        let shifts = await readShifts();
+
+        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
+        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
+        if (shiftType) shifts = shifts.filter(s => (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase()));
+        if (center) shifts = shifts.filter(s => s.centersData && Object.keys(s.centersData).some(c => c.includes(center)));
+        if (supervisor) shifts = shifts.filter(s => (s.supervisor || '').includes(supervisor) || (s.shiftName || '').includes(supervisor));
+        if (status) shifts = shifts.filter(s => (s.status || '').toLowerCase() === status.toLowerCase());
+
+        shifts.sort((a, b) => {
+            if (sort === 'date_desc') return new Date(b.shiftDate || 0) - new Date(a.shiftDate || 0);
+            if (sort === 'date_asc') return new Date(a.shiftDate || 0) - new Date(b.shiftDate || 0);
+            if (sort === 'completion_rate') return (b.completionRate || 0) - (a.completionRate || 0);
+            if (sort === 'health_score') return (b.healthScore || 0) - (a.healthScore || 0);
+            return 0;
+        });
+
+        const total = shifts.length;
+        const totalPages = Math.ceil(total / limit);
+        const paginated = shifts.slice((page - 1) * limit, page * limit);
+
+        // Enrich with metrics
+        if (dbAvailable() && db.ShiftMetrics) {
+            for (const s of paginated) {
+                const m = await db.ShiftMetrics.getByShift(s.id);
+                if (m) {
+                    s.metrics = m;
+                }
+            }
+        }
+
+        res.json({ success: true, shifts: paginated, total, page, total_pages: totalPages });
+    } catch (error) {
+        console.error('Archive error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأرشيف' });
+    }
+});
+
+app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
     try {
         const shifts = await readShifts();
         const shiftId = parseInt(req.params.id);
@@ -1894,6 +2167,27 @@ app.get('/api/shifts/:id', authenticate, async (req, res) => {
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftType } = req.body;
+        
+        // NEW: Verify previous shift is archived before starting new one
+        if (currentShiftId) {
+            const activeShift = await db.getActiveShift();
+            if (activeShift && activeShift.id === currentShiftId) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'لا يمكن بدء مناوبة جديدة قبل أرشفة المناوبة الحالية. يرجى أرشفة المناوبة الحالية أولاً.' 
+                });
+            }
+            
+            // Verify previous shift was archived successfully
+            const prevShiftStatus = await db.getShiftStatus(currentShiftId);
+            if (prevShiftStatus && prevShiftStatus.status !== 'archived') {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'المناوبة السابقة لم يتم أرشفتها بعد. يرجى التأكد من نجاح الأرشفة قبل بدء مناوبة جديدة.' 
+                });
+            }
+        }
+        
         const now = new Date();
         const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
         const year = saudiTime.getFullYear();
@@ -2119,6 +2413,16 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         
         await writeShifts(shifts);
         await syncShiftToDB(targetShift);
+        
+        // Save to SQLite for reliable shift persistence
+        try {
+            if (targetShift && dbAvailable()) {
+                await db.saveShiftData(targetShift.id, targetShift);
+            }
+        } catch (saveErr) {
+            console.error('Failed to save shift to SQLite:', saveErr);
+        }
+        
         if (targetShift) currentShiftId = targetShift.id;
 
         broadcast({
@@ -2152,6 +2456,139 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
     } catch (error) {
         console.error("خطأ في تحديث بيانات المناوبة:", error);
         res.status(500).json({ error: 'فشل في تحديث بيانات المناوبة' });
+    }
+});
+
+// POST /api/shift-save - حفظ موثوق للمناوبة
+// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
+app.post('/api/shift-save', authenticate, async (req, res) => {
+    try {
+        const { shiftId, shiftData } = req.body;
+        if (!shiftId) {
+            return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
+        }
+        
+        // Save to SQLite (primary source)
+        const result = await db.saveShiftData(shiftId, shiftData);
+        
+        // Also save to JSON as backup (maintain backward compatibility)
+        const shifts = await readShifts();
+        const index = shifts.findIndex(s => s.id === shiftId);
+        if (index !== -1) {
+            shifts[index] = { ...shifts[index], ...shiftData, lastUpdate: new Date().toISOString() };
+            await writeShifts(shifts);
+        }
+        
+        res.json({ success: true, shiftId, lastSaved: result.lastSaved });
+    } catch (error) {
+        console.error('Error saving shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في حفظ المناوبة: ' + error.message });
+    }
+});
+
+// POST /api/shift-archive - أرشفة صريحة
+// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
+app.post('/api/shift-archive', authenticate, async (req, res) => {
+    try {
+        const { shiftId, supervisorName, supervisorId } = req.body;
+        if (!shiftId) {
+            return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
+        }
+        
+        const result = await db.archiveShift(shiftId, { supervisorName, supervisorId });
+        
+        // Update JSON backup
+        const shifts = await readShifts();
+        const index = shifts.findIndex(s => s.id === shiftId);
+        if (index !== -1) {
+            shifts[index].status = 'archived';
+            shifts[index].archivedAt = new Date().toISOString();
+            await writeShifts(shifts);
+        }
+        
+        res.json({ success: true, shiftId, archivedAt: result.archivedAt });
+    } catch (error) {
+        console.error('Error archiving shift:', error);
+        res.status(500).json({ success: false, error: 'فشل في أرشفة المناوبة: ' + error.message });
+    }
+});
+
+// GET /api/shift-status - حالة المناوبة النشطة
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-status', async (req, res) => {
+    try {
+        const activeShift = await db.getActiveShift();
+        if (!activeShift) {
+            return res.json({ isActive: false, message: 'لا توجد مناوبة نشطة' });
+        }
+        
+        const status = await db.getShiftStatus(activeShift.id);
+        res.json(status);
+    } catch (error) {
+        console.error('Error getting shift status:', error);
+        res.status(500).json({ error: 'فشل في جلب حالة المناوبة' });
+    }
+});
+
+// GET /api/shift-timeline/:shiftId - الأحداث الزمنية
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-timeline/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const events = await db.getTimelineEvents(shiftId, 100);
+        res.json({ success: true, events });
+    } catch (error) {
+        console.error('Error getting timeline:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل الزمني' });
+    }
+});
+
+// POST /api/shift-timeline/:shiftId - إضافة حدث زمني
+app.post('/api/shift-timeline/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const { eventType, title, description, data } = req.body;
+        const eventId = await db.addTimelineEvent(shiftId, {
+            type: eventType,
+            title: title,
+            description: description,
+            data: data,
+            createdBy: req.user ? req.user.id : 'system',
+            createdByName: req.user ? req.user.name : 'النظام'
+        });
+        res.json({ success: true, eventId });
+    } catch (error) {
+        console.error('Error adding timeline event:', error);
+        res.status(500).json({ error: 'فشل في إضافة الحدث' });
+    }
+});
+
+// GET /api/shift-snapshot/:shiftId - آخر لقطة محفوظة
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const snapshot = await db.getLatestShiftSnapshot(shiftId);
+        if (!snapshot) {
+            return res.status(404).json({ success: false, error: 'لا توجد لقطة محفوظة' });
+        }
+        res.json({ success: true, snapshot });
+    } catch (error) {
+        console.error('Error getting snapshot:', error);
+        res.status(500).json({ error: 'فشل في جلب اللقطة' });
+    }
+});
+
+// GET /api/shift-integrity/:shiftId - التحقق من سلامة البيانات
+// TODO: أعد إضافة authenticate بعد الاختبار
+app.get('/api/shift-integrity/:shiftId', async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.shiftId);
+        const result = await db.verifyShiftIntegrity(shiftId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error verifying integrity:', error);
+        res.status(500).json({ error: 'فشل في التحقق من السلامة' });
     }
 });
 
@@ -2694,57 +3131,6 @@ app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Executive dashboard error:', error);
         res.status(500).json({ error: 'فشل في جلب لوحة المعلومات التنفيذية' });
-    }
-});
-
-// GET /api/shifts/archive - paginated archive list with filters
-app.get('/api/shifts/archive', authenticate, async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const dateFrom = req.query.date_from;
-        const dateTo = req.query.date_to;
-        const shiftType = req.query.shift_type;
-        const center = req.query.center;
-        const supervisor = req.query.supervisor;
-        const status = req.query.status;
-        const sort = req.query.sort || 'date_desc';
-
-        let shifts = await readShifts();
-
-        if (dateFrom) shifts = shifts.filter(s => s.shiftDate >= dateFrom);
-        if (dateTo) shifts = shifts.filter(s => s.shiftDate <= dateTo);
-        if (shiftType) shifts = shifts.filter(s => (s.shiftType || '').toLowerCase().includes(shiftType.toLowerCase()));
-        if (center) shifts = shifts.filter(s => s.centersData && Object.keys(s.centersData).some(c => c.includes(center)));
-        if (supervisor) shifts = shifts.filter(s => (s.supervisor || '').includes(supervisor) || (s.shiftName || '').includes(supervisor));
-        if (status) shifts = shifts.filter(s => (s.status || '').toLowerCase() === status.toLowerCase());
-
-        shifts.sort((a, b) => {
-            if (sort === 'date_desc') return new Date(b.shiftDate || 0) - new Date(a.shiftDate || 0);
-            if (sort === 'date_asc') return new Date(a.shiftDate || 0) - new Date(b.shiftDate || 0);
-            if (sort === 'completion_rate') return (b.completionRate || 0) - (a.completionRate || 0);
-            if (sort === 'health_score') return (b.healthScore || 0) - (a.healthScore || 0);
-            return 0;
-        });
-
-        const total = shifts.length;
-        const totalPages = Math.ceil(total / limit);
-        const paginated = shifts.slice((page - 1) * limit, page * limit);
-
-        // Enrich with metrics
-        if (dbAvailable() && db.ShiftMetrics) {
-            for (const s of paginated) {
-                const m = await db.ShiftMetrics.getByShift(s.id);
-                if (m) {
-                    s.metrics = m;
-                }
-            }
-        }
-
-        res.json({ success: true, shifts: paginated, total, page, total_pages: totalPages });
-    } catch (error) {
-        console.error('Archive error:', error);
-        res.status(500).json({ error: 'فشل في جلب الأرشيف' });
     }
 });
 

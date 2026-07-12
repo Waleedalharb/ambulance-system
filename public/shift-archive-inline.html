@@ -1,0 +1,251 @@
+<!-- shift-archive-inline.html - No html/head/body wrapper -->
+<style>
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Save Status Indicator */
+        .save-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            width: fit-content;
+            transition: all 0.3s ease;
+        }
+        .save-status-indicator.saved { background: #D1FAE5; color: #059669; border: 1px solid #A7F3D0; }
+        .save-status-indicator.saving { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+        .save-status-indicator.error { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
+        .save-status-indicator.inactive { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+
+        /* Active Shift Section */
+        .active-shift-section {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+            animation: fadeIn 0.5s ease;
+        }
+        .active-shift-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .active-shift-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .active-shift-title .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.active { background: #10B981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        .status-dot.inactive { background: #94A3B8; }
+        .active-shift-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .active-shift-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .active-shift-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .active-shift-card:hover { border-color: #CBD5E1; transform: translateY(-1px); }
+        .active-shift-card .value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #1E293B;
+            margin-bottom: 4px;
+        }
+        .active-shift-card .label {
+            font-size: 0.75rem;
+            color: #64748B;
+        }
+        .active-shift-card .integrity-ok { color: #059669; }
+        .active-shift-card .integrity-fail { color: #DC2626; }
+
+        /* Shift Detail Modal Tabs */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid #E2E8F0;
+            margin-bottom: 16px;
+            overflow-x: auto;
+        }
+        .tab-nav button {
+            padding: 10px 16px;
+            border: none;
+            background: none;
+            color: #64748B;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab-nav button:hover { color: #2563EB; }
+        .tab-nav button.active { color: #2563EB; border-bottom-color: #2563EB; }
+        .tab-panel { display: none; animation: fadeIn 0.3s ease; }
+        .tab-panel.active { display: block; }
+
+        /* Summary Cards in Modal */
+        .summary-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+        .summary-card .value { font-size: 1.3rem; font-weight: 800; color: #1E293B; }
+        .summary-card .label { font-size: 0.75rem; color: #64748B; }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-right: 24px;
+            border-right: 2px solid #E2E8F0;
+            margin-right: 8px;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 20px;
+            padding-right: 24px;
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute;
+            right: -31px;
+            top: 2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #CBD5E1;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 0 0 2px #CBD5E1;
+        }
+        .timeline-dot.start { background: #2563EB; box-shadow: 0 0 0 2px #2563EB; }
+        .timeline-dot.save { background: #10B981; box-shadow: 0 0 0 2px #10B981; }
+        .timeline-dot.report { background: #8B5CF6; box-shadow: 0 0 0 2px #8B5CF6; }
+        .timeline-dot.team { background: #F59E0B; box-shadow: 0 0 0 2px #F59E0B; }
+        .timeline-dot.end { background: #EF4444; box-shadow: 0 0 0 2px #EF4444; }
+        .timeline-time {
+            font-size: 0.75rem;
+            color: #94A3B8;
+            margin-bottom: 4px;
+        }
+        .timeline-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 2px;
+        }
+        .timeline-desc {
+            font-size: 0.85rem;
+            color: #64748B;
+        }
+
+        /* Lists in Tabs */
+        .tab-list { list-style: none; padding: 0; margin: 0; }
+        .tab-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid #F1F5F9;
+            transition: background 0.2s;
+        }
+        .tab-list-item:hover { background: #F8FAFC; }
+        .tab-list-item:last-child { border-bottom: none; }
+        .tab-list-meta { font-size: 0.8rem; color: #94A3B8; }
+
+        /* Snapshot Modal */
+        .snapshot-view {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #E2E8F0;
+            max-height: 60vh;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Section Titles */
+        .section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title i { color: #2563EB; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .active-shift-header { flex-direction: column; align-items: flex-start; }
+            .active-shift-cards { grid-template-columns: repeat(2, 1fr); }
+            .summary-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+<style>
+            .completion-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+            .comp-card { background:var(--card); border:2px solid var(--border); border-radius:14px; padding:14px; transition:all 0.2s; }
+            .comp-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+            .comp-card.status-ready { border-color:var(--green); background:var(--green-light); }
+            .comp-card.status-missing { border-color:var(--yellow); background:var(--yellow-light); }
+            .comp-card.status-offline { border-color:var(--red); background:var(--red-light); }
+            .comp-card.status-pending { border-color:var(--gray); background:var(--gray-light); }
+            .comp-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+            .comp-type { font-size:0.65rem; font-weight:700; padding:2px 10px; border-radius:8px; text-transform:uppercase; }
+            .comp-type.rapid { background:var(--yellow-light); color:#92400E; }
+            .comp-type.center { background:#DBEAFE; color:#1E40AF; }
+            .comp-type.special { background:#F3E8FF; color:#7C3AED; }
+            .comp-name { font-size:1rem; font-weight:700; }
+            .comp-center { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+            .comp-status { font-size:0.75rem; font-weight:700; padding:4px 14px; border-radius:20px; display:inline-block; margin-top:8px; }
+            .comp-card.status-ready .comp-status { background:var(--green); color:#fff; }
+            .comp-card.status-missing .comp-status { background:var(--yellow); color:#fff; }
+            .comp-card.status-offline .comp-status { background:var(--red); color:#fff; }
+            .comp-card.status-pending .comp-status { background:var(--gray); color:#fff; }
+            .comp-paramedics { font-size:0.8rem; margin-top:10px; }
+            .comp-paramedics .name-tag { display:inline-block; background:rgba(255,255,255,0.7); padding:3px 10px; border-radius:8px; margin:3px 2px; font-size:0.75rem; }
+            .comp-reason { font-size:0.75rem; margin-top:8px; padding:6px 10px; border-radius:8px; background:rgba(255,255,255,0.5); }
+            .comp-reason .label { font-weight:700; color:var(--muted); }
+            .section-divider { height:1px; background:var(--border); margin:24px 0; }
+            :root { --purple:#8B5CF6; }
+            </style>

@@ -30,7 +30,10 @@
     }
 
     function getAuthToken() {
-        return localStorage.getItem('authToken') || '';
+        if (typeof AuthManager !== 'undefined' && AuthManager.getToken) {
+            return AuthManager.getToken() || '';
+        }
+        return '';
     }
 
     function getPageInfo() {
@@ -53,14 +56,11 @@
         var batch = queue.splice(0, queue.length);
 
         try {
-            var token = getAuthToken();
-            var headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-
-            await fetch(CONFIG.endpoint, {
+            var payload = { errors: batch, sessionId: sessionId };
+            await AuthManager.apiRequest(CONFIG.endpoint, {
                 method: 'POST',
-                headers: headers,
-                body: JSON.stringify({ errors: batch, sessionId: sessionId })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
         } catch (e) {
             // لو فشل الإرسال، أعد الأخطاء للـ queue
@@ -163,107 +163,20 @@
         originalConsoleError.apply(console, args);
     };
 
-    // 5. Fetch errors — أخطاء الشبكة + Token Auto-Refresh
-    var originalFetch = window.fetch;
-    var isRefreshingToken = false;
-    var tokenRefreshQueue = [];
-
-    async function doTokenRefresh() {
-        if (isRefreshingToken) return new Promise(function(resolve) { tokenRefreshQueue.push(resolve); });
-        isRefreshingToken = true;
-        try {
-            var token = localStorage.getItem('authToken');
-            if (!token) throw new Error('no token');
-            var resp = await originalFetch('/api/auth/refresh', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-            });
-            if (!resp.ok) throw new Error('refresh failed');
-            var data = await resp.json();
-            if (data.success && data.token) {
-                localStorage.setItem('authToken', data.token);
-                console.log('[FrontendMonitor] Token refreshed successfully');
-                return true;
-            }
-            throw new Error('no new token');
-        } catch (e) {
-            console.error('[FrontendMonitor] Token refresh failed:', e);
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('currentUser');
-            // Notify user to re-login
-            if (typeof showNotification === 'function') {
-                showNotification('انتهت الجلسة', 'يرجى تسجيل الدخول من جديد', 'warning', 5000);
-            }
-            // Show login screen if on index.html, otherwise reload
-            var loginScreen = document.getElementById('loginScreen');
-            if (loginScreen) {
-                loginScreen.style.display = 'flex';
-                document.getElementById('mainContainer').style.display = 'none';
-                if (document.getElementById('sidebar')) document.getElementById('sidebar').style.display = 'none';
-            } else {
-                setTimeout(function() { location.href = '/index.html'; }, 2000);
-            }
-            return false;
-        } finally {
-            isRefreshingToken = false;
-            // Flush queue
-            while (tokenRefreshQueue.length > 0) {
-                (tokenRefreshQueue.shift())();
-            }
-        }
-    }
-
-    window.fetch = function() {
-        var url = arguments[0];
-        var options = arguments[1] || {};
-        var _retried = options._retried;
-
-        return originalFetch.apply(window, arguments).catch(function(err) {
+    // 5. AuthManager event tracking — تتبع أحداث المصادقة
+    if (typeof AuthManager !== 'undefined' && AuthManager.onAuthEvent) {
+        AuthManager.onAuthEvent(function(event) {
             enqueue({
-                type: 'fetch_error',
-                message: 'Fetch failed: ' + url + ' — ' + err.message,
-                file: null, line: null, column: null, stack: null, page: getPageInfo()
+                type: 'auth_event',
+                message: 'Auth event: ' + event.type,
+                file: null,
+                line: null,
+                column: null,
+                stack: event.detail ? JSON.stringify(event.detail).substring(0, 500) : null,
+                page: getPageInfo()
             });
-            throw err;
-        }).then(async function(response) {
-            // Don't intercept auth endpoints to avoid infinite loops or double refresh
-            var urlStr = String(url);
-            if (urlStr.indexOf('/api/auth/refresh') !== -1 || urlStr.indexOf('/api/auth/me') !== -1) return response;
-            // Detect TOKEN_INVALID and auto-refresh
-            if (response.status === 403 && !_retried) {
-                try {
-                    var clone = response.clone();
-                    var body = await clone.json();
-                    if (body && body.code === 'TOKEN_INVALID') {
-                        console.log('[FrontendMonitor] TOKEN_INVALID detected, refreshing...');
-                        var refreshed = await doTokenRefresh();
-                        if (refreshed) {
-                            // Retry original request with new token
-                            var newToken = localStorage.getItem('authToken');
-                            var newOptions = JSON.parse(JSON.stringify(options));
-                            newOptions._retried = true;
-                            if (newOptions.headers) {
-                                newOptions.headers['Authorization'] = 'Bearer ' + newToken;
-                            } else {
-                                newOptions.headers = { 'Authorization': 'Bearer ' + newToken };
-                            }
-                            return originalFetch(url, newOptions);
-                        }
-                    }
-                } catch (parseErr) {
-                    // Not JSON, ignore
-                }
-            }
-            if (!response.ok && response.status >= 500) {
-                enqueue({
-                    type: 'fetch_5xx',
-                    message: 'Server error ' + response.status + ': ' + url,
-                    file: null, line: null, column: null, stack: null, page: getPageInfo()
-                });
-            }
-            return response;
         });
-    };
+    }
 
     // 6. WebSocket errors — أخطاء الـ WebSocket
     var OriginalWebSocket = window.WebSocket;
@@ -290,7 +203,10 @@
         if (queue.length > 0) {
             // استخدم sendBeacon لو متاح
             if (navigator.sendBeacon) {
-                navigator.sendBeacon(CONFIG.endpoint, JSON.stringify({ errors: queue, sessionId: sessionId }));
+                var token = getAuthToken();
+                var payload = { errors: queue, sessionId: sessionId };
+                if (token) payload.token = token;
+                navigator.sendBeacon(CONFIG.endpoint, JSON.stringify(payload));
             }
         }
     });

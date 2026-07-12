@@ -2,7 +2,7 @@
 // نظام المستخدمين والمصادقة
 // ============================================
 var currentUser = null;
-var authToken = localStorage.getItem('authToken') || null;
+// auth state managed by AuthManager — always get fresh token
 
 // ============================================
 // إدارة المناوبات (Shift Management)
@@ -90,6 +90,9 @@ function hideSkeleton() {
 // نظام تسجيل الدخول (من inline.js)
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    if (typeof AuthManager !== 'undefined') {
+        AuthManager.init();
+    }
     var loginScreen = document.getElementById('loginScreen');
     var loginBtn = document.getElementById('loginBtn');
     var loginUsername = document.getElementById('loginUsername');
@@ -116,40 +119,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         try {
-            var res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            var data = await res.json();
-                if (data.success && data.token) {
-                localStorage.setItem('authToken', data.token);
-                localStorage.setItem('currentUser', JSON.stringify(data.user));
-                currentUser = data.user;
-                authToken = data.token;
-                hideLogin();
-                applyUserPermissions(data.user);
-                if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
-                loadAllData();
-                loadNotifications();
-                addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
-            } else {
-                loginError.textContent = data.error || 'فشل في تسجيل الدخول';
-                loginError.style.display = 'block';
-            }
+            var data = await AuthManager.login(username, password);
+            currentUser = data.user;
+            hideLogin();
+            applyUserPermissions(data.user);
+            if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
+            loadAllData();
+            loadNotifications();
+            addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
         } catch (e) {
-            loginError.textContent = 'خطأ في الاتصال بالسيرفر';
+            loginError.textContent = e.message || 'فشل في تسجيل الدخول';
             loginError.style.display = 'block';
         }
     }
 
     function doLogout() {
         addAuditEntry('system', 'تسجيل خروج', 'المستخدم ' + getCurrentUserName() + ' سجل الخروج من النظام', getCurrentUserName());
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
-        currentUser = null;
-        authToken = null;
-        location.reload();
+        AuthManager.logout();
     }
 
     if (loginBtn) loginBtn.addEventListener('click', doLogin);
@@ -161,23 +147,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (authToken) {
+    if (AuthManager.isLoggedIn()) {
         showSkeleton();
-        fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                currentUser = data.user;
-                hideLogin();
-                applyUserPermissions(data.user);
-                if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
-                loadAllData();
-            } else {
-                hideSkeleton();
-                showLogin();
-            }
-        })
-        .catch(function() { hideSkeleton(); showLogin(); });
+        var user = AuthManager.getUser();
+        if (user) {
+            currentUser = user;
+            hideLogin();
+            applyUserPermissions(user);
+            if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + (user.role === 'admin' ? 'مدير' : user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
+            loadAllData();
+        } else {
+            hideSkeleton();
+            showLogin();
+        }
     } else {
         // If currentUser exists but authToken is missing, clear inconsistent state
         if (localStorage.getItem('currentUser')) {
@@ -490,13 +472,13 @@ var wsFallbackInterval = null; // اسم متغير للتوافق مع الكو
 
 function connectSSE() {
     try {
-        var token = localStorage.getItem('authToken');
+        var token = AuthManager.getToken();
         if (!token) {
             console.log('🔴 SSE: no token, using polling only');
             startFallbackInterval();
             return;
         }
-        var sseUrl = '/api/sse?token=' + encodeURIComponent(token);
+        var sseUrl = AuthManager.getSSEUrl('/api/sse');
         
         // Close existing connection if any
         if (sseSource) {
@@ -542,6 +524,14 @@ function connectSSE() {
         startFallbackInterval();
     }
 }
+
+// Reconnect SSE on token refresh
+AuthManager.onAuthEvent(function(event, data) {
+    if (event === 'refresh') {
+        console.log('Token refreshed, reconnecting SSE...');
+        connectSSE();
+    }
+});
 
 function handleSSEEvent(data) {
     switch(data.type) {
@@ -723,7 +713,7 @@ async function removeSectorLogo() {
 
     // حذف من السيرفر أولاً
     try {
-        var response = await fetch('/api/remove-theme', { method: 'DELETE' });
+        var response = await AuthManager.apiRequest('/api/remove-theme', { method: 'DELETE' });
         var result = await response.json();
         if (result.success) {
             console.log('✅ تم حذف الشعار من السيرفر');
@@ -885,12 +875,11 @@ function addAuditEntry(type, action, detail, user) {
 
     // Fire-and-forget server-side logging
     try {
-        if (authToken) {
-            fetch('/api/audit-log', {
+        if (AuthManager.isLoggedIn()) {
+            AuthManager.apiRequest('/api/audit-log', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + authToken
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(entry)
             }).catch(function() {});
@@ -1150,8 +1139,8 @@ var notifications = [];
 var unreadNotificationsCount = 0;
 
 function loadNotifications() {
-    if (!authToken) return;
-    fetch('/api/notifications', { headers: { 'Authorization': 'Bearer ' + authToken } })
+    if (!AuthManager.isLoggedIn()) return;
+    AuthManager.apiRequest('/api/notifications')
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (data.success && Array.isArray(data.notifications)) {
@@ -1179,10 +1168,10 @@ function updateNotificationBadge() {
 }
 
 function markNotificationsRead() {
-    if (!authToken) return;
-    fetch('/api/notifications/read', {
+    if (!AuthManager.isLoggedIn()) return;
+    AuthManager.apiRequest('/api/notifications/read', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' }
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
@@ -1232,10 +1221,10 @@ function renderNotifications() {
 }
 
 function markNotificationRead(id) {
-    if (!authToken || id === undefined) return;
-    fetch('/api/notifications/read/' + id, {
+    if (!AuthManager.isLoggedIn() || id === undefined) return;
+    AuthManager.apiRequest('/api/notifications/read/' + id, {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' }
     })
     .then(function() {
         var n = notifications.find(function(x) { return x.id === id; });
@@ -1254,11 +1243,11 @@ function markAllNotificationsRead() {
 }
 
 function clearAllNotifications() {
-    if (!authToken) return;
+    if (!AuthManager.isLoggedIn()) return;
     if (!confirm('هل أنت متأكد من مسح جميع الإشعارات؟')) return;
-    fetch('/api/notifications/clear', {
+    AuthManager.apiRequest('/api/notifications/clear', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' }
     })
     .then(function() {
         notifications = [];
@@ -1286,7 +1275,7 @@ function goToPeakTime() {
 }
 
 function checkForAlerts() {
-    fetch('/api/peak-data', { headers: { 'Authorization': 'Bearer ' + authToken } })
+    AuthManager.apiRequest('/api/peak-data')
         .then(res => res.json())
         .then(result => {
             if (result.success) {
@@ -1771,11 +1760,8 @@ async function renderAdvancedDistribution() {
             else shiftType = 'صباح';
         } catch(e) { shiftType = 'صباح'; }
         
-        var token = localStorage.getItem('authToken');
-        if (token) {
-            var response = await fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
+        if (AuthManager.isLoggedIn()) {
+            var response = await AuthManager.apiRequest('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType));
             var data = await response.json();
             if (data.success && data.completion && data.completion.teams) {
                 hasCompletion = true;
@@ -2361,7 +2347,7 @@ function showToast(message, type) {
 
 async function loadAllData() {
     try {
-        var response = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/data');
         var result = await response.json();
         // Protect centersData: don't overwrite with empty from server
         if (result.centers && Object.keys(result.centers).length > 0) {
@@ -2605,7 +2591,7 @@ async function viewSelectedArchiveShift() {
     }
     
     try {
-        var response = await fetch('/api/shifts/' + shiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/shifts/' + shiftId);
         var result = await response.json();
         if (!result || !result.shift) {
             alert('المناوبة غير موجودة');
@@ -2930,7 +2916,7 @@ function selectShiftFromHistory(shiftId) {
     if (returnBtn) returnBtn.style.display = 'inline-block';
     
     // Load shift data including reports from server
-    fetch('/api/shifts/' + shiftIdNum, { headers: { 'Authorization': 'Bearer ' + authToken } })
+    AuthManager.apiRequest('/api/shifts/' + shiftIdNum)
         .then(function(r) { return r.json(); })
         .then(function(result) {
             if (result.shift) {
@@ -3223,7 +3209,7 @@ function syncReportEntryData() {
 // مؤشرات القوى العاملة
 // ============================================
 function updateWorkforceStats() {
-    var token = localStorage.getItem('authToken');
+    var token = AuthManager.getToken();
     var shiftDate = '';
     var shiftType = '';
     try {
@@ -3238,10 +3224,8 @@ function updateWorkforceStats() {
     } catch(e) { shiftType = 'صباح'; }
 
     // Try to get accurate ready-team count from completion (source of truth)
-    if (token) {
-        fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
-            headers: { 'Authorization': 'Bearer ' + token }
-        })
+    if (AuthManager.isLoggedIn()) {
+        AuthManager.apiRequest('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success && data.completion && data.completion.teams) {
@@ -3492,7 +3476,7 @@ function updateDistributionIndicator() {
 // ============================================
 async function loadAirRecords() {
     try {
-        var response = await fetch('/api/air-ambulance', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/air-ambulance');
         var result = await response.json();
         if (result.success) { airRecords = result.records || []; renderAirRecords(); }
     } catch (error) { console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error); }
@@ -3568,7 +3552,7 @@ function openShiftModal() {
 
 async function loadShifts() {
     try {
-        var response = await fetch('/api/shifts', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/shifts');
         var data = await response.json();
         if (Array.isArray(data)) {
             allShifts = data;
@@ -3683,7 +3667,7 @@ async function startNewShift() {
     if (!confirm('⚠️ هل أنت متأكد؟\n\nسيتم أرشفة المناوبة الحالية بالكامل، وبدء مناوبة ' + (normalizedType === 'صباح' ? 'صباحية' : 'ليلية') + ' جديدة.\n\nجميع البيانات التشغيلية ستبدأ من الصفر.')) return;
     
     try {
-        var response = await fetch('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ shiftType: normalizedType }) });
+        var response = await AuthManager.apiRequest('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: normalizedType }) });
         var result = await response.json();
         if (result.success) {
             // ============================================
@@ -4065,7 +4049,7 @@ async function viewShiftReports() {
     var shiftId = parseInt(select.value);
     if (!shiftId) { alert("الرجاء اختيار مناوبة من القائمة"); return; }
     try {
-        var response = await fetch('/api/shifts/' + shiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/shifts/' + shiftId);
         var result = await response.json();
         if (result && result.shift) {
             currentViewingShift = result.shift;
@@ -4305,7 +4289,7 @@ async function saveShiftData(silent) {
         var body = { shiftData: shiftData };
         if (targetId) body.shiftId = targetId;
         else { body.shiftDate = shiftDate; body.shiftType = shiftType; }
-        var response = await fetch('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(body) });
+        var response = await AuthManager.apiRequest('/api/update-shift-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         var result = await response.json();
         if (result.success) {
             if (result.shiftId) {
@@ -4337,7 +4321,7 @@ async function saveShiftData(silent) {
                 updateWorkforceStats();
                 updateDistributionIndicator();
                 if (viewingShiftId) {
-                    var viewResponse = await fetch('/api/shifts/' + viewingShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                    var viewResponse = await AuthManager.apiRequest('/api/shifts/' + viewingShiftId);
                     var viewResult = await viewResponse.json();
                     if (viewResult && viewResult.shift) { loadShiftToForm(viewResult.shift); }
                 }
@@ -4460,9 +4444,7 @@ async function fetchTeamParamedics(shiftId, teamName, type, index) {
     var cacheKey = shiftId + '_' + teamName;
     // Always fetch fresh data (cache-busting)
     try {
-        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now(), {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-        });
+        var response = await AuthManager.apiRequest('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now());
         var data = await response.json();
         console.log('[PARAMEDICS] Team:', teamName, 'ShiftType:', data.shiftType, 'Count:', data.paramedics.length, 'Codes:', data.paramedics.map(p => p.shift_code));
         var paramedics = data.paramedics || [];
@@ -4639,9 +4621,7 @@ function renderTeamParamedics(teamName, type, index, paramedics) {
 async function fetchTeamParamedics(shiftId, teamName, type, index) {
     var cacheKey = shiftId + '_' + teamName;
     try {
-        var response = await fetch('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now(), {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-        });
+        var response = await AuthManager.apiRequest('/api/shift-completion/' + shiftId + '/' + encodeURIComponent(teamName) + '?_=' + Date.now());
         var data = await response.json();
         console.log('[PARAMEDICS] Team:', teamName, 'ShiftType:', data.shiftType, 'Count:', data.paramedics.length, 'Codes:', data.paramedics.map(function(p) { return p.shift_code; }));
         var paramedics = data.paramedics || [];
@@ -6229,11 +6209,11 @@ async function loadSavedTable() {
     var container = document.getElementById('excelTableContainer');
     var status = document.getElementById('tableStatus');
     try {
-        var response = await fetch('/api/check-monthly-table', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/check-monthly-table');
         var result = await response.json();
         if (result.exists) {
             status.innerHTML = '⏳ جاري التحميل...';
-            var fileResponse = await fetch('/api/get-monthly-table', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var fileResponse = await AuthManager.apiRequest('/api/get-monthly-table');
             var blob = await fileResponse.blob();
             var reader = new FileReader();
             reader.onload = function(event) {
@@ -6524,7 +6504,7 @@ var el_excelFileInput=document.getElementById("excelFileInput");if(el_excelFileI
 // ============================================
 async function loadVacations() {
     try {
-        var response = await fetch('/api/vacations', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/vacations');
         var data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
             data.forEach(function(item, index) { if (controlData[index]) { controlData[index].vacationStart = item.vacationStart || ''; controlData[index].vacationEnd = item.vacationEnd || ''; } });
@@ -6560,7 +6540,7 @@ var el_editVacationsBtn = document.getElementById("editVacationsBtn"); if(el_edi
 var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_confirmPasswordBtn)el_confirmPasswordBtn.addEventListener('click', async function() {
     var password = document.getElementById('passwordInput').value;
     try {
-        var response = await fetch('/api/get-password', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/get-password');
         var result = await response.json();
         var storedPassword = result.password || '1234';
         if (password === storedPassword) {
@@ -6611,7 +6591,7 @@ function closeDocsPage() {
 
 async function loadDocsData() {
     try {
-        var response = await fetch('/api/docs', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/docs');
         var result = await response.json();
         if (result.success) {
             uploadedDocs = result.docs || [];
@@ -7736,7 +7716,7 @@ function addStructuredNote() {
 async function loadShiftNotes() {
     if (currentShiftId) {
         try {
-            var res = await apiFetch('/api/shift-notes/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var res = await AuthManager.apiRequest('/api/shift-notes/' + currentShiftId);
             var data = await res.json();
             shiftNotes = data && data.notes ? data.notes : (Array.isArray(data) ? data : []);
         } catch (e) {
@@ -7776,7 +7756,7 @@ function renderShiftNotes() {
 async function loadShiftNotes() {
     if (currentShiftId) {
         try {
-            var res = await apiFetch('/api/shift-notes/' + currentShiftId, { headers: { 'Authorization': 'Bearer ' + authToken } });
+            var res = await AuthManager.apiRequest('/api/shift-notes/' + currentShiftId);
             var data = await res.json();
             shiftNotes = data && data.notes ? data.notes : (Array.isArray(data) ? data : []);
         } catch (e) {
@@ -8853,7 +8833,7 @@ function opsSwitchTab(tab) {
 // تحميل البيانات
 async function opsLoadData() {
     try {
-        var res = await fetch('/api/operational-files', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var res = await AuthManager.apiRequest('/api/operational-files');
         var data = await res.json();
         opsMetadata = data.files || [];
         return opsMetadata;
@@ -9372,7 +9352,7 @@ async function uploadTheme() {
 // ============================================
 async function applyGlobalTheme() {
     try {
-        var response = await fetch('/api/theme-settings', { headers: { 'Authorization': 'Bearer ' + authToken } });
+        var response = await AuthManager.apiRequest('/api/theme-settings');
         var data = await response.json();
         
         if (data.fileName) {
@@ -9435,7 +9415,7 @@ async function removeGlobalTheme() {
     if (!confirm('⚠️ هل أنت متأكد من إزالة الثيم العام؟')) return;
     
     try {
-        var response = await fetch('/api/remove-theme', { method: 'DELETE' });
+        var response = await AuthManager.apiRequest('/api/remove-theme', { method: 'DELETE' });
         var result = await response.json();
         if (result.success) {
             alert('✅ تم إزالة الثيم العام');
@@ -9936,7 +9916,7 @@ document.head.appendChild(flashStyle);
 // ============================================
 var originalCheckForAlerts = checkForAlerts;
 checkForAlerts = function() {
-    fetch('/api/peak-data', { headers: { 'Authorization': 'Bearer ' + authToken } })
+    AuthManager.apiRequest('/api/peak-data')
         .then(function(res) { return res.json(); })
         .then(function(result) {
             if (result.success) {
@@ -10341,7 +10321,7 @@ if (!window.__fetchInterceptorInstalled) {
     window.fetch = function(url, options) {
         options = options || {};
         options.headers = options.headers || {};
-        var token = localStorage.getItem('authToken');
+        var token = AuthManager.getToken();
         if (token && typeof url === 'string' && url.startsWith('/api/')) {
             options.headers['Authorization'] = 'Bearer ' + token;
         }

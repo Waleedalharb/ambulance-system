@@ -296,8 +296,21 @@ window.addEventListener('load', function() {
             100% { background-position: -200% 0; }
         }
     </style>
+<base target="_blank">
 </head>
 <body>
+
+<!-- ===== Inline Archive View (loaded via AJAX) ===== -->
+<div id="archiveView" style="display:none; position:fixed; inset:0; z-index:9998; background:#F8FAFC; overflow-y:auto;">
+    <div style="position:sticky; top:0; z-index:10; background:linear-gradient(135deg, #1E293B 0%, #334155 100%); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+        <h2 style="color:#fff; margin:0; font-size:1.1rem; display:flex; align-items:center; gap:10px;"><i class="fas fa-archive" style="color:#FBBF24;"></i> أرشيف المناوبات</h2>
+        <button onclick="showMainView()" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:8px 20px; border-radius:10px; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i> العودة للرئيسية
+        </button>
+    </div>
+    <div id="archiveViewContent" style="padding:20px;"></div>
+</div>
+
 <!-- Skeleton Loading Screen -->
 <div id="skeletonScreen" class="skeleton-container" style="display: none;">
     <div class="skeleton-header">
@@ -1825,7 +1838,7 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-dashboard.html?v=41');"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('achievementsModal').style.display='flex'; renderAchievements();"><i class="fas fa-trophy"></i> الإنجازات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); openShiftArchiveModal();"><i class="fas fa-archive"></i> أرشيف المناوبات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); loadArchiveInline();"><i class="fas fa-archive"></i> أرشيف المناوبات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); toggleAIChatPanel();"><i class="fas fa-robot"></i> المساعد التشغيلي</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-knowledge.html?v=41');"><i class="fas fa-book"></i> قاعدة المعرفة</button>
             </div>
@@ -1890,12 +1903,59 @@ window.addEventListener('load', function() {
 <script src="js/websocket-sync.js"></script>
 <script src="js/frontend-monitor.js?v=3"></script>
 <script src="js/chat-integration.js"></script>
+<script src="/js/auth-manager.js"></script>
 <script src="js/app.js?v=45" defer></script>
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
 <script>
+// ===== Inline Archive Loader =====
+function loadArchiveInline() {
+    var view = document.getElementById('archiveView');
+    var content = document.getElementById('archiveViewContent');
+
+    // Show archive view with loading (archiveView is position:fixed, covers everything)
+    view.style.display = 'block';
+    content.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px;"><div class="spinner"></div><div style="margin-top:20px; color:#64748B;">جاري تحميل الأرشيف...</div></div>';
+
+    // Fetch the inline archive
+    fetch('/shift-archive-inline.html')
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            // Parse and extract scripts for execution
+            var scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+            var scripts = [];
+            var match;
+            while ((match = scriptRegex.exec(html)) !== null) {
+                scripts.push(match[1]);
+            }
+            // Remove scripts from HTML before inserting
+            var cleanHtml = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            content.innerHTML = cleanHtml;
+            // Execute extracted scripts
+            scripts.forEach(function(code) {
+                try {
+                    var script = document.createElement('script');
+                    script.textContent = code;
+                    document.head.appendChild(script);
+                    document.head.removeChild(script);
+                } catch(e) { console.error('[loadArchiveInline] Script error:', e); }
+            });
+        })
+        .catch(function(e) {
+            console.error('[loadArchiveInline] Error:', e);
+            content.innerHTML = '<div style="text-align:center; padding:60px; color:#DC2626;"><i class="fas fa-exclamation-triangle" style="font-size:3rem; margin-bottom:20px;"></i><h3>فشل في تحميل الأرشيف</h3><p>يرجى المحاولة مرة أخرى</p><button onclick="showMainView()" style="margin-top:20px; padding:10px 30px; background:var(--primary); color:#fff; border:none; border-radius:10px; cursor:pointer;">العودة للرئيسية</button></div>';
+        });
+}
+
+function showMainView() {
+    // Simply hide the archive overlay - main page is underneath
+    document.getElementById('archiveView').style.display = 'none';
+    document.body.style.overflow = '';
+    window.scrollTo(0, 0);
+}
+
 function navigateToPage(url) {
     var overlay = document.getElementById('pageLoadingOverlay');
     if (overlay) overlay.style.display = 'flex';

@@ -1,0 +1,256 @@
+{
+  "id": "1783662667494",
+  "shiftType": "صباح",
+  "shiftDate": "2026-07-10",
+  "shift_id": 1783658362761,
+  "teams": {
+    "rapid_1": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "rapid_2": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "الشفاء"
+    },
+    "rapid_3": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "rapid_4": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "غير محدد"
+    },
+    "rapid_5": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "غير محدد"
+    },
+    "جنوب 1": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "راكان شلال عامق العنزي"
+      ],
+      "centerName": "المنصورة"
+    },
+    "جنوب 2": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "عبدالرحمن حسين علي البوعبدي"
+      ],
+      "centerName": "الخالدية"
+    },
+    "جنوب 3": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "امجد محمد سعد الزهراني"
+      ],
+      "centerName": "منفوحة"
+    },
+    "جنوب 4": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "الدار البيضاء"
+    },
+    "جنوب 5": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "سعيد سرحان عوض الاسمري",
+        "عبدالمجيد علي حسن مجرشي",
+        "عبدالله محمد صالح عكران",
+        "يوسف عيسى عائض الحربي"
+      ],
+      "centerName": "الدار البيضاء"
+    },
+    "جنوب 6": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "حسن علي محمد العامر"
+      ],
+      "centerName": "الإسكان"
+    },
+    "جنوب 7": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "محمد سعد عبدالله المسعود",
+        "خالد حزام خالد المطيري"
+      ],
+      "centerName": "الحائر"
+    },
+    "جنوب 8": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "الشفاء"
+    },
+    "جنوب 9": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "عكاظ"
+    },
+    "جنوب 10": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "ثريان عائض علي المطيري",
+        "نواف مسفر مطلق القثامي العتيبي"
+      ],
+      "centerName": "ديراب"
+    },
+    "جنوب 11": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "جنوب 12": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "جنوب 13": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "جنوب 14": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "سعود محمد عبيد المطيري",
+        "عمر متعب كسار العنزي"
+      ],
+      "centerName": "المنصورة"
+    },
+    "جنوب 15": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "سلمان حمد مهدي ال رشيد"
+      ],
+      "centerName": "المنصورة"
+    },
+    "جنوب 16": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "المنصورة"
+    },
+    "بنك_الدم": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "غير محدد"
+    },
+    "إجازة": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "غير محدد"
+    },
+    "قائد_ميداني": {
+      "status": "pending",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [],
+      "centerName": "غير محدد"
+    },
+    "تحكم_تنسيق": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "تركي عتيق الله خيرالله المطيري",
+        "سامي صالح عناد العنزي"
+      ],
+      "centerName": "غير محدد"
+    },
+    "دعم_لوجستي": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "مهوس ناصر عبدالله المهوس"
+      ],
+      "centerName": "غير محدد"
+    },
+    "باص_استجابة": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "ابراهيم محمد ابراهيم العوهلي"
+      ],
+      "centerName": "غير محدد"
+    },
+    "المنتدبين": {
+      "status": "ready",
+      "reason": "",
+      "missingPerson": "",
+      "paramedics": [
+        "هاشم حسن حسن الناشري",
+        "موسى علي احمد غروي",
+        "فواز محمد حميدان المطيري",
+        "طلال علي محمد الزهراني",
+        "حمزه شكري محمد الحرز",
+        "محمد ابراهيم محمد عبدالله",
+        "مصعب عبدالله معيش العتيبي",
+        "عبدالاله جهاد عبدالاله الخنيزي",
+        "حسن منير ابراهيم الشاوي",
+        "زياد سعيد جبران الشهراني",
+        "عبدالمجيد علي سعيد الغامدي",
+        "احمد كامل احمد لاجامي",
+        "نواف موسى علي محزري",
+        "علي موسى احمد ال رمضان",
+        "علي حسين محمد المحمد صالح",
+        "يوسف عواد هثل العنزي",
+        "فيصل احمد شريف الغامدي"
+      ],
+      "centerName": "غير محدد"
+    }
+  },
+  "notes": "",
+  "timestamp": "2026-07-10T05:51:07.481Z",
+  "createdBy": "مدير النظام"
+}
