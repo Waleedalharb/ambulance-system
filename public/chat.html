@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <!-- Chat Styles -->
-    <link rel="stylesheet" href="css/chat.css?v=2">
+    <link rel="stylesheet" href="css/chat.css?v=3">
 <base target="_blank">
 </head>
 <body>
@@ -32,7 +32,7 @@
         })();
     </script>
 
-    <!-- Toast Container (for in-page toast notifications) -->
+    <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Mobile Sidebar Toggle -->
@@ -85,20 +85,18 @@
                     </div>
                     <div class="sidebar-user-info">
                         <span class="sidebar-user-name" id="currentUserName">جاري التحميل...</span>
-                        <span class="sidebar-user-status" id="sidebarUserStatus">
+                        <span class="sidebar-user-status">
                             <span class="status-dot online"></span>
                             متصل
                         </span>
                     </div>
                 </div>
-                <div class="sidebar-footer-actions">
-                    <button class="sidebar-action-btn" id="soundToggleBtn" title="إعدادات الصوت" onclick="toggleSoundSettings()">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button class="sidebar-action-btn" onclick="location.href='index.html'" title="الرئيسية">
-                        <i class="fas fa-home"></i>
-                    </button>
-                </div>
+                <button class="sidebar-action-btn" onclick="toggleSettings()" title="الإعدادات">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="sidebar-action-btn" onclick="location.href='index.html'" title="الرئيسية">
+                    <i class="fas fa-home"></i>
+                </button>
             </div>
         </aside>
 
@@ -161,15 +159,15 @@
                 </div>
 
                 <!-- Input Area -->
-                <div class="chat-input-area">
-                    <div class="chat-input-wrap">
+                <div class="chat-input-area" id="chatInputArea">
+                    <div class="chat-input-wrap" id="messageInputWrap">
                         <button class="chat-input-btn attach-btn" id="attachBtn" title="إرفاق ملف">
                             <i class="fas fa-paperclip"></i>
                         </button>
                         <div class="chat-input-field">
                             <textarea id="messageInput" placeholder="اكتب رسالتك..." rows="1" autocomplete="off"></textarea>
                         </div>
-                        <button class="chat-input-btn send-btn" id="sendBtn" title="إرسال" disabled>
+                        <button class="chat-input-btn send-btn" id="sendBtn" title="إرسال">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -233,27 +231,10 @@
         </div>
     </div>
 
-    <!-- Sound Settings Panel -->
-    <div id="soundSettingsPanel" class="sound-settings-panel" style="display:none;">
-        <h3><i class="fas fa-volume-up"></i> إعدادات الصوت</h3>
-        <div class="sound-toggle-row">
-            <label>تفعيل أصوات الإشعارات</label>
-            <label class="sound-switch">
-                <input type="checkbox" id="soundMasterToggle" onchange="toggleSoundMaster(this)" checked>
-                <span class="sound-slider"></span>
-            </label>
-        </div>
-        <div class="sound-toggle-row">
-            <button class="btn btn-sm" onclick="document.getElementById('soundSettingsPanel').style.display='none'">
-                <i class="fas fa-times"></i> إغلاق
-            </button>
-        </div>
-    </div>
-
     <!-- Overlay for mobile sidebar -->
     <div class="sidebar-overlay" id="sidebarOverlay" style="display:none;"></div>
 
     <!-- Chat Logic -->
-    <script src="js/chat.js?v=2"></script>
+    <script src="js/chat.js?v=3"></script>
 </body>
 </html>

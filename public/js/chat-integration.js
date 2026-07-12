@@ -1,8 +1,8 @@
-// ============================================
-// Chat Integration Module for EMS Platform
-// Provides: Cross-page WebSocket, Toast Notifications,
-//           Unread badge, Browser notifications
-// ============================================
+/**
+ * Chat Integration Module — منصة الجنوب
+ * Provides: Cross-page WebSocket, Toast Notifications, Unread badge, Browser notifications
+ * v2: WebSocket-based INSTANT delivery (replaces polling)
+ */
 const ChatIntegration = {
     unreadCount: 0,
     ws: null,
@@ -11,10 +11,10 @@ const ChatIntegration = {
     maxReconnectDelay: 30000,
     heartbeatInterval: null,
     lastNotifiedId: null,
-    currentPage: window.location.pathname,
+    notifiedMessages: {},
 
     /**
-     * Initialize the chat integration
+     * Initialize — connect WebSocket for instant delivery
      */
     async init() {
         if (!this.isAuthenticated()) {
@@ -27,10 +27,10 @@ const ChatIntegration = {
             Notification.requestPermission();
         }
 
-        // Connect WebSocket for instant delivery
+        // Connect WebSocket for INSTANT delivery
         this.connectWebSocket();
 
-        // Initial badge update
+        // Initial badge update (fallback)
         await this.updateBadge();
 
         console.log('[ChatIntegration] Initialized with WebSocket');
@@ -55,7 +55,7 @@ const ChatIntegration = {
         const wsUrl = protocol + '//' + location.host + '/ws';
 
         try {
-            this.ws = new WebSocket(wsUrl, token);
+            this.ws = new WebSocket(wsUrl);
             const self = this;
 
             this.ws.onopen = function() {
@@ -63,6 +63,8 @@ const ChatIntegration = {
                 self.reconnectAttempts = 0;
                 console.log('[ChatIntegration] WebSocket connected');
                 self.startHeartbeat();
+                // Send presence
+                self.ws.send(JSON.stringify({ type: 'chat_presence' }));
             };
 
             this.ws.onmessage = function(event) {
@@ -76,6 +78,7 @@ const ChatIntegration = {
 
             this.ws.onerror = function(err) {
                 console.error('[ChatIntegration] WS error:', err);
+                self.connected = false;
             };
 
             this.ws.onclose = function() {
@@ -92,153 +95,122 @@ const ChatIntegration = {
     },
 
     /**
-     * Handle WebSocket messages - this is the KEY for instant notifications
+     * Handle WebSocket messages — KEY for instant notifications
      */
     handleWebSocketMessage(data) {
         // Ignore ping/pong
-        if (data.type === 'pong' || data.type === 'ping') return;
-        if (data.type === 'connected') return;
+        if (data.type === 'pong' || data.type === 'ping' || data.type === 'connected') return;
         if (data.type === 'online_users_list') return;
 
-        // NEW: Handle incoming chat messages - INSTANT NOTIFICATION
+        // NEW: Handle incoming chat messages — INSTANT NOTIFICATION
         if (data.type === 'chat_message' && data.message && data.conversationId) {
             this.handleIncomingMessage(data.message, data.conversationId);
             return;
         }
 
-        // Update badge on read receipts (messages were read)
+        // Update badge on read receipts
         if (data.type === 'chat_read') {
             this.updateBadge();
-            return;
-        }
-
-        // Handle online/offline for any UI that shows user status
-        if (data.type === 'user_online' || data.type === 'user_offline') {
-            // Could update any online status indicators on the current page
             return;
         }
     },
 
     /**
-     * Handle incoming message - show toast and update badge
+     * Handle incoming message — show Toast + Browser notification for EVERY message
      */
     handleIncomingMessage(message, conversationId) {
-        const currentUserId = this.getCurrentUserId();
+        const currentUser = this.getCurrentUserId();
 
         // Don't notify for own messages
-        if (currentUserId && String(message.sender_id) === String(currentUserId)) {
+        if (currentUser && String(message.sender_id) === String(currentUser)) {
             return;
         }
 
-        // Update badge immediately
+        // Don't notify if already on chat.html viewing this conversation
+        if (window.location.pathname.includes('chat.html')) {
+            return; // chat.js will handle it
+        }
+
+        // Prevent duplicate notification for same message
+        if (this.notifiedMessages[message.id]) return;
+        this.notifiedMessages[message.id] = true;
+
+        // Update badge
         this.updateBadge();
 
-        // Show toast notification (ONLY if not on chat.html viewing this conversation)
-        const isOnChatPage = this.currentPage.indexOf('chat.html') !== -1;
-        if (!isOnChatPage) {
-            this.showToastNotification(message, conversationId);
-        }
+        // Show Toast notification (bottom-right popup) — EVERY message gets one
+        this.showToastNotification(message, conversationId);
 
         // Show browser notification
         this.showBrowserNotification(
             message.sender_name || 'رسالة جديدة',
             message.content || '',
             message.sender_id,
-            conversationId
+            message.id
         );
 
         // Notify other tabs via BroadcastChannel
         try {
             if (typeof BroadcastChannel !== 'undefined') {
                 const bc = new BroadcastChannel('chat_sync');
-                bc.postMessage({
-                    type: 'new_message',
-                    message: message,
-                    conversationId: conversationId
-                });
+                bc.postMessage({ type: 'chat_badge_update', unreadTotal: this.unreadCount });
                 bc.close();
             }
         } catch(e) {}
     },
 
     /**
-     * Show toast notification (bottom-right popup)
+     * Show Toast notification (bottom-right popup) — ONE PER MESSAGE
      */
     showToastNotification(message, conversationId) {
-        // Use the global ChatToast if available, otherwise create inline toast
-        if (typeof ChatToast !== 'undefined' && ChatToast.show) {
-            ChatToast.show({
-                senderName: message.sender_name || 'مستخدم',
-                senderId: message.sender_id,
-                conversationId: conversationId,
-                content: message.content,
-                messageId: message.id,
-                timestamp: message.created_at
-            });
-            return;
-        }
-
-        // Fallback: create inline toast
-        this.createInlineToast(message, conversationId);
-    },
-
-    /**
-     * Create inline toast (fallback when ChatToast module not loaded)
-     */
-    createInlineToast(message, conversationId) {
-        let container = document.getElementById('chatInlineToastContainer');
+        // Ensure container exists
+        var container = document.getElementById('chatToastContainer');
         if (!container) {
             container = document.createElement('div');
-            container.id = 'chatInlineToastContainer';
-            container.style.cssText = 'position:fixed;bottom:24px;left:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;direction:rtl;';
+            container.id = 'chatToastContainer';
+            container.setAttribute('dir', 'rtl');
+            container.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;direction:rtl;';
             document.body.appendChild(container);
         }
 
-        const toast = document.createElement('div');
-        const colors = ['#0D9488', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
-        const color = colors[(message.sender_name || '').charCodeAt(0) % colors.length];
-        const initials = (message.sender_name || 'مستخدم').split(' ').map(w => w[0]).join('').substring(0, 2);
+        var senderName = message.sender_name || 'مستخدم';
+        var initials = senderName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2);
+        var colors = ['#0D9488','#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981'];
+        var color = colors[senderName.charCodeAt(0) % colors.length];
+        var time = this.formatTime(message.created_at);
+        var preview = this.escapeHtml(message.content || '').substring(0, 55);
+        if ((message.content || '').length > 55) preview += '...';
 
-        toast.style.cssText = `
-            display:flex;align-items:flex-start;gap:12px;padding:14px 16px;
-            background:linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
-            border-radius:16px;box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04);
-            cursor:pointer;pointer-events:all;min-width:300px;max-width:380px;
-            opacity:0;transform:translateX(-120%) scale(0.9);transition:all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-            position:relative;overflow:hidden;
-        `;
-        toast.innerHTML = `
-            <div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg, ${color} 0%, #14B8A6 100%);"></div>
-            <div style="width:44px;height:44px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:0.85rem;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-                <span style="line-height:1;">${initials}</span>
-            </div>
-            <div style="flex:1;min-width:0;text-align:right;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
-                    <span style="font-weight:700;font-size:0.85rem;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this.escapeHtml(message.sender_name || 'مستخدم')}</span>
-                    <span style="font-size:0.7rem;color:#94A3B8;flex-shrink:0;">${this.formatTime(message.created_at)}</span>
-                </div>
-                <div style="font-size:0.8rem;color:#64748B;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">
-                    ${this.escapeHtml(message.content || '').substring(0, 60)}${(message.content || '').length > 60 ? '...' : ''}
-                </div>
-            </div>
-            <button style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:1.2rem;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;flex-shrink:0;margin-top:-2px;" onclick="event.stopPropagation();this.parentElement.remove();">&times;</button>
-        `;
+        var toast = document.createElement('div');
+        toast.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04);cursor:pointer;pointer-events:all;min-width:280px;max-width:340px;opacity:0;transform:translateX(-100px);transition:all 0.3s ease;border-right:3px solid ' + color + ';direction:rtl;margin-bottom:6px;';
 
-        toast.addEventListener('click', () => {
+        toast.innerHTML = '<div style="width:38px;height:38px;border-radius:50%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">' + initials + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
+                    '<span style="font-weight:600;font-size:0.82rem;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">' + this.escapeHtml(senderName) + '</span>' +
+                    '<span style="font-size:0.65rem;color:#94A3B8;flex-shrink:0;">' + time + '</span>' +
+                '</div>' +
+                '<div style="font-size:0.78rem;color:#64748B;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + preview + '</div>' +
+            '</div>' +
+            '<button style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:1.1rem;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;" onclick="event.stopPropagation();this.parentElement.remove();">&times;</button>';
+
+        container.appendChild(toast);
+        requestAnimationFrame(function() {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(0)';
+        });
+
+        // Click to open conversation
+        toast.addEventListener('click', function() {
             sessionStorage.setItem('chat_target_conversation', conversationId);
             window.location.href = 'chat.html?conv=' + conversationId;
         });
 
-        container.appendChild(toast);
-        requestAnimationFrame(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateX(0) scale(1)';
-        });
-
-        setTimeout(() => {
+        // Auto remove after 6 seconds
+        setTimeout(function() {
             toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-120%) scale(0.9)';
-            setTimeout(() => toast.remove(), 300);
+            toast.style.transform = 'translateX(-100px)';
+            setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
         }, 6000);
     },
 
@@ -259,27 +231,14 @@ const ChatIntegration = {
             const data = await res.json();
             const conversations = data.conversations || data || [];
 
-            // Count unread messages
             let unread = 0;
-            let latestUnreadMessage = null;
-
             conversations.forEach(conv => {
                 const unreadInConv = (conv.unread_count || conv.unreadCount || 0);
                 unread += unreadInConv;
-                if (unreadInConv > 0 && conv.last_message) {
-                    if (!latestUnreadMessage || new Date(conv.last_message.created_at) > new Date(latestUnreadMessage.created_at)) {
-                        latestUnreadMessage = conv.last_message;
-                    }
-                }
             });
 
             this.unreadCount = unread;
             this.renderBadge(unread);
-
-            // Browser notification for latest unread (only if different from last)
-            if (latestUnreadMessage && latestUnreadMessage.id !== this.lastNotifiedId) {
-                this.lastNotifiedId = latestUnreadMessage.id;
-            }
         } catch (err) {
             console.log('[ChatIntegration] updateBadge error:', err.message);
         }
@@ -301,16 +260,82 @@ const ChatIntegration = {
     },
 
     /**
-     * Open chat.html with a pre-filled share context
+     * Show a browser notification (if permitted) — UNIQUE tag per message
      */
-    shareToChat(context) {
-        if (!context) return;
-        const url = `chat.html?share=${encodeURIComponent(JSON.stringify(context))}`;
-        window.open(url, '_blank');
+    showBrowserNotification(title, body, senderId, messageId) {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        try {
+            new Notification(title, {
+                body: body ? body.substring(0, 100) : 'لديك رسالة جديدة',
+                icon: '/logo.png',
+                badge: '/logo.png',
+                tag: 'chat-msg-' + (messageId || Date.now()),
+                requireInteraction: false
+            });
+        } catch (e) {}
     },
 
     /**
-     * Toggle the chat preview dropdown
+     * Format timestamp to relative time
+     */
+    formatTime(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return 'الآن';
+        if (diff < 3600) return `${Math.floor(diff / 60)} د`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} س`;
+        return `${Math.floor(diff / 86400)} ي`;
+    },
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    /**
+     * Get current user ID
+     */
+    getCurrentUserId() {
+        try {
+            const user = localStorage.getItem('currentUser');
+            if (user) {
+                const parsed = JSON.parse(user);
+                return parsed.id;
+            }
+        } catch (e) {}
+        return null;
+    },
+
+    /**
+     * Heartbeat to keep connection alive
+     */
+    startHeartbeat() {
+        this.stopHeartbeat();
+        const self = this;
+        this.heartbeatInterval = setInterval(function() {
+            if (self.connected && self.ws && self.ws.readyState === WebSocket.OPEN) {
+                self.ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 25000);
+    },
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+    },
+
+    /**
+     * Toggle chat preview dropdown panel
      */
     toggleChatPreview(event) {
         event && event.stopPropagation();
@@ -331,7 +356,7 @@ const ChatIntegration = {
     },
 
     /**
-     * Load recent messages for the preview panel
+     * Load recent messages for preview panel
      */
     async loadChatPreview() {
         const list = document.getElementById('chatPreviewList');
@@ -376,119 +401,20 @@ const ChatIntegration = {
                 const snippet = lastMsg ? (lastMsg.content || '').substring(0, 60) : 'لا توجد رسائل';
                 const sender = lastMsg ? (lastMsg.sender_name || 'مستخدم') : '';
 
-                return `
-                    <a href="chat.html?conv=${conv.id}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--gray-200); text-decoration:none; color:inherit; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <span style="font-weight:600; font-size:0.8rem; color:var(--text);">${this.escapeHtml(conv.title || 'محادثة')}</span>
-                            ${unread > 0 ? `<span style="background:#EF4444; color:white; font-size:0.6rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 4px;">${unread}</span>` : ''}
-                        </div>
-                        <div style="font-size:0.75rem; color:var(--gray-500); direction:rtl; text-align:right;">
-                            ${sender ? `<strong>${this.escapeHtml(sender)}:</strong> ` : ''}${this.escapeHtml(snippet)}${lastMsg && lastMsg.content && lastMsg.content.length > 60 ? '...' : ''}
-                        </div>
-                        ${time ? `<div style="font-size:0.65rem; color:var(--gray-400); margin-top:3px; text-align:left;">${time}</div>` : ''}
-                    </a>
-                `;
+                return `<a href="chat.html?conv=${conv.id}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--gray-200); text-decoration:none; color:inherit; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">` +
+                    `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">` +
+                        `<span style="font-weight:600; font-size:0.8rem; color:var(--text);">${this.escapeHtml(conv.title || 'محادثة')}</span>` +
+                        (unread > 0 ? `<span style="background:#EF4444; color:white; font-size:0.6rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 4px;">${unread}</span>` : '') +
+                    `</div>` +
+                    `<div style="font-size:0.75rem; color:var(--gray-500); direction:rtl; text-align:right;">` +
+                        (sender ? `<strong>${this.escapeHtml(sender)}:</strong> ` : '') + this.escapeHtml(snippet) + (lastMsg && lastMsg.content && lastMsg.content.length > 60 ? '...' : '') +
+                    `</div>` +
+                    (time ? `<div style="font-size:0.65rem; color:var(--gray-400); margin-top:3px; text-align:left;">${time}</div>` : '') +
+                `</a>`;
             }).join('');
         } catch (err) {
             list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">لا توجد رسائل حديثة</p>';
         }
-    },
-
-    /**
-     * Show a browser notification (if permitted)
-     */
-    showBrowserNotification(title, body, senderId, conversationId) {
-        if (!('Notification' in window)) return;
-        if (Notification.permission !== 'granted') return;
-
-        try {
-            const notif = new Notification(title, {
-                body: body ? body.substring(0, 100) : 'لديك رسالة جديدة',
-                icon: '/logo.png',
-                badge: '/logo.png',
-                tag: 'chat-' + (conversationId || senderId || 'msg'),
-                requireInteraction: false,
-                data: { conversationId: conversationId, senderId: senderId }
-            });
-
-            notif.onclick = function() {
-                window.focus();
-                if (conversationId) {
-                    sessionStorage.setItem('chat_target_conversation', conversationId);
-                    window.location.href = 'chat.html?conv=' + conversationId;
-                }
-                notif.close();
-            };
-        } catch (e) {
-            // Fallback for older browsers
-        }
-    },
-
-    /**
-     * Format timestamp to relative time
-     */
-    formatTime(timestamp) {
-        if (!timestamp) return '';
-        const date = new Date(timestamp);
-        if (isNaN(date.getTime())) return '';
-        const now = new Date();
-        const diff = Math.floor((now - date) / 1000);
-
-        if (diff < 60) return 'الآن';
-        if (diff < 3600) return `${Math.floor(diff / 60)} د`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)} س`;
-        return `${Math.floor(diff / 86400)} ي`;
-    },
-
-    /**
-     * Escape HTML to prevent XSS
-     */
-    escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-
-    /**
-     * Get current user ID from localStorage
-     */
-    getCurrentUserId() {
-        try {
-            const user = localStorage.getItem('currentUser');
-            if (user) {
-                const parsed = JSON.parse(user);
-                return parsed.id;
-            }
-        } catch (e) {}
-        return null;
-    },
-
-    /**
-     * Heartbeat to keep connection alive
-     */
-    startHeartbeat() {
-        this.stopHeartbeat();
-        const self = this;
-        this.heartbeatInterval = setInterval(function() {
-            if (self.connected && self.ws && self.ws.readyState === WebSocket.OPEN) {
-                self.ws.send(JSON.stringify({ type: 'ping' }));
-            }
-        }, 25000);
-    },
-
-    stopHeartbeat() {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
-        }
-    },
-
-    /**
-     * Public API for external modules
-     */
-    updateBadgeFromWebSocket() {
-        this.updateBadge();
     },
 
     /**
@@ -514,25 +440,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => ChatIntegration.init(), 1000);
 });
 
-// Close chat preview when clicking outside
-document.addEventListener('click', (e) => {
-    const panel = document.getElementById('chatPreviewPanel');
-    const btn = document.getElementById('chatToolbarBtn');
-    if (panel && !panel.contains(e.target) && e.target !== btn && btn && !btn.contains(e.target)) {
-        panel.style.display = 'none';
-    }
-});
-
 // Listen for cross-tab chat updates via BroadcastChannel
 if (typeof BroadcastChannel !== 'undefined') {
     try {
         const chatBC = new BroadcastChannel('chat_sync');
         chatBC.onmessage = function(ev) {
             if (ev.data && ev.data.type === 'chat_badge_update') {
-                ChatIntegration.updateBadge();
-            }
-            if (ev.data && ev.data.type === 'new_message') {
-                // Another tab received a message - update badge
                 ChatIntegration.updateBadge();
             }
         };

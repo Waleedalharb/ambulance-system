@@ -428,19 +428,45 @@ function broadcast(data) {
 }
 
 // Helper: broadcast to conversation subscribers only
+// CRITICAL: Broadcast to ALL authenticated clients (not just subscribers)
+// This ensures EVERY participant receives messages instantly, even if they
+// haven't opened the specific conversation yet.
 function broadcastToConversation(conversationId, data) {
     var message = JSON.stringify(data);
+    var sentCount = 0;
+
+    // Phase 1: Send to explicit subscribers first (immediate delivery)
     clients.forEach(function(client) {
         if (client.readyState === WebSocket.OPEN && client.chatConversations) {
             if (client.chatConversations.includes(conversationId)) {
                 try {
                     client.send(message);
+                    sentCount++;
                 } catch (e) {
-                    console.error('Broadcast to conversation error:', e.message);
+                    console.error('[WS] Subscriber broadcast error:', e.message);
                 }
             }
         }
     });
+
+    // Phase 2: Send to ALL other authenticated clients (the CRITICAL fix)
+    // This ensures messages reach users who haven't subscribed yet,
+    // or are on other pages (index.html, dashboard, etc.)
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated) {
+            var isSubscribed = client.chatConversations && client.chatConversations.includes(conversationId);
+            if (!isSubscribed) {
+                try {
+                    client.send(message);
+                    sentCount++;
+                } catch (e) {
+                    console.error('[WS] Participant broadcast error:', e.message);
+                }
+            }
+        }
+    });
+
+    console.log('[WS] Broadcast to', sentCount, 'clients for conversation', conversationId, '- type:', data.type);
 }
 
 // Helper: broadcast to ALL authenticated connected clients
@@ -9550,7 +9576,8 @@ app.post('/api/chat/conversations/:id/messages', authenticate, async (req, res) 
         );
         message.read_by = [];
         // Broadcast to conversation subscribers
-        broadcastToConversation(convId, { type: 'chat_message', conversationId: convId, message });
+        // ENHANCED: Broadcast to ALL participants (subscribers + all authenticated clients)
+                    broadcastToConversation(convId, { type: 'chat_message', conversationId: convId, message: message });
         res.json({ success: true, message });
     } catch (err) {
         console.error('Send message error:', err);
@@ -9585,7 +9612,8 @@ app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
             [message.conversation_id, userId]
         );
         // Broadcast read receipt to conversation participants
-        broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId });
+        // ENHANCED: Broadcast read receipt with timestamp to ALL participants
+                    broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId, readAt: new Date().toISOString() });
         // Broadcast read receipt to conversation participants
         res.json({ success: true, message: 'تم الت标记 كمقروء' });
     } catch (err) {

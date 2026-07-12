@@ -1,45 +1,25 @@
 // ============================================
-// Chat Module — منصة الجنوب (Enhanced v2)
-// Features: Instant WebSocket, Toast Notifications, Read Receipts,
-//           Real-time Online Status, Sound Alerts, Smart Filtering
+// Chat Module v3 — Complete Rewrite (Modular)
+// منصة الجنوب — نظام الدردشة المتكامل
+// Features: Toast, Smart Scroll, Voice, Context Menu,
+//           Reply/Edit/Delete, Pin/Mute, Search, Settings
 // ============================================
 
 (function() {
     'use strict';
 
-    // ===== Auth Token =====
     var authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-        location.href = 'index.html';
-        return;
-    }
+    if (!authToken) { location.href = 'index.html'; return; }
 
-    // ===== Sound / Notification State =====
-    var audioContextUnlocked = false;
-    var notificationPermission = false;
-    var soundSettings = {
-        enabled: true,
-        volume: 0.3
-    };
-
-    // Load sound settings
-    (function loadSoundSettings() {
-        try {
-            var saved = localStorage.getItem('chat_sound_settings');
-            if (saved) {
-                var parsed = JSON.parse(saved);
-                soundSettings.enabled = parsed.enabled !== false;
-                soundSettings.volume = parsed.volume || 0.3;
-            }
-        } catch(e) {}
-    })();
-
-    var chatState = {
+    // ============================================
+    // STATE MANAGER
+    // ============================================
+    var State = {
         conversations: [],
         currentConversation: null,
         messages: [],
         users: [],
-        onlineUsers: [], // Array of user IDs
+        onlineUsers: [],
         unreadTotal: 0,
         isTyping: false,
         currentUser: null,
@@ -47,1474 +27,895 @@
         messagePage: 1,
         hasMoreMessages: false,
         isLoadingMessages: false,
-        selectedParticipants: new Set()
+        selectedParticipants: new Set(),
+        isScrolledToBottom: true,
+        newMessageCount: 0,
+        soundEnabled: true,
+        replyTo: null,
+        editingMessageId: null,
+        searchQuery: '',
+        settings: {
+            sound: true,
+            readReceipts: true,
+            lastSeen: true,
+            typingIndicator: true
+        }
     };
 
-    // ===== DOM Cache =====
-    var $ = function(id) { return document.getElementById(id); };
+    // Load settings
+    try {
+        var saved = localStorage.getItem('chat_settings');
+        if (saved) State.settings = JSON.parse(saved);
+        State.soundEnabled = State.settings.sound;
+    } catch(e) {}
 
-    // ===== Helpers =====
-    function getAuthHeaders() {
-        return {
-            'Authorization': 'Bearer ' + authToken,
-            'Content-Type': 'application/json'
-        };
+    function saveSettings() {
+        State.settings.sound = State.soundEnabled;
+        try { localStorage.setItem('chat_settings', JSON.stringify(State.settings)); } catch(e) {}
     }
 
-    function formatTime(dateStr) {
-        if (!dateStr) return '';
-        var d = new Date(dateStr);
-        if (isNaN(d.getTime())) return '';
-        var now = new Date();
-        var isToday = d.toDateString() === now.toDateString();
-        if (isToday) {
-            return d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
-        var yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-        if (d.toDateString() === yesterday.toDateString()) return 'أمس';
-        return d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
-    }
+    // ============================================
+    // DOM HELPERS
+    // ============================================
+    function $(id) { return document.getElementById(id); }
+    function escapeHtml(t) { if(!t)return'';var d=document.createElement('div');d.textContent=t;return d.innerHTML; }
+    function formatTime(d) { if(!d)return'';var n=new Date(),x=new Date(d);if(isNaN(x))return'';return x.toDateString()===n.toDateString()?x.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',hour12:false}):x.toLocaleDateString('ar-SA',{month:'short',day:'numeric'}); }
+    function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn.bind.apply(fn,[this].concat(Array.prototype.slice.call(arguments))),ms);};}
 
-    function formatDateDivider(dateStr) {
-        if (!dateStr) return '';
-        var d = new Date(dateStr);
-        if (isNaN(d.getTime())) return '';
-        var now = new Date();
-        var isToday = d.toDateString() === now.toDateString();
-        if (isToday) return 'اليوم';
-        var yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-        if (d.toDateString() === yesterday.toDateString()) return 'أمس';
-        return d.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function debounce(fn, ms) {
-        var t;
-        return function() {
-            clearTimeout(t);
-            t = setTimeout(fn.bind.apply(fn, [this].concat(Array.prototype.slice.call(arguments))), ms);
-        };
-    }
-
-    // ===== Sound System (Web Audio API) =====
-    var audioCtx = null;
-
-    function getAudioContext() {
-        if (!audioCtx) {
-            var AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                audioCtx = new AudioContext();
+    // ============================================
+    // AUDIO SYSTEM
+    // ============================================
+    var notifyAudio = null;
+    function playSound() {
+        if (!State.soundEnabled) return;
+        try {
+            if (!notifyAudio) {
+                notifyAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBjiR1/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
+                notifyAudio.volume = 0.3;
             }
-        }
-        return audioCtx;
+            notifyAudio.cloneNode().play().catch(function(){});
+        } catch(e){}
     }
 
-    function unlockAudio() {
-        if (audioContextUnlocked) return;
-        audioContextUnlocked = true;
-        var ctx = getAudioContext();
-        if (ctx && ctx.state === 'suspended') {
-            ctx.resume();
-        }
-    }
-
-    // Unlock audio on first user interaction
-    document.addEventListener('click', unlockAudio, { once: true });
-    document.addEventListener('keydown', unlockAudio, { once: true });
-
-    function playNotificationSound() {
-        if (!soundSettings.enabled) return;
-        if (!audioContextUnlocked) return;
-        
-        try {
-            var ctx = getAudioContext();
-            if (!ctx) return;
-            var now = ctx.currentTime;
-
-            // Two-tone notification (WhatsApp-like)
-            var osc1 = ctx.createOscillator();
-            var gain1 = ctx.createGain();
-            osc1.connect(gain1);
-            gain1.connect(ctx.destination);
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(830, now);
-            osc1.frequency.setValueAtTime(660, now + 0.08);
-            gain1.gain.setValueAtTime(soundSettings.volume, now);
-            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-            osc1.start(now);
-            osc1.stop(now + 0.25);
-
-            var osc2 = ctx.createOscillator();
-            var gain2 = ctx.createGain();
-            osc2.connect(gain2);
-            gain2.connect(ctx.destination);
-            osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(1047, now + 0.12);
-            osc2.frequency.setValueAtTime(830, now + 0.2);
-            gain2.gain.setValueAtTime(soundSettings.volume * 0.8, now + 0.12);
-            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-            osc2.start(now + 0.12);
-            osc2.stop(now + 0.4);
-        } catch(e) {
-            console.log('[Chat] Sound error:', e.message);
-        }
-    }
-
-    function playSentSound() {
-        if (!soundSettings.enabled) return;
-        if (!audioContextUnlocked) return;
-        try {
-            var ctx = getAudioContext();
-            if (!ctx) return;
-            var now = ctx.currentTime;
-            var osc = ctx.createOscillator();
-            var gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, now);
-            gain.gain.setValueAtTime(soundSettings.volume * 0.4, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-            osc.start(now);
-            osc.stop(now + 0.1);
-        } catch(e) {}
-    }
-
-    // ===== Toast Notification System =====
-    var ToastSystem = {
-        container: null,
+    // ============================================
+    // TOAST NOTIFICATION SYSTEM
+    // ============================================
+    var Toast = {
         stack: [],
         maxStack: 5,
         duration: 6000,
 
-        init: function() {
-            this.container = document.createElement('div');
-            this.container.id = 'chatToastContainer';
-            this.container.className = 'chat-toast-container';
-            this.container.setAttribute('dir', 'rtl');
-            document.body.appendChild(this.container);
-        },
-
         show: function(data) {
-            if (!this.container) this.init();
-
             var senderName = data.senderName || 'مستخدم';
-            var senderId = data.senderId || '';
             var conversationId = data.conversationId;
-            var messageContent = data.content || '';
-            var messageId = data.messageId;
+            var content = data.content || '';
             var timestamp = data.timestamp || new Date().toISOString();
 
-            // Smart filter: Don't show if viewing this conversation
-            if (chatState.currentConversation &&
-                String(chatState.currentConversation.id) === String(conversationId)) {
-                return;
-            }
+            // Don't show if viewing same conversation
+            if (State.currentConversation && String(State.currentConversation.id) === String(conversationId)) return;
+            // Don't show own messages
+            if (data.senderId && State.currentUser && String(data.senderId) === String(State.currentUser.id)) return;
 
-            // Smart filter: Don't show own messages
-            if (senderId && chatState.currentUser && String(senderId) === String(chatState.currentUser.id)) {
-                return;
-            }
+            var container = $('chatToastContainer') || this._createContainer();
 
-            // Limit stack
+            // Stack limit
             if (this.stack.length >= this.maxStack) {
-                var oldest = this.stack.shift();
-                this._remove(oldest.el);
+                var old = this.stack.shift();
+                if (old && old.parentNode) old.remove();
             }
 
-            var toast = this._createElement(senderName, messageContent, timestamp, conversationId);
-            this.container.appendChild(toast);
+            var toast = this._createToast(senderName, content, timestamp, conversationId);
+            container.appendChild(toast);
+            requestAnimationFrame(function(){ toast.style.opacity='1'; toast.style.transform='translateX(0)'; });
+            this.stack.push(toast);
 
-            // Animate in
-            requestAnimationFrame(function() {
-                toast.classList.add('chat-toast-visible');
-            });
+            setTimeout(function(){ toast.style.opacity='0'; toast.style.transform='translateX(-100px)'; setTimeout(function(){if(toast.parentNode)toast.remove();},300); }, this.duration);
 
-            var obj = { el: toast, conversationId: conversationId, messageId: messageId };
-            this.stack.push(obj);
-
-            // Play sound
-            playNotificationSound();
-
-            // Auto remove
-            setTimeout(function() {
-                ToastSystem._remove(toast);
-            }, this.duration);
+            playSound();
         },
 
-        _createElement: function(senderName, content, timestamp, conversationId) {
-            var toast = document.createElement('div');
-            toast.className = 'chat-toast';
-            toast.dataset.conversationId = conversationId;
-
-            var initials = senderName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2);
-            var colors = ['#0D9488', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
-            var color = colors[senderName.charCodeAt(0) % colors.length];
-            var time = formatTime(timestamp);
-            var preview = escapeHtml(content).substring(0, 60);
-            if (content.length > 60) preview += '...';
-
-            toast.innerHTML =
-                '<div class="chat-toast-avatar" style="background:' + color + '"><span>' + initials + '</span></div>' +
-                '<div class="chat-toast-body">' +
-                    '<div class="chat-toast-header">' +
-                        '<span class="chat-toast-name">' + escapeHtml(senderName) + '</span>' +
-                        '<span class="chat-toast-time">' + time + '</span>' +
-                    '</div>' +
-                    '<div class="chat-toast-preview">' + preview + '</div>' +
-                '</div>' +
-                '<button class="chat-toast-close" title="إغلاق">&times;</button>';
-
-            // Click to open conversation
-            toast.addEventListener('click', function(e) {
-                if (e.target.closest('.chat-toast-close')) return;
-                window.openConversation(conversationId);
-                ToastSystem._remove(toast);
-            });
-
-            toast.querySelector('.chat-toast-close').addEventListener('click', function(e) {
-                e.stopPropagation();
-                ToastSystem._remove(toast);
-            });
-
-            return toast;
+        _createContainer: function() {
+            var c = document.createElement('div');
+            c.id = 'chatToastContainer';
+            c.setAttribute('dir','rtl');
+            c.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;direction:rtl;';
+            document.body.appendChild(c);
+            return c;
         },
 
-        _remove: function(el) {
-            if (!el || !el.parentNode) return;
-            el.classList.remove('chat-toast-visible');
-            el.classList.add('chat-toast-hiding');
-            setTimeout(function() {
-                if (el.parentNode) el.parentNode.removeChild(el);
-                ToastSystem.stack = ToastSystem.stack.filter(function(t) { return t.el !== el; });
-            }, 300);
+        _createToast: function(name, content, time, convId) {
+            var t = document.createElement('div');
+            var initials = name.split(' ').map(function(w){return w[0]}).join('').substring(0,2);
+            var colors = ['#0D9488','#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981'];
+            var color = colors[name.charCodeAt(0)%colors.length];
+            var preview = escapeHtml(content).substring(0,55);
+            if (content.length > 55) preview += '...';
+
+            t.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04);cursor:pointer;pointer-events:all;min-width:280px;max-width:340px;opacity:0;transform:translateX(-100px);transition:all 0.3s ease;border-right:3px solid '+color+';direction:rtl;margin-bottom:6px;';
+            t.innerHTML = '<div style="width:38px;height:38px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">'+initials+'</div><div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><span style="font-weight:600;font-size:0.82rem;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">'+escapeHtml(name)+'</span><span style="font-size:0.65rem;color:#94A3B8;flex-shrink:0;">'+formatTime(time)+'</span></div><div style="font-size:0.78rem;color:#64748B;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+preview+'</div></div><button style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:1.1rem;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;" onclick="event.stopPropagation();this.parentElement.remove();">&times;</button>';
+
+            t.addEventListener('click', function(){ window.openConversation(convId); });
+            return t;
         },
 
-        clearAll: function() {
-            this.stack.forEach(function(t) { ToastSystem._remove(t.el); });
-            this.stack = [];
+        clearAll: function() { this.stack.forEach(function(t){if(t.parentNode)t.remove();}); this.stack=[]; }
+    };
+
+    // ============================================
+    // SMART SCROLL SYSTEM
+    // ============================================
+    var Scroll = {
+        toBottom: function() {
+            var c = $('chatMessages');
+            c.scrollTop = c.scrollHeight;
+            State.isScrolledToBottom = true;
+            State.newMessageCount = 0;
+            this._hideBtn();
+        },
+
+        smart: function() {
+            if (State.isScrolledToBottom) {
+                this.toBottom();
+            } else {
+                State.newMessageCount++;
+                this._showBtn(State.newMessageCount);
+            }
+        },
+
+        track: function() {
+            var c = $('chatMessages');
+            var atBottom = (c.scrollHeight - c.scrollTop - c.clientHeight) < 100;
+            State.isScrolledToBottom = atBottom;
+            if (atBottom && State.newMessageCount > 0) {
+                State.newMessageCount = 0;
+                this._hideBtn();
+            }
+        },
+
+        _showBtn: function(count) {
+            var btn = $('scrollToBottomBtn');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'scrollToBottomBtn';
+                btn.className = 'scroll-to-bottom-btn';
+                btn.innerHTML = '<i class="fas fa-arrow-down"></i> <span></span>';
+                btn.addEventListener('click', this.toBottom.bind(this));
+                $('chatActive').style.position = 'relative';
+                $('chatActive').appendChild(btn);
+            }
+            btn.querySelector('span').textContent = count + ' رسالة جديدة';
+            btn.style.display = 'flex';
+        },
+
+        _hideBtn: function() {
+            var btn = $('scrollToBottomBtn');
+            if (btn) btn.style.display = 'none';
         }
     };
 
-    // ===== API =====
-    var ChatAPI = {
-        getConversations: async function() {
-            var res = await fetch('/api/chat/conversations', { headers: { 'Authorization': 'Bearer ' + authToken } });
-            if (!res.ok) throw new Error('Failed to load conversations');
-            return res.json();
-        },
-        getMessages: async function(convId, page) {
-            page = page || 1;
-            var res = await fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages?page=' + page, {
-                headers: { 'Authorization': 'Bearer ' + authToken }
-            });
-            if (!res.ok) throw new Error('Failed to load messages');
-            return res.json();
-        },
-        sendMessage: async function(convId, data) {
-            var res = await fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) throw new Error('Failed to send message');
-            return res.json();
-        },
-        markRead: async function(messageId) {
-            var res = await fetch('/api/chat/messages/' + encodeURIComponent(messageId) + '/read', {
-                method: 'PUT',
-                headers: { 'Authorization': 'Bearer ' + authToken }
-            });
-            if (!res.ok) throw new Error('Failed to mark read');
-            return res.json();
-        },
-        markConversationRead: async function(convId) {
-            // Mark all messages in conversation as read
-            if (!chatState.messages || chatState.messages.length === 0) return;
-            var unreadMessages = chatState.messages.filter(function(m) {
-                return m.sender_id !== chatState.currentUser.id && !isMessageReadByMe(m);
-            });
-            for (var i = 0; i < unreadMessages.length; i++) {
-                try { await ChatAPI.markRead(unreadMessages[i].id); } catch(e) {}
-            }
-        },
-        createGroup: async function(title, participantIds) {
-            var res = await fetch('/api/chat/conversations', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ type: 'group', title: title, participant_ids: participantIds })
-            });
-            if (!res.ok) throw new Error('Failed to create group');
-            return res.json();
-        },
-        startPrivateChat: async function(userId) {
-            var res = await fetch('/api/chat/conversations/private', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ user_id: userId })
-            });
-            if (!res.ok) throw new Error('Failed to start chat');
-            return res.json();
-        },
-        getUsers: async function() {
-            var res = await fetch('/api/chat/users', { headers: { 'Authorization': 'Bearer ' + authToken } });
-            if (!res.ok) throw new Error('Failed to load users');
-            return res.json();
-        },
-        getOnlineUsers: async function() {
-            var res = await fetch('/api/chat/online', { headers: { 'Authorization': 'Bearer ' + authToken } });
-            if (!res.ok) throw new Error('Failed to load online users');
-            return res.json();
-        }
+    // ============================================
+    // API
+    // ============================================
+    var API = {
+        _headers: function() { return { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }; },
+        getConversations: function() { return fetch('/api/chat/conversations', { headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        getMessages: function(convId, page) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages?page=' + (page||1), { headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        sendMessage: function(convId, data) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages', { method: 'POST', headers: this._headers(), body: JSON.stringify(data) }).then(function(r){return r.json();}); },
+        markRead: function(msgId) { return fetch('/api/chat/messages/' + encodeURIComponent(msgId) + '/read', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        createGroup: function(title, ids) { return fetch('/api/chat/conversations', { method: 'POST', headers: this._headers(), body: JSON.stringify({ type: 'group', title: title, participant_ids: ids }) }).then(function(r){return r.json();}); },
+        startPrivate: function(userId) { return fetch('/api/chat/conversations/private', { method: 'POST', headers: this._headers(), body: JSON.stringify({ user_id: userId }) }).then(function(r){return r.json();}); },
+        getUsers: function() { return fetch('/api/chat/users', { headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        editMessage: function(msgId, content) { return fetch('/api/chat/messages/' + encodeURIComponent(msgId), { method: 'PUT', headers: this._headers(), body: JSON.stringify({ content: content }) }).then(function(r){return r.json();}); },
+        deleteMessage: function(msgId, scope) { return fetch('/api/chat/messages/' + encodeURIComponent(msgId), { method: 'DELETE', headers: this._headers(), body: JSON.stringify({ scope: scope }) }).then(function(r){return r.json();}); },
+        pinConversation: function(convId) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/pin', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        muteConversation: function(convId) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/mute', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
+        deleteConversation: function(convId) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId), { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); }
     };
 
-    // ===== Check if message is read by current user =====
-    function isMessageReadByMe(message) {
-        if (!message.read_by || !Array.isArray(message.read_by)) return false;
-        if (!chatState.currentUser) return false;
-        return message.read_by.some(function(r) {
-            var rId = r.user_id !== undefined ? r.user_id : r.userId;
-            return String(rId) === String(chatState.currentUser.id);
-        });
-    }
-
-    // ===== WebSocket (Enhanced) =====
-    var ChatSocket = {
-        ws: null,
-        connected: false,
-        reconnectAttempts: 0,
-        maxReconnectDelay: 30000,
-        heartbeatInterval: null,
-        messageCallbacks: [],
-        typingCallbacks: [],
-        readCallbacks: [],
-        presenceCallbacks: [],
-
-        connect: function() {
-            var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            var wsUrl = protocol + '//' + location.host + '/ws';
-            // Include token in the WebSocket protocol header for auth
-            try {
-                this.ws = new WebSocket(wsUrl, authToken);
-                var self = this;
-
-                this.ws.onopen = function() {
-                    self.connected = true;
-                    self.reconnectAttempts = 0;
-                    console.log('[ChatSocket] Connected');
-                    
-                    // Subscribe to current conversation if any
-                    if (chatState.currentConversation) {
-                        self.subscribe(chatState.currentConversation.id);
-                    }
-                    // Subscribe to all conversations for instant delivery
-                    chatState.conversations.forEach(function(conv) {
-                        self.subscribe(conv.id);
-                    });
-                    
-                    // Start heartbeat
-                    self.startHeartbeat();
-                    
-                    // Send presence
-                    self.sendPresence();
-                    
-                    // Update connection status indicator
-                    updateConnectionStatus(true);
-                };
-
-                this.ws.onmessage = function(event) {
-                    try {
-                        var data = JSON.parse(event.data);
-                        self.handleMessage(data);
-                    } catch (e) {
-                        console.error('[ChatSocket] Parse error:', e);
-                    }
-                };
-
-                this.ws.onerror = function(err) {
-                    console.error('[ChatSocket] Error:', err);
-                    updateConnectionStatus(false);
-                };
-
-                this.ws.onclose = function() {
-                    self.connected = false;
-                    self.stopHeartbeat();
-                    updateConnectionStatus(false);
-                    
-                    // Exponential backoff reconnect
-                    var delay = Math.min(1000 * Math.pow(2, self.reconnectAttempts), self.maxReconnectDelay);
-                    self.reconnectAttempts++;
-                    console.log('[ChatSocket] Disconnected, reconnecting in', delay, 'ms (attempt', self.reconnectAttempts, ')');
-                    setTimeout(function() { self.connect(); }, delay);
-                };
-            } catch (e) {
-                console.error('[ChatSocket] Init error:', e);
-            }
-        },
-
-        startHeartbeat: function() {
-            this.stopHeartbeat();
-            var self = this;
-            this.heartbeatInterval = setInterval(function() {
-                if (self.connected && self.ws && self.ws.readyState === WebSocket.OPEN) {
-                    self.ws.send(JSON.stringify({ type: 'ping' }));
-                }
-            }, 25000);
-        },
-
-        stopHeartbeat: function() {
-            if (this.heartbeatInterval) {
-                clearInterval(this.heartbeatInterval);
-                this.heartbeatInterval = null;
-            }
-        },
-
-        handleMessage: function(data) {
-            // Heartbeat response
-            if (data.type === 'pong' || data.type === 'ping') {
-                return;
-            }
-            if (data.type === 'connected') {
-                console.log('[ChatSocket]:', data.message);
-                // Update online users list from server
-                if (data.onlineUsers) {
-                    chatState.onlineUsers = data.onlineUsers.map(function(u) { return u.id; });
-                    updateAllOnlineStatuses();
-                }
-                return;
-            }
-            if (data.type === 'online_users_list') {
-                if (data.users) {
-                    chatState.onlineUsers = data.users.map(function(u) { return u.id; });
-                    updateAllOnlineStatuses();
-                }
-                return;
-            }
-            if (data.type === 'chat_message') {
-                this.messageCallbacks.forEach(function(cb) { cb(data); });
-            } else if (data.type === 'chat_typing') {
-                this.typingCallbacks.forEach(function(cb) { cb(data); });
-            } else if (data.type === 'chat_read') {
-                this.readCallbacks.forEach(function(cb) { cb(data); });
-            } else if (data.type === 'user_online') {
-                // Add to online users
-                if (data.userId && !chatState.onlineUsers.includes(data.userId)) {
-                    chatState.onlineUsers.push(data.userId);
-                }
-                this.presenceCallbacks.forEach(function(cb) {
-                    cb({ userId: data.userId, name: data.name, status: 'online', timestamp: data.timestamp });
-                });
-            } else if (data.type === 'user_offline') {
-                // Remove from online users
-                chatState.onlineUsers = chatState.onlineUsers.filter(function(id) {
-                    return id !== data.userId;
-                });
-                this.presenceCallbacks.forEach(function(cb) {
-                    cb({ userId: data.userId, name: data.name, status: 'offline', timestamp: data.timestamp });
-                });
-            } else if (data.type === 'chat_presence_ack') {
-                // Server acknowledged our presence - we're online
-                return;
-            }
-        },
-
-        onMessage: function(callback) {
-            this.messageCallbacks.push(callback);
-        },
-
-        onTyping: function(callback) {
-            this.typingCallbacks.push(callback);
-        },
-
-        onRead: function(callback) {
-            this.readCallbacks.push(callback);
-        },
-
-        onPresence: function(callback) {
-            this.presenceCallbacks.push(callback);
-        },
-
-        sendTyping: function(conversationId) {
-            if (!this.connected || !this.ws) return;
-            this.ws.send(JSON.stringify({
-                type: 'chat_typing',
-                conversationId: conversationId,
-                user: chatState.currentUser ? { id: chatState.currentUser.id, name: chatState.currentUser.name } : null
-            }));
-        },
-
-        subscribe: function(conversationId) {
-            if (!this.connected || !this.ws) return;
-            this.ws.send(JSON.stringify({
-                type: 'chat_subscribe',
-                conversationId: conversationId
-            }));
-        },
-
-        unsubscribe: function(conversationId) {
-            if (!this.connected || !this.ws) return;
-            this.ws.send(JSON.stringify({
-                type: 'chat_unsubscribe',
-                conversationId: conversationId
-            }));
-        },
-
-        sendPresence: function() {
-            if (!this.connected || !this.ws) return;
-            this.ws.send(JSON.stringify({
-                type: 'chat_presence',
-                userId: chatState.currentUser ? chatState.currentUser.id : null,
-                name: chatState.currentUser ? chatState.currentUser.name : null
-            }));
-        },
-
-        sendLogout: function() {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.send(JSON.stringify({ type: 'logout' }));
-            }
-        }
-    };
-
-    // ===== Connection Status Indicator =====
-    function updateConnectionStatus(isConnected) {
-        var statusEl = $('sidebarUserStatus');
-        if (!statusEl) return;
-        
-        if (isConnected) {
-            statusEl.innerHTML = '<span class="status-dot online"></span> متصل';
-        } else {
-            statusEl.innerHTML = '<span class="status-dot offline" style="background:#EF4444"></span> جاري الاتصال...';
-        }
-    }
-
-    // ===== UI Components =====
-    function renderConversationList(conversations) {
-        var list = $('conversationList');
-        if (!conversations || conversations.length === 0) {
-            list.innerHTML = '<div class="sidebar-empty"><i class="fas fa-inbox"></i><span>لا توجد محادثات</span></div>';
-            return;
-        }
-
-        var html = '';
-        conversations.forEach(function(conv) {
-            var isActive = chatState.currentConversation && chatState.currentConversation.id === conv.id;
-            var lastMsg = conv.last_message;
-            var preview = lastMsg ? lastMsg.content : 'لا توجد رسائل';
-            var time = lastMsg ? formatTime(lastMsg.created_at) : formatTime(conv.updated_at);
-            var unread = conv.unread_count || 0;
-            var avatarIcon = conv.type === 'group' ? 'fa-users' : 'fa-user';
-            var activeClass = isActive ? 'active' : '';
-
-            // Check if other participant is online (for private chats)
-            var otherOnline = false;
-            if (conv.type === 'private') {
-                var otherParticipant = conv.participants.find(function(p) {
-                    return p.user_id !== (chatState.currentUser ? chatState.currentUser.id : null);
-                });
-                if (otherParticipant) {
-                    otherOnline = chatState.onlineUsers.includes(otherParticipant.user_id);
-                }
-            }
-
-            html += '<div class="conversation-item ' + activeClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
-                '<div class="conversation-avatar ' + (conv.type === 'group' ? 'group' : '') + '">' +
-                    '<i class="fas ' + avatarIcon + '"></i>' +
-                    (conv.type === 'private' ? '<span class="avatar-status ' + (otherOnline ? 'online' : 'offline') + '"></span>' : '') +
-                '</div>' +
-                '<div class="conversation-info">' +
-                    '<div class="conversation-top">' +
-                        '<span class="conversation-name">' + escapeHtml(conv.title) + '</span>' +
-                        '<span class="conversation-time">' + time + '</span>' +
-                    '</div>' +
-                    '<div class="conversation-bottom">' +
-                        '<span class="conversation-preview">' + escapeHtml(preview) + '</span>' +
-                        (unread > 0 ? '<span class="conversation-unread">' + unread + '</span>' : '') +
-                    '</div>' +
-                '</div>' +
-            '</div>';
-        });
-
-        list.innerHTML = html;
-        updateUnreadTotal(conversations);
-    }
-
-    function updateUnreadTotal(conversations) {
-        var total = 0;
-        if (conversations) {
-            conversations.forEach(function(c) { total += (c.unread_count || 0); });
-        }
-        chatState.unreadTotal = total;
-        if (total > 0) {
-            document.title = '(' + total + ') المراسلات \u2013 منصة إدارة العمليات الإسعافية';
-        } else {
-            document.title = 'الدردشة \u2013 منصة إدارة العمليات الإسعافية';
-        }
-    }
-
-    // ===== Read Receipt Status =====
-    function getReadStatusHtml(message, isMine) {
-        if (!isMine) return '';
-
-        var readCount = 0;
-        var totalParticipants = (chatState.currentConversation && chatState.currentConversation.participants
-            ? chatState.currentConversation.participants.length : 2);
-        var otherReaders = 0;
-
-        if (message.read_by && Array.isArray(message.read_by)) {
-            message.read_by.forEach(function(r) {
-                var rId = r.user_id !== undefined ? r.user_id : r.userId;
-                if (String(rId) !== String(message.sender_id)) otherReaders++;
-            });
-            readCount = message.read_by.length;
-        }
-
-        // Check if message has temp- prefix (not yet confirmed by server)
-        var isTemp = message.id && String(message.id).startsWith('temp-');
-
-        var statusClass = '';
-        var icon = '';
-        var title = '';
-
-        if (isTemp) {
-            // Sending...
-            icon = '<i class="fas fa-clock"></i>';
-            statusClass = 'sending';
-            title = 'جاري الإرسال...';
-        } else if (otherReaders === 0) {
-            // Sent (single checkmark)
-            icon = '<i class="fas fa-check"></i>';
-            statusClass = 'sent';
-            title = 'تم الإرسال';
-        } else if (otherReaders < totalParticipants - 1) {
-            // Delivered to some (double checkmark gray)
-            icon = '<i class="fas fa-check-double"></i>';
-            statusClass = 'delivered';
-            title = 'تم التسليم';
-        } else {
-            // Read by all (double checkmark blue)
-            icon = '<i class="fas fa-check-double"></i>';
-            statusClass = 'read';
-            title = 'تم القراءة';
-        }
-
-        return '<span class="message-read-status ' + statusClass + '" title="' + title + '">' + icon + '</span>';
-    }
-
-    function renderMessageBubble(message, isMine) {
+    // ============================================
+    // MESSAGE RENDERER (with 3-state receipts + reply + edit)
+    // ============================================
+    function renderBubble(msg, isMine) {
         var bubbleClass = isMine ? 'sent' : 'received';
-        var time = formatTime(message.created_at);
-        var readStatus = getReadStatusHtml(message, isMine);
-        var content = escapeHtml(message.content).replace(/\n/g, '<br>');
+        var time = formatTime(msg.created_at);
+        var readStatus = '';
 
-        var senderName = !isMine && message.sender_name
-            ? '<div class="message-sender">' + escapeHtml(message.sender_name) + '</div>' : '';
+        if (isMine) {
+            var totalOthers = State.currentConversation && State.currentConversation.participants
+                ? State.currentConversation.participants.filter(function(p){return p.user_id !== msg.sender_id;}).length : 1;
+            var otherReaders = 0;
+            if (msg.read_by && Array.isArray(msg.read_by)) {
+                msg.read_by.forEach(function(r){ var rId = r.user_id !== undefined ? r.user_id : r.userId; if (String(rId) !== String(msg.sender_id)) otherReaders++; });
+            }
+            var otherDelivered = 0;
+            if (msg.delivered_to && Array.isArray(msg.delivered_to)) {
+                msg.delivered_to.forEach(function(d){ var dId = d.user_id !== undefined ? d.user_id : d.userId; if (String(dId) !== String(msg.sender_id)) otherDelivered++; });
+            }
 
-        return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '" data-message-id="' + message.id + '">' +
-            '<div class="message-bubble ' + bubbleClass + '">' +
-                senderName +
-                '<div class="message-content">' + content + '</div>' +
-                '<div class="message-meta">' +
-                    '<span class="message-time">' + time + '</span>' +
-                    readStatus +
-                '</div>' +
+            if (otherReaders >= totalOthers && totalOthers > 0) {
+                readStatus = '<span class="message-read read" title="تم القراءة"><i class="fas fa-check-double"></i></span>';
+            } else if (otherReaders > 0 || otherDelivered > 0) {
+                readStatus = '<span class="message-read delivered" title="تم التسليم"><i class="fas fa-check-double"></i></span>';
+            } else {
+                readStatus = '<span class="message-read" title="تم الإرسال"><i class="fas fa-check"></i></span>';
+            }
+        }
+
+        var content = escapeHtml(msg.content).replace(/\n/g, '<br>');
+        var senderName = !isMine && msg.sender_name ? '<div class="message-sender">' + escapeHtml(msg.sender_name) + '</div>' : '';
+        var editedFlag = msg.is_edited ? '<span class="message-edited">(تم التعديل)</span>' : '';
+        var replyHtml = '';
+        if (msg.reply_to) {
+            replyHtml = '<div class="message-reply"><i class="fas fa-reply"></i> <span>' + escapeHtml((msg.reply_to.sender_name || 'مستخدم') + ': ' + msg.reply_to.content.substring(0, 40)) + (msg.reply_to.content.length > 40 ? '...' : '') + '</span></div>';
+        }
+
+        return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '" data-msg-id="' + msg.id + '" data-is-mine="' + isMine + '">' +
+            '<div class="message-bubble ' + bubbleClass + '">' + replyHtml + senderName +
+                '<div class="message-content">' + content + '</div>' + editedFlag +
+                '<div class="message-time">' + readStatus + ' ' + time + '</div>' +
             '</div>' +
         '</div>';
     }
 
-    function renderTypingIndicator(userName) {
-        $('typingText').textContent = (userName || 'يكتب') + '...';
-        $('typingIndicator').style.display = 'flex';
-    }
-
-    function hideTypingIndicator() {
-        $('typingIndicator').style.display = 'none';
-    }
-
-    function renderUserList(users, containerId, selectable) {
-        var container = $(containerId);
-        if (!users || users.length === 0) {
-            container.innerHTML = '<div class="sidebar-empty"><span>لا يوجد مستخدمون</span></div>';
-            return;
-        }
-
-        var currentUserId = chatState.currentUser ? chatState.currentUser.id : null;
-        var html = '';
-        users.forEach(function(user) {
-            if (user.id === currentUserId) return;
-            var isSelected = selectable && chatState.selectedParticipants.has(user.id);
-            var selectedClass = isSelected ? 'selected' : '';
-            var checkHtml = selectable ? '<div class="user-item-check"><i class="fas fa-check"></i></div>' : '';
-
-            // Check online status
-            var isOnline = chatState.onlineUsers.includes(user.id);
-
-            html += '<div class="user-item ' + selectedClass + '" data-id="' + user.id + '" data-name="' + escapeHtml(user.name || user.username) + '">' +
-                '<div class="user-item-avatar ' + (isOnline ? 'online' : '') + '"><i class="fas fa-user"></i></div>' +
-                '<div class="user-item-info">' +
-                    '<div class="user-item-name">' + escapeHtml(user.name || user.username) + '</div>' +
-                    '<div class="user-item-role">' + escapeHtml(user.role || 'مستخدم') + '</div>' +
-                '</div>' +
-                checkHtml +
-            '</div>';
-        });
-
-        container.innerHTML = html;
-    }
-
-    // ===== Conversations =====
-    async function loadConversations() {
-        try {
-            var data = await ChatAPI.getConversations();
-            chatState.conversations = data.conversations || [];
-            renderConversationList(chatState.conversations);
-            // Subscribe to all conversations
-            chatState.conversations.forEach(function(conv) {
-                ChatSocket.subscribe(conv.id);
-            });
-        } catch (e) {
-            console.error('loadConversations:', e);
-            showToast('تعذر تحميل المحادثات', 'error');
-        }
-    }
-
-    window.openConversation = async function(convId) {
-        var conv = chatState.conversations.find(function(c) { return c.id === convId; });
-        if (!conv) return;
-
-        chatState.currentConversation = conv;
-        chatState.messages = [];
-        chatState.messagePage = 1;
-        chatState.hasMoreMessages = false;
-        chatState.isLoadingMessages = false;
-
-        // Update UI
-        renderConversationList(chatState.conversations);
-        $('chatEmpty').style.display = 'none';
-        $('chatActive').style.display = 'flex';
-
-        // Header
-        $('chatHeaderName').textContent = conv.title;
-        $('chatHeaderAvatar').innerHTML = conv.type === 'group' ? '<i class="fas fa-users"></i>' : '<i class="fas fa-user"></i>';
-        $('chatHeaderAvatar').style.background = conv.type === 'group'
-            ? 'linear-gradient(135deg, #3B82F6, #60A5FA)'
-            : 'linear-gradient(135deg, #0D9488, #14B8A6)';
-
-        // Update header status
-        updateChatHeaderStatus(conv);
-
-        // Subscribe to WS
-        ChatSocket.subscribe(convId);
-
-        // Load messages
-        await loadMessages(convId, 1);
-
-        // Mark unread as read
-        if (conv.unread_count > 0) {
-            try {
-                await ChatAPI.markConversationRead(convId);
-                conv.unread_count = 0;
-                renderConversationList(chatState.conversations);
-            } catch(e) {
-                console.error('markConversationRead error:', e);
-            }
-        }
-
-        // On mobile, close sidebar
-        if (window.innerWidth <= 768) {
-            closeSidebar();
-        }
-
-        // Notify toast system about current conversation
-        ToastSystem.currentConversationId = convId;
-    };
-
-    function updateChatHeaderStatus(conv) {
-        if (!conv) return;
-        var statusText = $('chatHeaderStatusText');
-        
-        if (conv.type === 'group') {
-            statusText.textContent = (conv.participants ? conv.participants.length : 0) + ' عضو';
-            statusText.classList.remove('online');
-        } else {
-            // Private chat - check if other participant is online
-            var other = conv.participants.find(function(p) {
-                return p.user_id !== (chatState.currentUser ? chatState.currentUser.id : null);
-            });
-            if (other && chatState.onlineUsers.includes(other.user_id)) {
-                statusText.textContent = 'متصل الآن';
-                statusText.classList.add('online');
-            } else {
-                statusText.textContent = 'غير متصل';
-                statusText.classList.remove('online');
-            }
-        }
-    }
-
-    async function loadMessages(convId, page) {
-        if (chatState.isLoadingMessages) return;
-        chatState.isLoadingMessages = true;
-        $('messagesLoader').style.display = 'flex';
-
-        try {
-            var data = await ChatAPI.getMessages(convId, page);
-            var newMessages = data.messages || [];
-            chatState.hasMoreMessages = newMessages.length >= (data.limit || 50);
-
-            if (page === 1) {
-                chatState.messages = newMessages.reverse(); // Oldest first
-                $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                scrollToBottom();
-            } else {
-                var oldScrollHeight = $('chatMessages').scrollHeight;
-                chatState.messages = newMessages.reverse().concat(chatState.messages);
-                $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                var newScrollHeight = $('chatMessages').scrollHeight;
-                $('chatMessages').scrollTop = newScrollHeight - oldScrollHeight;
-            }
-        } catch (e) {
-            console.error('loadMessages:', e);
-            showToast('تعذر تحميل الرسائل', 'error');
-        } finally {
-            chatState.isLoadingMessages = false;
-            $('messagesLoader').style.display = 'none';
-        }
-    }
-
-    function renderMessagesList(messages) {
-        if (!messages || messages.length === 0) {
-            return '<div class="sidebar-empty" style="padding:40px 20px;"><span>لا توجد رسائل بعد</span></div>';
-        }
-
-        var html = '';
-        var lastDate = null;
-        var currentUserId = chatState.currentUser ? chatState.currentUser.id : null;
-
-        messages.forEach(function(msg) {
+    function renderMessages(msgs) {
+        if (!msgs || msgs.length === 0) return '<div class="sidebar-empty" style="padding:40px 20px;"><span>لا توجد رسائل بعد</span></div>';
+        var html = '', lastDate = null;
+        var myId = State.currentUser ? State.currentUser.id : null;
+        msgs.forEach(function(msg) {
             var msgDate = new Date(msg.created_at).toDateString();
             if (msgDate !== lastDate) {
                 html += '<div class="date-divider">' + formatDateDivider(msg.created_at) + '</div>';
                 lastDate = msgDate;
             }
-            var isMine = String(msg.sender_id) === String(currentUserId);
-            html += renderMessageBubble(msg, isMine);
+            html += renderBubble(msg, String(msg.sender_id) === String(myId));
         });
-
         return html;
     }
 
-    function scrollToBottom() {
-        var container = $('chatMessages');
-        container.scrollTop = container.scrollHeight;
+    function formatDateDivider(d) {
+        if (!d) return '';
+        var x = new Date(d);
+        if (isNaN(x)) return '';
+        var n = new Date();
+        if (x.toDateString() === n.toDateString()) return 'اليوم';
+        var y = new Date(n); y.setDate(y.getDate()-1);
+        if (x.toDateString() === y.toDateString()) return 'أمس';
+        return x.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
 
-    // ===== Sending Messages =====
-    async function sendMessage() {
-        var input = $('messageInput');
-        var content = input.value.trim();
-        if (!content || !chatState.currentConversation) return;
+    // ============================================
+    // MESSAGE CONTEXT MENU
+    // ============================================
+    var messageMenu = null;
+    function showMessageMenu(e, msgId, isMine) {
+        e.preventDefault(); e.stopPropagation(); closeMessageMenu();
+        var msg = State.messages.find(function(m){return m.id === msgId;});
+        if (!msg) return;
 
-        var convId = chatState.currentConversation.id;
-        var tempId = 'temp-' + Date.now();
-        var tempMsg = {
-            id: tempId,
-            sender_id: chatState.currentUser ? chatState.currentUser.id : null,
-            sender_name: chatState.currentUser ? chatState.currentUser.name : null,
-            content: content,
-            created_at: new Date().toISOString(),
-            read_by: []
-        };
+        var menu = document.createElement('div');
+        menu.className = 'message-context-menu';
+        menu.style.cssText = 'position:fixed;z-index:1000;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15),0 0 0 1px rgba(0,0,0,0.05);padding:6px 0;min-width:180px;direction:rtl;animation:menuIn 0.15s ease;overflow:hidden;';
 
-        // Optimistic UI
-        chatState.messages.push(tempMsg);
-        $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-        scrollToBottom();
-        input.value = '';
-        input.style.height = 'auto';
-        $('sendBtn').disabled = true;
+        var items = [
+            { icon: 'fa-reply', label: 'رد', action: function(){ startReply(msgId); } },
+            { icon: 'fa-copy', label: 'نسخ', action: function(){ copyMsg(msg.content); } }
+        ];
+        if (isMine) {
+            items.push({ icon: 'fa-edit', label: 'تعديل', action: function(){ startEdit(msgId); } });
+            items.push({ icon: 'fa-trash', label: 'حذف', action: function(){ deleteMsg(msgId, 'me'); }, danger: true });
+            items.push({ icon: 'fa-trash-alt', label: 'حذف للجميع', action: function(){ deleteMsg(msgId, 'all'); }, danger: true });
+        }
 
-        // Play sent sound
-        playSentSound();
+        items.forEach(function(item){
+            var div = document.createElement('div');
+            div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:0.8rem;color:'+(item.danger?'#EF4444':'#1E293B')+';transition:background 0.1s;white-space:nowrap;';
+            div.innerHTML = '<i class="fas '+item.icon+'" style="width:16px;text-align:center;color:'+(item.danger?'#EF4444':'#64748B')+';"></i> '+item.label;
+            div.addEventListener('click', function(ev){ ev.stopPropagation(); item.action(); closeMessageMenu(); });
+            div.addEventListener('mouseenter', function(){div.style.background='#F8FAFC';});
+            div.addEventListener('mouseleave', function(){div.style.background='transparent';});
+            menu.appendChild(div);
+        });
 
-        try {
-            var data = await ChatAPI.sendMessage(convId, { content: content, type: 'text' });
-            if (data.success && data.message) {
-                // Replace temp message with real one
-                var idx = chatState.messages.findIndex(function(m) { return m.id === tempId; });
-                if (idx !== -1) {
-                    chatState.messages[idx] = data.message;
-                    $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                }
-                
-                // The server will broadcast the message to all participants
-                // But also update the conversation list immediately
-                conv.last_message = {
-                    content: data.message.content,
-                    sender_id: data.message.sender_id,
-                    created_at: data.message.created_at,
-                    sender_name: data.message.sender_name
+        document.body.appendChild(menu); messageMenu = menu;
+        var x = e.clientX, y = e.clientY;
+        var rect = menu.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 10;
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 10;
+        menu.style.left = x + 'px'; menu.style.top = y + 'px';
+        setTimeout(function(){document.addEventListener('click', closeMessageMenu, {once:true});}, 10);
+    }
+    function closeMessageMenu(){ if(messageMenu){messageMenu.remove();messageMenu=null;} }
+
+    function copyMsg(text) {
+        navigator.clipboard.writeText(text).then(function(){showToast('تم النسخ','success');}).catch(function(){
+            var ta = document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('تم النسخ','success');
+        });
+    }
+
+    function startReply(msgId) {
+        var msg = State.messages.find(function(m){return m.id===msgId;});
+        if(!msg)return;
+        State.replyTo = {id:msgId, content:msg.content, sender:msg.sender_name||'مستخدم'};
+        State.editingMessageId = null;
+        showReplyBar();
+    }
+    function startEdit(msgId) {
+        var msg = State.messages.find(function(m){return m.id===msgId;});
+        if(!msg)return;
+        State.editingMessageId = msgId;
+        State.replyTo = null;
+        $('messageInput').value = msg.content;
+        $('messageInput').focus();
+        showEditBar();
+    }
+    function deleteMsg(msgId, scope) {
+        if(!confirm(scope==='all'?'حذف الرسالة عند الجميع؟':'حذف الرسالة من عندك فقط؟'))return;
+        State.messages = State.messages.filter(function(m){return m.id!==msgId;});
+        $('messagesList').innerHTML = renderMessages(State.messages);
+        API.deleteMessage(msgId, scope).catch(function(e){console.error(e);});
+        showToast('تم الحذف','success');
+    }
+
+    function showReplyBar() {
+        var bar = $('replyBar');
+        if(!bar){ bar = document.createElement('div'); bar.id='replyBar'; bar.className='reply-bar'; $('chatInputArea').insertBefore(bar, $('chatInputArea').firstChild); }
+        bar.innerHTML = '<div class="reply-bar-content"><i class="fas fa-reply"></i> <span>رد على: '+escapeHtml(State.replyTo.content.substring(0,40))+(State.replyTo.content.length>40?'...':'')+'</span></div><button onclick="window._cancelReply()"><i class="fas fa-times"></i></button>';
+        bar.style.display='flex';
+    }
+    function showEditBar() {
+        var bar = $('editBar');
+        if(!bar){ bar = document.createElement('div'); bar.id='editBar'; bar.className='reply-bar edit-bar'; $('chatInputArea').insertBefore(bar, $('chatInputArea').firstChild); }
+        bar.innerHTML = '<div class="reply-bar-content"><i class="fas fa-edit"></i> <span>تعديل الرسالة</span></div><button onclick="window._cancelEdit()"><i class="fas fa-times"></i></button>';
+        bar.style.display='flex';
+    }
+    window._cancelReply = function(){ State.replyTo=null; var bar=$('replyBar'); if(bar)bar.style.display='none'; };
+    window._cancelEdit = function(){ State.editingMessageId=null; $('messageInput').value=''; var bar=$('editBar'); if(bar)bar.style.display='none'; };
+
+    // ============================================
+    // VOICE MESSAGE SYSTEM
+    // ============================================
+    var Voice = {
+        mediaRecorder: null,
+        audioChunks: [],
+        isRecording: false,
+        recordingTime: 0,
+        recordingInterval: null,
+
+        startRecording: function() {
+            if (this.isRecording) return;
+            var self = this;
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                self.mediaRecorder = new MediaRecorder(stream);
+                self.audioChunks = [];
+                self.isRecording = true;
+                self.recordingTime = 0;
+
+                self.mediaRecorder.ondataavailable = function(e) { self.audioChunks.push(e.data); };
+                self.mediaRecorder.onstop = function() {
+                    var blob = new Blob(self.audioChunks, { type: 'audio/webm' });
+                    self._showPreview(blob);
+                    stream.getTracks().forEach(function(t){t.stop();});
                 };
-                conv.updated_at = data.message.created_at;
-                chatState.conversations.sort(function(a, b) {
-                    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
-                });
-                renderConversationList(chatState.conversations);
+
+                self.mediaRecorder.start();
+                self._showRecordingUI();
+                self.recordingInterval = setInterval(function(){ self.recordingTime++; self._updateTimer(); }, 1000);
+            }).catch(function(err){ showToast('لا يمكن الوصول للميكروفون','error'); console.error(err); });
+        },
+
+        stopRecording: function() {
+            if (!this.isRecording || !this.mediaRecorder) return;
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            clearInterval(this.recordingInterval);
+            this._hideRecordingUI();
+        },
+
+        cancelRecording: function() {
+            if (!this.isRecording) return;
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            clearInterval(this.recordingInterval);
+            this.audioChunks = [];
+            this._hideRecordingUI();
+        },
+
+        _showRecordingUI: function() {
+            var panel = $('voiceRecordingPanel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.id = 'voiceRecordingPanel';
+                panel.className = 'voice-recording-panel';
+                panel.innerHTML = '<div class="voice-recording-inner"><div class="voice-recording-wave"><span></span><span></span><span></span><span></span><span></span></div><div class="voice-recording-timer" id="voiceTimer">00:00</div><div class="voice-recording-actions"><button class="voice-btn voice-cancel" onclick="window.Voice.cancelRecording()" title="إلغاء"><i class="fas fa-trash"></i></button><button class="voice-btn voice-stop" onclick="window.Voice.stopRecording()" title="إرسال"><i class="fas fa-check"></i></button></div></div>';
+                $('chatInputArea').insertBefore(panel, $('chatInputArea').firstChild);
             }
-        } catch (e) {
-            console.error('sendMessage:', e);
-            showToast('تعذر إرسال الرسالة', 'error');
-            // Mark as failed
-            var failIdx = chatState.messages.findIndex(function(m) { return m.id === tempId; });
-            if (failIdx !== -1) {
-                chatState.messages[failIdx]._failed = true;
-                $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-            }
+            panel.style.display = 'block';
+            $('messageInputWrap').style.display = 'none';
+        },
+
+        _hideRecordingUI: function() {
+            var panel = $('voiceRecordingPanel');
+            if (panel) panel.style.display = 'none';
+            $('messageInputWrap').style.display = 'flex';
+        },
+
+        _updateTimer: function() {
+            var m = Math.floor(this.recordingTime / 60).toString().padStart(2, '0');
+            var s = (this.recordingTime % 60).toString().padStart(2, '0');
+            var el = $('voiceTimer');
+            if (el) el.textContent = m + ':' + s;
+        },
+
+        _showPreview: function(blob) {
+            // TODO: Upload blob to server and send as voice message
+            console.log('Voice recorded:', blob.size, 'bytes');
+            showToast('سيتم دعم الرسائل الصوتية قريباً', 'info');
+        },
+
+        // Playback
+        playVoice: function(url, btn) {
+            var audio = new Audio(url);
+            var progress = btn.parentNode.querySelector('.voice-progress-bar');
+            var timeEl = btn.parentNode.querySelector('.voice-time');
+
+            audio.addEventListener('timeupdate', function() {
+                var pct = (audio.currentTime / audio.duration) * 100;
+                if (progress) progress.style.width = pct + '%';
+                if (timeEl) timeEl.textContent = formatTime(audio.currentTime);
+            });
+            audio.addEventListener('ended', function() {
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+                if (progress) progress.style.width = '0%';
+            });
+
+            audio.play();
+            btn.innerHTML = '<i class="fas fa-pause"></i>';
         }
-    }
-
-    function handleTyping() {
-        if (!chatState.currentConversation) return;
-        var now = Date.now();
-        if (chatState.lastTypingSent && (now - chatState.lastTypingSent) < 2000) return;
-        chatState.lastTypingSent = now;
-        ChatSocket.sendTyping(chatState.currentConversation.id);
-    }
-
-    // ===== Pagination on Scroll =====
-    function handleMessagesScroll() {
-        var container = $('chatMessages');
-        if (container.scrollTop < 50 && chatState.hasMoreMessages && !chatState.isLoadingMessages) {
-            chatState.messagePage++;
-            loadMessages(chatState.currentConversation.id, chatState.messagePage);
-        }
-    }
-
-    // ===== Users & Modals =====
-    async function loadUsers() {
-        try {
-            var data = await ChatAPI.getUsers();
-            chatState.users = data.users || [];
-        } catch (e) {
-            console.error('loadUsers:', e);
-            showToast('تعذر تحميل قائمة المستخدمين', 'error');
-        }
-    }
-
-    function openNewChatModal() {
-        renderUserList(chatState.users, 'userList', false);
-        $('newChatModal').style.display = 'flex';
-        $('userSearchInput').value = '';
-        $('userSearchInput').focus();
-    }
-
-    function openNewGroupModal() {
-        chatState.selectedParticipants.clear();
-        updateSelectedUsers();
-        renderUserList(chatState.users, 'groupUserList', true);
-        $('newGroupModal').style.display = 'flex';
-        $('groupTitleInput').value = '';
-        $('groupUserSearchInput').value = '';
-        $('groupTitleInput').focus();
-    }
-
-    window.closeModal = function(modalId) {
-        $(modalId).style.display = 'none';
     };
+    window.Voice = Voice;
 
-    function filterUsers(query, listId, selectable) {
-        query = (query || '').toLowerCase().trim();
-        if (!query) {
-            renderUserList(chatState.users, listId, selectable);
-            return;
-        }
-        var filtered = chatState.users.filter(function(u) {
-            var name = (u.name || u.username || '').toLowerCase();
-            return name.indexOf(query) !== -1;
-        });
-        renderUserList(filtered, listId, selectable);
-    }
+    // ============================================
+    // WEBSOCKET MANAGER
+    // ============================================
+    var WS = {
+        ws: null, connected: false, reconnectAttempts: 0, maxDelay: 30000, heartbeat: null,
 
-    function toggleUserSelection(userId, userName) {
-        if (chatState.selectedParticipants.has(userId)) {
-            chatState.selectedParticipants.delete(userId);
-        } else {
-            chatState.selectedParticipants.add(userId);
-        }
-        updateSelectedUsers();
-        renderUserList(chatState.users, 'groupUserList', true);
-    }
+        connect: function() {
+            var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var url = protocol + '//' + location.host + '/ws';
+            try {
+                this.ws = new WebSocket(url);
+                var self = this;
+                this.ws.onopen = function() {
+                    self.connected = true; self.reconnectAttempts = 0;
+                    console.log('[Chat WS] connected');
+                    self.startHeartbeat();
+                    if (State.currentConversation) self.subscribe(State.currentConversation.id);
+                    self.ws.send(JSON.stringify({ type: 'chat_presence' }));
+                };
+                this.ws.onmessage = function(ev) {
+                    try { self._handle(JSON.parse(ev.data)); } catch(e) {}
+                };
+                this.ws.onerror = function() { self.connected = false; };
+                this.ws.onclose = function() {
+                    self.connected = false; self.stopHeartbeat();
+                    var delay = Math.min(1000 * Math.pow(2, self.reconnectAttempts), self.maxDelay);
+                    self.reconnectAttempts++;
+                    console.log('[Chat WS] closed, reconnecting in', delay, 'ms...');
+                    setTimeout(function(){self.connect();}, delay);
+                };
+            } catch(e) { console.error('[Chat WS] init error:', e); }
+        },
 
-    function updateSelectedUsers() {
-        var container = $('selectedUsers');
-        var count = $('selectedCount');
-        if (chatState.selectedParticipants.size === 0) {
-            container.innerHTML = '<span style="color:#94A3B8; font-size:0.75rem;">لم يتم اختيار أحد</span>';
-            count.textContent = '0';
-            return;
-        }
-        count.textContent = chatState.selectedParticipants.size;
-        var html = '';
-        chatState.selectedParticipants.forEach(function(id) {
-            var user = chatState.users.find(function(u) { return u.id === id; });
-            if (!user) return;
-            var name = user.name || user.username;
-            html += '<span class="selected-user-chip">' + escapeHtml(name) +
-                '<button onclick="removeSelectedUser(' + id + ')" title="إزالة"><i class="fas fa-times"></i></button></span>';
-        });
-        container.innerHTML = html;
-    }
-
-    window.removeSelectedUser = function(userId) {
-        chatState.selectedParticipants.delete(userId);
-        updateSelectedUsers();
-        renderUserList(chatState.users, 'groupUserList', true);
-    };
-
-    async function startPrivateChat(userId) {
-        closeModal('newChatModal');
-        try {
-            var data = await ChatAPI.startPrivateChat(userId);
-            if (data.success && data.conversation) {
-                var exists = chatState.conversations.some(function(c) { return c.id === data.conversation.id; });
-                if (!exists) {
-                    chatState.conversations.unshift(data.conversation);
+        startHeartbeat: function() {
+            this.stopHeartbeat();
+            var self = this;
+            this.heartbeat = setInterval(function() {
+                if (self.connected && self.ws && self.ws.readyState === WebSocket.OPEN) {
+                    self.ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
                 }
-                renderConversationList(chatState.conversations);
-                openConversation(data.conversation.id);
-                showToast('تم بدء المحادثة', 'success');
+            }, 25000);
+        },
+
+        stopHeartbeat: function() { if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; } },
+
+        subscribe: function(convId) { if (this.connected && this.ws) this.ws.send(JSON.stringify({ type: 'chat_subscribe', conversationId: convId })); },
+        unsubscribe: function(convId) { if (this.connected && this.ws) this.ws.send(JSON.stringify({ type: 'chat_unsubscribe', conversationId: convId })); },
+        sendTyping: function(convId) { if (this.connected && this.ws) this.ws.send(JSON.stringify({ type: 'chat_typing', conversationId: convId, user: State.currentUser })); },
+
+        _handle: function(data) {
+            if (data.type === 'pong' || data.type === 'connected' || data.type === 'online_users_list') return;
+
+            if (data.type === 'chat_message') {
+                onIncomingMessage(data);
+            } else if (data.type === 'chat_typing') {
+                if (State.currentConversation && data.conversationId === State.currentConversation.id) {
+                    if (data.user && State.currentUser && data.user.id == State.currentUser.id) return;
+                    $('typingIndicator').style.display = 'flex';
+                    $('typingText').textContent = (data.user ? data.user.name : 'مستخدم') + ' يكتب...';
+                    clearTimeout(State.typingTimeout);
+                    State.typingTimeout = setTimeout(function(){ $('typingIndicator').style.display = 'none'; }, 3000);
+                }
+            } else if (data.type === 'chat_read') {
+                var msg = State.messages.find(function(m){return m.id === data.messageId;});
+                if (msg) {
+                    if (!msg.read_by) msg.read_by = [];
+                    var already = msg.read_by.some(function(r){ var rId = r.user_id !== undefined ? r.user_id : r.userId; return String(rId) === String(data.userId); });
+                    if (!already) { msg.read_by.push({ user_id: data.userId, read_at: data.readAt || new Date().toISOString() }); $('messagesList').innerHTML = renderMessages(State.messages); }
+                }
+            } else if (data.type === 'chat_delivered') {
+                var msg = State.messages.find(function(m){return m.id === data.messageId;});
+                if (msg) {
+                    if (!msg.delivered_to) msg.delivered_to = [];
+                    var already = msg.delivered_to.some(function(d){ var dId = d.user_id !== undefined ? d.user_id : d.userId; return String(dId) === String(data.userId); });
+                    if (!already) { msg.delivered_to.push({ user_id: data.userId, delivered_at: new Date().toISOString() }); $('messagesList').innerHTML = renderMessages(State.messages); }
+                }
+            } else if (data.type === 'user_online') {
+                if (data.userId && !State.onlineUsers.includes(data.userId)) State.onlineUsers.push(data.userId);
+                updateOnlineStatus();
+            } else if (data.type === 'user_offline') {
+                State.onlineUsers = State.onlineUsers.filter(function(id){return id !== data.userId;});
+                updateOnlineStatus();
             }
-        } catch (e) {
-            console.error('startPrivateChat:', e);
-            showToast('تعذر بدء المحادثة', 'error');
         }
-    }
+    };
 
-    async function createGroup() {
-        var title = $('groupTitleInput').value.trim();
-        if (!title) {
-            showToast('يرجى إدخال اسم المجموعة', 'warning');
-            return;
-        }
-        if (chatState.selectedParticipants.size === 0) {
-            showToast('يرجى اختيار عضو واحد على الأقل', 'warning');
-            return;
-        }
-
-        var ids = Array.from(chatState.selectedParticipants);
-        closeModal('newGroupModal');
-
-        try {
-            var data = await ChatAPI.createGroup(title, ids);
-            if (data.success && data.conversation) {
-                chatState.conversations.unshift(data.conversation);
-                renderConversationList(chatState.conversations);
-                openConversation(data.conversation.id);
-                showToast('تم إنشاء المجموعة بنجاح', 'success');
-            }
-        } catch (e) {
-            console.error('createGroup:', e);
-            showToast('تعذر إنشاء المجموعة', 'error');
-        }
-    }
-
-    // ===== Mobile Sidebar =====
-    function openSidebar() {
-        $('chatSidebar').classList.add('open');
-        $('sidebarOverlay').style.display = 'block';
-    }
-
-    function closeSidebar() {
-        $('chatSidebar').classList.remove('open');
-        $('sidebarOverlay').style.display = 'none';
-    }
-
-    // ===== Update all online statuses across the UI =====
-    function updateAllOnlineStatuses() {
-        // Update conversation list
-        renderConversationList(chatState.conversations);
-        
-        // Update current conversation header
-        if (chatState.currentConversation) {
-            updateChatHeaderStatus(chatState.currentConversation);
-        }
-        
-        // Update user lists if modals are open
-        if ($('userList') && $('userList').children.length > 0) {
-            renderUserList(chatState.users, 'userList', false);
-        }
-        if ($('groupUserList') && $('groupUserList').children.length > 0) {
-            renderUserList(chatState.users, 'groupUserList', true);
-        }
-    }
-
-    // ===== WebSocket Handlers =====
+    // ============================================
+    // INCOMING MESSAGE HANDLER
+    // ============================================
     function onIncomingMessage(data) {
-        var msg = data.message;
-        var convId = data.conversationId;
+        var msg = data.message; var convId = data.conversationId;
         if (!msg || !convId) return;
 
-        var isMine = chatState.currentUser && String(msg.sender_id) === String(chatState.currentUser.id);
+        var existingIdx = State.messages.findIndex(function(m){
+            return m.id === msg.id || (m.id && m.id.toString().startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id);
+        });
+        if (existingIdx !== -1) {
+            State.messages[existingIdx] = msg;
+            if (State.currentConversation && State.currentConversation.id === convId) {
+                $('messagesList').innerHTML = renderMessages(State.messages);
+                Scroll.smart();
+            }
+        }
 
-        // Update conversation list preview
-        var conv = chatState.conversations.find(function(c) { return c.id === convId; });
+        var conv = State.conversations.find(function(c){return c.id === convId;});
         if (conv) {
-            conv.last_message = {
-                content: msg.content,
-                sender_id: msg.sender_id,
-                created_at: msg.created_at,
-                sender_name: msg.sender_name
-            };
+            conv.last_message = { content: msg.content, sender_id: msg.sender_id, created_at: msg.created_at, sender_name: msg.sender_name };
             conv.updated_at = msg.created_at;
 
-            // If this is the current conversation, add message to view
-            if (chatState.currentConversation && chatState.currentConversation.id === convId) {
-                // Check for duplicate
-                var existingIdx = chatState.messages.findIndex(function(m) {
-                    return String(m.id) === String(msg.id);
-                });
+            if (State.currentConversation && State.currentConversation.id === convId) {
                 if (existingIdx === -1) {
-                    // Check if this replaces a temp message
-                    var tempIdx = chatState.messages.findIndex(function(m) {
-                        return String(m.id).startsWith('temp-') &&
-                            m.content === msg.content &&
-                            String(m.sender_id) === String(msg.sender_id);
-                    });
-                    if (tempIdx !== -1) {
-                        chatState.messages[tempIdx] = msg;
-                    } else {
-                        chatState.messages.push(msg);
-                    }
-                    $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                    scrollToBottom();
+                    State.messages.push(msg);
+                    $('messagesList').innerHTML = renderMessages(State.messages);
+                    Scroll.smart();
                 }
-
-                // Auto-mark as read if not mine
-                if (!isMine) {
-                    try {
-                        ChatAPI.markRead(msg.id);
-                        // Optimistically add read_by
-                        if (!msg.read_by) msg.read_by = [];
-                        var alreadyRead = msg.read_by.some(function(r) {
-                            var rId = r.user_id !== undefined ? r.user_id : r.userId;
-                            return String(rId) === String(chatState.currentUser.id);
-                        });
-                        if (!alreadyRead) {
-                            msg.read_by.push({ user_id: chatState.currentUser.id, read_at: new Date().toISOString() });
-                            $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                        }
-                    } catch(e) {}
-                }
+                if (msg.sender_id !== State.currentUser.id) API.markRead(msg.id).catch(function(e){});
+                // Broadcast delivered
+                if (WS.connected) WS.ws.send(JSON.stringify({ type: 'chat_delivered', messageId: msg.id, conversationId: convId, userId: State.currentUser ? State.currentUser.id : null }));
             } else {
-                // Not viewing this conversation - increment unread
-                if (!isMine) {
-                    conv.unread_count = (conv.unread_count || 0) + 1;
-                    
-                    // Show toast notification
-                    ToastSystem.show({
-                        senderName: msg.sender_name || 'مستخدم',
-                        senderId: msg.sender_id,
-                        conversationId: convId,
-                        content: msg.content,
-                        messageId: msg.id,
-                        timestamp: msg.created_at
-                    });
-                }
+                // Different conversation — Toast + Notification
+                conv.unread_count = (conv.unread_count || 0) + 1;
+                if (WS.connected) WS.ws.send(JSON.stringify({ type: 'chat_delivered', messageId: msg.id, conversationId: convId, userId: State.currentUser ? State.currentUser.id : null }));
+                Toast.show({ senderName: msg.sender_name || 'مستخدم', senderId: msg.sender_id, conversationId: convId, content: msg.content, messageId: msg.id, timestamp: msg.created_at });
+                browserNotify(msg.sender_name || 'رسالة جديدة', msg.content || '', msg.sender_id, msg.id);
             }
 
-            // Move to top
-            chatState.conversations.sort(function(a, b) {
-                return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
-            });
-            renderConversationList(chatState.conversations);
+            State.conversations.sort(function(a,b){return new Date(b.updated_at||0)-new Date(a.updated_at||0);});
+            renderConversationList(State.conversations);
 
-            // Notify other pages via BroadcastChannel
-            try {
-                if (typeof BroadcastChannel !== 'undefined') {
-                    var bc = new BroadcastChannel('chat_sync');
-                    bc.postMessage({ type: 'chat_badge_update', unreadTotal: chatState.unreadTotal });
-                    bc.close();
-                }
-            } catch(e) {}
+            try { if (typeof BroadcastChannel !== 'undefined') { var bc = new BroadcastChannel('chat_sync'); bc.postMessage({ type: 'chat_badge_update' }); bc.close(); } } catch(e){}
         } else {
-            // New conversation - reload list
             loadConversations();
         }
     }
 
-    function onIncomingRead(data) {
-        var messageId = data.messageId;
-        var userId = data.userId;
-        var readAt = data.readAt || new Date().toISOString();
-        if (!messageId) return;
-
-        // Find message and update read_by
-        var msg = chatState.messages.find(function(m) { return String(m.id) === String(messageId); });
-        if (msg) {
-            if (!msg.read_by) msg.read_by = [];
-            var alreadyRead = msg.read_by.some(function(r) {
-                var rId = r.user_id !== undefined ? r.user_id : r.userId;
-                return String(rId) === String(userId);
-            });
-            if (!alreadyRead) {
-                msg.read_by.push({ user_id: userId, read_at: readAt });
-                // Re-render if this message is visible
-                if (chatState.currentConversation) {
-                    $('messagesList').innerHTML = renderMessagesList(chatState.messages);
-                }
-            }
-        }
-    }
-
-    function onIncomingTyping(data) {
-        if (!chatState.currentConversation) return;
-        if (data.conversationId !== chatState.currentConversation.id) return;
-        if (data.user && chatState.currentUser && data.user.id == chatState.currentUser.id) return;
-
-        renderTypingIndicator(data.user ? data.user.name : 'يكتب');
-
-        if (chatState.typingTimeout) clearTimeout(chatState.typingTimeout);
-        chatState.typingTimeout = setTimeout(hideTypingIndicator, 3000);
-    }
-
-    function onIncomingPresence(data) {
-        if (!data.userId) return;
-        
-        var isOnline = data.status === 'online';
-        
-        // Update online users array
-        if (isOnline) {
-            if (!chatState.onlineUsers.includes(data.userId)) {
-                chatState.onlineUsers.push(data.userId);
-            }
-        } else {
-            chatState.onlineUsers = chatState.onlineUsers.filter(function(id) {
-                return id !== data.userId;
-            });
-        }
-        
-        // Update all UI elements
-        updateAllOnlineStatuses();
-    }
-
-    async function loadCurrentUser() {
+    function browserNotify(title, body, senderId, messageId) {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
         try {
-            var res = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } });
-            var data = await res.json();
-            if (data.user) {
-                chatState.currentUser = data.user;
-                $('currentUserName').textContent = data.user.name || data.user.username;
-            }
-        } catch (e) {
-            console.error('loadCurrentUser:', e);
-        }
+            new Notification(title, { body: body.substring(0, 100), icon: '/logo.png', tag: 'chat-msg-' + (messageId || Date.now()), requireInteraction: false });
+        } catch(e){}
     }
 
-    // ===== Conversation Search =====
-    function handleConversationSearch(query) {
-        query = (query || '').toLowerCase().trim();
-        if (!query) {
-            renderConversationList(chatState.conversations);
-            return;
-        }
-        var filtered = chatState.conversations.filter(function(c) {
-            var title = (c.title || '').toLowerCase();
-            var preview = c.last_message ? (c.last_message.content || '').toLowerCase() : '';
-            return title.indexOf(query) !== -1 || preview.indexOf(query) !== -1;
-        });
-        renderConversationList(filtered);
+    // ============================================
+    // CONVERSATION MANAGEMENT
+    // ============================================
+    async function loadConversations() {
+        try {
+            var data = await API.getConversations();
+            State.conversations = data.conversations || [];
+            renderConversationList(State.conversations);
+            State.conversations.forEach(function(conv){ WS.subscribe(conv.id); });
+        } catch(e) { showToast('تعذر تحميل المحادثات', 'error'); }
     }
 
-    // ===== Toast (in-page) =====
-    function showToast(message, type) {
-        type = type || 'info';
-        var container = $('toastContainer');
-        var toast = document.createElement('div');
-        toast.className = 'toast ' + type;
-        var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-        toast.innerHTML = '<i class="fas ' + icon + '"></i> ' + escapeHtml(message);
-        container.appendChild(toast);
-        setTimeout(function() {
-            toast.classList.add('toast-exit');
-            setTimeout(function() { toast.remove(); }, 300);
-        }, 3000);
-    }
+    window.openConversation = async function(convId) {
+        var conv = State.conversations.find(function(c){return c.id === convId;});
+        if (!conv) return;
+        State.currentConversation = conv;
+        State.messages = [];
+        State.messagePage = 1;
+        State.hasMoreMessages = false;
+        State.isLoadingMessages = false;
+        State.newMessageCount = 0;
+        State.replyTo = null;
+        State.editingMessageId = null;
+        window._cancelReply();
+        window._cancelEdit();
 
-    // ===== Sound Settings Panel =====
-    function toggleSoundSettings() {
-        var panel = $('soundSettingsPanel');
-        panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-    }
+        renderConversationList(State.conversations);
+        $('chatEmpty').style.display = 'none';
+        $('chatActive').style.display = 'flex';
+        $('chatHeaderName').textContent = conv.title;
+        $('chatHeaderAvatar').innerHTML = conv.type === 'group' ? '<i class="fas fa-users"></i>' : '<i class="fas fa-user"></i>';
+        $('chatHeaderAvatar').style.background = conv.type === 'group' ? 'linear-gradient(135deg, #3B82F6, #60A5FA)' : 'linear-gradient(135deg, #0D9488, #14B8A6)';
 
-    window.toggleSoundMaster = function(checkbox) {
-        soundSettings.enabled = checkbox.checked;
-        localStorage.setItem('chat_sound_settings', JSON.stringify(soundSettings));
+        updateHeaderStatus(conv);
+        WS.subscribe(convId);
+        await loadMessages(convId, 1);
+        if (conv.unread_count > 0) { conv.unread_count = 0; renderConversationList(State.conversations); }
+        if (window.innerWidth <= 768) { $('chatSidebar').classList.remove('open'); $('sidebarOverlay').style.display = 'none'; }
+        Scroll.toBottom();
     };
 
-    // ===== Event Listeners =====
+    async function loadMessages(convId, page) {
+        if (State.isLoadingMessages) return;
+        State.isLoadingMessages = true;
+        $('messagesLoader').style.display = 'flex';
+        try {
+            var data = await API.getMessages(convId, page);
+            var newMsgs = data.messages || [];
+            State.hasMoreMessages = newMsgs.length >= (data.limit || 50);
+            if (page === 1) {
+                State.messages = newMsgs.reverse();
+                $('messagesList').innerHTML = renderMessages(State.messages);
+                Scroll.toBottom();
+            } else {
+                var oldH = $('chatMessages').scrollHeight;
+                State.messages = newMsgs.reverse().concat(State.messages);
+                $('messagesList').innerHTML = renderMessages(State.messages);
+                $('chatMessages').scrollTop = $('chatMessages').scrollHeight - oldH;
+            }
+        } catch(e) { showToast('تعذر تحميل الرسائل', 'error'); }
+        finally { State.isLoadingMessages = false; $('messagesLoader').style.display = 'none'; }
+    }
+
+    function renderConversationList(conversations) {
+        var list = $('conversationList');
+        if (!conversations || conversations.length === 0) { list.innerHTML = '<div class="sidebar-empty"><i class="fas fa-inbox"></i><span>لا توجد محادثات</span></div>'; return; }
+
+        var html = '';
+        conversations.forEach(function(conv) {
+            var isActive = State.currentConversation && State.currentConversation.id === conv.id;
+            var lastMsg = conv.last_message;
+            var preview = lastMsg ? lastMsg.content : 'لا توجد رسائل';
+            var time = lastMsg ? formatTime(lastMsg.created_at) : formatTime(conv.updated_at);
+            var unread = conv.unread_count || 0;
+            var avatarIcon = conv.type === 'group' ? 'fa-users' : 'fa-user';
+            var pinnedClass = conv.is_pinned ? 'pinned' : '';
+            var mutedClass = conv.is_muted ? 'muted' : '';
+
+            var otherOnline = false;
+            if (conv.type === 'private') {
+                var other = conv.participants.find(function(p){return p.user_id !== (State.currentUser ? State.currentUser.id : null);});
+                if (other) otherOnline = State.onlineUsers.includes(other.user_id);
+            }
+
+            html += '<div class="conversation-item ' + (isActive?'active ':'') + pinnedClass + ' ' + mutedClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
+                '<div class="conversation-avatar ' + (conv.type==='group'?'group':'') + '"><i class="fas ' + avatarIcon + '"></i>' + (conv.type==='private' ? '<span class="avatar-status ' + (otherOnline?'online':'offline') + '"></span>' : '') + '</div>' +
+                '<div class="conversation-info"><div class="conversation-top"><span class="conversation-name">' + escapeHtml(conv.title) + '</span><span class="conversation-time">' + time + '</span></div>' +
+                '<div class="conversation-bottom"><span class="conversation-preview">' + escapeHtml(preview) + '</span>' + (unread>0?'<span class="conversation-unread">' + unread + '</span>':'') + '</div></div>' +
+                '</div>';
+        });
+        list.innerHTML = html;
+
+        var total = 0;
+        conversations.forEach(function(c){total += (c.unread_count||0);});
+        if (total > 0) document.title = '(' + total + ') المراسلات \u2013 منصة إدارة العمليات الإسعافية';
+        else document.title = 'الدردشة \u2013 منصة إدارة العمليات الإسعافية';
+    }
+
+    function updateHeaderStatus(conv) {
+        if (!conv) return;
+        var statusText = $('chatHeaderStatusText');
+        if (conv.type === 'group') { statusText.textContent = (conv.participants ? conv.participants.length : 0) + ' عضو'; statusText.classList.remove('online'); }
+        else {
+            var other = conv.participants.find(function(p){return p.user_id !== (State.currentUser ? State.currentUser.id : null);});
+            if (other && State.onlineUsers.includes(other.user_id)) { statusText.textContent = 'متصل الآن'; statusText.classList.add('online'); }
+            else { statusText.textContent = 'غير متصل'; statusText.classList.remove('online'); }
+        }
+    }
+
+    function updateOnlineStatus() {
+        renderConversationList(State.conversations);
+        if (State.currentConversation) updateHeaderStatus(State.currentConversation);
+    }
+
+    // ============================================
+    // SETTINGS PANEL
+    // ============================================
+    window.toggleSettings = function() {
+        var panel = $('settingsPanel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'settingsPanel';
+            panel.className = 'settings-panel';
+            panel.innerHTML = '<div class="settings-panel-header"><h3><i class="fas fa-cog"></i> إعدادات الدردشة</h3><button onclick="toggleSettings()" style="background:none;border:none;color:#64748B;cursor:pointer;width:28px;height:28px;border-radius:50%;"><i class="fas fa-times"></i></button></div>' +
+                '<div class="settings-panel-body">' +
+                '<div class="settings-row"><div class="settings-row-label"><i class="fas fa-volume-up"></i> صوت الإشعارات</div><label class="toggle-switch"><input type="checkbox" id="settingSound" ' + (State.soundEnabled ? 'checked' : '') + ' onchange="updateSetting(\'sound\', this.checked)"><span class="toggle-slider"></span></label></div>' +
+                '<div class="settings-row"><div class="settings-row-label"><i class="fas fa-check-double"></i> مؤشرات القراءة</div><label class="toggle-switch"><input type="checkbox" id="settingReadReceipts" ' + (State.settings.readReceipts ? 'checked' : '') + ' onchange="updateSetting(\'readReceipts\', this.checked)"><span class="toggle-slider"></span></label></div>' +
+                '<div class="settings-row"><div class="settings-row-label"><i class="fas fa-eye"></i> آخر ظهور</div><label class="toggle-switch"><input type="checkbox" id="settingLastSeen" ' + (State.settings.lastSeen ? 'checked' : '') + ' onchange="updateSetting(\'lastSeen\', this.checked)"><span class="toggle-slider"></span></label></div>' +
+                '<div class="settings-row"><div class="settings-row-label"><i class="fas fa-keyboard"></i> مؤشر الكتابة</div><label class="toggle-switch"><input type="checkbox" id="settingTyping" ' + (State.settings.typingIndicator ? 'checked' : '') + ' onchange="updateSetting(\'typingIndicator\', this.checked)"><span class="toggle-slider"></span></label></div>' +
+                '</div>';
+            document.body.appendChild(panel);
+        }
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    };
+
+    window.updateSetting = function(key, value) {
+        State.settings[key] = value;
+        if (key === 'sound') State.soundEnabled = value;
+        saveSettings();
+        showToast('تم حفظ الإعدادات', 'success');
+    };
+
+    // ============================================
+    // SEARCH WITHIN CONVERSATION
+    // ============================================
+    window.toggleSearch = function() {
+        var searchBox = $('messageSearchBox');
+        if (!searchBox) {
+            searchBox = document.createElement('div');
+            searchBox.id = 'messageSearchBox';
+            searchBox.style.cssText = 'position:absolute;top:0;left:0;right:0;background:#fff;padding:10px 20px;border-bottom:1px solid #E2E8F0;z-index:60;display:flex;gap:10px;align-items:center;direction:rtl;';
+            searchBox.innerHTML = '<i class="fas fa-search" style="color:#94A3B8;"></i><input type="text" id="messageSearchInput" placeholder="البحث في الرسائل..." style="flex:1;border:none;outline:none;font-family:inherit;font-size:0.85rem;background:transparent;"><button onclick="toggleSearch()" style="background:none;border:none;color:#94A3B8;cursor:pointer;"><i class="fas fa-times"></i></button>';
+            $('chatActive').insertBefore(searchBox, $('chatHeader').nextSibling);
+            $('messageSearchInput').addEventListener('input', debounce(searchMessages, 300));
+        }
+        var isVisible = searchBox.style.display !== 'none';
+        searchBox.style.display = isVisible ? 'none' : 'flex';
+        if (!isVisible) { $('messageSearchInput').value = ''; $('messageSearchInput').focus(); searchMessages(); }
+    };
+
+    function searchMessages() {
+        var query = ($('messageSearchInput') ? $('messageSearchInput').value : '').toLowerCase().trim();
+        if (!query) {
+            $('messagesList').innerHTML = renderMessages(State.messages);
+            return;
+        }
+        var filtered = State.messages.filter(function(m){return (m.content || '').toLowerCase().includes(query);});
+        $('messagesList').innerHTML = renderMessages(filtered);
+    }
+
+    // ============================================
+    // SEND MESSAGE (with reply + edit support)
+    // ============================================
+    async function sendMessage() {
+        var input = $('messageInput');
+        var content = input.value.trim();
+        if (!content || !State.currentConversation) return;
+
+        var convId = State.currentConversation.id;
+
+        // Handle edit
+        if (State.editingMessageId) {
+            try {
+                await API.editMessage(State.editingMessageId, content);
+                var msg = State.messages.find(function(m){return m.id === State.editingMessageId;});
+                if (msg) { msg.content = content; msg.is_edited = true; $('messagesList').innerHTML = renderMessages(State.messages); }
+                window._cancelEdit();
+                showToast('تم التعديل', 'success');
+            } catch(e) { showToast('تعذر التعديل', 'error'); }
+            return;
+        }
+
+        var tempId = 'temp-' + Date.now();
+        var replyData = State.replyTo ? { reply_to_id: State.replyTo.id, reply_preview: State.replyTo.content.substring(0, 50) } : null;
+        var tempMsg = { id: tempId, sender_id: State.currentUser.id, sender_name: State.currentUser.name, content: content, created_at: new Date().toISOString(), read_by: [], reply_to: State.replyTo };
+
+        State.messages.push(tempMsg);
+        $('messagesList').innerHTML = renderMessages(State.messages);
+        Scroll.toBottom();
+        input.value = ''; input.style.height = 'auto'; $('sendBtn').disabled = true;
+        window._cancelReply();
+
+        try {
+            var payload = { content: content, type: 'text' };
+            if (replyData) payload.reply_to = replyData;
+            var data = await API.sendMessage(convId, payload);
+            if (data.success && data.message) {
+                var idx = State.messages.findIndex(function(m){return m.id === tempId;});
+                if (idx !== -1) State.messages[idx] = data.message;
+                $('messagesList').innerHTML = renderMessages(State.messages);
+                conv.last_message = { content: data.message.content, sender_id: data.message.sender_id, created_at: data.message.created_at, sender_name: data.message.sender_name };
+                conv.updated_at = data.message.created_at;
+                State.conversations.sort(function(a,b){return new Date(b.updated_at||0)-new Date(a.updated_at||0);});
+                renderConversationList(State.conversations);
+            }
+        } catch(e) { showToast('تعذر الإرسال', 'error'); }
+    }
+
+    function handleTyping() {
+        if (!State.currentConversation) return;
+        var now = Date.now();
+        if (State.lastTypingSent && (now - State.lastTypingSent) < 2000) return;
+        State.lastTypingSent = now;
+        WS.sendTyping(State.currentConversation.id);
+    }
+
+    // ============================================
+    // VOICE BUTTON
+    // ============================================
+    function setupVoiceButton() {
+        var attachBtn = $('attachBtn');
+        if (attachBtn) {
+            attachBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            attachBtn.title = 'رسالة صوتية';
+            attachBtn.onclick = function() { Voice.startRecording(); };
+        }
+    }
+
+    // ============================================
+    // EVENT BINDINGS
+    // ============================================
     function bindEvents() {
         $('sendBtn').addEventListener('click', sendMessage);
-
-        $('messageInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        $('messageInput').addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-            $('sendBtn').disabled = !this.value.trim();
-            handleTyping();
-        });
-
+        $('messageInput').addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+        $('messageInput').addEventListener('input', function(){ this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; $('sendBtn').disabled = !this.value.trim(); handleTyping(); });
         $('chatMessages').addEventListener('scroll', debounce(handleMessagesScroll, 200));
-
+        $('chatMessages').addEventListener('scroll', debounce(function(){Scroll.track();}, 100));
+        $('messagesList').addEventListener('contextmenu', function(e){
+            var row = e.target.closest('.message-row');
+            if (row) { var msgId = parseInt(row.dataset.msgId); var isMine = row.dataset.isMine === 'true'; showMessageMenu(e, msgId, isMine); }
+        });
         $('newChatBtn').addEventListener('click', openNewChatModal);
         $('newGroupBtn').addEventListener('click', openNewGroupModal);
-
-        $('mobileSidebarToggle').addEventListener('click', openSidebar);
-        $('chatHeaderBack').addEventListener('click', function() {
-            chatState.currentConversation = null;
-            ToastSystem.currentConversationId = null;
-            $('chatActive').style.display = 'none';
-            $('chatEmpty').style.display = 'flex';
-            renderConversationList(chatState.conversations);
-            openSidebar();
-        });
-        $('sidebarOverlay').addEventListener('click', closeSidebar);
-
-        $('userSearchInput').addEventListener('input', function() {
-            filterUsers(this.value, 'userList', false);
-        });
-
-        $('userList').addEventListener('click', function(e) {
-            var item = e.target.closest('.user-item');
-            if (!item) return;
-            var userId = item.dataset.id;
-            startPrivateChat(userId);
-        });
-
-        $('groupUserSearchInput').addEventListener('input', function() {
-            filterUsers(this.value, 'groupUserList', true);
-        });
-
-        $('groupUserList').addEventListener('click', function(e) {
-            var item = e.target.closest('.user-item');
-            if (!item) return;
-            var userId = item.dataset.id;
-            var userName = item.dataset.name;
-            toggleUserSelection(userId, userName);
-        });
-
+        $('mobileSidebarToggle').addEventListener('click', function(){$('chatSidebar').classList.add('open'); $('sidebarOverlay').style.display='block';});
+        $('chatHeaderBack').addEventListener('click', function(){State.currentConversation=null; $('chatActive').style.display='none'; $('chatEmpty').style.display='flex'; renderConversationList(State.conversations); $('chatSidebar').classList.add('open'); $('sidebarOverlay').style.display='block';});
+        $('sidebarOverlay').addEventListener('click', function(){$('chatSidebar').classList.remove('open'); this.style.display='none';});
+        $('userSearchInput').addEventListener('input', function(){filterUsers(this.value, 'userList', false);});
+        $('userList').addEventListener('click', function(e){var item=e.target.closest('.user-item'); if(item) startPrivateChat(item.dataset.id);});
+        $('groupUserSearchInput').addEventListener('input', function(){filterUsers(this.value, 'groupUserList', true);});
+        $('groupUserList').addEventListener('click', function(e){var item=e.target.closest('.user-item'); if(item) toggleUserSelection(item.dataset.id, item.dataset.name);});
         $('createGroupBtn').addEventListener('click', createGroup);
+        $('conversationSearch').addEventListener('input', function(){var q=this.value.toLowerCase().trim(); if(!q){renderConversationList(State.conversations);return;} var f=State.conversations.filter(function(c){return (c.title||'').toLowerCase().includes(q) || (c.last_message && (c.last_message.content||'').toLowerCase().includes(q));}); renderConversationList(f);});
+        $('chatHeaderSearch').addEventListener('click', function(){toggleSearch();});
 
-        $('conversationSearch').addEventListener('input', function() {
-            handleConversationSearch(this.value);
-        });
+        setupVoiceButton();
 
-        $('attachBtn').addEventListener('click', function() {
-            showToast('سيتم دعم إرفاق الملفات قريباً', 'info');
-        });
-
-        // Sound settings
-        var soundToggleBtn = document.getElementById('soundToggleBtn');
-        if (soundToggleBtn) {
-            soundToggleBtn.addEventListener('click', toggleSoundSettings);
-        }
-
-        // Close modal on backdrop click
-        document.querySelectorAll('.modal').forEach(function(modal) {
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
-        });
+        document.querySelectorAll('.modal').forEach(function(m){m.addEventListener('click', function(e){if(e.target===m)m.style.display='none';});});
     }
 
-    // ===== Init =====
-    async function loadOnlineUsers() {
-        try {
-            var data = await ChatAPI.getOnlineUsers();
-            if (data.success && data.onlineUsers) {
-                chatState.onlineUsers = data.onlineUsers.map(function(u) { return u.id; });
-                updateAllOnlineStatuses();
-                console.log('[chat] Online users loaded:', data.onlineUsers.length);
-            }
-        } catch (e) {
-            console.log('[chat] Failed to load online users:', e);
-        }
-    }
+    function handleMessagesScroll() { var c=$('chatMessages'); if(c.scrollTop<50 && State.hasMoreMessages && !State.isLoadingMessages){State.messagePage++; loadMessages(State.currentConversation.id, State.messagePage);} }
 
-    // Check for target conversation from URL or sessionStorage
-    function getTargetConversationId() {
-        // From URL ?conv=xxx
-        var urlParams = new URLSearchParams(window.location.search);
-        var convId = urlParams.get('conv');
-        if (convId) return parseInt(convId);
-        
-        // From sessionStorage (set by toast click from other pages)
-        var stored = sessionStorage.getItem('chat_target_conversation');
-        if (stored) {
-            sessionStorage.removeItem('chat_target_conversation');
-            return parseInt(stored);
-        }
-        return null;
-    }
+    async function loadCurrentUser() { try { var r=await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+authToken}}); var d=await r.json(); if(d.user){State.currentUser=d.user; $('currentUserName').textContent=d.user.name||d.user.username;} } catch(e){} }
+    async function loadUsers() { try { var d=await API.getUsers(); State.users=d.users||[]; } catch(e){showToast('تعذر تحميل المستخدمين','error');} }
 
+    // --- Modal functions ---
+    window.closeModal=function(id){$(id).style.display='none';};
+    function openNewChatModal(){renderUserList(State.users,'userList',false); $('newChatModal').style.display='flex'; $('userSearchInput').value=''; $('userSearchInput').focus();}
+    function openNewGroupModal(){State.selectedParticipants.clear(); updateSelectedUsers(); renderUserList(State.users,'groupUserList',true); $('newGroupModal').style.display='flex'; $('groupTitleInput').value=''; $('groupUserSearchInput').value=''; $('groupTitleInput').focus();}
+    async function startPrivateChat(userId){closeModal('newChatModal'); try{var d=await API.startPrivate(userId); if(d.success&&d.conversation){var exists=State.conversations.some(function(c){return c.id===d.conversation.id;}); if(!exists)State.conversations.unshift(d.conversation); renderConversationList(State.conversations); openConversation(d.conversation.id); showToast('تم بدء المحادثة','success');}}catch(e){showToast('تعذر بدء المحادثة','error');}}
+    async function createGroup(){var t=$('groupTitleInput').value.trim(); if(!t){showToast('أدخل اسم المجموعة','warning');return;} if(State.selectedParticipants.size===0){showToast('اختر عضواً واحداً على الأقل','warning');return;} var ids=Array.from(State.selectedParticipants); closeModal('newGroupModal'); try{var d=await API.createGroup(t,ids); if(d.success&&d.conversation){State.conversations.unshift(d.conversation); renderConversationList(State.conversations); openConversation(d.conversation.id); showToast('تم إنشاء المجموعة','success');}}catch(e){showToast('تعذر إنشاء المجموعة','error');}}
+    function filterUsers(q,listId,sel){q=(q||'').toLowerCase().trim(); if(!q){renderUserList(State.users,listId,sel);return;} var f=State.users.filter(function(u){return(u.name||u.username||'').toLowerCase().includes(q);}); renderUserList(f,listId,sel);}
+    function toggleUserSelection(id,name){if(State.selectedParticipants.has(id))State.selectedParticipants.delete(id);else State.selectedParticipants.add(id); updateSelectedUsers(); renderUserList(State.users,'groupUserList',true);}
+    function updateSelectedUsers(){var c=$('selectedUsers'); var n=$('selectedCount'); if(State.selectedParticipants.size===0){c.innerHTML='<span style="color:#94A3B8;font-size:0.75rem;">لم يتم اختيار أحد</span>'; n.textContent='0';return;} n.textContent=State.selectedParticipants.size; var h=''; State.selectedParticipants.forEach(function(id){var u=State.users.find(function(x){return x.id===id;}); if(!u)return; var nm=u.name||u.username; h+='<span class="selected-user-chip">'+escapeHtml(nm)+'<button onclick="window._removeSelected('+id+')" title="إزالة"><i class="fas fa-times"></i></button></span>';}); c.innerHTML=h;}
+    window._removeSelected=function(id){State.selectedParticipants.delete(id); updateSelectedUsers(); renderUserList(State.users,'groupUserList',true);};
+    function renderUserList(users,containerId,sel){var c=$(containerId); if(!users||users.length===0){c.innerHTML='<div class="sidebar-empty"><span>لا يوجد مستخدمون</span></div>';return;} var myId=State.currentUser?State.currentUser.id:null; var h=''; users.forEach(function(u){if(u.id===myId)return; var isSel=sel&&State.selectedParticipants.has(u.id); h+='<div class="user-item '+(isSel?'selected':'')+'" data-id="'+u.id+'" data-name="'+escapeHtml(u.name||u.username)+'"><div class="user-item-avatar '+(State.onlineUsers.includes(u.id)?'online':'')+'"><i class="fas fa-user"></i></div><div class="user-item-info"><div class="user-item-name">'+escapeHtml(u.name||u.username)+'</div><div class="user-item-role">'+escapeHtml(u.role||'مستخدم')+'</div></div>'+(sel?'<div class="user-item-check"><i class="fas fa-check"></i></div>':'')+'</div>';}); c.innerHTML=h;}
+
+    // ============================================
+    // INIT
+    // ============================================
     async function init() {
         bindEvents();
         await loadCurrentUser();
         await loadUsers();
-        await loadOnlineUsers();
         await loadConversations();
-
-        // Connect WebSocket
-        ChatSocket.connect();
-        ChatSocket.onMessage(onIncomingMessage);
-        ChatSocket.onTyping(onIncomingTyping);
-        ChatSocket.onRead(onIncomingRead);
-        ChatSocket.onPresence(onIncomingPresence);
-
-        // Handle target conversation
-        var targetConvId = getTargetConversationId();
-        if (targetConvId) {
-            setTimeout(function() {
-                var conv = chatState.conversations.find(function(c) { return c.id === targetConvId; });
-                if (conv) {
-                    openConversation(targetConvId);
-                }
-            }, 300);
-        }
-
-        // Send offline on page unload
-        window.addEventListener('beforeunload', function() {
-            ChatSocket.sendLogout();
-        });
-
-        // Request browser notification permission
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-
-        // Periodic presence ping
-        setInterval(function() {
-            if (ChatSocket.connected) {
-                ChatSocket.sendPresence();
-            }
-        }, 30000);
+        WS.connect();
+        if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+        window.addEventListener('beforeunload', function(){ if(WS.ws) try{WS.ws.close();}catch(e){} });
     }
 
-    // Start
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
