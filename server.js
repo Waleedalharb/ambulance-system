@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cors = require('cors');
+const { ShiftArchiveEngine } = require('./shift-archive-engine');
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -534,6 +535,13 @@ const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
 const UNIT_LOCATION_ADDRESSES_PATH = path.join(STORAGE_PATH, 'unit-location-addresses.json');
 const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
 
+// ============================================
+// Shift Archive Engine v2.0 — Atomic Archive System
+// ============================================
+const archiveEngine = new ShiftArchiveEngine(db, STORAGE_PATH);
+console.log('[ArchiveEngine] Shift Archive Engine v2.0 initialized');
+
+
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
 
@@ -583,26 +591,22 @@ async function autoArchiveIfShiftChanged() {
     try {
         const currentReports = await readData();
         const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-        if (total === 0) return false; // No data to archive
-        
+        if (total === 0) return false;
+
         const shifts = await readShifts();
         const currentShiftType = getCurrentShiftType();
         const currentShiftDate = getCurrentShiftDate();
-        const shiftKey = getShiftKey();
-        
-        // Check if this shift is already archived
+
+        // Check if this shift already exists
         const existingShift = shifts.find(s => s.shiftDate === currentShiftDate && s.shiftType === currentShiftType);
-        if (existingShift) return false; // Already archived for this shift
-        
-        // FIX: Check if data has timestamps from the CURRENT shift
-        // If so, don't archive - just create a shift record for tracking
-        // Night shift spans two calendar days (e.g., starts 1st July 20:00, ends 2nd July 05:00)
+        if (existingShift) return false;
+
+        // Check if data has timestamps from CURRENT shift
         const hasCurrentShiftData = Object.values(currentReports).some(r => {
             if (!r.times || r.times.length === 0) return false;
             return r.times.some(t => {
                 const reportDate = t.substring(0, 10);
                 if (currentShiftType === 'ليلية') {
-                    // Night shift: data from shiftDate OR shiftDate+1
                     const shiftDateObj = new Date(currentShiftDate + 'T00:00:00');
                     const nextDayObj = new Date(shiftDateObj);
                     nextDayObj.setDate(nextDayObj.getDate() + 1);
@@ -612,9 +616,9 @@ async function autoArchiveIfShiftChanged() {
                 return reportDate === currentShiftDate;
             });
         });
-        
+
         if (hasCurrentShiftData) {
-            // Data is from current shift, create record without archiving/clearing
+            // Data is from current shift — create record without archiving
             const saudiTime = getSaudiDateTime();
             const newShift = {
                 id: Date.now(),
@@ -631,7 +635,8 @@ async function autoArchiveIfShiftChanged() {
                 fuelData: {},
                 generalNotes: "",
                 lastUpdate: saudiTime.toISOString(),
-                autoArchived: false
+                autoArchived: false,
+                status: 'active'
             };
             shifts.unshift(newShift);
             if (shifts.length > 50) shifts.pop();
@@ -640,9 +645,78 @@ async function autoArchiveIfShiftChanged() {
             currentShiftId = newShift.id;
             return false;
         }
-        
-        // Data is from previous shift, archive it properly
+
+        // ═══════════════════════════════════════════
+        // Data is from previous shift — use Archive Engine
+        // ═══════════════════════════════════════════
+        console.log('[AutoArchive] Previous shift detected. Using archive engine for shift #' + currentShiftId);
+
+        if (currentShiftId) {
+            const archiveResult = await archiveEngine.executeArchive(currentShiftId, {
+                strict: false,
+                skipVerify: false
+            });
+
+            if (!archiveResult.success) {
+                console.error('[AutoArchive] Archive engine failed:', archiveResult.error);
+                // Fall back to legacy method
+                return await _legacyAutoArchive(currentReports, shifts, currentShiftType, currentShiftDate);
+            }
+
+            console.log('[AutoArchive] Archive engine completed successfully:', archiveResult.snapshotHash);
+        }
+
+        // Clear current reports for new shift
+        await writeData({});
+
+        // Create new shift record
         const saudiTime = getSaudiDateTime();
+        const newShift = {
+            id: Date.now(),
+            shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
+            shiftDate: currentShiftDate,
+            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+            shiftType: currentShiftType,
+            startTime: saudiTime.toISOString(),
+            savedReports: {},
+            totalReports: 0,
+            rapidLocations: {},
+            centersData: {},
+            vehicleData: {},
+            fuelData: {},
+            generalNotes: "",
+            lastUpdate: saudiTime.toISOString(),
+            autoArchived: false,
+            status: 'active'
+        };
+
+        shifts.unshift(newShift);
+        if (shifts.length > 50) shifts.pop();
+        await writeShifts(shifts);
+        await syncShiftToDB(newShift);
+        currentShiftId = newShift.id;
+
+        broadcast({
+            type: 'shift_auto_archived',
+            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً',
+            shiftId: newShift.id,
+            shiftType: currentShiftType
+        });
+
+        return true;
+    } catch (error) {
+        console.error('Auto-archive error:', error);
+        return false;
+    }
+}
+
+// Legacy fallback (original method)
+async function _legacyAutoArchive(currentReports, shifts, currentShiftType, currentShiftDate) {
+    console.log('[AutoArchive] Falling back to legacy archive method...');
+    try {
+        const saudiTime = getSaudiDateTime();
+        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
+
         const newShift = {
             id: Date.now(),
             shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
@@ -660,33 +734,29 @@ async function autoArchiveIfShiftChanged() {
             lastUpdate: saudiTime.toISOString(),
             autoArchived: true
         };
-        
+
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
         await syncShiftToDB(newShift);
-        
-        // Clear current reports for new shift
+
         await writeData({});
         currentShiftId = newShift.id;
-        
+
         broadcast({
             type: 'shift_auto_archived',
-            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً',
+            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً (legacy)',
             shiftId: newShift.id,
             shiftType: currentShiftType
         });
-        
+
         return true;
-    } catch (error) {
-        console.error('Auto-archive error:', error);
+    } catch (err) {
+        console.error('Legacy auto-archive error:', err);
         return false;
     }
 }
 
-// ============================================
-// التأكد من وجود مجلدات البيانات
-// ============================================
 async function initDefaultUsers() {
     try {
         await fs.access(USERS_PATH);
@@ -2193,27 +2263,63 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftType } = req.body;
-        
-        // NEW: Verify previous shift is archived before starting new one
+        const user = req.user;
+
+        console.log('[Shift] Starting new shift archive process...');
+
+        // ═══════════════════════════════════════════
+        // STEP 0: Archive current shift if exists
+        // ═══════════════════════════════════════════
         if (currentShiftId) {
-            const activeShift = await db.getActiveShift();
-            if (activeShift && activeShift.id === currentShiftId) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'لا يمكن بدء مناوبة جديدة قبل أرشفة المناوبة الحالية. يرجى أرشفة المناوبة الحالية أولاً.' 
+            console.log('[Shift] Archiving current shift #' + currentShiftId + ' before starting new shift...');
+
+            const archiveResult = await archiveEngine.executeArchive(currentShiftId, {
+                user: user,
+                strict: false,
+                skipVerify: false
+            });
+
+            if (!archiveResult.success) {
+                console.error('[Shift] Archive failed:', archiveResult.error);
+                await addAuditLogEntry(
+                    'shift_archive_failed',
+                    'فشلت أرشفة المناوبة السابقة: ' + (archiveResult.error?.message || 'unknown'),
+                    'shifts',
+                    user.name,
+                    user.role,
+                    user.id,
+                    currentShiftId
+                );
+                broadcast({
+                    type: 'shift_archive_warning',
+                    message: '⚠️ فشلت أرشفة المناوبة السابقة: ' + (archiveResult.error?.message || 'خطأ غير معروف'),
+                    shiftId: currentShiftId,
+                    details: archiveResult.phases
                 });
-            }
-            
-            // Verify previous shift was archived successfully
-            const prevShiftStatus = await db.getShiftStatus(currentShiftId);
-            if (prevShiftStatus && prevShiftStatus.status !== 'archived') {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'المناوبة السابقة لم يتم أرشفتها بعد. يرجى التأكد من نجاح الأرشفة قبل بدء مناوبة جديدة.' 
+            } else {
+                console.log('[Shift] Archive completed successfully:', archiveResult.snapshotHash);
+                await addAuditLogEntry(
+                    'shift_archived',
+                    'تمت أرشفة المناوبة بنجاح، Hash: ' + archiveResult.snapshotHash,
+                    'shifts',
+                    user.name,
+                    user.role,
+                    user.id,
+                    currentShiftId
+                );
+                broadcast({
+                    type: 'shift_archived',
+                    message: '✅ تمت أرشفة المناوبة السابقة بنجاح',
+                    shiftId: currentShiftId,
+                    hash: archiveResult.snapshotHash,
+                    duration: archiveResult.duration
                 });
             }
         }
-        
+
+        // ═══════════════════════════════════════════
+        // STEP 1: Get Saudi time
+        // ═══════════════════════════════════════════
         const now = new Date();
         const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
         const year = saudiTime.getFullYear();
@@ -2221,8 +2327,8 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         const day = saudiTime.getDate().toString().padStart(2, '0');
         const isoDate = `${year}-${month}-${day}`;
         const hour = saudiTime.getHours();
-        
-        // Handle night shift after midnight (hour < 5) — date belongs to previous day
+
+        // Handle night shift after midnight
         let shiftDate = isoDate;
         if (shiftType === 'ليلية' && hour < 5) {
             const prevDay = new Date(saudiTime);
@@ -2232,42 +2338,12 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
             const prevDayNum = prevDay.getDate().toString().padStart(2, '0');
             shiftDate = `${prevYear}-${prevMonth}-${prevDayNum}`;
         }
-        
-        // ============================================
-        // STEP 1: Archive current shift data (if exists)
-        // ============================================
-        const shifts = await readShifts();
-        if (currentShiftId) {
-            const currentShiftIndex = shifts.findIndex(s => s.id === currentShiftId);
-            if (currentShiftIndex !== -1) {
-                // Read current operational data
-                const currentData = await readData();
-                const currentShift = shifts[currentShiftIndex];
-                
-                // Archive current data to the old shift
-                shifts[currentShiftIndex].savedReports = currentData || {};
-                shifts[currentShiftIndex].centersData = currentShift.centersData || {};
-                shifts[currentShiftIndex].rapidLocations = currentShift.rapidLocations || {};
-                shifts[currentShiftIndex].vehicleData = currentShift.vehicleData || {};
-                shifts[currentShiftIndex].fuelData = currentShift.fuelData || {};
-                shifts[currentShiftIndex].generalNotes = currentShift.generalNotes || '';
-                shifts[currentShiftIndex].totalReports = Object.values(currentData || {}).reduce(
-                    (sum, r) => sum + (r.count || 0), 0
-                );
-                shifts[currentShiftIndex].lastUpdate = saudiTime.toISOString();
-                shifts[currentShiftIndex].autoArchived = true;
-                shifts[currentShiftIndex].archiveTime = saudiTime.toISOString();
-                
-                console.log(`[Shift Archive] Shift ${currentShiftId} archived with ${shifts[currentShiftIndex].totalReports} reports`);
-            }
-        }
-        
-        // ============================================
+
+        // ═══════════════════════════════════════════
         // STEP 2: Reset operational data files
-        // ============================================
-        // Clear ambulance-data.json (current reports)
+        // ═══════════════════════════════════════════
+        console.log('[Shift] Clearing operational data for new shift...');
         await writeData({});
-        // Reset centersData to default (keep team-to-center mapping for dispatch)
         centersData = {
             "المنصورة": ["جنوب 1", "جنوب 11", "جنوب 12", "سريع 3"],
             "الخالدية": ["جنوب 2"],
@@ -2280,18 +2356,15 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
             "الشفاء": ["جنوب 8", "سريع 2"],
             "الفرق الإضافية": ["سريع 4", "جنوب 13", "جنوب 14", "جنوب 15", "جنوب 16", "جنوب 17", "جنوب 18", "جنوب 19"]
         };
-        // Reset other operational data
-        await writeData({});
-        // Clear centersData
-        centersData = {};
-        // Reset other operational data
         await fs.writeFile(path.join(STORAGE_PATH, 'shift-events.json'), JSON.stringify([], null, 2));
         await fs.writeFile(path.join(STORAGE_PATH, 'shift-absences.json'), JSON.stringify([], null, 2));
         await fs.writeFile(path.join(STORAGE_PATH, 'shift-notes.json'), JSON.stringify([], null, 2));
-        
-        // ============================================
+
+        // ═══════════════════════════════════════════
         // STEP 3: Create new shift
-        // ============================================
+        // ═══════════════════════════════════════════
+        console.log('[Shift] Creating new shift record...');
+        const shifts = await readShifts();
         const newShift = {
             id: Date.now(),
             shiftName: `${shiftType} - ${shiftDate}`,
@@ -2308,39 +2381,52 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
             fuelData: {},
             generalNotes: '',
             lastUpdate: saudiTime.toISOString(),
-            autoArchived: false
+            autoArchived: false,
+            status: 'active',
+            archiveEngine: '2.0'
         };
-        
-        // Save to file
+
         shifts.unshift(newShift);
         if (shifts.length > 50) shifts.pop();
         await writeShifts(shifts);
         await syncShiftToDB(newShift);
-        
-        // Set as current shift
         currentShiftId = newShift.id;
-        
-        // Broadcast to all clients
+
+        // ═══════════════════════════════════════════
+        // STEP 4: Audit log + broadcast
+        // ═══════════════════════════════════════════
+        await addAuditLogEntry(
+            'shift_started',
+            'تم بدء مناوبة جديدة: ' + shiftType + ' - ' + shiftDate,
+            'shifts',
+            user.name,
+            user.role,
+            user.id,
+            newShift.id
+        );
+
         broadcast({
             type: 'shift_started',
-            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'}`,
+            message: 'تم بدء المناوبة ' + (shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'),
             shiftId: newShift.id,
             shiftDate: shiftDate,
             shiftType: shiftType
         });
-        
-        res.json({ 
-            success: true, 
+
+        console.log('[Shift] New shift started:', newShift.id);
+
+        res.json({
+            success: true,
             shiftId: newShift.id,
             shift: newShift,
-            message: `تم بدء المناوبة ${shiftType === 'صباحية' ? 'الصباحية' : 'الليلية'} بنجاح`
+            message: 'تم بدء المناوبة ' + (shiftType === 'صباحية' ? 'الصباحية' : 'الليلية') + ' بنجاح'
         });
+
     } catch (error) {
         console.error('Error starting new shift:', error);
         res.status(500).json({ success: false, error: 'فشل في بدء المناوبة: ' + error.message });
     }
 });
-
 app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftId, shiftData, shiftDate, shiftType } = req.body;
@@ -2520,27 +2606,67 @@ app.post('/api/shift-archive', authenticate, async (req, res) => {
         if (!shiftId) {
             return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
         }
-        
-        const result = await db.archiveShift(shiftId, { supervisorName, supervisorId });
-        
-        // Update JSON backup
-        const shifts = await readShifts();
-        const index = shifts.findIndex(s => s.id === shiftId);
-        if (index !== -1) {
-            shifts[index].status = 'archived';
-            shifts[index].archivedAt = new Date().toISOString();
-            await writeShifts(shifts);
+
+        console.log('[ShiftArchive] Manual archive requested for shift #' + shiftId);
+
+        const result = await archiveEngine.executeArchive(parseInt(shiftId), {
+            user: req.user,
+            strict: true,
+            skipVerify: false
+        });
+
+        if (result.success) {
+            const shifts = await readShifts();
+            const index = shifts.findIndex(s => s.id === parseInt(shiftId));
+            if (index !== -1) {
+                shifts[index].status = 'archived';
+                shifts[index].archivedAt = new Date().toISOString();
+                shifts[index].archivedBy = req.user ? req.user.name : 'system';
+                shifts[index].snapshotHash = result.snapshotHash;
+                await writeShifts(shifts);
+            }
+
+            await addAuditLogEntry(
+                'shift_archived_manual',
+                'تمت أرشفة المناوبة يدوياً، Hash: ' + result.snapshotHash,
+                'shifts',
+                req.user ? req.user.name : 'system',
+                req.user ? req.user.role : 'system',
+                req.user ? req.user.id : null,
+                parseInt(shiftId)
+            );
+
+            res.json({
+                success: true,
+                shiftId: parseInt(shiftId),
+                archivedAt: new Date().toISOString(),
+                snapshotHash: result.snapshotHash,
+                duration: result.duration,
+                phases: result.phases
+            });
+        } else {
+            await addAuditLogEntry(
+                'shift_archive_failed_manual',
+                'فشلت الأرشفة اليدارية: ' + (result.error?.message || 'unknown'),
+                'shifts',
+                req.user ? req.user.name : 'system',
+                req.user ? req.user.role : 'system',
+                req.user ? req.user.id : null,
+                parseInt(shiftId)
+            );
+
+            res.status(500).json({
+                success: false,
+                error: result.error?.message || 'فشل في أرشفة المناوبة',
+                code: result.error?.code || 'UNKNOWN',
+                phases: result.phases
+            });
         }
-        
-        res.json({ success: true, shiftId, archivedAt: result.archivedAt });
     } catch (error) {
         console.error('Error archiving shift:', error);
         res.status(500).json({ success: false, error: 'فشل في أرشفة المناوبة: ' + error.message });
     }
 });
-
-// GET /api/shift-status - حالة المناوبة النشطة
-// TODO: أعد إضافة authenticate بعد الاختبار
 app.get('/api/shift-status', async (req, res) => {
     try {
         const activeShift = await db.getActiveShift();
@@ -9944,6 +10070,86 @@ process.on('SIGTERM', () => {
             process.exit(0);
         }
     });
+});
+
+
+// ============================================
+// Shift Archive Engine v2.0 — New Routes
+// ============================================
+
+// GET /api/shifts/:id/verify-archive — التحقق من سلامة أرشيف
+app.get('/api/shifts/:id/verify-archive', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        console.log('[ShiftArchive] Verify archive requested for shift #' + shiftId);
+
+        const { ShiftArchiveSnapshot, ShiftIntegrityChecker } = require('./shift-archive-engine');
+        const snapshotter = new ShiftArchiveSnapshot(db, STORAGE_PATH);
+        const checker = new ShiftIntegrityChecker(db, STORAGE_PATH);
+
+        const snapshot = await snapshotter.create(shiftId);
+        const result = await checker.verify(shiftId, snapshot);
+
+        res.json({
+            success: true,
+            shiftId,
+            passed: result.passed,
+            timestamp: result.timestamp,
+            checks: result.checks
+        });
+    } catch (error) {
+        console.error('Verify archive error:', error);
+        res.status(500).json({ error: 'فشل في التحقق من سلامة الأرشيف: ' + error.message });
+    }
+});
+
+// POST /api/shifts/:id/rearchive — إعادة أرشفة
+app.post('/api/shifts/:id/rearchive', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        console.log('[ShiftArchive] Re-archive requested for shift #' + shiftId);
+
+        const result = await archiveEngine.executeArchive(shiftId, {
+            user: req.user,
+            strict: true,
+            skipVerify: false,
+            force: true
+        });
+
+        if (result.success) {
+            res.json({
+                success: true,
+                shiftId,
+                message: 'تمت إعادة الأرشفة بنجاح',
+                snapshotHash: result.snapshotHash,
+                duration: result.duration
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: result.error?.message || 'فشلت إعادة الأرشفة',
+                phases: result.phases
+            });
+        }
+    } catch (error) {
+        console.error('Re-archive error:', error);
+        res.status(500).json({ error: 'فشل في إعادة الأرشفة: ' + error.message });
+    }
+});
+
+// GET /api/shifts/:id/archive-log — سجل عمليات الأرشفة
+app.get('/api/shifts/:id/archive-log', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        const { ShiftAuditLogger } = require('./shift-archive-engine');
+        const logger = new ShiftAuditLogger(db, STORAGE_PATH);
+        const logs = await logger.getLogs(shiftId, parseInt(req.query.limit) || 50);
+
+        res.json({ success: true, shiftId, logs });
+    } catch (error) {
+        console.error('Archive log error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل الأرشفة: ' + error.message });
+    }
 });
 
 process.on('SIGINT', () => {

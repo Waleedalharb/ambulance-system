@@ -78,7 +78,27 @@
     }
 
     // ============================================
-    // TOAST NOTIFICATION SYSTEM
+    // IN-PAGE TOAST (top-center for feedback)
+    // ============================================
+    function showToast(message, type) {
+        type = type || 'info';
+        var container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:100000;display:flex;flex-direction:column;gap:8px;align-items:center;';
+            document.body.appendChild(container);
+        }
+        var toast = document.createElement('div');
+        toast.style.cssText = 'background:#fff;border-radius:12px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-size:0.85rem;display:flex;align-items:center;gap:8px;animation:toastIn 0.3s ease;direction:rtl;';
+        var icon = type === 'success' ? '<i class="fas fa-check-circle" style="color:#10B981;"></i>' : type === 'error' ? '<i class="fas fa-exclamation-circle" style="color:#EF4444;"></i>' : type === 'warning' ? '<i class="fas fa-exclamation-triangle" style="color:#F59E0B;"></i>' : '<i class="fas fa-info-circle" style="color:#3B82F6;"></i>';
+        toast.innerHTML = icon + ' <span>' + escapeHtml(message) + '</span>';
+        container.appendChild(toast);
+        setTimeout(function(){ toast.style.opacity = '0'; toast.style.transform = 'translateY(-10px)'; setTimeout(function(){toast.remove();},300); }, 3000);
+    }
+
+    // ============================================
+    // TOAST NOTIFICATION SYSTEM (bottom-right popup)
     // ============================================
     var Toast = {
         stack: [],
@@ -200,7 +220,7 @@
         _headers: function() { return { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }; },
         getConversations: function() { return fetch('/api/chat/conversations', { headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
         getMessages: function(convId, page) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages?page=' + (page||1), { headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
-        sendMessage: function(convId, data) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages', { method: 'POST', headers: this._headers(), body: JSON.stringify(data) }).then(function(r){return r.json();}); },
+        sendMessage: function(convId, data) { return fetch('/api/chat/conversations/' + encodeURIComponent(convId) + '/messages', { method: 'POST', headers: this._headers(), body: JSON.stringify(data) }).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json().catch(function(){return {success:true};}); }); },
         markRead: function(msgId) { return fetch('/api/chat/messages/' + encodeURIComponent(msgId) + '/read', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + authToken } }).then(function(r){return r.json();}); },
         createGroup: function(title, ids) { return fetch('/api/chat/conversations', { method: 'POST', headers: this._headers(), body: JSON.stringify({ type: 'group', title: title, participant_ids: ids }) }).then(function(r){return r.json();}); },
         startPrivate: function(userId) { return fetch('/api/chat/conversations/private', { method: 'POST', headers: this._headers(), body: JSON.stringify({ user_id: userId }) }).then(function(r){return r.json();}); },
@@ -241,7 +261,17 @@
             }
         }
 
-        var content = escapeHtml(msg.content).replace(/\n/g, '<br>');
+        // Voice message rendering
+        var messageHtml = '';
+        if (msg.type === 'voice' || (msg.content && msg.content.startsWith('data:audio'))) {
+            var dur = msg.duration || 0;
+            var mins = Math.floor(dur / 60).toString().padStart(2, '0');
+            var secs = (dur % 60).toString().padStart(2, '0');
+            messageHtml = '<div class="voice-message"><button class="voice-play-btn" onclick="window.Voice.playVoice(\'' + msg.content + '\', this)"><i class="fas fa-play"></i></button><div class="voice-progress"><div class="voice-progress-bar"></div></div><span class="voice-time">' + mins + ':' + secs + '</span></div>';
+        } else {
+            messageHtml = '<div class="message-content">' + escapeHtml(msg.content).replace(/\n/g, '<br>') + '</div>';
+        }
+
         var senderName = !isMine && msg.sender_name ? '<div class="message-sender">' + escapeHtml(msg.sender_name) + '</div>' : '';
         var editedFlag = msg.is_edited ? '<span class="message-edited">(تم التعديل)</span>' : '';
         var replyHtml = '';
@@ -251,7 +281,7 @@
 
         return '<div class="message-row ' + (isMine ? 'mine' : 'theirs') + '" data-msg-id="' + msg.id + '" data-is-mine="' + isMine + '">' +
             '<div class="message-bubble ' + bubbleClass + '">' + replyHtml + senderName +
-                '<div class="message-content">' + content + '</div>' + editedFlag +
+                messageHtml + editedFlag +
                 '<div class="message-time">' + readStatus + ' ' + time + '</div>' +
             '</div>' +
         '</div>';
@@ -447,9 +477,60 @@
         },
 
         _showPreview: function(blob) {
-            // TODO: Upload blob to server and send as voice message
-            console.log('Voice recorded:', blob.size, 'bytes');
-            showToast('سيتم دعم الرسائل الصوتية قريباً', 'info');
+            var self = this;
+            var reader = new FileReader();
+            reader.onloadend = function() {
+                var audioUrl = reader.result;
+                var duration = self.recordingTime;
+                self._sendVoiceMessage(audioUrl, duration);
+            };
+            reader.readAsDataURL(blob);
+        },
+
+        _sendVoiceMessage: function(audioUrl, duration) {
+            if (!State.currentConversation) return;
+            var conv = State.currentConversation;
+            var convId = conv.id;
+            var tempId = 'temp-voice-' + Date.now();
+            var tempMsg = {
+                id: tempId,
+                sender_id: State.currentUser.id,
+                sender_name: State.currentUser.name,
+                content: audioUrl,
+                type: 'voice',
+                duration: duration,
+                created_at: new Date().toISOString(),
+                read_by: []
+            };
+
+            State.messages.push(tempMsg);
+            $('messagesList').innerHTML = renderMessages(State.messages);
+            Scroll.toBottom();
+
+            // Send to server
+            API.sendMessage(convId, {
+                content: audioUrl,
+                type: 'voice',
+                duration: duration
+            }).then(function(data) {
+                // Server accepted the message (HTTP 200/201)
+                // Update temp message to real one if server returned it
+                if (data && data.message) {
+                    var idx = State.messages.findIndex(function(m) { return m.id === tempId; });
+                    if (idx !== -1) State.messages[idx] = data.message;
+                    $('messagesList').innerHTML = renderMessages(State.messages);
+                }
+                // Update conversation preview
+                conv.last_message = { content: '\uD83C\uDFA4 رسالة صوتية', sender_id: State.currentUser.id, created_at: new Date().toISOString(), sender_name: State.currentUser.name };
+                conv.updated_at = new Date().toISOString();
+                State.conversations.sort(function(a, b) { return new Date(b.updated_at || 0) - new Date(a.updated_at || 0); });
+                renderConversationList(State.conversations);
+                showToast('\uD83C\uDFA4 تم إرسال الرسالة الصوتية', 'success');
+            }).catch(function(e) {
+                // Only show error if fetch actually failed (network error or HTTP 4xx/5xx)
+                showToast('تعذر إرسال الرسالة الصوتية', 'error');
+                console.error('[Voice] Send error:', e.message);
+            });
         },
 
         // Playback
