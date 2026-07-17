@@ -638,6 +638,19 @@ async function runMigrations() {
     }
   }
 
+  // Add created_at/updated_at columns to shifts (required by StorageAdapter)
+  try {
+    await exec(`ALTER TABLE shifts ADD COLUMN created_at DATETIME`);
+    await exec(`ALTER TABLE shifts ADD COLUMN updated_at DATETIME`);
+    logger.info('Added created_at/updated_at columns to shifts');
+  } catch (err) {
+    if (err.message && err.message.includes('duplicate column')) {
+      logger.info('shifts created_at/updated_at columns already exist');
+    } else {
+      logger.warn('shifts created_at/updated_at migration: ' + err.message);
+    }
+  }
+
   // app_settings (replaces theme-settings.json, password.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS app_settings (

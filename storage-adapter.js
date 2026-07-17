@@ -3,6 +3,10 @@
  * ═══════════════════════════════════════════════════════════
  * No Manager or Endpoint talks to SQLite directly.
  * All data operations go through this adapter.
+ *
+ * NOTE: db.js run/get/all are async (Promise-returning).
+ * Every call below MUST await so SQL errors surface instead of
+ * being swallowed as unhandled rejections.
  */
 
 class StorageAdapter {
@@ -12,7 +16,7 @@ class StorageAdapter {
 
     // ─── Shifts ───
     async createShift(data) {
-        const result = this.db.run(
+        const result = await this.db.run(
             `INSERT INTO shifts (shift_name, shift_date, shift_time, shift_type, shift_day, start_time, status, total_reports, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, 'active', 0, datetime('now'), datetime('now'))`,
             [data.shiftName, data.shiftDate, data.shiftTime, data.shiftType, data.shiftDay, data.startTime]
@@ -29,21 +33,21 @@ class StorageAdapter {
     }
 
     async archiveShift(id) {
-        this.db.run(
+        await this.db.run(
             "UPDATE shifts SET status = 'archived', archived_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
             [id]
         );
     }
 
     async endShift(id, notes) {
-        this.db.run(
+        await this.db.run(
             "UPDATE shifts SET status = 'pending_handover', general_notes = ?, end_time = datetime('now'), updated_at = datetime('now') WHERE id = ?",
             [notes || '', id]
         );
     }
 
     async updateShiftTotalReports(shiftId, total) {
-        this.db.run('UPDATE shifts SET total_reports = ?, updated_at = datetime("now") WHERE id = ?', [total, shiftId]);
+        await this.db.run("UPDATE shifts SET total_reports = ?, updated_at = datetime('now') WHERE id = ?", [total, shiftId]);
     }
 
     async getAllShifts(limit = 100) {
@@ -59,7 +63,7 @@ class StorageAdapter {
     }
 
     async createReport(shiftId, center, unit) {
-        const result = this.db.run(
+        const result = await this.db.run(
             'INSERT INTO reports (shift_id, center, unit, count) VALUES (?, ?, ?, 1)',
             [shiftId, center, unit]
         );
@@ -67,19 +71,19 @@ class StorageAdapter {
     }
 
     async incrementReport(id) {
-        this.db.run('UPDATE reports SET count = count + 1 WHERE id = ?', [id]);
-        const row = this.db.get('SELECT count FROM reports WHERE id = ?', [id]);
+        await this.db.run('UPDATE reports SET count = count + 1 WHERE id = ?', [id]);
+        const row = await this.db.get('SELECT count FROM reports WHERE id = ?', [id]);
         return row ? row.count : 0;
     }
 
     async decrementReport(id) {
-        this.db.run('UPDATE reports SET count = count - 1 WHERE id = ? AND count > 0', [id]);
-        const row = this.db.get('SELECT count FROM reports WHERE id = ?', [id]);
+        await this.db.run('UPDATE reports SET count = count - 1 WHERE id = ? AND count > 0', [id]);
+        const row = await this.db.get('SELECT count FROM reports WHERE id = ?', [id]);
         return row ? row.count : 0;
     }
 
     async getTotalReports(shiftId) {
-        const row = this.db.get('SELECT SUM(count) as total FROM reports WHERE shift_id = ?', [shiftId]);
+        const row = await this.db.get('SELECT SUM(count) as total FROM reports WHERE shift_id = ?', [shiftId]);
         return row ? (row.total || 0) : 0;
     }
 
@@ -89,7 +93,7 @@ class StorageAdapter {
 
     // ─── Shift Completions ───
     async createCompletion(data) {
-        const result = this.db.run(
+        const result = await this.db.run(
             `INSERT INTO shift_completions (shift_type, shift_date, shift_id, teams_data, notes, created_by, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [data.shiftType, data.shiftDate, data.shiftId, JSON.stringify(data.teams), data.notes || '', data.createdBy, data.createdAt]
@@ -106,7 +110,7 @@ class StorageAdapter {
 
     // ─── Audit Log ───
     async logAudit(data) {
-        this.db.run(
+        await this.db.run(
             `INSERT INTO audit_log (shift_id, user_id, user_name, action, detail, type, created_at)
              VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
             [data.shiftId, data.userId, data.userName, data.action, data.detail, data.type]
@@ -115,7 +119,7 @@ class StorageAdapter {
 
     // ─── Generic ───
     async exec(sql) {
-        this.db.exec(sql);
+        await this.db.exec(sql);
     }
 
     async run(sql, params = []) {
