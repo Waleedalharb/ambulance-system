@@ -406,6 +406,11 @@ class ShiftArchiveSnapshot {
         // 11. جلب الغيابات
         snapshot.absences = await this._getAbsences(shiftId);
 
+        // 12-14. Archive slice: تفاصيل البلاغات + التمركزات + المحادثات (D-6)
+        snapshot.reportEntries = await this._getReportEntries(shiftId);
+        snapshot.positioning = await this._getPositioning(shiftId);
+        snapshot.conversations = await this._getConversations(shiftId);
+
         // Calculate integrity hash
         snapshot.metadata.hash = this._calculateHash(snapshot);
 
@@ -530,35 +535,55 @@ class ShiftArchiveSnapshot {
         return null;
     }
 
-    async _getNotes(shiftId) {
+    // ─── Archive slice: unified content collectors (SQLite single source) ───
+    async _getContentRows(table, shiftId) {
         try {
-            const notesPath = path.join(this.storagePath, 'shift-notes.json');
-            const data = await fs.readFile(notesPath, 'utf8').catch(() => '[]');
-            const notes = JSON.parse(data);
-            return notes.filter(n => n.shift_id === shiftId || n.shiftId === shiftId);
+            if (!this.db || !this.db.all) return [];
+            const rows = await this.db.all(`SELECT * FROM ${table} WHERE shift_id = ?`, [shiftId]);
+            return rows.map(r => {
+                let data = {};
+                try { data = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
+                return { ...data, id: r.id, shiftId: r.shift_id };
+            });
         } catch (err) {
+            console.error(`[Snapshot] Error getting ${table}:`, err.message);
             return [];
         }
+    }
+
+    async _getNotes(shiftId) {
+        return this._getContentRows('shift_notes', shiftId);
     }
 
     async _getEvents(shiftId) {
-        try {
-            const eventsPath = path.join(this.storagePath, 'shift-events.json');
-            const data = await fs.readFile(eventsPath, 'utf8').catch(() => '[]');
-            const events = JSON.parse(data);
-            return events.filter(e => e.shift_id === shiftId || e.shiftId === shiftId);
-        } catch (err) {
-            return [];
-        }
+        return this._getContentRows('shift_events', shiftId);
     }
 
     async _getAbsences(shiftId) {
+        return this._getContentRows('shift_absences', shiftId);
+    }
+
+    async _getReportEntries(shiftId) {
+        return this._getContentRows('report_entries', shiftId);
+    }
+
+    async _getPositioning(shiftId) {
+        return this._getContentRows('peak_plans', shiftId);
+    }
+
+    // Archive Contract §5: conversations explicitly linked via shift_id
+    async _getConversations(shiftId) {
         try {
-            const absencesPath = path.join(this.storagePath, 'shift-absences.json');
-            const data = await fs.readFile(absencesPath, 'utf8').catch(() => '[]');
-            const absences = JSON.parse(data);
-            return absences.filter(a => a.shift_id === shiftId || a.shiftId === shiftId);
+            if (!this.db || !this.db.all) return [];
+            const convs = await this.db.all('SELECT * FROM chat_conversations WHERE shift_id = ?', [shiftId]);
+            const out = [];
+            for (const c of convs) {
+                const messages = await this.db.all('SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC', [c.id]);
+                out.push({ ...c, messages });
+            }
+            return out;
         } catch (err) {
+            console.error('[Snapshot] Error getting conversations:', err.message);
             return [];
         }
     }
@@ -1065,6 +1090,20 @@ class ShiftArchiveEngine {
                             shift_id: shiftId
                         });
                         details.push({ step: 'sqlite_metrics', status: 'success' });
+                    }
+
+                    // Archive slice: persist the seal blob itself (SQLite = source of truth)
+                    // Without this the seal existed only as a file and the
+                    // snapshot/integrity endpoints could never find it.
+                    // snapshot_type respects the legacy CHECK constraint.
+                    if (this.db.run) {
+                        const snapType = ['auto', 'manual', 'pre_archive'].includes(options && options.snapshotType)
+                            ? options.snapshotType : 'manual';
+                        await this.db.run(
+                            'INSERT INTO shift_snapshots (shift_id, snapshot_type, snapshot_data, snapshot_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+                            [shiftId, snapType, JSON.stringify(snapshot), snapshot.metadata.hash, new Date().toISOString()]
+                        );
+                        details.push({ step: 'sqlite_snapshot', status: 'success' });
                     }
 
                 } catch (dbErr) {

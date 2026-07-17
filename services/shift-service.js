@@ -35,8 +35,13 @@ class ShiftService {
         };
     }
 
-    /** بدء مناوبة جديدة → ShiftStarted */
+    /** بدء مناوبة جديدة → ShiftStarted (+ ختم المناوبة السابقة المؤرشفة تلقائياً) */
     async startShift(shiftType, user) {
+        // Capture the active shift BEFORE the manager auto-archives it (Archive
+        // Contract §2: auto-archived shifts get a seal too)
+        let previousActive = null;
+        try { previousActive = await this.storage.getActiveShift(); } catch (e) { /* best-effort */ }
+
         const result = await this.manager.startShift(shiftType, user);
         if (result && result.success) {
             this.bus.emit('ShiftStarted', {
@@ -45,6 +50,22 @@ class ShiftService {
                 date: result.date,
                 ...this._actor(user)
             });
+
+            if (previousActive && typeof this.getArchiveService === 'function') {
+                const archiveService = this.getArchiveService();
+                if (archiveService) {
+                    try {
+                        await archiveService.archive(previousActive.id, user, {
+                            source: 'auto',
+                            reason: 'أرشفة تلقائية عند بدء المناوبة التالية'
+                        });
+                    } catch (e) {
+                        // The previous shift is already status-flipped by the manager;
+                        // a seal failure here must not fail the new shift start.
+                        console.error('[ShiftService] Auto-archive seal failed:', e.message);
+                    }
+                }
+            }
         }
         return result;
     }

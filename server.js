@@ -1429,6 +1429,37 @@ async function readShifts() {
     }
 }
 
+// ═══ Archive slice: unified shift-content stores (SQLite single source) ═══
+// The legacy JSON files (notes/events/absences/peak-plans/report-entry) are
+// frozen; rows keep their legacy string ids and full payload in `data`.
+function contentRowToJson(row) {
+    let data = {};
+    try { data = row.data ? JSON.parse(row.data) : {}; } catch (e) {}
+    return { ...data, id: row.id, shiftId: row.shift_id };
+}
+async function contentList(table) {
+    const rows = await db.all(`SELECT * FROM ${table} ORDER BY created_at DESC, id DESC`);
+    return rows.map(contentRowToJson);
+}
+async function contentListByShift(table, shiftId) {
+    const rows = await db.all(`SELECT * FROM ${table} WHERE shift_id = ? ORDER BY created_at DESC, id DESC`, [shiftId]);
+    return rows.map(contentRowToJson);
+}
+async function contentInsert(table, shiftId, obj) {
+    const sid = shiftId != null ? shiftId : (obj.shiftId != null ? obj.shiftId : null);
+    await db.run(`INSERT INTO ${table} (id, shift_id, data) VALUES (?, ?, ?)`, [String(obj.id), sid, JSON.stringify(obj)]);
+}
+async function withTx(fn) {
+    if (opsEngine && typeof opsEngine.runInTransaction === 'function') return opsEngine.runInTransaction(fn);
+    return fn();
+}
+async function getActiveShiftId() {
+    try {
+        const active = opsEngine && opsEngine.shifts ? await opsEngine.shifts.getActiveShift() : null;
+        return active ? active.id : null;
+    } catch (e) { return null; }
+}
+
 async function writeShifts(data) {
     await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
     // ═══ Auto-recalculate KPIs on any shift change ═══
@@ -2370,18 +2401,14 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
         if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
         if (shift.status !== 'pending_handover') return res.status(400).json({ error: 'المناوبة ليست بانتظار التسليم' });
 
-        // Create snapshot via archive engine (snapshot stays with the archive
-        // engine until the dedicated Archive slice)
-        const archiveResult = await archiveEngine.executeArchive(shiftId, { user, strict: false, skipVerify: false });
-
-        // Slice 2: archived transition + audit owned by ShiftService;
-        // ShiftArchived event drives the 'shift_archived' WS broadcast
-        await opsEngine.shiftService.markArchived(
-            shiftId,
-            user,
-            archiveResult.snapshotHash,
-            'تم اعتماد التسليم وأرشفة المناوبة' + (archiveResult.snapshotHash ? ' Snapshot: ' + archiveResult.snapshotHash : '')
-        );
+        // Archive slice: single archive path (seal + conversations + transition)
+        const archiveResult = await opsEngine.archiveService.archive(shiftId, user, {
+            source: 'handover',
+            reason: 'تم اعتماد التسليم وأرشفة المناوبة'
+        });
+        if (!archiveResult.success) {
+            return res.status(500).json({ error: archiveResult.error || 'فشل في اعتماد التسليم' });
+        }
 
         res.json({ success: true, message: 'تم اعتماد التسليم وأرشفة المناوبة', snapshotHash: archiveResult.snapshotHash });
     } catch (error) {
@@ -2397,8 +2424,12 @@ app.post('/api/shift/:id/archive', authenticate, authorize(['admin']), async (re
         const shiftId = parseInt(req.params.id);
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        // Slice 2: archived transition owned by ShiftService (emits ShiftArchived)
-        const result = await opsEngine.shiftService.markArchived(shiftId, req.user, null, req.body.reason || 'أرشفة مباشرة');
+        // Archive slice: single archive path — direct archive now seals too
+        // (previously flipped status WITHOUT a snapshot — contract violation)
+        const result = await opsEngine.archiveService.archive(shiftId, req.user, {
+            source: 'direct',
+            reason: req.body.reason || 'أرشفة مباشرة'
+        });
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error archiving shift:', error);
@@ -2677,16 +2708,14 @@ app.post('/api/shift-archive', authenticate, async (req, res) => {
 
         console.log('[ShiftArchive] Manual archive requested for shift #' + shiftId);
 
-        const result = await archiveEngine.executeArchive(parseInt(shiftId), {
-            user: req.user,
+        // Archive slice: single archive path (seal + conversations + transition)
+        const result = await opsEngine.archiveService.archive(parseInt(shiftId), req.user, {
+            source: 'manual',
             strict: true,
-            skipVerify: false
+            reason: 'أرشفة يدوية'
         });
 
         if (result.success) {
-            // ═══ Slice 2: archived transition owned by ShiftService → SQLite ═══
-            await opsEngine.shiftService.markArchived(parseInt(shiftId), req.user, result.snapshotHash, 'أرشفة يدوية، Hash: ' + result.snapshotHash);
-
             await addAuditLogEntry(
                 'shift_archived_manual',
                 'تمت أرشفة المناوبة يدوياً، Hash: ' + result.snapshotHash,
@@ -2781,11 +2810,14 @@ app.post('/api/shift-timeline/:shiftId', authenticate, authorize(['admin', 'dire
 app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const snapshot = await db.getLatestShiftSnapshot(shiftId);
-        if (!snapshot) {
+        // Archive slice: read from shift_snapshots (db.getLatestShiftSnapshot never existed)
+        const row = await db.get('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY id DESC LIMIT 1', [shiftId]);
+        if (!row) {
             return res.status(404).json({ success: false, error: 'لا توجد لقطة محفوظة' });
         }
-        res.json({ success: true, snapshot });
+        let snapshot = null;
+        try { snapshot = JSON.parse(row.snapshot_data); } catch (e) { snapshot = row.snapshot_data; }
+        res.json({ success: true, snapshot, snapshotType: row.snapshot_type, createdAt: row.created_at });
     } catch (error) {
         console.error('Error getting snapshot:', error);
         res.status(500).json({ error: 'فشل في جلب اللقطة' });
@@ -2797,7 +2829,15 @@ app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
 app.get('/api/shift-integrity/:shiftId', async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const result = await db.verifyShiftIntegrity(shiftId);
+        // Archive slice: verify against the stored seal (db.verifyShiftIntegrity never existed)
+        const row = await db.get('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY id DESC LIMIT 1', [shiftId]);
+        if (!row) {
+            return res.status(404).json({ success: false, error: 'لا توجد لقطة محفوظة للتحقق منها' });
+        }
+        const snapshot = JSON.parse(row.snapshot_data);
+        const { ShiftIntegrityChecker } = require('./shift-archive-engine');
+        const checker = new ShiftIntegrityChecker(db, STORAGE_PATH);
+        const result = await checker.verify(shiftId, snapshot);
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('Error verifying integrity:', error);
@@ -6546,9 +6586,8 @@ app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async
 app.get('/api/shift-events/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const events = await readShiftEvents();
-        const filtered = events.filter(e => e.shiftId === shiftId);
-        res.json({ success: true, events: filtered });
+        const events = await contentListByShift('shift_events', shiftId);
+        res.json({ success: true, events });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الأحداث' });
     }
@@ -6561,7 +6600,6 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
         if (!type || !description) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const events = await readShiftEvents();
         const newEvent = {
             id: Date.now().toString(),
             shiftId,
@@ -6570,8 +6608,7 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
             timestamp: timestamp || new Date().toISOString(),
             createdAt: new Date().toISOString()
         };
-        events.unshift(newEvent);
-        await writeShiftEvents(events);
+        await contentInsert('shift_events', shiftId, newEvent);
         broadcast({
             type: 'shift_event_added',
             message: 'تم إضافة حدث جديد للمناوبة',
@@ -6590,9 +6627,7 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res) => {
     try {
         const { shiftId, eventId } = req.params;
-        const events = await readShiftEvents();
-        const filtered = events.filter(e => !(e.shiftId === parseInt(shiftId) && e.id === eventId));
-        await writeShiftEvents(filtered);
+        await db.run('DELETE FROM shift_events WHERE shift_id = ? AND id = ?', [parseInt(shiftId), eventId]);
         broadcast({
             type: 'shift_event_deleted',
             message: 'تم حذف حدث من المناوبة',
@@ -6609,9 +6644,8 @@ app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res)
 app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const absences = await readShiftAbsences();
-        const filtered = absences.filter(a => a.shiftId === shiftId);
-        res.json({ success: true, absences: filtered });
+        const absences = await contentListByShift('shift_absences', shiftId);
+        res.json({ success: true, absences });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الغيابات' });
     }
@@ -6624,10 +6658,14 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
         if (!absences || !Array.isArray(absences)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const allAbsences = await readShiftAbsences();
-        const filtered = allAbsences.filter(a => a.shiftId !== shiftId);
         const newAbsences = absences.map((a, i) => ({ ...a, shiftId, id: a.id ? String(a.id) : (Date.now() + i).toString() }));
-        await writeShiftAbsences([...filtered, ...newAbsences]);
+        // Archive slice: bulk-replace inside one transaction (same semantics as the JSON write)
+        await withTx(async () => {
+            await db.run('DELETE FROM shift_absences WHERE shift_id = ?', [shiftId]);
+            for (const a of newAbsences) {
+                await contentInsert('shift_absences', shiftId, a);
+            }
+        });
         broadcast({
             type: 'shift_absence_added',
             message: 'تم تحديث سجل الغياب'
@@ -6641,9 +6679,7 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, res) => {
     try {
         const { shiftId, absenceId } = req.params;
-        const absences = await readShiftAbsences();
-        const filtered = absences.filter(a => !(a.shiftId === parseInt(shiftId) && a.id === absenceId));
-        await writeShiftAbsences(filtered);
+        await db.run('DELETE FROM shift_absences WHERE shift_id = ? AND id = ?', [parseInt(shiftId), absenceId]);
         broadcast({
             type: 'shift_absence_deleted',
             message: 'تم حذف غياب من المناوبة',
@@ -6660,9 +6696,8 @@ app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, 
 app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const notes = await readShiftNotes();
-        const filtered = notes.filter(n => n.shiftId === shiftId);
-        res.json({ success: true, notes: filtered });
+        const notes = await contentListByShift('shift_notes', shiftId);
+        res.json({ success: true, notes });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الملاحظات' });
     }
@@ -6675,10 +6710,14 @@ app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
         if (!notes || !Array.isArray(notes)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const allNotes = await readShiftNotes();
-        const filtered = allNotes.filter(n => n.shiftId !== shiftId);
         const newNotes = notes.map((n, i) => ({ ...n, shiftId, id: n.id ? String(n.id) : (Date.now() + i).toString() }));
-        await writeShiftNotes([...filtered, ...newNotes]);
+        // Archive slice: bulk-replace inside one transaction (same semantics as the JSON write)
+        await withTx(async () => {
+            await db.run('DELETE FROM shift_notes WHERE shift_id = ?', [shiftId]);
+            for (const n of newNotes) {
+                await contentInsert('shift_notes', shiftId, n);
+            }
+        });
         broadcast({
             type: 'shift_note_added',
             message: 'تم تحديث سجل الملاحظات'
@@ -6692,9 +6731,7 @@ app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) => {
     try {
         const { shiftId, noteId } = req.params;
-        const notes = await readShiftNotes();
-        const filtered = notes.filter(n => !(n.shiftId === parseInt(shiftId) && n.id === noteId));
-        await writeShiftNotes(filtered);
+        await db.run('DELETE FROM shift_notes WHERE shift_id = ? AND id = ?', [parseInt(shiftId), noteId]);
         broadcast({
             type: 'shift_note_deleted',
             message: 'تم حذف ملاحظة من المناوبة',
@@ -6712,7 +6749,7 @@ app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) =
 // ============================================
 app.get('/api/peak-plans', authenticate, async (req, res) => {
     try {
-        const plans = await readPeakPlans();
+        const plans = await contentList('peak_plans');
         res.json({ success: true, plans });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب خطط الذروة' });
@@ -6725,7 +6762,6 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
         if (!title || !location) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const plans = await readPeakPlans();
         const newPlan = {
             id: Date.now().toString(),
             title,
@@ -6739,8 +6775,8 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
             createdAt: new Date().toISOString(),
             createdBy: req.user.username || 'unknown'
         };
-        plans.unshift(newPlan);
-        await writePeakPlans(plans);
+        // Archive slice: SQLite + explicit shift stamp (positioning belongs to the active shift)
+        await contentInsert('peak_plans', await getActiveShiftId(), newPlan);
         broadcast({
             type: 'peak_plan_added',
             message: 'تم إضافة خطة ذروة جديدة: ' + title,
@@ -6756,11 +6792,10 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
-        const plans = await readPeakPlans();
-        const plan = plans.find(p => p.id === id);
-        if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
-        Object.assign(plan, updates);
-        await writePeakPlans(plans);
+        const row = await db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
+        if (!row) return res.status(404).json({ error: 'الخطة غير موجودة' });
+        const plan = { ...contentRowToJson(row), ...updates, id: row.id };
+        await db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), id]);
         broadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan });
         res.json({ success: true, plan });
     } catch (error) {
@@ -6770,9 +6805,7 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
 
 app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
-        const plans = await readPeakPlans();
-        const filtered = plans.filter(p => p.id !== req.params.id);
-        await writePeakPlans(filtered);
+        await db.run('DELETE FROM peak_plans WHERE id = ?', [req.params.id]);
         broadcast({
             type: 'peak_plan_deleted',
             message: 'تم حذف خطة ذروة',
@@ -6976,7 +7009,7 @@ app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/report-entry', authenticate, async (req, res) => {
     try {
-        const records = await readReportEntry();
+        const records = await contentList('report_entries');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب البلاغات' });
@@ -6989,14 +7022,14 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
         if (!record || typeof record !== 'object') {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readReportEntry();
+        const records = await contentList('report_entries');
         const newRecord = {
             id: Date.now().toString(),
             ...record,
             createdAt: new Date().toISOString()
         };
-        records.unshift(newRecord);
-        await writeReportEntry(records);
+        // Archive slice: SQLite + explicit shift stamp (dispatch log belongs to the active shift)
+        await contentInsert('report_entries', await getActiveShiftId(), newRecord);
 
         broadcast({
             type: 'report_entry_added',
@@ -7034,9 +7067,7 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
 
 app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
     try {
-        const records = await readReportEntry();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeReportEntry(filtered);
+        await db.run('DELETE FROM report_entries WHERE id = ?', [req.params.id]);
 
         broadcast({
             type: 'report_entry_deleted',
@@ -7055,7 +7086,7 @@ app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
 
 app.delete('/api/report-entry', authenticate, authorize(['admin']), async (req, res) => {
     try {
-        await writeReportEntry([]);
+        await db.run('DELETE FROM report_entries');
 
         broadcast({
             type: 'report_entry_cleared',
@@ -9403,6 +9434,11 @@ app.post('/api/chat/conversations', authenticate, async (req, res) => {
             `INSERT INTO chat_conversations (type, title, created_by) VALUES (?, ?, ?);`,
             ['group', title.trim(), req.user.id]
         );
+        // Archive Contract §5: stamp with the active shift (NULL = general conversation)
+        try {
+            const _sid = await getActiveShiftId();
+            if (_sid) await db.run('UPDATE chat_conversations SET shift_id = ? WHERE id = ?', [_sid, convId.id]);
+        } catch (e) { /* shift stamping is best-effort */ }
         // Add creator as admin
         await db.run(
             `INSERT INTO chat_participants (conversation_id, user_id, is_admin) VALUES (?, ?, ?);`,
@@ -9464,6 +9500,11 @@ app.post('/api/chat/conversations/private', authenticate, async (req, res) => {
             `INSERT INTO chat_conversations (type, created_by) VALUES (?, ?);`,
             ['private', currentUserId]
         );
+        // Archive Contract §5: stamp with the active shift (NULL = general conversation)
+        try {
+            const _sid = await getActiveShiftId();
+            if (_sid) await db.run('UPDATE chat_conversations SET shift_id = ? WHERE id = ?', [_sid, convResult.id]);
+        } catch (e) { /* shift stamping is best-effort */ }
         await db.run(
             `INSERT INTO chat_participants (conversation_id, user_id) VALUES (?, ?);`,
             [convResult.id, currentUserId]
@@ -9917,6 +9958,19 @@ server.listen(PORT, async () => {
             reportService = new ReportService({ engine: opsEngine, bus: opsEngine.bus });
             completionService = new CompletionService({ engine: opsEngine, bus: opsEngine.bus });
             console.log('✅ Event-driven services wired (ReportService, CompletionService)');
+
+            // Archive slice: single archive path (Archive Contract §2) —
+            // seal + conversation archiving + status transition
+            const ArchiveService = require('./services/archive-service');
+            opsEngine.archiveService = new ArchiveService({
+                archiveEngine,
+                shiftService: opsEngine.shiftService,
+                storage: opsEngine.storage,
+                db
+            });
+            // Late binding so ShiftService.startShift can seal auto-archived shifts
+            opsEngine.shiftService.getArchiveService = () => opsEngine.archiveService;
+            console.log('✅ ArchiveService wired (single archive path)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;

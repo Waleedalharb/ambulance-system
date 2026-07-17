@@ -733,6 +733,102 @@ async function runMigrations() {
     logger.warn('JSON shifts reconciliation: ' + err.message);
   }
 
+  // ── Archive slice: unified tables for shift operational content (X2 pattern) ──
+  // Content previously split across JSON files. shift_id has no REFERENCES
+  // clause on purpose: archived content must survive an admin hard-delete of
+  // its parent shift (audit safety). Rows are keyed by their legacy string ids.
+  const contentTables = ['shift_notes', 'shift_events', 'shift_absences', 'peak_plans', 'report_entries'];
+  for (const t of contentTables) {
+    try {
+      await exec(`CREATE TABLE IF NOT EXISTS ${t} (
+        id TEXT PRIMARY KEY,
+        shift_id INTEGER,
+        data TEXT NOT NULL DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_${t}_shift ON ${t}(shift_id)`);
+    } catch (err) {
+      logger.warn(`${t} table creation: ` + err.message);
+    }
+  }
+
+  // Archive slice: seal blobs. The table predates this slice in real
+  // databases (REFERENCES shifts + CHECK on snapshot_type) but nothing ever
+  // wrote to it — the engine now inserts one row per seal and the
+  // snapshot/integrity endpoints read the latest by shift_id.
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+      snapshot_data TEXT NOT NULL,
+      snapshot_type TEXT DEFAULT 'auto' CHECK(snapshot_type IN ('auto', 'manual', 'pre_archive')),
+      snapshot_hash TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_shift ON shift_snapshots(shift_id)`);
+  } catch (err) {
+    logger.warn('shift_snapshots table creation: ' + err.message);
+  }
+  // Real databases predate the snapshot_hash column — add it idempotently.
+  try {
+    await exec(`ALTER TABLE shift_snapshots ADD COLUMN snapshot_hash TEXT`);
+    logger.info('Added snapshot_hash to shift_snapshots');
+  } catch (err) {
+    if (!(err.message && err.message.includes('duplicate column'))) {
+      logger.warn('shift_snapshots snapshot_hash migration: ' + err.message);
+    }
+  }
+
+  // Explicit Shift↔Conversation link (Archive Contract §5, owner decision):
+  // NULL = general conversation, never archived.
+  try {
+    await exec(`ALTER TABLE chat_conversations ADD COLUMN shift_id INTEGER`);
+    logger.info('Added shift_id to chat_conversations');
+  } catch (err) {
+    if (err.message && err.message.includes('duplicate column')) {
+      logger.info('chat_conversations.shift_id already exists');
+    } else {
+      logger.warn('chat_conversations shift_id migration: ' + err.message);
+    }
+  }
+  try {
+    await exec(`CREATE INDEX IF NOT EXISTS idx_chat_conv_shift ON chat_conversations(shift_id)`);
+  } catch (err) { /* index is best-effort */ }
+
+  // One-time idempotent reconcile of the legacy JSON stores into their tables
+  const jsonStoreReconciles = [
+    ['shift-notes.json', 'shift_notes', true],
+    ['shift-events.json', 'shift_events', true],
+    ['shift-absences.json', 'shift_absences', true],
+    ['peak-plans.json', 'peak_plans', false],
+    ['report-entry.json', 'report_entries', false]
+  ];
+  for (const [file, table, hasShiftId] of jsonStoreReconciles) {
+    try {
+      const p = path.join(
+        process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data'),
+        file
+      );
+      const raw = await fs.readFile(p, 'utf8').catch(() => null);
+      if (!raw) continue;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) continue;
+      let n = 0;
+      for (const item of arr) {
+        if (!item || item.id == null) continue;
+        const id = String(item.id);
+        const exists = await get(`SELECT id FROM ${table} WHERE id = ?`, [id]);
+        if (exists) continue;
+        const shiftId = hasShiftId ? (item.shiftId != null ? item.shiftId : null) : null;
+        await run(`INSERT INTO ${table} (id, shift_id, data) VALUES (?, ?, ?)`, [id, shiftId, JSON.stringify(item)]);
+        n++;
+      }
+      if (n > 0) logger.info(`Reconciled ${n} row(s) from ${file} into ${table}`);
+    } catch (err) {
+      logger.warn(`${file} reconciliation: ` + err.message);
+    }
+  }
+
   // app_settings (replaces theme-settings.json, password.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS app_settings (

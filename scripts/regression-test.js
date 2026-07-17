@@ -163,6 +163,19 @@ async function main() {
         record('إنشاء/فتح محادثة خاصة', false, 'لا يوجد مستخدم آخر');
     }
 
+    // Archive slice (D-6): a freshly created conversation is stamped with the active shift.
+    // Group conv guarantees an INSERT (private may reopen a pre-existing unstamped one).
+    let gconvId = null;
+    if (other) {
+        const gconv = await api('POST', '/api/chat/conversations', { title: 'regression D-6', participant_ids: [other.id || other.user_id] });
+        gconvId = gconv.data && gconv.data.conversation && gconv.data.conversation.id;
+        const glist = await api('GET', '/api/chat/conversations');
+        const gitems = (glist.data && glist.data.conversations) || [];
+        const gmine = Array.isArray(gitems) ? gitems.find(c => c.id === gconvId) : null;
+        record('المحادثة تُختم بالمناوبة النشطة عند إنشائها (D-6)', !!(gconvId && gmine && gmine.shift_id === shiftId),
+            gmine ? `shift_id=${gmine.shift_id} expected=${shiftId}` : `conv=${gconvId} status=${gconv.status}`);
+    }
+
     // ─── 10. Notifications ───
     const notif = await api('GET', '/api/notifications');
     record('جلب الإشعارات', notif.status === 200, `status=${notif.status}`);
@@ -177,6 +190,24 @@ async function main() {
     const arch = await api('GET', `/api/shifts/${shiftId}`);
     const archivedOk = arch.ok && arch.data && (arch.data.shift || arch.data).status === 'archived';
     record('المناوبة مؤرشفة وقابلة للفتح', !!archivedOk, `status=${arch.data && ((arch.data.shift || arch.data).status)}`);
+
+    // ─── 11b. Archive slice: seal + conversations (D-6) + integrity ───
+    if (gconvId) {
+        const convs = await api('GET', '/api/chat/conversations');
+        const convList = (convs.data && (convs.data.conversations || convs.data)) || [];
+        const stillVisible = Array.isArray(convList) && convList.some(c => c.id === gconvId);
+        record('المحادثة المؤرشفة تختفي من القائمة النشطة (is_archived=1)', !stillVisible);
+    }
+    const snap = await api('GET', `/api/shift-snapshot/${shiftId}`);
+    record('لقطة الأرشفة محفوظة وقابلة للجلب', snap.ok && snap.data && snap.data.success && !!snap.data.snapshot, `status=${snap.status}`);
+    if (gconvId && snap.data && snap.data.snapshot) {
+        const sconvs = snap.data.snapshot.conversations || [];
+        const sco = sconvs.find(c => c.id === gconvId);
+        record('لقطة الأرشفة تتضمن محادثات المناوبة ورسائلها (D-6)', !!sco && Array.isArray(sco.messages), `convs=${sconvs.length}`);
+    }
+    const integ = await api('GET', `/api/shift-integrity/${shiftId}`);
+    record('مسار التحقق من سلامة الأرشيف يعمل', integ.ok && integ.data && integ.data.success && !!integ.data.checks,
+        `status=${integ.status} passed=${integ.data && integ.data.passed}`);
 
     // ─── 12. Cross-page sync (new shift for a clean read) ───
     const start2 = await api('POST', '/api/start-new-shift', { shiftType: 'صباح' });
@@ -211,6 +242,32 @@ async function main() {
     record('حذف مناوبة من المصدر الواحد (SQLite)', !!(mkId && delRead.ok && del.ok && afterDel.status === 404),
         `mk=${mkId} read=${delRead.status} del=${del.status} after=${afterDel.status}`);
 
+    // ─── 12c. Archive slice: unified content stores (SQLite) + shift stamping ───
+    const notePost = await api('POST', `/api/shift-notes/${shift2Id}`, { notes: [{ text: 'ملاحظة regression', author: 'اختبار' }] });
+    const noteGet = await api('GET', `/api/shift-notes/${shift2Id}`);
+    const noteList = noteGet.data && noteGet.data.notes || [];
+    record('سجل الملاحظات عبر SQLite (كتابة/قراءة)', notePost.ok && noteList.some(n => n.text === 'ملاحظة regression'), `notes=${noteList.length}`);
+    const evPost = await api('POST', `/api/shift-events/${shift2Id}`, { type: 'اختبار', description: 'حدث regression' });
+    const evGet = await api('GET', `/api/shift-events/${shift2Id}`);
+    const evList = evGet.data && evGet.data.events || [];
+    record('سجل الأحداث عبر SQLite (كتابة/قراءة)', evPost.ok && evList.some(e => e.description === 'حدث regression'), `events=${evList.length}`);
+    const abPost = await api('POST', `/api/shift-absences/${shift2Id}`, { absences: [{ name: 'غياب اختبار', center: 'منفوحة' }] });
+    const abGet = await api('GET', `/api/shift-absences/${shift2Id}`);
+    const abList = abGet.data && abGet.data.absences || [];
+    record('سجل الغيابات عبر SQLite (كتابة/قراءة)', abPost.ok && abList.some(a => a.name === 'غياب اختبار'), `absences=${abList.length}`);
+    const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });
+    const ppGet = await api('GET', '/api/peak-plans');
+    const ppList = ppGet.data && ppGet.data.plans || [];
+    const pp = ppList.find(p => p.title === 'خطة regression');
+    record('خطة الذروة تُحفظ في SQLite وتُختم بالمناوبة النشطة', ppPost.ok && !!pp && pp.shiftId === shift2Id, `shiftId=${pp && pp.shiftId} expected=${shift2Id}`);
+    const rePost = await api('POST', '/api/report-entry', { team: 'جنوب 1', caseType: 'regression' });
+    const reGet = await api('GET', '/api/report-entry');
+    const reList = reGet.data && reGet.data.records || [];
+    const re = reList.find(r => r.caseType === 'regression');
+    record('تفاصيل البلاغات عبر SQLite مع ختم المناوبة', rePost.ok && !!re && re.shiftId === shift2Id, `shiftId=${re && re.shiftId}`);
+    if (re) await api('DELETE', `/api/report-entry/${re.id}`);
+    if (pp) await api('DELETE', `/api/peak-plans/${pp.id}`);
+
     // ─── 13. WebSocket live sync (shift_started + new_report) ───
     let wsStarted = false, wsReport = false;
     try {
@@ -235,6 +292,16 @@ async function main() {
     } catch (e) {}
     record('التحديث اللحظي عبر WebSocket (new_report)', wsReport);
     record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', wsStarted);
+
+    // ─── 13b. Archive slice: auto-archive + direct archive produce seals (bug fix verification) ───
+    const autoSnap = await api('GET', `/api/shift-snapshot/${shift2Id}`);
+    record('الأرشفة التلقائية تُنتج لقطة ختم (إصلاح الخلل)', autoSnap.ok && autoSnap.data && autoSnap.data.success && !!autoSnap.data.snapshot, `status=${autoSnap.status}`);
+    const mk2 = await api('POST', '/api/update-shift-data', { shiftDate: '2099-01-02', shiftType: 'ليلية', shiftData: { generalNotes: 'disposable direct-archive regression' } });
+    const mk2Id = mk2.data && mk2.data.shiftId;
+    const dArch = mk2Id ? await api('POST', `/api/shift/${mk2Id}/archive`, { reason: 'regression direct' }) : { ok: false };
+    const dSnap = mk2Id ? await api('GET', `/api/shift-snapshot/${mk2Id}`) : { ok: false };
+    record('الأرشفة المباشرة تُنتج لقطة ختم (إصلاح الخلل)', !!(mk2Id && dArch.ok && dSnap.ok && dSnap.data && dSnap.data.success), `mk=${mk2Id} arch=${dArch.status} snap=${dSnap.status}`);
+    if (mk2Id) await api('DELETE', `/api/shifts/${mk2Id}`);
 
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
