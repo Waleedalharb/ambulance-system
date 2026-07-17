@@ -692,6 +692,47 @@ async function runMigrations() {
     logger.warn('shifts CHECK rebuild migration: ' + err.message);
   }
 
+  // Reconcile legacy JSON shifts into SQLite (X2 single-source adoption):
+  // any shift present only in shift-data.json is inserted preserving its id.
+  // JSON-only stubs with status 'active' are inserted as 'archived' — the
+  // domain allows one ACTIVE shift and newer shifts already started after
+  // them (auto-archive rule). Existing ids are never touched (content was
+  // verified identical at adoption time: 17/17 equal).
+  try {
+    const shiftsJsonPath = path.join(
+      process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data'),
+      'shift-data.json'
+    );
+    const raw = await fs.readFile(shiftsJsonPath, 'utf8').catch(() => null);
+    if (raw) {
+      const jsonShifts = JSON.parse(raw);
+      let inserted = 0;
+      for (const js of jsonShifts) {
+        if (!js || js.id == null) continue;
+        const exists = await get('SELECT id FROM shifts WHERE id = ?', [js.id]);
+        if (exists) continue;
+        const status = js.status === 'active' ? 'archived' : (js.status || 'archived');
+        await run(
+          `INSERT INTO shifts (id, shift_name, shift_date, shift_time, shift_type, shift_day, start_time,
+           total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, last_update, status, archived_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            js.id, js.shiftName || '', js.shiftDate || '', js.shiftTime || '', js.shiftType || '',
+            js.shiftDay || '', js.startTime || '', js.totalReports || 0,
+            JSON.stringify(js.rapidLocations || {}), JSON.stringify(js.centersData || {}),
+            JSON.stringify(js.vehicleData || {}), JSON.stringify(js.fuelData || {}),
+            js.generalNotes || '', js.lastUpdate || null, status,
+            js.archivedAt || (status === 'archived' ? new Date().toISOString() : null)
+          ]
+        );
+        inserted++;
+      }
+      if (inserted > 0) logger.info(`Reconciled ${inserted} JSON-only shift(s) into SQLite (as archived)`);
+    }
+  } catch (err) {
+    logger.warn('JSON shifts reconciliation: ' + err.message);
+  }
+
   // app_settings (replaces theme-settings.json, password.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS app_settings (

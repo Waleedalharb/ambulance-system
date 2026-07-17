@@ -189,28 +189,52 @@ async function main() {
     record('مزامنة نفس البيانات عبر المسارات (صفحات مختلفة)', !!syncOk && start2.ok && r3.ok,
         `data=${dA.data && dA.data.data && dA.data.data[key2] && dA.data.data[key2].count} shiftTotal=${dB.data && dB.data.shift && dB.data.shift.totalReports}`);
 
-    // ─── 13. WebSocket live sync ───
-    let wsOk = false;
+    // ─── 12b. Slice 2: X2 — shift data single source (SQLite) ───
+    const shift2Id = start2.data && start2.data.shiftId;
+    const upd = await api('POST', '/api/update-shift-data', { shiftId: shift2Id, shiftData: { centersData: { 'مركز الاختبار': { staffCount: 2, carsCount: 1 } } } });
+    const wf2 = await api('GET', `/api/workforce-stats/${shift2Id}`);
+    const dist = wf2.data && wf2.data.distribution;
+    record('X2: كتابة بيانات المناوبة عبر ShiftService وقراءتها من SQLite', upd.ok && dist && dist['مركز الاختبار'] === 2,
+        `upd=${upd.status} dist=${dist && dist['مركز الاختبار']}`);
+
+    const allShifts = await api('GET', '/api/shifts');
+    const shiftsList = Array.isArray(allShifts.data) ? allShifts.data : (allShifts.data && allShifts.data.shifts) || [];
+    const reconciled = shiftsList.find(s => s.id === 1784126563154);
+    record('X2: مناوبة كانت JSON-فقط ظهرت من SQLite (reconcile)', !!reconciled && reconciled.status === 'archived',
+        reconciled ? `status=${reconciled.status}` : 'غير موجودة');
+
+    const mk = await api('POST', '/api/update-shift-data', { shiftDate: '2099-01-01', shiftType: 'صباحية', shiftData: { generalNotes: 'disposable regression shift' } });
+    const mkId = mk.data && mk.data.shiftId;
+    const delRead = mkId ? await api('GET', `/api/shifts/${mkId}`) : { status: 0 };
+    const del = mkId ? await api('DELETE', `/api/shifts/${mkId}`) : { status: 0 };
+    const afterDel = mkId ? await api('GET', `/api/shifts/${mkId}`) : { status: 0 };
+    record('حذف مناوبة من المصدر الواحد (SQLite)', !!(mkId && delRead.ok && del.ok && afterDel.status === 404),
+        `mk=${mkId} read=${delRead.status} del=${del.status} after=${afterDel.status}`);
+
+    // ─── 13. WebSocket live sync (shift_started + new_report) ───
+    let wsStarted = false, wsReport = false;
     try {
         const WebSocket = require('ws');
-        wsOk = await new Promise((resolve) => {
+        await new Promise((resolve) => {
             const ws = new WebSocket(`ws://localhost:3080/ws?token=${TOKEN}`);
-            const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(false); }, 8000);
+            const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(); }, 10000);
             ws.on('open', async () => {
+                await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
                 await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3' });
             });
             ws.on('message', (raw) => {
                 try {
                     const m = JSON.parse(raw.toString());
-                    if (m.type === 'new_report' && m.center === 'منفوحة') {
-                        clearTimeout(timer); ws.terminate(); resolve(true);
-                    }
+                    if (m.type === 'shift_started') wsStarted = true;
+                    if (m.type === 'new_report' && m.center === 'منفوحة') wsReport = true;
+                    if (wsStarted && wsReport) { clearTimeout(timer); ws.terminate(); resolve(); }
                 } catch (_) {}
             });
-            ws.on('error', () => { clearTimeout(timer); resolve(false); });
+            ws.on('error', () => { clearTimeout(timer); resolve(); });
         });
-    } catch (e) { wsOk = false; }
-    record('التحديث اللحظي عبر WebSocket (new_report)', wsOk);
+    } catch (e) {}
+    record('التحديث اللحظي عبر WebSocket (new_report)', wsReport);
+    record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', wsStarted);
 
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});

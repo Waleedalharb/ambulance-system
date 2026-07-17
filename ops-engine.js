@@ -8,6 +8,7 @@
 
 const StorageAdapter = require('./storage-adapter');
 const { createEventBus } = require('./services/event-bus');
+const ShiftService = require('./services/shift-service');
 const {
     ShiftManager,
     ReportManager,
@@ -38,6 +39,11 @@ class OperationsEngine {
         // domain events into it; subscribers (broadcast, indicators,
         // timeline) are registered here in the engine wiring.
         this.bus = createEventBus();
+
+        // Slice 2: ShiftService — single writer for shift lifecycle + shift data (X2)
+        this.shiftService = this.storage
+            ? new ShiftService({ shiftManager: this.shifts, storage: this.storage, bus: this.bus })
+            : null;
 
         // Serializes SQLite write transactions across ALL services
         // (single shared connection — interleaved BEGINs would fail).
@@ -125,6 +131,30 @@ class OperationsEngine {
                 shiftType: e.shift_type
             });
         });
+
+        // ─── Slice 2: Shift lifecycle events → legacy WS shapes (byte-identical) ───
+
+        // ShiftStarted → existing 'shift_started' message (was broadcast by the route)
+        this.bus.on('ShiftStarted', (e) => {
+            safeBroadcast({ type: 'shift_started', shiftId: e.shift_id, shiftType: e.shift_type });
+        });
+
+        // ShiftUpdated → existing 'shift_updated' message (was broadcast by update-shift-data)
+        this.bus.on('ShiftUpdated', (e) => {
+            safeBroadcast({ type: 'shift_updated', message: 'تم تحديث بيانات المناوبة', shiftId: e.shift_id });
+        });
+
+        // ShiftArchived → existing 'shift_archived' message (was broadcast by handover-approve)
+        this.bus.on('ShiftArchived', (e) => {
+            safeBroadcast({
+                type: 'shift_archived',
+                shiftId: e.shift_id,
+                message: '✅ تمت أرشفة المناوبة بنجاح',
+                hash: e.snapshot_hash
+            });
+        });
+
+        // ShiftEnded: bus-only — no legacy WS message existed for end-shift
     }
 
     // ─── Initialization ───

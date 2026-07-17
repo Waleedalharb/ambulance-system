@@ -1385,7 +1385,41 @@ async function readData() {
     }
 }
 
+// ═══ Slice 2 (X2): shifts read from SQLite — the single source of truth ═══
+// shift-data.json is kept as a frozen legacy fallback only. All ~30 callers
+// keep working unchanged: rows are normalized to the legacy camelCase shape.
+function normalizeShiftRow(row) {
+    const parseJson = (v, fb) => { try { return v ? JSON.parse(v) : fb; } catch (e) { return fb; } };
+    return {
+        id: row.id,
+        shiftName: row.shift_name,
+        shiftDate: row.shift_date,
+        shiftTime: row.shift_time,
+        shiftType: row.shift_type,
+        shiftDay: row.shift_day,
+        startTime: row.start_time,
+        totalReports: row.total_reports || 0,
+        rapidLocations: parseJson(row.rapid_locations, {}),
+        centersData: parseJson(row.centers_data, {}),
+        vehicleData: parseJson(row.vehicle_data, {}),
+        fuelData: parseJson(row.fuel_data, {}),
+        generalNotes: row.general_notes || '',
+        lastUpdate: row.last_update,
+        status: row.status || 'active',
+        archivedAt: row.archived_at,
+        createdAt: row.created_at
+    };
+}
+
 async function readShifts() {
+    try {
+        if (db && db.Shifts && db.Shifts.getAll) {
+            const rows = await db.Shifts.getAll();
+            if (rows && rows.length > 0) return rows.map(normalizeShiftRow);
+        }
+    } catch (e) {
+        console.warn('[readShifts] SQLite read failed, falling back to JSON:', e.message);
+    }
     try {
         const data = await fs.readFile(SHIFT_DATA_PATH, 'utf8');
         return JSON.parse(data);
@@ -2297,10 +2331,8 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
         const { shiftType } = req.body;
         if (!opsEngine) return res.status(503).json({ success: false, error: 'Engine unavailable' });
 
-        const result = await opsEngine.shifts.startShift(shiftType, req.user);
-        if (result.success) {
-            broadcast({ type: 'shift_started', shiftId: result.shiftId, shiftType: result.type });
-        }
+        // Slice 2: via ShiftService — ShiftStarted event drives the WS broadcast
+        const result = await opsEngine.shiftService.startShift(shiftType, req.user);
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error:', error);
@@ -2321,7 +2353,8 @@ app.post('/api/shift/:id/end', authenticate, authorize(['admin', 'director']), a
 
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        const result = await opsEngine.shifts.endShift(shiftId, req.user, handoverNotes);
+        // Slice 2: via ShiftService — emits ShiftEnded (bus-only, no legacy WS)
+        const result = await opsEngine.shiftService.endShift(shiftId, req.user, handoverNotes);
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error ending shift:', error);
@@ -2337,30 +2370,18 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
         if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
         if (shift.status !== 'pending_handover') return res.status(400).json({ error: 'المناوبة ليست بانتظار التسليم' });
 
-        // Create snapshot via archive engine
+        // Create snapshot via archive engine (snapshot stays with the archive
+        // engine until the dedicated Archive slice)
         const archiveResult = await archiveEngine.executeArchive(shiftId, { user, strict: false, skipVerify: false });
 
-        // Update status to archived
-        await db.run("UPDATE shifts SET status = 'archived', archived_at = datetime('now') WHERE id = ?", [shiftId]);
-
-        await db.run(
-            'INSERT INTO audit_log (shift_id, user_id, user_name, action, detail, type, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'))',
-            [
-                shiftId,
-                user.id,
-                user.name,
-                'shift_archived',
-                'تم اعتماد التسليم وأرشفة المناوبة' + (archiveResult.snapshotHash ? ' Snapshot: ' + archiveResult.snapshotHash : ''),
-                'shifts'
-            ]
-        );
-
-        broadcast({
-            type: 'shift_archived',
+        // Slice 2: archived transition + audit owned by ShiftService;
+        // ShiftArchived event drives the 'shift_archived' WS broadcast
+        await opsEngine.shiftService.markArchived(
             shiftId,
-            message: '✅ تمت أرشفة المناوبة بنجاح',
-            hash: archiveResult.snapshotHash
-        });
+            user,
+            archiveResult.snapshotHash,
+            'تم اعتماد التسليم وأرشفة المناوبة' + (archiveResult.snapshotHash ? ' Snapshot: ' + archiveResult.snapshotHash : '')
+        );
 
         res.json({ success: true, message: 'تم اعتماد التسليم وأرشفة المناوبة', snapshotHash: archiveResult.snapshotHash });
     } catch (error) {
@@ -2376,7 +2397,8 @@ app.post('/api/shift/:id/archive', authenticate, authorize(['admin']), async (re
         const shiftId = parseInt(req.params.id);
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        const result = await opsEngine.shifts.archiveShift(shiftId, req.user, req.body.reason);
+        // Slice 2: archived transition owned by ShiftService (emits ShiftArchived)
+        const result = await opsEngine.shiftService.markArchived(shiftId, req.user, null, req.body.reason || 'أرشفة مباشرة');
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error archiving shift:', error);
@@ -2389,8 +2411,8 @@ app.post('/api/shift/:id/restore', authenticate, authorize(['admin', 'director']
         const shiftId = parseInt(req.params.id);
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        // Restore = start new shift (old one stays archived)
-        const result = await opsEngine.shifts.startShift(null, req.user);
+        // Restore = start new shift (old one stays archived) — via ShiftService
+        const result = await opsEngine.shiftService.startShift(null, req.user);
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error restoring shift:', error);
@@ -2579,25 +2601,19 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             console.warn('Could not enrich centersData with paramedics:', e.message);
         }
         
-        await writeShifts(shifts);
-        await syncShiftToDB(targetShift);
-        
-        // Save to SQLite for reliable shift persistence
-        try {
-            if (targetShift && dbAvailable()) {
-                await db.saveShiftData(targetShift.id, targetShift);
+        // ═══ Slice 2 (X2): persist via ShiftService → SQLite (single source) ═══
+        // JSON writeShifts + dead syncShiftToDB + missing db.saveShiftData removed.
+        // The ShiftUpdated event drives the 'shift_updated' WS broadcast.
+        if (targetShift) {
+            try {
+                await opsEngine.shiftService.saveShiftData(targetShift);
+            } catch (saveErr) {
+                console.error('Failed to save shift to SQLite:', saveErr);
+                return res.status(500).json({ error: 'فشل في حفظ بيانات المناوبة' });
             }
-        } catch (saveErr) {
-            console.error('Failed to save shift to SQLite:', saveErr);
         }
         
         if (targetShift) currentShiftId = targetShift.id;
-
-        broadcast({
-            type: 'shift_updated',
-            message: 'تم تحديث بيانات المناوبة',
-            shiftId: targetShift ? targetShift.id : null
-        });
 
         // Create notifications for admin/director
         try {
@@ -2636,16 +2652,12 @@ app.post('/api/shift-save', authenticate, async (req, res) => {
             return res.status(400).json({ success: false, error: 'shiftId مطلوب' });
         }
         
-        // Save to SQLite (primary source)
-        const result = await db.saveShiftData(shiftId, shiftData);
-        
-        // Also save to JSON as backup (maintain backward compatibility)
+        // ═══ Slice 2: persist via ShiftService → SQLite (db.saveShiftData never
+        // existed — this route previously always failed 500) ═══
         const shifts = await readShifts();
-        const index = shifts.findIndex(s => s.id === shiftId);
-        if (index !== -1) {
-            shifts[index] = { ...shifts[index], ...shiftData, lastUpdate: new Date().toISOString() };
-            await writeShifts(shifts);
-        }
+        const existing = shifts.find(s => s.id === shiftId) || { id: shiftId };
+        const merged = { ...existing, ...shiftData, id: shiftId, lastUpdate: new Date().toISOString() };
+        const result = await opsEngine.shiftService.saveShiftData(merged);
         
         res.json({ success: true, shiftId, lastSaved: result.lastSaved });
     } catch (error) {
@@ -2672,15 +2684,8 @@ app.post('/api/shift-archive', authenticate, async (req, res) => {
         });
 
         if (result.success) {
-            const shifts = await readShifts();
-            const index = shifts.findIndex(s => s.id === parseInt(shiftId));
-            if (index !== -1) {
-                shifts[index].status = 'archived';
-                shifts[index].archivedAt = new Date().toISOString();
-                shifts[index].archivedBy = req.user ? req.user.name : 'system';
-                shifts[index].snapshotHash = result.snapshotHash;
-                await writeShifts(shifts);
-            }
+            // ═══ Slice 2: archived transition owned by ShiftService → SQLite ═══
+            await opsEngine.shiftService.markArchived(parseInt(shiftId), req.user, result.snapshotHash, 'أرشفة يدوية، Hash: ' + result.snapshotHash);
 
             await addAuditLogEntry(
                 'shift_archived_manual',
@@ -2804,8 +2809,8 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
     try {
         const shifts = await readShifts();
         const id = parseInt(req.params.id);
-        const filtered = shifts.filter(s => s.id !== id);
-        await writeShifts(filtered);
+        // ═══ Slice 2: delete from SQLite (single source) via ShiftService ═══
+        await opsEngine.shiftService.deleteShift(id);
 
         broadcast({
             type: 'shift_deleted',
