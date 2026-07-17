@@ -663,37 +663,6 @@ router.post('/reindex', async (req, res) => {
     res.status(500).json({ error: 'فشل في إعادة بناء الفهرس' });
   }
 });
-router.post('/reindex', async (req, res) => {
-  try {
-    const db = req.app.locals.db;
-    if (!db) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
-
-    // Clear existing index
-    ragIndex.chunks = [];
-    ragIndex.vocabulary = [];
-    ragIndex.idf = {};
-    ragIndex.isBuilt = false;
-
-    const tokenize = require('./rag-engine').tokenize;
-    const allChunks = await db.all('SELECT id, document_id, doc_id, chunk_index, content FROM kb_chunks WHERE content IS NOT NULL');
-    for (const c of allChunks) {
-      ragIndex.addChunk({
-        id: c.id,
-        docId: c.document_id,
-        chunkIndex: c.chunk_index,
-        content: c.content,
-        tokens: tokenize(c.content)
-      });
-    }
-    ragIndex.build();
-    await persistIndex();
-
-    res.json({ success: true, message: 'تم إعادة بناء الفهرس بنجاح', chunks: allChunks.length });
-  } catch (err) {
-    logger.error('Reindex failed', err);
-    res.status(500).json({ error: 'فشل في إعادة بناء الفهرس' });
-  }
-});
 
 // POST /api/rag/reports/generate - Generate a report
 router.post('/reports/generate', async (req, res) => {

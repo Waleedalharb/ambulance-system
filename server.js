@@ -646,180 +646,6 @@ function getCurrentShiftDate() {
     return `${shiftYear}-${shiftMonth}-${shiftDay}`;
 }
 
-function getShiftKey() {
-    return getCurrentShiftDate() + ' ' + getCurrentShiftType();
-}
-
-async function autoArchiveIfShiftChanged() {
-    try {
-        const currentReports = await readData();
-        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-        if (total === 0) return false;
-
-        const shifts = await readShifts();
-        const currentShiftType = getCurrentShiftType();
-        const currentShiftDate = getCurrentShiftDate();
-
-        // Check if this shift already exists
-        const existingShift = shifts.find(s => s.shiftDate === currentShiftDate && s.shiftType === currentShiftType);
-        if (existingShift) return false;
-
-        // Check if data has timestamps from CURRENT shift
-        const hasCurrentShiftData = Object.values(currentReports).some(r => {
-            if (!r.times || r.times.length === 0) return false;
-            return r.times.some(t => {
-                const reportDate = t.substring(0, 10);
-                if (currentShiftType === 'ليلية') {
-                    const shiftDateObj = new Date(currentShiftDate + 'T00:00:00');
-                    const nextDayObj = new Date(shiftDateObj);
-                    nextDayObj.setDate(nextDayObj.getDate() + 1);
-                    const nextDayStr = `${nextDayObj.getFullYear()}-${String(nextDayObj.getMonth()+1).padStart(2,'0')}-${String(nextDayObj.getDate()).padStart(2,'0')}`;
-                    return reportDate === currentShiftDate || reportDate === nextDayStr;
-                }
-                return reportDate === currentShiftDate;
-            });
-        });
-
-        if (hasCurrentShiftData) {
-            // Data is from current shift — create record without archiving
-            const saudiTime = getSaudiDateTime();
-            const newShift = {
-                id: Date.now(),
-                shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
-                shiftDate: currentShiftDate,
-                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-                shiftType: currentShiftType,
-                startTime: saudiTime.toISOString(),
-                savedReports: {},
-                totalReports: 0,
-                rapidLocations: {},
-                centersData: {},
-                vehicleData: {},
-                fuelData: {},
-                generalNotes: "",
-                lastUpdate: saudiTime.toISOString(),
-                autoArchived: false,
-                status: 'active'
-            };
-            shifts.unshift(newShift);
-            if (shifts.length > 50) shifts.pop();
-            await writeShifts(shifts);
-            await syncShiftToDB(newShift);
-            currentShiftId = newShift.id;
-            return false;
-        }
-
-        // ═══════════════════════════════════════════
-        // Data is from previous shift — use Archive Engine
-        // ═══════════════════════════════════════════
-        console.log('[AutoArchive] Previous shift detected. Using archive engine for shift #' + currentShiftId);
-
-        if (currentShiftId) {
-            const archiveResult = await archiveEngine.executeArchive(currentShiftId, {
-                strict: false,
-                skipVerify: false
-            });
-
-            if (!archiveResult.success) {
-                console.error('[AutoArchive] Archive engine failed:', archiveResult.error);
-                // Fall back to legacy method
-                return await _legacyAutoArchive(currentReports, shifts, currentShiftType, currentShiftDate);
-            }
-
-            console.log('[AutoArchive] Archive engine completed successfully:', archiveResult.snapshotHash);
-        }
-
-        // Clear current reports for new shift
-        await writeData({});
-
-        // Create new shift record
-        const saudiTime = getSaudiDateTime();
-        const newShift = {
-            id: Date.now(),
-            shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
-            shiftDate: currentShiftDate,
-            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-            shiftType: currentShiftType,
-            startTime: saudiTime.toISOString(),
-            savedReports: {},
-            totalReports: 0,
-            rapidLocations: {},
-            centersData: {},
-            vehicleData: {},
-            fuelData: {},
-            generalNotes: "",
-            lastUpdate: saudiTime.toISOString(),
-            autoArchived: false,
-            status: 'active'
-        };
-
-        shifts.unshift(newShift);
-        if (shifts.length > 50) shifts.pop();
-        await writeShifts(shifts);
-        await syncShiftToDB(newShift);
-        currentShiftId = newShift.id;
-
-        broadcast({
-            type: 'shift_auto_archived',
-            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً',
-            shiftId: newShift.id,
-            shiftType: currentShiftType
-        });
-
-        return true;
-    } catch (error) {
-        console.error('Auto-archive error:', error);
-        return false;
-    }
-}
-
-// Legacy fallback (original method)
-async function _legacyAutoArchive(currentReports, shifts, currentShiftType, currentShiftDate) {
-    console.log('[AutoArchive] Falling back to legacy archive method...');
-    try {
-        const saudiTime = getSaudiDateTime();
-        const total = Object.values(currentReports).reduce((sum, r) => sum + (r.count || 0), 0);
-
-        const newShift = {
-            id: Date.now(),
-            shiftName: `${currentShiftType} - ${currentShiftDate} ${saudiTime.toLocaleTimeString('ar-SA')}`,
-            shiftDate: currentShiftDate,
-            shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
-            shiftType: currentShiftType,
-            startTime: saudiTime.toISOString(),
-            savedReports: JSON.parse(JSON.stringify(currentReports)),
-            totalReports: total,
-            rapidLocations: {},
-            centersData: {},
-            vehicleData: {},
-            fuelData: {},
-            generalNotes: "",
-            lastUpdate: saudiTime.toISOString(),
-            autoArchived: true
-        };
-
-        shifts.unshift(newShift);
-        if (shifts.length > 50) shifts.pop();
-        await writeShifts(shifts);
-        await syncShiftToDB(newShift);
-
-        await writeData({});
-        currentShiftId = newShift.id;
-
-        broadcast({
-            type: 'shift_auto_archived',
-            message: 'تم أرشفة نوبة ' + currentShiftType + ' تلقائياً (legacy)',
-            shiftId: newShift.id,
-            shiftType: currentShiftType
-        });
-
-        return true;
-    } catch (err) {
-        console.error('Legacy auto-archive error:', err);
-        return false;
-    }
-}
-
 async function initDefaultUsers() {
     try {
         await fs.access(USERS_PATH);
@@ -950,15 +776,6 @@ const globalLimiter = rateLimit({
     }
 });
 app.use(globalLimiter);
-
-// 7. Lighter rate limit for read-heavy API endpoints
-const apiReadLimiter = rateLimit({
-    windowMs: API_READ_LIMIT_WINDOW_MS,
-    max: API_READ_LIMIT_MAX,
-    message: { error: 'عدد الطلبات مرتفع جداً. الرجاء المحاولة لاحقاً.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
 
 // 8. Login Rate Limiting (stricter)
 const loginLimiter = rateLimit({
@@ -1145,47 +962,6 @@ app.get('/health', (req, res) => {
     }
     res.json(health);
 });
-
-// ============================================
-// API: AI Monitor
-// ============================================
-if (aiMonitor) {
-    app.get('/api/monitor/health', authenticate, authorize(['admin']), (req, res) => {
-        res.json(aiMonitor.getHealth());
-    });
-
-    app.get('/api/monitor/logs', authenticate, authorize(['admin']), (req, res) => {
-        const { level, category, since, limit } = req.query;
-        res.json(aiMonitor.getLogs({
-            level,
-            category,
-            since,
-            limit: limit ? parseInt(limit) : undefined
-        }));
-    });
-
-    app.get('/api/monitor/alerts', authenticate, authorize(['admin']), (req, res) => {
-        const { level, category } = req.query;
-        res.json(aiMonitor.getAlerts({ level, category }));
-    });
-
-    app.post('/api/monitor/alerts/:id/resolve', authenticate, authorize(['admin']), (req, res) => {
-        const success = aiMonitor.resolveAlert(req.params.id);
-        res.json({
-            success,
-            message: success ? 'تم حل التنبيه' : 'التنبيه غير موجود أو تم حله مسبقاً'
-        });
-    });
-
-    app.get('/api/monitor/stats', authenticate, authorize(['admin']), (req, res) => {
-        res.json(aiMonitor.getStats());
-    });
-
-    app.post('/api/monitor/force-check', authenticate, authorize(['admin']), async (req, res) => {
-        const health = await aiMonitor.forceCheck();
-        res.json(health);
-    });
-}
 
 // ============================================
 // API: المصادقة (JWT)
@@ -1600,17 +1376,6 @@ async function readData() {
     } catch (error) {
         if (error.code === 'ENOENT') return {};
         throw error;
-    }
-}
-
-async function writeData(data) {
-    await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2));
-    lastUpdateTime = Date.now();
-    // ═══ Auto-recalculate KPIs on any data change ═══
-    try {
-        await unifiedDataLayer.recalculateAllKPIs();
-    } catch (e) {
-        console.warn('[KPIs] Auto-recalculation failed:', e.message);
     }
 }
 
@@ -6551,44 +6316,6 @@ app.get('/api/download-operational/:id', authenticate, async (req, res) => {
     }
 });
 
-// Alias: DELETE /api/ops-files/:id → same as /api/delete-operational/:id
-app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
-    try {
-        const metadata = await readOpsMetadata();
-        const index = metadata.findIndex(f => f.id === req.params.id);
-        if (index === -1) {
-            return res.status(404).json({ error: 'الملف غير موجود' });
-        }
-        const entry = metadata[index];
-        const safeName = path.basename(entry.storedName);
-        const filePath = path.join(OPS_UPLOAD_DIR, safeName);
-        if (!filePath.startsWith(OPS_UPLOAD_DIR + path.sep)) {
-            return res.status(400).json({ error: 'مسار الملف غير صالح' });
-        }
-        try {
-            await fs.unlink(filePath);
-        } catch (e) {
-            if (e.code !== 'ENOENT') {
-                console.error('Failed to delete file:', e);
-                return res.status(500).json({ error: 'فشل في حذف الملف من القرص' });
-            }
-        }
-        metadata.splice(index, 1);
-        await writeOpsMetadata(metadata);
-        
-        broadcast({
-            type: 'ops_file_deleted',
-            message: 'تم حذف ملف تشغيلي',
-            id: req.params.id
-        });
-        
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Delete error:', error);
-        res.status(500).json({ error: 'فشل في حذف الملف' });
-    }
-});
-
 // حذف ملف (legacy endpoint — kept for backward compatibility)
 app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
     try {
@@ -6698,18 +6425,6 @@ app.delete('/api/schedule/employees', authenticate, authorize(['admin']), async 
 // ============================================
 // Health Check & Monitoring
 // ============================================
-app.get('/health', async (req, res) => {
-    const health = {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        version: process.env.npm_package_version || '2.0.0',
-        env: process.env.NODE_ENV || 'development'
-    };
-    res.status(200).json(health);
-});
-
 // Disk usage endpoint for monitoring (admin only)
 app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
@@ -8020,17 +7735,6 @@ app.get('/api/notifications/log', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Notification log GET error:', error);
         res.status(500).json({ error: 'فشل في جلب سجل الإشعارات' });
-    }
-});
-
-app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
-    try {
-        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
-        await db.NotificationLog.markAsRead(req.params.id);
-        res.json({ success: true, message: 'تم تحديد الإشعار كمقروء' });
-    } catch (error) {
-        console.error('Notification read error:', error);
-        res.status(500).json({ error: 'فشل في تحديث حالة الإشعار' });
     }
 });
 
