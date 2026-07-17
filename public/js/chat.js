@@ -8,7 +8,7 @@
 (function() {
     'use strict';
 
-    var authToken = localStorage.getItem('authToken');
+    var authToken = AuthCore.getToken();
     if (!authToken) { location.href = 'index.html'; return; }
 
     // ============================================
@@ -81,20 +81,7 @@
     // IN-PAGE TOAST (top-center for feedback)
     // ============================================
     function showToast(message, type) {
-        type = type || 'info';
-        var container = document.getElementById('toastContainer');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toastContainer';
-            container.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:100000;display:flex;flex-direction:column;gap:8px;align-items:center;';
-            document.body.appendChild(container);
-        }
-        var toast = document.createElement('div');
-        toast.style.cssText = 'background:#fff;border-radius:12px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-size:0.85rem;display:flex;align-items:center;gap:8px;animation:toastIn 0.3s ease;direction:rtl;';
-        var icon = type === 'success' ? '<i class="fas fa-check-circle" style="color:#10B981;"></i>' : type === 'error' ? '<i class="fas fa-exclamation-circle" style="color:#EF4444;"></i>' : type === 'warning' ? '<i class="fas fa-exclamation-triangle" style="color:#F59E0B;"></i>' : '<i class="fas fa-info-circle" style="color:#3B82F6;"></i>';
-        toast.innerHTML = icon + ' <span>' + escapeHtml(message) + '</span>';
-        container.appendChild(toast);
-        setTimeout(function(){ toast.style.opacity = '0'; toast.style.transform = 'translateY(-10px)'; setTimeout(function(){toast.remove();},300); }, 3000);
+        ToastCore.show(message, type || 'info', 3000);
     }
 
     // ============================================

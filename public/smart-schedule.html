@@ -1653,6 +1653,9 @@
     <!-- ==========================================
          JavaScript
          ========================================== -->
+    <script src="js/core/core-auth.js"></script>
+    <script src="js/core/core-toast.js"></script>
+    <script src="js/core/core-time.js"></script>
     <script>
         // ==========================================
         // المتغيرات العامة - Global Variables
@@ -1856,7 +1859,7 @@
         // ==========================================
         async function uploadExcelToServer(file) {
             try {
-                var token = localStorage.getItem('authToken');
+                var token = AuthCore.getToken();
                 var formData = new FormData();
                 formData.append('file', file);
                 
@@ -1893,7 +1896,7 @@
         // ==========================================
         async function loadMonthlyTableFromServer() {
             try {
-                var token = localStorage.getItem('authToken');
+                var token = AuthCore.getToken();
                 var response = await fetch('/api/get-monthly-table', {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
@@ -2553,7 +2556,7 @@
 
         async function loadFromServer() {
             try {
-                var token = localStorage.getItem('authToken');
+                var token = AuthCore.getToken();
                 var response = await fetch('/api/schedule/employees', {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
@@ -2573,7 +2576,7 @@
 
         async function saveToServer() {
             try {
-                var token = localStorage.getItem('authToken');
+                var token = AuthCore.getToken();
                 var shiftId = localStorage.getItem('currentShiftId');
                 var payload = { employees: employees };
                 if (shiftId) {
@@ -2669,7 +2672,7 @@
                 return;
             }
             // 3. Try server
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (token) {
                 try {
                     await loadFromServer();
@@ -3022,7 +3025,7 @@
             cell.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>';
             _activeEditCell = null;
 
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (!token) {
                 showToast('يجب تسجيل الدخول أولاً', 'error');
                 cancelEdit(cell);
@@ -3802,7 +3805,7 @@
                 showToast('لا توجد بيانات للمزامنة', 'warning');
                 return;
             }
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (!token) {
                 showToast('يجب تسجيل الدخول أولاً', 'error');
                 return;
@@ -3911,7 +3914,7 @@
             document.getElementById('analysisSection').classList.add('hidden');
             
             // 5. Clear server (if logged in)
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (token) {
                 try {
                     var response = await fetch('/api/shift-roster/clear-all', {
@@ -3940,7 +3943,7 @@
         // تحميل من السيرفر - Load from Server
         // ==========================================
         async function loadFromServer() {
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (!token) {
                 showToast('يجب تسجيل الدخول أولاً', 'error');
                 return;
@@ -4045,13 +4048,7 @@
         // Toast Notifications
         // ==========================================
         function showToast(message, type) {
-            var container = document.getElementById('toastContainer');
-            var toast = document.createElement('div');
-            toast.className = 'toast ' + type;
-            var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
-            toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
-            container.appendChild(toast);
-            setTimeout(function() { toast.remove(); }, 3000);
+            ToastCore.show(message, type, 3000);
         }
 
         // ==========================================

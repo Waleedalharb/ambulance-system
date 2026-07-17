@@ -434,23 +434,19 @@
         </div>
     </div>
 
+    <script src="js/core/core-auth.js"></script>
+    <script src="js/core/core-toast.js"></script>
+    <script src="js/core/core-time.js"></script>
     <script>
         let currentQuestionId = null;
         const API_BASE = '/api/ai/v2';
-        
+
         function getToken() {
-            return localStorage.getItem('authToken') || '';
+            return AuthCore.getToken() || '';
         }
-        
+
         async function fetchWithAuth(url, options = {}) {
-            const token = getToken();
-            const res = await fetch(url, {
-                ...options,
-                headers: {
-                    ...options.headers,
-                    'Authorization': token ? 'Bearer ' + token : ''
-                }
-            });
+            const res = await AuthCore.apiRequest(url, options);
             if (res.status === 401) {
                 alert('جلسة غير صالحة، يرجى تسجيل الدخول');
                 window.location.href = '/index.html';

@@ -355,3 +355,19 @@ if (typeof module !== 'undefined' && module.exports) {
     getShiftBadgeStyle
   };
 }
+
+/* ============================================================================
+   Browser globals (classic <script> loading — e.g. index.html,
+   admin-shift-codes.html). NOTE: intentionally NO ESM `export` keyword
+   so this file stays loadable as a classic (non-module) script.
+   ============================================================================ */
+
+if (typeof window !== 'undefined') {
+  window.SHIFT_CODES = SHIFT_CODES;
+  window.getShiftByCode = getShiftByCode;
+  window.isPresent = isPresent;
+  window.getShiftLabel = getShiftLabel;
+  window.getCodesByStatus = getCodesByStatus;
+  window.getSortedCodes = getSortedCodes;
+  window.getShiftBadgeStyle = getShiftBadgeStyle;
+}

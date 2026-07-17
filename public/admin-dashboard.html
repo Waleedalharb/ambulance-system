@@ -165,8 +165,11 @@
         </div>
     </div>
 
+    <script src="js/core/core-auth.js"></script>
+    <script src="js/core/core-toast.js"></script>
+    <script src="js/core/core-time.js"></script>
     <script>
-        var authToken = localStorage.getItem('authToken');
+        var authToken = AuthCore.getToken();
         var hourlyChart, weeklyChart;
 
         async function loadDashboard() {

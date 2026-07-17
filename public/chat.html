@@ -22,10 +22,15 @@
 <base target="_blank">
 </head>
 <body>
+    <!-- Shared core modules (auth/toast/time) -->
+    <script src="js/core/core-auth.js"></script>
+    <script src="js/core/core-toast.js"></script>
+    <script src="js/core/core-time.js"></script>
+
     <!-- Auth Check -->
     <script>
         (function() {
-            var token = localStorage.getItem('authToken');
+            var token = AuthCore.getToken();
             if (!token) {
                 location.href = 'index.html';
             }
