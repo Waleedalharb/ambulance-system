@@ -1321,6 +1321,9 @@ table.data-table tr:hover td {
 <!-- ============================================
      JavaScript
      ============================================ -->
+<script src="js/core/core-auth.js"></script>
+<script src="js/core/core-toast.js"></script>
+<script src="js/core/core-time.js"></script>
 <script>
 // ========== البيانات ==========
 var centersData = {
@@ -1386,7 +1389,7 @@ function resetTempCounters() {
 
 async function getRecords() {
     try {
-        var authToken = localStorage.getItem('authToken');
+        var authToken = AuthCore.getToken();
         var resp = await fetch('/api/report-entry', {
             headers: { 'Authorization': 'Bearer ' + (authToken || '') }
         });
@@ -1410,7 +1413,7 @@ async function getRecords() {
 }
 
 async function saveRecords(records) {
-    var authToken = localStorage.getItem('authToken');
+    var authToken = AuthCore.getToken();
     var serverRecords = serverRecordsCache || [];
 
     var serverIds = {};
@@ -2111,7 +2114,7 @@ async function clearAllData() {
     if (!confirm("هل أنت متأكد من مسح جميع البيانات؟ لا يمكن التراجع!")) {
         return;
     }
-    var authToken = localStorage.getItem('authToken');
+    var authToken = AuthCore.getToken();
     var records = await getRecords();
     for (var i = 0; i < records.length; i++) {
         try {
@@ -2133,22 +2136,7 @@ async function clearAllData() {
 
 // ========== Toast Notifications ==========
 function showToast(message, type) {
-    var container = document.getElementById("toastContainer");
-    var toast = document.createElement("div");
-    toast.className = "toast " + (type || "info");
-
-    var icon = "info-circle";
-    if (type === "success") icon = "check-circle";
-    if (type === "error") icon = "exclamation-circle";
-
-    toast.innerHTML = '<i class="fas fa-' + icon + '"></i> ' + message;
-    container.appendChild(toast);
-
-    setTimeout(function() {
-        if (toast.parentElement) {
-            toast.parentElement.removeChild(toast);
-        }
-    }, 3000);
+    ToastCore.show(message, type, 3000);
 }
 
 // ========== إغلاق Modal عند الضغط على الخلفية ==========

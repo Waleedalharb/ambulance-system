@@ -635,11 +635,14 @@ body {
      SCRIPTS
      ═══════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/core/core-auth.js"></script>
+<script src="js/core/core-toast.js"></script>
+<script src="js/core/core-time.js"></script>
 <script>
 // ============================================
 // CONFIG
 // ============================================
-var token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
+var token = AuthCore.getToken() || '';
 var allShifts = [];
 var archiveData = [];
 
@@ -653,7 +656,7 @@ function destroyCharts() {
 }
 
 function authHeaders() {
-    return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    return AuthCore.authHeaders({ 'Content-Type': 'application/json' });
 }
 
 // ============================================
@@ -673,12 +676,7 @@ function switchTab(name) {
 // TOAST
 // ============================================
 function showToast(msg, type) {
-    var c = document.getElementById('toastContainer');
-    var t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(function() { t.remove(); }, 4000);
+    ToastCore.show(msg, type, 4000);
 }
 
 // ============================================

@@ -1712,6 +1712,9 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
          Vanilla JavaScript - لا frameworks
      ═══════════════════════════════════════════════════════════════
      ═══════════════════════════════════════════════════════════════ -->
+<script src="js/core/core-auth.js"></script>
+<script src="js/core/core-toast.js"></script>
+<script src="js/core/core-time.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
@@ -1725,7 +1728,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 //  البيانات من الخادم (Server Data)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function getAuthToken() { return localStorage.getItem('authToken'); }
+function getAuthToken() { return AuthCore.getToken(); }
 let currentUser = null;
 
 // Load current user info
@@ -1742,14 +1745,7 @@ async function loadCurrentUser() {
 }
 
 function apiFetch(url, options) {
-  options = options || {};
-  options.headers = options.headers || {};
-  const token = getAuthToken();
-  options.headers['Authorization'] = 'Bearer ' + token;
-  if (!options.headers['Content-Type'] && options.method && options.method !== 'GET') {
-    options.headers['Content-Type'] = 'application/json';
-  }
-  return fetch(url, options);
+  return AuthCore.apiRequest(url, options);
 }
 
 /** بيانات لوحة القيادة الرئيسية **/
@@ -2675,18 +2671,7 @@ function respond(text) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function showToast(type, title, message) {
-  const container = document.getElementById('toastContainer');
-  const toast = document.createElement('div');
-  toast.className = 'toast ' + type;
-  const iconMap = { success:'fa-check-circle', error:'fa-times-circle', info:'fa-info-circle', warning:'fa-exclamation-triangle' };
-  toast.innerHTML = `
-    <div class="toast-icon"><i class="fas ${iconMap[type]}"></i></div>
-    <div class="toast-body"><div class="toast-title">${title}</div><div class="toast-text">${message}</div></div>
-    <span class="toast-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></span>
-  `;
-  container.appendChild(toast);
-  // إزالة تلقائياً بعد 4 ثواني
-  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 4000);
+  ToastCore.show((title ? title + ' — ' : '') + (message || ''), type, 4000);
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

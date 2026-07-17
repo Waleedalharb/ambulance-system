@@ -216,9 +216,12 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 </div>
 
 <!-- Session Check -->
+<script src="js/core/core-auth.js"></script>
+<script src="js/core/core-toast.js"></script>
+<script src="js/core/core-time.js"></script>
 <script>
 (function() {
-    var token = localStorage.getItem('authToken');
+    var token = AuthCore.getToken();
     if (!token && window.location.pathname.indexOf('login') === -1) {
         window.location.href = 'login.html';
         return;
@@ -534,7 +537,7 @@ function getCurrentShiftId() {
 async function fetchCurrentShiftId() {
     // Fetch from server API
     try {
-        var token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
+        var token = AuthCore.getToken() || '';
         var res = await fetch('/api/current-shift', {
             headers: token ? { 'Authorization': 'Bearer ' + token } : {}
         });
@@ -640,7 +643,7 @@ function tryLocalStorageFallback() {
 }
 
 function tryServerFallback() {
-    var token = localStorage.getItem('authToken');
+    var token = AuthCore.getToken();
     if (!token) {
         showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
         renderAll();
@@ -673,7 +676,7 @@ function tryServerFallback() {
 // LOAD SAVED COMPLETION FROM SERVER
 // ============================================
 function loadSavedCompletion() {
-    var token = localStorage.getItem('authToken');
+    var token = AuthCore.getToken();
     console.log('[loadSavedCompletion] Token:', token ? 'exists' : 'missing');
     if (!token) return;
     
@@ -1093,7 +1096,7 @@ function summaryRow(name, teamId, s) {
 }
 
 function saveToServer(silent) {
-    var token = localStorage.getItem('authToken');
+    var token = AuthCore.getToken();
     if (!token) {
         console.error('[saveToServer] No auth token found');
         if (!silent) showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
@@ -1159,12 +1162,7 @@ function printSummary() {
 // UTILS
 // ============================================
 function showToast(msg, type) {
-    var c = document.getElementById('toastContainer');
-    var t = document.createElement('div');
-    t.className = 'toast ' + (type || '');
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(function() { t.remove(); }, 3000);
+    ToastCore.show(msg, type, 3000);
 }
 
 function escapeHtml(text) {
