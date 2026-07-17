@@ -282,6 +282,48 @@ async function main() {
     if (re) await api('DELETE', `/api/report-entry/${re.id}`);
     if (pp) await api('DELETE', `/api/peak-plans/${pp.id}`);
 
+    // ─── 12d. Slice 6: FormsService — all six form types via single owner (shift_forms) ───
+    const incPost = await api('POST', '/api/incidents', { unit: 'reg-وحدة', type: 'regression' });
+    const incGet = await api('GET', '/api/incidents');
+    const inc = (incGet.data && incGet.data.records || []).find(r => r.unit === 'reg-وحدة');
+    record('حادث يُحفظ في shift_forms ويُختم بالمناوبة النشطة (FormsService)', incPost.ok && !!inc && inc.shiftId === shift2Id, `shiftId=${inc && inc.shiftId} expected=${shift2Id}`);
+
+    const ecPost = await api('POST', '/api/e-cases', { patient: 'reg-e-case' });
+    const ecGet = await api('GET', '/api/e-cases');
+    const ec = (ecGet.data && ecGet.data.records || []).find(r => r.patient === 'reg-e-case');
+    record('حالة طوارئ (e_case) عبر المصدر الواحد', ecPost.ok && !!ec && ec.shiftId === shift2Id, `shiftId=${ec && ec.shiftId}`);
+
+    const esPost = await api('POST', '/api/escalations', { title: 'reg-تصعيد' });
+    const esGet = await api('GET', '/api/escalations');
+    const es = (esGet.data && esGet.data.records || []).find(r => r.title === 'reg-تصعيد');
+    record('بلاغ تصعيد (escalation) عبر المصدر الواحد', esPost.ok && !!es && es.shiftId === shift2Id, `shiftId=${es && es.shiftId}`);
+
+    const ssPost = await api('POST', '/api/senior-shifts', { officer: 'reg-ضابط' });
+    const ssGet = await api('GET', '/api/senior-shifts');
+    const ss = (ssGet.data && ssGet.data.records || []).find(r => r.officer === 'reg-ضابط');
+    record('مناوبة كبار الضباط (senior_shift) عبر المصدر الواحد', ssPost.ok && !!ss && ss.shiftId === shift2Id, `shiftId=${ss && ss.shiftId}`);
+
+    const drPost = await api('POST', '/api/daily-reports', { title: 'reg-تقرير' });
+    const drGet = await api('GET', '/api/daily-reports');
+    const dr = (drGet.data && drGet.data.records || []).find(r => r.title === 'reg-تقرير');
+    record('تقرير يومي (daily_report) عبر المصدر الواحد', drPost.ok && !!dr && dr.shiftId === shift2Id, `shiftId=${dr && dr.shiftId}`);
+
+    const airBad = await api('POST', '/api/save-air-ambulance', { reportNumber: 'REG-AIR-1' });
+    const airPost = await api('POST', '/api/save-air-ambulance', { reportNumber: 'REG-AIR-1', unit: 'جنوب 1', dateTime: '2099-01-01T10:00', destinationHospital: 'مستشفى regression' });
+    const airGet = await api('GET', '/api/air-ambulance');
+    const air = (airGet.data && airGet.data.records || []).find(r => r.reportNumber === 'REG-AIR-1');
+    record('إسعاف جوي: تحقق الحقول + تعيين hospital + ختم المناوبة', airBad.status === 400 && airPost.ok && !!air && air.hospital === 'مستشفى regression' && air.shiftId === shift2Id, `bad=${airBad.status} hospital=${air && air.hospital} shiftId=${air && air.shiftId}`);
+
+    const incDel = inc ? await api('DELETE', `/api/incidents/${inc.id}`) : { ok: false, status: 0 };
+    const incGet2 = await api('GET', '/api/incidents');
+    const incGone = !(incGet2.data && incGet2.data.records || []).some(r => r.unit === 'reg-وحدة');
+    record('حذف نموذج من المصدر الواحد (FormsService)', incDel.ok && incGone, `del=${incDel.status} gone=${incGone}`);
+    if (ec) await api('DELETE', `/api/e-cases/${ec.id}`);
+    if (es) await api('DELETE', `/api/escalations/${es.id}`);
+    if (ss) await api('DELETE', `/api/senior-shifts/${ss.id}`);
+    if (dr) await api('DELETE', `/api/daily-reports/${dr.id}`);
+    if (air) await api('DELETE', `/api/delete-air-ambulance/${air.id}`);
+
     // ─── 13. WebSocket live sync (shift_started + new_report) ───
     let wsStarted = false, wsReport = false, wsPlanAdded = false, wsPlanDeleted = false, wsPlanId = null, wsNoteAdded = false;
     try {

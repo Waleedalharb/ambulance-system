@@ -178,6 +178,23 @@ class OperationsEngine {
         this.bus.on('ShiftNoteAdded', (e) => {
             safeBroadcast({ type: 'shift_note_added', message: 'تم تحديث سجل الملاحظات' });
         });
+
+        // ─── Slice 6: Forms events → legacy WS shapes (byte-identical per form_type) ───
+        const FORM_WS = {
+            incident:      { type: 'incident_added',      message: () => 'تم إضافة حادث جديد' },
+            senior_shift:  { type: 'senior_shift_added',  message: () => 'تم إضافة مناوبة كبار الضباط' },
+            e_case:        { type: 'e_case_added',        message: () => 'تم إضافة حالة طوارئ جديدة' },
+            escalation:    { type: 'escalation_added',    message: () => 'تم إضافة بلاغ تصعيد جديد' },
+            daily_report:  { type: 'daily_report_added',  message: () => 'تم إضافة تقرير يومي جديد' },
+            air_ambulance: { type: 'air_ambulance_saved', message: (e) => 'بلاغ إسعاف جوي جديد: ' + (e.record && e.record.reportNumber) }
+        };
+
+        // FormSubmitted → existing '<type>_added' / 'air_ambulance_saved' message
+        this.bus.on('FormSubmitted', (e) => {
+            const m = FORM_WS[e.form_type];
+            if (!m) return;
+            safeBroadcast({ type: m.type, message: m.message(e), record: e.record });
+        });
     }
 
     // ─── Initialization ───

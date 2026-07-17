@@ -829,6 +829,45 @@ async function runMigrations() {
     }
   }
 
+  // Slice 6: one-time idempotent reconcile of the six legacy form JSON stores
+  // into shift_forms (form_name = form_type, form_id = legacy string id).
+  // Legacy records carried no shift context → shift_id NULL (same rule as the
+  // other reconciles). Rows are inserted oldest-first so AUTOINCREMENT id DESC
+  // keeps the legacy unshift (newest-first) display order.
+  const formReconciles = [
+    ['incidents.json', 'incident'],
+    ['senior-shifts.json', 'senior_shift'],
+    ['e-cases.json', 'e_case'],
+    ['escalations.json', 'escalation'],
+    ['daily-reports.json', 'daily_report'],
+    ['air-ambulance.json', 'air_ambulance']
+  ];
+  for (const [file, formType] of formReconciles) {
+    try {
+      const p = path.join(
+        process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data'),
+        file
+      );
+      const raw = await fs.readFile(p, 'utf8').catch(() => null);
+      if (!raw) continue;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) continue;
+      let n = 0;
+      for (const item of [...arr].reverse()) {
+        if (!item || item.id == null) continue;
+        const id = String(item.id);
+        const exists = await get('SELECT id FROM shift_forms WHERE form_name = ? AND form_id = ?', [formType, id]);
+        if (exists) continue;
+        await run('INSERT INTO shift_forms (shift_id, form_id, form_name, form_data, created_by) VALUES (?, ?, ?, ?, ?)',
+          [item.shiftId != null ? item.shiftId : null, id, formType, JSON.stringify(item), null]);
+        n++;
+      }
+      if (n > 0) logger.info(`Reconciled ${n} form(s) from ${file} into shift_forms (${formType})`);
+    } catch (err) {
+      logger.warn(`${file} form reconciliation: ` + err.message);
+    }
+  }
+
   // app_settings (replaces theme-settings.json, password.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS app_settings (

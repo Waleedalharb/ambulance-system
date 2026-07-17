@@ -25,6 +25,7 @@ let reportService = null;
 let completionService = null;
 let positioningService = null; // Slice 4: single owner of peak_plans writes
 let notesService = null; // Slice 5: single owner of shift_notes writes
+let formsService = null; // Slice 6: single owner of all form writes (form_type)
 
 // ═══════════════════════════════════════════════════════════
 // Unified Data Layer v3.0
@@ -4523,7 +4524,8 @@ app.get('/api/download-identity', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/air-ambulance', authenticate, async (req, res) => {
     try {
-        const records = await readAirRecords();
+        // Slice 6: read via FormsService (form_type='air_ambulance')
+        const records = await formsService.list('air_ambulance');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب سجلات الإسعاف الجوي' });
@@ -4536,24 +4538,15 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
         if (!reportNumber || !unit || !dateTime || !destinationHospital) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readAirRecords();
-        const newRecord = {
-            id: Date.now().toString(),
+        // Slice 6: FormsService owns build + shift stamp + insert;
+        // FormSubmitted → air_ambulance_saved (engine broadcast subscriber)
+        const newRecord = await formsService.submit('air_ambulance', {
             reportNumber,
             unit,
             hospital: destinationHospital,
             dateTime,
-            notes: `pickup: ${pickupLocation}, diagnosis: ${diagnosis}, reason: ${reason}, patient: ${patientName}, age: ${patientAge}, paramedic: ${paramedic}`,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeAirRecords(records);
-
-        broadcast({
-            type: 'air_ambulance_saved',
-            message: 'بلاغ إسعاف جوي جديد: ' + reportNumber,
-            record: newRecord
-        });
+            notes: `pickup: ${pickupLocation}, diagnosis: ${diagnosis}, reason: ${reason}, patient: ${patientName}, age: ${patientAge}, paramedic: ${paramedic}`
+        }, req.user);
 
         // Audit log
         await addAuditLogEntry('air_ambulance_saved', 'بلاغ إسعاف جوي جديد: ' + reportNumber, 'air_ambulance', req.user.name, req.user.role, req.user.id);
@@ -4567,10 +4560,8 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
 
 app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
     try {
-        const records = await readAirRecords();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeAirRecords(filtered);
-
+        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        await formsService.remove('air_ambulance', req.params.id);
         broadcast({
             type: 'air_ambulance_deleted',
             message: 'تم حذف بلاغ إسعاف جوي',
@@ -4585,8 +4576,8 @@ app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
 
 app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
-        await writeAirRecords([]);
-
+        // Slice 6: clear via FormsService (LEGACY EXCEPTION: broadcast stays here)
+        await formsService.clear('air_ambulance');
         broadcast({
             type: 'air_ambulance_cleared',
             message: 'تم حذف جميع بلاغات الإسعاف الجوي'
@@ -4603,7 +4594,8 @@ app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'direct
 // ============================================
 app.get('/api/incidents', authenticate, async (req, res) => {
     try {
-        const records = await readIncidents();
+        // Slice 6: read via FormsService (single owner, form_type='incident')
+        const records = await formsService.list('incident');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الحوادث' });
@@ -4616,21 +4608,9 @@ app.post('/api/incidents', authenticate, async (req, res) => {
         if (!record) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readIncidents();
-        const newRecord = {
-            id: Date.now().toString(),
-            ...record,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeIncidents(records);
-
-        broadcast({
-            type: 'incident_added',
-            message: 'تم إضافة حادث جديد',
-            record: newRecord
-        });
-
+        // Slice 6: FormsService owns build + shift stamp + insert;
+        // FormSubmitted fires after the write (engine broadcasts incident_added)
+        const newRecord = await formsService.submit('incident', record, req.user);
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4640,10 +4620,10 @@ app.post('/api/incidents', authenticate, async (req, res) => {
 
 app.delete('/api/incidents/:id', authenticate, async (req, res) => {
     try {
-        const records = await readIncidents();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeIncidents(filtered);
-
+        // Slice 6: delete via FormsService.
+        // LEGACY EXCEPTION: no catalogued FormDeleted event — broadcast stays
+        // here pending the Domain Events Catalog review (owner-scheduled).
+        await formsService.remove('incident', req.params.id);
         broadcast({
             type: 'incident_deleted',
             message: 'تم حذف حادث',
@@ -4661,7 +4641,8 @@ app.delete('/api/incidents/:id', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/senior-shifts', authenticate, async (req, res) => {
     try {
-        const records = await readSeniorShifts();
+        // Slice 6: read via FormsService (form_type='senior_shift')
+        const records = await formsService.list('senior_shift');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب مناوبات كبار الضباط' });
@@ -4674,21 +4655,8 @@ app.post('/api/senior-shifts', authenticate, async (req, res) => {
         if (!record) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readSeniorShifts();
-        const newRecord = {
-            id: Date.now().toString(),
-            ...record,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeSeniorShifts(records);
-
-        broadcast({
-            type: 'senior_shift_added',
-            message: 'تم إضافة مناوبة كبار الضباط',
-            record: newRecord
-        });
-
+        // Slice 6: FormsService owns the write; FormSubmitted → senior_shift_added
+        const newRecord = await formsService.submit('senior_shift', record, req.user);
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4698,10 +4666,8 @@ app.post('/api/senior-shifts', authenticate, async (req, res) => {
 
 app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
     try {
-        const records = await readSeniorShifts();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeSeniorShifts(filtered);
-
+        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        await formsService.remove('senior_shift', req.params.id);
         broadcast({
             type: 'senior_shift_deleted',
             message: 'تم حذف مناوبة كبار الضباط',
@@ -4719,7 +4685,8 @@ app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/e-cases', authenticate, async (req, res) => {
     try {
-        const records = await readECases();
+        // Slice 6: read via FormsService (form_type='e_case')
+        const records = await formsService.list('e_case');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب حالات الطوارئ' });
@@ -4732,21 +4699,8 @@ app.post('/api/e-cases', authenticate, async (req, res) => {
         if (!record) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readECases();
-        const newRecord = {
-            id: Date.now().toString(),
-            ...record,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeECases(records);
-
-        broadcast({
-            type: 'e_case_added',
-            message: 'تم إضافة حالة طوارئ جديدة',
-            record: newRecord
-        });
-
+        // Slice 6: FormsService owns the write; FormSubmitted → e_case_added
+        const newRecord = await formsService.submit('e_case', record, req.user);
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4756,10 +4710,8 @@ app.post('/api/e-cases', authenticate, async (req, res) => {
 
 app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
     try {
-        const records = await readECases();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeECases(filtered);
-
+        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        await formsService.remove('e_case', req.params.id);
         broadcast({
             type: 'e_case_deleted',
             message: 'تم حذف حالة طوارئ',
@@ -4777,7 +4729,8 @@ app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/escalations', authenticate, async (req, res) => {
     try {
-        const records = await readEscalations();
+        // Slice 6: read via FormsService (form_type='escalation')
+        const records = await formsService.list('escalation');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب بلاغات التصعيد' });
@@ -4790,21 +4743,8 @@ app.post('/api/escalations', authenticate, async (req, res) => {
         if (!record) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readEscalations();
-        const newRecord = {
-            id: Date.now().toString(),
-            ...record,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeEscalations(records);
-
-        broadcast({
-            type: 'escalation_added',
-            message: 'تم إضافة بلاغ تصعيد جديد',
-            record: newRecord
-        });
-
+        // Slice 6: FormsService owns the write; FormSubmitted → escalation_added
+        const newRecord = await formsService.submit('escalation', record, req.user);
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4814,10 +4754,8 @@ app.post('/api/escalations', authenticate, async (req, res) => {
 
 app.delete('/api/escalations/:id', authenticate, async (req, res) => {
     try {
-        const records = await readEscalations();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeEscalations(filtered);
-
+        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        await formsService.remove('escalation', req.params.id);
         broadcast({
             type: 'escalation_deleted',
             message: 'تم حذف بلاغ تصعيد',
@@ -4835,7 +4773,8 @@ app.delete('/api/escalations/:id', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/daily-reports', authenticate, async (req, res) => {
     try {
-        const records = await readDailyReports();
+        // Slice 6: read via FormsService (form_type='daily_report')
+        const records = await formsService.list('daily_report');
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب التقارير اليومية' });
@@ -4848,21 +4787,8 @@ app.post('/api/daily-reports', authenticate, async (req, res) => {
         if (!record) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const records = await readDailyReports();
-        const newRecord = {
-            id: Date.now().toString(),
-            ...record,
-            createdAt: new Date().toISOString()
-        };
-        records.unshift(newRecord);
-        await writeDailyReports(records);
-
-        broadcast({
-            type: 'daily_report_added',
-            message: 'تم إضافة تقرير يومي جديد',
-            record: newRecord
-        });
-
+        // Slice 6: FormsService owns the write; FormSubmitted → daily_report_added
+        const newRecord = await formsService.submit('daily_report', record, req.user);
         res.json({ success: true, record: newRecord });
     } catch (error) {
         console.error(error);
@@ -4872,10 +4798,8 @@ app.post('/api/daily-reports', authenticate, async (req, res) => {
 
 app.delete('/api/daily-reports/:id', authenticate, async (req, res) => {
     try {
-        const records = await readDailyReports();
-        const filtered = records.filter(r => r.id !== req.params.id);
-        await writeDailyReports(filtered);
-
+        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        await formsService.remove('daily_report', req.params.id);
         broadcast({
             type: 'daily_report_deleted',
             message: 'تم حذف تقرير يومي',
@@ -9961,12 +9885,18 @@ server.listen(PORT, async () => {
             const NotesService = require('./services/notes-service');
             notesService = new NotesService({ engine: opsEngine, db, bus: opsEngine.bus });
             console.log('✅ NotesService wired (Slice 5)');
+
+            // Slice 6: FormsService — single owner of all form writes (form_type)
+            const FormsService = require('./services/forms-service');
+            formsService = new FormsService({ db, bus: opsEngine.bus, getActiveShiftId });
+            console.log('✅ FormsService wired (Slice 6)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
             completionService = null;
             positioningService = null;
             notesService = null;
+            formsService = null;
         }
     }
     
