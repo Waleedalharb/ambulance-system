@@ -155,6 +155,22 @@ class OperationsEngine {
         });
 
         // ShiftEnded: bus-only — no legacy WS message existed for end-shift
+
+        // ─── Slice 4: Positioning events → legacy WS shapes (byte-identical) ───
+
+        // PositioningStarted → existing 'peak_plan_added' message (was broadcast by the route)
+        this.bus.on('PositioningStarted', (e) => {
+            safeBroadcast({
+                type: 'peak_plan_added',
+                message: 'تم إضافة خطة ذروة جديدة: ' + e.title,
+                plan: e.plan
+            });
+        });
+
+        // PositioningEnded → existing 'peak_plan_deleted' message (was broadcast by the route)
+        this.bus.on('PositioningEnded', (e) => {
+            safeBroadcast({ type: 'peak_plan_deleted', message: 'تم حذف خطة ذروة', planId: e.plan_id });
+        });
     }
 
     // ─── Initialization ───

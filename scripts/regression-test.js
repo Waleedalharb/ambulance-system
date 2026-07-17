@@ -266,6 +266,10 @@ async function main() {
     const ppList = ppGet.data && ppGet.data.plans || [];
     const pp = ppList.find(p => p.title === 'خطة regression');
     record('خطة الذروة تُحفظ في SQLite وتُختم بالمناوبة النشطة', ppPost.ok && !!pp && pp.shiftId === shift2Id, `shiftId=${pp && pp.shiftId} expected=${shift2Id}`);
+    const ppUpd = pp ? await api('PUT', `/api/peak-plans/${pp.id}`, { title: 'خطة regression معدلة' }) : { ok: false, status: 0 };
+    const ppAfter = await api('GET', '/api/peak-plans');
+    const pp2 = (ppAfter.data && ppAfter.data.plans || []).find(p => p.id === (pp && pp.id));
+    record('تعديل خطة التمركز ينعكس من المصدر الواحد (PositioningService)', ppUpd.ok && !!pp2 && pp2.title === 'خطة regression معدلة', `status=${ppUpd.status}`);
     const rePost = await api('POST', '/api/report-entry', { team: 'جنوب 1', caseType: 'regression' });
     const reGet = await api('GET', '/api/report-entry');
     const reList = reGet.data && reGet.data.records || [];
@@ -275,7 +279,7 @@ async function main() {
     if (pp) await api('DELETE', `/api/peak-plans/${pp.id}`);
 
     // ─── 13. WebSocket live sync (shift_started + new_report) ───
-    let wsStarted = false, wsReport = false;
+    let wsStarted = false, wsReport = false, wsPlanAdded = false, wsPlanDeleted = false, wsPlanId = null;
     try {
         const WebSocket = require('ws');
         await new Promise((resolve) => {
@@ -284,13 +288,18 @@ async function main() {
             ws.on('open', async () => {
                 await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
                 await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3' });
+                const wp = await api('POST', '/api/peak-plans', { title: 'خطة WS regression', location: 'موقع WS' });
+                const pid = wp.data && wp.data.plan && wp.data.plan.id;
+                if (pid) await api('DELETE', `/api/peak-plans/${pid}`);
             });
             ws.on('message', (raw) => {
                 try {
                     const m = JSON.parse(raw.toString());
                     if (m.type === 'shift_started') wsStarted = true;
                     if (m.type === 'new_report' && m.center === 'منفوحة') wsReport = true;
-                    if (wsStarted && wsReport) { clearTimeout(timer); ws.terminate(); resolve(); }
+                    if (m.type === 'peak_plan_added' && m.plan && m.plan.title === 'خطة WS regression') { wsPlanAdded = true; wsPlanId = m.plan.id; }
+                    if (m.type === 'peak_plan_deleted' && m.planId === wsPlanId) wsPlanDeleted = true;
+                    if (wsStarted && wsReport && wsPlanAdded && wsPlanDeleted) { clearTimeout(timer); ws.terminate(); resolve(); }
                 } catch (_) {}
             });
             ws.on('error', () => { clearTimeout(timer); resolve(); });
@@ -298,6 +307,8 @@ async function main() {
     } catch (e) {}
     record('التحديث اللحظي عبر WebSocket (new_report)', wsReport);
     record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', wsStarted);
+    record('بث إنشاء التمركز لحظياً (PositioningStarted ← peak_plan_added)', wsPlanAdded);
+    record('بث إنهاء التمركز لحظياً (PositioningEnded ← peak_plan_deleted)', wsPlanDeleted);
 
     // ─── 13b. Archive slice: auto-archive + direct archive produce seals (bug fix verification) ───
     const autoSnap = await api('GET', `/api/shift-snapshot/${shift2Id}`);

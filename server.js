@@ -23,6 +23,7 @@ let opsEngine = null;
 // ═══════════════════════════════════════════════════════════
 let reportService = null;
 let completionService = null;
+let positioningService = null; // Slice 4: single owner of peak_plans writes
 
 // ═══════════════════════════════════════════════════════════
 // Unified Data Layer v3.0
@@ -6749,7 +6750,8 @@ app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) =
 // ============================================
 app.get('/api/peak-plans', authenticate, async (req, res) => {
     try {
-        const plans = await contentList('peak_plans');
+        // Slice 4: read via PositioningService (single owner)
+        const plans = await positioningService.list();
         res.json({ success: true, plans });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب خطط الذروة' });
@@ -6758,31 +6760,14 @@ app.get('/api/peak-plans', authenticate, async (req, res) => {
 
 app.post('/api/peak-plans', authenticate, async (req, res) => {
     try {
-        const { title, description, location, units, startTime, endTime, priority } = req.body;
+        const { title, location } = req.body;
         if (!title || !location) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const newPlan = {
-            id: Date.now().toString(),
-            title,
-            description: description || '',
-            location,
-            units: units || [],
-            startTime: startTime || '',
-            endTime: endTime || '',
-            priority: priority || 'عادي',
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            createdBy: req.user.username || 'unknown'
-        };
-        // Archive slice: SQLite + explicit shift stamp (positioning belongs to the active shift)
-        await contentInsert('peak_plans', await getActiveShiftId(), newPlan);
-        broadcast({
-            type: 'peak_plan_added',
-            message: 'تم إضافة خطة ذروة جديدة: ' + title,
-            plan: newPlan
-        });
-        res.json({ success: true, plan: newPlan });
+        // Slice 4: PositioningService owns build + shift stamp + insert;
+        // PositioningStarted fires after the write (engine broadcasts peak_plan_added)
+        const plan = await positioningService.create(req.body, req.user);
+        res.json({ success: true, plan });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ خطة الذروة' });
     }
@@ -6791,11 +6776,12 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
 app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
-        const row = await db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
-        if (!row) return res.status(404).json({ error: 'الخطة غير موجودة' });
-        const plan = { ...contentRowToJson(row), ...updates, id: row.id };
-        await db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), id]);
+        // Slice 4: merge + save via PositioningService.
+        // LEGACY EXCEPTION: no catalogued PositioningUpdated event (DOMAIN-MODEL
+        // §10.2 د lists only Started/Ended) — the broadcast stays here until
+        // the catalog gains the event (same status as ShiftDeleted).
+        const plan = await positioningService.update(id, req.body);
+        if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
         broadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan });
         res.json({ success: true, plan });
     } catch (error) {
@@ -6805,12 +6791,9 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
 
 app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
-        await db.run('DELETE FROM peak_plans WHERE id = ?', [req.params.id]);
-        broadcast({
-            type: 'peak_plan_deleted',
-            message: 'تم حذف خطة ذروة',
-            planId: req.params.id
-        });
+        // Slice 4: delete via PositioningService; PositioningEnded fires after
+        // the write when a row existed (engine broadcasts peak_plan_deleted)
+        await positioningService.remove(req.params.id);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف خطة الذروة' });
@@ -9971,10 +9954,16 @@ server.listen(PORT, async () => {
             // Late binding so ShiftService.startShift can seal auto-archived shifts
             opsEngine.shiftService.getArchiveService = () => opsEngine.archiveService;
             console.log('✅ ArchiveService wired (single archive path)');
+
+            // Slice 4: PositioningService — single owner of peak_plans writes
+            const PositioningService = require('./services/positioning-service');
+            positioningService = new PositioningService({ db, bus: opsEngine.bus, getActiveShiftId });
+            console.log('✅ PositioningService wired (Slice 4)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
             completionService = null;
+            positioningService = null;
         }
     }
     
