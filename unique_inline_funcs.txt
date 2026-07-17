@@ -1,5 +1,0 @@
-doLogin
-doLogout
-hideLogin
-setupAutoAuditLogging
-showLogin
