@@ -208,6 +208,12 @@ async function main() {
     const integ = await api('GET', `/api/shift-integrity/${shiftId}`);
     record('مسار التحقق من سلامة الأرشيف يعمل', integ.ok && integ.data && integ.data.success && !!integ.data.checks,
         `status=${integ.status} passed=${integ.data && integ.data.passed}`);
+    const tok2 = TOKEN; TOKEN = null;
+    const noAuthSnap = await api('GET', `/api/shift-snapshot/${shiftId}`, undefined, 401);
+    const noAuthInteg = await api('GET', `/api/shift-integrity/${shiftId}`, undefined, 401);
+    TOKEN = tok2;
+    record('مسارا اللقطة والسلامة مقيّدان بالصلاحيات (401 بدون توكن)', noAuthSnap.status === 401 && noAuthInteg.status === 401,
+        `snap=${noAuthSnap.status} integ=${noAuthInteg.status}`);
 
     // ─── 12. Cross-page sync (new shift for a clean read) ───
     const start2 = await api('POST', '/api/start-new-shift', { shiftType: 'صباح' });

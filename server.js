@@ -2806,8 +2806,8 @@ app.post('/api/shift-timeline/:shiftId', authenticate, authorize(['admin', 'dire
 });
 
 // GET /api/shift-snapshot/:shiftId - آخر لقطة محفوظة
-// TODO: أعد إضافة authenticate بعد الاختبار
-app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
+// مقيّد: اللقطات تحوي بيانات تشغيلية ومحادثات (قرار المالك بعد شريحة الأرشفة)
+app.get('/api/shift-snapshot/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         // Archive slice: read from shift_snapshots (db.getLatestShiftSnapshot never existed)
@@ -2825,8 +2825,8 @@ app.get('/api/shift-snapshot/:shiftId', async (req, res) => {
 });
 
 // GET /api/shift-integrity/:shiftId - التحقق من سلامة البيانات
-// TODO: أعد إضافة authenticate بعد الاختبار
-app.get('/api/shift-integrity/:shiftId', async (req, res) => {
+// مقيّد: يكشف محتوى اللقطة (قرار المالك بعد شريحة الأرشفة)
+app.get('/api/shift-integrity/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         // Archive slice: verify against the stored seal (db.verifyShiftIntegrity never existed)
