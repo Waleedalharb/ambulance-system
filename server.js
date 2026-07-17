@@ -2124,8 +2124,9 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
         if (opsService && opsService.getShiftById) {
             shift = await opsService.getShiftById(shiftId);
         }
-        // Fallback: db.Shifts
-        if (!shift && dbAvailable() && db.Shifts && db.Shifts.getById) {
+        // Fallback: db.Shifts (guarded directly — dbAvailable() is an
+        // overly-broad gate; full gate cleanup is Slice 2 scope)
+        if (!shift && db.Shifts && db.Shifts.getById) {
             shift = await db.Shifts.getById(shiftId);
         }
         // Final fallback: JSON (backward compatibility)
@@ -2332,7 +2333,7 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
         const shiftId = parseInt(req.params.id);
         const user = req.user;
 
-        const shift = await opsService.getShiftById(shiftId);
+        const shift = await db.get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
         if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
         if (shift.status !== 'pending_handover') return res.status(400).json({ error: 'المناوبة ليست بانتظار التسليم' });
 
@@ -2342,14 +2343,17 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
         // Update status to archived
         await db.run("UPDATE shifts SET status = 'archived', archived_at = datetime('now') WHERE id = ?", [shiftId]);
 
-        await opsService.logAudit({
-            shiftId: shiftId,
-            userId: user.id,
-            userName: user.name,
-            action: 'shift_archived',
-            detail: 'تم اعتماد التسليم وأرشفة المناوبة' + (archiveResult.snapshotHash ? ' Snapshot: ' + archiveResult.snapshotHash : ''),
-            type: 'shifts'
-        });
+        await db.run(
+            'INSERT INTO audit_log (shift_id, user_id, user_name, action, detail, type, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'))',
+            [
+                shiftId,
+                user.id,
+                user.name,
+                'shift_archived',
+                'تم اعتماد التسليم وأرشفة المناوبة' + (archiveResult.snapshotHash ? ' Snapshot: ' + archiveResult.snapshotHash : ''),
+                'shifts'
+            ]
+        );
 
         broadcast({
             type: 'shift_archived',
@@ -3931,7 +3935,22 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         const shifts = await readShifts();
-        const shift = shifts.find(s => s.id === shiftId);
+        let shift = shifts.find(s => s.id === shiftId);
+        if (!shift) {
+            // Fallback to SQLite (Single Source of Truth) — shifts created via
+            // Operations Engine live in SQLite only. Full JSON removal is Slice 2 scope.
+            const row = await db.get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
+            if (row) {
+                const parseJson = (v, fb) => { try { return v ? JSON.parse(v) : fb; } catch (e) { return fb; } };
+                shift = {
+                    id: row.id,
+                    shiftDate: row.shift_date,
+                    centersData: parseJson(row.centers_data, {}),
+                    vehicleData: parseJson(row.vehicle_data, {}),
+                    fuelData: parseJson(row.fuel_data, {})
+                };
+            }
+        }
         if (!shift) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }

@@ -651,6 +651,47 @@ async function runMigrations() {
     }
   }
 
+  // Rebuild shifts table when a legacy CHECK constraint blocks the current
+  // lifecycle states (e.g. CHECK(status IN ('active','archived','closed'))).
+  // SQLite cannot alter a CHECK constraint, so the table is rebuilt with the
+  // same columns and the canonical CHECK: active / pending_handover / archived.
+  try {
+    const tableRow = await get(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'shifts'`);
+    if (tableRow && tableRow.sql && !tableRow.sql.includes('pending_handover')) {
+      logger.info('Rebuilding shifts table: legacy status CHECK constraint detected');
+      const cols = await all(`PRAGMA table_info(shifts)`);
+      const colNames = cols.map(c => c.name);
+      const colDefs = cols.map(c => {
+        if (c.name === 'id') return 'id INTEGER PRIMARY KEY AUTOINCREMENT';
+        if (c.name === 'status') return `status TEXT DEFAULT 'active' CHECK(status IN ('active', 'pending_handover', 'archived'))`;
+        const type = c.type || 'TEXT';
+        const notNull = c.notnull ? ' NOT NULL' : '';
+        const dflt = (c.dflt_value !== null && c.dflt_value !== undefined) ? ` DEFAULT ${c.dflt_value}` : '';
+        return `${c.name} ${type}${notNull}${dflt}`;
+      });
+      // FK pragma cannot change inside a transaction — disable before BEGIN
+      db.pragma('foreign_keys = OFF');
+      beginTransaction();
+      try {
+        await exec(`CREATE TABLE shifts_new (${colDefs.join(', ')})`);
+        // Map any legacy 'closed' status to 'archived' during the copy
+        const selectCols = colNames.map(n => n === 'status' ? `CASE WHEN status = 'closed' THEN 'archived' ELSE status END` : n).join(', ');
+        await exec(`INSERT INTO shifts_new (${colNames.join(', ')}) SELECT ${selectCols} FROM shifts`);
+        await exec(`DROP TABLE shifts`);
+        await exec(`ALTER TABLE shifts_new RENAME TO shifts`);
+        commitTransaction();
+        db.pragma('foreign_keys = ON');
+        logger.info('shifts table rebuilt with canonical status CHECK constraint');
+      } catch (rebuildErr) {
+        rollbackTransaction();
+        db.pragma('foreign_keys = ON');
+        throw rebuildErr;
+      }
+    }
+  } catch (err) {
+    logger.warn('shifts CHECK rebuild migration: ' + err.message);
+  }
+
   // app_settings (replaces theme-settings.json, password.json)
   try {
     await exec(`CREATE TABLE IF NOT EXISTS app_settings (
