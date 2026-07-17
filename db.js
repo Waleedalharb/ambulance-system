@@ -109,18 +109,13 @@ const TABLE_SCHEMAS = [
     shift_type TEXT,
     shift_day TEXT,
     start_time TEXT,
-    end_time TEXT,
-    status TEXT DEFAULT 'active' CHECK(status IN ('active', 'archived', 'closed')),
-    archived_at DATETIME,
-    supervisor_name TEXT,
     total_reports INTEGER DEFAULT 0,
     rapid_locations TEXT,
     centers_data TEXT,
     vehicle_data TEXT,
     fuel_data TEXT,
     general_notes TEXT,
-    last_update TEXT,
-    data_json TEXT
+    last_update TEXT
   );`,
   `CREATE TABLE IF NOT EXISTS shift_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -520,271 +515,6 @@ const TABLE_SCHEMAS = [
     mime_type TEXT,
     size INTEGER DEFAULT 0,
     upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-
-  // Shift Snapshots (continuous save during active shift)
-  `CREATE TABLE IF NOT EXISTS shift_snapshots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-    snapshot_data TEXT NOT NULL,
-    snapshot_type TEXT DEFAULT 'auto' CHECK(snapshot_type IN ('auto', 'manual', 'pre_archive')),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_data_integrity (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-    integrity_status TEXT DEFAULT 'unknown' CHECK(integrity_status IN ('unknown', 'valid', 'corrupted', 'incomplete')),
-    integrity_details TEXT,
-    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_audit_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    roster_id INTEGER,
-    employee_id INTEGER,
-    team_id INTEGER,
-    shift_date TEXT NOT NULL,
-    old_shift_code TEXT,
-    new_shift_code TEXT,
-    old_team_id INTEGER,
-    new_team_id INTEGER,
-    changed_by TEXT NOT NULL,
-    changed_by_name TEXT,
-    change_type TEXT DEFAULT 'edit' CHECK(change_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
-    reason TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-
-  // Notification Log
-  `CREATE TABLE IF NOT EXISTS notification_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
-    recipient_id INTEGER NOT NULL,
-    recipient_name TEXT,
-    recipient_phone TEXT,
-    message TEXT NOT NULL,
-    channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
-    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read')),
-    roster_id INTEGER,
-    shift_date TEXT,
-    old_value TEXT,
-    new_value TEXT,
-    sent_at DATETIME,
-    delivered_at DATETIME,
-    opened_at DATETIME,
-    error_message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-
-  // Shift Roster Drafts
-  `CREATE TABLE IF NOT EXISTS shift_roster_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    draft_data_json TEXT NOT NULL,
-    operation_type TEXT DEFAULT 'edit' CHECK(operation_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
-    created_by TEXT NOT NULL,
-    created_by_name TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    applied_at DATETIME,
-    reverted_at DATETIME
-  );`,
-
-  // Shift Change Requests
-  `CREATE TABLE IF NOT EXISTS shift_change_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    roster_id INTEGER,
-    employee_id INTEGER NOT NULL,
-    team_id INTEGER,
-    shift_date TEXT NOT NULL,
-    proposed_shift_code TEXT NOT NULL,
-    old_shift_code TEXT,
-    requested_by TEXT NOT NULL,
-    requested_by_name TEXT,
-    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'cancelled')),
-    reason TEXT,
-    reviewed_by TEXT,
-    reviewed_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-
-  // Shift Analytics & Archive Tables
-  `CREATE TABLE IF NOT EXISTS shift_metrics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-    total_reports INTEGER DEFAULT 0,
-    completed_reports INTEGER DEFAULT 0,
-    pending_reports INTEGER DEFAULT 0,
-    suspended_reports INTEGER DEFAULT 0,
-    total_completions INTEGER DEFAULT 0,
-    total_forms INTEGER DEFAULT 0,
-    staff_count INTEGER DEFAULT 0,
-    team_count INTEGER DEFAULT 0,
-    vehicle_count INTEGER DEFAULT 0,
-    completion_rate REAL DEFAULT 0,
-    avg_response_time REAL DEFAULT 0,
-    avg_closure_time REAL DEFAULT 0,
-    critical_cases INTEGER DEFAULT 0,
-    health_score REAL DEFAULT 0,
-    data_completeness REAL DEFAULT 0,
-    notes_count INTEGER DEFAULT 0,
-    event_count INTEGER DEFAULT 0,
-    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_kpi_daily (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL UNIQUE,
-    total_shifts INTEGER DEFAULT 0,
-    total_reports INTEGER DEFAULT 0,
-    completed_reports INTEGER DEFAULT 0,
-    open_reports INTEGER DEFAULT 0,
-    suspended_reports INTEGER DEFAULT 0,
-    total_staff INTEGER DEFAULT 0,
-    total_teams INTEGER DEFAULT 0,
-    total_vehicles INTEGER DEFAULT 0,
-    completion_rate REAL DEFAULT 0,
-    avg_response_time REAL DEFAULT 0,
-    avg_closure_time REAL DEFAULT 0,
-    top_center TEXT,
-    top_report_type TEXT,
-    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_kpi_weekly (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_start TEXT NOT NULL,
-    week_end TEXT NOT NULL,
-    total_shifts INTEGER DEFAULT 0,
-    total_reports INTEGER DEFAULT 0,
-    avg_daily_reports REAL DEFAULT 0,
-    peak_day TEXT,
-    peak_day_count INTEGER DEFAULT 0,
-    lowest_day TEXT,
-    lowest_day_count INTEGER DEFAULT 0,
-    completion_rate REAL DEFAULT 0,
-    total_operating_hours REAL DEFAULT 0,
-    total_staff INTEGER DEFAULT 0,
-    total_teams INTEGER DEFAULT 0,
-    total_vehicles INTEGER DEFAULT 0,
-    avg_staff_per_shift REAL DEFAULT 0,
-    comparison_last_week REAL DEFAULT 0,
-    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_kpi_monthly (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    month INTEGER NOT NULL,
-    year INTEGER NOT NULL,
-    total_shifts INTEGER DEFAULT 0,
-    total_reports INTEGER DEFAULT 0,
-    total_operating_hours REAL DEFAULT 0,
-    total_staff INTEGER DEFAULT 0,
-    total_teams INTEGER DEFAULT 0,
-    total_vehicles INTEGER DEFAULT 0,
-    morning_shifts INTEGER DEFAULT 0,
-    night_shifts INTEGER DEFAULT 0,
-    completion_rate REAL DEFAULT 0,
-    avg_performance REAL DEFAULT 0,
-    comparison_last_month REAL DEFAULT 0,
-    comparison_chart_data TEXT,
-    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_timeline_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-    event_type TEXT NOT NULL CHECK(event_type IN ('start', 'team_checkin', 'report_received', 'report_completed', 'shift_change', 'form_filed', 'note_added', 'alert_triggered', 'peak_mission', 'end')),
-    event_title TEXT NOT NULL,
-    event_description TEXT,
-    event_data TEXT,
-    event_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_by TEXT,
-    created_by_name TEXT
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_alerts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
-    alert_type TEXT NOT NULL CHECK(alert_type IN ('high_pending', 'low_completion', 'staff_shortage', 'workload_spike', 'closure_delay', 'repeated_notes')),
-    severity TEXT DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
-    message TEXT NOT NULL,
-    suggested_reason TEXT,
-    is_acknowledged INTEGER DEFAULT 0,
-    acknowledged_by TEXT,
-    acknowledged_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_comparison_snapshots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    comparison_name TEXT,
-    shift_a_id INTEGER NOT NULL,
-    shift_b_id INTEGER NOT NULL,
-    shift_a_date TEXT,
-    shift_b_date TEXT,
-    comparison_data TEXT NOT NULL,
-    created_by TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_reports_generated (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    report_type TEXT NOT NULL CHECK(report_type IN ('daily', 'weekly', 'monthly', 'shift_detail')),
-    report_date_from TEXT,
-    report_date_to TEXT,
-    shift_id INTEGER,
-    report_data TEXT,
-    file_path TEXT,
-    file_format TEXT DEFAULT 'pdf',
-    generated_by TEXT,
-    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS shift_audit_trail (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-    action_type TEXT NOT NULL CHECK(action_type IN ('created', 'modified', 'reviewed', 'approved', 'deleted', 'data_added', 'data_updated', 'export', 'alert_acked')),
-    actor_id TEXT NOT NULL,
-    actor_name TEXT,
-    actor_role TEXT,
-    action_detail TEXT,
-    old_data TEXT,
-    new_data TEXT,
-    ip_address TEXT,
-    user_agent TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-
-  // Authentication Sessions
-  `CREATE TABLE IF NOT EXISTS auth_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,
-    username TEXT NOT NULL,
-    role TEXT,
-    access_token_hash TEXT,
-    refresh_token_hash TEXT,
-    ip_address TEXT,
-    user_agent TEXT,
-    session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
-    session_last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
-    session_expires DATETIME,
-    refresh_expires DATETIME,
-    is_active INTEGER DEFAULT 1,
-    logout_time DATETIME,
-    logout_reason TEXT
-  );`,
-  `CREATE TABLE IF NOT EXISTS auth_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT,
-    username TEXT,
-    action_type TEXT NOT NULL CHECK(action_type IN ('login', 'logout', 'refresh', 'token_invalid', 'session_expired', 'access_denied', 'password_change', 'session_revoked')),
-    action_detail TEXT,
-    ip_address TEXT,
-    user_agent TEXT,
-    session_id INTEGER,
-    success INTEGER DEFAULT 1,
-    error_message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );`,
-  `CREATE TABLE IF NOT EXISTS token_blacklist (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    token_hash TEXT NOT NULL UNIQUE,
-    token_type TEXT DEFAULT 'access' CHECK(token_type IN ('access', 'refresh')),
-    user_id TEXT,
-    session_id INTEGER,
-    reason TEXT,
-    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATETIME
   );`
 ];
 
@@ -797,15 +527,6 @@ async function initTables() {
   try {
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_date_team ON shift_roster(shift_date, team_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_employee ON shift_roster(employee_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_roster ON shift_audit_log(roster_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_employee ON shift_audit_log(employee_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_date ON shift_audit_log(shift_date);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_changed_by ON shift_audit_log(changed_by);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_recipient ON notification_log(recipient_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_status ON notification_log(status);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_created_by ON shift_roster_drafts(created_by);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_employee ON shift_change_requests(employee_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_status ON shift_change_requests(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_employee ON team_assignments(employee_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_team_assignments_team ON team_assignments(team_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);`);
@@ -828,44 +549,7 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_ai_unanswered_status ON ai_unanswered_questions(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_user ON ai_chat_logs(user_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_created ON ai_chat_logs(created_at);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_roster ON shift_audit_log(roster_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_employee ON shift_audit_log(employee_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_date ON shift_audit_log(shift_date);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_type ON shift_audit_log(change_type);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_recipient ON notification_log(recipient_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_status ON notification_log(status);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_roster ON notification_log(roster_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_created ON shift_roster_drafts(created_by);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_applied ON shift_roster_drafts(applied_at);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_employee ON shift_change_requests(employee_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_status ON shift_change_requests(status);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_date ON shift_change_requests(shift_date);`);
-    // New shift analytics indexes
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_metrics_shift_id ON shift_metrics(shift_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_metrics_date ON shift_metrics(calculated_at);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_daily_date ON shift_kpi_daily(date);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_weekly_start ON shift_kpi_weekly(week_start);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_monthly_month_year ON shift_kpi_monthly(month, year);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_timeline_events_shift_id ON shift_timeline_events(shift_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_timeline_events_time ON shift_timeline_events(event_time);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_shift_id ON shift_alerts(shift_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_type ON shift_alerts(alert_type);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_acknowledged ON shift_alerts(is_acknowledged);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_comparison_snapshots ON shift_comparison_snapshots(shift_a_id, shift_b_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_shift_id ON shift_audit_trail(shift_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_actor ON shift_audit_trail(actor_id);`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_shift_id ON shift_snapshots(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_created ON shift_snapshots(created_at)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_data_integrity_shift ON shift_data_integrity(shift_id)`);
-    // Auth indexes
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_active ON auth_sessions(is_active)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(access_token_hash)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_user ON auth_logs(user_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_action ON auth_logs(action_type)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_hash ON token_blacklist(token_hash)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)`);
+    logger.info('Indexes created successfully');
   } catch (idxErr) {
     logger.warn('Some indexes may already exist: ' + idxErr.message);
   }
@@ -903,130 +587,6 @@ async function runMigrations() {
     }
   }
 
-  // Add new columns to shift_roster and users (backward-compatible)
-  const columnMigrations = [
-    `ALTER TABLE shift_roster ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
-    `ALTER TABLE shift_roster ADD COLUMN updated_by TEXT`,
-    `ALTER TABLE shift_roster ADD COLUMN version INTEGER DEFAULT 1`,
-    `ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL`,
-    `ALTER TABLE shifts ADD COLUMN status TEXT DEFAULT 'active' CHECK(status IN ('active', 'archived', 'closed'))`,
-    `ALTER TABLE shifts ADD COLUMN archived_at DATETIME`
-  ];
-
-  for (const sql of columnMigrations) {
-    try {
-      await exec(sql);
-      logger.info(`Migration executed: ${sql}`);
-    } catch (err) {
-      if (err.message && err.message.includes('duplicate column')) {
-        logger.info(`Column already exists, skipping: ${sql}`);
-      } else {
-        logger.warn(`Migration warning: ${err.message}`);
-      }
-    }
-  }
-
-  // Create shift_audit_log table (defensive)
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_audit_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      roster_id INTEGER,
-      employee_id INTEGER,
-      team_id INTEGER,
-      shift_date TEXT NOT NULL,
-      old_shift_code TEXT,
-      new_shift_code TEXT,
-      old_team_id INTEGER,
-      new_team_id INTEGER,
-      changed_by TEXT NOT NULL,
-      changed_by_name TEXT,
-      change_type TEXT DEFAULT 'edit' CHECK(change_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
-      reason TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_roster ON shift_audit_log(roster_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_employee ON shift_audit_log(employee_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_date ON shift_audit_log(shift_date)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_log_type ON shift_audit_log(change_type)`);
-    logger.info('shift_audit_log table created');
-  } catch (err) {
-    logger.warn('shift_audit_log table creation warning: ' + err.message);
-  }
-
-  // Create notification_log table (defensive)
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS notification_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
-      recipient_id INTEGER NOT NULL,
-      recipient_name TEXT,
-      recipient_phone TEXT,
-      message TEXT NOT NULL,
-      channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read')),
-      roster_id INTEGER,
-      shift_date TEXT,
-      old_value TEXT,
-      new_value TEXT,
-      sent_at DATETIME,
-      delivered_at DATETIME,
-      opened_at DATETIME,
-      error_message TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_recipient ON notification_log(recipient_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_status ON notification_log(status)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_notification_log_roster ON notification_log(roster_id)`);
-    logger.info('notification_log table created');
-  } catch (err) {
-    logger.warn('notification_log table creation warning: ' + err.message);
-  }
-
-  // Create shift_roster_drafts table (defensive)
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_roster_drafts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      draft_data_json TEXT NOT NULL,
-      operation_type TEXT DEFAULT 'edit' CHECK(operation_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
-      created_by TEXT NOT NULL,
-      created_by_name TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      applied_at DATETIME,
-      reverted_at DATETIME
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_created ON shift_roster_drafts(created_by)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_roster_drafts_applied ON shift_roster_drafts(applied_at)`);
-    logger.info('shift_roster_drafts table created');
-  } catch (err) {
-    logger.warn('shift_roster_drafts table creation warning: ' + err.message);
-  }
-
-  // Create shift_change_requests table (defensive)
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_change_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      roster_id INTEGER,
-      employee_id INTEGER NOT NULL,
-      team_id INTEGER,
-      shift_date TEXT NOT NULL,
-      proposed_shift_code TEXT NOT NULL,
-      old_shift_code TEXT,
-      requested_by TEXT NOT NULL,
-      requested_by_name TEXT,
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'cancelled')),
-      reason TEXT,
-      reviewed_by TEXT,
-      reviewed_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_employee ON shift_change_requests(employee_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_status ON shift_change_requests(status)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_change_requests_date ON shift_change_requests(shift_date)`);
-    logger.info('shift_change_requests table created');
-  } catch (err) {
-    logger.warn('shift_change_requests table creation warning: ' + err.message);
-  }
-
   // Create audit_log table
   try {
     await exec(`CREATE TABLE IF NOT EXISTS audit_log (
@@ -1060,6 +620,90 @@ async function runMigrations() {
     logger.info('shift_forms table created');
   } catch (err) {
     logger.warn('shift_forms table creation warning: ' + err.message);
+  }
+
+
+  // ── New unified tables (Phase 1: JSON → SQLite) ──
+
+  // Add status column to shifts table
+  try {
+    await exec(`ALTER TABLE shifts ADD COLUMN status TEXT DEFAULT 'active' CHECK(status IN ('active', 'pending_handover', 'archived'))`);
+    await exec(`ALTER TABLE shifts ADD COLUMN archived_at DATETIME`);
+    logger.info('Added status column to shifts');
+  } catch (err) {
+    if (err.message && err.message.includes('duplicate column')) {
+      logger.info('shifts status column already exists');
+    } else {
+      logger.warn('shifts status migration: ' + err.message);
+    }
+  }
+
+  // app_settings (replaces theme-settings.json, password.json)
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    logger.info('app_settings table created');
+  } catch (err) {
+    logger.warn('app_settings: ' + err.message);
+  }
+
+  // incidents (replaces incidents.json)
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS incidents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      type TEXT,
+      severity TEXT DEFAULT 'medium' CHECK(severity IN ('low', 'medium', 'high', 'critical')),
+      status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'resolved', 'closed')),
+      location TEXT,
+      reported_by TEXT,
+      shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_incidents_shift ON incidents(shift_id)`);
+    logger.info('incidents table created');
+  } catch (err) {
+    logger.warn('incidents: ' + err.message);
+  }
+
+  // escalations (replaces escalations.json)
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS escalations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      level TEXT DEFAULT 'level1' CHECK(level IN ('level1', 'level2', 'level3')),
+      status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'resolved', 'closed')),
+      reported_by TEXT,
+      shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_escalations_shift ON escalations(shift_id)`);
+    logger.info('escalations table created');
+  } catch (err) {
+    logger.warn('escalations: ' + err.message);
+  }
+
+  // daily_reports (replaces daily-reports.json)
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS daily_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT,
+      report_type TEXT DEFAULT 'general',
+      created_by TEXT,
+      shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_daily_reports_shift ON daily_reports(shift_id)`);
+    logger.info('daily_reports table created');
+  } catch (err) {
+    logger.warn('daily_reports: ' + err.message);
   }
 
   // KB migrations: add columns to existing kb_documents for backward compatibility
@@ -1150,320 +794,6 @@ async function runMigrations() {
     logger.warn('kb_queries table creation warning: ' + err.message);
   }
 
-  // Create shift_metrics table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_metrics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      total_reports INTEGER DEFAULT 0,
-      completed_reports INTEGER DEFAULT 0,
-      pending_reports INTEGER DEFAULT 0,
-      suspended_reports INTEGER DEFAULT 0,
-      total_completions INTEGER DEFAULT 0,
-      total_forms INTEGER DEFAULT 0,
-      staff_count INTEGER DEFAULT 0,
-      team_count INTEGER DEFAULT 0,
-      vehicle_count INTEGER DEFAULT 0,
-      completion_rate REAL DEFAULT 0,
-      avg_response_time REAL DEFAULT 0,
-      avg_closure_time REAL DEFAULT 0,
-      critical_cases INTEGER DEFAULT 0,
-      health_score REAL DEFAULT 0,
-      data_completeness REAL DEFAULT 0,
-      notes_count INTEGER DEFAULT 0,
-      event_count INTEGER DEFAULT 0,
-      calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_metrics_shift_id ON shift_metrics(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_metrics_date ON shift_metrics(calculated_at)`);
-    logger.info('shift_metrics table created');
-  } catch (err) {
-    logger.warn('shift_metrics table creation warning: ' + err.message);
-  }
-
-  // Create shift_kpi_daily table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_kpi_daily (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      date TEXT NOT NULL UNIQUE,
-      total_shifts INTEGER DEFAULT 0,
-      total_reports INTEGER DEFAULT 0,
-      completed_reports INTEGER DEFAULT 0,
-      open_reports INTEGER DEFAULT 0,
-      suspended_reports INTEGER DEFAULT 0,
-      total_staff INTEGER DEFAULT 0,
-      total_teams INTEGER DEFAULT 0,
-      total_vehicles INTEGER DEFAULT 0,
-      completion_rate REAL DEFAULT 0,
-      avg_response_time REAL DEFAULT 0,
-      avg_closure_time REAL DEFAULT 0,
-      top_center TEXT,
-      top_report_type TEXT,
-      calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_daily_date ON shift_kpi_daily(date)`);
-    logger.info('shift_kpi_daily table created');
-  } catch (err) {
-    logger.warn('shift_kpi_daily table creation warning: ' + err.message);
-  }
-
-  // Create shift_kpi_weekly table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_kpi_weekly (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      week_start TEXT NOT NULL,
-      week_end TEXT NOT NULL,
-      total_shifts INTEGER DEFAULT 0,
-      total_reports INTEGER DEFAULT 0,
-      avg_daily_reports REAL DEFAULT 0,
-      peak_day TEXT,
-      peak_day_count INTEGER DEFAULT 0,
-      lowest_day TEXT,
-      lowest_day_count INTEGER DEFAULT 0,
-      completion_rate REAL DEFAULT 0,
-      total_operating_hours REAL DEFAULT 0,
-      total_staff INTEGER DEFAULT 0,
-      total_teams INTEGER DEFAULT 0,
-      total_vehicles INTEGER DEFAULT 0,
-      avg_staff_per_shift REAL DEFAULT 0,
-      comparison_last_week REAL DEFAULT 0,
-      calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_weekly_start ON shift_kpi_weekly(week_start)`);
-    logger.info('shift_kpi_weekly table created');
-  } catch (err) {
-    logger.warn('shift_kpi_weekly table creation warning: ' + err.message);
-  }
-
-  // Create shift_kpi_monthly table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_kpi_monthly (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      month INTEGER NOT NULL,
-      year INTEGER NOT NULL,
-      total_shifts INTEGER DEFAULT 0,
-      total_reports INTEGER DEFAULT 0,
-      total_operating_hours REAL DEFAULT 0,
-      total_staff INTEGER DEFAULT 0,
-      total_teams INTEGER DEFAULT 0,
-      total_vehicles INTEGER DEFAULT 0,
-      morning_shifts INTEGER DEFAULT 0,
-      night_shifts INTEGER DEFAULT 0,
-      completion_rate REAL DEFAULT 0,
-      avg_performance REAL DEFAULT 0,
-      comparison_last_month REAL DEFAULT 0,
-      comparison_chart_data TEXT,
-      calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_kpi_monthly_month_year ON shift_kpi_monthly(month, year)`);
-    logger.info('shift_kpi_monthly table created');
-  } catch (err) {
-    logger.warn('shift_kpi_monthly table creation warning: ' + err.message);
-  }
-
-  // Create shift_timeline_events table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_timeline_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      event_type TEXT NOT NULL CHECK(event_type IN ('start', 'team_checkin', 'report_received', 'report_completed', 'shift_change', 'form_filed', 'note_added', 'alert_triggered', 'peak_mission', 'end')),
-      event_title TEXT NOT NULL,
-      event_description TEXT,
-      event_data TEXT,
-      event_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-      created_by TEXT,
-      created_by_name TEXT
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_timeline_events_shift_id ON shift_timeline_events(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_timeline_events_time ON shift_timeline_events(event_time)`);
-    logger.info('shift_timeline_events table created');
-  } catch (err) {
-    logger.warn('shift_timeline_events table creation warning: ' + err.message);
-  }
-
-  // Create shift_alerts table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_alerts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
-      alert_type TEXT NOT NULL CHECK(alert_type IN ('high_pending', 'low_completion', 'staff_shortage', 'workload_spike', 'closure_delay', 'repeated_notes')),
-      severity TEXT DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
-      message TEXT NOT NULL,
-      suggested_reason TEXT,
-      is_acknowledged INTEGER DEFAULT 0,
-      acknowledged_by TEXT,
-      acknowledged_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_shift_id ON shift_alerts(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_type ON shift_alerts(alert_type)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_alerts_acknowledged ON shift_alerts(is_acknowledged)`);
-    logger.info('shift_alerts table created');
-  } catch (err) {
-    logger.warn('shift_alerts table creation warning: ' + err.message);
-  }
-
-  // Create shift_comparison_snapshots table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_comparison_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      comparison_name TEXT,
-      shift_a_id INTEGER NOT NULL,
-      shift_b_id INTEGER NOT NULL,
-      shift_a_date TEXT,
-      shift_b_date TEXT,
-      comparison_data TEXT NOT NULL,
-      created_by TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_comparison_snapshots ON shift_comparison_snapshots(shift_a_id, shift_b_id)`);
-    logger.info('shift_comparison_snapshots table created');
-  } catch (err) {
-    logger.warn('shift_comparison_snapshots table creation warning: ' + err.message);
-  }
-
-  // Create shift_reports_generated table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_reports_generated (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      report_type TEXT NOT NULL CHECK(report_type IN ('daily', 'weekly', 'monthly', 'shift_detail')),
-      report_date_from TEXT,
-      report_date_to TEXT,
-      shift_id INTEGER,
-      report_data TEXT,
-      file_path TEXT,
-      file_format TEXT DEFAULT 'pdf',
-      generated_by TEXT,
-      generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    logger.info('shift_reports_generated table created');
-  } catch (err) {
-    logger.warn('shift_reports_generated table creation warning: ' + err.message);
-  }
-
-  // Create shift_audit_trail table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_audit_trail (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      action_type TEXT NOT NULL CHECK(action_type IN ('created', 'modified', 'reviewed', 'approved', 'deleted', 'data_added', 'data_updated', 'export', 'alert_acked')),
-      actor_id TEXT NOT NULL,
-      actor_name TEXT,
-      actor_role TEXT,
-      action_detail TEXT,
-      old_data TEXT,
-      new_data TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_shift_id ON shift_audit_trail(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_audit_trail_actor ON shift_audit_trail(actor_id)`);
-    logger.info('shift_audit_trail table created');
-  } catch (err) {
-    logger.warn('shift_audit_trail table creation warning: ' + err.message);
-  }
-
-  // Create shift_snapshots table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      snapshot_data TEXT NOT NULL,
-      snapshot_type TEXT DEFAULT 'auto' CHECK(snapshot_type IN ('auto', 'manual', 'pre_archive')),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_shift_id ON shift_snapshots(shift_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_snapshots_created ON shift_snapshots(created_at)`);
-    logger.info('shift_snapshots table created');
-  } catch (err) {
-    logger.warn('shift_snapshots table creation warning: ' + err.message);
-  }
-
-  // Create shift_data_integrity table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS shift_data_integrity (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      integrity_status TEXT DEFAULT 'unknown' CHECK(integrity_status IN ('unknown', 'valid', 'corrupted', 'incomplete')),
-      integrity_details TEXT,
-      checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_data_integrity_shift ON shift_data_integrity(shift_id)`);
-    logger.info('shift_data_integrity table created');
-  } catch (err) {
-    logger.warn('shift_data_integrity table creation warning: ' + err.message);
-  }
-
-  // Create auth_sessions table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS auth_sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      username TEXT NOT NULL,
-      role TEXT,
-      access_token_hash TEXT,
-      refresh_token_hash TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
-      session_last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
-      session_expires DATETIME,
-      refresh_expires DATETIME,
-      is_active INTEGER DEFAULT 1,
-      logout_time DATETIME,
-      logout_reason TEXT
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_active ON auth_sessions(is_active)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(access_token_hash)`);
-    logger.info('auth_sessions table created');
-  } catch (err) {
-    logger.warn('auth_sessions table creation warning: ' + err.message);
-  }
-
-  // Create auth_logs table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS auth_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT,
-      username TEXT,
-      action_type TEXT NOT NULL CHECK(action_type IN ('login', 'logout', 'refresh', 'token_invalid', 'session_expired', 'access_denied', 'password_change', 'session_revoked')),
-      action_detail TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      session_id INTEGER,
-      success INTEGER DEFAULT 1,
-      error_message TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_user ON auth_logs(user_id)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_action ON auth_logs(action_type)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at)`);
-    logger.info('auth_logs table created');
-  } catch (err) {
-    logger.warn('auth_logs table creation warning: ' + err.message);
-  }
-
-  // Create token_blacklist table
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS token_blacklist (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      token_hash TEXT NOT NULL UNIQUE,
-      token_type TEXT DEFAULT 'access' CHECK(token_type IN ('access', 'refresh')),
-      user_id TEXT,
-      session_id INTEGER,
-      reason TEXT,
-      blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_hash ON token_blacklist(token_hash)`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)`);
-    logger.info('token_blacklist table created');
-  } catch (err) {
-    logger.warn('token_blacklist table creation warning: ' + err.message);
-  }
-
   logger.info('Migrations complete');
 }
 
@@ -1551,9 +881,6 @@ const Users = {
   },
   async getById(id) {
     return get('SELECT * FROM users WHERE id = ?', [id]);
-  },
-  async getByUserId(user_id) {
-    return get('SELECT * FROM users WHERE user_id = ?', [user_id]);
   },
   async getByUsername(username) {
     return get('SELECT * FROM users WHERE username = ?', [username]);
@@ -2243,141 +1570,108 @@ const AuditLog = {
 };
 
 // ============================================
-// CRUD: SHIFT AUDIT LOG
+
+
 // ============================================
-const ShiftAuditLog = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_audit_log ORDER BY created_at DESC LIMIT ?', [limit]);
+// CRUD: APP SETTINGS (Replaces JSON: theme-settings, password)
+// ============================================
+const AppSettings = {
+  async get(key) {
+    const row = await get('SELECT value FROM app_settings WHERE key = ?', [key]);
+    return row ? JSON.parse(row.value) : null;
   },
-  async getById(id) {
-    return get('SELECT * FROM shift_audit_log WHERE id = ?', [id]);
+  async set(key, value) {
+    const json = JSON.stringify(value);
+    const existing = await get('SELECT key FROM app_settings WHERE key = ?', [key]);
+    if (existing) {
+      return run('UPDATE app_settings SET value = ?, updated_at = datetime("now") WHERE key = ?', [json, key]);
+    } else {
+      return run('INSERT INTO app_settings (key, value) VALUES (?, ?)', [key, json]);
+    }
   },
-  async getByEmployee(employee_id, limit = 50) {
-    return all('SELECT * FROM shift_audit_log WHERE employee_id = ? ORDER BY created_at DESC LIMIT ?', [employee_id, limit]);
-  },
-  async getByDateRange(date_from, date_to, limit = 50) {
-    return all('SELECT * FROM shift_audit_log WHERE shift_date >= ? AND shift_date <= ? ORDER BY created_at DESC LIMIT ?', [date_from, date_to, limit]);
-  },
-  async getByRoster(roster_id) {
-    return all('SELECT * FROM shift_audit_log WHERE roster_id = ? ORDER BY created_at DESC', [roster_id]);
-  },
-  async getByChangedBy(changed_by, limit = 50) {
-    return all('SELECT * FROM shift_audit_log WHERE changed_by = ? ORDER BY created_at DESC LIMIT ?', [changed_by, limit]);
-  },
-  async create(data) {
-    const result = await run('INSERT INTO shift_audit_log (roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, changed_by, changed_by_name, change_type, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
-      data.roster_id || null, data.employee_id || null, data.team_id || null, data.shift_date,
-      data.old_shift_code || null, data.new_shift_code || null, data.old_team_id || null, data.new_team_id || null,
-      data.changed_by, data.changed_by_name || null, data.change_type || 'edit', data.reason || null
-    ]);
-    return result.id;
+  async delete(key) {
+    return run('DELETE FROM app_settings WHERE key = ?', [key]);
   }
 };
 
 // ============================================
-// CRUD: NOTIFICATION LOG
+// CRUD: INCIDENTS (Replaces incidents.json)
 // ============================================
-const NotificationLog = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM notification_log ORDER BY created_at DESC LIMIT ?', [limit]);
+const Incidents = {
+  async getAll() {
+    return all('SELECT * FROM incidents ORDER BY id DESC');
   },
-  async getById(id) {
-    return get('SELECT * FROM notification_log WHERE id = ?', [id]);
-  },
-  async getByRecipient(recipient_id, limit = 50) {
-    return all('SELECT * FROM notification_log WHERE recipient_id = ? ORDER BY created_at DESC LIMIT ?', [recipient_id, limit]);
-  },
-  async getByStatus(status, limit = 50) {
-    return all('SELECT * FROM notification_log WHERE status = ? ORDER BY created_at DESC LIMIT ?', [status, limit]);
+  async getByShift(shift_id) {
+    return all('SELECT * FROM incidents WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
   },
   async create(data) {
-    const result = await run('INSERT INTO notification_log (notification_type, recipient_id, recipient_name, recipient_phone, message, channel, status, roster_id, shift_date, old_value, new_value, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
-      data.notification_type || 'shift_change', data.recipient_id, data.recipient_name || null, data.recipient_phone || null,
-      data.message, data.channel || 'in-app', data.status || 'pending', data.roster_id || null, data.shift_date || null,
-      data.old_value || null, data.new_value || null, data.error_message || null
-    ]);
+    const result = await run(
+      'INSERT INTO incidents (title, description, type, severity, status, location, reported_by, shift_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [data.title, data.description, data.type, data.severity || 'medium', data.status || 'open', data.location, data.reportedBy, data.shiftId || null]
+    );
     return result.id;
   },
-  async markAsSent(id) {
-    return run('UPDATE notification_log SET status = ?, sent_at = CURRENT_TIMESTAMP WHERE id = ?', ['sent', id]);
-  },
-  async markAsDelivered(id) {
-    return run('UPDATE notification_log SET status = ?, delivered_at = CURRENT_TIMESTAMP WHERE id = ?', ['delivered', id]);
-  },
-  async markAsRead(id) {
-    return run('UPDATE notification_log SET status = ?, opened_at = CURRENT_TIMESTAMP WHERE id = ?', ['read', id]);
-  },
-  async markAsFailed(id, error_message) {
-    return run('UPDATE notification_log SET status = ?, error_message = ? WHERE id = ?', ['failed', error_message || null, id]);
-  }
-};
-
-// ============================================
-// CRUD: SHIFT ROSTER DRAFTS
-// ============================================
-const ShiftRosterDrafts = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_roster_drafts ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_roster_drafts WHERE id = ?', [id]);
-  },
-  async getByCreatedBy(created_by, limit = 50) {
-    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? ORDER BY created_at DESC LIMIT ?', [created_by, limit]);
-  },
-  async getPendingByCreatedBy(created_by) {
-    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? AND applied_at IS NULL AND reverted_at IS NULL ORDER BY created_at DESC', [created_by]);
-  },
-  async create(data) {
-    const result = await run('INSERT INTO shift_roster_drafts (draft_data_json, operation_type, created_by, created_by_name) VALUES (?, ?, ?, ?);', [
-      data.draft_data_json, data.operation_type || 'edit', data.created_by, data.created_by_name || null
-    ]);
-    return result.id;
-  },
-  async markApplied(id) {
-    return run('UPDATE shift_roster_drafts SET applied_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-  },
-  async markReverted(id) {
-    return run('UPDATE shift_roster_drafts SET reverted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  async update(id, data) {
+    return run(
+      'UPDATE incidents SET title = ?, description = ?, type = ?, severity = ?, status = ?, location = ? WHERE id = ?',
+      [data.title, data.description, data.type, data.severity, data.status, data.location, id]
+    );
   },
   async delete(id) {
-    return run('DELETE FROM shift_roster_drafts WHERE id = ?', [id]);
+    return run('DELETE FROM incidents WHERE id = ?', [id]);
   }
 };
 
 // ============================================
-// CRUD: SHIFT CHANGE REQUESTS
+// CRUD: ESCALATIONS (Replaces escalations.json)
 // ============================================
-const ShiftChangeRequests = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_change_requests ORDER BY created_at DESC LIMIT ?', [limit]);
+const Escalations = {
+  async getAll() {
+    return all('SELECT * FROM escalations ORDER BY id DESC');
   },
-  async getById(id) {
-    return get('SELECT * FROM shift_change_requests WHERE id = ?', [id]);
-  },
-  async getByEmployee(employee_id, limit = 50) {
-    return all('SELECT * FROM shift_change_requests WHERE employee_id = ? ORDER BY created_at DESC LIMIT ?', [employee_id, limit]);
-  },
-  async getByStatus(status, limit = 50) {
-    return all('SELECT * FROM shift_change_requests WHERE status = ? ORDER BY created_at DESC LIMIT ?', [status, limit]);
+  async getByShift(shift_id) {
+    return all('SELECT * FROM escalations WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
   },
   async create(data) {
-    const result = await run('INSERT INTO shift_change_requests (roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, requested_by, requested_by_name, status, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', [
-      data.roster_id || null, data.employee_id, data.team_id || null, data.shift_date,
-      data.proposed_shift_code, data.old_shift_code || null, data.requested_by, data.requested_by_name || null,
-      data.status || 'pending', data.reason || null
-    ]);
+    const result = await run(
+      'INSERT INTO escalations (title, description, level, status, reported_by, shift_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [data.title, data.description, data.level || 'level1', data.status || 'open', data.reportedBy, data.shiftId || null]
+    );
     return result.id;
   },
-  async updateStatus(id, status, reviewed_by) {
-    return run('UPDATE shift_change_requests SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?;', [status, reviewed_by || null, id]);
+  async update(id, data) {
+    return run(
+      'UPDATE escalations SET title = ?, description = ?, level = ?, status = ? WHERE id = ?',
+      [data.title, data.description, data.level, data.status, id]
+    );
   },
   async delete(id) {
-    return run('DELETE FROM shift_change_requests WHERE id = ?', [id]);
+    return run('DELETE FROM escalations WHERE id = ?', [id]);
   }
 };
 
 // ============================================
+// CRUD: DAILY REPORTS (Replaces daily-reports.json)
+// ============================================
+const DailyReports = {
+  async getAll() {
+    return all('SELECT * FROM daily_reports ORDER BY id DESC');
+  },
+  async getByShift(shift_id) {
+    return all('SELECT * FROM daily_reports WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
+  },
+  async create(data) {
+    const result = await run(
+      'INSERT INTO daily_reports (title, content, report_type, created_by, shift_id) VALUES (?, ?, ?, ?, ?)',
+      [data.title, data.content, data.reportType || 'general', data.createdBy, data.shiftId || null]
+    );
+    return result.id;
+  },
+  async delete(id) {
+    return run('DELETE FROM daily_reports WHERE id = ?', [id]);
+  }
+};
+
 // CRUD: SHIFT FORMS
 // ============================================
 const ShiftForms = {
@@ -2393,336 +1687,6 @@ const ShiftForms = {
   async create(data) {
     const result = await run('INSERT INTO shift_forms (shift_id, form_id, form_name, form_data, created_by) VALUES (?, ?, ?, ?, ?);', [data.shift_id, data.form_id, data.form_name || null, data.form_data || null, data.created_by || null]);
     return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT METRICS
-// ============================================
-const ShiftMetrics = {
-  async getAll() {
-    return all('SELECT * FROM shift_metrics ORDER BY calculated_at DESC');
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_metrics WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id) {
-    return get('SELECT * FROM shift_metrics WHERE shift_id = ? ORDER BY calculated_at DESC LIMIT 1', [shift_id]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_metrics (shift_id, total_reports, completed_reports, pending_reports, suspended_reports, total_completions, total_forms, staff_count, team_count, vehicle_count, completion_rate, avg_response_time, avg_closure_time, critical_cases, health_score, data_completeness, notes_count, event_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.shift_id, data.total_reports || 0, data.completed_reports || 0, data.pending_reports || 0, data.suspended_reports || 0,
-      data.total_completions || 0, data.total_forms || 0, data.staff_count || 0, data.team_count || 0, data.vehicle_count || 0,
-      data.completion_rate || 0, data.avg_response_time || 0, data.avg_closure_time || 0, data.critical_cases || 0,
-      data.health_score || 0, data.data_completeness || 0, data.notes_count || 0, data.event_count || 0
-    ]);
-    return result.id;
-  },
-  async update(id, data) {
-    return run(`UPDATE shift_metrics SET total_reports = ?, completed_reports = ?, pending_reports = ?, suspended_reports = ?, total_completions = ?, total_forms = ?, staff_count = ?, team_count = ?, vehicle_count = ?, completion_rate = ?, avg_response_time = ?, avg_closure_time = ?, critical_cases = ?, health_score = ?, data_completeness = ?, notes_count = ?, event_count = ?, calculated_at = CURRENT_TIMESTAMP WHERE id = ?;`, [
-      data.total_reports || 0, data.completed_reports || 0, data.pending_reports || 0, data.suspended_reports || 0,
-      data.total_completions || 0, data.total_forms || 0, data.staff_count || 0, data.team_count || 0, data.vehicle_count || 0,
-      data.completion_rate || 0, data.avg_response_time || 0, data.avg_closure_time || 0, data.critical_cases || 0,
-      data.health_score || 0, data.data_completeness || 0, data.notes_count || 0, data.event_count || 0, id
-    ]);
-  },
-  async deleteByShift(shift_id) {
-    return run('DELETE FROM shift_metrics WHERE shift_id = ?', [shift_id]);
-  }
-};
-
-// ============================================
-// CRUD: SHIFT KPI DAILY
-// ============================================
-const ShiftKpiDaily = {
-  async getAll() {
-    return all('SELECT * FROM shift_kpi_daily ORDER BY date DESC');
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_kpi_daily WHERE id = ?', [id]);
-  },
-  async getByDate(date) {
-    return get('SELECT * FROM shift_kpi_daily WHERE date = ?', [date]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_kpi_daily (date, total_shifts, total_reports, completed_reports, open_reports, suspended_reports, total_staff, total_teams, total_vehicles, completion_rate, avg_response_time, avg_closure_time, top_center, top_report_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.date, data.total_shifts || 0, data.total_reports || 0, data.completed_reports || 0, data.open_reports || 0, data.suspended_reports || 0,
-      data.total_staff || 0, data.total_teams || 0, data.total_vehicles || 0, data.completion_rate || 0, data.avg_response_time || 0,
-      data.avg_closure_time || 0, data.top_center || null, data.top_report_type || null
-    ]);
-    return result.id;
-  },
-  async updateByDate(date, data) {
-    return run(`UPDATE shift_kpi_daily SET total_shifts = ?, total_reports = ?, completed_reports = ?, open_reports = ?, suspended_reports = ?, total_staff = ?, total_teams = ?, total_vehicles = ?, completion_rate = ?, avg_response_time = ?, avg_closure_time = ?, top_center = ?, top_report_type = ?, calculated_at = CURRENT_TIMESTAMP WHERE date = ?;`, [
-      data.total_shifts || 0, data.total_reports || 0, data.completed_reports || 0, data.open_reports || 0, data.suspended_reports || 0,
-      data.total_staff || 0, data.total_teams || 0, data.total_vehicles || 0, data.completion_rate || 0, data.avg_response_time || 0,
-      data.avg_closure_time || 0, data.top_center || null, data.top_report_type || null, date
-    ]);
-  }
-};
-
-// ============================================
-// CRUD: SHIFT KPI WEEKLY
-// ============================================
-const ShiftKpiWeekly = {
-  async getAll() {
-    return all('SELECT * FROM shift_kpi_weekly ORDER BY week_start DESC');
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_kpi_weekly WHERE id = ?', [id]);
-  },
-  async getByWeekStart(week_start) {
-    return get('SELECT * FROM shift_kpi_weekly WHERE week_start = ?', [week_start]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_kpi_weekly (week_start, week_end, total_shifts, total_reports, avg_daily_reports, peak_day, peak_day_count, lowest_day, lowest_day_count, completion_rate, total_operating_hours, total_staff, total_teams, total_vehicles, avg_staff_per_shift, comparison_last_week) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.week_start, data.week_end, data.total_shifts || 0, data.total_reports || 0, data.avg_daily_reports || 0,
-      data.peak_day || null, data.peak_day_count || 0, data.lowest_day || null, data.lowest_day_count || 0,
-      data.completion_rate || 0, data.total_operating_hours || 0, data.total_staff || 0, data.total_teams || 0,
-      data.total_vehicles || 0, data.avg_staff_per_shift || 0, data.comparison_last_week || 0
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT KPI MONTHLY
-// ============================================
-const ShiftKpiMonthly = {
-  async getAll() {
-    return all('SELECT * FROM shift_kpi_monthly ORDER BY year DESC, month DESC');
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_kpi_monthly WHERE id = ?', [id]);
-  },
-  async getByMonthYear(month, year) {
-    return get('SELECT * FROM shift_kpi_monthly WHERE month = ? AND year = ?', [month, year]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_kpi_monthly (month, year, total_shifts, total_reports, total_operating_hours, total_staff, total_teams, total_vehicles, morning_shifts, night_shifts, completion_rate, avg_performance, comparison_last_month, comparison_chart_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.month, data.year, data.total_shifts || 0, data.total_reports || 0, data.total_operating_hours || 0,
-      data.total_staff || 0, data.total_teams || 0, data.total_vehicles || 0, data.morning_shifts || 0, data.night_shifts || 0,
-      data.completion_rate || 0, data.avg_performance || 0, data.comparison_last_month || 0, data.comparison_chart_data || null
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT TIMELINE EVENTS
-// ============================================
-const ShiftTimelineEvents = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_timeline_events ORDER BY event_time DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_timeline_events WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_timeline_events WHERE shift_id = ? ORDER BY event_time DESC LIMIT ?', [shift_id, limit]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_timeline_events (shift_id, event_type, event_title, event_description, event_data, event_time, created_by, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.shift_id, data.event_type, data.event_title, data.event_description || null, data.event_data || null,
-      data.event_time || new Date().toISOString(), data.created_by || null, data.created_by_name || null
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT ALERTS
-// ============================================
-const ShiftAlerts = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_alerts ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_alerts WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_alerts WHERE shift_id = ? ORDER BY created_at DESC LIMIT ?', [shift_id, limit]);
-  },
-  async getUnacknowledged(limit = 50) {
-    return all('SELECT * FROM shift_alerts WHERE is_acknowledged = 0 ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_alerts (shift_id, alert_type, severity, message, suggested_reason) VALUES (?, ?, ?, ?, ?);`, [
-      data.shift_id || null, data.alert_type, data.severity || 'warning', data.message, data.suggested_reason || null
-    ]);
-    return result.id;
-  },
-  async acknowledge(id, acknowledged_by) {
-    return run('UPDATE shift_alerts SET is_acknowledged = 1, acknowledged_by = ?, acknowledged_at = CURRENT_TIMESTAMP WHERE id = ?', [acknowledged_by, id]);
-  },
-  async deleteByShift(shift_id) {
-    return run('DELETE FROM shift_alerts WHERE shift_id = ?', [shift_id]);
-  }
-};
-
-// ============================================
-// CRUD: SHIFT COMPARISON SNAPSHOTS
-// ============================================
-const ShiftComparisonSnapshots = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_comparison_snapshots ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_comparison_snapshots WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_comparison_snapshots WHERE shift_a_id = ? OR shift_b_id = ? ORDER BY created_at DESC LIMIT ?', [shift_id, shift_id, limit]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_comparison_snapshots (comparison_name, shift_a_id, shift_b_id, shift_a_date, shift_b_date, comparison_data, created_by) VALUES (?, ?, ?, ?, ?, ?, ?);`, [
-      data.comparison_name || null, data.shift_a_id, data.shift_b_id, data.shift_a_date || null, data.shift_b_date || null,
-      data.comparison_data, data.created_by || null
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT REPORTS GENERATED
-// ============================================
-const ShiftReportsGenerated = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_reports_generated ORDER BY generated_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_reports_generated WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_reports_generated WHERE shift_id = ? ORDER BY generated_at DESC LIMIT ?', [shift_id, limit]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_reports_generated (report_type, report_date_from, report_date_to, shift_id, report_data, file_path, file_format, generated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.report_type, data.report_date_from || null, data.report_date_to || null, data.shift_id || null,
-      data.report_data || null, data.file_path || null, data.file_format || 'pdf', data.generated_by || null
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: SHIFT AUDIT TRAIL
-// ============================================
-const ShiftAuditTrail = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_audit_trail ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_audit_trail WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_audit_trail WHERE shift_id = ? ORDER BY created_at DESC LIMIT ?', [shift_id, limit]);
-  },
-  async getByActor(actor_id, limit = 50) {
-    return all('SELECT * FROM shift_audit_trail WHERE actor_id = ? ORDER BY created_at DESC LIMIT ?', [actor_id, limit]);
-  },
-  async getByActionType(action_type, limit = 50) {
-    return all('SELECT * FROM shift_audit_trail WHERE action_type = ? ORDER BY created_at DESC LIMIT ?', [action_type, limit]);
-  },
-  async create(data) {
-    const result = await run(`INSERT INTO shift_audit_trail (shift_id, action_type, actor_id, actor_name, actor_role, action_detail, old_data, new_data, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
-      data.shift_id, data.action_type, data.actor_id, data.actor_name || null, data.actor_role || null,
-      data.action_detail || null, data.old_data || null, data.new_data || null, data.ip_address || null, data.user_agent || null
-    ]);
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: AUTH SESSIONS
-// ============================================
-const AuthSessions = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM auth_sessions ORDER BY session_start DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM auth_sessions WHERE id = ?', [id]);
-  },
-  async getByUser(user_id, limit = 50) {
-    return all('SELECT * FROM auth_sessions WHERE user_id = ? ORDER BY session_start DESC LIMIT ?', [user_id, limit]);
-  },
-  async getActiveByUser(user_id) {
-    return all('SELECT * FROM auth_sessions WHERE user_id = ? AND is_active = 1 ORDER BY session_last_active DESC', [user_id]);
-  },
-  async getByTokenHash(token_hash) {
-    return get('SELECT * FROM auth_sessions WHERE access_token_hash = ? OR refresh_token_hash = ?', [token_hash, token_hash]);
-  },
-  async create(data) {
-    const result = await run(
-      `INSERT INTO auth_sessions (user_id, username, role, access_token_hash, refresh_token_hash, ip_address, user_agent, session_expires, refresh_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [data.user_id, data.username, data.role || null, data.access_token_hash || null, data.refresh_token_hash || null, data.ip_address || null, data.user_agent || null, data.session_expires || null, data.refresh_expires || null]
-    );
-    return result.id;
-  },
-  async updateLastActive(id) {
-    return run('UPDATE auth_sessions SET session_last_active = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-  },
-  async update(id, data) {
-    const fields = [];
-    const values = [];
-    if (data.access_token_hash !== undefined) { fields.push('access_token_hash = ?'); values.push(data.access_token_hash); }
-    if (data.refresh_token_hash !== undefined) { fields.push('refresh_token_hash = ?'); values.push(data.refresh_token_hash); }
-    if (data.session_expires !== undefined) { fields.push('session_expires = ?'); values.push(data.session_expires); }
-    if (data.refresh_expires !== undefined) { fields.push('refresh_expires = ?'); values.push(data.refresh_expires); }
-    if (data.session_last_active !== undefined) { fields.push('session_last_active = ?'); values.push(data.session_last_active); }
-    if (data.is_active !== undefined) { fields.push('is_active = ?'); values.push(data.is_active ? 1 : 0); }
-    if (data.logout_time !== undefined) { fields.push('logout_time = ?'); values.push(data.logout_time); }
-    if (data.logout_reason !== undefined) { fields.push('logout_reason = ?'); values.push(data.logout_reason); }
-    if (fields.length === 0) return 0;
-    values.push(id);
-    return run(`UPDATE auth_sessions SET ${fields.join(', ')} WHERE id = ?`, values);
-  },
-  async deactivate(id, reason) {
-    return run('UPDATE auth_sessions SET is_active = 0, logout_time = CURRENT_TIMESTAMP, logout_reason = ? WHERE id = ?', [reason || null, id]);
-  },
-  async deactivateAllByUser(user_id, reason) {
-    return run('UPDATE auth_sessions SET is_active = 0, logout_time = CURRENT_TIMESTAMP, logout_reason = ? WHERE user_id = ? AND is_active = 1', [reason || 'user_logged_out', user_id]);
-  }
-};
-
-// ============================================
-// CRUD: AUTH LOGS
-// ============================================
-const AuthLogs = {
-  async getAll(limit = 100) {
-    return all('SELECT * FROM auth_logs ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getByUser(user_id, limit = 100) {
-    return all('SELECT * FROM auth_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?', [user_id, limit]);
-  },
-  async getByAction(action_type, limit = 100) {
-    return all('SELECT * FROM auth_logs WHERE action_type = ? ORDER BY created_at DESC LIMIT ?', [action_type, limit]);
-  },
-  async create(data) {
-    const result = await run(
-      `INSERT INTO auth_logs (user_id, username, action_type, action_detail, ip_address, user_agent, session_id, success, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [data.user_id || null, data.username || null, data.action_type, data.action_detail || null, data.ip_address || null, data.user_agent || null, data.session_id || null, data.success !== undefined ? (data.success ? 1 : 0) : 1, data.error_message || null]
-    );
-    return result.id;
-  }
-};
-
-// ============================================
-// CRUD: TOKEN BLACKLIST
-// ============================================
-const TokenBlacklist = {
-  async isBlacklisted(token_hash) {
-    const row = await get('SELECT id FROM token_blacklist WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > datetime(\'now\'))', [token_hash]);
-    return !!row;
-  },
-  async add(token_hash, data = {}) {
-    const result = await run(
-      `INSERT INTO token_blacklist (token_hash, token_type, user_id, session_id, reason, expires_at) VALUES (?, ?, ?, ?, ?, ?);`,
-      [token_hash, data.token_type || 'access', data.user_id || null, data.session_id || null, data.reason || 'logout', data.expires_at || null]
-    );
-    return result.id;
-  },
-  async cleanup() {
-    return run('DELETE FROM token_blacklist WHERE expires_at IS NOT NULL AND expires_at < datetime(\'now\')');
   }
 };
 
@@ -3016,398 +1980,6 @@ const AIFeedback = {
 };
 
 // ============================================
-// CRUD: SHIFT SNAPSHOTS
-// ============================================
-const ShiftSnapshots = {
-  async getAll(limit = 50) {
-    return all('SELECT * FROM shift_snapshots ORDER BY created_at DESC LIMIT ?', [limit]);
-  },
-  async getById(id) {
-    return get('SELECT * FROM shift_snapshots WHERE id = ?', [id]);
-  },
-  async getByShift(shift_id, limit = 50) {
-    return all('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY created_at DESC LIMIT ?', [shift_id, limit]);
-  },
-  async getLatestByShift(shift_id) {
-    return get('SELECT * FROM shift_snapshots WHERE shift_id = ? ORDER BY created_at DESC LIMIT 1', [shift_id]);
-  },
-  async create(data) {
-    const result = await run(
-      'INSERT INTO shift_snapshots (shift_id, snapshot_data, snapshot_type) VALUES (?, ?, ?);',
-      [data.shift_id, data.snapshot_data, data.snapshot_type || 'auto']
-    );
-    return result.id;
-  },
-  async deleteByShift(shift_id) {
-    return run('DELETE FROM shift_snapshots WHERE shift_id = ?', [shift_id]);
-  }
-};
-
-// ============================================
-// CRUD: SHIFT DATA INTEGRITY
-// ============================================
-const ShiftDataIntegrity = {
-  async getByShift(shift_id) {
-    return get('SELECT * FROM shift_data_integrity WHERE shift_id = ? ORDER BY checked_at DESC LIMIT 1', [shift_id]);
-  },
-  async create(data) {
-    const result = await run(
-      'INSERT INTO shift_data_integrity (shift_id, integrity_status, integrity_details) VALUES (?, ?, ?);',
-      [data.shift_id, data.integrity_status || 'unknown', data.integrity_details || null]
-    );
-    return result.id;
-  }
-};
-
-// ============================================
-// RELIABLE SHIFT SAVE SYSTEM
-// ============================================
-
-/**
- * Save complete shift data to SQLite (primary source) and JSON (backup)
- * This is the core reliable save function
- */
-async function saveShiftData(shiftId, data) {
-  try {
-    // 1. Save to SQLite as primary source
-    await run(
-      `UPDATE shifts SET
-        shift_name = ?,
-        shift_date = ?,
-        shift_time = ?,
-        shift_type = ?,
-        shift_day = ?,
-        start_time = ?,
-        end_time = ?,
-        status = ?,
-        supervisor_name = ?,
-        total_reports = ?,
-        rapid_locations = ?,
-        centers_data = ?,
-        vehicle_data = ?,
-        fuel_data = ?,
-        general_notes = ?,
-        last_update = ?,
-        data_json = ?
-      WHERE id = ?;`,
-      [
-        data.shiftName || null,
-        data.shiftDate || null,
-        data.shiftTime || null,
-        data.shiftType || null,
-        data.shiftDay || null,
-        data.startTime || null,
-        data.endTime || null,
-        data.status || 'active',
-        data.supervisorName || null,
-        data.totalReports || 0,
-        data.rapidLocations ? JSON.stringify(data.rapidLocations) : null,
-        data.centersData ? JSON.stringify(data.centersData) : null,
-        data.vehicleData ? JSON.stringify(data.vehicleData) : null,
-        data.fuelData ? JSON.stringify(data.fuelData) : null,
-        data.generalNotes || '',
-        new Date().toISOString(),
-        JSON.stringify(data),
-        shiftId
-      ]
-    );
-
-    // 2. Save snapshot for continuous tracking
-    await ShiftSnapshots.create({
-      shift_id: shiftId,
-      snapshot_data: JSON.stringify(data),
-      snapshot_type: data.snapshotType || 'auto'
-    });
-
-    // 3. Update metrics
-    await calculateAndUpdateMetrics(shiftId, data);
-
-    // 4. Verify integrity
-    await verifyShiftIntegrity(shiftId);
-
-    return { success: true, shiftId, lastSaved: new Date().toISOString() };
-  } catch (err) {
-    logger.error('Failed to save shift data', err);
-    throw new Error(`Save failed: ${err.message}`);
-  }
-}
-
-/**
- * Get shift data from SQLite (primary source)
- */
-async function getShiftData(shiftId) {
-  try {
-    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
-    if (!shift) return null;
-    
-    // Parse JSON data if available
-    if (shift.data_json) {
-      try {
-        const parsed = JSON.parse(shift.data_json);
-        return { ...shift, ...parsed, data_json: undefined };
-      } catch (e) {
-        logger.warn('Failed to parse shift data_json, returning raw');
-      }
-    }
-    return shift;
-  } catch (err) {
-    logger.error('Failed to get shift data', err);
-    throw err;
-  }
-}
-
-/**
- * Get the currently active shift
- */
-async function getActiveShift() {
-  try {
-    const shift = await get('SELECT * FROM shifts WHERE status = ? ORDER BY id DESC LIMIT 1', ['active']);
-    if (!shift) return null;
-    
-    if (shift.data_json) {
-      try {
-        const parsed = JSON.parse(shift.data_json);
-        return { ...shift, ...parsed, data_json: undefined };
-      } catch (e) {
-        // ignore parse error
-      }
-    }
-    return shift;
-  } catch (err) {
-    logger.error('Failed to get active shift', err);
-    throw err;
-  }
-}
-
-/**
- * Archive a shift - mark it as archived and immutable
- */
-async function archiveShift(shiftId, archiveData = {}) {
-  try {
-    // 1. Verify shift exists
-    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
-    if (!shift) {
-      throw new Error(`Shift ${shiftId} not found`);
-    }
-    if (shift.status === 'archived') {
-      throw new Error(`Shift ${shiftId} is already archived`);
-    }
-
-    // 2. Save final snapshot before archiving
-    const latestSnapshot = await ShiftSnapshots.getLatestByShift(shiftId);
-    if (!latestSnapshot) {
-      // Create a snapshot if none exists
-      await ShiftSnapshots.create({
-        shift_id: shiftId,
-        snapshot_data: shift.data_json || JSON.stringify(shift),
-        snapshot_type: 'pre_archive'
-      });
-    }
-
-    // 3. Update shift status
-    await run(
-      'UPDATE shifts SET status = ?, archived_at = ?, end_time = ? WHERE id = ?;',
-      ['archived', new Date().toISOString(), archiveData.endTime || new Date().toISOString(), shiftId]
-    );
-
-    // 4. Add archive event to timeline
-    await ShiftTimelineEvents.create({
-      shift_id: shiftId,
-      event_type: 'end',
-      event_title: 'إنهاء المناوبة وأرشفتها',
-      event_description: `تم إنهاء المناوبة وأرشفتها بواسطة ${archiveData.supervisorName || 'النظام'}`,
-      event_data: JSON.stringify({ archived_at: new Date().toISOString() }),
-      created_by: archiveData.supervisorId || 'system',
-      created_by_name: archiveData.supervisorName || 'النظام'
-    });
-
-    // 5. Final integrity check
-    await verifyShiftIntegrity(shiftId);
-
-    return { success: true, shiftId, archivedAt: new Date().toISOString() };
-  } catch (err) {
-    logger.error('Failed to archive shift', err);
-    throw new Error(`Archive failed: ${err.message}`);
-  }
-}
-
-/**
- * Add a timeline event for a shift
- */
-async function addTimelineEvent(shiftId, event) {
-  try {
-    return await ShiftTimelineEvents.create({
-      shift_id: shiftId,
-      event_type: event.type || 'note_added',
-      event_title: event.title || 'حدث جديد',
-      event_description: event.description || null,
-      event_data: event.data ? JSON.stringify(event.data) : null,
-      created_by: event.createdBy || 'system',
-      created_by_name: event.createdByName || 'النظام'
-    });
-  } catch (err) {
-    logger.error('Failed to add timeline event', err);
-    throw err;
-  }
-}
-
-/**
- * Get timeline events for a shift
- */
-async function getTimelineEvents(shiftId, limit = 100) {
-  try {
-    return await ShiftTimelineEvents.getByShift(shiftId, limit);
-  } catch (err) {
-    logger.error('Failed to get timeline events', err);
-    throw err;
-  }
-}
-
-/**
- * Calculate and update metrics for a shift
- */
-async function calculateAndUpdateMetrics(shiftId, data) {
-  try {
-    const metrics = {
-      shift_id: shiftId,
-      total_reports: data.savedReports ? Object.keys(data.savedReports).length : 0,
-      completed_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'completed').length : 0,
-      pending_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'pending').length : 0,
-      suspended_reports: data.savedReports ? Object.values(data.savedReports).filter(r => r.status === 'suspended').length : 0,
-      total_completions: data.teamsData ? Object.keys(data.teamsData).length : 0,
-      total_forms: data.forms ? data.forms.length : 0,
-      staff_count: data.staffCount || 0,
-      team_count: data.teamCount || 0,
-      vehicle_count: data.vehicleCount || 0,
-      completion_rate: data.completionRate || 0,
-      notes_count: data.notes ? data.notes.length : 0,
-      event_count: data.events ? data.events.length : 0,
-      health_score: data.healthScore || 100,
-      data_completeness: data.dataCompleteness || 100
-    };
-
-    const existing = await ShiftMetrics.getByShift(shiftId);
-    if (existing) {
-      await ShiftMetrics.update(existing.id, metrics);
-    } else {
-      await ShiftMetrics.create(metrics);
-    }
-    return metrics;
-  } catch (err) {
-    logger.error('Failed to calculate metrics', err);
-    // Don't throw - metrics are secondary
-    return null;
-  }
-}
-
-/**
- * Verify data integrity of a shift
- */
-async function verifyShiftIntegrity(shiftId) {
-  try {
-    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
-    if (!shift) {
-      return { valid: false, reason: 'Shift not found' };
-    }
-
-    const checks = {
-      hasData: !!shift.data_json,
-      hasStartTime: !!shift.start_time,
-      hasShiftType: !!shift.shift_type,
-      hasSnapshot: !!(await ShiftSnapshots.getLatestByShift(shiftId)),
-      hasMetrics: !!(await ShiftMetrics.getByShift(shiftId))
-    };
-
-    const allValid = Object.values(checks).every(v => v === true);
-    const integrityStatus = allValid ? 'valid' : 'incomplete';
-    const integrityDetails = JSON.stringify(checks);
-
-    await ShiftDataIntegrity.create({
-      shift_id: shiftId,
-      integrity_status: integrityStatus,
-      integrity_details: integrityDetails
-    });
-
-    return { valid: allValid, checks, shiftId };
-  } catch (err) {
-    logger.error('Failed to verify integrity', err);
-    return { valid: false, reason: err.message };
-  }
-}
-
-/**
- * Get latest saved snapshot for a shift
- */
-async function getLatestShiftSnapshot(shiftId) {
-  try {
-    const snapshot = await ShiftSnapshots.getLatestByShift(shiftId);
-    if (!snapshot) return null;
-    try {
-      return JSON.parse(snapshot.snapshot_data);
-    } catch (e) {
-      return snapshot;
-    }
-  } catch (err) {
-    logger.error('Failed to get latest snapshot', err);
-    throw err;
-  }
-}
-
-/**
- * Get shift status with save info
- */
-async function getShiftStatus(shiftId) {
-  try {
-    const shift = await get('SELECT * FROM shifts WHERE id = ?', [shiftId]);
-    if (!shift) return null;
-
-    let latestSnapshot = null;
-    let integrity = null;
-    let metrics = null;
-    let timelineCount = null;
-    let saveCount = 0;
-
-    try {
-      latestSnapshot = await ShiftSnapshots.getLatestByShift(shiftId);
-    } catch (e) { /* ignore */ }
-
-    try {
-      integrity = await ShiftDataIntegrity.getByShift(shiftId);
-    } catch (e) { /* ignore */ }
-
-    try {
-      metrics = await ShiftMetrics.getByShift(shiftId);
-    } catch (e) { /* ignore */ }
-
-    try {
-      timelineCount = await get('SELECT COUNT(*) as count FROM shift_timeline_events WHERE shift_id = ?', [shiftId]);
-    } catch (e) { /* ignore */ }
-
-    try {
-      const sc = await get('SELECT COUNT(*) as count FROM shift_snapshots WHERE shift_id = ?', [shiftId]);
-      saveCount = sc ? sc.count : 0;
-    } catch (e) { /* ignore */ }
-
-    return {
-      shiftId: shift.id,
-      isActive: shift.status === 'active',
-      status: shift.status || 'unknown',
-      lastSaved: latestSnapshot ? latestSnapshot.created_at : shift.last_update,
-      saveCount: saveCount,
-      dataIntegrity: integrity ? integrity.integrity_status : 'unknown',
-      integrityDetails: integrity ? integrity.integrity_details : null,
-      metrics: metrics || {},
-      timelineEventCount: timelineCount ? timelineCount.count : 0,
-      startTime: shift.start_time,
-      endTime: shift.end_time
-    };
-  } catch (err) {
-    logger.error('Failed to get shift status', err);
-    throw err;
-  }
-}
-
-// ============================================
 // MIGRATION FUNCTIONS
 // ============================================
 async function migrateReports() {
@@ -3640,18 +2212,6 @@ module.exports = {
   beginTransaction,
   commitTransaction,
   rollbackTransaction,
-  // Reliable Shift Save System
-  saveShiftData,
-  getShiftData,
-  getActiveShift,
-  archiveShift,
-  addTimelineEvent,
-  getTimelineEvents,
-  calculateAndUpdateMetrics,
-  verifyShiftIntegrity,
-  getLatestShiftSnapshot,
-  getShiftStatus,
-
   // CRUD namespaces
   Reports,
   Shifts,
@@ -3672,25 +2232,7 @@ module.exports = {
   Notifications,
   ShiftCompletions,
   AuditLog,
-  ShiftAuditLog,
-  NotificationLog,
-  ShiftRosterDrafts,
-  ShiftChangeRequests,
   ShiftForms,
-  ShiftMetrics,
-  ShiftKpiDaily,
-  ShiftKpiWeekly,
-  ShiftKpiMonthly,
-  ShiftTimelineEvents,
-  ShiftAlerts,
-  ShiftComparisonSnapshots,
-  ShiftReportsGenerated,
-  ShiftAuditTrail,
-  ShiftSnapshots,
-  ShiftDataIntegrity,
-  AuthSessions,
-  AuthLogs,
-  TokenBlacklist,
   KBDocuments,
   KBChunks,
   KBChatSessions,

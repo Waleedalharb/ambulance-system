@@ -130,7 +130,7 @@ async function resolveShiftId(req, shiftDate, shiftType) {
     // 4. Fallback: query SQLite directly
     if (dbAvailable()) {
         try {
-            const row = await db.get("SELECT id FROM shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+            const row = await db.get('SELECT id FROM shifts WHERE status = "active" ORDER BY id DESC LIMIT 1');
             if (row) return row.id;
         } catch (e) {}
     }
@@ -2566,7 +2566,7 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
         const archiveResult = await archiveEngine.executeArchive(shiftId, { user, strict: false, skipVerify: false });
 
         // Update status to archived
-        await db.run("UPDATE shifts SET status = 'archived', archived_at = datetime('now') WHERE id = ?", [shiftId]);
+        await db.prepare("UPDATE shifts SET status = 'archived', archived_at = datetime('now') WHERE id = ?").run(shiftId);
 
         await opsService.logAudit({
             shiftId: shiftId,
@@ -2628,7 +2628,7 @@ app.get('/api/emergency/active-shifts', authenticate, authorize(['admin', 'direc
     try {
         if (!db) return res.status(503).json({ error: 'Database not available' });
         const shifts = await db.all(
-            "SELECT id, shift_name, shift_date, shift_type, status, start_time, total_reports FROM shifts WHERE status IN ('active', 'pending_handover') ORDER BY id DESC"
+            'SELECT id, shift_name, shift_date, shift_type, status, start_time, total_reports FROM shifts WHERE status IN ("active", "pending_handover") ORDER BY id DESC'
         );
         res.json({ success: true, count: shifts.length, shifts });
     } catch (error) {
@@ -2644,7 +2644,7 @@ app.post('/api/emergency/archive-shift', authenticate, authorize(['admin', 'dire
         if (!shiftId) return res.status(400).json({ error: 'shiftId مطلوب' });
         
         await db.run(
-            "UPDATE shifts SET status = 'archived', archived_at = datetime('now') WHERE id = ?",
+            'UPDATE shifts SET status = "archived", archived_at = datetime("now") WHERE id = ?',
             [shiftId]
         );
         res.json({ success: true, message: `تم أرشفة المناوبة #${shiftId}` });

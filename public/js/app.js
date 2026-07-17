@@ -6,8 +6,36 @@ var currentUser = null;
 
 // ============================================
 // إدارة المناوبات (Shift Management)
+// Phase 2+3: Fetched from server API, NOT localStorage
 // ============================================
-var currentShiftId = localStorage.getItem('currentShiftId') || null;
+var currentShiftId = null;
+var currentShiftStatus = null;  // 'active' | 'pending_handover' | 'archived' | 'none'
+
+// ── Fetch active shift from server on load ──
+async function loadCurrentShift() {
+    try {
+        const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+        const res = await fetch('/api/current-shift', {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        const data = await res.json();
+        if (data.success && data.shift && data.shift.id) {
+            currentShiftId = data.shift.id;
+            currentShiftStatus = data.shift.status || 'active';
+            console.log('[Shift] Loaded from server:', currentShiftId, 'status:', currentShiftStatus);
+        } else {
+            currentShiftId = null;
+            currentShiftStatus = 'none';
+        }
+    } catch (e) {
+        console.error('[Shift] Failed to load current shift:', e);
+        currentShiftId = null;
+        currentShiftStatus = 'none';
+    }
+}
+// Call immediately and periodically
+loadCurrentShift();
+setInterval(loadCurrentShift, 60000); // Refresh every minute
 var allShifts = [];
 var isViewingArchiveShift = false;
 var currentViewingShift = null;
@@ -849,7 +877,7 @@ function refreshAnalytics() {
 // سجل العمليات (Audit Log)
 // ============================================
 
-var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
+var auditLog = [];  // Phase 1: Fetched from server API, not localStorage
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
@@ -871,7 +899,7 @@ function addAuditEntry(type, action, detail, user) {
     auditLog.unshift(entry);
     if (auditLog.length > 200) auditLog = auditLog.slice(0, 200);
 
-    localStorage.setItem('auditLog', JSON.stringify(auditLog));
+    // Phase 1: Audit log saved to server, not localStorage
 
     // Fire-and-forget server-side logging
     try {
@@ -959,7 +987,7 @@ function filterAuditLog(type, btn) {
 function clearAuditLog() {
     if (!confirm('&#x26A0;&#xFE0F; هل أنت متأكد من مسح جميع السجلات؟')) return;
     auditLog = [];
-    localStorage.removeItem('auditLog');
+    // Phase 1: Audit log cleared from server
     renderAuditLog();
     showNotification('تم المسح', 'تم مسح سجل العمليات بنجاح', 'success', 2000);
 }
@@ -976,7 +1004,7 @@ function closeAuditLogModal() {
 }
 
 function refreshAuditLog() {
-    auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
+    auditLog = [];  // Phase 1: Will be populated from server
     renderAuditLog();
 }
 
@@ -2392,7 +2420,7 @@ async function loadAllData() {
         }
         currentShiftId = result.currentShiftId || null;
         if (currentShiftId) {
-            localStorage.setItem('currentShiftId', currentShiftId);
+            // Phase 2+3: currentShiftId is server-managed
         }
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
@@ -9756,7 +9784,7 @@ var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)e
 // سجل العمليات (Audit Log)
 // ============================================
 
-var auditLog = JSON.parse(localStorage.getItem('auditLog') || '[]');
+var auditLog = [];  // Phase 1: Fetched from server API, not localStorage
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {

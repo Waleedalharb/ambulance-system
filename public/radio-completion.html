@@ -206,6 +206,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
     .modal-box { width:95%; max-height:90vh; }
 }
 </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -296,13 +297,17 @@ function navigateToPage(url) {
 <div class="notes-section">
     <div class="notes-box">
         <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل</h3>
-        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value"></textarea>
+        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value; triggerAutoSave();"></textarea>
     </div>
 </div>
 
-<!-- Finish -->
+<!-- Summary View Button (Auto-save active - no manual save needed) -->
 <div class="finish-bar">
-    <button class="btn-finish" id="finishBtn" onclick="finishShift()"><i class="fas fa-flag-checkered"></i> إنهاء التكميل</button>
+    <button class="btn-finish" id="finishBtn" onclick="finishShift()" style="background:var(--primary)"><i class="fas fa-eye"></i> عرض الملخص</button>
+    <div id="autoSaveIndicator" style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">
+        <i class="fas fa-sync fa-spin" style="display:none" id="saveSpinner"></i>
+        <span id="saveStatus">يتم الحفظ تلقائياً...</span>
+    </div>
 </div>
 
 <!-- Summary Modal -->
@@ -315,7 +320,7 @@ function navigateToPage(url) {
         <div class="modal-body" id="summaryContent"></div>
         <div class="modal-footer">
             <button class="btn btn-print" onclick="printSummary()"><i class="fas fa-print"></i> طباعة الملخص</button>
-            <button class="btn btn-home" onclick="saveToServer(); document.getElementById('summaryModal').classList.remove('active');"><i class="fas fa-save"></i> حفظ في السيرفر</button>
+            <button class="btn btn-home" onclick="document.getElementById('summaryModal').classList.remove('active')"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
 </div>
@@ -511,23 +516,39 @@ function getShiftTimeStr() {
 }
 
 // ============================================
-// SHIFT ID HELPER
+// SHIFT ID HELPER (async — fetches from server)
 // ============================================
+var _cachedShiftId = null;
+
 function getCurrentShiftId() {
-    // Try to get from localStorage (if app.js stored it)
+    // Return cached value immediately (sync)
+    if (_cachedShiftId) return _cachedShiftId;
+    // Try localStorage as fallback
     var stored = localStorage.getItem('currentShiftId');
     if (stored) {
-        try {
-            var parsed = parseInt(stored);
-            if (!isNaN(parsed) && parsed > 0) {
-                console.log('[getCurrentShiftId] From localStorage:', parsed);
-                return parsed;
-            }
-        } catch(e) {}
+        try { var parsed = parseInt(stored); if (!isNaN(parsed) && parsed > 0) { _cachedShiftId = parsed; return parsed; } } catch(e) {}
     }
-    // Infer from shift_date + shift_type: not possible without server lookup
-    console.log('[getCurrentShiftId] Not available in localStorage');
     return null;
+}
+
+async function fetchCurrentShiftId() {
+    // Fetch from server API
+    try {
+        var token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
+        var res = await fetch('/api/current-shift', {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        var data = await res.json();
+        if (data.success && data.shift && data.shift.id) {
+            _cachedShiftId = data.shift.id;
+            localStorage.setItem('currentShiftId', String(data.shift.id));
+            console.log('[fetchCurrentShiftId] From server:', data.shift.id);
+            return data.shift.id;
+        }
+    } catch (e) {
+        console.error('[fetchCurrentShiftId] Error:', e);
+    }
+    return getCurrentShiftId();
 }
 
 // ============================================
@@ -538,6 +559,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initStatuses();
     loadFromSmartSchedule();
     initWebSocket();
+    
+    // Phase 2+3: Fetch current shift_id from server on load
+    fetchCurrentShiftId().then(function(sid) {
+        console.log('[Init] Shift ID from server:', sid);
+    });
     
     // Check for URL params (from archive edit)
     var urlParams = new URLSearchParams(window.location.search);
@@ -655,8 +681,11 @@ function loadSavedCompletion() {
     var shiftDate = getShiftDate();
     console.log('[loadSavedCompletion] Loading for:', shiftDate, shiftType);
     
-    fetch('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType), {
-        headers: { 'Authorization': 'Bearer ' + token }
+    // Phase 2+3: Fetch shift_id from server first
+    fetchCurrentShiftId().then(function(shiftId) {
+        var url = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
+        if (shiftId) url += '&shift_id=' + shiftId;
+        return fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
     })
     .then(function(r) { 
         console.log('[loadSavedCompletion] Response status:', r.status);
@@ -922,12 +951,14 @@ function setReason(teamId, reason) {
     teamStatus[teamId].reason = reason;
     teamStatus[teamId].missingPerson = '';
     renderAll();
+    triggerAutoSave();
 }
 
 function setMissingPerson(teamId, personName) {
     if (!teamStatus[teamId]) return;
     teamStatus[teamId].missingPerson = personName;
     renderAll();
+    triggerAutoSave();
 }
 
 function nameOfTeam(id) {
@@ -982,7 +1013,7 @@ function updateDashboard() {
             if (counts.pending > 0) {
                 finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + counts.pending + ' فريق';
             } else {
-                finishBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> إنهاء التكميل';
+                finishBtn.innerHTML = '<i class="fas fa-eye"></i> عرض الملخص';
             }
         }
     } catch (err) {
@@ -1069,34 +1100,36 @@ function saveToServer(silent) {
         return;
     }
     
-    var shiftId = getCurrentShiftId();
-    // Enrich teamStatus with center names before saving
-    var enrichedTeams = {};
-    Object.keys(teamStatus).forEach(function(teamId) {
-        enrichedTeams[teamId] = Object.assign({}, teamStatus[teamId]);
-        enrichedTeams[teamId].centerName = getTeamCenter(teamId);
-    });
-    
-    var payload = {
-        shiftType: getShiftType(),
-        shiftDate: getShiftDate(),
-        teams: enrichedTeams,
-        notes: document.getElementById('globalNotes').value.trim(),
-        timestamp: new Date().toISOString()
-    };
-    // Include shift_id if available (backward-compatible: optional)
-    if (shiftId) {
-        payload.shift_id = shiftId;
-    }
-    console.log('[saveToServer] Sending payload:', payload);
-    
-    fetch('/api/shift-completion', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify(payload)
+    // Phase 2+3: Fetch shift_id from server (async)
+    fetchCurrentShiftId().then(function(shiftId) {
+        // Enrich teamStatus with center names before saving
+        var enrichedTeams = {};
+        Object.keys(teamStatus).forEach(function(teamId) {
+            enrichedTeams[teamId] = Object.assign({}, teamStatus[teamId]);
+            enrichedTeams[teamId].centerName = getTeamCenter(teamId);
+        });
+        
+        var payload = {
+            shiftType: getShiftType(),
+            shiftDate: getShiftDate(),
+            teams: enrichedTeams,
+            notes: document.getElementById('globalNotes').value.trim(),
+            timestamp: new Date().toISOString()
+        };
+        // Include shift_id (Phase 2+3: tied to active shift)
+        if (shiftId) {
+            payload.shift_id = shiftId;
+        }
+        console.log('[saveToServer] Sending payload:', payload);
+        
+        return fetch('/api/shift-completion', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(payload)
+        });
     }).then(function(r) { 
         console.log('[saveToServer] Response status:', r.status);
         return r.json(); 
@@ -1105,13 +1138,16 @@ function saveToServer(silent) {
         console.log('[saveToServer] Response data:', d);
         if (d.success) {
             if (!silent) showToast('✅ تم حفظ التكميل في السيرفر', 'success');
+            onAutoSaveSuccess();
             broadcastCompletionSaved();
         } else {
             if (!silent) showToast('⚠️ ' + (d.error || 'فشل في الحفظ'), 'error');
+            onAutoSaveError(d.error || 'فشل في الحفظ');
         }
     }).catch(function(e) {
         console.error('[saveToServer] Error:', e);
         if (!silent) showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
+        onAutoSaveError('خطأ في الاتصال');
     });
 }
 

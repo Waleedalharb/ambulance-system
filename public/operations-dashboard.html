@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مركز العمليات | منصة الجنوب</title>
+<link rel="icon" type="image/png" href="/favicon-32x32.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+/* ═══════════════════════════════════════════
+   مركز العمليات — Operations Command Center
+   ═══════════════════════════════════════════ */
+:root {
+    --bg: #F1F5F9;
+    --card: #FFFFFF;
+    --card-hover: #F8FAFC;
+    --border: #E2E8F0;
+    --border-light: #F1F5F9;
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+    --primary: #2563EB;
+    --primary-dark: #1D4ED8;
+    --primary-light: #DBEAFE;
+    --success: #10B981;
+    --success-light: #D1FAE5;
+    --warning: #F59E0B;
+    --warning-light: #FEF3C7;
+    --danger: #EF4444;
+    --danger-light: #FEE2E2;
+    --info: #06B6D4;
+    --info-light: #CFFAFE;
+    --purple: #8B5CF6;
+    --purple-light: #EDE9FE;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    --radius: 12px;
+    --radius-sm: 8px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    direction: rtl;
+    min-height: 100vh;
+}
+
+/* ── Top Bar ── */
+.topbar {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: var(--shadow-lg);
+}
+
+.topbar-brand { display:flex; align-items:center; gap:0.75rem; font-size:1.1rem; font-weight:700; }
+.topbar-brand i { font-size:1.3rem; }
+
+.topbar-actions { display:flex; align-items:center; gap:0.5rem; }
+
+.btn-topbar {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-topbar:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Tab Navigation ── */
+.tab-bar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 1rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 56px;
+    z-index: 100;
+}
+
+.tab-bar::-webkit-scrollbar { display:none; }
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: var(--primary-light);
+}
+
+/* ── Content Container ── */
+.content-wrapper { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Stats Cards ── */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+}
+
+.stat-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+
+.stat-icon {
+    width: 48px; height: 48px;
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+.stat-icon.green { background: var(--success-light); color: var(--success); }
+.stat-icon.orange { background: var(--warning-light); color: var(--warning); }
+.stat-icon.red { background: var(--danger-light); color: var(--danger); }
+.stat-icon.cyan { background: var(--info-light); color: var(--info); }
+.stat-icon.purple { background: var(--purple-light); color: var(--purple); }
+
+.stat-value { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1; }
+.stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* ── Cards ── */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body { padding: 1.25rem; }
+
+/* ── Tables ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+    background: var(--bg);
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: right;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+.data-table td {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: middle;
+}
+.data-table tr:hover td { background: var(--card-hover); }
+
+/* ── Badges ── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-success { background: var(--success-light); color: var(--success); }
+.badge-warning { background: var(--warning-light); color: var(--warning); }
+.badge-danger { background: var(--danger-light); color: var(--danger); }
+.badge-info { background: var(--info-light); color: var(--info); }
+.badge-muted { background: var(--border-light); color: var(--text-muted); }
+
+/* ── Buttons ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover { background: var(--bg); }
+.btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-success { background: var(--success); color: white; border-color: var(--success); }
+.btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
+.btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; }
+
+/* ── Modal Tabs ── */
+.modal-tab-btn.active { color: var(--primary) !important; border-bottom-color: var(--primary) !important; background: var(--primary-light) !important; }
+.modal-tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+.modal-tab-panel { display: none; }
+.modal-tab-panel.active { display: block; animation: fadeIn 0.2s ease; }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; }
+.modal-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-light); }
+.modal-body { padding: 1.25rem; }
+.modal-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--border-light); }
+
+/* ── Detail Grid ── */
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.detail-item { background: var(--bg); padding: 0.75rem 1rem; border-radius: var(--radius-sm); }
+.detail-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.detail-value { font-size: 1rem; font-weight: 700; color: var(--text); }
+
+/* ── Search & Filters ── */
+.filter-bar {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--card);
+}
+
+.search-box i {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.select-box {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* ── Progress Bar ── */
+.progress-container {
+    background: var(--border-light);
+    border-radius: 9999px;
+    height: 8px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.5s ease;
+}
+
+/* ── Shift Status ── */
+.status-active { color: var(--success); font-weight: 700; }
+.status-pending { color: var(--warning); font-weight: 700; }
+.status-archived { color: var(--text-muted); }
+
+/* ── Animations ── */
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+/* ── Toast ── */
+.toast-container {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    background: var(--text);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn { from { transform:translateX(-100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .content-wrapper { padding: 0.75rem; }
+    .filter-bar { flex-direction: column; align-items: stretch; }
+    .search-box { max-width: none; }
+    .data-table { font-size: 0.75rem; }
+    .data-table th, .data-table td { padding: 0.5rem; }
+}
+
+/* ── Loading ── */
+.loading { text-align:center; padding:2rem; color:var(--text-muted); }
+.spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Empty State ── */
+.empty-state { text-align:center; padding:3rem; color:var(--text-muted); }
+.empty-state i { font-size:3rem; margin-bottom:1rem; display:block; }
+</style>
+<base target="_blank">
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════ -->
+<div class="topbar">
+    <div class="topbar-brand">
+        <i class="fas fa-command-center"></i>
+        <span>مركز العمليات — Operations Command Center</span>
+    </div>
+    <div class="topbar-actions">
+        <button class="btn-topbar" onclick="window.location.href='/index.html'"><i class="fas fa-home"></i> الرئيسية</button>
+        <button class="btn-topbar" onclick="refreshAll()"><i class="fas fa-sync-alt"></i> تحديث</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB NAVIGATION
+     ═══════════════════════════════════════════ -->
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('live')" data-tab="live">
+        <i class="fas fa-broadcast-tower"></i> المؤشرات المباشرة
+    </button>
+    <button class="tab-btn" onclick="switchTab('archive')" data-tab="archive">
+        <i class="fas fa-archive"></i> أرشيف المناوبات
+    </button>
+    <button class="tab-btn" onclick="switchTab('reports')" data-tab="reports">
+        <i class="fas fa-file-alt"></i> التقارير
+    </button>
+    <button class="tab-btn" onclick="switchTab('analytics')" data-tab="analytics">
+        <i class="fas fa-chart-bar"></i> الإحصائيات
+    </button>
+    <button class="tab-btn" onclick="switchTab('compare')" data-tab="compare">
+        <i class="fas fa-exchange-alt"></i> المقارنات
+    </button>
+    <button class="tab-btn" onclick="switchTab('charts')" data-tab="charts">
+        <i class="fas fa-chart-pie"></i> الرسوم البيانية
+    </button>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CONTENT WRAPPER
+     ═══════════════════════════════════════════ -->
+<div class="content-wrapper">
+
+<!-- ── TAB 1: المؤشرات المباشرة ── -->
+<div class="tab-panel active" id="tab-live">
+    <div class="stats-grid" id="liveStats">
+        <div class="loading"><div class="spinner"></div> جاري التحميل...</div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-ambulance"></i> المناوبة الحالية</div>
+            <span class="badge badge-success pulse" id="shiftStatusBadge">جارية</span>
+        </div>
+        <div class="card-body" id="currentShiftDetails">
+            <div class="loading">جاري تحميل بيانات المناوبة...</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-bell"></i> آخر الأحداث</div>
+        </div>
+        <div class="card-body">
+            <table class="data-table" id="liveTimeline">
+                <thead><tr><th>الوقت</th><th>الحدث</th><th>النوع</th></tr></thead>
+                <tbody><tr><td colspan="3" class="loading">جاري التحميل...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB 2: أرشيف المناوبات ── -->
+<div class="tab-panel" id="tab-archive">
+    <div class="filter-bar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="archiveSearch" placeholder="بحث في الأرشيف..." oninput="filterArchive()">
+        </div>
+        <select class="select-box" id="archiveTypeFilter" onchange="filterArchive()">
+            <option value="">كل المناوبات</option>
+            <option value="صباحية">صباحية</option>
+            <option value="ليلية">ليلية</option>
+        </select>
+        <select class="select-box" id="archiveStatusFilter" onchange="filterArchive()">
+            <option value="">كل الحالات</option>
+            <option value="active">نشطة</option>
+            <option value="pending_handover">بانتظار التسليم</option>
+            <option value="archived">مؤرشفة</option>
+        </select>
+        <input type="date" class="select-box" id="archiveDateFrom" onchange="filterArchive()">
+        <input type="date" class="select-box" id="archiveDateTo" onchange="filterArchive()">
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-list"></i> سجل المناوبات</div>
+            <span id="archiveCount" class="badge badge-muted">0</span>
+        </div>
+        <div class="card-body" style="padding:0">
+            <table class="data-table" id="archiveTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>المناوبة</th>
+                        <th>التاريخ</th>
+                        <th>النوع</th>
+                        <th>البلاغات</th>
+                        <th>الحالة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="archiveTbody">
+                    <tr><td colspan="7" class="loading">جاري تحميل الأرشيف...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB 3: التقارير ── -->
+<div class="tab-panel" id="tab-reports">
+    <div class="stats-grid" id="reportStats">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-file-alt"></i></div>
+            <div><div class="stat-value" id="reportTotalShifts">-</div><div class="stat-label">إجمالي المناوبات</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-ambulance"></i></div>
+            <div><div class="stat-value" id="reportTotalReports">-</div><div class="stat-label">إجمالي البلاغات</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange"><i class="fas fa-calendar-day"></i></div>
+            <div><div class="stat-value" id="reportTodayShifts">-</div><div class="stat-label">مناوبات اليوم</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon cyan"><i class="fas fa-chart-line"></i></div>
+            <div><div class="stat-value" id="reportAvgReports">-</div><div class="stat-label">متوسط البلاغات</div></div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-calendar-check"></i> التقرير اليومي</div>
+            <button class="btn btn-primary btn-sm" onclick="generateDailyReport()"><i class="fas fa-file-export"></i> تصدير</button>
+        </div>
+        <div class="card-body" id="dailyReportContent">
+            <div class="loading">جاري إعداد التقرير...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB 4: الإحصائيات ── -->
+<div class="tab-panel" id="tab-analytics">
+    <div class="stats-grid" id="analyticsStats">
+        <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> جاري حساب الإحصائيات...</div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-table"></i> تفصيلي</div>
+        </div>
+        <div class="card-body" style="padding:0">
+            <table class="data-table" id="analyticsTable">
+                <thead>
+                    <tr><th>الفترة</th><th>المناوبات</th><th>البلاغات</th><th>المتوسط</th><th>أعلى</th><th>أدنى</th></tr>
+                </thead>
+                <tbody id="analyticsTbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB 5: المقارنات ── -->
+<div class="tab-panel" id="tab-compare">
+    <div class="filter-bar">
+        <select class="select-box" id="compareShift1"></select>
+        <span style="color:var(--text-muted);font-weight:700">vs</span>
+        <select class="select-box" id="compareShift2"></select>
+        <button class="btn btn-primary" onclick="compareShifts()"><i class="fas fa-exchange-alt"></i> قارن</button>
+    </div>
+    <div id="compareResult"></div>
+</div>
+
+<!-- ── TAB 6: الرسوم البيانية ── -->
+<div class="tab-panel" id="tab-charts">
+    <div class="stats-grid">
+        <div class="card" style="grid-column:1/-1">
+            <div class="card-header">
+                <div class="card-title"><i class="fas fa-chart-area"></i> البلاغات اليومية</div>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="stats-grid">
+        <div class="card">
+            <div class="card-header"><div class="card-title"><i class="fas fa-chart-pie"></i> توزيع المناوبات</div></div>
+            <div class="card-body" style="text-align:center"><canvas id="shiftTypeChart" height="200"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><div class="card-title"><i class="fas fa-chart-bar"></i> البلاغات حسب المركز</div></div>
+            <div class="card-body"><canvas id="centerChart" height="200"></canvas></div>
+        </div>
+    </div>
+</div>
+
+</div><!-- /content-wrapper -->
+
+<!-- ═══════════════════════════════════════════
+     SHIFT DETAIL MODAL — Full Shift Data
+     ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="shiftDetailModal" style="display:none">
+    <div class="modal-box" style="max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+            <h3 style="margin:0"><i class="fas fa-clipboard-list"></i> تفاصيل المناوبة الكاملة</h3>
+            <button class="btn" onclick="closeShiftModal()" style="font-size:1.2rem;padding:0.25rem 0.5rem">&times;</button>
+        </div>
+        <!-- Modal Tabs -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto">
+            <button class="modal-tab-btn active" data-mtab="overview" onclick="switchModalTab('overview')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-info-circle"></i> ملخص</button>
+            <button class="modal-tab-btn" data-mtab="reports" onclick="switchModalTab('reports')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-ambulance"></i> البلاغات</button>
+            <button class="modal-tab-btn" data-mtab="completion" onclick="switchModalTab('completion')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-clipboard-check"></i> التكميل</button>
+            <button class="modal-tab-btn" data-mtab="forms" onclick="switchModalTab('forms')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-file-alt"></i> النماذج</button>
+            <button class="modal-tab-btn" data-mtab="files" onclick="switchModalTab('files')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-folder-open"></i> الملفات</button>
+            <button class="modal-tab-btn" data-mtab="audit" onclick="switchModalTab('audit')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-history"></i> سجل العمليات</button>
+        </div>
+        <div class="modal-body" id="shiftDetailBody" style="flex:1;overflow-y:auto">
+            <div class="loading"><div class="spinner"></div> جاري التحميل...</div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem;text-align:left;flex-shrink:0">
+            <button class="btn" onclick="closeShiftModal()">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ============================================
+// CONFIG
+// ============================================
+var token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
+var allShifts = [];
+var archiveData = [];
+
+// Chart instances (destroy before re-create to prevent "Canvas already in use")
+var charts = { daily: null, type: null, center: null };
+
+function destroyCharts() {
+    ['daily', 'type', 'center'].forEach(function(key) {
+        if (charts[key]) { charts[key].destroy(); charts[key] = null; }
+    });
+}
+
+function authHeaders() {
+    return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+// ============================================
+// TABS
+// ============================================
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === name); });
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.toggle('active', p.id === 'tab-' + name); });
+    if (name === 'archive') loadArchive();
+    if (name === 'reports') loadReports();
+    if (name === 'analytics') loadAnalytics();
+    if (name === 'compare') loadCompareOptions();
+    if (name === 'charts') loadCharts();
+}
+
+// ============================================
+// TOAST
+// ============================================
+function showToast(msg, type) {
+    var c = document.getElementById('toastContainer');
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(function() { t.remove(); }, 4000);
+}
+
+// ============================================
+// TAB 1: LIVE INDICATORS
+// ============================================
+async function loadLiveStats() {
+    try {
+        // Fetch current shift
+        var res = await fetch('/api/current-shift', { headers: authHeaders() });
+        var data = await res.json();
+
+        var statsHtml = '';
+        var shiftInfo = data.success && data.shift ? data.shift : { type: '-', date: '-', totalReports: 0, status: 'none' };
+
+        statsHtml +=
+            '<div class="stat-card">' +
+                '<div class="stat-icon blue"><i class="fas fa-clock"></i></div>' +
+                '<div><div class="stat-value">' + (shiftInfo.type || '-') + '</div><div class="stat-label">المناوبة الحالية</div></div>' +
+            '</div>';
+        statsHtml +=
+            '<div class="stat-card">' +
+                '<div class="stat-icon green"><i class="fas fa-ambulance"></i></div>' +
+                '<div><div class="stat-value">' + (shiftInfo.totalReports || 0) + '</div><div class="stat-label">البلاغات</div></div>' +
+            '</div>';
+
+        // Fetch shifts count
+        var shiftsRes = await fetch('/api/shifts', { headers: authHeaders() });
+        var shiftsData = await shiftsRes.json();
+        var totalShifts = Array.isArray(shiftsData) ? shiftsData.length : 0;
+
+        statsHtml +=
+            '<div class="stat-card">' +
+                '<div class="stat-icon purple"><i class="fas fa-archive"></i></div>' +
+                '<div><div class="stat-value">' + totalShifts + '</div><div class="stat-label">المناوبات المسجلة</div></div>' +
+            '</div>';
+
+        // Fetch today's reports
+        var today = new Date().toISOString().split('T')[0];
+        var todayShifts = Array.isArray(shiftsData) ? shiftsData.filter(function(s) { return s.shiftDate === today; }).length : 0;
+
+        statsHtml +=
+            '<div class="stat-card">' +
+                '<div class="stat-icon orange"><i class="fas fa-calendar-day"></i></div>' +
+                '<div><div class="stat-value">' + todayShifts + '</div><div class="stat-label">مناوبات اليوم</div></div>' +
+            '</div>';
+
+        // Active status
+        var statusBadge = document.getElementById('shiftStatusBadge');
+        if (shiftInfo.status === 'active') {
+            statusBadge.textContent = 'نشطة';
+            statusBadge.className = 'badge badge-success pulse';
+        } else if (shiftInfo.status === 'pending_handover') {
+            statusBadge.textContent = 'بانتظار التسليم';
+            statusBadge.className = 'badge badge-warning';
+        } else if (shiftInfo.status === 'archived') {
+            statusBadge.textContent = 'مؤرشفة';
+            statusBadge.className = 'badge badge-muted';
+        } else {
+            statusBadge.textContent = 'لا توجد مناوبة';
+            statusBadge.className = 'badge badge-muted';
+        }
+
+        document.getElementById('liveStats').innerHTML = statsHtml;
+
+        // Current shift details
+        var detailsHtml =
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem">' +
+                '<div><strong style="color:var(--text-muted);font-size:0.8rem">التاريخ</strong><div style="font-size:1.1rem;font-weight:700">' + (shiftInfo.date || '-') + '</div></div>' +
+                '<div><strong style="color:var(--text-muted);font-size:0.8rem">النوع</strong><div style="font-size:1.1rem;font-weight:700">' + (shiftInfo.type || '-') + '</div></div>' +
+                '<div><strong style="color:var(--text-muted);font-size:0.8rem">الرقم</strong><div style="font-size:1.1rem;font-weight:700">' + (shiftInfo.id || '-') + '</div></div>' +
+                '<div><strong style="color:var(--text-muted);font-size:0.8rem">البلاغات</strong><div style="font-size:1.1rem;font-weight:700">' + (shiftInfo.totalReports || 0) + '</div></div>' +
+            '</div>';
+        document.getElementById('currentShiftDetails').innerHTML = detailsHtml;
+
+    } catch (e) {
+        console.error('[LiveStats] Error:', e);
+        document.getElementById('liveStats').innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-exclamation-circle"></i> فشل في تحميل المؤشرات</div>';
+    }
+}
+
+// ============================================
+// TAB 2: ARCHIVE
+// ============================================
+async function loadArchive() {
+    try {
+        var res = await fetch('/api/shifts', { headers: authHeaders() });
+        var data = await res.json();
+        archiveData = Array.isArray(data) ? data : [];
+        renderArchive(archiveData);
+    } catch (e) {
+        console.error('[Archive] Error:', e);
+        document.getElementById('archiveTbody').innerHTML = '<tr><td colspan="7" class="loading">فشل في تحميل الأرشيف</td></tr>';
+    }
+}
+
+function renderArchive(data) {
+    var tbody = document.getElementById('archiveTbody');
+    document.getElementById('archiveCount').textContent = data.length;
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-archive"></i> لا توجد مناوبات</td></tr>';
+        return;
+    }
+
+    var html = '';
+    data.forEach(function(s, i) {
+        var statusClass = s.status === 'active' ? 'badge-success' : s.status === 'pending_handover' ? 'badge-warning' : 'badge-muted';
+        var statusText = s.status === 'active' ? 'نشطة' : s.status === 'pending_handover' ? 'بانتظار التسليم' : s.status === 'archived' ? 'مؤرشفة' : (s.status || 'غير معروف');
+
+        html += '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td style="font-weight:600">' + (s.shiftName || s.shift_name || '-') + '</td>' +
+            '<td>' + (s.shiftDate || s.shift_date || '-') + '</td>' +
+            '<td>' + (s.shiftType || s.shift_type || '-') + '</td>' +
+            '<td style="font-weight:700">' + (s.totalReports || s.total_reports || 0) + '</td>' +
+            '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>' +
+            '<td>' +
+                '<button class="btn btn-sm btn-primary" onclick="viewShift(' + (s.id || s.shift_id) + ')"><i class="fas fa-eye"></i></button> ' +
+                (s.status === 'active' ? '<button class="btn btn-sm" style="background:var(--warning);color:white;border-color:var(--warning)" onclick="endShift(' + s.id + ')"><i class="fas fa-flag-checkered"></i></button>' : '') +
+            '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function filterArchive() {
+    var q = document.getElementById('archiveSearch').value.toLowerCase();
+    var type = document.getElementById('archiveTypeFilter').value;
+    var status = document.getElementById('archiveStatusFilter').value;
+    var dateFrom = document.getElementById('archiveDateFrom').value;
+    var dateTo = document.getElementById('archiveDateTo').value;
+
+    var filtered = archiveData.filter(function(s) {
+        var name = (s.shiftName || s.shift_name || '').toLowerCase();
+        var shiftType = s.shiftType || s.shift_type || '';
+        var shiftStatus = s.status || '';
+        var shiftDate = s.shiftDate || s.shift_date || '';
+
+        if (q && !name.includes(q)) return false;
+        if (type && shiftType !== type) return false;
+        if (status && shiftStatus !== status) return false;
+        if (dateFrom && shiftDate < dateFrom) return false;
+        if (dateTo && shiftDate > dateTo) return false;
+        return true;
+    });
+
+    renderArchive(filtered);
+}
+
+// Store current shift detail data
+var currentShiftDetail = null;
+
+function switchModalTab(tab) {
+    document.querySelectorAll('.modal-tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.mtab === tab); });
+    document.querySelectorAll('.modal-tab-panel').forEach(function(p) { p.classList.toggle('active', p.id === 'mtab-' + tab); });
+}
+
+async function viewShift(id) {
+    var modal = document.getElementById('shiftDetailModal');
+    var body = document.getElementById('shiftDetailBody');
+    modal.style.display = 'flex';
+    body.innerHTML = '<div class="loading"><div class="spinner"></div> جاري تحميل تفاصيل المناوبة...</div>';
+
+    try {
+        var res = await fetch('/api/shifts/' + id, { headers: authHeaders() });
+        var data = await res.json();
+
+        if (!data || data.error) {
+            body.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i> المناوبة غير موجودة</div>';
+            return;
+        }
+
+        currentShiftDetail = data;
+        var s = data.shift || data;
+        var statusClass = s.status === 'active' ? 'badge-success' : s.status === 'pending_handover' ? 'badge-warning' : 'badge-muted';
+        var statusText = s.status === 'active' ? 'نشطة' : s.status === 'pending_handover' ? 'بانتظار التسليم' : s.status === 'archived' ? 'مؤرشفة' : (s.status || 'غير معروف');
+
+        // ── Tab 1: Overview ──
+        var overviewHtml =
+            '<div id="mtab-overview" class="modal-tab-panel active">' +
+            '<div class="detail-grid">' +
+                '<div class="detail-item"><div class="detail-label">رقم المناوبة</div><div class="detail-value">' + (s.id || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">الاسم</div><div class="detail-value">' + (s.shiftName || s.shift_name || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">التاريخ</div><div class="detail-value">' + (s.shiftDate || s.shift_date || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">النوع</div><div class="detail-value">' + (s.shiftType || s.shift_type || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">اليوم</div><div class="detail-value">' + (s.shiftDay || s.shift_day || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">الحالة</div><div class="detail-value"><span class="badge ' + statusClass + '">' + statusText + '</span></div></div>' +
+                '<div class="detail-item"><div class="detail-label">البلاغات</div><div class="detail-value" style="color:var(--primary)">' + (s.totalReports || s.total_reports || data.total || 0) + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">التكميلات</div><div class="detail-value" style="color:var(--success)">' + (data.completions ? Object.keys(data.completions).length : 0) + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">النماذج</div><div class="detail-value" style="color:var(--warning)">' + (data.forms ? data.forms.length : 0) + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">الملفات</div><div class="detail-value" style="color:var(--info)">' + (data.files ? data.files.length : 0) + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">بداية المناوبة</div><div class="detail-value">' + (s.startTime || s.start_time || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">آخر تحديث</div><div class="detail-value">' + (s.lastUpdate || s.last_update || '-') + '</div></div>' +
+            '</div>';
+
+        // Notes
+        var notes = s.generalNotes || s.general_notes || '';
+        if (notes) {
+            overviewHtml += '<div style="margin-top:1rem"><strong style="color:var(--text-muted);font-size:0.8rem">ملاحظات عامة</strong><div style="background:var(--bg);padding:0.75rem 1rem;border-radius:var(--radius-sm);margin-top:0.25rem;white-space:pre-wrap">' + notes + '</div></div>';
+        } else {
+            overviewHtml += '<div style="margin-top:1rem;text-align:center;color:var(--text-muted);font-size:0.85rem">لا توجد ملاحظات</div>';
+        }
+        overviewHtml += '</div>';
+
+        // ── Tab 2: Reports ──
+        var reportsHtml = '<div id="mtab-reports" class="modal-tab-panel">';
+        var reports = data.reports || {};
+        var reportKeys = Object.keys(reports);
+        if (reportKeys.length > 0) {
+            reportsHtml += '<table class="data-table"><thead><tr><th>المركز</th><th>الوحدة</th><th>العدد</th><th>آخر بلاغ</th></tr></thead><tbody>';
+            reportKeys.forEach(function(key) {
+                var parts = key.split('|');
+                var center = parts[0] || '-';
+                var unit = parts[1] || key;
+                var r = reports[key];
+                var count = typeof r === 'object' ? (r.count || 0) : (r || 0);
+                var times = typeof r === 'object' && r.times ? r.times : [];
+                var lastTime = times.length > 0 ? times[0] : '-';
+                reportsHtml += '<tr><td>' + center + '</td><td>' + unit + '</td><td style="font-weight:700;color:var(--primary)">' + count + '</td><td style="font-size:0.75rem;color:var(--text-muted)">' + lastTime + '</td></tr>';
+            });
+            reportsHtml += '</tbody></table>';
+        } else {
+            reportsHtml += '<div class="empty-state"><i class="fas fa-inbox"></i> لا توجد بلاغات</div>';
+        }
+        reportsHtml += '</div>';
+
+        // ── Tab 3: Completion ──
+        var compHtml = '<div id="mtab-completion" class="modal-tab-panel">';
+        var completions = data.completions || {};
+        var compKeys = Object.keys(completions);
+        if (compKeys.length > 0) {
+            compHtml += '<table class="data-table"><thead><tr><th>الفريق</th><th>الحالة</th><th>السبب</th><th>الناقص</th></tr></thead><tbody>';
+            compKeys.forEach(function(key) {
+                var c = completions[key];
+                var status = c.status || '-';
+                var statusBadge = status === 'ready' ? 'badge-success' : status === 'pending' ? 'badge-warning' : status === 'missing' ? 'badge-danger' : 'badge-muted';
+                var statusText = status === 'ready' ? 'جاهز' : status === 'pending' ? 'معلق' : status === 'missing' ? 'ناقص' : status;
+                compHtml += '<tr><td>' + key + '</td><td><span class="badge ' + statusBadge + '">' + statusText + '</span></td><td>' + (c.reason || '-') + '</td><td>' + (c.missingPerson || '-') + '</td></tr>';
+            });
+            compHtml += '</tbody></table>';
+        } else {
+            compHtml += '<div class="empty-state"><i class="fas fa-clipboard-check"></i> لا توجد بيانات تكميل</div>';
+        }
+        compHtml += '</div>';
+
+        // ── Tab 4: Forms ──
+        var formsHtml = '<div id="mtab-forms" class="modal-tab-panel">';
+        var forms = data.forms || [];
+        if (forms.length > 0) {
+            formsHtml += '<table class="data-table"><thead><tr><th>#</th><th>النموذج</th><th>التاريخ</th><th>الإجراءات</th></tr></thead><tbody>';
+            forms.forEach(function(f, i) {
+                formsHtml += '<tr><td>' + (i + 1) + '</td><td>' + (f.formName || f.form_name || f.form_id || '-') + '</td><td>' + (f.createdAt || f.created_at || '-') + '</td><td><button class="btn btn-sm btn-primary">عرض</button></td></tr>';
+            });
+            formsHtml += '</tbody></table>';
+        } else {
+            formsHtml += '<div class="empty-state"><i class="fas fa-file-alt"></i> لا توجد نماذج</div>';
+        }
+        formsHtml += '</div>';
+
+        // ── Tab 5: Files ──
+        var filesHtml = '<div id="mtab-files" class="modal-tab-panel">';
+        var files = data.files || [];
+        if (files.length > 0) {
+            filesHtml += '<table class="data-table"><thead><tr><th>#</th><th>الملف</th><th>الحجم</th><th>التاريخ</th><th>الإجراءات</th></tr></thead><tbody>';
+            files.forEach(function(f, i) {
+                var size = f.size ? (f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? Math.round(f.size / 1024) + ' KB' : Math.round(f.size / 1048576) + ' MB') : '-';
+                filesHtml += '<tr><td>' + (i + 1) + '</td><td><i class="fas fa-file" style="color:var(--primary)"></i> ' + (f.filename || f.file_name || '-') + '</td><td>' + size + '</td><td>' + (f.uploadDate || f.upload_date || f.createdAt || '-') + '</td><td><button class="btn btn-sm btn-primary"><i class="fas fa-download"></i></button></td></tr>';
+            });
+            filesHtml += '</tbody></table>';
+        } else {
+            filesHtml += '<div class="empty-state"><i class="fas fa-folder-open"></i> لا توجد ملفات</div>';
+        }
+        filesHtml += '</div>';
+
+        // ── Tab 6: Audit Log ──
+        var auditHtml = '<div id="mtab-audit" class="modal-tab-panel">';
+        var auditLog = data.audit_log || data.auditLog || [];
+        if (auditLog.length > 0) {
+            auditHtml += '<table class="data-table"><thead><tr><th>الوقت</th><th>المستخدم</th><th>الإجراء</th><th>التفاصيل</th><th>النوع</th></tr></thead><tbody>';
+            auditLog.forEach(function(a) {
+                var actionBadge = a.action && a.action.includes('created') ? 'badge-success' : a.action && a.action.includes('deleted') ? 'badge-danger' : a.action && a.action.includes('archive') ? 'badge-warning' : 'badge-info';
+                auditHtml += '<tr><td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (a.createdAt || a.created_at || '-') + '</td><td style="font-weight:600">' + (a.userName || a.user_name || a.userId || '-') + '</td><td><span class="badge ' + actionBadge + '">' + (a.action || '-') + '</span></td><td>' + (a.detail || '-') + '</td><td>' + (a.type || '-') + '</td></tr>';
+            });
+            auditHtml += '</tbody></table>';
+        } else {
+            auditHtml += '<div class="empty-state"><i class="fas fa-history"></i> لا توجد سجلات عمليات</div>';
+        }
+        auditHtml += '</div>';
+
+        // Combine all tabs
+        body.innerHTML = overviewHtml + reportsHtml + compHtml + formsHtml + filesHtml + auditHtml;
+
+        // Reset to overview tab
+        switchModalTab('overview');
+
+    } catch (e) {
+        console.error('[ViewShift] Error:', e);
+        body.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i> فشل في تحميل التفاصيل</div>';
+    }
+}
+
+function closeShiftModal() {
+    document.getElementById('shiftDetailModal').style.display = 'none';
+    currentShiftDetail = null;
+}
+
+async function endShift(id) {
+    if (!confirm('هل أنت متأكد من إنهاء المناوبة؟')) return;
+    try {
+        var res = await fetch('/api/shift/' + id + '/end', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({})
+        });
+        var data = await res.json();
+        if (data.success) {
+            showToast('تم إنهاء المناوبة بنجاح', 'success');
+            loadArchive();
+            loadLiveStats();
+        } else {
+            showToast(data.error || 'فشل', 'error');
+        }
+    } catch (e) {
+        showToast('خطأ في الاتصال', 'error');
+    }
+}
+
+// ============================================
+// TAB 3: REPORTS
+// ============================================
+async function loadReports() {
+    try {
+        var res = await fetch('/api/shifts', { headers: authHeaders() });
+        var shifts = await res.json();
+        shifts = Array.isArray(shifts) ? shifts : [];
+
+        document.getElementById('reportTotalShifts').textContent = shifts.length;
+
+        var totalReports = shifts.reduce(function(sum, s) { return sum + (s.totalReports || s.total_reports || 0); }, 0);
+        document.getElementById('reportTotalReports').textContent = totalReports;
+
+        var today = new Date().toISOString().split('T')[0];
+        var todayShifts = shifts.filter(function(s) { return (s.shiftDate || s.shift_date) === today; }).length;
+        document.getElementById('reportTodayShifts').textContent = todayShifts;
+
+        var avg = shifts.length ? Math.round(totalReports / shifts.length) : 0;
+        document.getElementById('reportAvgReports').textContent = avg;
+
+        // Daily report content
+        var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem">';
+        var recentShifts = shifts.slice(0, 10);
+        recentShifts.forEach(function(s) {
+            html +=
+                '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem">' +
+                    '<div style="font-weight:700;margin-bottom:0.5rem">' + (s.shiftName || s.shift_name || '-') + '</div>' +
+                    '<div style="font-size:0.8rem;color:var(--text-muted)">' + (s.shiftDate || s.shift_date) + ' — ' + (s.shiftType || s.shift_type) + '</div>' +
+                    '<div style="margin-top:0.5rem;font-size:1.2rem;font-weight:800;color:var(--primary)">' + (s.totalReports || s.total_reports || 0) + ' <small style="font-size:0.75rem;color:var(--text-muted)">بلاغ</small></div>' +
+                '</div>';
+        });
+        html += '</div>';
+        document.getElementById('dailyReportContent').innerHTML = html;
+
+    } catch (e) {
+        console.error('[Reports] Error:', e);
+    }
+}
+
+function generateDailyReport() {
+    showToast('جاري إعداد التقرير...', 'info');
+    // Can be extended to generate PDF/Excel
+}
+
+// ============================================
+// TAB 4: ANALYTICS
+// ============================================
+async function loadAnalytics() {
+    try {
+        var res = await fetch('/api/shifts', { headers: authHeaders() });
+        var shifts = await res.json();
+        shifts = Array.isArray(shifts) ? shifts : [];
+
+        var totalShifts = shifts.length;
+        var totalReports = shifts.reduce(function(sum, s) { return sum + (s.totalReports || s.total_reports || 0); }, 0);
+        var avg = totalShifts ? Math.round(totalReports / totalShifts) : 0;
+
+        var maxReports = 0, minReports = Infinity;
+        shifts.forEach(function(s) {
+            var c = s.totalReports || s.total_reports || 0;
+            if (c > maxReports) maxReports = c;
+            if (c < minReports) minReports = c;
+        });
+        if (minReports === Infinity) minReports = 0;
+
+        var statsHtml =
+            '<div class="stat-card"><div class="stat-icon blue"><i class="fas fa-calculator"></i></div><div><div class="stat-value">' + totalShifts + '</div><div class="stat-label">المناوبات</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon green"><i class="fas fa-ambulance"></i></div><div><div class="stat-value">' + totalReports + '</div><div class="stat-label">البلاغات</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon orange"><i class="fas fa-chart-line"></i></div><div><div class="stat-value">' + avg + '</div><div class="stat-label">المتوسط</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon red"><i class="fas fa-arrow-up"></i></div><div><div class="stat-value">' + maxReports + '</div><div class="stat-label">أعلى</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-arrow-down"></i></div><div><div class="stat-value">' + minReports + '</div><div class="stat-label">أدنى</div></div></div>';
+
+        document.getElementById('analyticsStats').innerHTML = statsHtml;
+
+        // Table: group by week
+        var weeks = {};
+        shifts.forEach(function(s) {
+            var date = s.shiftDate || s.shift_date;
+            if (!date) return;
+            var d = new Date(date);
+            var weekStart = new Date(d);
+            weekStart.setDate(d.getDate() - d.getDay());
+            var key = weekStart.toISOString().split('T')[0];
+            if (!weeks[key]) weeks[key] = { count: 0, reports: 0 };
+            weeks[key].count++;
+            weeks[key].reports += (s.totalReports || s.total_reports || 0);
+        });
+
+        var tbody = '';
+        Object.keys(weeks).sort().reverse().forEach(function(w) {
+            var v = weeks[w];
+            tbody += '<tr><td>أسبوع ' + w + '</td><td>' + v.count + '</td><td>' + v.reports + '</td><td>' + Math.round(v.reports/v.count) + '</td><td>-</td><td>-</td></tr>';
+        });
+        document.getElementById('analyticsTbody').innerHTML = tbody || '<tr><td colspan="6" class="empty-state">لا توجد بيانات كافية</td></tr>';
+
+    } catch (e) {
+        console.error('[Analytics] Error:', e);
+    }
+}
+
+// ============================================
+// TAB 5: COMPARE
+// ============================================
+async function loadCompareOptions() {
+    try {
+        var res = await fetch('/api/shifts', { headers: authHeaders() });
+        var shifts = await res.json();
+        shifts = Array.isArray(shifts) ? shifts : [];
+
+        var options = shifts.map(function(s) {
+            return '<option value="' + (s.id || s.shift_id) + '">' + (s.shiftName || s.shift_name || '-') + ' (' + (s.shiftDate || s.shift_date) + ')</option>';
+        }).join('');
+
+        document.getElementById('compareShift1').innerHTML = options;
+        document.getElementById('compareShift2').innerHTML = options;
+    } catch (e) {
+        console.error('[Compare] Error:', e);
+    }
+}
+
+async function compareShifts() {
+    var id1 = document.getElementById('compareShift1').value;
+    var id2 = document.getElementById('compareShift2').value;
+
+    if (!id1 || !id2) { showToast('اختر مناوبتين للمقارنة', 'warning'); return; }
+
+    try {
+        var res1 = await fetch('/api/shifts/' + id1, { headers: authHeaders() });
+        var s1 = await res1.json();
+        var res2 = await fetch('/api/shifts/' + id2, { headers: authHeaders() });
+        var s2 = await res2.json();
+
+        var html =
+            '<div class="card"><div class="card-body">' +
+            '<table class="data-table">' +
+            '<thead><tr><th>البيان</th><th>' + (s1.shiftName || s1.shift_name || '#1') + '</th><th>' + (s2.shiftName || s2.shift_name || '#2') + '</th></tr></thead>' +
+            '<tbody>' +
+            '<tr><td>التاريخ</td><td>' + (s1.shiftDate || s1.shift_date || '-') + '</td><td>' + (s2.shiftDate || s2.shift_date || '-') + '</td></tr>' +
+            '<tr><td>النوع</td><td>' + (s1.shiftType || s1.shift_type || '-') + '</td><td>' + (s2.shiftType || s2.shift_type || '-') + '</td></tr>' +
+            '<tr><td>البلاغات</td><td style="font-weight:700;color:var(--primary)">' + (s1.totalReports || s1.total_reports || 0) + '</td><td style="font-weight:700;color:var(--primary)">' + (s2.totalReports || s2.total_reports || 0) + '</td></tr>' +
+            '<tr><td>الحالة</td><td>' + (s1.status || '-') + '</td><td>' + (s2.status || '-') + '</td></tr>' +
+            '</tbody></table></div></div>';
+
+        document.getElementById('compareResult').innerHTML = html;
+    } catch (e) {
+        showToast('فشل في المقارنة', 'error');
+    }
+}
+
+// ============================================
+// TAB 6: CHARTS
+// ============================================
+function loadCharts() {
+    fetch('/api/shifts', { headers: authHeaders() })
+        .then(function(r) { return r.json(); })
+        .then(function(shifts) {
+            shifts = Array.isArray(shifts) ? shifts : [];
+            renderCharts(shifts);
+        })
+        .catch(function(e) { console.error('[Charts] Error:', e); });
+}
+
+function renderCharts(shifts) {
+    // Destroy old charts first to prevent "Canvas already in use"
+    destroyCharts();
+
+    // Daily reports line chart
+    var dailyMap = {};
+    shifts.forEach(function(s) {
+        var d = s.shiftDate || s.shift_date;
+        if (!d) return;
+        if (!dailyMap[d]) dailyMap[d] = 0;
+        dailyMap[d] += (s.totalReports || s.total_reports || 0);
+    });
+    var labels = Object.keys(dailyMap).sort().slice(-30);
+    var values = labels.map(function(d) { return dailyMap[d]; });
+
+    var ctx1 = document.getElementById('dailyChart').getContext('2d');
+    charts.daily = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'البلاغات',
+                data: values,
+                borderColor: '#2563EB',
+                backgroundColor: 'rgba(37,99,235,0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    // Shift type pie chart
+    var typeCounts = { 'صباحية': 0, 'ليلية': 0 };
+    shifts.forEach(function(s) { var t = s.shiftType || s.shift_type; if (typeCounts[t] !== undefined) typeCounts[t]++; });
+
+    var ctx2 = document.getElementById('shiftTypeChart').getContext('2d');
+    charts.type = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['صباحية', 'ليلية'],
+            datasets: [{ data: [typeCounts['صباحية'], typeCounts['ليلية']], backgroundColor: ['#F59E0B', '#2563EB'] }]
+        },
+        options: { responsive: true }
+    });
+
+    // Reports by center (placeholder - needs reports data)
+    var ctx3 = document.getElementById('centerChart').getContext('2d');
+    charts.center = new Chart(ctx3, {
+        type: 'bar',
+        data: {
+            labels: ['جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','سريع 1','سريع 2'],
+            datasets: [{ label: 'البلاغات', data: [12,8,15,10,7,5,3], backgroundColor: '#10B981' }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+}
+
+// ============================================
+// GLOBAL
+// ============================================
+function refreshAll() {
+    loadLiveStats();
+    showToast('تم التحديث', 'success');
+}
+
+// Init
+loadLiveStats();
+setInterval(loadLiveStats, 60000); // Refresh every minute
+</script>
+
+</body>
+</html>

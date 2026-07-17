@@ -1,5 +1,90 @@
 [
   {
+    "id": 1784126563154,
+    "shiftName": "ليلية - 2026-07-15 ٥:٤٢:٤٣ م",
+    "shiftDate": "2026-07-15",
+    "shiftTime": "٥:٤٢:٤٣ م",
+    "shiftType": "ليلية",
+    "startTime": "2026-07-15T14:42:43.154Z",
+    "savedReports": {
+      "المنصورة|جنوب 1": {
+        "count": 1,
+        "times": [
+          "2026-07-15 17:42:42"
+        ]
+      },
+      "المنصورة|جنوب 12": {
+        "count": 1,
+        "times": [
+          "2026-07-15 17:42:43"
+        ]
+      },
+      "الخالدية|جنوب 2": {
+        "count": 2,
+        "times": [
+          "2026-07-15 20:14:39",
+          "2026-07-15 17:42:44"
+        ]
+      },
+      "منفوحة|جنوب 3": {
+        "count": 2,
+        "times": [
+          "2026-07-15 20:14:44",
+          "2026-07-15 17:42:44"
+        ]
+      },
+      "الإسكان|جنوب 6": {
+        "count": 2,
+        "times": [
+          "2026-07-15 19:35:14",
+          "2026-07-15 17:42:49"
+        ]
+      }
+    },
+    "totalReports": 8,
+    "rapidLocations": {},
+    "centersData": {},
+    "vehicleData": {},
+    "fuelData": {},
+    "generalNotes": "",
+    "lastUpdate": "2026-07-15T17:14:44.964Z",
+    "autoArchived": false,
+    "status": "active"
+  },
+  {
+    "id": 1784126557226,
+    "shiftName": "ليل - 2026-07-15",
+    "shiftDate": "2026-07-15",
+    "shiftTime": "٨:٤٢:٣٧ م",
+    "shiftType": "ليل",
+    "shiftDay": "الأربعاء",
+    "startTime": "2026-07-15T17:42:37.217Z",
+    "totalReports": 2,
+    "savedReports": {
+      "المنصورة|جنوب 1": {
+        "count": 1,
+        "times": [
+          "2026-07-15 17:42:42"
+        ]
+      },
+      "المنصورة|جنوب 12": {
+        "count": 1,
+        "times": [
+          "2026-07-15 17:42:43"
+        ]
+      }
+    },
+    "rapidLocations": {},
+    "centersData": {},
+    "vehicleData": {},
+    "fuelData": {},
+    "generalNotes": "",
+    "lastUpdate": "2026-07-15T14:42:43.159Z",
+    "autoArchived": false,
+    "status": "active",
+    "archiveEngine": "2.0"
+  },
+  {
     "id": 1783874590724,
     "shiftName": "ليل - 2026-07-12",
     "shiftDate": "2026-07-12",
