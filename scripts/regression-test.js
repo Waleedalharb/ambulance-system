@@ -253,6 +253,10 @@ async function main() {
     const noteGet = await api('GET', `/api/shift-notes/${shift2Id}`);
     const noteList = noteGet.data && noteGet.data.notes || [];
     record('سجل الملاحظات عبر SQLite (كتابة/قراءة)', notePost.ok && noteList.some(n => n.text === 'ملاحظة regression'), `notes=${noteList.length}`);
+    const noteDel = noteList.length ? await api('DELETE', `/api/shift-notes/${shift2Id}/${noteList[0].id}`) : { ok: false, status: 0 };
+    const noteGet2 = await api('GET', `/api/shift-notes/${shift2Id}`);
+    const noteList2 = (noteGet2.data && noteGet2.data.notes) || [];
+    record('حذف ملاحظة من المصدر الواحد (NotesService)', noteDel.ok && noteList2.length === noteList.length - 1, `before=${noteList.length} after=${noteList2.length}`);
     const evPost = await api('POST', `/api/shift-events/${shift2Id}`, { type: 'اختبار', description: 'حدث regression' });
     const evGet = await api('GET', `/api/shift-events/${shift2Id}`);
     const evList = evGet.data && evGet.data.events || [];
@@ -279,18 +283,20 @@ async function main() {
     if (pp) await api('DELETE', `/api/peak-plans/${pp.id}`);
 
     // ─── 13. WebSocket live sync (shift_started + new_report) ───
-    let wsStarted = false, wsReport = false, wsPlanAdded = false, wsPlanDeleted = false, wsPlanId = null;
+    let wsStarted = false, wsReport = false, wsPlanAdded = false, wsPlanDeleted = false, wsPlanId = null, wsNoteAdded = false;
     try {
         const WebSocket = require('ws');
         await new Promise((resolve) => {
             const ws = new WebSocket(`ws://localhost:3080/ws?token=${TOKEN}`);
             const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(); }, 10000);
             ws.on('open', async () => {
-                await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
+                const st = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
+                const wsShift = st.data && st.data.shiftId;
                 await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3' });
                 const wp = await api('POST', '/api/peak-plans', { title: 'خطة WS regression', location: 'موقع WS' });
                 const pid = wp.data && wp.data.plan && wp.data.plan.id;
                 if (pid) await api('DELETE', `/api/peak-plans/${pid}`);
+                if (wsShift) await api('POST', `/api/shift-notes/${wsShift}`, { notes: [{ text: 'ملاحظة WS regression' }] });
             });
             ws.on('message', (raw) => {
                 try {
@@ -299,7 +305,8 @@ async function main() {
                     if (m.type === 'new_report' && m.center === 'منفوحة') wsReport = true;
                     if (m.type === 'peak_plan_added' && m.plan && m.plan.title === 'خطة WS regression') { wsPlanAdded = true; wsPlanId = m.plan.id; }
                     if (m.type === 'peak_plan_deleted' && m.planId === wsPlanId) wsPlanDeleted = true;
-                    if (wsStarted && wsReport && wsPlanAdded && wsPlanDeleted) { clearTimeout(timer); ws.terminate(); resolve(); }
+                    if (m.type === 'shift_note_added') wsNoteAdded = true;
+                    if (wsStarted && wsReport && wsPlanAdded && wsPlanDeleted && wsNoteAdded) { clearTimeout(timer); ws.terminate(); resolve(); }
                 } catch (_) {}
             });
             ws.on('error', () => { clearTimeout(timer); resolve(); });
@@ -309,6 +316,7 @@ async function main() {
     record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', wsStarted);
     record('بث إنشاء التمركز لحظياً (PositioningStarted ← peak_plan_added)', wsPlanAdded);
     record('بث إنهاء التمركز لحظياً (PositioningEnded ← peak_plan_deleted)', wsPlanDeleted);
+    record('بث تحديث سجل الملاحظات لحظياً (ShiftNoteAdded ← shift_note_added)', wsNoteAdded);
 
     // ─── 13b. Archive slice: auto-archive + direct archive produce seals (bug fix verification) ───
     const autoSnap = await api('GET', `/api/shift-snapshot/${shift2Id}`);

@@ -171,6 +171,13 @@ class OperationsEngine {
         this.bus.on('PositioningEnded', (e) => {
             safeBroadcast({ type: 'peak_plan_deleted', message: 'تم حذف خطة ذروة', planId: e.plan_id });
         });
+
+        // ─── Slice 5: Notes events → legacy WS shapes (byte-identical) ───
+
+        // ShiftNoteAdded (bulk register save) → existing 'shift_note_added' message
+        this.bus.on('ShiftNoteAdded', (e) => {
+            safeBroadcast({ type: 'shift_note_added', message: 'تم تحديث سجل الملاحظات' });
+        });
     }
 
     // ─── Initialization ───

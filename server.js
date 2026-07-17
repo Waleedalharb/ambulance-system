@@ -24,6 +24,7 @@ let opsEngine = null;
 let reportService = null;
 let completionService = null;
 let positioningService = null; // Slice 4: single owner of peak_plans writes
+let notesService = null; // Slice 5: single owner of shift_notes writes
 
 // ═══════════════════════════════════════════════════════════
 // Unified Data Layer v3.0
@@ -6697,7 +6698,8 @@ app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, 
 app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
-        const notes = await contentListByShift('shift_notes', shiftId);
+        // Slice 5: read via NotesService (single owner)
+        const notes = await notesService.list(shiftId);
         res.json({ success: true, notes });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الملاحظات' });
@@ -6711,18 +6713,9 @@ app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
         if (!notes || !Array.isArray(notes)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        const newNotes = notes.map((n, i) => ({ ...n, shiftId, id: n.id ? String(n.id) : (Date.now() + i).toString() }));
-        // Archive slice: bulk-replace inside one transaction (same semantics as the JSON write)
-        await withTx(async () => {
-            await db.run('DELETE FROM shift_notes WHERE shift_id = ?', [shiftId]);
-            for (const n of newNotes) {
-                await contentInsert('shift_notes', shiftId, n);
-            }
-        });
-        broadcast({
-            type: 'shift_note_added',
-            message: 'تم تحديث سجل الملاحظات'
-        });
+        // Slice 5: NotesService owns the bulk-replace transaction;
+        // ShiftNoteAdded fires after COMMIT (engine broadcasts shift_note_added)
+        await notesService.replaceAll(shiftId, notes);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الملاحظة' });
@@ -6732,7 +6725,11 @@ app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) => {
     try {
         const { shiftId, noteId } = req.params;
-        await db.run('DELETE FROM shift_notes WHERE shift_id = ? AND id = ?', [parseInt(shiftId), noteId]);
+        // Slice 5: delete via NotesService.
+        // LEGACY EXCEPTION: no catalogued ShiftNoteDeleted event (DOMAIN-MODEL
+        // §10.2 هـ lists ShiftNoteAdded only) — the broadcast stays here until
+        // the catalog gains the event (same status as PositioningUpdated).
+        await notesService.remove(parseInt(shiftId), noteId);
         broadcast({
             type: 'shift_note_deleted',
             message: 'تم حذف ملاحظة من المناوبة',
@@ -9959,11 +9956,17 @@ server.listen(PORT, async () => {
             const PositioningService = require('./services/positioning-service');
             positioningService = new PositioningService({ db, bus: opsEngine.bus, getActiveShiftId });
             console.log('✅ PositioningService wired (Slice 4)');
+
+            // Slice 5: NotesService — single owner of shift_notes writes
+            const NotesService = require('./services/notes-service');
+            notesService = new NotesService({ engine: opsEngine, db, bus: opsEngine.bus });
+            console.log('✅ NotesService wired (Slice 5)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
             completionService = null;
             positioningService = null;
+            notesService = null;
         }
     }
     
