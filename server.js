@@ -19,6 +19,12 @@ const { createEngine, getEngine } = require('./ops-engine');
 let opsEngine = null;
 
 // ═══════════════════════════════════════════════════════════
+// Slice 1: Event-driven services (instantiated after engine init)
+// ═══════════════════════════════════════════════════════════
+let reportService = null;
+let completionService = null;
+
+// ═══════════════════════════════════════════════════════════
 // Unified Data Layer v3.0
 // ═══════════════════════════════════════════════════════════
 const unifiedDataLayer = require('./unified-data-layer');
@@ -1940,7 +1946,10 @@ async function writeUnitLocationAddresses(data) {
 // ============================================
 app.get('/api/data', authenticate, async (req, res) => {
     try {
-        const data = await readData();
+        // Slice 1: dispatch data comes from SQLite (reports + report_times
+        // of the ACTIVE shift) via ReportService. Falls back to the JSON
+        // file ONLY when the engine/services are unavailable (init failure).
+        const data = reportService ? await reportService.getCurrentData() : await readData();
         const shiftType = getCurrentShiftType();
         const shiftDate = getCurrentShiftDate();
         
@@ -3856,7 +3865,8 @@ app.post('/api/report', authenticate, validateBody({
     center: { required: true, type: 'string', minLength: 1, maxLength: 100 },
     unit: { required: true, type: 'string', minLength: 1, maxLength: 100 }
 }), async (req, res) => {
-    // Operations Engine → ReportManager → SQLite
+    // Slice 1: Route → ReportService → SQLite tx → COMMIT → DispatchLogCreated
+    // event → broadcast subscriber emits the SAME 'new_report' WS payload.
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
@@ -3866,6 +3876,12 @@ app.post('/api/report', authenticate, validateBody({
         const shiftId = await opsEngine.shifts.resolveShiftId(req);
         if (!shiftId) return res.status(400).json({ error: 'لا توجد مناوبة نشطة - ابدأ مناوبة أولاً' });
 
+        if (reportService) {
+            const result = await reportService.createReport({ center, unit, shiftId }, req.user);
+            return res.json(result);
+        }
+
+        // Legacy fallback (services unavailable): original inline path
         const result = await opsEngine.reports.addReport(shiftId, center, unit);
 
         if (result.success) {
@@ -3880,7 +3896,8 @@ app.post('/api/report', authenticate, validateBody({
 
 
 app.post('/api/undo', authenticate, async (req, res) => {
-    // Operations Engine → ReportManager → SQLite
+    // Slice 1: Route → ReportService → SQLite tx → COMMIT → DispatchUndone
+    // event → broadcast subscriber emits the SAME 'report_undone' WS payload.
     const { center, unit } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
@@ -3890,6 +3907,12 @@ app.post('/api/undo', authenticate, async (req, res) => {
         const shiftId = await opsEngine.shifts.resolveShiftId(req);
         if (!shiftId) return res.status(400).json({ error: 'لا توجد مناوبة نشطة' });
 
+        if (reportService) {
+            const result = await reportService.undoLastReport({ center, unit, shiftId }, req.user);
+            return res.json(result);
+        }
+
+        // Legacy fallback (services unavailable): original inline path
         const result = await opsEngine.reports.undoReport(shiftId, center, unit);
 
         if (result.success) {
@@ -4207,7 +4230,8 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
 // API: Save Radio Completion (Shift Quick Log)
 // ============================================
 app.post('/api/shift-completion', authenticate, async (req, res) => {
-    // Operations Engine → CompletionManager → SQLite
+    // Slice 1: Route → CompletionService → SQLite tx → COMMIT →
+    // CompletionUpdated (+ CenterStatusChanged on ready/not-ready flips).
     try {
         const { shiftType, shiftDate, teams, notes } = req.body;
         if (!shiftType || !shiftDate || !teams) {
@@ -4218,6 +4242,14 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
 
         const shiftId = await opsEngine.shifts.resolveShiftId(req, shiftDate, shiftType);
 
+        if (completionService) {
+            const result = await completionService.saveCompletion(
+                { shiftType, shiftDate, teams, notes, shiftId }, req.user
+            );
+            return res.json({ success: true, message: 'تم حفظ التكميل', ...result });
+        }
+
+        // Legacy fallback (services unavailable): original inline path
         const result = await opsEngine.completions.saveCompletion(
             shiftId, shiftType, shiftDate, teams, notes, req.user
         );
@@ -4234,14 +4266,16 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
 // API: Get Radio Completion (latest for shift date + type)
 // ============================================
 app.get('/api/completion/latest', authenticate, async (req, res) => {
-    // Operations Engine → CompletionManager → SQLite
+    // Slice 1: Route → CompletionService → SQLite (read)
     try {
         const { shiftDate, shiftType } = req.query;
         if (!shiftDate || !shiftType) return res.status(400).json({ error: 'shiftDate and shiftType required' });
 
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        const completion = await opsEngine.completions.getLatestCompletion(shiftDate, shiftType);
+        const completion = completionService
+            ? await completionService.getLatest({ shiftDate, shiftType })
+            : await opsEngine.completions.getLatestCompletion(shiftDate, shiftType);
         if (!completion) return res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
 
         res.json({ success: true, completion });
@@ -9842,6 +9876,28 @@ server.listen(PORT, async () => {
     } catch (err) {
         console.error('⚠️ Operations Engine failed:', err.message);
         opsEngine = null;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Slice 1: Event-driven write path (Reports + Completion)
+    // Route → Service → SQLite transaction → COMMIT → domain event
+    // on the engine-owned Event Bus → subscribers (broadcast, ...).
+    // The engine holds the bus; we register ONE broadcast subscriber
+    // that maps domain events to the EXISTING broadcast() payloads.
+    // ═══════════════════════════════════════════════════════════
+    if (opsEngine) {
+        try {
+            const ReportService = require('./services/report-service');
+            const CompletionService = require('./services/completion-service');
+            opsEngine.wireEvents({ broadcast });
+            reportService = new ReportService({ engine: opsEngine, bus: opsEngine.bus });
+            completionService = new CompletionService({ engine: opsEngine, bus: opsEngine.bus });
+            console.log('✅ Event-driven services wired (ReportService, CompletionService)');
+        } catch (err) {
+            console.error('⚠️ Event-driven services failed:', err.message);
+            reportService = null;
+            completionService = null;
+        }
     }
     
     // Initialize RAG Engine

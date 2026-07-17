@@ -7,6 +7,7 @@
  */
 
 const StorageAdapter = require('./storage-adapter');
+const { createEventBus } = require('./services/event-bus');
 const {
     ShiftManager,
     ReportManager,
@@ -31,6 +32,99 @@ class OperationsEngine {
         this.shifts = this.storage ? new ShiftManager(this.storage) : null;
         this.reports = this.storage ? new ReportManager(this.storage) : null;
         this.completions = this.storage ? new CompletionManager(this.storage) : null;
+
+        // ─── Slice 1: Event-driven write path ───
+        // The engine OWNS the internal domain Event Bus. Services emit
+        // domain events into it; subscribers (broadcast, indicators,
+        // timeline) are registered here in the engine wiring.
+        this.bus = createEventBus();
+
+        // Serializes SQLite write transactions across ALL services
+        // (single shared connection — interleaved BEGINs would fail).
+        this._txQueue = Promise.resolve();
+        this._eventsWired = false;
+    }
+
+    // ─── Transactions ───
+    /**
+     * Run fn inside a SQLite transaction (BEGIN → fn → COMMIT, ROLLBACK
+     * on throw). Transactions are serialized through an in-process queue
+     * because all services share one better-sqlite3 connection.
+     */
+    runInTransaction(fn) {
+        const exec = async () => {
+            const dbm = this.storage && this.storage.db;
+            const hasTx = dbm && typeof dbm.beginTransaction === 'function';
+            if (hasTx) dbm.beginTransaction();
+            try {
+                const out = await fn();
+                if (hasTx) dbm.commitTransaction();
+                return out;
+            } catch (err) {
+                if (hasTx) {
+                    try { dbm.rollbackTransaction(); } catch (_) { /* already rolled back */ }
+                }
+                throw err;
+            }
+        };
+        const run = this._txQueue.then(exec);
+        this._txQueue = run.catch(() => { /* keep the queue alive after failures */ });
+        return run;
+    }
+
+    // ─── Event Wiring ───
+    /**
+     * Register the ONE broadcast subscriber that maps domain events to
+     * the EXISTING broadcast() message types/payloads the frontend
+     * already expects. server.js passes its own broadcast function here.
+     * Idempotent — safe to call once after engine creation.
+     *
+     * @param {Object} deps
+     * @param {Function} deps.broadcast - server.js broadcast(data)
+     */
+    wireEvents({ broadcast } = {}) {
+        if (this._eventsWired) return;
+        this._eventsWired = true;
+
+        const safeBroadcast = (data) => {
+            if (typeof broadcast !== 'function') return;
+            try {
+                broadcast(data);
+            } catch (err) {
+                console.error('[OpsEngine] Broadcast subscriber error:', err.message);
+            }
+        };
+
+        // Dispatch log created → existing 'new_report' message
+        this.bus.on('DispatchLogCreated', (e) => {
+            safeBroadcast({ type: 'new_report', center: e.center, unit: e.unit, shiftId: e.shift_id });
+        });
+
+        // Dispatch undone → existing 'report_undone' message
+        this.bus.on('DispatchUndone', (e) => {
+            safeBroadcast({ type: 'report_undone', center: e.center, unit: e.unit, shiftId: e.shift_id });
+        });
+
+        // Completion saved → existing 'completion_updated' message type
+        this.bus.on('CompletionUpdated', (e) => {
+            safeBroadcast({
+                type: 'completion_updated',
+                shiftId: e.shift_id,
+                shiftDate: e.shift_date,
+                shiftType: e.shift_type
+            });
+        });
+
+        // Team ready/not-ready flip → existing 'team_status_changed' message type
+        this.bus.on('CenterStatusChanged', (e) => {
+            safeBroadcast({
+                type: 'team_status_changed',
+                teamId: e.team,
+                status: e.to === 'مكتمل' ? 'ready' : 'missing',
+                shiftDate: e.shift_date,
+                shiftType: e.shift_type
+            });
+        });
     }
 
     // ─── Initialization ───

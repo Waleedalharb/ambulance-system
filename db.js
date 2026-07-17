@@ -5,7 +5,7 @@ const path = require('path');
 // ============================================
 // CONFIGURATION
 // ============================================
-const DB_PATH = path.join(__dirname, 'database.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'database.db');
 const DATA_DIR = path.join(__dirname, 'data');
 const OPS_UPLOAD_DIR = path.join(DATA_DIR, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
