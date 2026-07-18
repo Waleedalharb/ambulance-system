@@ -1824,7 +1824,7 @@
                     date: new Date().toISOString()
                 };
                 savedFiles.unshift(fileInfo);
-                localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+                saveFilesToServer(); // F6/D2 — كان مفتاح localStorage المحلي للملفات (أُلغي)
                 renderSavedFiles();
                 // عرض شريط التقدم
                 document.getElementById('uploadProgress').classList.add('active');
@@ -2554,24 +2554,38 @@
             }
         }
 
-        async function loadFromServer() {
+        // F6/D1: المصدر الرسمي المؤقت للموظفين هو /api/schedule/employees (ملف JSON خادمي).
+        // جالب صامت مشترك (Server-First): يُستخدم في التهيئة (setupDemoData) ومستمع WebSocket (D4).
+        // يعيد مصفوفة غير فارغة عند نجاح الخادم؛ وnull عند: غياب التوكن / فشل شبكة أو مصادقة /
+        // نجاح فارغ (= لا بيانات رُفعت بعد — ليست «أحدث» فيُكمل للكاش). صامت: بلا Toast.
+        async function fetchEmployeesFromServerSilent() {
             try {
                 var token = AuthCore.getToken();
+                if (!token) return null;
                 var response = await fetch('/api/schedule/employees', {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
+                if (!response.ok) return null;
                 var result = await response.json();
                 if (result.success && Array.isArray(result.employees) && result.employees.length > 0) {
-                    employees = result.employees;
-                    updateStats();
-                    renderCharts();
-                    renderCurrentView();
-                    populateLocationFilter();
-                    showToast('تم تحميل ' + employees.length + ' موظف من السيرفر', 'success');
+                    return result.employees;
                 }
-            } catch (error) {
-                console.error('خطأ في تحميل البيانات من السيرفر:', error);
+                return null;
+            } catch (e) {
+                console.warn('[F6] تعذر جلب الموظفين من الخادم — السقوط للكاش:', e);
+                return null;
             }
+        }
+
+        // F6: اعتماد بيانات الخادم + كتابة الكاشين (write-through) + العرض — منطق مشترك واحد
+        function adoptServerEmployees(serverEmployees) {
+            employees = serverEmployees;
+            saveToIndexedDB();
+            saveToLocalStorage();
+            updateStats();
+            renderCharts();
+            renderCurrentView();
+            populateLocationFilter();
         }
 
         async function saveToServer() {
@@ -2612,12 +2626,34 @@
             } catch(e) { return null; }
         }
 
-        function loadSavedFiles() {
+        // F6/D2: سجل الملفات المرفوعة من الخادم (/api/schedule/files) — أُلغي مفتاح localStorage المحلي للملفات
+        async function loadSavedFiles() {
             try {
-                var files = localStorage.getItem('ss_savedFiles');
-                savedFiles = files ? JSON.parse(files) : [];
+                var token = AuthCore.getToken();
+                if (!token) { savedFiles = []; renderSavedFiles(); return; }
+                var response = await fetch('/api/schedule/files', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var result = await response.json();
+                savedFiles = (result.success && Array.isArray(result.files)) ? result.files : [];
                 renderSavedFiles();
-            } catch(e) { savedFiles = []; }
+            } catch(e) { savedFiles = []; renderSavedFiles(); }
+        }
+
+        // F6/D2: كتابة السجل كاملاً للخادم (عقد POST يقبل المصفوفة كاملة — لا يوجد DELETE مفرد في العقد القائم)
+        async function saveFilesToServer() {
+            try {
+                var token = AuthCore.getToken();
+                if (!token) return;
+                await fetch('/api/schedule/files', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ files: savedFiles })
+                });
+            } catch(e) { console.warn('[F6] تعذر حفظ سجل الملفات في الخادم:', e); }
         }
 
         function getSavedFiles() { return savedFiles; }
@@ -2644,7 +2680,7 @@
 
         function deleteSavedFile(id) {
             savedFiles = savedFiles.filter(function(f) { return f.id !== id; });
-            localStorage.setItem('ss_savedFiles', JSON.stringify(savedFiles));
+            saveFilesToServer(); // F6/D2 — كان مفتاح localStorage المحلي للملفات (أُلغي)
             renderSavedFiles();
             showToast('تم حذف الملف', 'info');
         }
@@ -2654,7 +2690,14 @@
         // ==========================================
         async function setupDemoData() {
             if (employees.length > 0) return;
-            // 1. Try IndexedDB first (most reliable)
+            // F6: Server-First — الخادم هو المصدر الأول دائماً (قاعدة الحافة المعتمدة: غير فارغ فقط يُعتمد)
+            var serverEmployees = await fetchEmployeesFromServerSilent();
+            if (serverEmployees) {
+                adoptServerEmployees(serverEmployees);
+                console.log('[setupDemoData] Loaded', employees.length, 'from server (F6 server-first)');
+                return;
+            }
+            // 1. Try IndexedDB (fallback فقط عند فشل/فراغ الخادم)
             try {
                 await loadFromIndexedDB();
                 if (employees.length > 0) {
@@ -2671,21 +2714,7 @@
                 saveToIndexedDB();
                 return;
             }
-            // 3. Try server
-            var token = AuthCore.getToken();
-            if (token) {
-                try {
-                    await loadFromServer();
-                    if (employees.length > 0) {
-                        console.log('[setupDemoData] Loaded', employees.length, 'from server');
-                        // Save to local for offline use
-                        saveToIndexedDB();
-                        saveToLocalStorage();
-                        return;
-                    }
-                } catch(e) { console.error('Auto-load from server failed:', e); }
-            }
-            // 4. Empty
+            // 3. Empty
             employees = generateDemoData();
             saveToIndexedDB();
             saveToLocalStorage();

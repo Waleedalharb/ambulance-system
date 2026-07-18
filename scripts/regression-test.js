@@ -675,6 +675,69 @@ async function main() {
     const f5bNoFabricated = !f5bAppSrc.includes('staffCount) || 2');
     record('F5b+ ⑥: لا افتراضي مختلق في staffCount (|| 2 أُزيل — الحالة الصادقة «—» عند الغياب)', f5bNoFabricated, f5bNoFabricated ? 'clean' : 'fabricated default found');
 
+    // ─── 13k. F6: Source of Truth Validation — smart-schedule SoT ───
+    const f6RcSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
+    const f6SsSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'smart-schedule.html'), 'utf8');
+    const f6WsSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'js', 'websocket-sync.js'), 'utf8');
+    const f6AdmSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'admin-dashboard.html'), 'utf8');
+
+    // ① الخادم يغلب الكاش: الجلب الخادمي يسبق مراجع الكاش نصياً في مسارَي الفتح
+    const f6RcRegion = f6RcSrc.slice(f6RcSrc.indexOf('function loadFromSmartSchedule()'), f6RcSrc.indexOf('function showNoScheduleData'));
+    const f6RcOrder = f6RcRegion.indexOf('/api/schedule/employees') !== -1
+        && f6RcRegion.indexOf('/api/schedule/employees') < f6RcRegion.indexOf('loadFromIndexedDBFallback')
+        && f6RcRegion.indexOf('/api/schedule/employees') < f6RcRegion.indexOf('indexedDB.open');
+    const f6SsSetup = f6SsSrc.slice(f6SsSrc.indexOf('async function setupDemoData()'), f6SsSrc.indexOf('function generateDemoData'));
+    const f6SsOrder = f6SsSetup.indexOf('fetchEmployeesFromServerSilent') !== -1
+        && f6SsSetup.indexOf('fetchEmployeesFromServerSilent') < f6SsSetup.indexOf('loadFromIndexedDB');
+    record('F6 ①: الخادم يغلب الكاش — الجلب الخادمي أولاً في مسارَي الفتح (radio + smart-schedule)', f6RcOrder && f6SsOrder, `radio=${f6RcOrder} schedule=${f6SsOrder}`);
+
+    // ② الكاش fallback فقط (بعد الجلب الخادمي نصياً) + الجلب الصامت بلا Toast
+    const f6SsFetcher = f6SsSrc.slice(f6SsSrc.indexOf('async function fetchEmployeesFromServerSilent'), f6SsSrc.indexOf('// F6: اعتماد بيانات الخادم'));
+    const f6SilentOk = !f6SsFetcher.includes('showToast') && !f6RcRegion.includes('showToast');
+    const f6RcFallbackOnly = f6RcRegion.indexOf('/api/schedule/employees') < f6RcRegion.indexOf("localStorage.getItem('ss_employees')");
+    const f6SsFallbackOnly = f6SsSetup.indexOf('fetchEmployeesFromServerSilent') < f6SsSetup.indexOf('loadFromLocalStorage');
+    record('F6 ②: الكاش fallback فقط عند الفشل/الفراغ + الجلب الصامت بلا Toast', f6SilentOk && f6RcFallbackOnly && f6SsFallbackOnly, `silent=${f6SilentOk} rcCache=${f6RcFallbackOnly} ssCache=${f6SsFallbackOnly}`);
+
+    // ③ تحديث الكاش بعد النجاح (write-through) في الصفحتين
+    const f6SsAdopt = f6SsSrc.slice(f6SsSrc.indexOf('function adoptServerEmployees'), f6SsSrc.indexOf('async function saveToServer'));
+    const f6SsWT = f6SsAdopt.includes('saveToIndexedDB()') && f6SsAdopt.includes('saveToLocalStorage()');
+    const f6RcWTfn = f6RcSrc.slice(f6RcSrc.indexOf('function writeEmployeesToCaches'), f6RcSrc.indexOf('// F6: قراءة الكاش'));
+    const f6RcWT = f6RcWTfn.includes("localStorage.setItem('ss_employees'") && f6RcWTfn.includes('indexedDB.open');
+    const f6RcWTcalled = f6RcRegion.includes('writeEmployeesToCaches(serverEmployees)');
+    record('F6 ③: write-through للكاشين بعد نجاح الجلب الخادمي في الصفحتين', f6SsWT && f6RcWT && f6RcWTcalled, `schedule=${f6SsWT} radio=${f6RcWT} called=${f6RcWTcalled}`);
+
+    // ④ تطابق الشاشتين على المصدر الواحد: static + runtime (POST⇒GET للموظفين والملفات، سجل اختباري يُنظَّف)
+    const f6BothFetch = f6RcSrc.includes("'/api/schedule/employees'") && f6SsSrc.includes("'/api/schedule/employees'");
+    const f6EmpOrig = await api('GET', '/api/schedule/employees');
+    const f6EmpList = (f6EmpOrig.data && f6EmpOrig.data.employees) || [];
+    const f6TestEmp = { id: 'F6TEST_EMP', name: 'موظف اختبار F6', jobTitle: 'اختبار', phone: '', team: '', schedule: [] };
+    const f6EmpMod = f6EmpList.concat([f6TestEmp]);
+    const f6EmpPut = await api('POST', '/api/schedule/employees', { employees: f6EmpMod });
+    const f6EmpAfter = await api('GET', '/api/schedule/employees');
+    const f6EmpMatch = f6EmpAfter.ok && JSON.stringify((f6EmpAfter.data && f6EmpAfter.data.employees) || []) === JSON.stringify(f6EmpMod);
+    await api('POST', '/api/schedule/employees', { employees: f6EmpList }); // حذف السجل الاختباري = استعادة الحالة
+    const f6EmpBack = await api('GET', '/api/schedule/employees');
+    const f6EmpRestored = JSON.stringify((f6EmpBack.data && f6EmpBack.data.employees) || []) === JSON.stringify(f6EmpList);
+    const f6FilesOrig = await api('GET', '/api/schedule/files');
+    const f6FilesList = (f6FilesOrig.data && f6FilesOrig.data.files) || [];
+    const f6TestFile = { id: 987654321, name: 'F6TEST.xlsx', type: 'xlsx', size: 1, date: new Date().toISOString() };
+    const f6FilesMod = [f6TestFile].concat(f6FilesList);
+    await api('POST', '/api/schedule/files', { files: f6FilesMod });
+    const f6FilesAfter = await api('GET', '/api/schedule/files');
+    const f6FilesMatch = JSON.stringify((f6FilesAfter.data && f6FilesAfter.data.files) || []) === JSON.stringify(f6FilesMod);
+    await api('POST', '/api/schedule/files', { files: f6FilesList }); // استعادة
+    record('F6 ④: تطابق الشاشتين على /api/schedule/employees + runtime POST⇒GET (موظفون وملفات)', f6BothFetch && f6EmpPut.ok && f6EmpMatch && f6EmpRestored && f6FilesMatch, `static=${f6BothFetch} emp=${f6EmpMatch} restore=${f6EmpRestored} files=${f6FilesMatch}`);
+
+    // ⑤ لا مصدر أول محلي: صفر مفتاح الملفات المحلي، مستمعا WS صحيحان، تعريف loadFromServer واحد، المفاتيح الأربعة غائبة، لا بذور موظفين ثابتة
+    const f6NoSavedFiles = !f6SsSrc.includes('ss_savedFiles');
+    const f6WsEmp = f6WsSrc.includes('fetchEmployeesFromServerSilent');
+    const f6WsFiles = f6WsSrc.includes('loadSavedFiles');
+    const f6SsFilesApi = /function loadSavedFiles[\s\S]{0,600}?\/api\/schedule\/files/.test(f6SsSrc);
+    const f6OneLfs = (f6SsSrc.match(/function loadFromServer\(/g) || []).length === 1;
+    const f6KeysGone = !f6AdmSrc.includes('importedEmployees') && !f6AdmSrc.includes('plannerEmployees') && !f6AdmSrc.includes('lastImportedFile') && !f6AdmSrc.includes('shift-planner-data');
+    const f6NoSeeds = !f6RcSrc.includes('generateDemoData') && /function generateDemoData\(\)[\s\S]{0,500}?return \[\];/.test(f6SsSrc);
+    record('F6 ⑤: لا مصدر أول محلي (مفتاح الملفات صفر، مستمعا WS، loadFromServer واحد، المفاتيح الأربعة، لا بذور)', f6NoSavedFiles && f6WsEmp && f6WsFiles && f6SsFilesApi && f6OneLfs && f6KeysGone && f6NoSeeds, `files=${f6NoSavedFiles} ws=${f6WsEmp}/${f6WsFiles} api=${f6SsFilesApi} lfs=${f6OneLfs} keys=${f6KeysGone} seeds=${f6NoSeeds}`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

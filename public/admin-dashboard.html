@@ -574,7 +574,7 @@
                 cleared.push('IndexedDB (smartScheduleDB)');
             } catch (e) { errors.push('IndexedDB: ' + e.message); }
             // 2. Clear localStorage keys
-            var localKeys = ['ss_employees', 'importedEmployees', 'plannerEmployees', 'lastImportedFile', 'shift-planner-data'];
+            var localKeys = ['ss_employees']; // F6: حُذفت المفاتيح الأربعة الميتة (صفر مراجع في public/)
             localKeys.forEach(function(key) {
                 try { localStorage.removeItem(key); cleared.push('localStorage: ' + key); }
                 catch (e) { errors.push('localStorage ' + key + ': ' + e.message); }

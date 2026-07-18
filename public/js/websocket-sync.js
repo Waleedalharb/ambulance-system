@@ -221,7 +221,12 @@
                         break;
                     case 'schedule_employees_updated':
                     case 'schedule_employees_cleared':
-                        if (typeof loadFromServer === 'function') loadFromServer();
+                        // F6/D4: إعادة الجلب من المصدر الرسمي (JSON /api/schedule/employees) بدل loadFromServer العلائقية الفارغة
+                        if (typeof fetchEmployeesFromServerSilent === 'function') {
+                            fetchEmployeesFromServerSilent().then(function(list) {
+                                if (list && typeof adoptServerEmployees === 'function') adoptServerEmployees(list);
+                            });
+                        }
                         if (typeof loadEmployees === 'function') loadEmployees();
                         if (typeof loadData === 'function') loadData();
                         if (typeof loadAllData === 'function') loadAllData();

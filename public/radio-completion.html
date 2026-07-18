@@ -601,6 +601,67 @@ function initStatuses() {
 // LOAD PARAMEDICS FROM SMART SCHEDULE
 // ============================================
 function loadFromSmartSchedule() {
+    // F6: Server-First — الخادم (/api/schedule/employees) هو المصدر الأول دائماً (جلب صامت).
+    // نجاح غير فارغ ← يُعتمد + write-through للكاشين؛ نجاح فارغ (= لا بيانات رُفعت بعد) أو فشل شبكة/مصادقة أو لا توكن ← الكاش.
+    var token = AuthCore.getToken();
+    var serverFetch = token
+        ? fetch('/api/schedule/employees', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(result) {
+            if (result && result.success && Array.isArray(result.employees) && result.employees.length > 0) {
+                return result.employees;
+            }
+            return null;
+        })
+        .catch(function(e) {
+            console.warn('[F6] تعذر جلب الموظفين من الخادم — السقوط للكاش:', e);
+            return null;
+        })
+        : Promise.resolve(null);
+
+    serverFetch.then(function(serverEmployees) {
+        if (serverEmployees) {
+            smartScheduleData = serverEmployees;
+            assignParamedics();
+            renderAll();
+            // F6: write-through — تحديث الكاشين تلقائياً بعد نجاح الاتصال (كانت localStorage فقط)
+            writeEmployeesToCaches(serverEmployees);
+            // After paramedics loaded, try loading saved completion (كما كان في المسار الخادمي)
+            loadSavedCompletion();
+            return;
+        }
+        // Fallback فقط عند فشل/فراغ الخادم: IndexedDB ثم localStorage
+        loadFromIndexedDBFallback();
+    });
+}
+
+// F6: كتابة الكاشين (IndexedDB + localStorage) بعد نجاح الجلب الخادمي
+function writeEmployeesToCaches(list) {
+    try { localStorage.setItem('ss_employees', JSON.stringify(list)); } catch(e) {}
+    try {
+        var req = indexedDB.open('SmartScheduleDB_v13', 3);
+        req.onupgradeneeded = function(e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains('employees')) {
+                db.createObjectStore('employees', { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = function(e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains('employees')) { db.close(); return; }
+            var tx = db.transaction('employees', 'readwrite');
+            var store = tx.objectStore('employees');
+            store.clear();
+            for (var i = 0; i < list.length; i++) store.put(list[i]);
+            tx.oncomplete = function() { db.close(); };
+        };
+    } catch(e) {}
+}
+
+// F6: قراءة الكاش — تُستدعى فقط بعد فشل/فراغ الخادم (كانت نقطة الدخول الأولى قبل F6)
+function loadFromIndexedDBFallback() {
     try {
         var req = indexedDB.open('SmartScheduleDB_v13', 2);
         req.onsuccess = function(e) {
@@ -639,37 +700,13 @@ function tryLocalStorageFallback() {
             }
         } catch(e) {}
     }
-    tryServerFallback();
+    showNoScheduleData();
 }
 
-function tryServerFallback() {
-    var token = AuthCore.getToken();
-    if (!token) {
-        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
-        renderAll();
-        return;
-    }
-    fetch('/api/schedule/employees', {
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(result) {
-        if (result.success && Array.isArray(result.employees) && result.employees.length > 0) {
-            smartScheduleData = result.employees;
-            assignParamedics();
-            renderAll();
-            localStorage.setItem('ss_employees', JSON.stringify(result.employees));
-            // After paramedics loaded, try loading saved completion
-            loadSavedCompletion();
-        } else {
-            showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
-            renderAll();
-        }
-    })
-    .catch(function(e) {
-        showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
-        renderAll();
-    });
+// F6: الحالة الفارغة — نفس رسالة/توست اليوم حرفياً (كانت في tryServerFallback المحذوفة)
+function showNoScheduleData() {
+    showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
+    renderAll();
 }
 
 // ============================================
