@@ -738,6 +738,12 @@ async function main() {
     const f6NoSeeds = !f6RcSrc.includes('generateDemoData') && /function generateDemoData\(\)[\s\S]{0,500}?return \[\];/.test(f6SsSrc);
     record('F6 ⑤: لا مصدر أول محلي (مفتاح الملفات صفر، مستمعا WS، loadFromServer واحد، المفاتيح الأربعة، لا بذور)', f6NoSavedFiles && f6WsEmp && f6WsFiles && f6SsFilesApi && f6OneLfs && f6KeysGone && f6NoSeeds, `files=${f6NoSavedFiles} ws=${f6WsEmp}/${f6WsFiles} api=${f6SsFilesApi} lfs=${f6OneLfs} keys=${f6KeysGone} seeds=${f6NoSeeds}`);
 
+    // ⑥ Phase 2 Final Cleanup: زر «تحميل من السيرفر» اليدوي مربوط بالمصدر الرسمي المؤقت (JSON) لا بالمسار العلائقي الفارغ (إصلاح خلل — كان مكسوراً إنتاجياً)
+    const f6BtnWired = f6SsSrc.includes('onclick="loadFromServerManual()"');
+    const f6BtnHandler = /async function loadFromServerManual\(\)[\s\S]{0,800}?fetchEmployeesFromServerSilent/.test(f6SsSrc);
+    const f6BtnNotRelational = !f6SsSrc.includes('onclick="loadFromServer()"');
+    record('F6 ⑥: زر «تحميل من السيرفر» مربوط بالمصدر JSON (إصلاح خلل — كان علائقياً فارغاً)', f6BtnWired && f6BtnHandler && f6BtnNotRelational, `wired=${f6BtnWired} handler=${f6BtnHandler} notRelational=${f6BtnNotRelational}`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

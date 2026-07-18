@@ -1532,7 +1532,7 @@
                 <button class="btn btn-primary" onclick="syncToServer()" id="syncBtn" style="display:none;">
                     <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
                 </button>
-                <button class="btn btn-info" onclick="loadFromServer()" id="loadServerBtn">
+                <button class="btn btn-info" onclick="loadFromServerManual()" id="loadServerBtn">
                     <i class="fas fa-cloud-download-alt"></i> تحميل من السيرفر
                 </button>
                 <button class="btn btn-danger" onclick="clearServerRoster()">
@@ -2587,6 +2587,25 @@
             renderCurrentView();
             populateLocationFilter();
         }
+
+        // Phase 2 Final Cleanup: إصلاح زر «تحميل من السيرفر» — كان يستدعي المسار العلائقي الفارغ (مكسور إنتاجياً: «لا توجد موظفين» دائماً)
+        // فيُربط بالمصدر الرسمي المؤقت نفسه (JSON) مع نفس نمط التغذية الراجعة — إجراء يدوي فالتوست مقصود هنا (الصمت للتهيئة فقط)
+        async function loadFromServerManual() {
+            var token = AuthCore.getToken();
+            if (!token) {
+                showToast('يجب تسجيل الدخول أولاً', 'error');
+                return;
+            }
+            showToast('جاري تحميل البيانات من النظام...', 'info');
+            var serverEmployees = await fetchEmployeesFromServerSilent();
+            if (serverEmployees) {
+                adoptServerEmployees(serverEmployees);
+                showToast('✅ تم تحميل ' + serverEmployees.length + ' موظف من النظام', 'success');
+            } else {
+                showToast('لا توجد موظفين في النظام', 'info');
+            }
+        }
+        window.loadFromServerManual = loadFromServerManual;
 
         async function saveToServer() {
             try {
