@@ -2362,7 +2362,7 @@ var controlData = [
     { code: "10373", name: "سامي صالح عناد العنزي", role: "تنسيق استجابة", vacationStart: "", vacationEnd: "" }
 ];
 var isEditMode = false;
-var airRecords = [];
+// ملاحظة: airRecords يُعرَّف مرة واحدة في قسم نماذج التشغيلية (مصدره الخادم)
 
 // ============================================
 // دوال العرض الرئيسية
@@ -3497,27 +3497,44 @@ function updateDistributionIndicator() {
 // ============================================
 // دوال الإسعاف الجوي
 // ============================================
-async function loadAirRecords() {
+// الخادم هو مصدر الحقيقة — الترحيل يحاول مرة واحدة لكل تحميل صفحة
+var airRecordsMigrated = false;
+
+// ترحيل سجلات الجوي من localStorage — لا يُحذف المفتاح إلا بعد نجاح رفع جميع العناصر
+async function migrateLocalAirRecords() {
+    var raw = localStorage.getItem('airRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل سجلات الجوي المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('airRecords'); return; }
     try {
-        var response = await AuthManager.apiRequest('/api/air-ambulance');
-        var result = await response.json();
-        if (result.success) { airRecords = result.records || []; renderAirRecords(); }
-    } catch (error) { console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error); }
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/save-air-ambulance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('airRecords'); // نجح رفع الكل
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل سجلات الجوي المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
 }
 
-function renderAirRecords() {
-    var container = document.getElementById('airRecordsList');
-    var section = document.getElementById('airSavedRecords');
-    if (!container || !section) return;
-    if (airRecords.length === 0) { section.style.display = 'none'; return; }
-    section.style.display = 'block';
-    var html = '';
-    airRecords.forEach(function(record) {
-        var date = getSaudiDateTime();
-        var notes = record.notes || 'لا توجد ملاحظات';
-        html += '<div class="record-item"><div class="record-info"><strong>' + (record.reportNumber || 'بدون رقم') + '</strong><span style="margin:0 5px;">|</span><span>' + (record.unit || '-') + '</span><span style="margin:0 5px;">|</span><span>' + (record.hospital || '-') + '</span><span style="margin:0 5px;">|</span><span style="font-size:0.6rem; color:var(--gray-600); display:block;">📝 ' + notes + '</span><span class="rec-date">🕒 ' + date + '</span></div><div class="record-actions"><button onclick="deleteAirRecord(\'' + record.id + '\')">🗑️ حذف</button></div></div>';
-    });
-    container.innerHTML = html;
+// جلب سجلات الجوي من الخدمة ثم تحديث معاينة النموذج (يبقي على اسم خطاف المزامنة loadAirRecords)
+async function loadAirRecords() {
+    try {
+        if (!airRecordsMigrated) {
+            airRecordsMigrated = true;
+            await migrateLocalAirRecords(); // الترحيل أولاً ثم الجلب
+        }
+        var response = await AuthManager.apiRequest('/api/air-ambulance');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var result = await response.json();
+        if (result && result.success) { airRecords = result.records || []; renderAirPreview(); }
+    } catch (error) { console.error("خطأ في تحميل سجلات الإسعاف الجوي:", error); }
 }
 
 // ============================================
@@ -4819,7 +4836,7 @@ function renderSeniorRecords() {
     seniorRecords.forEach(function(record, index) {
         var date = getSaudiDateTime();
         var locations = record.locations && record.locations.length ? record.locations.join('، ') : 'لا يوجد';
-        html += '<div class="record-item"><div class="record-info"><strong>🚑 ' + (record.activeCars || 0) + '</strong><span style="margin:0 5px;">|</span><span>🔧 ' + (record.brokenCars || 0) + '</span><span style="margin:0 5px;">|</span><span>🔄 ' + (record.reserveCars || 0) + '</span><span style="margin:0 5px;">|</span><span>📊 ' + (record.overlapTeams || 0) + '</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ' + locations + '</span><span class="rec-date">🕒 ' + date + '</span>' + (record.assistantName ? '<span style="font-size:0.6rem; color:var(--primary-700);">👤 ' + record.assistantName + '</span>' : '') + '</div><div class="record-actions"><button onclick="deleteSeniorRecord(' + index + ')">🗑️ حذف</button></div></div>';
+        html += '<div class="record-item"><div class="record-info"><strong>🚑 ' + (record.activeCars || 0) + '</strong><span style="margin:0 5px;">|</span><span>🔧 ' + (record.brokenCars || 0) + '</span><span style="margin:0 5px;">|</span><span>🔄 ' + (record.reserveCars || 0) + '</span><span style="margin:0 5px;">|</span><span>📊 ' + (record.overlapTeams || 0) + '</span><span style="margin:0 5px;">|</span><span class="rec-locations">📍 ' + locations + '</span><span class="rec-date">🕒 ' + date + '</span>' + (record.assistantName ? '<span style="font-size:0.6rem; color:var(--primary-700);">👤 ' + record.assistantName + '</span>' : '') + '</div><div class="record-actions"><button onclick="deleteSeniorRecord(\'' + record.id + '\')">🗑️ حذف</button></div></div>';
     });
     container.innerHTML = html;
 }
@@ -4841,11 +4858,22 @@ function getSeniorShiftData() {
     return { activeCars: activeCars, brokenCars: brokenCars, reserveCars: reserveCars, overlapTeams: overlapTeams, locations: locations, notes: notes, assistantName: assistantName, assistantSignature: assistantSignature, chiefName: chiefName, chiefSignature: chiefSignature, leaderName: leaderName, leaderSignature: leaderSignature };
 }
 
-function saveSeniorRecordToLocal(data) {
+// حفظ مناوبة كبار المسعفين (واجهة المودال) عبر المصدر الواحد — بنفس مخطط هذه الواجهة كما هو
+async function saveSeniorRecordToLocal(data) {
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return false; }
-    seniorRecords.unshift({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature, createdAt: new Date().toISOString() });
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    renderSeniorRecords();
+    try {
+        var response = await AuthManager.apiRequest('/api/senior-shifts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activeCars: data.activeCars, brokenCars: data.brokenCars, reserveCars: data.reserveCars, overlapTeams: data.overlapTeams, locations: data.locations, notes: data.notes, assistantName: data.assistantName, assistantSignature: data.assistantSignature, chiefName: data.chiefName, chiefSignature: data.chiefSignature, leaderName: data.leaderName, leaderSignature: data.leaderSignature })
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ مناوبة كبار المسعفين:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return false;
+    }
+    await loadSeniorShifts(); // يحدّث قائمتي الواجهتين معاً
     return true;
 }
 
@@ -4903,20 +4931,20 @@ var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShif
     var el_seniorRegionLeaderDate = document.getElementById('seniorRegionLeaderDate'); if (el_seniorRegionLeaderDate) el_seniorRegionLeaderDate.innerText = dateStr;
     var el_seniorPrintDate = document.getElementById('seniorPrintDate'); if (el_seniorPrintDate) el_seniorPrintDate.innerText = dateStr + ' - ' + getSaudiTime();
     var el_seniorShiftModal_d34 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d34) el_seniorShiftModal_d34.style.display = 'flex';
-    renderSeniorRecords();
+    loadSeniorShifts(); // جلب طازج من الخادم (يحدّث قائمة المودال وقائمة النموذج معاً)
 });
 
 var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { var el_seniorShiftModal_d35 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d35) el_seniorShiftModal_d35.style.display = 'none'; });
-var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', function() {
+var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', async function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
-    if (saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
+    if (await saveSeniorRecordToLocal(data)) { alert('✅ تم حفظ مناوبة كبار المسعفين بنجاح'); clearSeniorShiftForm(); renderSeniorRecords(); }
 });
 
 var el_sendWhatsAppSeniorShift=document.getElementById("sendWhatsAppSeniorShift");if(el_sendWhatsAppSeniorShift)el_sendWhatsAppSeniorShift.addEventListener('click', function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة قبل الإرسال'); return; }
-    saveSeniorRecordToLocal(data);
+    saveSeniorRecordToLocal(data); // حفظ صامت في الخلفية ثم يفتح واتساب فوراً (نفس السلوك القديم)
     var message = formatWhatsAppMessage(data);
     sendWhatsAppMessage(message);
 });
@@ -5102,7 +5130,49 @@ function executeFormScripts(formId) {
 // ============================================
 
 // ----- نموذج بلاغ حادث (incident) -----
-var incidentRecords = JSON.parse(localStorage.getItem('incidentRecords') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadIncidentRecords
+var incidentRecords = [];
+
+// الترحيل يحاول مرة واحدة لكل تحميل صفحة — لا يُحذف المفتاح إلا بعد نجاح رفع الكل
+var incidentRecordsMigrated = false;
+async function migrateLocalIncidentRecords() {
+    var raw = localStorage.getItem('incidentRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل بلاغات الحوادث المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('incidentRecords'); return; }
+    try {
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/incidents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('incidentRecords');
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل بلاغات الحوادث المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب البلاغات من الخدمة ثم تحديث المعاينة (اسم الخطاف للمزامنة اللحظية)
+async function loadIncidentRecords() {
+    try {
+        if (!incidentRecordsMigrated) {
+            incidentRecordsMigrated = true;
+            await migrateLocalIncidentRecords();
+        }
+        var response = await AuthManager.apiRequest('/api/incidents');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        incidentRecords = (data && data.records) || [];
+        renderIncidentPreview();
+    } catch (e) {
+        console.error('❌ فشل تحميل بلاغات الحوادث:', e);
+    }
+}
 
 function initForm_incident() {
     var now = new Date();
@@ -5110,9 +5180,10 @@ function initForm_incident() {
     var el = document.getElementById('incDateTime');
     if (el) el.value = dt;
     renderIncidentPreview();
+    loadIncidentRecords();
 }
 
-function saveIncident() {
+async function saveIncident() {
     var reportNumber = (document.getElementById('incReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('incDateTime') || {}).value || '';
     var type = (document.getElementById('incType') || {}).value || '';
@@ -5130,7 +5201,8 @@ function saveIncident() {
         return;
     }
 
-    incidentRecords.unshift({
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         type: type,
@@ -5141,13 +5213,23 @@ function saveIncident() {
         age: age,
         gender: gender,
         description: description.trim(),
-        actions: actions.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
+        actions: actions.trim()
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/incidents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ بلاغ الحادث:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ بلاغ الحادث');
     clearIncidentForm();
-    renderIncidentPreview();
+    await loadIncidentRecords();
 }
 
 function clearIncidentForm() {
@@ -5221,21 +5303,71 @@ function renderIncidentPreview() {
         html += '📍 ' + (rec.location || '-') + ' | ' + (rec.type || '-') + ' | ' + (rec.unit || '-') + '</div>';
         if (rec.patientName) html += '<div style="font-size:0.8rem; color:var(--gray-600);">👤 ' + rec.patientName + '</div>';
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteIncidentRecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteIncidentRecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function deleteIncidentRecord(index) {
+// حذف بالمعرف عبر المصدر الواحد ثم إعادة الجلب
+async function deleteIncidentRecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    incidentRecords.splice(index, 1);
-    localStorage.setItem('incidentRecords', JSON.stringify(incidentRecords));
-    renderIncidentPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/incidents/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف بلاغ الحادث:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadIncidentRecords();
 }
 
 // ----- نموذج تسليم مناوبة كبار المسعفين (senior) -----
-var seniorRecords = JSON.parse(localStorage.getItem('seniorShiftRecords') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadSeniorShifts
+var seniorRecords = [];
+
+// الترحيل يحاول مرة واحدة لكل تحميل صفحة — يُرفع كل سجل كما هو (مخططا الواجهتين موجودان ميدانياً)
+var seniorRecordsMigrated = false;
+async function migrateLocalSeniorShiftRecords() {
+    var raw = localStorage.getItem('seniorShiftRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل مناوبات كبار المسعفين المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('seniorShiftRecords'); return; }
+    try {
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/senior-shifts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('seniorShiftRecords');
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل مناوبات كبار المسعفين المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب المناوبات من الخدمة ثم تحديث قائمتي الواجهتين (المودال + النموذج) — اسم الخطاف للمزامنة اللحظية
+async function loadSeniorShifts() {
+    try {
+        if (!seniorRecordsMigrated) {
+            seniorRecordsMigrated = true;
+            await migrateLocalSeniorShiftRecords();
+        }
+        var response = await AuthManager.apiRequest('/api/senior-shifts');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        seniorRecords = (data && data.records) || [];
+        renderSeniorRecords();
+        renderSeniorPreview();
+    } catch (e) {
+        console.error('❌ فشل تحميل مناوبات كبار المسعفين:', e);
+    }
+}
 
 function initForm_senior() {
     var today = new Date().toISOString().slice(0, 10);
@@ -5245,9 +5377,10 @@ function initForm_senior() {
         if (el) el.value = today;
     });
     renderSeniorPreview();
+    loadSeniorShifts();
 }
 
-function saveSenior() {
+async function saveSenior() {
     var workingCars = (document.getElementById('senWorkingCars') || {}).value || '0';
     var brokenCars = (document.getElementById('senBrokenCars') || {}).value || '0';
     var reserveCars = (document.getElementById('senReserveCars') || {}).value || '0';
@@ -5279,7 +5412,8 @@ function saveSenior() {
         return;
     }
 
-    seniorRecords.unshift({
+    // نفس مخطط هذه الواجهة كما هو (الخادم يختم createdAt) — يُحفظ عبر المصدر الواحد
+    var record = {
         workingCars: workingCars,
         brokenCars: brokenCars,
         reserveCars: reserveCars,
@@ -5294,13 +5428,23 @@ function saveSenior() {
         chiefDate: chiefDate,
         cmdrName: cmdrName.trim(),
         cmdrSign: cmdrSign.trim(),
-        cmdrDate: cmdrDate,
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
+        cmdrDate: cmdrDate
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/senior-shifts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ مناوبة كبار المسعفين:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ مناوبة كبار المسعفين');
     clearSeniorForm();
-    renderSeniorPreview();
+    await loadSeniorShifts();
 }
 
 function clearSeniorForm() {
@@ -5392,46 +5536,59 @@ function renderSeniorPreview() {
             html += '<div style="font-size:0.8rem; color:var(--gray-600);">📍 ' + rec.overlapAreas.join('، ') + '</div>';
         }
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteSeniorRecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteSeniorRecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function deleteSeniorRecord(index) {
+// حذف بالمعرف عبر المصدر الواحد — يحدّث قائمتي الواجهتين معاً
+async function deleteSeniorRecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    seniorRecords.splice(index, 1);
-    localStorage.setItem('seniorShiftRecords', JSON.stringify(seniorRecords));
-    renderSeniorPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/senior-shifts/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف مناوبة كبار المسعفين:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadSeniorShifts();
 }
 
 // ----- نموذج الإسعاف الجوي (air) -----
-var airRecords = JSON.parse(localStorage.getItem('airRecords') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadAirRecords
+var airRecords = [];
 
 function initForm_air() {
     var el = document.getElementById('airDateTime');
     if (el) el.value = new Date().toISOString().slice(0, 16);
     renderAirPreview();
+    loadAirRecords();
 }
 
-function saveAirAmbulance() {
-    var reportNumber = (document.getElementById('airReportNumber') || {}).value || '';
-    var dateTime = (document.getElementById('airDateTime') || {}).value || '';
-    var pickupLocation = (document.getElementById('airPickupLocation') || {}).value || '';
-    var destinationHospital = (document.getElementById('airDestinationHospital') || {}).value || '';
-    var diagnosis = (document.getElementById('airDiagnosis') || {}).value || '';
-    var reason = (document.getElementById('airReason') || {}).value || '';
-    var patientName = (document.getElementById('airPatientName') || {}).value || '';
-    var patientAge = (document.getElementById('airPatientAge') || {}).value || '';
-    var unit = (document.getElementById('airUnit') || {}).value || '';
-    var paramedic = (document.getElementById('airParamedic') || {}).value || '';
+// قراءة حقول النموذج من حاويته فقط — يمنع أي التباس مع عناصر أخرى بنفس المعرف
+function fq(id) { return document.querySelector('#formContent #' + id); }
+
+async function saveAirAmbulance() {
+    var reportNumber = (fq('airReportNumber') || {}).value || '';
+    var dateTime = (fq('airDateTime') || {}).value || '';
+    var pickupLocation = (fq('airPickupLocation') || {}).value || '';
+    var destinationHospital = (fq('airDestinationHospital') || {}).value || '';
+    var diagnosis = (fq('airDiagnosis') || {}).value || '';
+    var reason = (fq('airReason') || {}).value || '';
+    var patientName = (fq('airPatientName') || {}).value || '';
+    var patientAge = (fq('airPatientAge') || {}).value || '';
+    var unit = (fq('airUnit') || {}).value || '';
+    var paramedic = (fq('airParamedic') || {}).value || '';
 
     if (!reportNumber || !pickupLocation || !destinationHospital || !unit) {
         alert('⚠️ الرجاء ملء الحقول المطلوبة');
         return;
     }
 
-    airRecords.unshift({
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt ويشتق الحقول التوافقية)
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         pickupLocation: pickupLocation.trim(),
@@ -5441,13 +5598,23 @@ function saveAirAmbulance() {
         patientName: patientName.trim(),
         patientAge: patientAge,
         unit: unit,
-        paramedic: paramedic.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('airRecords', JSON.stringify(airRecords));
+        paramedic: paramedic.trim()
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/save-air-ambulance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ طلب الإسعاف الجوي:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ طلب الإسعاف الجوي');
     clearAirForm();
-    renderAirPreview();
+    await loadAirRecords();
 }
 
 function clearAirForm() {
@@ -5513,30 +5680,76 @@ function renderAirPreview() {
         html += '<div style="font-size:0.8rem; color:var(--gray-600);">';
         html += '🚁 ' + (rec.pickupLocation || '-') + ' → ' + (rec.destinationHospital || '-') + '</div>';
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteAirRecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteAirRecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function deleteAirRecord(index) {
+// حذف بالمعرف عبر المصدر الواحد ثم إعادة الجلب
+async function deleteAirRecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    airRecords.splice(index, 1);
-    localStorage.setItem('airRecords', JSON.stringify(airRecords));
-    renderAirPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/delete-air-ambulance/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف بلاغ الإسعاف الجوي:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadAirRecords();
 }
 
 // ----- نموذج التقرير اليومي (daily) -----
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadDailyRecords
 var dailyRecords = [];
 
-function initForm_daily() {
+// الترحيل يحاول مرة واحدة لكل تحميل صفحة — لا يُحذف المفتاح إلا بعد نجاح رفع الكل
+var dailyRecordsMigrated = false;
+async function migrateLocalDailyRecords() {
+    var raw = localStorage.getItem('dailyRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل التقارير اليومية المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('dailyRecords'); return; }
     try {
-        var saved = localStorage.getItem('dailyRecords');
-        dailyRecords = saved ? JSON.parse(saved) : [];
-    } catch (e) { dailyRecords = []; }
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/daily-reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('dailyRecords');
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل التقارير اليومية المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب التقارير من الخدمة ثم تحديث المعاينة (اسم الخطاف للمزامنة اللحظية)
+async function loadDailyRecords() {
+    try {
+        if (!dailyRecordsMigrated) {
+            dailyRecordsMigrated = true;
+            await migrateLocalDailyRecords();
+        }
+        var response = await AuthManager.apiRequest('/api/daily-reports');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        dailyRecords = (data && data.records) || [];
+        renderDailyPreview();
+    } catch (e) {
+        console.error('❌ فشل تحميل التقارير اليومية:', e);
+    }
+}
+
+function initForm_daily() {
     var el = document.getElementById('dailyDate');
     if (el) el.value = new Date().toISOString().split('T')[0];
     renderDailyPreview();
+    loadDailyRecords(); // حلّ محل القراءة الكسولة من localStorage
 }
 
 function renderDailyPreview() {
@@ -5559,13 +5772,13 @@ function renderDailyPreview() {
         if (rec.borderReports) html += '<div style="font-size:0.8rem; color:var(--gray-600);">🌐 ' + rec.borderReports + '</div>';
         html += '<div style="font-size:0.75rem; color:var(--gray-500);">🛣️ ' + paths + '</div>';
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteDailyRecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteDailyRecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function saveDailyReport() {
+async function saveDailyReport() {
     var reportNumber = (document.getElementById('dailyReportNumber') || {}).value || '';
     var date = (document.getElementById('dailyDate') || {}).value || '';
     var responseTeams = (document.getElementById('dailyResponseTeams') || {}).value || 0;
@@ -5584,7 +5797,8 @@ function saveDailyReport() {
         return;
     }
 
-    dailyRecords.unshift({
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var record = {
         reportNumber: reportNumber.trim(),
         date: date,
         responseTeams: parseInt(responseTeams) || 0,
@@ -5592,20 +5806,37 @@ function saveDailyReport() {
         borderReports: borderReports.trim(),
         paths: paths,
         formFill: formFill.trim(),
-        summary: summary.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
+        summary: summary.trim()
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/daily-reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ التقرير اليومي:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ التقرير اليومي');
     clearDailyForm();
-    renderDailyPreview();
+    await loadDailyRecords();
 }
 
-function deleteDailyRecord(index) {
+// حذف بالمعرف عبر المصدر الواحد ثم إعادة الجلب
+async function deleteDailyRecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    dailyRecords.splice(index, 1);
-    localStorage.setItem('dailyRecords', JSON.stringify(dailyRecords));
-    renderDailyPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/daily-reports/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف التقرير اليومي:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadDailyRecords();
 }
 
 function clearDailyForm() {
@@ -5659,15 +5890,58 @@ function sendDailyWhatsApp() {
 }
 
 // ----- نموذج E - حالات توقف قلب وتنفس (e) -----
-var eRecords = JSON.parse(localStorage.getItem('eRecords') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadERecords
+var eRecords = [];
+
+// الترحيل يحاول مرة واحدة لكل تحميل صفحة — لا يُحذف المفتاح إلا بعد نجاح رفع الكل
+var eRecordsMigrated = false;
+async function migrateLocalERecords() {
+    var raw = localStorage.getItem('eRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل حالات E المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('eRecords'); return; }
+    try {
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/e-cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('eRecords');
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل حالات E المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب الحالات من الخدمة ثم تحديث المعاينة (اسم الخطاف للمزامنة اللحظية)
+async function loadERecords() {
+    try {
+        if (!eRecordsMigrated) {
+            eRecordsMigrated = true;
+            await migrateLocalERecords();
+        }
+        var response = await AuthManager.apiRequest('/api/e-cases');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        eRecords = (data && data.records) || [];
+        renderEPreview();
+    } catch (e) {
+        console.error('❌ فشل تحميل حالات E:', e);
+    }
+}
 
 function initForm_e() {
     var el = document.getElementById('eDateTime');
     if (el) el.value = new Date().toISOString().slice(0, 16);
     renderEPreview();
+    loadERecords();
 }
 
-function saveE() {
+async function saveE() {
     var reportNumber = (document.getElementById('eReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('eDateTime') || {}).value || '';
     var location = (document.getElementById('eLocation') || {}).value || '';
@@ -5684,7 +5958,8 @@ function saveE() {
         return;
     }
 
-    eRecords.unshift({
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         location: location.trim(),
@@ -5694,13 +5969,23 @@ function saveE() {
         responseTime: responseTime,
         hospital: hospital.trim(),
         outcome: outcome,
-        notes: notes.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('eRecords', JSON.stringify(eRecords));
+        notes: notes.trim()
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/e-cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ حالة E:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ حالة E');
     clearEForm();
-    renderEPreview();
+    await loadERecords();
 }
 
 function clearEForm() {
@@ -5770,29 +6055,79 @@ function renderEPreview() {
         html += '📍 ' + (rec.location || '-') + ' | ' + (rec.unit || '-') + '</div>';
         if (rec.outcome) html += '<div style="font-size:0.8rem; color:var(--gray-600);">✅ ' + rec.outcome + '</div>';
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteERecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteERecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function deleteERecord(index) {
+// حذف بالمعرف عبر المصدر الواحد ثم إعادة الجلب
+async function deleteERecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    eRecords.splice(index, 1);
-    localStorage.setItem('eRecords', JSON.stringify(eRecords));
-    renderEPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/e-cases/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف حالة E:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadERecords();
 }
 
 // ----- نموذج التصعيد (escalation) -----
-var escalationRecords = JSON.parse(localStorage.getItem('escalationRecords') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل السجلات من الخدمة عبر loadEscalationRecords
+var escalationRecords = [];
+
+// الترحيل يحاول مرة واحدة لكل تحميل صفحة — لا يُحذف المفتاح إلا بعد نجاح رفع الكل
+var escalationRecordsMigrated = false;
+async function migrateLocalEscalationRecords() {
+    var raw = localStorage.getItem('escalationRecords');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) { console.warn('⚠️ تعذر تحليل بلاغات التصعيد المحلية — تُرك المفتاح كما هو'); return; }
+    if (items.length === 0) { localStorage.removeItem('escalationRecords'); return; }
+    try {
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/escalations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('escalationRecords');
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل بلاغات التصعيد المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب البلاغات من الخدمة ثم تحديث المعاينة (اسم الخطاف للمزامنة اللحظية)
+async function loadEscalationRecords() {
+    try {
+        if (!escalationRecordsMigrated) {
+            escalationRecordsMigrated = true;
+            await migrateLocalEscalationRecords();
+        }
+        var response = await AuthManager.apiRequest('/api/escalations');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        escalationRecords = (data && data.records) || [];
+        renderEscalationPreview();
+    } catch (e) {
+        console.error('❌ فشل تحميل بلاغات التصعيد:', e);
+    }
+}
 
 function initForm_escalation() {
     var el = document.getElementById('escDateTime');
     if (el) el.value = new Date().toISOString().slice(0, 16);
     renderEscalationPreview();
+    loadEscalationRecords();
 }
 
-function saveEscalation() {
+async function saveEscalation() {
     var reportNumber = (document.getElementById('escReportNumber') || {}).value || '';
     var dateTime = (document.getElementById('escDateTime') || {}).value || '';
     var location = (document.getElementById('escLocation') || {}).value || '';
@@ -5810,7 +6145,8 @@ function saveEscalation() {
         return;
     }
 
-    escalationRecords.unshift({
+    // نفس الكائن الذي كانت الواجهة تخزنه محلياً (الخادم يختم createdAt)
+    var record = {
         reportNumber: reportNumber.trim(),
         dateTime: dateTime,
         location: location.trim(),
@@ -5818,13 +6154,23 @@ function saveEscalation() {
         injuries: parseInt(injuries) || 0,
         deaths: parseInt(deaths) || 0,
         agencies: agencies,
-        details: details.trim(),
-        createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('escalationRecords', JSON.stringify(escalationRecords));
+        details: details.trim()
+    };
+    try {
+        var response = await AuthManager.apiRequest('/api/escalations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حفظ بلاغ التصعيد:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
     alert('✅ تم حفظ بلاغ التصعيد');
     clearEscalationForm();
-    renderEscalationPreview();
+    await loadEscalationRecords();
 }
 
 function clearEscalationForm() {
@@ -5892,17 +6238,24 @@ function renderEscalationPreview() {
         html += '📍 ' + (rec.location || '-') + ' | ' + (rec.eventType || '-') + '</div>';
         html += '<div style="font-size:0.8rem; color:var(--gray-600);">👥 ' + rec.injuries + ' مصاب / ' + rec.deaths + ' وفاة</div>';
         html += '<div style="display:flex; gap:6px; margin-top:8px;">';
-        html += '<button onclick="deleteEscalationRecord(' + i + ')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
+        html += '<button onclick="deleteEscalationRecord(\'' + rec.id + '\')" style="padding:4px 10px; font-size:0.7rem; border-radius:4px; border:1px solid var(--coral); background:var(--coral-50); color:var(--coral); cursor:pointer;">🗑️ حذف</button>';
         html += '</div></div>';
     });
     container.innerHTML = html;
 }
 
-function deleteEscalationRecord(index) {
+// حذف بالمعرف عبر المصدر الواحد ثم إعادة الجلب
+async function deleteEscalationRecord(id) {
     if (!confirm('⚠️ هل أنت متأكد من الحذف؟')) return;
-    escalationRecords.splice(index, 1);
-    localStorage.setItem('escalationRecords', JSON.stringify(escalationRecords));
-    renderEscalationPreview();
+    try {
+        var response = await AuthManager.apiRequest('/api/escalations/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل في حذف بلاغ التصعيد:', e);
+        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        return;
+    }
+    await loadEscalationRecords();
 }
 
 // ============================================
@@ -8471,7 +8824,7 @@ function printAllQRCodes() {
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'airAmbulanceModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'qrModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
+    var modals = ['shiftModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'qrModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
     modals.forEach(function(id) {
         var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }

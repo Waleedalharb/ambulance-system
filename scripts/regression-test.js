@@ -449,6 +449,58 @@ async function main() {
     if (f1Found) await api('DELETE', `/api/peak-plans/${f1Found.id}`);
     if (f1ExpId) await api('DELETE', `/api/peak-plans/${f1ExpId}`);
 
+    // ─── 13e. F2: تكامل الواجهة (النماذج) — المصدر الواحد + إزالة مودال الجوي الميت ───
+    const f2AppJs = await (await fetch(BASE + '/js/app.js')).text();
+    const f2LoadersOk = ['loadIncidentRecords', 'loadERecords', 'loadEscalationRecords', 'loadDailyRecords', 'loadSeniorShifts'].every(s => f2AppJs.includes(s));
+    const f2Keys = ['incidentRecords', 'seniorShiftRecords', 'eRecords', 'escalationRecords', 'dailyRecords', 'airRecords'];
+    const f2NoWrites = f2Keys.every(k => !f2AppJs.includes("localStorage.setItem('" + k));
+    record('F2 UI: محمّلات النماذج معرّفة ولا كتابات localStorage للمفاتيح الستة', f2LoadersOk && f2NoWrites, `loaders=${f2LoadersOk} noWrites=${f2NoWrites}`);
+
+    const f2Html = await (await fetch(BASE + '/')).text();
+    const f2FormsOk = f2Html.includes('id="formsModal"') && f2Html.includes('id="formContent"');
+    record('F2 UI: مركز النماذج سليم ومودال الجوي الميت أُزيل', f2FormsOk && !f2Html.includes('airAmbulanceModal') && !f2Html.includes('airRecordsList'), `forms=${f2FormsOk}`);
+
+    const f2AirBody = { reportNumber: 'F2-AIR-1', unit: 'جنوب 1', dateTime: '2099-01-01T10:00', pickupLocation: 'موقع F2', destinationHospital: 'مستشفى F2', diagnosis: 'تشخيص', reason: 'سبب', patientName: 'مريض', patientAge: 40, paramedic: 'مسعف' };
+    const f2AirPost = await api('POST', '/api/save-air-ambulance', f2AirBody);
+    const f2AirGet = await api('GET', '/api/air-ambulance');
+    const f2Air = ((f2AirGet.data && f2AirGet.data.records) || []).find(r => r.reportNumber === 'F2-AIR-1');
+    const f2AirStructured = !!f2Air && f2Air.pickupLocation === 'موقع F2' && f2Air.destinationHospital === 'مستشفى F2' && f2Air.diagnosis === 'تشخيص' && f2Air.reason === 'سبب' && f2Air.patientName === 'مريض' && f2Air.paramedic === 'مسعف';
+    const f2AirCompat = !!f2Air && f2Air.hospital === 'مستشفى F2' && typeof f2Air.notes === 'string' && f2Air.notes.includes('موقع F2');
+    record('F2: الجوي يحفظ الحقول المهيكلة كما هي + الحقول التوافقية', f2AirPost.ok && f2AirStructured && f2AirCompat, `structured=${f2AirStructured} compat=${f2AirCompat}`);
+
+    const f2SenA = await api('POST', '/api/senior-shifts', { activeCars: 5, locations: ['الشفا'], assistantName: 'أ' });
+    const f2SenB = await api('POST', '/api/senior-shifts', { workingCars: 7, overlapAreas: ['العزيزية'], asstName: 'ب' });
+    const f2SenGet = await api('GET', '/api/senior-shifts');
+    const f2SenList = (f2SenGet.data && f2SenGet.data.records) || [];
+    const f2FoundA = f2SenList.find(r => r.assistantName === 'أ');
+    const f2FoundB = f2SenList.find(r => r.asstName === 'ب');
+    const f2SchemaA = !!f2FoundA && f2FoundA.activeCars === 5 && Array.isArray(f2FoundA.locations) && f2FoundA.locations[0] === 'الشفا';
+    const f2SchemaB = !!f2FoundB && f2FoundB.workingCars === 7;
+    record('F2: senior_shift يحفظ مخططي الواجهتين', f2SenA.ok && f2SenB.ok && f2SchemaA && f2SchemaB, `schemaA=${f2SchemaA} schemaB=${f2SchemaB}`);
+
+    const f2EcPost = await api('POST', '/api/e-cases', { patient: 'f2-delete' });
+    const f2EcId = f2EcPost.data && f2EcPost.data.record && f2EcPost.data.record.id;
+    const f2EcDel = f2EcId ? await api('DELETE', `/api/e-cases/${f2EcId}`) : { ok: false, status: 0 };
+    const f2EcGet = await api('GET', '/api/e-cases');
+    const f2EcGone = !((f2EcGet.data && f2EcGet.data.records) || []).some(r => r.patient === 'f2-delete');
+    record('F2: حذف نموذج بالمعرف عبر المصدر الواحد', f2EcPost.ok && !!f2EcId && f2EcDel.ok && f2EcGone, `id=${f2EcId} del=${f2EcDel.status} gone=${f2EcGone}`);
+
+    const f2Routes = ['/api/incidents', '/api/e-cases', '/api/escalations', '/api/daily-reports', '/api/senior-shifts', '/api/air-ambulance'];
+    const f2Avgs = {};
+    let f2TotalMs = 0;
+    for (const route of f2Routes) {
+        let ms = 0;
+        for (let i = 0; i < 10; i++) { const t0 = Date.now(); await api('GET', route); ms += Date.now() - t0; }
+        f2Avgs[route] = ms / 10;
+        f2TotalMs += ms;
+    }
+    const f2OverallAvg = f2TotalMs / 60;
+    record('F2 Performance: مسارات النماذج الستة ضمن العتبة', f2OverallAvg < 200, `overallAvg=${f2OverallAvg.toFixed(1)}ms | ` + f2Routes.map(r => `${r}=${f2Avgs[r].toFixed(1)}ms`).join(' | '));
+
+    if (f2Air) await api('DELETE', `/api/delete-air-ambulance/${f2Air.id}`);
+    if (f2FoundA) await api('DELETE', `/api/senior-shifts/${f2FoundA.id}`);
+    if (f2FoundB) await api('DELETE', `/api/senior-shifts/${f2FoundB.id}`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

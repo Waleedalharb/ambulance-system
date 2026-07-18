@@ -4533,13 +4533,22 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
         if (!reportNumber || !unit || !dateTime || !destinationHospital) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
-        // Slice 6: FormsService owns build + shift stamp + insert;
-        // FormSubmitted → air_ambulance_saved (engine broadcast subscriber)
+        // Slice 6 + F2: FormsService owns build + shift stamp + insert;
+        // FormSubmitted → air_ambulance_saved (engine broadcast subscriber).
+        // F2: تخزين جميع الحقول المهيكلة من الواجهة كما هي + الحقول التوافقية القديمة
         const newRecord = await formsService.submit('air_ambulance', {
             reportNumber,
-            unit,
-            hospital: destinationHospital,
             dateTime,
+            pickupLocation,
+            destinationHospital,
+            diagnosis,
+            reason,
+            patientName,
+            patientAge,
+            unit,
+            paramedic,
+            // حقول توافقية مشتقة (سلوك قديم — يبقى كما هو)
+            hospital: destinationHospital,
             notes: `pickup: ${pickupLocation}, diagnosis: ${diagnosis}, reason: ${reason}, patient: ${patientName}, age: ${patientAge}, paramedic: ${paramedic}`
         }, req.user);
 
