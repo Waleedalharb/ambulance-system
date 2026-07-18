@@ -501,6 +501,38 @@ async function main() {
     if (f2FoundA) await api('DELETE', `/api/senior-shifts/${f2FoundA.id}`);
     if (f2FoundB) await api('DELETE', `/api/senior-shifts/${f2FoundB.id}`);
 
+    // ─── 13f. F3: Single Source Verification — نوع البلاغ من المصدر الواحد (report_times.type) ───
+    const f3AppJs = await (await fetch(BASE + '/js/app.js')).text();
+    record('F3 UI: app.js خالٍ من reportTypeStorage وsyncReportEntryData', !f3AppJs.includes('reportTypeStorage') && !f3AppJs.includes('syncReportEntryData'));
+
+    let f3WriteCount = 0, f3WriteIdx = -1;
+    while ((f3WriteIdx = f3AppJs.indexOf("localStorage.setItem('report", f3WriteIdx + 1)) !== -1) f3WriteCount++;
+    record('F3 UI: صفر كتابات localStorage لمفاتيح البلاغات', f3WriteCount === 0, `writes=${f3WriteCount}`);
+
+    const f3Center = 'الشفاء', f3Unit = 'جنوب 8', f3Type = 'إصابة';
+    const f3Key = f3Center + '|' + f3Unit;
+    const f3Post = await api('POST', '/api/report', { center: f3Center, unit: f3Unit, type: f3Type });
+    const f3Data1 = await api('GET', '/api/data');
+    const f3Entry1 = f3Data1.data && f3Data1.data.data && f3Data1.data.data[f3Key];
+    const f3TypeOk = !!f3Entry1 && f3Entry1.types && f3Entry1.types[f3Type] === 1 && Array.isArray(f3Entry1.times) && f3Entry1.times.length === 1;
+    record('F3: نوع البلاغ ينعكس من المصدر الواحد (types + times)', f3Post.ok && f3TypeOk, JSON.stringify(f3Entry1));
+
+    const f3Undo = await api('POST', '/api/undo', { center: f3Center, unit: f3Unit });
+    const f3Data2 = await api('GET', '/api/data');
+    const f3Entry2 = f3Data2.data && f3Data2.data.data && f3Data2.data.data[f3Key];
+    const f3Cleared = !!f3Entry2 && Array.isArray(f3Entry2.times) && f3Entry2.times.length === 0 && (!f3Entry2.types || !f3Entry2.types[f3Type]);
+    record('F3: التراجع يحذف آخر زمن/نوع من المصدر الواحد (وهو التنظيف)', f3Undo.ok && f3Cleared, JSON.stringify(f3Entry2));
+
+    const f3FnStart = f3AppJs.indexOf('function getShiftTypeBreakdown');
+    const f3FnEnd = f3FnStart !== -1 ? f3AppJs.indexOf('\nfunction ', f3FnStart + 1) : -1;
+    const f3FnBody = (f3FnStart !== -1 && f3FnEnd !== -1) ? f3AppJs.slice(f3FnStart, f3FnEnd) : '';
+    record('F3 UI: getShiftTypeBreakdown معرّفة وجسمها بلا localStorage (مصدر واحد)', f3FnBody.length > 0 && !f3FnBody.includes('localStorage'), `bodyLen=${f3FnBody.length}`);
+
+    let f3DataMs = 0;
+    for (let i = 0; i < 20; i++) { const t0 = Date.now(); await api('GET', '/api/data'); f3DataMs += Date.now() - t0; }
+    const f3DataAvg = f3DataMs / 20;
+    record('F3 Performance: GET /api/data ضمن العتبة', f3DataAvg < 200, `avg=${f3DataAvg.toFixed(1)}ms`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

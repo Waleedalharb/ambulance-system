@@ -3914,7 +3914,7 @@ app.post('/api/report', authenticate, validateBody({
 }), async (req, res) => {
     // Slice 1: Route → ReportService → SQLite tx → COMMIT → DispatchLogCreated
     // event → broadcast subscriber emits the SAME 'new_report' WS payload.
-    const { center, unit } = req.body;
+    const { center, unit, type } = req.body;
     if (!center || !unit) return res.status(400).json({ error: 'بيانات ناقصة' });
 
     try {
@@ -3924,12 +3924,12 @@ app.post('/api/report', authenticate, validateBody({
         if (!shiftId) return res.status(400).json({ error: 'لا توجد مناوبة نشطة - ابدأ مناوبة أولاً' });
 
         if (reportService) {
-            const result = await reportService.createReport({ center, unit, shiftId }, req.user);
+            const result = await reportService.createReport({ center, unit, type, shiftId }, req.user);
             return res.json(result);
         }
 
         // Legacy fallback (services unavailable): original inline path
-        const result = await opsEngine.reports.addReport(shiftId, center, unit);
+        const result = await opsEngine.reports.addReport(shiftId, center, unit, type);
 
         if (result.success) {
             broadcast({ type: 'new_report', center, unit, shiftId });

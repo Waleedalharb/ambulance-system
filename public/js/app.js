@@ -567,6 +567,9 @@ function handleSSEEvent(data) {
             showNotification('بلاغ جديد', data.message, 'info', 5000);
             refreshReports();
             break;
+        case 'report_undone':
+            refreshReports();
+            break;
         case 'theme_updated':
             showNotification('تم التحديث', 'تم تحديث الثيم من قبل مشرف آخر', 'info', 3000);
             applyGlobalTheme();
@@ -1657,53 +1660,16 @@ var REPORT_TYPE_DEFS = {
 };
 var selectedReportType = 'medical';
 
-function getReportTypeStorage() {
-    try {
-        return JSON.parse(localStorage.getItem('reportTypeStorage') || '{}');
-    } catch(e) { return {}; }
-}
-function setReportTypeStorage(data) {
-    try { localStorage.setItem('reportTypeStorage', JSON.stringify(data)); } catch(e) {}
-}
-function addReportTypeToStorage(center, unit, type) {
-    var storage = getReportTypeStorage();
-    var shiftKey = currentShiftId || 'current';
-    if (!storage[shiftKey]) storage[shiftKey] = {};
-    var unitKey = center + '|' + unit;
-    if (!storage[shiftKey][unitKey]) storage[shiftKey][unitKey] = {};
-    storage[shiftKey][unitKey][type] = (storage[shiftKey][unitKey][type] || 0) + 1;
-    setReportTypeStorage(storage);
-}
-function undoReportTypeFromStorage(center, unit) {
-    var storage = getReportTypeStorage();
-    var shiftKey = currentShiftId || 'current';
-    var unitKey = center + '|' + unit;
-    var types = storage[shiftKey] && storage[shiftKey][unitKey];
-    if (!types) return;
-    // Remove one from the most frequent type (or any type with count > 0)
-    for (var t in types) {
-        if (types[t] > 0) {
-            types[t]--;
-            if (types[t] === 0) delete types[t];
-            break;
-        }
-    }
-    setReportTypeStorage(storage);
-}
 function getUnitTypeBreakdown(center, unit) {
-    var storage = getReportTypeStorage();
-    var shiftKey = currentShiftId || 'current';
-    var unitKey = center + '|' + unit;
-    return (storage[shiftKey] && storage[shiftKey][unitKey]) || {};
+    var key = center + '|' + unit;
+    return (reports && reports[key] && reports[key].types) || {};
 }
 function getShiftTypeBreakdown() {
-    var storage = getReportTypeStorage();
-    var shiftKey = currentShiftId || 'current';
-    var shiftData = storage[shiftKey] || {};
     var totals = {};
-    for (var unitKey in shiftData) {
-        for (var type in shiftData[unitKey]) {
-            totals[type] = (totals[type] || 0) + shiftData[unitKey][type];
+    for (var key in reports) {
+        var types = (reports[key] && reports[key].types) || {};
+        for (var type in types) {
+            totals[type] = (totals[type] || 0) + types[type];
         }
     }
     return totals;
@@ -3170,62 +3136,6 @@ function calculateLiveReportStats() {
             '</div>';
         listContainer.appendChild(div);
     });
-    // ═══ مزامنة بيانات إدخال بلاغات الفرق ═══
-    syncReportEntryData();
-}
-
-// ============================================
-// مزامنة بيانات إدخال بلاغات الفرق
-// ============================================
-function syncReportEntryData() {
-    try {
-        var stored = localStorage.getItem('reportEntryRecords');
-        if (!stored) return;
-        var records = JSON.parse(stored);
-        if (!records || !records.length) return;
-        var today = new Date().toISOString().split('T')[0];
-        var todayRecords = records.filter(function(r) { return r.date === today; });
-        if (todayRecords.length === 0) return;
-        // دمج مع البيانات الموجودة
-        var entryTotal = todayRecords.length;
-        var entryUnitStats = {};
-        todayRecords.forEach(function(r) {
-            if (r.unit) {
-                entryUnitStats[r.unit] = (entryUnitStats[r.unit] || 0) + 1;
-            }
-        });
-        // تحديث الإجمالي
-        var totalEl = document.getElementById('liveTotalReports');
-        if (totalEl) {
-            var currentTotal = parseInt(totalEl.innerText) || 0;
-            totalEl.innerText = currentTotal + entryTotal;
-        }
-        // تحديث قائمة الفرق
-        var listContainer = document.getElementById('liveUnitList');
-        if (listContainer && Object.keys(entryUnitStats).length > 0) {
-            var syncHeader = document.createElement('div');
-            syncHeader.className = 'live-report-sync-header';
-            syncHeader.innerHTML = '<i class="fas fa-clipboard-check"></i><span>من نظام إدخال البلاغات (' + entryTotal + ')</span>';
-            listContainer.appendChild(syncHeader);
-            Object.entries(entryUnitStats).sort(function(a,b){return b[1]-a[1];}).forEach(function(item, index){
-                var div = document.createElement('div');
-                div.className = 'distribution-item';
-                div.style.borderLeft = '3px solid var(--teal)';
-                div.innerHTML = '<div class="distribution-item-rank rank-other"><i class="fas fa-check" style="font-size:0.6rem;"></i></div>' +
-                    '<div class="distribution-item-info">' +
-                        '<div class="distribution-item-name" style="color:var(--teal);">' + item[0] + '</div>' +
-                        '<div class="distribution-item-bar-track">' +
-                            '<div class="distribution-item-bar-fill" style="width:100%; background:linear-gradient(90deg, var(--teal), #34D399);"></div>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="distribution-item-meta">' +
-                        '<span class="distribution-item-count" style="color:var(--teal);">' + item[1] + '</span>' +
-                        '<span class="distribution-item-percent">جديد</span>' +
-                    '</div>';
-                listContainer.appendChild(div);
-            });
-        }
-    } catch(e) { console.log('Report Entry sync error:', e); }
 }
 
 // ============================================
@@ -3787,8 +3697,6 @@ async function addReportToServer(center, unit) {
         });
         var result = await response.json();
         if (result.success) {
-            // Store type locally for stats tracking
-            addReportTypeToStorage(center, unit, selectedReportType);
             await loadAllData();
             updateUnitCounter(center, unit);
             calculateLiveReportStats();
@@ -3834,8 +3742,6 @@ async function undoLastReport(center, unit) {
         });
         var result = await response.json();
         if (result.success) {
-            // Remove one type count locally
-            undoReportTypeFromStorage(center, unit);
             await loadAllData();
             updateUnitCounter(center, unit);
             calculateLiveReportStats();

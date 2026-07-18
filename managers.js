@@ -194,19 +194,25 @@ class ReportManager {
         this.storage = storage;
     }
 
-    async addReport(shiftId, center, unit) {
+    async addReport(shiftId, center, unit, type) {
         if (!shiftId) return { success: false, error: 'لا توجد مناوبة نشطة' };
 
         // Find existing report for this center/unit/shift
         const existing = await this.storage.getReport(shiftId, center, unit);
         let newCount;
+        let reportId;
 
         if (existing) {
             newCount = await this.storage.incrementReport(existing.id);
+            reportId = existing.id;
         } else {
             const created = await this.storage.createReport(shiftId, center, unit);
             newCount = created.count;
+            reportId = created.id;
         }
+
+        // Single source: record the report time (+ type) in report_times
+        await this.storage.addReportTime(reportId, new Date().toISOString(), type || null);
 
         // Update shift total
         const total = await this.storage.getTotalReports(shiftId);
@@ -224,6 +230,8 @@ class ReportManager {
         }
 
         const newCount = await this.storage.decrementReport(existing.id);
+        // Single source: remove the most recent report_times row for this report
+        await this.storage.deleteLastReportTime(existing.id);
         const total = await this.storage.getTotalReports(shiftId);
         await this.storage.updateShiftTotalReports(shiftId, total);
 

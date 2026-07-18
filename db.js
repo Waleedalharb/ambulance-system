@@ -571,7 +571,9 @@ async function runMigrations() {
     `ALTER TABLE shift_completions ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE`,
     `ALTER TABLE ops_files ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
     `ALTER TABLE timeline ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
-    `ALTER TABLE announcements ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`
+    `ALTER TABLE announcements ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
+    // F3: report type column — single source for type breakdowns
+    `ALTER TABLE report_times ADD COLUMN type TEXT`
   ];
 
   for (const sql of migrations) {

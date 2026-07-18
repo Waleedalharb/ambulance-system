@@ -8,8 +8,9 @@
  * (no rewrites); it only adds transaction boundaries and event
  * emission around it. It never touches broadcast/WebSocket directly.
  *
- * Read path: getCurrentData() builds the exact same shape that
- * GET /api/data has always served ({ "center|unit": { count, times[] } })
+ * Read path: getCurrentData() builds the same shape that
+ * GET /api/data has always served, extended with per-type counts
+ * ({ "center|unit": { count, times[], types{} } })
  * but sourced from SQLite (reports + report_times for the ACTIVE shift)
  * instead of data/ambulance-data.json.
  */
@@ -36,17 +37,18 @@ class ReportService {
      * @param {string} data.center
      * @param {string} data.unit
      * @param {number} [data.count] - number of increments (default 1)
+     * @param {string} [data.type]  - report type key (stored in report_times.type)
      * @param {number} data.shiftId - resolved by the route via ShiftManager
      * @param {Object} [actor] - req.user ({ id, username, name, role })
      * @returns {Object} the SAME result object ReportManager.addReport returns
      */
-    async createReport({ center, unit, count = 1, shiftId }, actor = null) {
+    async createReport({ center, unit, count = 1, shiftId, type }, actor = null) {
         const increments = (Number.isInteger(count) && count > 1) ? count : 1;
 
         const result = await this.engine.runInTransaction(async () => {
             let last = null;
             for (let i = 0; i < increments; i++) {
-                last = await this.engine.reports.addReport(shiftId, center, unit);
+                last = await this.engine.reports.addReport(shiftId, center, unit, type);
                 if (!last || !last.success) break;
             }
             return last;
@@ -97,8 +99,8 @@ class ReportService {
 
     /**
      * Current dispatch data for the ACTIVE shift, from SQLite.
-     * Shape matches data/ambulance-data.json field-for-field:
-     *   { "<center>|<unit>": { count: <int>, times: [<string>, ...] } }
+     * Shape matches data/ambulance-data.json field-for-field, plus types:
+     *   { "<center>|<unit>": { count: <int>, times: [<string>, ...], types: { <type>: <int>, ... } } }
      *
      * @returns {Object} data map ({} when there is no active shift)
      */
@@ -107,7 +109,7 @@ class ReportService {
         if (!activeShift) return {};
 
         const rows = await this.engine.storage.all(
-            `SELECT r.id, r.center, r.unit, r.count, t.timestamp AS ts
+            `SELECT r.id, r.center, r.unit, r.count, t.timestamp AS ts, t.type AS rtype
              FROM reports r
              LEFT JOIN report_times t ON t.report_id = r.id
              WHERE r.shift_id = ?
@@ -119,9 +121,10 @@ class ReportService {
         for (const row of rows) {
             const key = `${row.center}|${row.unit}`;
             if (!data[key]) {
-                data[key] = { count: row.count || 0, times: [] };
+                data[key] = { count: row.count || 0, times: [], types: {} };
             }
             if (row.ts) data[key].times.push(row.ts);
+            if (row.rtype) data[key].types[row.rtype] = (data[key].types[row.rtype] || 0) + 1;
         }
         return data;
     }

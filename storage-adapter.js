@@ -82,6 +82,20 @@ class StorageAdapter {
         return row ? row.count : 0;
     }
 
+    async addReportTime(reportId, timestamp, type) {
+        await this.db.run(
+            'INSERT INTO report_times (report_id, timestamp, type) VALUES (?, ?, ?)',
+            [reportId, timestamp, type || null]
+        );
+    }
+
+    async deleteLastReportTime(reportId) {
+        await this.db.run(
+            'DELETE FROM report_times WHERE id = (SELECT id FROM report_times WHERE report_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1)',
+            [reportId]
+        );
+    }
+
     async getTotalReports(shiftId) {
         const row = await this.db.get('SELECT SUM(count) as total FROM reports WHERE shift_id = ?', [shiftId]);
         return row ? (row.total || 0) : 0;
