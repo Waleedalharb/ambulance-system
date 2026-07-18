@@ -6645,9 +6645,6 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         // Slice 4: merge + save via PositioningService.
-        // LEGACY EXCEPTION: no catalogued PositioningUpdated event (DOMAIN-MODEL
-        // §10.2 د lists only Started/Ended) — the broadcast stays here until
-        // the catalog gains the event (same status as ShiftDeleted).
         const plan = await positioningService.update(id, req.body);
         if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
         // PositioningUpdated (Catalog D-4) fires inside the service → engine broadcasts 'peak_plan_updated'

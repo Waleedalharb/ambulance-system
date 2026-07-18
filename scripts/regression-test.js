@@ -415,6 +415,40 @@ async function main() {
     record('بث FormsCleared لحظياً (Catalog D-7 ← air_ambulance_cleared)', wsFormClr);
     record('بث ShiftDeleted لحظياً (Catalog D-3 ← shift_deleted)', wsShiftDel);
 
+    // ─── 13d. F1: تكامل الواجهة (التمركز) — توسيع العقد + الإنهاء داخل الخدمة + إزالة الكود الميت ───
+    const f1Payload = { title: 'خطة F1', location: 'موقع F1', planType: 'peak', teamType: 'advanced', unit: 'جنوب 5', notes: 'ملاحظة F1', lat: 24.1, lng: 46.1 };
+    const f1Post = await api('POST', '/api/peak-plans', f1Payload);
+    const f1Plans1 = await api('GET', '/api/peak-plans');
+    const f1Found = ((f1Plans1.data && f1Plans1.data.plans) || []).find(p => p.title === 'خطة F1');
+    const f1AllKept = !!f1Found && ['planType', 'teamType', 'unit', 'notes', 'lat', 'lng'].every(k => f1Found[k] === f1Payload[k]);
+    record('F1: الخدمة تحفظ جميع حقول الواجهة كما هي (توسيع العقد)', f1Post.ok && f1AllKept, `id=${f1Found && f1Found.id}`);
+
+    const f1Exp = await api('POST', '/api/peak-plans', { title: 'خطة F1 منتهية', location: 'موقع', endTime: '2020-01-01T10:00' });
+    const f1ExpId = f1Exp.data && f1Exp.data.plan && f1Exp.data.plan.id;
+    const f1Plans2 = await api('GET', '/api/peak-plans');
+    const f1Swept = ((f1Plans2.data && f1Plans2.data.plans) || []).find(p => p.id === f1ExpId);
+    record('F1: إنهاء الخطط المنتهية داخل الخدمة (Zero Business Logic)', f1Exp.ok && !!f1Swept && f1Swept.status === 'completed', `status=${f1Swept && f1Swept.status}`);
+
+    const f1Html = await (await fetch(BASE + '/')).text();
+    const f1IdsOk = ['id="peakTimeModal"', 'id="peakDeploymentsList"', 'id="peakKpiActive"', 'id="peakPlanForm"'].every(s => f1Html.includes(s));
+    record('F1 UI: index.html يحوي عناصر التمركز وخالٍ من الكود الميت', f1IdsOk && !f1Html.includes("'peakDeployments'") && !f1Html.includes('/api/peak-deployments'), `ids=${f1IdsOk}`);
+
+    const f1AppJs = await (await fetch(BASE + '/js/app.js')).text();
+    record('F1 UI: app.js يربط بالمصدر الواحد', f1AppJs.includes('loadPeakPlans') && !f1AppJs.includes("localStorage.setItem('peakPlans'"));
+
+    const f1WsJs = await (await fetch(BASE + '/js/websocket-sync.js')).text();
+    record('F1 UI: تحديث التمركز يُعيد التحميل لحظياً (peak_plan_updated)', f1WsJs.includes("case 'peak_plan_updated'"));
+
+    let f1ApiMs = 0;
+    for (let i = 0; i < 20; i++) { const t0 = Date.now(); await api('GET', '/api/peak-plans'); f1ApiMs += Date.now() - t0; }
+    let f1PageMs = 0;
+    for (let i = 0; i < 5; i++) { const t0 = Date.now(); await fetch(BASE + '/'); f1PageMs += Date.now() - t0; }
+    const f1ApiAvg = f1ApiMs / 20, f1PageAvg = f1PageMs / 5;
+    record('F1 Performance: استجابة المسار والصفحة ضمن العتبة', f1ApiAvg < 200 && f1PageAvg < 500, `apiAvg=${f1ApiAvg.toFixed(1)}ms pageAvg=${f1PageAvg.toFixed(1)}ms`);
+
+    if (f1Found) await api('DELETE', `/api/peak-plans/${f1Found.id}`);
+    if (f1ExpId) await api('DELETE', `/api/peak-plans/${f1ExpId}`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

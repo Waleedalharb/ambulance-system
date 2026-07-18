@@ -10040,7 +10040,8 @@ if (!window.__fetchInterceptorInstalled) {
 // PEAK TIME SYSTEM v2 — نظام إدارة وقت الذروة
 // ============================================
 
-var peakPlans = JSON.parse(localStorage.getItem('peakPlans') || '[]');
+// الخادم هو مصدر الحقيقة الوحيد — تُحمَّل الخطط من الخدمة عبر loadPeakPlans (لا localStorage)
+var peakPlans = [];
 var peakAssignments = JSON.parse(localStorage.getItem('peakAssignments') || '[]');
 var peakCurrentTab = 'dashboard';
 var peakCountdownIntervals = {};
@@ -10063,6 +10064,54 @@ var PEAK_PLAN_TYPES = {
 
 var PEAK_UNITS = ['سريع 1','سريع 2','سريع 3','سريع 4','جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','جنوب 6','جنوب 7','جنوب 8','جنوب 9','جنوب 10','جنوب 11','جنوب 12','جنوب 13','جنوب 14','جنوب 15','جنوب 16','جنوب 17','جنوب 18','جنوب 19'];
 
+// ----- التحميل من الخادم (المصدر الوحيد للحقيقة) -----
+var peakPlansMigrated = false; // محاولة ترحيل localStorage مرة واحدة فقط لكل تحميل صفحة
+
+// ترحيل خطط localStorage القديمة إلى الخادم — لا يُحذف المفتاح إلا بعد نجاح رفع جميع العناصر (لا نفقد بيانات محلية أبداً)
+async function migrateLocalPeakPlans() {
+    var raw = localStorage.getItem('peakPlans');
+    if (!raw) return;
+    var items;
+    try { items = JSON.parse(raw); } catch (e) { items = null; }
+    if (!Array.isArray(items)) {
+        console.warn('⚠️ تعذر تحليل خطط التمركز المحلية — تُرك المفتاح كما هو');
+        return;
+    }
+    if (items.length === 0) { localStorage.removeItem('peakPlans'); return; }
+    try {
+        for (var i = 0; i < items.length; i++) {
+            var migRes = await AuthManager.apiRequest('/api/peak-plans', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items[i])
+            });
+            if (!migRes.ok) throw new Error('status=' + migRes.status);
+        }
+        localStorage.removeItem('peakPlans'); // نجح رفع الكل — أمكن حذف النسخة المحلية بأمان
+    } catch (e) {
+        console.warn('⚠️ فشل ترحيل خطط التمركز المحلية — تُعاد المحاولة عند التحميل القادم', e);
+    }
+}
+
+// جلب الخطط من الخدمة ثم تحديث كل العروض (عرض فقط — لا منطق تشغيلي هنا)
+async function loadPeakPlans() {
+    try {
+        if (!peakPlansMigrated) {
+            peakPlansMigrated = true;
+            await migrateLocalPeakPlans(); // الترحيل أولاً ثم الجلب للحصول على القائمة الكاملة
+        }
+        var response = await AuthManager.apiRequest('/api/peak-plans');
+        if (!response.ok) throw new Error('status=' + response.status);
+        var data = await response.json();
+        peakPlans = Array.isArray(data.plans) ? data.plans : [];
+        refreshPeakDashboard();
+        renderPeakDeployments();
+        renderPeakArchive();
+    } catch (e) {
+        console.error('❌ فشل تحميل خطط التمركز:', e);
+    }
+}
+
 // ----- Modal Open/Close -----
 function openPeakTimeModal() {
     var el_peakTimeModal_d85 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d85) el_peakTimeModal_d85.style.display = 'flex';
@@ -10079,6 +10128,22 @@ function closePeakTimeModal() {
 var el_peakTimeBtn = document.getElementById('peakTimeBtn');
 if (el_peakTimeBtn) {
     el_peakTimeBtn.onclick = function() { openPeakTimeModal(); };
+}
+
+// ربط إرسال نموذج خطة التمركز (ينوب عن ربط الوحدة المضمّنة المحذوفة من index.html)
+function bindPeakPlanForm() {
+    var el_peakPlanForm = document.getElementById('peakPlanForm');
+    if (el_peakPlanForm) {
+        el_peakPlanForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            savePeakPlan();
+        });
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindPeakPlanForm);
+} else {
+    bindPeakPlanForm();
 }
 
 // ----- Tab Switching -----
@@ -10115,7 +10180,7 @@ function initPeakFormDefaults() {
 }
 
 // ----- Save Plan -----
-function savePeakPlan() {
+async function savePeakPlan() {
     var title = document.getElementById('peakPlanTitle').value.trim();
     var planType = document.getElementById('peakPlanType').value;
     var location = document.getElementById('peakLocation').value.trim();
@@ -10134,9 +10199,9 @@ function savePeakPlan() {
         return;
     }
 
-    var planId = 'plan_' + Date.now();
+    // نفس مجموعة الحقول التي كانت الواجهة تبنيها سابقاً — الخادم يملك id/status/createdAt
     var plan = {
-        id: planId,
+        id: 'plan_' + Date.now(),
         title: title,
         planType: planType,
         location: location,
@@ -10154,13 +10219,30 @@ function savePeakPlan() {
         createdAt: new Date().toISOString()
     };
 
-    peakPlans.unshift(plan);
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    var savedPlan;
+    try {
+        var response = await AuthManager.apiRequest('/api/peak-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(plan)
+        });
+        if (!response.ok) {
+            alert('❌ فشل في حفظ خطة التمركز');
+            return;
+        }
+        var data = await response.json();
+        savedPlan = (data && data.plan) || plan; // الخطة الراجعة من الخادم (بالمعرف الرسمي)
+    } catch (e) {
+        console.error('❌ فشل في حفظ خطة التمركز:', e);
+        alert('❌ فشل في حفظ خطة التمركز');
+        return;
+    }
+
     clearPeakForm();
     alert('✅ تم حفظ خطة التمركز');
     switchPeakTab('dashboard');
-    refreshPeakDashboard();
-    startPeakReminders(plan);
+    startPeakReminders(savedPlan);
+    await loadPeakPlans();
 }
 
 function clearPeakForm() {
@@ -10330,37 +10412,64 @@ function buildPeakDeploymentRow(plan, compact) {
     return html;
 }
 
-function confirmPeakArrival(planId) {
+async function confirmPeakArrival(planId) {
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
-    plan.arrivalTime = new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
-    renderPeakDeployments();
-    refreshPeakDashboard();
+    var arrivalTime = new Date().toISOString(); // نفس الحقل والصيغة اللذين كانت الواجهة تخزنهما
+    try {
+        var response = await AuthManager.apiRequest('/api/peak-plans/' + encodeURIComponent(planId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ arrivalTime: arrivalTime })
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل تأكيد وصول التمركز:', e);
+        return;
+    }
+    await loadPeakPlans();
     showToast('✅ تم تأكيد وصول ' + plan.unit, 'success');
     playPeakSound('arrival');
 }
 
-function confirmPeakDeparture(planId) {
+async function confirmPeakDeparture(planId) {
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
-    plan.departureTime = new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
-    renderPeakDeployments();
-    refreshPeakDashboard();
+    var departureTime = new Date().toISOString(); // نفس الحقل والصيغة اللذين كانت الواجهة تخزنهما
+    try {
+        var response = await AuthManager.apiRequest('/api/peak-plans/' + encodeURIComponent(planId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ departureTime: departureTime })
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل تأكيد مغادرة التمركز:', e);
+        return;
+    }
+    await loadPeakPlans();
     showToast('✅ تم تأكيد مغادرة ' + plan.unit, 'success');
 }
 
-function resolvePeakPlan(planId) {
+async function resolvePeakPlan(planId) {
     if (!confirm('⚠️ هل أنت متأكد من إنهاء هذه الخطة؟')) return;
     var plan = peakPlans.find(function(p) { return p.id === planId; });
     if (!plan) return;
-    plan.status = 'completed';
-    plan.departureTime = plan.departureTime || new Date().toISOString();
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
+    // نفس التعديلات القديمة حرفياً: status = 'completed' مع الإبقاء على departureTime إن وُجد
+    var departureTime = plan.departureTime || new Date().toISOString();
+    try {
+        var response = await AuthManager.apiRequest('/api/peak-plans/' + encodeURIComponent(planId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed', departureTime: departureTime })
+        });
+        if (!response.ok) throw new Error('status=' + response.status);
+    } catch (e) {
+        console.error('❌ فشل إنهاء خطة التمركز:', e);
+        return;
+    }
     stopPeakCountdown(planId);
-    renderPeakDeployments();
-    refreshPeakDashboard();
+    await loadPeakPlans();
     showToast('✅ تم إنهاء الخطة', 'success');
 }
 
@@ -10687,19 +10796,9 @@ function exportPeakArchive() {
     showToast('✅ تم التصدير', 'success');
 }
 
-// ----- Cleanup on load -----
-function cleanupPeakPlans() {
-    var now = new Date();
-    peakPlans.forEach(function(p) {
-        if (p.status === 'active' && p.endTime && new Date(p.endTime) < now) {
-            p.status = 'completed';
-        }
-    });
-    localStorage.setItem('peakPlans', JSON.stringify(peakPlans));
-}
-
-// Run cleanup on startup
-cleanupPeakPlans();
+// ----- التحميل الأولي من الخادم -----
+// كنس الخطط المنتهية انتقل إلى الخدمة (PositioningService.list) — لا منطق تشغيلي في الواجهة
+loadPeakPlans();
 
 // Update the sidebar button
 var sidebarPeak = document.getElementById('sidebarPeak');

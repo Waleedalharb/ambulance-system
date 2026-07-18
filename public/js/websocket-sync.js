@@ -322,6 +322,7 @@
                         if (typeof loadData === 'function') loadData();
                         break;
                     case 'peak_plan_added':
+                    case 'peak_plan_updated':
                     case 'peak_plan_deleted':
                         if (typeof loadPeakPlans === 'function') loadPeakPlans();
                         if (typeof checkForAlerts === 'function') checkForAlerts();
