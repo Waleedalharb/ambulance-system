@@ -671,6 +671,10 @@ async function main() {
     const f5bExportOk = !!f5bGenMatch && f5bGenMatch[0].includes("window.open('daily-report.html', '_blank')") && !f5bGenMatch[0].includes('showToast');
     record('F5b ⑤: تصدير operations-dashboard يفتح daily-report.html', f5bExportOk, f5bGenMatch ? 'function found' : 'function NOT found');
 
+    // ─── 13j. No Fabricated Defaults — إزالة الافتراضي المختلق (بقرار المالك بعد F5b) ───
+    const f5bNoFabricated = !f5bAppSrc.includes('staffCount) || 2');
+    record('F5b+ ⑥: لا افتراضي مختلق في staffCount (|| 2 أُزيل — الحالة الصادقة «—» عند الغياب)', f5bNoFabricated, f5bNoFabricated ? 'clean' : 'fabricated default found');
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

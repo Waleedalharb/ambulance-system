@@ -3190,6 +3190,7 @@ function updateWorkforceStats() {
 
 function updateWorkforceFromCompletion(teams) {
     var totalStaff = 0;
+    var staffKnown = false; // بقرار المالك: لا افتراضي مختلق — يُجمع المسجل فقط، وعند غياب كل القيم «—»
     var readyTeams = 0;
     var totalOperational = 0;
     
@@ -3200,14 +3201,15 @@ function updateWorkforceFromCompletion(teams) {
         if (!isOperational) continue;
         totalOperational++;
         if (team.status === 'ready') {
-            totalStaff += parseInt(team.staffCount) || 2;
+            var sc = parseInt(team.staffCount);
+            if (!isNaN(sc)) { totalStaff += sc; staffKnown = true; }
             readyTeams++;
         }
     }
     
     var readiness = totalOperational > 0 ? Math.round((readyTeams / totalOperational) * 100) : 0;
     var missingTeams = totalOperational - readyTeams;
-    updateWorkforceDisplay(totalStaff, readyTeams, readiness, missingTeams);
+    updateWorkforceDisplay(staffKnown ? totalStaff : '—', readyTeams, readiness, missingTeams);
 }
 
 function updateWorkforceStatsFallback() {
