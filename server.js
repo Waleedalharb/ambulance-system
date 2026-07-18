@@ -591,7 +591,6 @@ const INCIDENTS_PATH = path.join(STORAGE_PATH, 'incidents.json');
 const SENIOR_SHIFTS_PATH = path.join(STORAGE_PATH, 'senior-shifts.json');
 const E_CASES_PATH = path.join(STORAGE_PATH, 'e-cases.json');
 const ESCALATIONS_PATH = path.join(STORAGE_PATH, 'escalations.json');
-const DAILY_REPORTS_PATH = path.join(STORAGE_PATH, 'daily-reports.json');
 const SCHEDULE_EMPLOYEES_PATH = path.join(STORAGE_PATH, 'schedule-employees.json');
 const SCHEDULE_FILES_PATH = path.join(STORAGE_PATH, 'schedule-files.json');
 const REPORT_ENTRY_PATH = path.join(STORAGE_PATH, 'report-entry.json');
@@ -1796,23 +1795,6 @@ async function readEscalations() {
 
 async function writeEscalations(data) {
     await fs.writeFile(ESCALATIONS_PATH, JSON.stringify(data, null, 2));
-}
-
-// ============================================
-// دوال التقارير اليومية
-// ============================================
-async function readDailyReports() {
-    try {
-        const data = await fs.readFile(DAILY_REPORTS_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-    }
-}
-
-async function writeDailyReports(data) {
-    await fs.writeFile(DAILY_REPORTS_PATH, JSON.stringify(data, null, 2));
 }
 
 // ============================================
@@ -3819,11 +3801,26 @@ app.get('/api/daily-report', authenticate, async (req, res) => {
             // SQLite mode
             if (shiftId) {
                 shift = await db.Shifts.getById(shiftId);
-                shiftReports = shift ? await db.Shifts.getShiftReports(shiftId) : [];
             } else {
                 allShifts = await db.Shifts.getAll();
                 shift = allShifts[0] || null;
-                shiftReports = shift ? await db.Shifts.getShiftReports(shift.id) : [];
+            }
+            if (shift) {
+                if (reportService) {
+                    // F4: derive from the single source (reports) via ReportService;
+                    // the service falls back internally to the frozen migration
+                    // store (shift_reports) for pre-migration shifts.
+                    const reportsObj = await reportService.getShiftReports(shift.id);
+                    for (const key in reportsObj) {
+                        const parts = key.split('|');
+                        if (parts.length === 2) {
+                            shiftReports.push({ center: parts[0], unit: parts[1], count: reportsObj[key].count || 0 });
+                        }
+                    }
+                } else {
+                    // Legacy fallback (services unavailable): frozen migration store
+                    shiftReports = await db.Shifts.getShiftReports(shift.id);
+                }
             }
         } else {
             // JSON fallback mode
@@ -3858,17 +3855,24 @@ app.get('/api/daily-report', authenticate, async (req, res) => {
 
         unitRanking.sort((a, b) => b.count - a.count);
 
-        // Get previous shift for comparison
+        // Get previous shift for comparison (X13: normalize ordering locally —
+        // SQLite getAll is newest-first, JSON readShifts is oldest-first)
         if (allShifts.length === 0) {
             allShifts = (db && db.Shifts) ? await db.Shifts.getAll() : await readShifts();
         }
-        const currentIndex = allShifts.findIndex(s => s.id === shift.id);
-        const prevShift = currentIndex >= 0 && allShifts.length > currentIndex + 1 ? allShifts[currentIndex + 1] : null;
+        const shiftsDesc = [...allShifts].sort((a, b) => b.id - a.id);
+        const currentIndex = shiftsDesc.findIndex(s => s.id === shift.id);
+        const prevShift = currentIndex >= 0 && shiftsDesc.length > currentIndex + 1 ? shiftsDesc[currentIndex + 1] : null;
         let prevTotal = 0;
         if (prevShift) {
             if (db && db.Shifts) {
-                const prevReports = await db.Shifts.getShiftReports(prevShift.id);
-                prevTotal = prevReports.reduce((sum, r) => sum + (r.count || 0), 0);
+                if (reportService) {
+                    const prevObj = await reportService.getShiftReports(prevShift.id);
+                    prevTotal = Object.values(prevObj).reduce((sum, r) => sum + (r.count || 0), 0);
+                } else {
+                    const prevReports = await db.Shifts.getShiftReports(prevShift.id);
+                    prevTotal = prevReports.reduce((sum, r) => sum + (r.count || 0), 0);
+                }
             } else if (prevShift.savedReports) {
                 for (let key in prevShift.savedReports) {
                     prevTotal += (prevShift.savedReports[key].count || 0);
@@ -5558,60 +5562,6 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
     } catch (error) {
         console.error('Admin stats error:', error);
         res.status(500).json({ error: 'فشل في جلب الإحصائيات: ' + error.message });
-    }
-});
-
-app.get('/api/admin/daily-report', authenticate, authorize(['admin']), async (req, res) => {
-    try {
-        const saudiTime = getSaudiDateTime();
-        const year = saudiTime.getFullYear();
-        const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
-        const day = saudiTime.getDate().toString().padStart(2, '0');
-        const today = `${year}-${month}-${day}`;
-        const shiftType = getCurrentShiftType();
-        
-        const data = await readData();
-        const shifts = await readShifts();
-        const auditLog = await readAuditLog();
-        
-        // Today's shift
-        const todayShift = shifts.find(s => s.shiftDate === today && s.shiftType === shiftType);
-        
-        // Calculate metrics
-        const totalReports = Object.values(data).reduce((sum, r) => sum + (r.count || 0), 0);
-        const activeUnits = Object.keys(data).filter(k => data[k].count > 0).length;
-        const totalUnits = Object.keys(data).length;
-        
-        // Center breakdown
-        const centerBreakdown = {};
-        for (let key in data) {
-            const parts = key.split('|');
-            if (parts.length === 2) {
-                const center = parts[0];
-                if (!centerBreakdown[center]) centerBreakdown[center] = 0;
-                centerBreakdown[center] += data[key].count;
-            }
-        }
-        
-        // Recent audit entries (last 20)
-        const recentAudit = auditLog.slice(0, 20);
-        
-        res.json({
-            success: true,
-            report: {
-                date: today,
-                shiftType,
-                totalReports,
-                activeUnits,
-                totalUnits,
-                centerBreakdown,
-                recentAudit,
-                shiftData: todayShift || null
-            }
-        });
-    } catch (error) {
-        console.error('Daily report error:', error);
-        res.status(500).json({ error: 'فشل في إنشاء التقرير' });
     }
 });
 

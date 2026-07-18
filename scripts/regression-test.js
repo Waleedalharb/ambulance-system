@@ -533,6 +533,56 @@ async function main() {
     const f3DataAvg = f3DataMs / 20;
     record('F3 Performance: GET /api/data ضمن العتبة', f3DataAvg < 200, `avg=${f3DataAvg.toFixed(1)}ms`);
 
+    // ─── 13g. F4: Daily Report Single Source — التقرير اليومي مشتق من المصدر الواحد ───
+    // ① الاشتقاق الحي: بلاغات في مركزين ← التقرير يطابقها (المصدر reports لا shift_reports المجمد)
+    const f4StartA = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
+    const f4ShiftA = f4StartA.data && f4StartA.data.shiftId;
+    await api('POST', '/api/report', { center: 'الشفاء', unit: 'جنوب 8', type: 'إصابة' });
+    await api('POST', '/api/report', { center: 'الشفاء', unit: 'جنوب 8', type: 'إصابة' });
+    await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3', type: 'نقل مريض' });
+    const f4Rep1 = await api('GET', `/api/daily-report?shiftId=${f4ShiftA}`);
+    const f4D1 = f4Rep1.data || {};
+    const f4Derived = f4D1.shift && f4D1.shift.totalReports === 3
+        && f4D1.centerBreakdown && f4D1.centerBreakdown['الشفاء'] === 2 && f4D1.centerBreakdown['منفوحة'] === 1;
+    record('F4: التقرير اليومي مشتق من المصدر الواحد لا الجدول المجمد', f4Rep1.ok && !!f4ShiftA && f4Derived, JSON.stringify(f4D1.shift));
+
+    // ② التحديث اللحظي: التراجع عن بلاغ ← التقرير يعكس النقصان فوراً
+    await api('POST', '/api/undo', { center: 'الشفاء', unit: 'جنوب 8' });
+    const f4Rep2 = await api('GET', `/api/daily-report?shiftId=${f4ShiftA}`);
+    const f4D2 = f4Rep2.data || {};
+    const f4Live = f4D2.shift && f4D2.shift.totalReports === 2 && f4D2.centerBreakdown && f4D2.centerBreakdown['الشفاء'] === 1;
+    record('F4: التقرير يعكس التراجع لحظياً (اشتقاق حي غير مجمد)', f4Rep2.ok && f4Live, `total=${f4D2.shift && f4D2.shift.totalReports}`);
+
+    // تنظيف ①② أفضل جهد: إفراغ بلاغات المناوبة A
+    await api('POST', '/api/undo', { center: 'الشفاء', unit: 'جنوب 8' });
+    await api('POST', '/api/undo', { center: 'منفوحة', unit: 'جنوب 3' });
+
+    // ③ X13: مناوبة B جديدة ← التقرير يقارنها بالأقدم A فعلاً (ترتيب محلي مطبّع)
+    const f4StartB = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
+    const f4ShiftB = f4StartB.data && f4StartB.data.shiftId;
+    const f4Rep3 = await api('GET', `/api/daily-report?shiftId=${f4ShiftB}`);
+    const f4Prev = f4Rep3.data && f4Rep3.data.previousShift;
+    record('F4 X13: المقارنة تتم مع المناوبة الأقدم مباشرة', f4Rep3.ok && !!f4ShiftB && !!f4Prev && f4Prev.id === f4ShiftA, `prev=${f4Prev && f4Prev.id} expected=${f4ShiftA}`);
+
+    // ④ fallback الهجرة: لا مناوبة بـ shift_reports دون reports في النسخة ← تحقق ساكن من مسار الـ fallback
+    const f4Fs = require('fs'), f4Path = require('path');
+    const f4SvcSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'services', 'report-service.js'), 'utf8');
+    const f4SrvSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'server.js'), 'utf8');
+    const f4FallbackOk = f4SvcSrc.includes('getShiftReports') && f4SvcSrc.includes('FROM shift_reports') && f4SrvSrc.includes('reportService.getShiftReports');
+    record('F4: مسار fallback الهجرة (shift_reports) موجود في الخدمة والمسار', f4FallbackOk);
+
+    // ⑤ التنظيف: server.js بلا مخلفات daily-reports.json والمسار الإداري؛ db.js بلا مخطط/namespace الميت
+    const f4DbSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'db.js'), 'utf8');
+    const f4SrvClean = !f4SrvSrc.includes('admin/daily-report') && !f4SrvSrc.includes('readDailyReports') && !f4SrvSrc.includes('DAILY_REPORTS_PATH');
+    const f4DbClean = !f4DbSrc.includes('DailyReports') && !f4DbSrc.includes('CREATE TABLE IF NOT EXISTS daily_reports');
+    record('F4: إزالة مخزن daily_reports الميت ومساره الإداري ودوال JSON', f4SrvClean && f4DbClean, `srv=${f4SrvClean} db=${f4DbClean}`);
+
+    // ⑥ الأداء
+    let f4Ms = 0;
+    for (let i = 0; i < 20; i++) { const t0 = Date.now(); await api('GET', '/api/daily-report'); f4Ms += Date.now() - t0; }
+    const f4Avg = f4Ms / 20;
+    record('F4 Performance: GET /api/daily-report ضمن العتبة', f4Avg < 200, `avg=${f4Avg.toFixed(1)}ms`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

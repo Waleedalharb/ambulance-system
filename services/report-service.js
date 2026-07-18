@@ -128,6 +128,47 @@ class ReportService {
         }
         return data;
     }
+
+    /**
+     * Read-only: reports for ANY shift (active or archived) as an object map
+     *   { "<center>|<unit>": { count: <int>, times: [<string>, ...] } }
+     * Mirrors the archive engine's _getReports logic: the single source
+     * (reports table) first; when the shift predates the single source,
+     * falls back to the frozen migration store (shift_reports — written by
+     * migrateShifts from the legacy savedReports map).
+     *
+     * @param {number} shiftId
+     * @returns {Object} data map ({} when the shift has no reports anywhere)
+     */
+    async getShiftReports(shiftId) {
+        const live = await this.engine.storage.all(
+            'SELECT center, unit, count FROM reports WHERE shift_id = ? ORDER BY id ASC',
+            [shiftId]
+        );
+        if (Array.isArray(live) && live.length > 0) {
+            const obj = {};
+            for (const r of live) {
+                if (r.center && r.unit) {
+                    obj[`${r.center}|${r.unit}`] = { count: r.count || 0, times: [] };
+                }
+            }
+            return obj;
+        }
+
+        // Migration fallback: frozen shift_reports store (legacy savedReports)
+        const migrated = await this.engine.storage.all(
+            'SELECT center, unit, count, times FROM shift_reports WHERE shift_id = ?',
+            [shiftId]
+        );
+        const obj = {};
+        for (const r of migrated) {
+            if (!r.center || !r.unit) continue;
+            let times = [];
+            try { times = r.times ? JSON.parse(r.times) : []; } catch (_) { times = []; }
+            obj[`${r.center}|${r.unit}`] = { count: r.count || 0, times };
+        }
+        return obj;
+    }
 }
 
 module.exports = ReportService;

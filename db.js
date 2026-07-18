@@ -589,6 +589,14 @@ async function runMigrations() {
     }
   }
 
+  // F4: drop the dead daily_reports store (derived daily report replaces it)
+  try {
+    await exec(`DROP TABLE IF EXISTS daily_reports`);
+    logger.info('daily_reports table dropped (dead store cleanup)');
+  } catch (err) {
+    logger.warn('daily_reports drop warning: ' + err.message);
+  }
+
   // Create audit_log table
   try {
     await exec(`CREATE TABLE IF NOT EXISTS audit_log (
@@ -919,23 +927,6 @@ async function runMigrations() {
     logger.info('escalations table created');
   } catch (err) {
     logger.warn('escalations: ' + err.message);
-  }
-
-  // daily_reports (replaces daily-reports.json)
-  try {
-    await exec(`CREATE TABLE IF NOT EXISTS daily_reports (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      content TEXT,
-      report_type TEXT DEFAULT 'general',
-      created_by TEXT,
-      shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await exec(`CREATE INDEX IF NOT EXISTS idx_daily_reports_shift ON daily_reports(shift_id)`);
-    logger.info('daily_reports table created');
-  } catch (err) {
-    logger.warn('daily_reports: ' + err.message);
   }
 
   // KB migrations: add columns to existing kb_documents for backward compatibility
@@ -1879,28 +1870,6 @@ const Escalations = {
   },
   async delete(id) {
     return run('DELETE FROM escalations WHERE id = ?', [id]);
-  }
-};
-
-// ============================================
-// CRUD: DAILY REPORTS (Replaces daily-reports.json)
-// ============================================
-const DailyReports = {
-  async getAll() {
-    return all('SELECT * FROM daily_reports ORDER BY id DESC');
-  },
-  async getByShift(shift_id) {
-    return all('SELECT * FROM daily_reports WHERE shift_id = ? ORDER BY id DESC', [shift_id]);
-  },
-  async create(data) {
-    const result = await run(
-      'INSERT INTO daily_reports (title, content, report_type, created_by, shift_id) VALUES (?, ?, ?, ?, ?)',
-      [data.title, data.content, data.reportType || 'general', data.createdBy, data.shiftId || null]
-    );
-    return result.id;
-  },
-  async delete(id) {
-    return run('DELETE FROM daily_reports WHERE id = ?', [id]);
   }
 };
 
