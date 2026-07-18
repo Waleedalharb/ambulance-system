@@ -523,9 +523,6 @@ window.addEventListener('load', function() {
             <button class="btn" onclick="navigateToPage('admin-dashboard.html?v=41')" style="background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; font-weight:700;">
                 <i class="fas fa-heartbeat"></i> مراقب النظام
             </button>
-            <button id="achievementsBtn" class="btn" style="background:linear-gradient(135deg, #FFD700, #FFA500); color:#0F172A; border:none; font-weight:700;" title="الإنجازات">
-                <i class="fas fa-trophy"></i> الإنجازات
-            </button>
 
             <!-- ===== فاصل ===== -->
             <span style="flex:1;"></span>
@@ -1478,41 +1475,7 @@ window.addEventListener('load', function() {
 <!-- ===== حاوية الإشعارات ===== -->
 <div id="toastContainer" class="toast-container"></div>
 
-<!-- ===== نافذة QR Codes ===== -->
-<div id="qrModal" class="modal">
-    <div class="modal-content qr-modal-content">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon teal"><i class="fas fa-qrcode"></i></span>
-                <div>
-                    <h2 style="margin:0; font-size:1.2rem;">QR Codes - الفرق الإسعافية</h2>
-                    <span style="font-size:0.7rem; color:var(--gray-400);">امسح الكود لتسجيل بلاغ سريع</span>
-                </div>
-            </div>
-            <div style="display:flex; gap:8px;">
-                <button onclick="printAllQRCodes()" class="btn btn-secondary" style="font-size:0.75rem;">
-                    <i class="fas fa-print"></i> طباعة الكل
-                </button>
-                <button onclick="document.getElementById('qrModal').style.display='none'" class="btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </div>
-        
-        <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:12px; margin-bottom:15px; font-size:0.8rem; color:var(--gray-600);">
-            <i class="fas fa-info-circle" style="color:var(--teal);"></i> 
-            كل QR code يربط مباشرة بتسجيل بلاغ للفرقة المحددة. اطبعها والصقها في المركبات.
-        </div>
-        
-        <div id="qrCodesContainer"></div>
-        
-        <div class="modal-buttons">
-            <button onclick="document.getElementById('qrModal').style.display='none'" class="btn">
-                <i class="fas fa-times"></i> إغلاق
-            </button>
-        </div>
-    </div>
-</div>
+<!-- ===== F5b: حُذفت نافذة QR Codes (قرار المالك) — حُذفت منظومتها من app.js معها ===== -->
 
 <!-- ===== نافذة لوحة التحكم المتقدمة ===== -->
 <div id="analyticsModal" class="modal">
@@ -1740,7 +1703,6 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('analyticsModal').style.display='flex'; renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-command-center"></i> مركز العمليات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-dashboard.html?v=41');"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('achievementsModal').style.display='flex'; renderAchievements();"><i class="fas fa-trophy"></i> الإنجازات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); toggleAIChatPanel();"><i class="fas fa-robot"></i> المساعد التشغيلي</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-knowledge.html?v=41');"><i class="fas fa-book"></i> قاعدة المعرفة</button>

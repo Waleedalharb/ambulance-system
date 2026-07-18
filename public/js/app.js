@@ -824,17 +824,35 @@ function renderHeatmap() {
     var grid = document.getElementById('heatmapGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    
+
     var colors = ['#e8f5e9', '#c8e6c9', '#a5d6a7', '#81c784', '#66bb6a', '#ffb74d', '#ffa726', '#f57c00', '#e57373', '#c62828'];
-    
+
+    // F5b: هيستوغرام ساعي حقيقي من مرآة بلاغات المناوبة الجارية (reports[key].times — نفس تجميع getPeakHour)
+    var hourCounts = new Array(24).fill(0);
+    var maxCount = 0;
+    for (var key in reports) {
+        var r = reports[key];
+        if (r && r.times) {
+            for (var i = 0; i < r.times.length; i++) {
+                var h = new Date(r.times[i]).getHours();
+                if (!isNaN(h)) {
+                    hourCounts[h]++;
+                    if (hourCounts[h] > maxCount) maxCount = hourCounts[h];
+                }
+            }
+        }
+    }
+
     for (var hour = 0; hour < 24; hour++) {
         var cell = document.createElement('div');
         cell.className = 'heatmap-cell';
         cell.setAttribute('data-hour', hour + ':00');
-        
-        var intensity = Math.floor(Math.random() * 10);
+        cell.title = hour + ':00 — ' + hourCounts[hour] + ' بلاغ';
+
+        // 0 بلاغ ← الفهرس 0؛ وإلا تدرج نسبي 1..9 من الأعلى (maxCount)
+        var intensity = hourCounts[hour] === 0 ? 0 : Math.min(9, 1 + Math.floor((hourCounts[hour] / maxCount) * 8));
         cell.style.background = colors[intensity] || colors[0];
-        
+
         grid.appendChild(cell);
     }
 }
@@ -2390,13 +2408,7 @@ async function loadAllData() {
         }
         updateShiftStatus();
         document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
-        
-        // تحديث الإنجازات ولوحة الصدارة
-        var el_achievementsModal_d15 = document.getElementById('achievementsModal');
-        if (el_achievementsModal_d15 && el_achievementsModal_d15.style.display == 'flex') {
-            renderAchievements();
-            renderLeaderboard();
-        }
+
         // Hide skeleton loading screen when data is loaded
         hideSkeleton();
     } catch (error) {
@@ -3211,52 +3223,13 @@ function updateWorkforceStatsFallback() {
         updateWorkforceFromShiftData(shiftData);
         return;
     }
-    
-    // Fallback: count from actual centersData instead of random numbers
-    var totalStaff = 0;
-    var totalCars = 0;
-    var readyCenters = 0;
-    var missingCenters = 0;
-    var centerCount = 0;
-    
-    // Count all centers that actually have data
-    for (var center in centersData) {
-        var units = centersData[center] || [];
-        for (var i = 0; i < units.length; i++) {
-            var unit = units[i];
-            // Default to 2 staff + 1 car per unit if no specific data
-            var staff = (unit && unit.staffCount) ? parseInt(unit.staffCount) : 2;
-            var cars = (unit && unit.carsCount) ? parseInt(unit.carsCount) : 1;
-            totalStaff += staff;
-            totalCars += cars;
-            centerCount++;
-            if (staff >= 2 && cars >= 1) {
-                readyCenters++;
-            } else {
-                missingCenters++;
-            }
-        }
-    }
-    
-    // If centersData is empty, try to count from the reports keys (actual active locations)
-    if (centerCount === 0) {
-        var activeLocations = {};
-        for (var key in reports) {
-            var parts = key.split('|');
-            if (parts.length >= 2) {
-                activeLocations[parts[1]] = true;
-            }
-        }
-        var activeKeys = Object.keys(activeLocations);
-        centerCount = activeKeys.length;
-        totalStaff = centerCount * 2;
-        totalCars = centerCount;
-        readyCenters = centerCount;
-        missingCenters = 0;
-    }
-    
-    var readiness = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-    updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters);
+
+    // F5b: أُزيل الافتراضي المختلق 2/1 ومضاعفات مفاتيح البلاغات (بيانات وهمية ممنوعة).
+    // لا مصدر حقيقي آخر للقوى خارج نموذج المناوبة المحفوظ:
+    //   - centersData أسماء وحدات نصية فقط (بلا staffCount/carsCount فعلية)
+    //   - shift_completions غير متاح هنا بحكم التصميم (الوصول للـ fallback يعني غيابه)
+    // ← الحالة الصادقة «—»
+    updateWorkforceDisplay('—', '—', '—', '—');
 }
 
 function updateWorkforceFromShiftData(shiftData) {
@@ -3288,36 +3261,51 @@ function updateWorkforceFromShiftData(shiftData) {
 }
 
 function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
+    // F5b: يقبل «—» (الحالة الصادقة عند غياب مصدر حقيقي) — يتخطى النسب والاتجاهات الرقمية
+    var honest = (totalStaff === '—');
     animateValue('wfTotalStaff', totalStaff);
     animateValue('wfTotalCars', totalCars);
-    var el_wfReadiness = document.getElementById('wfReadiness'); if (el_wfReadiness) el_wfReadiness.innerText = readiness + '%';
+    var el_wfReadiness = document.getElementById('wfReadiness'); if (el_wfReadiness) el_wfReadiness.innerText = honest ? '—' : readiness + '%';
     var el_wfMissingCenters = document.getElementById('wfMissingCenters'); if (el_wfMissingCenters) el_wfMissingCenters.innerText = missingCenters;
-    
-    var staffPct = Math.min((totalStaff / 30) * 100, 100);
-    var carsPct = Math.min((totalCars / 20) * 100, 100);
-    var missingPct = Math.min((missingCenters / 10) * 100, 100);
-    
+
+    var staffPct = honest ? 0 : Math.min((totalStaff / 30) * 100, 100);
+    var carsPct = honest ? 0 : Math.min((totalCars / 20) * 100, 100);
+    var missingPct = honest ? 0 : Math.min((missingCenters / 10) * 100, 100);
+
     var el_wfStaffProgress = document.getElementById('wfStaffProgress'); if (el_wfStaffProgress) el_wfStaffProgress.style.width = staffPct + '%';
     var el_wfCarsProgress = document.getElementById('wfCarsProgress'); if (el_wfCarsProgress) el_wfCarsProgress.style.width = carsPct + '%';
-    var el_wfReadinessProgress = document.getElementById('wfReadinessProgress'); if (el_wfReadinessProgress) el_wfReadinessProgress.style.width = readiness + '%';
+    var el_wfReadinessProgress = document.getElementById('wfReadinessProgress'); if (el_wfReadinessProgress) el_wfReadinessProgress.style.width = (honest ? 0 : readiness) + '%';
     var el_wfMissingProgress = document.getElementById('wfMissingProgress'); if (el_wfMissingProgress) el_wfMissingProgress.style.width = missingPct + '%';
-    
-    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = totalStaff + ' / 30 هدف';
-    var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = totalCars + ' / 20 هدف';
-    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = readiness + '% جاهز';
-    var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = missingCenters + ' / 10 مركز';
-    
-    updateTrend('wfStaffTrend', totalStaff, 20);
-    updateTrend('wfCarsTrend', totalCars, 15);
-    updateTrend('wfReadinessTrend', readiness, 70);
-    updateTrend('wfMissingTrend', missingCenters, 3);
-    
+
+    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = honest ? '—' : totalStaff + ' / 30 هدف';
+    var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = honest ? '—' : totalCars + ' / 20 هدف';
+    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = honest ? '—' : readiness + '% جاهز';
+    var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = honest ? '—' : missingCenters + ' / 10 مركز';
+
+    if (!honest) {
+        updateTrend('wfStaffTrend', totalStaff, 20);
+        updateTrend('wfCarsTrend', totalCars, 15);
+        updateTrend('wfReadinessTrend', readiness, 70);
+        updateTrend('wfMissingTrend', missingCenters, 3);
+    } else {
+        var trendIds = ['wfStaffTrend', 'wfCarsTrend', 'wfReadinessTrend', 'wfMissingTrend'];
+        for (var ti = 0; ti < trendIds.length; ti++) {
+            var trendEl = document.getElementById(trendIds[ti]);
+            if (trendEl) { trendEl.className = 'wf-card-trend neutral'; trendEl.innerText = '—'; }
+        }
+    }
+
     var el_wfLastUpdate = document.getElementById('wfLastUpdate'); if (el_wfLastUpdate) el_wfLastUpdate.innerText = getSaudiTime();
 }
 
 function animateValue(elementId, value) {
     var el = document.getElementById(elementId);
     if (!el) return;
+    // F5b: القيمة النصية («—» الحالة الصادقة) تُعرض مباشرة بلا مقارنة رقمية
+    if (typeof value !== 'number' || !isFinite(value)) {
+        el.innerText = value;
+        return;
+    }
     var current = parseInt(el.innerText) || 0;
     if (current === value) return;
     el.innerText = value;
@@ -8329,11 +8317,9 @@ var achievements = [
 var gamificationStats = JSON.parse(localStorage.getItem('gamificationStats') || '{"mapOpens":0,"pdfExports":0,"notificationsSent":0}');
 var unlockedAchievements = JSON.parse(localStorage.getItem('unlockedAchievements') || '[]');
 
-var el_achievementsBtn=document.getElementById("achievementsBtn");if(el_achievementsBtn)el_achievementsBtn.addEventListener('click', function() {
-    var el_achievementsModal_d54 = document.getElementById('achievementsModal'); if (el_achievementsModal_d54) el_achievementsModal_d54.style.display = 'flex';
-    renderAchievements();
-    renderLeaderboard();
-});
+// F5b: أُطفئت Gamification بالكامل (قرار المالك) — نقاط الدخول والمستمعات حُذفت.
+// التعريفات أدناه (renderAchievements/renderLeaderboard) يتيمة وتبقى موثقة:
+// ستُبنى مستقبلاً على IndicatorService.
 
 function renderAchievements() {
     var grid = document.getElementById('achievementsGrid');
@@ -8612,125 +8598,15 @@ var el_cancelChangePasswordBtn=document.getElementById("cancelChangePasswordBtn"
 });
 
 // ============================================
-// نظام QR Codes
+// F5b: حُذفت منظومة QR Codes بالكامل (قرار المالك) —
+// كانت البطاقات تقود إلى GET /api/report?center&unit (مسار معدوم).
+// CSS الخاص بالمودال في smart-toolbar.css يبقى موثقاً كدين مؤجل.
 // ============================================
-
-var el_qrCodesBtn=document.getElementById("qrCodesBtn");if(el_qrCodesBtn)el_qrCodesBtn.addEventListener('click', function() {
-    var el_qrModal_d65 = document.getElementById('qrModal'); if (el_qrModal_d65) el_qrModal_d65.style.display = 'flex';
-    generateAllQRCodes();
-});
-
-function generateAllQRCodes() {
-    var container = document.getElementById('qrCodesContainer');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    // تجميع الفرق حسب المركز
-    var centerGroups = {};
-    for (var center in centersData) {
-        centerGroups[center] = centersData[center];
-    }
-    
-    for (var center in centerGroups) {
-        var section = document.createElement('div');
-        section.className = 'qr-section';
-        
-        var title = document.createElement('h3');
-        title.innerHTML = '<i class="fas fa-hospital" style="color:var(--teal);"></i> ' + center;
-        section.appendChild(title);
-        
-        var grid = document.createElement('div');
-        grid.className = 'qr-grid';
-        
-        var units = centerGroups[center];
-        for (var i = 0; i < units.length; i++) {
-            var unit = units[i];
-            var card = createQRCard(center, unit);
-            grid.appendChild(card);
-        }
-        
-        section.appendChild(grid);
-        container.appendChild(section);
-    }
-}
-
-function createQRCard(center, unit) {
-    var card = document.createElement('div');
-    card.className = 'qr-card';
-    
-    var qrDiv = document.createElement('div');
-    qrDiv.className = 'qr-code-container';
-    qrDiv.id = 'qr-' + unit.replace(/\s/g, '-');
-    
-    var unitName = document.createElement('div');
-    unitName.className = 'qr-unit-name';
-    unitName.textContent = unit;
-    
-    var centerName = document.createElement('div');
-    centerName.className = 'qr-center-name';
-    centerName.textContent = center;
-    
-    card.appendChild(qrDiv);
-    card.appendChild(unitName);
-    card.appendChild(centerName);
-    
-    // إنشاء QR Code بعد إضافة العنصر للـ DOM
-    setTimeout(function() {
-        var url = window.location.origin + '/api/report?center=' + encodeURIComponent(center) + '&unit=' + encodeURIComponent(unit);
-        try {
-            new QRCode(qrDiv, {
-                text: url,
-                width: 120,
-                height: 120,
-                colorDark: '#1E293B',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        } catch(e) {
-            qrDiv.innerHTML = '<div style="font-size:0.7rem; color:var(--coral);">خطأ في إنشاء QR</div>';
-        }
-    }, 100);
-    
-    // طباعة فردية
-    card.addEventListener('click', function() {
-        printQRCard(center, unit, card);
-    });
-    
-    return card;
-}
-
-function printQRCard(center, unit, cardElement) {
-    var printWindow = window.open('', '_blank');
-    var url = window.location.origin + '/api/report?center=' + encodeURIComponent(center) + '&unit=' + encodeURIComponent(unit);
-    
-    printWindow.document.write('<html dir="rtl"><head><title>QR - ' + unit + '</title>');
-    printWindow.document.write('<style>');
-    printWindow.document.write('body { font-family: Arial; text-align: center; padding: 20px; }');
-    printWindow.document.write('.qr-box { border: 2px solid #2563EB; border-radius: 12px; padding: 20px; display: inline-block; }');
-    printWindow.document.write('h2 { color: #1E293B; margin: 0 0 5px; }');
-    printWindow.document.write('p { color: #64748B; margin: 0 0 10px; font-size: 0.85rem; }');
-    printWindow.document.write('</style></head><body>');
-    printWindow.document.write('<div class="qr-box">');
-    printWindow.document.write('<h2>' + unit + '</h2>');
-    printWindow.document.write('<p>' + center + '</p>');
-    printWindow.document.write(cardElement.querySelector('.qr-code-container').innerHTML);
-    printWindow.document.write('<p style="font-size:0.7rem; margin-top:10px;">امسح الكود لتسجيل بلاغ</p>');
-    printWindow.document.write('</div></body></html>');
-    printWindow.document.close();
-    
-    setTimeout(function() {
-        printWindow.print();
-    }, 500);
-}
-
-function printAllQRCodes() {
-    window.print();
-}
 
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'qrModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
+    var modals = ['shiftModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
     modals.forEach(function(id) {
         var modal = document.getElementById(id);
         if (e.target === modal) { modal.style.display = 'none'; }
@@ -9490,10 +9366,20 @@ function renderHourlyChart() {
 
     var hours = [];
     var data = [];
+    // F5b: بيانات حقيقية من مرآة بلاغات المناوبة الجارية (reports[key].times — نفس تجميع getPeakHour)
+    var hourCounts = {};
+    for (var key in reports) {
+        var r = reports[key];
+        if (r && r.times) {
+            for (var j = 0; j < r.times.length; j++) {
+                var hh = new Date(r.times[j]).getHours();
+                if (!isNaN(hh)) hourCounts[hh] = (hourCounts[hh] || 0) + 1;
+            }
+        }
+    }
     for (var i = 0; i < 24; i++) {
         hours.push(i + ':00');
-        var base = (i >= 16 && i <= 22) ? 15 : (i >= 8 && i <= 15) ? 8 : 3;
-        data.push(base + Math.floor(Math.random() * 10));
+        data.push(hourCounts[i] || 0);
     }
 
     if (chartInstances.hourly) chartInstances.hourly.destroy();
@@ -9615,41 +9501,55 @@ function renderTopUnitsChart() {
 function renderWeeklyChart() {
     var ctx = document.getElementById('weeklyChart');
     if (!ctx) return;
-    
+
     var days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    var data = [];
-    for (var i = 0; i < 7; i++) {
-        data.push(Math.floor(Math.random() * 40) + 20);
-    }
-    
-    if (chartInstances.weekly) chartInstances.weekly.destroy();
-    
-    chartInstances.weekly = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: days,
-            datasets: [{
-                label: 'إجمالي البلاغات',
-                data: data,
-                borderColor: '#F59E0B',
-                backgroundColor: 'rgba(232, 200, 74, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#F59E0B',
-                pointRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-                x: { grid: { display: false } }
-            }
+
+    // F5b: بيانات حقيقية من حزمة المؤشرات (/api/indicators/dashboard — dailySeries آخر 30 يوماً)
+    // مجمّعة حسب اليوم-من-الأسبوع (getDay: 0=الأحد .. 6=السبت). عند فشل الجلب: لا رسم إطلاقاً (لا خط صفري مضلل).
+    if (!AuthManager.isLoggedIn()) return;
+    AuthManager.apiRequest('/api/indicators/dashboard')
+    .then(function(res) { return res.json(); })
+    .then(function(bundle) {
+        var data = [0, 0, 0, 0, 0, 0, 0];
+        var series = (bundle && bundle.dailySeries) || {};
+        var labels = series.labels || [];
+        var values = series.values || [];
+        for (var i = 0; i < labels.length; i++) {
+            var d = new Date(labels[i]);
+            if (isNaN(d)) continue;
+            data[d.getDay()] += values[i] || 0;
         }
-    });
+
+        if (chartInstances.weekly) chartInstances.weekly.destroy();
+
+        chartInstances.weekly = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'إجمالي البلاغات',
+                    data: data,
+                    borderColor: '#F59E0B',
+                    backgroundColor: 'rgba(232, 200, 74, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#F59E0B',
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    })
+    .catch(function(e) { console.warn('[renderWeeklyChart] تعذر جلب حزمة المؤشرات:', e); });
 }
 
 function renderChartsSummary() {
@@ -10003,8 +9903,13 @@ function refreshOperationsData() {
         icon.classList.add('fa-spin');
         setTimeout(function() { icon.classList.remove('fa-spin'); }, 1000);
     }
+    // F5b: «عمليات نشطة» = عدد مفاتيح المرآة ذات count>0 (فرقة لها بلاغ ≥1 في المناوبة الحالية — نفس تعريف renderKPIs)
     var kpiActive = document.getElementById('opsKpiActive');
-    if (kpiActive) kpiActive.textContent = Math.floor(Math.random() * 20 + 5);
+    if (kpiActive) {
+        var activeUnits = 0;
+        for (var key in reports) { if (reports[key] && reports[key].count > 0) activeUnits++; }
+        kpiActive.textContent = activeUnits;
+    }
 }
 
 document.addEventListener('click', function(e) {
@@ -10079,10 +9984,7 @@ function initSmartToolbar() {
     
     var sidebarAnalytics = document.getElementById('sidebarAnalytics');
     if (sidebarAnalytics) sidebarAnalytics.onclick = function() { toggleSidebar(); var el_analyticsModal_d80 = document.getElementById('analyticsModal'); if (el_analyticsModal_d80) el_analyticsModal_d80.style.display = 'flex'; };
-    
-    var sidebarAchievements = document.getElementById('sidebarAchievements');
-    if (sidebarAchievements) sidebarAchievements.onclick = function() { toggleSidebar(); var el_achievementsModal_d81 = document.getElementById('achievementsModal'); if (el_achievementsModal_d81) el_achievementsModal_d81.style.display = 'flex'; };
-    
+
     var sidebarAudit = document.getElementById('sidebarAudit');
     if (sidebarAudit) sidebarAudit.onclick = function() { toggleSidebar(); var el_auditLogModal_d82 = document.getElementById('auditLogModal'); if (el_auditLogModal_d82) el_auditLogModal_d82.style.display = 'flex'; };
     

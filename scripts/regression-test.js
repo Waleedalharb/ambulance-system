@@ -627,6 +627,50 @@ async function main() {
     await api('POST', '/api/undo', { center: 'الشفاء', unit: 'جنوب 8' });
     await api('POST', '/api/undo', { center: 'منفوحة', unit: 'جنوب 3' });
 
+    // ─── 13i. F5b: Zero Fake Data — صفر بيانات وهمية في الواجهة ───
+    // (بند liveTimeline مجمّد رسمياً بقرار المالك — فحص timeline القديم ⑥ مُلغى مع التجميد)
+    const f5bAppSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'js', 'app.js'), 'utf8');
+    const f5bIdxSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+    const f5bOpsSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'public', 'operations-dashboard.html'), 'utf8');
+
+    // ① Math.random في app.js === 1 بالضبط (شريط الرفع التجميلي فقط)
+    const f5bRandomCount = (f5bAppSrc.match(/Math\.random/g) || []).length;
+    record('F5b ①: Math.random في app.js === 1 (شريط الرفع التجميلي فقط)', f5bRandomCount === 1, `count=${f5bRandomCount}`);
+
+    // ② علامات الوهم زالت (قاعدة 15/8/3، عشوائية الأسبوعي، عشوائية الحرارية) + دوال الرسوم تقرأ من المرآة/الحزمة
+    const f5bFakeGone = !f5bAppSrc.includes('(i >= 16 && i <= 22) ? 15')
+        && !f5bAppSrc.includes('Math.floor(Math.random() * 40) + 20')
+        && !f5bAppSrc.includes('intensity = Math.floor(Math.random() * 10)');
+    const f5bHourlyReal = /function renderHourlyChart\(\)[\s\S]{0,1200}?\.times/.test(f5bAppSrc);
+    const f5bHeatmapReal = /function renderHeatmap\(\)[\s\S]{0,1200}?\.times/.test(f5bAppSrc);
+    const f5bWeeklyReal = /function renderWeeklyChart\(\)[\s\S]{0,1600}?indicators\/dashboard/.test(f5bAppSrc);
+    record('F5b ②: علامات الوهم زالت والرسوم تقرأ من المرآة/حزمة المؤشرات', f5bFakeGone && f5bHourlyReal && f5bHeatmapReal && f5bWeeklyReal, `fakeGone=${f5bFakeGone} hourly=${f5bHourlyReal} heatmap=${f5bHeatmapReal} weekly=${f5bWeeklyReal}`);
+
+    // ③ QR: صفر مراجع (generateAllQRCodes/createQRCard/qrCodesBtn) في public/
+    const f5bQrTokens = ['generateAllQRCodes', 'createQRCard', 'qrCodesBtn'];
+    const f5bQrHits = [];
+    (function scanPublic(dir) {
+        for (const entry of f4Fs.readdirSync(dir, { withFileTypes: true })) {
+            const p = f4Path.join(dir, entry.name);
+            if (entry.isDirectory()) { scanPublic(p); continue; }
+            if (!/\.(html|js|css)$/i.test(entry.name)) continue;
+            const src = f4Fs.readFileSync(p, 'utf8');
+            for (const t of f5bQrTokens) { if (src.includes(t)) f5bQrHits.push(entry.name + ':' + t); }
+        }
+    })(f4Path.join(__dirname, '..', 'public'));
+    record('F5b ③: صفر مراجع QR (generateAllQRCodes/createQRCard/qrCodesBtn) في public/', f5bQrHits.length === 0, f5bQrHits.join(' | ') || 'clean');
+
+    // ④ Gamification: صفر نداءات renderAchievements خارج تعريفها + صفر sidebarAchievements
+    const f5bAchApp = (f5bAppSrc.match(/renderAchievements\s*\(/g) || []).length;
+    const f5bAchIdx = (f5bIdxSrc.match(/renderAchievements\s*\(/g) || []).length;
+    const f5bSidebarAch = f5bAppSrc.includes('sidebarAchievements') || f5bIdxSrc.includes('sidebarAchievements');
+    record('F5b ④: Gamification مُطفأة (renderAchievements = التعريف اليتيم فقط، صفر sidebarAchievements)', f5bAchApp === 1 && f5bAchIdx === 0 && !f5bSidebarAch, `app=${f5bAchApp} index=${f5bAchIdx} sidebar=${f5bSidebarAch}`);
+
+    // ⑤ التصدير: operations-dashboard تفتح daily-report.html
+    const f5bGenMatch = f5bOpsSrc.match(/function generateDailyReport\(\)\s*\{[\s\S]{0,300}?\}/);
+    const f5bExportOk = !!f5bGenMatch && f5bGenMatch[0].includes("window.open('daily-report.html', '_blank')") && !f5bGenMatch[0].includes('showToast');
+    record('F5b ⑤: تصدير operations-dashboard يفتح daily-report.html', f5bExportOk, f5bGenMatch ? 'function found' : 'function NOT found');
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);
