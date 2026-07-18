@@ -159,7 +159,13 @@ class ShiftService {
     /** حذف مناوبة (admin فقط — يفرضه المسار) */
     async deleteShift(shiftId) {
         const result = await this.storage.db.run('DELETE FROM shifts WHERE id = ?', [shiftId]);
-        return { success: true, deleted: result.changes > 0 };
+        const deleted = result.changes > 0;
+        // Catalog D-3: ShiftDeleted — admin exceptional delete; events are facts,
+        // so it fires only when a row actually existed (same precedent as PositioningEnded)
+        if (deleted) {
+            this.bus.emit('ShiftDeleted', { shift_id: shiftId });
+        }
+        return { success: true, deleted };
     }
 }
 

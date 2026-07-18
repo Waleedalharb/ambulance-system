@@ -62,8 +62,12 @@ class NotesService {
     }
 
     /** حذف ملاحظة واحدة — بلا حدث domain (لا ShiftNoteDeleted في الكتالوج بعد) */
+    /** حذف ملاحظة → ShiftNoteDeleted (Catalog D-5 — مُفعَّل؛ يُطلق فقط عند وجود صف فعلي) */
     async remove(shiftId, noteId) {
-        await this.db.run('DELETE FROM shift_notes WHERE shift_id = ? AND id = ?', [shiftId, noteId]);
+        const result = await this.db.run('DELETE FROM shift_notes WHERE shift_id = ? AND id = ?', [shiftId, noteId]);
+        if (result.changes > 0) {
+            this.bus.emit('ShiftNoteDeleted', { shift_id: shiftId, note_id: noteId });
+        }
         return true;
     }
 }

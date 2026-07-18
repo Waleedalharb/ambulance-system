@@ -18,9 +18,10 @@
  * engine's broadcast subscriber maps it per form_type to the legacy WS
  * payloads (<type>_added / air_ambulance_saved).
  *
- * Documented exception: deletes have no catalogued domain event (the catalog
- * lists FormSubmitted only) — the legacy <type>_deleted broadcasts stay in
- * the routes pending the post-Slice-6 Domain Events Catalog review.
+ * Deletes and clear: FormDeleted / FormsCleared adopted by the Domain Events
+ * Catalog (D-6/D-7) and fired here after the write — the engine's broadcast
+ * subscriber maps them to the legacy <type>_deleted / air_ambulance_cleared
+ * payloads byte-identically.
  */
 
 const FORM_TYPES = ['incident', 'senior_shift', 'e_case', 'escalation', 'daily_report', 'air_ambulance'];
@@ -73,17 +74,21 @@ class FormsService {
         return record;
     }
 
-    /** حذف نموذج — بلا حدث domain (لا FormDeleted في الكتالوج بعد) */
+    /** حذف نموذج → FormDeleted (Catalog D-6 — مُفعَّل؛ يُطلق فقط عند وجود صف فعلي) */
     async remove(formType, recordId) {
         this._assertType(formType);
-        await this.db.run('DELETE FROM shift_forms WHERE form_name = ? AND form_id = ?', [formType, String(recordId)]);
+        const result = await this.db.run('DELETE FROM shift_forms WHERE form_name = ? AND form_id = ?', [formType, String(recordId)]);
+        if (result.changes > 0) {
+            this.bus.emit('FormDeleted', { form_type: formType, form_id: String(recordId) });
+        }
         return true;
     }
 
-    /** مسح جميع سجلات نوع معين (clear-air-ambulance — admin/director فقط) */
+    /** مسح جميع سجلات نوع معين → FormsCleared (Catalog D-7 — مُفعَّل؛ يُطلق دائماً لأن المسح إجراء مقصود) */
     async clear(formType) {
         this._assertType(formType);
         await this.db.run('DELETE FROM shift_forms WHERE form_name = ?', [formType]);
+        this.bus.emit('FormsCleared', { form_type: formType });
         return true;
     }
 }

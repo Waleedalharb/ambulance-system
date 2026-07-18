@@ -195,6 +195,44 @@ class OperationsEngine {
             if (!m) return;
             safeBroadcast({ type: m.type, message: m.message(e), record: e.record });
         });
+
+        // ─── Event Activation Slice (Catalog D-3..D-7) → legacy WS shapes (byte-identical) ───
+
+        // ShiftDeleted (Catalog D-3) → existing 'shift_deleted' message
+        this.bus.on('ShiftDeleted', (e) => {
+            safeBroadcast({ type: 'shift_deleted', message: 'تم حذف المناوبة', shiftId: e.shift_id });
+        });
+
+        // PositioningUpdated (Catalog D-4) → existing 'peak_plan_updated' message
+        this.bus.on('PositioningUpdated', (e) => {
+            safeBroadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan: e.plan });
+        });
+
+        // ShiftNoteDeleted (Catalog D-5) → existing 'shift_note_deleted' message
+        this.bus.on('ShiftNoteDeleted', (e) => {
+            safeBroadcast({ type: 'shift_note_deleted', message: 'تم حذف ملاحظة من المناوبة', shiftId: e.shift_id, noteId: e.note_id });
+        });
+
+        // FormDeleted (Catalog D-6) → existing '<type>_deleted' message per form_type
+        const FORM_DELETED_WS = {
+            incident:      { type: 'incident_deleted',      message: 'تم حذف حادث' },
+            senior_shift:  { type: 'senior_shift_deleted',  message: 'تم حذف مناوبة كبار الضباط' },
+            e_case:        { type: 'e_case_deleted',        message: 'تم حذف حالة طوارئ' },
+            escalation:    { type: 'escalation_deleted',    message: 'تم حذف بلاغ تصعيد' },
+            daily_report:  { type: 'daily_report_deleted',  message: 'تم حذف تقرير يومي' },
+            air_ambulance: { type: 'air_ambulance_deleted', message: 'تم حذف بلاغ إسعاف جوي' }
+        };
+        this.bus.on('FormDeleted', (e) => {
+            const m = FORM_DELETED_WS[e.form_type];
+            if (!m) return;
+            safeBroadcast({ type: m.type, message: m.message, recordId: e.form_id });
+        });
+
+        // FormsCleared (Catalog D-7) → existing 'air_ambulance_cleared' message
+        this.bus.on('FormsCleared', (e) => {
+            if (e.form_type !== 'air_ambulance') return;
+            safeBroadcast({ type: 'air_ambulance_cleared', message: 'تم حذف جميع بلاغات الإسعاف الجوي' });
+        });
     }
 
     // ─── Initialization ───

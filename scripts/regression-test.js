@@ -370,6 +370,51 @@ async function main() {
     record('الأرشفة المباشرة تُنتج لقطة ختم (إصلاح الخلل)', !!(mk2Id && dArch.ok && dSnap.ok && dSnap.data && dSnap.data.success), `mk=${mk2Id} arch=${dArch.status} snap=${dSnap.status}`);
     if (mk2Id) await api('DELETE', `/api/shifts/${mk2Id}`);
 
+    // ─── 13c. Event Activation Slice (Catalog D-3..D-7): adopted events broadcast via engine ───
+    let wsShiftDel = false, wsPlanUpd = false, wsNoteDel = false, wsFormDel = false, wsFormClr = false;
+    try {
+        const WebSocket = require('ws');
+        await new Promise((resolve) => {
+            const ws = new WebSocket(`ws://localhost:3080/ws?token=${TOKEN}`);
+            const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(); }, 12000);
+            ws.on('open', async () => {
+                const p = await api('POST', '/api/peak-plans', { title: 'خطة تفعيل regression', location: 'موقع تفعيل' });
+                const pid = p.data && p.data.plan && p.data.plan.id;
+                if (pid) await api('PUT', `/api/peak-plans/${pid}`, { title: 'خطة تفعيل معدلة' });
+                await api('POST', `/api/shift-notes/${shift2Id}`, { notes: [{ text: 'ملاحظة تفعيل regression' }] });
+                const ng = await api('GET', `/api/shift-notes/${shift2Id}`);
+                const target = ((ng.data && ng.data.notes) || []).find(x => x.text === 'ملاحظة تفعيل regression');
+                if (target) await api('DELETE', `/api/shift-notes/${shift2Id}/${target.id}`);
+                const f = await api('POST', '/api/incidents', { unit: 'reg-تفعيل' });
+                const fid = f.data && f.data.record && f.data.record.id;
+                if (fid) await api('DELETE', `/api/incidents/${fid}`);
+                await api('POST', '/api/save-air-ambulance', { reportNumber: 'REG-CLR-1', unit: 'جنوب 1', dateTime: '2099-01-01T11:00', destinationHospital: 'مستشفى تفعيل' });
+                await api('DELETE', '/api/clear-air-ambulance');
+                const mk3 = await api('POST', '/api/update-shift-data', { shiftDate: '2099-01-03', shiftType: 'صباحية', shiftData: { generalNotes: 'disposable activation regression' } });
+                const mk3Id = mk3.data && mk3.data.shiftId;
+                if (mk3Id) await api('DELETE', `/api/shifts/${mk3Id}`);
+                if (pid) await api('DELETE', `/api/peak-plans/${pid}`);
+            });
+            ws.on('message', (raw) => {
+                try {
+                    const m = JSON.parse(raw.toString());
+                    if (m.type === 'shift_deleted') wsShiftDel = true;
+                    if (m.type === 'peak_plan_updated') wsPlanUpd = true;
+                    if (m.type === 'shift_note_deleted') wsNoteDel = true;
+                    if (m.type === 'incident_deleted') wsFormDel = true;
+                    if (m.type === 'air_ambulance_cleared') wsFormClr = true;
+                    if (wsShiftDel && wsPlanUpd && wsNoteDel && wsFormDel && wsFormClr) { clearTimeout(timer); ws.terminate(); resolve(); }
+                } catch (_) {}
+            });
+            ws.on('error', () => { clearTimeout(timer); resolve(); });
+        });
+    } catch (e) {}
+    record('بث PositioningUpdated لحظياً (Catalog D-4 ← peak_plan_updated)', wsPlanUpd);
+    record('بث ShiftNoteDeleted لحظياً (Catalog D-5 ← shift_note_deleted)', wsNoteDel);
+    record('بث FormDeleted لحظياً (Catalog D-6 ← incident_deleted)', wsFormDel);
+    record('بث FormsCleared لحظياً (Catalog D-7 ← air_ambulance_cleared)', wsFormClr);
+    record('بث ShiftDeleted لحظياً (Catalog D-3 ← shift_deleted)', wsShiftDel);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

@@ -2853,13 +2853,8 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
         const shifts = await readShifts();
         const id = parseInt(req.params.id);
         // ═══ Slice 2: delete from SQLite (single source) via ShiftService ═══
+        // ShiftDeleted (Catalog D-3) fires inside the service → engine broadcasts 'shift_deleted'
         await opsEngine.shiftService.deleteShift(id);
-
-        broadcast({
-            type: 'shift_deleted',
-            message: 'تم حذف المناوبة',
-            shiftId: id
-        });
 
         // Audit log
         await addAuditLogEntry('shift_deleted', 'تم حذف المناوبة: ' + id, 'shifts', req.user.name, req.user.role, req.user.id);
@@ -4560,14 +4555,8 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
 
 app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'air_ambulance_deleted'
         await formsService.remove('air_ambulance', req.params.id);
-        broadcast({
-            type: 'air_ambulance_deleted',
-            message: 'تم حذف بلاغ إسعاف جوي',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
@@ -4576,13 +4565,8 @@ app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
 
 app.delete('/api/clear-air-ambulance', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
-        // Slice 6: clear via FormsService (LEGACY EXCEPTION: broadcast stays here)
+        // Slice 6 + Catalog D-7: FormsCleared fires inside the service → engine broadcasts 'air_ambulance_cleared'
         await formsService.clear('air_ambulance');
-        broadcast({
-            type: 'air_ambulance_cleared',
-            message: 'تم حذف جميع بلاغات الإسعاف الجوي'
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف جميع البلاغات' });
@@ -4620,16 +4604,8 @@ app.post('/api/incidents', authenticate, async (req, res) => {
 
 app.delete('/api/incidents/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService.
-        // LEGACY EXCEPTION: no catalogued FormDeleted event — broadcast stays
-        // here pending the Domain Events Catalog review (owner-scheduled).
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'incident_deleted'
         await formsService.remove('incident', req.params.id);
-        broadcast({
-            type: 'incident_deleted',
-            message: 'تم حذف حادث',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف الحادث' });
@@ -4666,14 +4642,8 @@ app.post('/api/senior-shifts', authenticate, async (req, res) => {
 
 app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'senior_shift_deleted'
         await formsService.remove('senior_shift', req.params.id);
-        broadcast({
-            type: 'senior_shift_deleted',
-            message: 'تم حذف مناوبة كبار الضباط',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف مناوبة كبار الضباط' });
@@ -4710,14 +4680,8 @@ app.post('/api/e-cases', authenticate, async (req, res) => {
 
 app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'e_case_deleted'
         await formsService.remove('e_case', req.params.id);
-        broadcast({
-            type: 'e_case_deleted',
-            message: 'تم حذف حالة طوارئ',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف حالة الطوارئ' });
@@ -4754,14 +4718,8 @@ app.post('/api/escalations', authenticate, async (req, res) => {
 
 app.delete('/api/escalations/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'escalation_deleted'
         await formsService.remove('escalation', req.params.id);
-        broadcast({
-            type: 'escalation_deleted',
-            message: 'تم حذف بلاغ تصعيد',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف بلاغ التصعيد' });
@@ -4798,14 +4756,8 @@ app.post('/api/daily-reports', authenticate, async (req, res) => {
 
 app.delete('/api/daily-reports/:id', authenticate, async (req, res) => {
     try {
-        // Slice 6: delete via FormsService (LEGACY EXCEPTION: no FormDeleted event yet)
+        // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'daily_report_deleted'
         await formsService.remove('daily_report', req.params.id);
-        broadcast({
-            type: 'daily_report_deleted',
-            message: 'تم حذف تقرير يومي',
-            recordId: req.params.id
-        });
-
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف التقرير اليومي' });
@@ -6654,12 +6606,7 @@ app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) =
         // §10.2 هـ lists ShiftNoteAdded only) — the broadcast stays here until
         // the catalog gains the event (same status as PositioningUpdated).
         await notesService.remove(parseInt(shiftId), noteId);
-        broadcast({
-            type: 'shift_note_deleted',
-            message: 'تم حذف ملاحظة من المناوبة',
-            shiftId: parseInt(shiftId),
-            noteId
-        });
+        // ShiftNoteDeleted (Catalog D-5) fires inside the service → engine broadcasts 'shift_note_deleted'
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف الملاحظة' });
@@ -6703,7 +6650,7 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
         // the catalog gains the event (same status as ShiftDeleted).
         const plan = await positioningService.update(id, req.body);
         if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
-        broadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan });
+        // PositioningUpdated (Catalog D-4) fires inside the service → engine broadcasts 'peak_plan_updated'
         res.json({ success: true, plan });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تحديث خطة الذروة' });

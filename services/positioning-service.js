@@ -68,12 +68,13 @@ class PositioningService {
         return plan;
     }
 
-    /** تعديل خطة — بلا حدث domain (الكتالوج لا يعرف PositioningUpdated بعد) */
+    /** تعديل خطة → PositioningUpdated (Catalog D-4 — مُفعَّل) */
     async update(id, updates) {
         const row = await this.db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
         if (!row) return null;
         const plan = { ...this._rowToJson(row), ...updates, id: row.id };
         await this.db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), id]);
+        this.bus.emit('PositioningUpdated', { plan_id: row.id, shift_id: row.shift_id, plan });
         return plan;
     }
 
