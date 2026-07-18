@@ -1009,31 +1009,23 @@ async function endShift(id) {
 // ============================================
 async function loadReports() {
     try {
-        var res = await fetch('/api/shifts', { headers: authHeaders() });
-        var shifts = await res.json();
-        shifts = Array.isArray(shifts) ? shifts : [];
+        var res = await fetch('/api/indicators/dashboard', { headers: authHeaders() });
+        var bundle = await res.json();
+        var st = bundle.shiftStats || {};
 
-        document.getElementById('reportTotalShifts').textContent = shifts.length;
-
-        var totalReports = shifts.reduce(function(sum, s) { return sum + (s.totalReports || s.total_reports || 0); }, 0);
-        document.getElementById('reportTotalReports').textContent = totalReports;
-
-        var today = new Date().toISOString().split('T')[0];
-        var todayShifts = shifts.filter(function(s) { return (s.shiftDate || s.shift_date) === today; }).length;
-        document.getElementById('reportTodayShifts').textContent = todayShifts;
-
-        var avg = shifts.length ? Math.round(totalReports / shifts.length) : 0;
-        document.getElementById('reportAvgReports').textContent = avg;
+        document.getElementById('reportTotalShifts').textContent = st.totalShifts || 0;
+        document.getElementById('reportTotalReports').textContent = st.totalReports || 0;
+        document.getElementById('reportTodayShifts').textContent = st.todayShifts || 0;
+        document.getElementById('reportAvgReports').textContent = st.avgReportsPerShift || 0;
 
         // Daily report content
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem">';
-        var recentShifts = shifts.slice(0, 10);
-        recentShifts.forEach(function(s) {
+        (bundle.recentShifts || []).forEach(function(s) {
             html +=
                 '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem">' +
-                    '<div style="font-weight:700;margin-bottom:0.5rem">' + (s.shiftName || s.shift_name || '-') + '</div>' +
-                    '<div style="font-size:0.8rem;color:var(--text-muted)">' + (s.shiftDate || s.shift_date) + ' — ' + (s.shiftType || s.shift_type) + '</div>' +
-                    '<div style="margin-top:0.5rem;font-size:1.2rem;font-weight:800;color:var(--primary)">' + (s.totalReports || s.total_reports || 0) + ' <small style="font-size:0.75rem;color:var(--text-muted)">بلاغ</small></div>' +
+                    '<div style="font-weight:700;margin-bottom:0.5rem">' + (s.name || '-') + '</div>' +
+                    '<div style="font-size:0.8rem;color:var(--text-muted)">' + (s.date || '—') + ' — ' + (s.type || '—') + '</div>' +
+                    '<div style="margin-top:0.5rem;font-size:1.2rem;font-weight:800;color:var(--primary)">' + (s.totalReports || 0) + ' <small style="font-size:0.75rem;color:var(--text-muted)">بلاغ</small></div>' +
                 '</div>';
         });
         html += '</div>';
@@ -1054,49 +1046,23 @@ function generateDailyReport() {
 // ============================================
 async function loadAnalytics() {
     try {
-        var res = await fetch('/api/shifts', { headers: authHeaders() });
-        var shifts = await res.json();
-        shifts = Array.isArray(shifts) ? shifts : [];
-
-        var totalShifts = shifts.length;
-        var totalReports = shifts.reduce(function(sum, s) { return sum + (s.totalReports || s.total_reports || 0); }, 0);
-        var avg = totalShifts ? Math.round(totalReports / totalShifts) : 0;
-
-        var maxReports = 0, minReports = Infinity;
-        shifts.forEach(function(s) {
-            var c = s.totalReports || s.total_reports || 0;
-            if (c > maxReports) maxReports = c;
-            if (c < minReports) minReports = c;
-        });
-        if (minReports === Infinity) minReports = 0;
+        var res = await fetch('/api/indicators/dashboard', { headers: authHeaders() });
+        var bundle = await res.json();
+        var st = bundle.shiftStats || {};
 
         var statsHtml =
-            '<div class="stat-card"><div class="stat-icon blue"><i class="fas fa-calculator"></i></div><div><div class="stat-value">' + totalShifts + '</div><div class="stat-label">المناوبات</div></div></div>' +
-            '<div class="stat-card"><div class="stat-icon green"><i class="fas fa-ambulance"></i></div><div><div class="stat-value">' + totalReports + '</div><div class="stat-label">البلاغات</div></div></div>' +
-            '<div class="stat-card"><div class="stat-icon orange"><i class="fas fa-chart-line"></i></div><div><div class="stat-value">' + avg + '</div><div class="stat-label">المتوسط</div></div></div>' +
-            '<div class="stat-card"><div class="stat-icon red"><i class="fas fa-arrow-up"></i></div><div><div class="stat-value">' + maxReports + '</div><div class="stat-label">أعلى</div></div></div>' +
-            '<div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-arrow-down"></i></div><div><div class="stat-value">' + minReports + '</div><div class="stat-label">أدنى</div></div></div>';
+            '<div class="stat-card"><div class="stat-icon blue"><i class="fas fa-calculator"></i></div><div><div class="stat-value">' + (st.totalShifts || 0) + '</div><div class="stat-label">المناوبات</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon green"><i class="fas fa-ambulance"></i></div><div><div class="stat-value">' + (st.totalReports || 0) + '</div><div class="stat-label">البلاغات</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon orange"><i class="fas fa-chart-line"></i></div><div><div class="stat-value">' + (st.avgReportsPerShift || 0) + '</div><div class="stat-label">المتوسط</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon red"><i class="fas fa-arrow-up"></i></div><div><div class="stat-value">' + (st.maxReports || 0) + '</div><div class="stat-label">أعلى</div></div></div>' +
+            '<div class="stat-card"><div class="stat-icon cyan"><i class="fas fa-arrow-down"></i></div><div><div class="stat-value">' + (st.minReports || 0) + '</div><div class="stat-label">أدنى</div></div></div>';
 
         document.getElementById('analyticsStats').innerHTML = statsHtml;
 
-        // Table: group by week
-        var weeks = {};
-        shifts.forEach(function(s) {
-            var date = s.shiftDate || s.shift_date;
-            if (!date) return;
-            var d = new Date(date);
-            var weekStart = new Date(d);
-            weekStart.setDate(d.getDate() - d.getDay());
-            var key = weekStart.toISOString().split('T')[0];
-            if (!weeks[key]) weeks[key] = { count: 0, reports: 0 };
-            weeks[key].count++;
-            weeks[key].reports += (s.totalReports || s.total_reports || 0);
-        });
-
+        // Table: weekly aggregation from the single source (max/min now real)
         var tbody = '';
-        Object.keys(weeks).sort().reverse().forEach(function(w) {
-            var v = weeks[w];
-            tbody += '<tr><td>أسبوع ' + w + '</td><td>' + v.count + '</td><td>' + v.reports + '</td><td>' + Math.round(v.reports/v.count) + '</td><td>-</td><td>-</td></tr>';
+        (bundle.weekly || []).forEach(function(w) {
+            tbody += '<tr><td>أسبوع ' + w.weekStart + '</td><td>' + w.shiftCount + '</td><td>' + w.reports + '</td><td>' + w.avg + '</td><td>' + w.max + '</td><td>' + w.min + '</td></tr>';
         });
         document.getElementById('analyticsTbody').innerHTML = tbody || '<tr><td colspan="6" class="empty-state">لا توجد بيانات كافية</td></tr>';
 
@@ -1158,29 +1124,22 @@ async function compareShifts() {
 // TAB 6: CHARTS
 // ============================================
 function loadCharts() {
-    fetch('/api/shifts', { headers: authHeaders() })
+    fetch('/api/indicators/dashboard', { headers: authHeaders() })
         .then(function(r) { return r.json(); })
-        .then(function(shifts) {
-            shifts = Array.isArray(shifts) ? shifts : [];
-            renderCharts(shifts);
+        .then(function(bundle) {
+            renderCharts(bundle || {});
         })
         .catch(function(e) { console.error('[Charts] Error:', e); });
 }
 
-function renderCharts(shifts) {
+function renderCharts(bundle) {
     // Destroy old charts first to prevent "Canvas already in use"
     destroyCharts();
 
     // Daily reports line chart
-    var dailyMap = {};
-    shifts.forEach(function(s) {
-        var d = s.shiftDate || s.shift_date;
-        if (!d) return;
-        if (!dailyMap[d]) dailyMap[d] = 0;
-        dailyMap[d] += (s.totalReports || s.total_reports || 0);
-    });
-    var labels = Object.keys(dailyMap).sort().slice(-30);
-    var values = labels.map(function(d) { return dailyMap[d]; });
+    var ds = bundle.dailySeries || { labels: [], values: [] };
+    var labels = ds.labels;
+    var values = ds.values;
 
     var ctx1 = document.getElementById('dailyChart').getContext('2d');
     charts.daily = new Chart(ctx1, {
@@ -1200,26 +1159,26 @@ function renderCharts(shifts) {
     });
 
     // Shift type pie chart
-    var typeCounts = { 'صباحية': 0, 'ليلية': 0 };
-    shifts.forEach(function(s) { var t = s.shiftType || s.shift_type; if (typeCounts[t] !== undefined) typeCounts[t]++; });
+    var typeCounts = bundle.shiftTypes || { 'صباحية': 0, 'ليلية': 0 };
 
     var ctx2 = document.getElementById('shiftTypeChart').getContext('2d');
     charts.type = new Chart(ctx2, {
         type: 'doughnut',
         data: {
             labels: ['صباحية', 'ليلية'],
-            datasets: [{ data: [typeCounts['صباحية'], typeCounts['ليلية']], backgroundColor: ['#F59E0B', '#2563EB'] }]
+            datasets: [{ data: [typeCounts['صباحية'] || 0, typeCounts['ليلية'] || 0], backgroundColor: ['#F59E0B', '#2563EB'] }]
         },
         options: { responsive: true }
     });
 
-    // Reports by center (placeholder - needs reports data)
+    // Reports by center — real distribution from the single source (reports)
+    var centers = bundle.centerDistribution || [];
     var ctx3 = document.getElementById('centerChart').getContext('2d');
     charts.center = new Chart(ctx3, {
         type: 'bar',
         data: {
-            labels: ['جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','سريع 1','سريع 2'],
-            datasets: [{ label: 'البلاغات', data: [12,8,15,10,7,5,3], backgroundColor: '#10B981' }]
+            labels: centers.map(function(c) { return c.center; }),
+            datasets: [{ label: 'البلاغات', data: centers.map(function(c) { return c.count; }), backgroundColor: '#10B981' }]
         },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });

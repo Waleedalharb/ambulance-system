@@ -26,12 +26,7 @@ let completionService = null;
 let positioningService = null; // Slice 4: single owner of peak_plans writes
 let notesService = null; // Slice 5: single owner of shift_notes writes
 let formsService = null; // Slice 6: single owner of all form writes (form_type)
-
-// ═══════════════════════════════════════════════════════════
-// Unified Data Layer v3.0
-// ═══════════════════════════════════════════════════════════
-const unifiedDataLayer = require('./unified-data-layer');
-const unifiedRoutes = require('./unified-api-routes');
+let indicatorService = null; // F5a: read-only operational indicators
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -74,19 +69,6 @@ if (db) {
     } catch (err) {
         console.error('⚠️ Operations Service failed:', err.message);
         opsService = null;
-    }
-}
-
-// ── Unified Data Layer ──
-if (db) {
-    try {
-        const unifiedDataLayer = require('./unified-data-layer');
-        if (unifiedDataLayer.init) {
-            unifiedDataLayer.init(db, dbAvailable);
-            console.log('✅ Unified Data Layer initialized');
-        }
-    } catch (err) {
-        console.error('⚠️ Unified Data Layer failed:', err.message);
     }
 }
 
@@ -606,12 +588,6 @@ const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
 // ============================================
 const archiveEngine = new ShiftArchiveEngine(db, STORAGE_PATH);
 console.log('[ArchiveEngine] Shift Archive Engine v2.0 initialized');
-
-// ═══════════════════════════════════════════════════════════
-// Initialize Unified Data Layer v3.0
-// ═══════════════════════════════════════════════════════════
-unifiedDataLayer.init(db, dbAvailable);
-unifiedRoutes.register(app, authenticate, authorize, db, dbAvailable);
 
 let lastUpdateTime = Date.now();
 let currentShiftId = null;
@@ -1431,7 +1407,7 @@ async function readShifts() {
     }
 }
 
-// ═══ Archive slice: unified shift-content stores (SQLite single source) ═══
+// ═══ Archive slice: مخازن محتوى المناوبة الموحدة (SQLite single source) ═══
 // The legacy JSON files (notes/events/absences/peak-plans/report-entry) are
 // frozen; rows keep their legacy string ids and full payload in `data`.
 function contentRowToJson(row) {
@@ -1464,12 +1440,6 @@ async function getActiveShiftId() {
 
 async function writeShifts(data) {
     await fs.writeFile(SHIFT_DATA_PATH, JSON.stringify(data, null, 2));
-    // ═══ Auto-recalculate KPIs on any shift change ═══
-    try {
-        await unifiedDataLayer.recalculateAllKPIs();
-    } catch (e) {
-        console.warn('[KPIs] Auto-recalculation failed:', e.message);
-    }
 }
 
 // ═══ Phase 2+3: JSON → SQLite migration helpers ═══
@@ -3906,6 +3876,20 @@ app.get('/api/daily-report', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Daily report error:', error);
         res.status(500).json({ error: 'فشل في إنشاء التقرير اليومي' });
+    }
+});
+
+// ============================================
+// API: مؤشرات التشغيل (F5a — قراءة فقط من المصدر الواحد)
+// ============================================
+app.get('/api/indicators/dashboard', authenticate, async (req, res) => {
+    try {
+        if (!indicatorService) return res.status(503).json({ error: 'الخدمة غير متوفرة' });
+        const bundle = await indicatorService.getDashboard();
+        res.json({ success: true, ...bundle });
+    } catch (error) {
+        console.error('Indicators dashboard error:', error);
+        res.status(500).json({ error: 'فشل في جلب مؤشرات التشغيل' });
     }
 });
 
@@ -9766,6 +9750,11 @@ server.listen(PORT, async () => {
             completionService = new CompletionService({ engine: opsEngine, bus: opsEngine.bus });
             console.log('✅ Event-driven services wired (ReportService, CompletionService)');
 
+            // F5a: IndicatorService — read-only operational indicators bundle
+            const IndicatorService = require('./services/indicator-service');
+            indicatorService = new IndicatorService({ engine: opsEngine, reportService });
+            console.log('✅ IndicatorService wired (F5a, read-only)');
+
             // Archive slice: single archive path (Archive Contract §2) —
             // seal + conversation archiving + status transition
             const ArchiveService = require('./services/archive-service');
@@ -9797,6 +9786,7 @@ server.listen(PORT, async () => {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
             completionService = null;
+            indicatorService = null;
             positioningService = null;
             notesService = null;
             formsService = null;

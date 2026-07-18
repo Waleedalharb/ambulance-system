@@ -583,6 +583,50 @@ async function main() {
     const f4Avg = f4Ms / 20;
     record('F4 Performance: GET /api/daily-report ضمن العتبة', f4Avg < 200, `avg=${f4Avg.toFixed(1)}ms`);
 
+    // ─── 13h. F5a: Indicators Single Source — مؤشرات التشغيل من المصدر الواحد ───
+    // ① توزيع المراكز حقيقي: قياس قبل/بعد بلاغين بمركزين (المناوبة النشطة من 13g)
+    const f5Base = await api('GET', '/api/indicators/dashboard');
+    const f5BaseC = (f5Base.data && f5Base.data.centerDistribution) || [];
+    const f5B1 = (f5BaseC.find(c => c.center === 'الشفاء') || { count: 0 }).count;
+    const f5B2 = (f5BaseC.find(c => c.center === 'منفوحة') || { count: 0 }).count;
+    await api('POST', '/api/report', { center: 'الشفاء', unit: 'جنوب 8', type: 'إصابة' });
+    await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3', type: 'نقل مريض' });
+    const f5After = await api('GET', '/api/indicators/dashboard');
+    const f5AfterC = (f5After.data && f5After.data.centerDistribution) || [];
+    const f5A1 = (f5AfterC.find(c => c.center === 'الشفاء') || { count: 0 }).count;
+    const f5A2 = (f5AfterC.find(c => c.center === 'منفوحة') || { count: 0 }).count;
+    record('F5a: توزيع المراكز حقيقي من reports عبر قراءة F4 (+1 لكل مركز)', f5After.ok && f5A1 === f5B1 + 1 && f5A2 === f5B2 + 1, `الشفاء ${f5B1}→${f5A1} | منفوحة ${f5B2}→${f5A2}`);
+
+    // ② اللوحة مربوطة بالمصدر الواحد بلا بيانات ثابتة
+    const f5Html = await (await fetch(BASE + '/operations-dashboard.html')).text();
+    const f5UiOk = !f5Html.includes('[12,8,15,10,7,5,3]') && !f5Html.includes('(placeholder') && f5Html.includes('/api/indicators/dashboard');
+    record('F5a UI: operations-dashboard بلا بيانات ثابتة ومربوطة بالمسار الجديد', f5UiOk);
+
+    // ③ (قرار B): المسارات المحروسة بـ dbAvailable بلا تغيير — السلوك الصفري الحالي نفسه
+    const f5Guarded = await api('GET', '/api/shifts/daily-dashboard');
+    const f5G = f5Guarded.data || {};
+    const f5GuardedSame = f5Guarded.ok && f5G.success === true && f5G.total_shifts === 0 && f5G.total_reports === 0;
+    record('F5a: المسارات المحروسة لم تُحيَ (سلوكها كما قبل الشريحة)', f5GuardedSame, `total_shifts=${f5G.total_shifts} total_reports=${f5G.total_reports}`);
+
+    // ④ server.js بلا 'unified' + الملفان محذوفان
+    const f5SrvSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'server.js'), 'utf8');
+    const f5UnifiedGone = !f5SrvSrc.includes('unified');
+    const f5FilesGone = !f4Fs.existsSync(f4Path.join(__dirname, '..', 'unified-api-routes.js')) && !f4Fs.existsSync(f4Path.join(__dirname, '..', 'unified-data-layer.js'));
+    record('F5a: حذف unified-* من server.js والملفين', f5UnifiedGone && f5FilesGone, `src=${f5UnifiedGone} files=${f5FilesGone}`);
+
+    // ⑤ الملف الساعي الحقيقي من report_times (24 مفتاح ساعة، قيم رقمية)
+    const f5Hourly = f5After.data && f5After.data.hourlyProfile;
+    const f5HourlyOk = !!f5Hourly && Object.keys(f5Hourly).length === 24 && Object.keys(f5Hourly).every(k => /^\d{2}$/.test(k) && typeof f5Hourly[k] === 'number');
+    record('F5a: الملف الساعي موجود وبنيته صحيحة (24 ساعة رقمية)', f5HourlyOk, `keys=${f5Hourly ? Object.keys(f5Hourly).length : 0}`);
+
+    // ⑥ الأداء + تنظيف ① أفضل جهد
+    let f5Ms = 0;
+    for (let i = 0; i < 20; i++) { const t0 = Date.now(); await api('GET', '/api/indicators/dashboard'); f5Ms += Date.now() - t0; }
+    const f5Avg = f5Ms / 20;
+    record('F5a Performance: GET /api/indicators/dashboard ضمن العتبة', f5Avg < 200, `avg=${f5Avg.toFixed(1)}ms`);
+    await api('POST', '/api/undo', { center: 'الشفاء', unit: 'جنوب 8' });
+    await api('POST', '/api/undo', { center: 'منفوحة', unit: 'جنوب 3' });
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);
