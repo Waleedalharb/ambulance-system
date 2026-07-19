@@ -58,7 +58,8 @@
     if (!token) {
         // No token, check if we're on index.html (not login)
         if (window.location.pathname.indexOf('login') === -1 && window.location.pathname.indexOf('index') !== -1) {
-            window.location.href = 'login.html';
+            // login.html does not exist — root serves this same page with the in-app login screen
+            window.location.href = '/';
         }
     }
 })();

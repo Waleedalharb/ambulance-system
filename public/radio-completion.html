@@ -224,7 +224,8 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 (function() {
     var token = AuthCore.getToken();
     if (!token && window.location.pathname.indexOf('login') === -1) {
-        window.location.href = 'login.html';
+        // login.html does not exist — root serves index with the in-app login screen
+        window.location.href = '/';
         return;
     }
     window.addEventListener('load', function() {
