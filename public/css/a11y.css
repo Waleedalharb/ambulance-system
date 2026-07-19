@@ -1,0 +1,19 @@
+/* ============================================
+   Global Accessibility (a11y)
+   ============================================
+   P1-S2: القاعدة القانونية الوحيدة لاحترام prefers-reduced-motion
+   في كامل المنصة — كل الصفحات الـ13 تربط هذا الملف.
+   لا تُحذف أي حركة: الحالات النهائية تبقى ظاهرة (0.01ms / تكرار واحد)،
+   فيبقى مؤشر التحميل والهيكل العظمي قابلين للاستخدام.
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

@@ -1029,17 +1029,9 @@
 
 /* ============================================
    11. Accessibility
-   ============================================ */
-
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-}
+   ============================================
+   قاعدة prefers-reduced-motion القانونية انتقلت إلى /css/a11y.css (P1-S2)
+   — ملف واحد مربوط بكل الصفحات الـ13، بلا تكرار هنا. */
 
 /* Focus styles for keyboard navigation */
 .quick-action-btn:focus-visible,
