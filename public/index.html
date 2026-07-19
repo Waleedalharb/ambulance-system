@@ -370,7 +370,7 @@ window.addEventListener('load', function() {
                     <i class="fas fa-clipboard-list"></i>
                     <span>تكميل</span>
                 </button>
-                <button class="qa-btn" title="توزيع البلاغات" onclick="document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();">
+                <button class="qa-btn" title="توزيع البلاغات" onclick="openModalById('distributionModal'); renderAdvancedDistribution();">
                     <i class="fas fa-ambulance"></i>
                     <span>توزيع</span>
                 </button>
@@ -378,11 +378,11 @@ window.addEventListener('load', function() {
                     <i class="fas fa-calendar-alt"></i>
                     <span>الجداول</span>
                 </button>
-                <button class="qa-btn" title="النماذج" onclick="document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && typeof FORM_DEFINITIONS !== 'undefined' && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);">
+                <button class="qa-btn" title="النماذج" onclick="openModalById('formsModal'); loadFormsList(); if(!currentFormId && typeof FORM_DEFINITIONS !== 'undefined' && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);">
                     <i class="fas fa-file-alt"></i>
                     <span>نماذج</span>
                 </button>
-                <button class="qa-btn" title="إحصائيات" onclick="document.getElementById('chartsModal').style.display='flex'; renderAllCharts();">
+                <button class="qa-btn" title="إحصائيات" onclick="openModalById('chartsModal'); renderAllCharts();">
                     <i class="fas fa-chart-line"></i>
                     <span>إحصائيات</span>
                 </button>
@@ -661,7 +661,7 @@ window.addEventListener('load', function() {
                     <div class="distribution-header-subtitle" id="distTotal">0 بلاغ</div>
                 </div>
             </div>
-            <button class="distribution-expand-btn" onclick="document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();" title="عرض كامل">
+            <button class="distribution-expand-btn" onclick="openModalById('distributionModal'); renderAdvancedDistribution();" title="عرض كامل">
                 <i class="fas fa-expand-alt"></i>
                 <span>عرض كامل</span>
             </button>
@@ -852,12 +852,12 @@ window.addEventListener('load', function() {
                     <i class="fas fa-file-alt"></i> تقرير المناوبة
                 </button>
             </div>
-            <button onclick="document.getElementById('distributionModal').style.display='none'" class="btn"><i class="fas fa-times"></i></button>
+            <button onclick="closeModalById('distributionModal')" class="btn"><i class="fas fa-times"></i></button>
         </div>
         <div id="distributionContainer"></div>
         <div class="modal-buttons">
             <button onclick="generateShiftReport()" class="btn btn-primary"><i class="fas fa-file-alt"></i> تقرير المناوبة</button>
-            <button onclick="document.getElementById('distributionModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button onclick="closeModalById('distributionModal')" class="btn"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
 </div>
@@ -870,7 +870,7 @@ window.addEventListener('load', function() {
                 <i class="fas fa-file-medical-alt" style="font-size:1.4rem;"></i>
                 <h2>📋 تقرير المناوبة</h2>
             </div>
-            <button onclick="document.getElementById('shiftReportModal').style.display='none'" style="background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+            <button onclick="closeModalById('shiftReportModal')" style="background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -880,7 +880,7 @@ window.addEventListener('load', function() {
         <div class="shift-report-footer">
             <button onclick="downloadShiftReport()" class="btn btn-primary"><i class="fas fa-download"></i> تحميل التقرير</button>
             <button onclick="saveShiftReportToArchive()" class="btn btn-success"><i class="fas fa-archive"></i> حفظ في الأرشيف</button>
-            <button onclick="document.getElementById('shiftReportModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button onclick="closeModalById('shiftReportModal')" class="btn"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
 </div>
@@ -1521,7 +1521,7 @@ window.addEventListener('load', function() {
                     <span style="font-size:0.7rem; color:var(--gray-400);">تحليل بيانات البلاغات والفرق</span>
                 </div>
             </div>
-            <button onclick="document.getElementById('chartsModal').style.display='none'" class="btn">
+            <button onclick="closeModalById('chartsModal')" class="btn">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1559,7 +1559,7 @@ window.addEventListener('load', function() {
         
         <div class="modal-buttons">
             <button onclick="exportChartData()" class="btn btn-teal"><i class="fas fa-download"></i> تصدير البيانات</button>
-            <button onclick="document.getElementById('chartsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+            <button onclick="closeModalById('chartsModal')" class="btn"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
 </div>
@@ -1674,13 +1674,13 @@ window.addEventListener('load', function() {
             </div>
             <div class="group-items">
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=41');"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('distributionModal').style.display='flex'; renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('distributionModal'); renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-chart-pie"></i> الإحصائيات والتقارير</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('controlModal').style.display='flex'; loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('formsModal').style.display='flex'; loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('formsModal'); loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('chartsModal').style.display='flex'; renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('analyticsModal').style.display='flex'; renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('chartsModal'); renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('analyticsModal'); renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-command-center"></i> مركز العمليات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-dashboard.html?v=41');"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>

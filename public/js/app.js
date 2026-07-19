@@ -768,7 +768,7 @@ async function removeSectorLogo() {
 // ============================================
 
 var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)el_analyticsBtn.addEventListener('click', function() {
-    var el_analyticsModal_d3 = document.getElementById('analyticsModal'); if (el_analyticsModal_d3) el_analyticsModal_d3.style.display = 'flex';
+    openModalById('analyticsModal');
     renderAnalyticsDashboard();
 });
 
@@ -902,7 +902,7 @@ var auditLog = [];  // Phase 1: Fetched from server API, not localStorage
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
-    var el_auditLogModal_d4 = document.getElementById('auditLogModal'); if (el_auditLogModal_d4) el_auditLogModal_d4.style.display = 'flex';
+    openModalById('auditLogModal');
     renderAuditLog();
 });
 
@@ -1014,14 +1014,12 @@ function clearAuditLog() {
 }
 
 function openAuditLogModal() {
-    var el = document.getElementById('auditLogModal');
-    if (el) el.style.display = 'flex';
+    openModalById('auditLogModal');
     renderAuditLog();
 }
 
 function closeAuditLogModal() {
-    var el = document.getElementById('auditLogModal');
-    if (el) el.style.display = 'none';
+    closeModalById('auditLogModal');
 }
 
 function refreshAuditLog() {
@@ -1389,7 +1387,7 @@ function showPeakAlert(alertData) {
     // Hide rating initially
     var el_peakRatingSection_d7 = document.getElementById('peakRatingSection'); if (el_peakRatingSection_d7) el_peakRatingSection_d7.style.display = 'none';
 
-    var el_peakAlertModal_d8 = document.getElementById('peakAlertModal'); if (el_peakAlertModal_d8) el_peakAlertModal_d8.style.display = 'flex';
+    openModalById('peakAlertModal');
 
     // Play alert sound and flash screen
     playPeakSound('alert');
@@ -1461,7 +1459,7 @@ function initPeakAlertMap(alertData) {
 }
 
 function closePeakAlert() {
-    var el_peakAlertModal_d9 = document.getElementById('peakAlertModal'); if (el_peakAlertModal_d9) el_peakAlertModal_d9.style.display = 'none';
+    closeModalById('peakAlertModal');
     if (peakCountdownInterval) {
         clearInterval(peakCountdownInterval);
         peakCountdownInterval = null;
@@ -1505,12 +1503,12 @@ var peakMap = null;
 
 
 function openPeakMap() {
-    var el_peakMapModal_d10 = document.getElementById('peakMapModal'); if (el_peakMapModal_d10) el_peakMapModal_d10.style.display = 'flex';
+    openModalById('peakMapModal');
     setTimeout(initPeakMap, 500);
 }
 
 function closePeakMap() {
-    var el_peakMapModal_d11 = document.getElementById('peakMapModal'); if (el_peakMapModal_d11) el_peakMapModal_d11.style.display = 'none';
+    closeModalById('peakMapModal');
     if (peakMap) peakMap.invalidateSize();
 }
 
@@ -2087,11 +2085,10 @@ var map = null;
 var mapMarkers = [];
 
 function openMapPreview(unit, location) {
-    var modal = document.getElementById('mapModal');
     var el_mapModalTitle = document.getElementById('mapModalTitle'); if (el_mapModalTitle) el_mapModalTitle.innerText = '📍 معاينة موقع ' + unit;
     var el_mapLocationText = document.getElementById('mapLocationText'); if (el_mapLocationText) el_mapLocationText.innerText = '📍 الموقع: ' + location;
     var el_nearestUnitResult_h3 = document.getElementById('nearestUnitResult'); if (el_nearestUnitResult_h3) el_nearestUnitResult_h3.innerHTML = '';
-    modal.style.display = 'flex';
+    openModalById('mapModal');
 
     setTimeout(function() {
         initLeafletMap(unit);
@@ -2145,7 +2142,7 @@ function initLeafletMap(focusUnit) {
 }
 
 function closeMapPreview() {
-    var el_mapModal_d13 = document.getElementById('mapModal'); if (el_mapModal_d13) el_mapModal_d13.style.display = 'none';
+    closeModalById('mapModal');
     document.getElementById('mapFrame').src = '';
     var el_nearestUnitResult_h4 = document.getElementById('nearestUnitResult'); if (el_nearestUnitResult_h4) el_nearestUnitResult_h4.innerHTML = '';
 }
@@ -2298,7 +2295,7 @@ function drawCoverageCircles() {
 // ربط أزرار التوزيع
 // ============================================
 var el_distributionBtn=document.getElementById("distributionBtn");if(el_distributionBtn)el_distributionBtn.addEventListener('click', function() {
-    var el_distributionModal_d14 = document.getElementById('distributionModal'); if (el_distributionModal_d14) el_distributionModal_d14.style.display = 'flex';
+    openModalById('distributionModal');
     renderAdvancedDistribution();
 });
 
@@ -3636,7 +3633,7 @@ async function startNewShift() {
             
             // Close any open modals
             var distributionModal = document.getElementById('distributionModal');
-            if (distributionModal) distributionModal.style.display = 'none';
+            closeModalById('distributionModal');
             var shiftModal = document.getElementById('shiftModal');
             if (shiftModal) shiftModal.style.display = 'none';
             
@@ -3836,9 +3833,8 @@ function generateShiftReport() {
     
     var body = document.getElementById('shiftReportBody');
     if (body) body.innerHTML = html;
-    
-    var modal = document.getElementById('shiftReportModal');
-    if (modal) modal.style.display = 'flex';
+
+    openModalById('shiftReportModal');
 }
 
 function downloadShiftReport() {
@@ -4826,11 +4822,11 @@ var el_seniorShiftBtn=document.getElementById("seniorShiftBtn");if(el_seniorShif
     var el_seniorChiefDate = document.getElementById('seniorChiefDate'); if (el_seniorChiefDate) el_seniorChiefDate.innerText = dateStr;
     var el_seniorRegionLeaderDate = document.getElementById('seniorRegionLeaderDate'); if (el_seniorRegionLeaderDate) el_seniorRegionLeaderDate.innerText = dateStr;
     var el_seniorPrintDate = document.getElementById('seniorPrintDate'); if (el_seniorPrintDate) el_seniorPrintDate.innerText = dateStr + ' - ' + getSaudiTime();
-    var el_seniorShiftModal_d34 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d34) el_seniorShiftModal_d34.style.display = 'flex';
+    openModalById('seniorShiftModal');
     loadSeniorShifts(); // جلب طازج من الخادم (يحدّث قائمة المودال وقائمة النموذج معاً)
 });
 
-var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { var el_seniorShiftModal_d35 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d35) el_seniorShiftModal_d35.style.display = 'none'; });
+var el_closeSeniorShift = document.getElementById("closeSeniorShift"); if(el_closeSeniorShift) el_closeSeniorShift.addEventListener('click', function() { closeModalById('seniorShiftModal'); });
 var el_saveSeniorShift=document.getElementById("saveSeniorShift");if(el_saveSeniorShift)el_saveSeniorShift.addEventListener('click', async function() {
     var data = getSeniorShiftData();
     if (data.activeCars === 0 && data.brokenCars === 0 && data.reserveCars === 0 && data.overlapTeams === 0) { alert('⚠️ الرجاء إدخال بيانات المناوبة (على الأقل قيمة واحدة)'); return; }
@@ -4997,15 +4993,15 @@ function showFormContent(formId) {
 }
 
 function closeFormsModal() {
-    var el_formsModal_d37 = document.getElementById('formsModal'); if (el_formsModal_d37) el_formsModal_d37.style.display = 'none';
+    closeModalById('formsModal');
 }
 
 function closeAnalyticsModal() {
-    var el_analyticsModal_d38 = document.getElementById('analyticsModal'); if (el_analyticsModal_d38) el_analyticsModal_d38.style.display = 'none';
+    closeModalById('analyticsModal');
 }
 
 function closeChartsModal() {
-    var el_chartsModal_d39 = document.getElementById('chartsModal'); if (el_chartsModal_d39) el_chartsModal_d39.style.display = 'none';
+    closeModalById('chartsModal');
 }
 
 function executeFormScripts(formId) {
@@ -6509,7 +6505,7 @@ function formatDate(dateString) {
     return parts[2] + '/' + parts[1] + '/' + parts[0];
 }
 
-var el_editVacationsBtn = document.getElementById("editVacationsBtn"); if(el_editVacationsBtn) el_editVacationsBtn.addEventListener('click', function() { var el_passwordModal_d44 = document.getElementById('passwordModal'); if (el_passwordModal_d44) el_passwordModal_d44.style.display = 'flex'; var el_passwordInput_v22 = document.getElementById('passwordInput'); if (el_passwordInput_v22) el_passwordInput_v22.value = ''; document.getElementById('passwordInput').focus(); });
+var el_editVacationsBtn = document.getElementById("editVacationsBtn"); if(el_editVacationsBtn) el_editVacationsBtn.addEventListener('click', function() { openModalById('passwordModal'); var el_passwordInput_v22 = document.getElementById('passwordInput'); if (el_passwordInput_v22) el_passwordInput_v22.value = ''; document.getElementById('passwordInput').focus(); });
 var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_confirmPasswordBtn)el_confirmPasswordBtn.addEventListener('click', async function() {
     var password = document.getElementById('passwordInput').value;
     try {
@@ -6518,7 +6514,7 @@ var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_co
         var storedPassword = result.password || '1234';
         if (password === storedPassword) {
             isEditMode = true;
-            var el_passwordModal_d45 = document.getElementById('passwordModal'); if (el_passwordModal_d45) el_passwordModal_d45.style.display = 'none';
+            closeModalById('passwordModal');
             var el_passwordInput_v23 = document.getElementById('passwordInput'); if (el_passwordInput_v23) el_passwordInput_v23.value = '';
             renderControlList(true);
             var el_saveVacationsBtn_d46 = document.getElementById('saveVacationsBtn'); if (el_saveVacationsBtn_d46) el_saveVacationsBtn_d46.style.display = 'inline-block';
@@ -6528,7 +6524,7 @@ var el_confirmPasswordBtn=document.getElementById("confirmPasswordBtn");if(el_co
     } catch (error) { alert('❌ خطأ في التحقق من الرقم السري'); }
 });
 
-var el_cancelPasswordBtn = document.getElementById("cancelPasswordBtn"); if(el_cancelPasswordBtn) el_cancelPasswordBtn.addEventListener('click', function() { var el_passwordModal_d48 = document.getElementById('passwordModal'); if (el_passwordModal_d48) el_passwordModal_d48.style.display = 'none'; var el_passwordInput_v25 = document.getElementById('passwordInput'); if (el_passwordInput_v25) el_passwordInput_v25.value = ''; });
+var el_cancelPasswordBtn = document.getElementById("cancelPasswordBtn"); if(el_cancelPasswordBtn) el_cancelPasswordBtn.addEventListener('click', function() { closeModalById('passwordModal'); var el_passwordInput_v25 = document.getElementById('passwordInput'); if (el_passwordInput_v25) el_passwordInput_v25.value = ''; });
 var el_saveVacationsBtn=document.getElementById("saveVacationsBtn");if(el_saveVacationsBtn)el_saveVacationsBtn.addEventListener('click', async function() {
     controlData.forEach(function(person, index) {
         var startInput = document.getElementById('start_' + index);
@@ -8528,9 +8524,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     btn = document.getElementById("closeShiftBtn"); if (btn) btn.onclick = function() { var el_shiftModal_d55 = document.getElementById('shiftModal'); if (el_shiftModal_d55) el_shiftModal_d55.style.display = 'none'; };
     btn = document.getElementById("monthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d56 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d56) el_monthlyTableModal_d56.style.display = 'flex'; loadSavedTable(); };
     btn = document.getElementById("closeMonthlyTableBtn"); if (btn) btn.onclick = function() { var el_monthlyTableModal_d57 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d57) el_monthlyTableModal_d57.style.display = 'none'; };
-    btn = document.getElementById("controlBtn"); if (btn) btn.onclick = function() { var el_controlModal_d58 = document.getElementById('controlModal'); if (el_controlModal_d58) el_controlModal_d58.style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
+    btn = document.getElementById("controlBtn"); if (btn) btn.onclick = function() { openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); }); };
     btn = document.getElementById("closeControlBtn"); if (btn) btn.onclick = function() {
-        var el_controlModal_d59 = document.getElementById('controlModal'); if (el_controlModal_d59) el_controlModal_d59.style.display = 'none';
+        closeModalById('controlModal');
         isEditMode = false;
         var el_saveVacationsBtn_d60 = document.getElementById('saveVacationsBtn'); if (el_saveVacationsBtn_d60) el_saveVacationsBtn_d60.style.display = 'none';
         var el_editVacationsBtn_d61 = document.getElementById('editVacationsBtn'); if (el_editVacationsBtn_d61) el_editVacationsBtn_d61.style.display = 'inline-block';
@@ -8548,7 +8544,7 @@ setInterval(checkForAlerts, 10000);
 // تغيير الرقم السري
 // ============================================
 var el_changePasswordBtn=document.getElementById("changePasswordBtn");if(el_changePasswordBtn)el_changePasswordBtn.addEventListener('click', function() {
-    var el_changePasswordModal_d62 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d62) el_changePasswordModal_d62.style.display = 'flex';
+    openModalById('changePasswordModal');
 });
 
 var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBtn");if(el_confirmChangePasswordBtn)el_confirmChangePasswordBtn.addEventListener('click', async function() {
@@ -8580,7 +8576,7 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
         var result = await response.json();
         if (result.success) {
             alert('✅ تم تغيير الرقم السري بنجاح');
-            var el_changePasswordModal_d63 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d63) el_changePasswordModal_d63.style.display = 'none';
+            closeModalById('changePasswordModal');
             var el_oldPasswordInput_v26 = document.getElementById('oldPasswordInput'); if (el_oldPasswordInput_v26) el_oldPasswordInput_v26.value = '';
             var el_newPasswordInput_v27 = document.getElementById('newPasswordInput'); if (el_newPasswordInput_v27) el_newPasswordInput_v27.value = '';
             var el_confirmNewPasswordInput_v28 = document.getElementById('confirmNewPasswordInput'); if (el_confirmNewPasswordInput_v28) el_confirmNewPasswordInput_v28.value = '';
@@ -8593,7 +8589,7 @@ var el_confirmChangePasswordBtn=document.getElementById("confirmChangePasswordBt
 });
 
 var el_cancelChangePasswordBtn=document.getElementById("cancelChangePasswordBtn");if(el_cancelChangePasswordBtn)el_cancelChangePasswordBtn.addEventListener('click', function() {
-    var el_changePasswordModal_d64 = document.getElementById('changePasswordModal'); if (el_changePasswordModal_d64) el_changePasswordModal_d64.style.display = 'none';
+    closeModalById('changePasswordModal');
     var el_oldPasswordInput_v29 = document.getElementById('oldPasswordInput'); if (el_oldPasswordInput_v29) el_oldPasswordInput_v29.value = '';
     var el_newPasswordInput_v30 = document.getElementById('newPasswordInput'); if (el_newPasswordInput_v30) el_newPasswordInput_v30.value = '';
     var el_confirmNewPasswordInput_v31 = document.getElementById('confirmNewPasswordInput'); if (el_confirmNewPasswordInput_v31) el_confirmNewPasswordInput_v31.value = '';
@@ -8605,13 +8601,20 @@ var el_cancelChangePasswordBtn=document.getElementById("cancelChangePasswordBtn"
 // CSS الخاص بالمودال في smart-toolbar.css يبقى موثقاً كدين مؤجل.
 // ============================================
 
+// ============================================
+// P1-S6: آلية موحدة لفتح/إغلاق المودالات الحية
+// الفتح = display:flex — الإغلاق = display:none (سلوك مطابق تماماً للسابق)
+// ============================================
+function openModalById(id) { var m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+function closeModalById(id) { var m = document.getElementById(id); if (m) m.style.display = 'none'; }
+
 // إغلاق النوافذ بالضغط خارجها
 // ============================================
 window.onclick = function(e) {
-    var modals = ['shiftModal', 'monthlyTableModal', 'controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'uploadDocsModal', 'docPreviewModal', 'peakTimeModal', 'peakMapModal', 'themeModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
+    // P1-S6: المعرفات الحية فقط — أُسقطت المعدومة (shiftModal, monthlyTableModal, uploadDocsModal, docPreviewModal, themeModal) لأنها no-op أصلاً
+    var modals = ['controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'peakTimeModal', 'peakMapModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
     modals.forEach(function(id) {
-        var modal = document.getElementById(id);
-        if (e.target === modal) { modal.style.display = 'none'; }
+        if (e.target === document.getElementById(id)) { closeModalById(id); }
     });
 };
 
@@ -9350,7 +9353,7 @@ async function uploadSectorLogo() {
 var chartInstances = {};
 
 var el_chartsBtn=document.getElementById("chartsBtn");if(el_chartsBtn)el_chartsBtn.addEventListener('click', function() {
-    var el_chartsModal_d67 = document.getElementById('chartsModal'); if (el_chartsModal_d67) el_chartsModal_d67.style.display = 'flex';
+    openModalById('chartsModal');
     setTimeout(renderAllCharts, 300);
 });
 
@@ -9610,7 +9613,7 @@ function exportChartData() {
 // ============================================
 
 var el_analyticsBtn=document.getElementById("analyticsBtn");if(el_analyticsBtn)el_analyticsBtn.addEventListener('click', function() {
-    var el_analyticsModal_d68 = document.getElementById('analyticsModal'); if (el_analyticsModal_d68) el_analyticsModal_d68.style.display = 'flex';
+    openModalById('analyticsModal');
     renderAnalyticsDashboard();
 });
 
@@ -9627,7 +9630,7 @@ var auditLog = [];  // Phase 1: Fetched from server API, not localStorage
 var currentAuditFilter = 'all';
 
 var el_auditLogBtn=document.getElementById("auditLogBtn");if(el_auditLogBtn)el_auditLogBtn.addEventListener('click', function() {
-    var el_auditLogModal_d69 = document.getElementById('auditLogModal'); if (el_auditLogModal_d69) el_auditLogModal_d69.style.display = 'flex';
+    openModalById('auditLogModal');
     renderAuditLog();
 });
 
@@ -9949,13 +9952,13 @@ function initSmartToolbar() {
     if (qaShift) qaShift.onclick = openShiftModal;
     
     var qaDistribution = document.getElementById('qaDistribution');
-    if (qaDistribution) qaDistribution.onclick = function() { var el_distributionModal_d70 = document.getElementById('distributionModal'); if (el_distributionModal_d70) el_distributionModal_d70.style.display = 'flex'; };
-    
+    if (qaDistribution) qaDistribution.onclick = function() { openModalById('distributionModal'); };
+
     var qaForms = document.getElementById('qaForms');
-    if (qaForms) qaForms.onclick = function() { var el_formsModal_d71 = document.getElementById('formsModal'); if (el_formsModal_d71) el_formsModal_d71.style.display = 'flex'; };
-    
+    if (qaForms) qaForms.onclick = function() { openModalById('formsModal'); };
+
     var qaStats = document.getElementById('qaStats');
-    if (qaStats) qaStats.onclick = function() { var el_chartsModal_d72 = document.getElementById('chartsModal'); if (el_chartsModal_d72) el_chartsModal_d72.style.display = 'flex'; setTimeout(renderAllCharts, 300); };
+    if (qaStats) qaStats.onclick = function() { openModalById('chartsModal'); setTimeout(renderAllCharts, 300); };
     
     var sidebarNewShift = document.getElementById('sidebarNewShift');
     if (sidebarNewShift) sidebarNewShift.onclick = function() { toggleSidebar(); startNewShift(); };
@@ -9964,31 +9967,31 @@ function initSmartToolbar() {
     if (sidebarShift) sidebarShift.onclick = function() { toggleSidebar(); openShiftModal(); };
     
     var sidebarDistribution = document.getElementById('sidebarDistribution');
-    if (sidebarDistribution) sidebarDistribution.onclick = function() { toggleSidebar(); var el_distributionModal_d73 = document.getElementById('distributionModal'); if (el_distributionModal_d73) el_distributionModal_d73.style.display = 'flex'; };
+    if (sidebarDistribution) sidebarDistribution.onclick = function() { toggleSidebar(); openModalById('distributionModal'); };
     
     var sidebarTable = document.getElementById('sidebarTable');
     if (sidebarTable) sidebarTable.onclick = function() { toggleSidebar(); var el_monthlyTableModal_d74 = document.getElementById('monthlyTableModal'); if (el_monthlyTableModal_d74) el_monthlyTableModal_d74.style.display = 'flex'; loadSavedTable(); };
     
     var sidebarSenior = document.getElementById('sidebarSenior');
-    if (sidebarSenior) sidebarSenior.onclick = function() { toggleSidebar(); var el_seniorShiftModal_d75 = document.getElementById('seniorShiftModal'); if (el_seniorShiftModal_d75) el_seniorShiftModal_d75.style.display = 'flex'; };
-    
+    if (sidebarSenior) sidebarSenior.onclick = function() { toggleSidebar(); openModalById('seniorShiftModal'); };
+
     var sidebarControl = document.getElementById('sidebarControl');
-    if (sidebarControl) sidebarControl.onclick = function() { toggleSidebar(); var el_controlModal_d76 = document.getElementById('controlModal'); if (el_controlModal_d76) el_controlModal_d76.style.display = 'flex'; loadVacations().then(function() { renderControlList(false); }); };
-    
+    if (sidebarControl) sidebarControl.onclick = function() { toggleSidebar(); openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); }); };
+
     var sidebarForms = document.getElementById('sidebarForms');
-    if (sidebarForms) sidebarForms.onclick = function() { toggleSidebar(); var el_formsModal_d77 = document.getElementById('formsModal'); if (el_formsModal_d77) el_formsModal_d77.style.display = 'flex'; };
-    
+    if (sidebarForms) sidebarForms.onclick = function() { toggleSidebar(); openModalById('formsModal'); };
+
     var sidebarPeak = document.getElementById('sidebarPeak');
-    if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); var el_peakTimeModal_d78 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d78) el_peakTimeModal_d78.style.display = 'flex'; };
-    
+    if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); openModalById('peakTimeModal'); };
+
     var sidebarCharts = document.getElementById('sidebarCharts');
-    if (sidebarCharts) sidebarCharts.onclick = function() { toggleSidebar(); var el_chartsModal_d79 = document.getElementById('chartsModal'); if (el_chartsModal_d79) el_chartsModal_d79.style.display = 'flex'; setTimeout(renderAllCharts, 300); };
-    
+    if (sidebarCharts) sidebarCharts.onclick = function() { toggleSidebar(); openModalById('chartsModal'); setTimeout(renderAllCharts, 300); };
+
     var sidebarAnalytics = document.getElementById('sidebarAnalytics');
-    if (sidebarAnalytics) sidebarAnalytics.onclick = function() { toggleSidebar(); var el_analyticsModal_d80 = document.getElementById('analyticsModal'); if (el_analyticsModal_d80) el_analyticsModal_d80.style.display = 'flex'; };
+    if (sidebarAnalytics) sidebarAnalytics.onclick = function() { toggleSidebar(); openModalById('analyticsModal'); };
 
     var sidebarAudit = document.getElementById('sidebarAudit');
-    if (sidebarAudit) sidebarAudit.onclick = function() { toggleSidebar(); var el_auditLogModal_d82 = document.getElementById('auditLogModal'); if (el_auditLogModal_d82) el_auditLogModal_d82.style.display = 'flex'; };
+    if (sidebarAudit) sidebarAudit.onclick = function() { toggleSidebar(); openModalById('auditLogModal'); };
     
     var sidebarTheme = document.getElementById('sidebarTheme');
     if (sidebarTheme) sidebarTheme.onclick = function() { toggleSidebar(); var el_themeModal_d83 = document.getElementById('themeModal'); if (el_themeModal_d83) el_themeModal_d83.style.display = 'flex'; };
@@ -10277,14 +10280,14 @@ async function loadPeakPlans() {
 
 // ----- Modal Open/Close -----
 function openPeakTimeModal() {
-    var el_peakTimeModal_d85 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d85) el_peakTimeModal_d85.style.display = 'flex';
+    openModalById('peakTimeModal');
     switchPeakTab('dashboard');
     refreshPeakDashboard();
     initPeakFormDefaults();
 }
 
 function closePeakTimeModal() {
-    var el_peakTimeModal_d86 = document.getElementById('peakTimeModal'); if (el_peakTimeModal_d86) el_peakTimeModal_d86.style.display = 'none';
+    closeModalById('peakTimeModal');
 }
 
 // Replace the old event listener

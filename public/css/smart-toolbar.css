@@ -1994,7 +1994,6 @@
 /* 2. Universal Glassmorphism for all modal-content inside targeted modals */
 #shiftModal .modal-content,
 #distributionModal .modal-content,
-#themeModal .modal-content,
 #peakTimeModal .modal-content,
 #controlModal .modal-content,
 #formsModal .modal-content,
@@ -2010,7 +2009,6 @@
 #airAmbulanceModal .modal-content,
 #docsPage .modal-content,
 #soundSettingsPanel .modal-content,
-#qrModal .modal-content,
 #peakAlertModal .modal-content,
 #mapModal .modal-content,
 #opsPreviewModal .modal-content,
@@ -2027,7 +2025,6 @@
 /* Override inner headings for dark readability */
 #shiftModal .modal-content h2,
 #distributionModal .modal-content h2,
-#themeModal .modal-content h2,
 #peakTimeModal .modal-content h2,
 #controlModal .modal-content h2,
 #formsModal .modal-content h2,
@@ -2041,7 +2038,6 @@
 #seniorShiftModal .modal-content h2,
 #monthlyTableModal .modal-content h2,
 #airAmbulanceModal .modal-content h2,
-#qrModal .modal-content h2,
 #peakAlertModal .modal-content h2,
 #mapModal .modal-content h2,
 #opsModal .modal-content .modal-title {
@@ -2050,7 +2046,6 @@
 
 #shiftModal .modal-content .sub-title,
 #distributionModal .modal-content .sub-title,
-#themeModal .modal-content .sub-title,
 #peakTimeModal .modal-content .sub-title,
 #controlModal .modal-content .sub-title,
 #formsModal .modal-content .sub-title,
@@ -2067,7 +2062,6 @@
 /* 3. Button colors - Primary (Green) */
 #shiftModal .modal-content .btn.btn-primary,
 #distributionModal .modal-content .btn.btn-primary,
-#themeModal .modal-content .btn.btn-primary,
 #peakTimeModal .modal-content .btn.btn-primary,
 #controlModal .modal-content .btn.btn-primary,
 #formsModal .modal-content .btn.btn-primary,
@@ -2081,7 +2075,6 @@
 #seniorShiftModal .modal-content .btn.btn-primary,
 #monthlyTableModal .modal-content .btn.btn-primary,
 #airAmbulanceModal .modal-content .btn.btn-primary,
-#qrModal .modal-content .btn.btn-primary,
 #peakAlertModal .modal-content .btn.btn-primary,
 #mapModal .modal-content .btn.btn-primary,
 #opsModal .modal-content .btn.btn-primary {
@@ -2093,7 +2086,6 @@
 /* Button colors - Gold */
 #shiftModal .modal-content .btn.btn-gold,
 #distributionModal .modal-content .btn.btn-gold,
-#themeModal .modal-content .btn.btn-gold,
 #peakTimeModal .modal-content .btn.btn-gold,
 #controlModal .modal-content .btn.btn-gold,
 #formsModal .modal-content .btn.btn-gold,
@@ -2107,7 +2099,6 @@
 #seniorShiftModal .modal-content .btn.btn-gold,
 #monthlyTableModal .modal-content .btn.btn-gold,
 #airAmbulanceModal .modal-content .btn.btn-gold,
-#qrModal .modal-content .btn.btn-gold,
 #peakAlertModal .modal-content .btn.btn-gold,
 #mapModal .modal-content .btn.btn-gold,
 #opsModal .modal-content .btn.btn-gold,
@@ -2121,7 +2112,6 @@
 /* Button colors - Danger (Red) */
 #shiftModal .modal-content .btn.btn-coral,
 #distributionModal .modal-content .btn.btn-coral,
-#themeModal .modal-content .btn.btn-coral,
 #peakTimeModal .modal-content .btn.btn-coral,
 #controlModal .modal-content .btn.btn-coral,
 #formsModal .modal-content .btn.btn-coral,
@@ -2135,13 +2125,11 @@
 #seniorShiftModal .modal-content .btn.btn-coral,
 #monthlyTableModal .modal-content .btn.btn-coral,
 #airAmbulanceModal .modal-content .btn.btn-coral,
-#qrModal .modal-content .btn.btn-coral,
 #peakAlertModal .modal-content .btn.btn-coral,
 #mapModal .modal-content .btn.btn-coral,
 #opsModal .modal-content .btn.btn-coral,
 #shiftModal .modal-content .btn.btn-danger,
 #distributionModal .modal-content .btn.btn-danger,
-#themeModal .modal-content .btn.btn-danger,
 #peakTimeModal .modal-content .btn.btn-danger,
 #controlModal .modal-content .btn.btn-danger,
 #formsModal .modal-content .btn.btn-danger,
@@ -2155,7 +2143,6 @@
 #seniorShiftModal .modal-content .btn.btn-danger,
 #monthlyTableModal .modal-content .btn.btn-danger,
 #airAmbulanceModal .modal-content .btn.btn-danger,
-#qrModal .modal-content .btn.btn-danger,
 #peakAlertModal .modal-content .btn.btn-danger,
 #mapModal .modal-content .btn.btn-danger,
 #opsModal .modal-content .btn.btn-danger {
@@ -2167,7 +2154,6 @@
 /* Close buttons inside modals (neutral style) */
 #shiftModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #distributionModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
-#themeModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #peakTimeModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #controlModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #formsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
@@ -2181,7 +2167,6 @@
 #seniorShiftModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #monthlyTableModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #airAmbulanceModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
-#qrModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #peakAlertModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #mapModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #opsModal .modal-content .modal-close {
@@ -2193,7 +2178,6 @@
 /* 4. Form rows labels inside modals */
 #shiftModal .modal-content .form-row label,
 #distributionModal .modal-content .form-row label,
-#themeModal .modal-content .form-row label,
 #peakTimeModal .modal-content .form-row label,
 #controlModal .modal-content .form-row label,
 #formsModal .modal-content .form-row label,
@@ -2207,7 +2191,6 @@
 #seniorShiftModal .modal-content .form-row label,
 #monthlyTableModal .modal-content .form-row label,
 #airAmbulanceModal .modal-content .form-row label,
-#qrModal .modal-content .form-row label,
 #peakAlertModal .modal-content .form-row label,
 #mapModal .modal-content .form-row label,
 #opsModal .modal-content .form-row label {
@@ -2221,9 +2204,6 @@
 #distributionModal .modal-content input,
 #distributionModal .modal-content select,
 #distributionModal .modal-content textarea,
-#themeModal .modal-content input,
-#themeModal .modal-content select,
-#themeModal .modal-content textarea,
 #peakTimeModal .modal-content input,
 #peakTimeModal .modal-content select,
 #peakTimeModal .modal-content textarea,
@@ -2263,9 +2243,6 @@
 #airAmbulanceModal .modal-content input,
 #airAmbulanceModal .modal-content select,
 #airAmbulanceModal .modal-content textarea,
-#qrModal .modal-content input,
-#qrModal .modal-content select,
-#qrModal .modal-content textarea,
 #peakAlertModal .modal-content input,
 #peakAlertModal .modal-content select,
 #peakAlertModal .modal-content textarea,
@@ -2379,7 +2356,6 @@
 /* 11. Modal scrollbar styling for dark mode */
 #shiftModal .modal-content::-webkit-scrollbar,
 #distributionModal .modal-content::-webkit-scrollbar,
-#themeModal .modal-content::-webkit-scrollbar,
 #peakTimeModal .modal-content::-webkit-scrollbar,
 #controlModal .modal-content::-webkit-scrollbar,
 #formsModal .modal-content::-webkit-scrollbar,
@@ -2393,7 +2369,6 @@
 #seniorShiftModal .modal-content::-webkit-scrollbar,
 #monthlyTableModal .modal-content::-webkit-scrollbar,
 #airAmbulanceModal .modal-content::-webkit-scrollbar,
-#qrModal .modal-content::-webkit-scrollbar,
 #peakAlertModal .modal-content::-webkit-scrollbar,
 #mapModal .modal-content::-webkit-scrollbar,
 #opsModal .modal-content::-webkit-scrollbar {
@@ -2401,7 +2376,6 @@
 }
 #shiftModal .modal-content::-webkit-scrollbar-track,
 #distributionModal .modal-content::-webkit-scrollbar-track,
-#themeModal .modal-content::-webkit-scrollbar-track,
 #peakTimeModal .modal-content::-webkit-scrollbar-track,
 #controlModal .modal-content::-webkit-scrollbar-track,
 #formsModal .modal-content::-webkit-scrollbar-track,
@@ -2415,7 +2389,6 @@
 #seniorShiftModal .modal-content::-webkit-scrollbar-track,
 #monthlyTableModal .modal-content::-webkit-scrollbar-track,
 #airAmbulanceModal .modal-content::-webkit-scrollbar-track,
-#qrModal .modal-content::-webkit-scrollbar-track,
 #peakAlertModal .modal-content::-webkit-scrollbar-track,
 #mapModal .modal-content::-webkit-scrollbar-track,
 #opsModal .modal-content::-webkit-scrollbar-track {
@@ -2424,7 +2397,6 @@
 }
 #shiftModal .modal-content::-webkit-scrollbar-thumb,
 #distributionModal .modal-content::-webkit-scrollbar-thumb,
-#themeModal .modal-content::-webkit-scrollbar-thumb,
 #peakTimeModal .modal-content::-webkit-scrollbar-thumb,
 #controlModal .modal-content::-webkit-scrollbar-thumb,
 #formsModal .modal-content::-webkit-scrollbar-thumb,
@@ -2438,7 +2410,6 @@
 #seniorShiftModal .modal-content::-webkit-scrollbar-thumb,
 #monthlyTableModal .modal-content::-webkit-scrollbar-thumb,
 #airAmbulanceModal .modal-content::-webkit-scrollbar-thumb,
-#qrModal .modal-content::-webkit-scrollbar-thumb,
 #peakAlertModal .modal-content::-webkit-scrollbar-thumb,
 #mapModal .modal-content::-webkit-scrollbar-thumb,
 #opsModal .modal-content::-webkit-scrollbar-thumb {
