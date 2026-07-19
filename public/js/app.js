@@ -2728,6 +2728,9 @@ function renderArchiveReportsTab(container, reports, totalReports) {
             '</div>' +
             '<div class="archive-footer-stats">إجمالي البلاغات: <strong>' + totalReports + '</strong></div>' +
         '</div>';
+
+    // P1-S7: فرز الأعمدة (العدد رقمي تلقائياً) — الترتيب الافتراضي لا يتغير إلا بنقرة صريحة
+    if (window.TableSort) TableSort.makeSortable(container.querySelector('table.archive-table'));
 }
 
 function renderArchiveCompletionTab(container, completion, shift) {
