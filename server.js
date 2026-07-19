@@ -133,7 +133,7 @@ async function resolveShiftId(req, shiftDate, shiftType) {
     if (shiftDate && shiftType) {
         try {
             const shifts = await readShifts();
-            const shift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            const shift = shifts.find(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
             if (shift) return shift.id;
         } catch (e) {
             console.warn('[resolveShiftId] Could not resolve:', e.message);
@@ -609,6 +609,14 @@ function getCurrentShiftType() {
     return (hour >= 5 && hour < 17) ? 'صباحية' : 'ليلية';
 }
 
+// Shift rows may store the short form ('صباح'/'ليل') while time-based lookups
+// produce the long form ('صباحية'/'ليلية') — normalize before comparing.
+function normalizeShiftType(t) {
+    if (t === 'صباحية') return 'صباح';
+    if (t === 'ليلية') return 'ليل';
+    return t;
+}
+
 function getCurrentShiftDate() {
     const saudiTime = getSaudiDateTime();
     const year = saudiTime.getFullYear();
@@ -690,7 +698,7 @@ async function ensureDataDir() {
             const shifts = await readShifts();
             const shiftType = getCurrentShiftType();
             const shiftDate = getCurrentShiftDate();
-            const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            const currentShift = shifts.find(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
             if (currentShift) {
                 currentShiftId = currentShift.id;
                 console.log('✅ تم استعادة المناوبة الحالية: ' + currentShift.shiftName);
@@ -1977,7 +1985,7 @@ app.get('/api/data', authenticate, async (req, res) => {
         if (!currentShiftId) {
             try {
                 const shifts = await readShifts();
-                const currentShift = shifts.find(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+                const currentShift = shifts.find(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
                 if (currentShift) currentShiftId = currentShift.id;
             } catch (e) { /* ignore */ }
         }
@@ -2504,7 +2512,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             index = shifts.findIndex(s => s.id === shiftId);
         } else if (shiftDate && shiftType) {
             // Find by date + type (auto-shift mode)
-            index = shifts.findIndex(s => s.shiftDate === shiftDate && s.shiftType === shiftType);
+            index = shifts.findIndex(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
         }
         
         if (index !== -1) {
