@@ -549,8 +549,11 @@
         ws: null, connected: false, reconnectAttempts: 0, maxDelay: 30000, heartbeat: null,
 
         connect: function() {
+            // Include auth token (server rejects tokenless connections with 1008 — same pattern as websocket-sync.js)
+            var token = localStorage.getItem('authToken');
+            if (!token) return;
             var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            var url = protocol + '//' + location.host + '/ws';
+            var url = protocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token);
             try {
                 this.ws = new WebSocket(url);
                 var self = this;

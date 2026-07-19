@@ -52,7 +52,8 @@ const ChatIntegration = {
         if (!token) return;
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = protocol + '//' + location.host + '/ws';
+        // Include auth token (server rejects tokenless connections with 1008 — same pattern as websocket-sync.js)
+        const wsUrl = protocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token);
 
         try {
             this.ws = new WebSocket(wsUrl);
