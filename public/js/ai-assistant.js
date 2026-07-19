@@ -52,9 +52,10 @@
                 this.loadSuggestedQuestions();
                 this.loadSessions();
 
-                // Show greeting on first visit only
+                // Show greeting on first visit only — never before authentication
                 const hasVisited = localStorage.getItem('aiAssistantVisited');
-                if (!hasVisited) {
+                const isLoggedIn = !!(localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+                if (!hasVisited && isLoggedIn) {
                     setTimeout(() => {
                         this.showGreeting();
                         localStorage.setItem('aiAssistantVisited', 'true');
