@@ -1602,53 +1602,6 @@ window.addEventListener('load', function() {
     </div>
 </div>
 
-<!-- ===== نافذة الإنجازات والتحفيز ===== -->
-<div id="achievementsModal" class="modal">
-    <div class="modal-content" style="max-width:800px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span class="card-icon gold"><i class="fas fa-trophy"></i></span>
-                <div>
-                    <h2 style="margin:0; font-size:1.2rem;">&#x1F3C6; الإنجازات والتحفيز</h2>
-                    <span style="font-size:0.7rem; color:var(--gray-400);">حقق الإنجازات ونافس الزملاء</span>
-                </div>
-            </div>
-            <button onclick="document.getElementById('achievementsModal').style.display='none'" class="btn">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <!-- شريط التقدم العام -->
-        <div style="background:var(--gray-50); border-radius:var(--radius-md); padding:15px; margin-bottom:20px; text-align:center;">
-            <div style="font-size:0.8rem; color:var(--gray-600); margin-bottom:8px;">
-                &#x1F3AF; تقدمك العام: <strong id="totalProgressPercent">0%</strong>
-            </div>
-            <div style="height:12px; background:var(--gray-200); border-radius:6px; overflow:hidden;">
-                <div id="totalProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg, #F59E0B, #10B981); border-radius:6px; transition:width 0.5s ease;"></div>
-            </div>
-        </div>
-
-        <!-- الإنجازات -->
-        <h3 style="font-size:0.9rem; color:var(--primary-700); margin-bottom:12px;">&#x1F396;&#xFE0F; الإنجازات</h3>
-        <div class="achievements-grid" id="achievementsGrid"></div>
-
-        <!-- لوحة الصدارة -->
-        <h3 style="font-size:0.9rem; color:var(--primary-700); margin:20px 0 12px;">&#x1F4CA; لوحة الصدارة - هذا الشهر</h3>
-        <div style="overflow-x:auto;">
-            <table class="leaderboard-table" id="leaderboardTable">
-                <thead>
-                    <tr><th>🏆 الترتيب</th><th>الفرقة</th><th>المركز</th><th>البلاغات</th><th>النقاط</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        <div class="modal-buttons">
-            <button onclick="document.getElementById('achievementsModal').style.display='none'" class="btn"><i class="fas fa-times"></i> إغلاق</button>
-        </div>
-    </div>
-</div>
-
 <!-- ============================================================ -->
 <!-- ===== JavaScript ===== -->
 <!-- ============================================================ -->

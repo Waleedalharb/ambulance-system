@@ -4696,149 +4696,13 @@ input[type="search"], textarea, select {
     flex-shrink: 0;
 }
 
-/* ===== Achievements Modal (الإنجازات) ===== */
-#achievementsModal .modal-content {
-    max-width: 900px !important;
-}
-
-.achievements-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.achievement-card {
-    background: var(--white);
-    border: 2px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    text-align: center;
-    position: relative;
-    transition: all 0.3s ease;
-}
-
-.achievement-card.locked {
-    opacity: 0.6;
-    background: var(--gray-50);
-}
-
-.achievement-card.unlocked {
-    border-color: var(--gold);
-    background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
-}
-
-.achievement-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.achievement-badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--teal);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-.achievement-icon {
-    font-size: 2rem;
-    display: block;
-    margin-bottom: 8px;
-}
-
-.achievement-name {
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: var(--gray-800);
-    margin-bottom: 4px;
-}
-
-.achievement-desc {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    margin-bottom: 10px;
-    line-height: 1.4;
-}
-
-.achievement-progress {
-    height: 6px;
-    background: var(--gray-200);
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 8px;
-}
-
-.achievement-progress-bar {
-    height: 100%;
-    border-radius: 10px;
-    background: linear-gradient(90deg, var(--gold), #FCD34D);
-    transition: width 0.5s ease;
-}
-
-.achievement-card.unlocked .achievement-progress-bar {
-    background: linear-gradient(90deg, var(--teal), #34D399);
-}
-
-/* Leaderboard Table */
-.leaderboard-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--white);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    border: 1px solid var(--gray-200);
-}
-
-.leaderboard-table thead {
-    background: var(--gray-50);
-}
-
-.leaderboard-table th {
-    padding: 12px 16px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--gray-700);
-    text-align: center;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.leaderboard-table td {
-    padding: 10px 16px;
-    font-size: 0.85rem;
-    color: var(--gray-600);
-    text-align: center;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.leaderboard-table tbody tr:hover {
-    background: var(--gray-50);
-}
-
-.leaderboard-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
 /* Responsive for modals */
 @media (max-width: 768px) {
     .modal-content {
         width: 95% !important;
         padding: 16px !important;
     }
-    
-    .achievements-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
+
     .control-person {
         flex-wrap: wrap;
     }
@@ -4850,15 +4714,6 @@ input[type="search"], textarea, select {
     
     .control-vacation .edit {
         justify-content: flex-start;
-    }
-    
-    .leaderboard-table {
-        font-size: 0.75rem;
-    }
-    
-    .leaderboard-table th,
-    .leaderboard-table td {
-        padding: 8px 10px;
     }
 }
 
@@ -5167,7 +5022,7 @@ input[type="search"], textarea, select {
 
 /* --- Tables on Mobile --- */
 @media (max-width: 768px) {
-    table, .leaderboard-table, .wf-table {
+    table, .wf-table {
         display: block;
         overflow-x: auto;
         white-space: nowrap;

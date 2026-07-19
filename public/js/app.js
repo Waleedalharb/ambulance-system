@@ -1149,8 +1149,6 @@ function setupAutoAuditLogging() {
     var mapBtn = document.getElementById('mapBtn');
     if (mapBtn) {
         mapBtn.addEventListener('click', function() {
-            gamificationStats.mapOpens = (gamificationStats.mapOpens || 0) + 1;
-            localStorage.setItem('gamificationStats', JSON.stringify(gamificationStats));
             addAuditEntry('system', 'فتح الخريطة', 'المستخدم فتح الخريطة', getCurrentUserName());
         });
     }
@@ -8291,215 +8289,9 @@ function exportAllShiftsPDF() {
 }
 
 // ============================================
-// نظام الوضع الليلي + الإنجازات (مقدماً قبل DOMContentLoaded)
+// P1-S9: أُزيل نظام الإنجازات والتحفيز (Gamification) بالكامل — قرار المالك ADR-003 #1
+// (المصفوفة، العدّادات، مفاتيح التخزين المحلي، دوال العرض ومساعداتها — بلا يتيم)
 // ============================================
-
-
-
-// ============================================
-// نظام الإنجازات والتحفيز (Gamification)
-// ============================================
-
-var achievements = [
-    { id: 'first_report',  icon: '📊', name: 'أول بلاغ', desc: 'سجل أول بلاغ', check: function() { return getTotalReports() >= 1; }, max: 1 },
-    { id: 'reports_10',    icon: '🔟', name: '10 بلاغات', desc: 'سجل 10 بلاغات', check: function() { return getTotalReports() >= 10; }, max: 10 },
-    { id: 'reports_50',    icon: '📈', name: '50 بلاغ', desc: 'سجل 50 بلاغاً', check: function() { return getTotalReports() >= 50; }, max: 50 },
-    { id: 'reports_100',   icon: '💯', name: '100 بلاغ', desc: 'سجل 100 بلاغ', check: function() { return getTotalReports() >= 100; }, max: 100 },
-    { id: 'first_shift',  icon: '📋', name: 'أول مناوبة', desc: 'أكمل أول مناوبة', check: function() { return savedShifts.length >= 1; }, max: 1 },
-    { id: 'shifts_10',    icon: '🌅', name: '10 مناوبات', desc: 'أكمل 10 مناوبات', check: function() { return savedShifts.length >= 10; }, max: 10 },
-    { id: 'night_owl',    icon: '🦉', name: 'بومة الليل', desc: '5 مناوبات ليلية', check: function() { return countNightShifts() >= 5; }, max: 5 },
-    { id: 'all_centers',  icon: '🏥', name: 'جميع المراكز', desc: 'سجل في 5 مراكز', check: function() { return getUniqueCenters() >= 5; }, max: 5 },
-    { id: 'explorer',     icon: '🗺️', name: 'المستكشف', desc: 'افتح الخريطة 5 مرات', check: function() { return (gamificationStats.mapOpens || 0) >= 5; }, max: 5 },
-    { id: 'pdf_master',   icon: '📄', name: 'سيد PDF', desc: 'صدر 3 تقارير PDF', check: function() { return (gamificationStats.pdfExports || 0) >= 3; }, max: 3 },
-    { id: 'dark_mode',    icon: '🌙', name: 'وضع الليل', desc: 'فعّل الوضع الليلي', check: function() { return document.documentElement.getAttribute('data-theme') === 'dark'; }, max: 1 },
-    { id: 'theme_master', icon: '🎨', name: 'سيد الثيمات', desc: 'ارفع ثيم مخصص', check: function() { return localStorage.getItem('headerBackground') !== null; }, max: 1 }
-];
-
-var gamificationStats = JSON.parse(localStorage.getItem('gamificationStats') || '{"mapOpens":0,"pdfExports":0,"notificationsSent":0}');
-var unlockedAchievements = JSON.parse(localStorage.getItem('unlockedAchievements') || '[]');
-
-// F5b: أُطفئت Gamification بالكامل (قرار المالك) — نقاط الدخول والمستمعات حُذفت.
-// التعريفات أدناه (renderAchievements/renderLeaderboard) يتيمة وتبقى موثقة:
-// ستُبنى مستقبلاً على IndicatorService.
-
-function renderAchievements() {
-    var grid = document.getElementById('achievementsGrid');
-    if (!grid) return;
-    
-    grid.innerHTML = '';
-    var unlockedCount = 0;
-    
-    // جلب إحصائيات الفرق
-    var unitStats = getUnitStats();
-    var topUnit = getTopUnit();
-    
-    console.log('[ACH] unitStats:', unitStats.length, 'topUnit:', topUnit.name, topUnit.count);
-    
-    for (var i = 0; i < achievements.length; i++) {
-        var a = achievements[i];
-        var isUnlocked = false;
-        try { isUnlocked = a.check(); } catch(e) {}
-        if (isUnlocked) unlockedCount++;
-        
-        var progress = 0;
-        var extraInfo = '';
-        
-        if (a.id === 'first_report') { progress = Math.min(getTotalReports(), 1); extraInfo = unitStats.length > 0 ? '<div style="font-size:0.6rem;color:var(--teal);margin-top:3px;">📊 ' + getTotalReports() + ' بلاغ</div>' : ''; }
-        else if (a.id === 'reports_10') { progress = Math.min(getTotalReports(), 10); extraInfo = unitStats.length > 0 ? '<div style="font-size:0.6rem;color:var(--teal);margin-top:3px;">📊 ' + getTotalReports() + ' بلاغ</div>' : ''; }
-        else if (a.id === 'reports_50') { progress = Math.min(getTotalReports(), 50); extraInfo = unitStats.length > 0 ? '<div style="font-size:0.6rem;color:var(--teal);margin-top:3px;">📊 ' + getTotalReports() + ' بلاغ</div>' : ''; }
-        else if (a.id === 'reports_100') { progress = Math.min(getTotalReports(), 100); extraInfo = unitStats.length > 0 ? '<div style="font-size:0.6rem;color:var(--teal);margin-top:3px;">📊 ' + getTotalReports() + ' بلاغ</div>' : ''; }
-        else if (a.id === 'top_unit') { progress = topUnit.count > 0 ? 1 : 0; extraInfo = '<div style="font-size:0.6rem;color:var(--gold);margin-top:3px;">🏆 ' + escapeHtml(topUnit.name || '-') + ' (' + (topUnit.count || 0) + ')</div>'; }
-        else if (a.id === 'unit_10') { progress = topUnit.count; extraInfo = '<div style="font-size:0.6rem;color:var(--gold);margin-top:3px;">🏆 ' + escapeHtml(topUnit.name || '-') + ' (' + (topUnit.count || 0) + ')</div>'; }
-        else if (a.id === 'first_shift') progress = Math.min(savedShifts.length, 1);
-        else if (a.id === 'shifts_10') progress = Math.min(savedShifts.length, 10);
-        else if (a.id === 'night_owl') progress = Math.min(countNightShifts(), 5);
-        else if (a.id === 'all_centers') { progress = Math.min(getUniqueCenters(), 5); extraInfo = '<div style="font-size:0.6rem;color:var(--primary-500);margin-top:3px;">📍 ' + getUniqueCenters() + ' مركز</div>'; }
-        else if (a.id === 'explorer') progress = Math.min(gamificationStats.mapOpens || 0, 5);
-        else if (a.id === 'pdf_master') progress = Math.min(gamificationStats.pdfExports || 0, 3);
-        else if (a.id === 'dark_mode') progress = isUnlocked ? 1 : 0;
-        else if (a.id === 'theme_master') progress = isUnlocked ? 1 : 0;
-        else progress = isUnlocked ? 1 : 0;
-        
-        var percent = a.max > 0 ? Math.round((progress / a.max) * 100) : (isUnlocked ? 100 : 0);
-        
-        var card = document.createElement('div');
-        card.className = 'achievement-card ' + (isUnlocked ? 'unlocked' : 'locked');
-        card.innerHTML = 
-            (isUnlocked ? '<span class="achievement-badge">✓</span>' : '') +
-            '<span class="achievement-icon">' + a.icon + '</span>' +
-            '<div class="achievement-name">' + a.name + '</div>' +
-            '<div class="achievement-desc">' + a.desc + '</div>' +
-            extraInfo +
-            '<div class="achievement-progress">' +
-                '<div class="achievement-progress-bar" style="width:' + percent + '%"></div>' +
-            '</div>';
-        
-        grid.appendChild(card);
-    }
-    
-    var totalPercent = achievements.length > 0 ? Math.round((unlockedCount / achievements.length) * 100) : 0;
-    var progressPercentEl = document.getElementById('totalProgressPercent');
-    var progressBarEl = document.getElementById('totalProgressBar');
-    if (progressPercentEl) progressPercentEl.textContent = totalPercent + '%';
-    if (progressBarEl) progressBarEl.style.width = totalPercent + '%';
-    
-    var newlyUnlocked = [];
-    for (var j = 0; j < achievements.length; j++) {
-        var achUnlocked = false;
-        try { achUnlocked = achievements[j].check(); } catch(e) {}
-        if (achUnlocked && unlockedAchievements.indexOf(achievements[j].id) === -1) {
-            newlyUnlocked.push(achievements[j]);
-            unlockedAchievements.push(achievements[j].id);
-        }
-    }
-    localStorage.setItem('unlockedAchievements', JSON.stringify(unlockedAchievements));
-    
-    for (var k = 0; k < newlyUnlocked.length; k++) {
-        showNotification('إنجاز جديد! 🎉', 'لقد حققت: ' + newlyUnlocked[k].name, 'success', 5000);
-    }
-}
-
-function renderLeaderboard() {
-    var tbody = document.querySelector('#leaderboardTable tbody');
-    if (!tbody) return;
-    
-    // جلب إحصائيات الفرق الحقيقية من الـ reports
-    var unitStats = getUnitStats();
-    unitStats.sort(function(a, b) { return b.count - a.count; });
-    
-    console.log('[LB] unitStats count:', unitStats.length, 'units:', unitStats.map(function(u) { return u.name + ':' + u.count; }).join(', '));
-    
-    var html = '';
-    
-    if (unitStats.length === 0) {
-        html = '<tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:20px;">📭 لا توجد بيانات بلاغات بعد.<br>سجل بلاغات من "الفرق الإسعافية" لتظهر الفرق هنا.</td></tr>';
-    } else {
-        for (var i = 0; i < Math.min(unitStats.length, 10); i++) {
-            var u = unitStats[i];
-            var rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
-            var points = u.count * 10;
-            html += '<tr>' +
-                '<td style="text-align:center;font-size:1.2rem;">' + rankIcon + '</td>' +
-                '<td><strong>' + escapeHtml(u.name) + '</strong></td>' +
-                '<td style="color:var(--gray-600);font-size:0.8rem;">' + escapeHtml(u.center) + '</td>' +
-                '<td style="text-align:center;"><strong style="color:var(--primary-700);">' + u.count + '</strong></td>' +
-                '<td style="text-align:center;"><strong style="color:var(--gold);">' + points + '</strong></td>' +
-            '</tr>';
-        }
-    }
-    
-    tbody.innerHTML = html;
-}
-
-function getUnitStats() {
-    var stats = {};
-    
-    // مصدر 1: البلاغات الحالية (reports)
-    for (var key in reports) {
-        if (reports[key] && reports[key].count > 0) {
-            var parts = key.split('|');
-            var unit = parts.length > 1 ? parts[1] : key;
-            var center = parts[0] || '';
-            if (!stats[unit]) stats[unit] = { name: unit, center: center, count: 0 };
-            stats[unit].count += reports[key].count;
-        }
-    }
-    
-    // مصدر 2: بلاغات المناوبات المحفوظة (allShifts)
-    if (typeof allShifts !== 'undefined' && allShifts && allShifts.length > 0) {
-        for (var i = 0; i < allShifts.length; i++) {
-            var shift = allShifts[i];
-            if (shift && shift.savedReports) {
-                for (var sKey in shift.savedReports) {
-                    var sReport = shift.savedReports[sKey];
-                    if (sReport && sReport.count > 0) {
-                        var sParts = sKey.split('|');
-                        var sUnit = sParts.length > 1 ? sParts[1] : sKey;
-                        var sCenter = sParts[0] || (shift.center || '');
-                        if (!stats[sUnit]) stats[sUnit] = { name: sUnit, center: sCenter, count: 0 };
-                        stats[sUnit].count += sReport.count;
-                    }
-                }
-            }
-        }
-    }
-    
-    return Object.values(stats);
-}
-
-function getTopUnit() {
-    var stats = getUnitStats();
-    var top = { name: '-', count: 0, center: '' };
-    for (var i = 0; i < stats.length; i++) {
-        if (stats[i].count > top.count) top = stats[i];
-    }
-    return top;
-}
-
-function getTotalReports() {
-    var total = 0;
-    for (var key in reports) {
-        total += (reports[key] && reports[key].count) || 0;
-    }
-    return total;
-}
-
-function countNightShifts() {
-    var count = 0;
-    for (var i = 0; i < savedShifts.length; i++) {
-        if (savedShifts[i].shiftType === 'night') count++;
-    }
-    return count;
-}
-
-function getUniqueCenters() {
-    var centers = {};
-    for (var key in reports) {
-        var parts = key.split('|');
-        if (parts[0]) centers[parts[0]] = true;
-    }
-    return Object.keys(centers).length;
-}
 
 // ============================================
 // Helper Functions
@@ -8615,7 +8407,8 @@ function closeModalById(id) { var m = document.getElementById(id); if (m) m.styl
 // ============================================
 window.onclick = function(e) {
     // P1-S6: المعرفات الحية فقط — أُسقطت المعدومة (shiftModal, monthlyTableModal, uploadDocsModal, docPreviewModal, themeModal) لأنها no-op أصلاً
-    var modals = ['controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'peakTimeModal', 'peakMapModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal', 'achievementsModal'];
+    // P1-S9: أُسقط achievementsModal مع إزالة منظومة الجاميفيكيشن كاملة
+    var modals = ['controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'peakTimeModal', 'peakMapModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal'];
     modals.forEach(function(id) {
         if (e.target === document.getElementById(id)) { closeModalById(id); }
     });

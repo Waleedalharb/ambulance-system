@@ -251,18 +251,6 @@
     transform: translateY(-2px);
 }
 
-/* Achievements Button (Gold) */
-.quick-action-btn.achievements {
-    background: rgba(37, 99, 235, 0.1);
-    color: var(--primary);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.quick-action-btn.achievements:hover {
-    background: rgba(245, 158, 11, 0.25);
-    border-color: rgba(245, 158, 11, 0.5);
-}
-
 /* User Info Section */
 .top-bar-user-info {
     display: flex;
@@ -2000,7 +1988,6 @@
 #analyticsModal .modal-content,
 #chartsModal .modal-content,
 #auditLogModal .modal-content,
-#achievementsModal .modal-content,
 #operationsRoomModal .modal-content,
 #passwordModal .modal-content,
 #changePasswordModal .modal-content,
@@ -2031,7 +2018,6 @@
 #analyticsModal .modal-content h2,
 #chartsModal .modal-content h2,
 #auditLogModal .modal-content h2,
-#achievementsModal .modal-content h2,
 #operationsRoomModal .modal-content h2,
 #passwordModal .modal-content h3,
 #changePasswordModal .modal-content h3,
@@ -2052,7 +2038,6 @@
 #analyticsModal .modal-content .sub-title,
 #chartsModal .modal-content .sub-title,
 #auditLogModal .modal-content .sub-title,
-#achievementsModal .modal-content .sub-title,
 #seniorShiftModal .modal-content .sub-title,
 #passwordModal .modal-content .sub-title,
 #changePasswordModal .modal-content .sub-title {
@@ -2068,7 +2053,6 @@
 #analyticsModal .modal-content .btn.btn-primary,
 #chartsModal .modal-content .btn.btn-primary,
 #auditLogModal .modal-content .btn.btn-primary,
-#achievementsModal .modal-content .btn.btn-primary,
 #operationsRoomModal .modal-content .btn.btn-primary,
 #passwordModal .modal-content .btn.btn-primary,
 #changePasswordModal .modal-content .btn.btn-primary,
@@ -2092,7 +2076,6 @@
 #analyticsModal .modal-content .btn.btn-gold,
 #chartsModal .modal-content .btn.btn-gold,
 #auditLogModal .modal-content .btn.btn-gold,
-#achievementsModal .modal-content .btn.btn-gold,
 #operationsRoomModal .modal-content .btn.btn-gold,
 #passwordModal .modal-content .btn.btn-gold,
 #changePasswordModal .modal-content .btn.btn-gold,
@@ -2118,7 +2101,6 @@
 #analyticsModal .modal-content .btn.btn-coral,
 #chartsModal .modal-content .btn.btn-coral,
 #auditLogModal .modal-content .btn.btn-coral,
-#achievementsModal .modal-content .btn.btn-coral,
 #operationsRoomModal .modal-content .btn.btn-coral,
 #passwordModal .modal-content .btn.btn-coral,
 #changePasswordModal .modal-content .btn.btn-coral,
@@ -2136,7 +2118,6 @@
 #analyticsModal .modal-content .btn.btn-danger,
 #chartsModal .modal-content .btn.btn-danger,
 #auditLogModal .modal-content .btn.btn-danger,
-#achievementsModal .modal-content .btn.btn-danger,
 #operationsRoomModal .modal-content .btn.btn-danger,
 #passwordModal .modal-content .btn.btn-danger,
 #changePasswordModal .modal-content .btn.btn-danger,
@@ -2160,7 +2141,6 @@
 #analyticsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #chartsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #auditLogModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
-#achievementsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #operationsRoomModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #passwordModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
 #changePasswordModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
@@ -2184,7 +2164,6 @@
 #analyticsModal .modal-content .form-row label,
 #chartsModal .modal-content .form-row label,
 #auditLogModal .modal-content .form-row label,
-#achievementsModal .modal-content .form-row label,
 #operationsRoomModal .modal-content .form-row label,
 #passwordModal .modal-content .form-row label,
 #changePasswordModal .modal-content .form-row label,
@@ -2222,9 +2201,6 @@
 #auditLogModal .modal-content input,
 #auditLogModal .modal-content select,
 #auditLogModal .modal-content textarea,
-#achievementsModal .modal-content input,
-#achievementsModal .modal-content select,
-#achievementsModal .modal-content textarea,
 #operationsRoomModal .modal-content input,
 #operationsRoomModal .modal-content select,
 #operationsRoomModal .modal-content textarea,
@@ -2362,7 +2338,6 @@
 #analyticsModal .modal-content::-webkit-scrollbar,
 #chartsModal .modal-content::-webkit-scrollbar,
 #auditLogModal .modal-content::-webkit-scrollbar,
-#achievementsModal .modal-content::-webkit-scrollbar,
 #operationsRoomModal .modal-content::-webkit-scrollbar,
 #passwordModal .modal-content::-webkit-scrollbar,
 #changePasswordModal .modal-content::-webkit-scrollbar,
@@ -2382,7 +2357,6 @@
 #analyticsModal .modal-content::-webkit-scrollbar-track,
 #chartsModal .modal-content::-webkit-scrollbar-track,
 #auditLogModal .modal-content::-webkit-scrollbar-track,
-#achievementsModal .modal-content::-webkit-scrollbar-track,
 #operationsRoomModal .modal-content::-webkit-scrollbar-track,
 #passwordModal .modal-content::-webkit-scrollbar-track,
 #changePasswordModal .modal-content::-webkit-scrollbar-track,
@@ -2403,7 +2377,6 @@
 #analyticsModal .modal-content::-webkit-scrollbar-thumb,
 #chartsModal .modal-content::-webkit-scrollbar-thumb,
 #auditLogModal .modal-content::-webkit-scrollbar-thumb,
-#achievementsModal .modal-content::-webkit-scrollbar-thumb,
 #operationsRoomModal .modal-content::-webkit-scrollbar-thumb,
 #passwordModal .modal-content::-webkit-scrollbar-thumb,
 #changePasswordModal .modal-content::-webkit-scrollbar-thumb,

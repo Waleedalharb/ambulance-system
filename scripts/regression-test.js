@@ -660,11 +660,11 @@ async function main() {
     })(f4Path.join(__dirname, '..', 'public'));
     record('F5b ③: صفر مراجع QR (generateAllQRCodes/createQRCard/qrCodesBtn) في public/', f5bQrHits.length === 0, f5bQrHits.join(' | ') || 'clean');
 
-    // ④ Gamification: صفر نداءات renderAchievements خارج تعريفها + صفر sidebarAchievements
-    const f5bAchApp = (f5bAppSrc.match(/renderAchievements\s*\(/g) || []).length;
-    const f5bAchIdx = (f5bIdxSrc.match(/renderAchievements\s*\(/g) || []).length;
+    // ④ Gamification (P1-S9): إزالة كاملة بلا يتيم — صفر renderAchievements/achievementsModal/gamificationStats/leaderboard
+    const f5bAchApp = (f5bAppSrc.match(/renderAchievements|gamificationStats|unlockedAchievements|renderLeaderboard/g) || []).length;
+    const f5bAchIdx = (f5bIdxSrc.match(/achievementsModal|leaderboardTable|renderAchievements/g) || []).length;
     const f5bSidebarAch = f5bAppSrc.includes('sidebarAchievements') || f5bIdxSrc.includes('sidebarAchievements');
-    record('F5b ④: Gamification مُطفأة (renderAchievements = التعريف اليتيم فقط، صفر sidebarAchievements)', f5bAchApp === 1 && f5bAchIdx === 0 && !f5bSidebarAch, `app=${f5bAchApp} index=${f5bAchIdx} sidebar=${f5bSidebarAch}`);
+    record('F5b ④: Gamification مُزالة بالكامل بلا يتيم (P1-S9: صفر renderAchievements/gamificationStats/achievementsModal/leaderboard)', f5bAchApp === 0 && f5bAchIdx === 0 && !f5bSidebarAch, `app=${f5bAchApp} index=${f5bAchIdx} sidebar=${f5bSidebarAch}`);
 
     // ⑤ التصدير: operations-dashboard تفتح daily-report.html
     const f5bGenMatch = f5bOpsSrc.match(/function generateDailyReport\(\)\s*\{[\s\S]{0,300}?\}/);
