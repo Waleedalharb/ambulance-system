@@ -568,9 +568,16 @@
         if (!window.aiAssistant) window.aiAssistant = new AIAssistant();
     }
     if (window.AuthGate) {
-        AuthGate.onStart(initAIAssistant);
+        AuthGate.onStart(function() {
+            // الزر الثابت في topbar (index.html L393) مخفي افتراضياً — يظهر بعد المصادقة فقط
+            var topbarBtn = document.getElementById('aiAssistantBtn');
+            if (topbarBtn) topbarBtn.style.display = 'flex';
+            initAIAssistant();
+        });
         // تفكيك عند الخروج/انتهاء الجلسة — الزر لا يبقى فوق شاشة الدخول
         AuthGate.onStop(function() {
+            var topbarBtn = document.getElementById('aiAssistantBtn');
+            if (topbarBtn) topbarBtn.style.display = 'none';
             if (window.aiAssistant) {
                 try {
                     if (window.aiAssistant.container) window.aiAssistant.container.remove();
