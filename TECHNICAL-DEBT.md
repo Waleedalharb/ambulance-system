@@ -1,0 +1,39 @@
+# سجل الدين التقني (Technical Debt Register)
+
+> قاعدة العمل: أي اكتشاف خارج نطاق تقرير Operational Validation يُوثَّق هنا فقط ولا يُعمل عليه الآن.
+> يُراجع هذا السجل بعد إغلاق جميع شرائح OV والتحقق التشغيلي الكامل.
+> آخر تحديث: 2026-07-20 — بعد إغلاق الشريحة 2 (403eaa2) والشريحة 2-ب (037cc0c).
+
+---
+
+## مرتبط ببنود OV مؤكدة (يُنفَّذ ضمن شرائحه — ليس ديناً مؤجلاً)
+
+| # | الاكتشاف | البند المرتبط | الشريحة المالكة |
+|---|---|---|---|
+| D-01 | الـ13 namespace الناقصة في db.js (ShiftMetrics, ShiftAlerts, ShiftKpiDaily/Weekly/Monthly, ShiftAuditTrail, ShiftAuditLog, ShiftTimelineEvents, ShiftComparisonSnapshots, ShiftReportsGenerated, ShiftRosterDrafts, NotificationLog, ShiftChangeRequests) — نقاط ~25 ترجع 500 | OV-S9-05 (الجدول الزمني فارغ) + OV-S5-01 (التدقيق) | الشريحة 7 |
+| D-02 | `addShiftAuditLog` يسقط سجلات تدقيق الجداول الذكية بصمت (6 مواضع server.js:7118-7445) لأن `dbAvailable()=false` — نجاح زائف تدقيقي | OV-S5-01 (نفس الجذر ح: التدقيق لم يُنقل) | الشريحة 7 |
+| D-03 | كتابة `audit_log` في SQLite متوقفة (server.js:1684) + إشعارات المديرين عند تحديث المناوبة متوقفة (server.js:2614) — كلاهما خلف dbAvailable | OV-S5-01 | الشريحة 7 |
+| D-04 | تضارب مصادر المؤشرات يحتاج الـ namespaces أولاً (ShiftMetrics/ShiftKpi*) | OV-S9-02 | الشريحة 8 |
+| D-05 | جدول `shift_audit_log` غير مُنشأ ذاتياً (موجود في الإنتاج فقط) — مطلوب للشريحة 7 | OV-S5-01 | الشريحة 7 |
+
+## دين مؤجل خالص (لا بند OV له — لا يُعمل عليه الآن)
+
+| # | البند | الملاحظة | التصنيف |
+|---|---|---|---|
+| D-10 | `dbResponse()` معرّفة ولا تُستدعى إطلاقاً (كود ميت) | server.js:87 | تنظيف — شريحة 8/9 |
+| D-11 | `syncShiftToDB()` و`addShiftAuditTrail()` معرّفتان ولا يستدعيهما أحد | server.js:171, :158 | تنظيف — شريحة 8/9 |
+| D-12 | `migrate-shifts-table.js` أصبح زائداً بعد الترحيل الذاتي (2-ب) | يُوثَّق إهماله ثم يُحذف | شريحة 8 |
+| D-13 | تحذير `Cannot find module './services/operations.service'` عند الإقلاع — استيراد شرطي لملف غير موجود (opsService=null وكل مساراته fallback) | server.js:66 | شريحة 7 (تدقيق الخدمات) |
+| D-14 | محاولتا اتصال WS بعد الدخول (واحدة OPEN وأخرى عالقة CONNECTING) | رُصدت حياً في تحقق الشريحة 2 | الشريحة 6 (القناة اللحظية الواحدة) |
+| D-15 | `token_blacklist` ينمو بلا تنظيف (expires_at غير مُعبّأ، لا purge) | أمن/أداء منخفض الخطورة | P3 — شريحة 9 |
+| D-16 | `logout_time`/`logout_reason` لا تُعبّأ عند الخروج (تبقى NULL) | server.js:1191 يمرّر is_active فقط | P3 — شريحة 9 |
+| D-17 | 25 جدولاً في قاعدة الإنتاج لا ينشئها الكود (test_table, e_reports, daily_reports, peak_*, audit_logs بصيغة الجمع...) — يحتاج تدقيق «حي/ميت» قبل أي حذف | ممنوع الحذف دون إثبات الوفاة | شريحة 8/9 |
+| D-18 | أعمدة في الإنتاج لا يستخدمها الكود (users.team_id, ops_files.icon, updated_at في hospitals/references/timeline/shift_roster, roster.updated_by/version) | غير ضارة؛ تُراجع مع D-17 | شريحة 8/9 |
+| D-19 | صفحات بلا AuthGate (report-entry, operations-command) تجديد توكنها يفترض fetch ملفوفاً وهي لا تحمّل auth-manager بالكامل | ملاحظة من الشريحة 2 | يُقيَّم ضمن الشريحة 6 |
+
+## مُغلق (للسجل)
+
+| # | البند | أُغلق في |
+|---|---|---|
+| ~~D-00~~ | جداول token_blacklist/auth_sessions/auth_logs بلا namespaces — الإبطال ميت | الشريحة 2 (403eaa2) |
+| ~~D-00~~ | Schema Drift: end_time + 12 جدولاً مرجعياً + آلية ensureColumn | الشريحة 2-ب (037cc0c) |
