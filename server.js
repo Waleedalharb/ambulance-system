@@ -724,7 +724,17 @@ ensureDataDir();
 app.use(helmet(HELMET_CONFIG));
 
 // 2. Gzip Compression
-app.use(compression());
+// OV-S6: استثناء SSE من الضغط — compression يخزّن استجابة text/event-stream
+// مؤقتاً (المتصفح يرسل Accept-Encoding: gzip) فيبقى EventSource عالقاً في
+// CONNECTING ولا يصل أي حدث لحظي للمتصفح إطلاقاً (كان الاستطلاع الاحتياطي
+// كل 3 ثوانٍ يخفي العطل). القناة اللحظية الواحدة تعتمد على SSE حياً في المتصفح.
+app.use(compression({
+    filter: function (req, res) {
+        if (req.path === '/api/sse') return false;
+        if (res.getHeader('Content-Type') === 'text/event-stream') return false;
+        return compression.filter(req, res);
+    }
+}));
 
 // 3. CORS
 app.use(cors({
