@@ -43,6 +43,15 @@
 |---|---|---|
 | ~~D-00~~ | جداول token_blacklist/auth_sessions/auth_logs بلا namespaces — الإبطال ميت | الشريحة 2 (403eaa2) |
 | ~~D-00~~ | Schema Drift: end_time + 12 جدولاً مرجعياً + آلية ensureColumn | الشريحة 2-ب (037cc0c) |
+| ~~D-10~~ | dbResponse بلا مستدعٍ — حُذفت | الشريحة 8 (4671521) |
+| ~~D-11~~ | syncShiftToDB/addShiftAuditTrail بلا مستدعٍ — حُذفتا | الشريحة 8 (4671521) |
+| ~~D-12~~ | migrate-shifts-table.js الزائد — حُذف | الشريحة 8 (4671521) |
+| ~~D-22~~ | broadcastToAll بلا تحقق isAuthenticated — أُضيف التحقق | الشريحة 8 (4671521) |
+| ~~D-26~~ | migrateShifts بلا status/معرّفات جديدة — وُحّد مع reconcile | الشريحة 8 (4671521) |
+| ~~D-27~~ | /api/shifts يسقط إلى JSON بائت — SQLite فقط | الشريحة 8 (4671521) |
+| ~~D-35~~ | تظليل مسارات roster — أُعيد الترتيب | الشريحة 8 (4671521) |
+| ~~D-36~~ | /api/shift/:id/status مكسور بلا مستهلك — حُذف (OV-S9-01) | الشريحة 8 (4671521) |
+
 | D-26 | تناقض مسارَي تهجير المناوبات في db.js: `migrateShifts()` يقرأ `data/shift-data.json` من مسار ثابت (يتجاهل DATA_DIR) ويدرج **بلا عمود status** (يرث `active` افتراضياً) وبمعرّفات تلقائية جديدة، بينما reconcile (~db.js:951) يقرأ DATA_DIR ويحفظ المعرّف ويُدرج `archived` — على قاعدة جديدة ينتج 19 مناوبة legacy «active» زائفة تلوّث أي بيئة جديدة | اكتشاف الشريحة 5 (تحقق المنفّذ) — لم يؤثر على البوابة | يُقيَّم مع شريحة دورة المناوبة/8 |
 | D-27 | `GET /api/shifts` يسقط إلى JSON عند فراغ SQLite (مسار fallback عام) | اكتشاف الشريحة 5 | شريحة 8 |
 | D-28 | سباق حميد عند `shift_started`: رد «لا مناوبة» متأخر من استدعاء `loadCurrentShift` متزامن قد يمسح الـ cache لحظياً قبل إعادة كتابته — بلا أثر وظيفي لأن كل استخدام يعيد التحقق من السيرفر (fetchVerifiedShiftId) | رُصد حياً في التحقق الشخصي للشريحة 5 | P3 — شريحة 9 |
@@ -54,3 +63,6 @@
 | D-34 | `smart-schedule-*.js` و`ai-assistant.js` ما زالت تقرأ مفتاح التوكن القديم `authToken` فقط | اكتشاف الشريحة 6 | شريحة 9 |
 | D-35 | تظليل مسارات: `GET /api/shift-roster/:id` (server.js:7181) مسجّل قبل `/audit-log` و`/drafts` و`/stats` فيظللها (ترجع «السجل غير موجود») — الجذر ترتيب التسجيل | اكتشاف الشريحة 7 | الشريحة 8 |
 | D-36 | `/api/shift/:id/status` (:2509) يستدعي `opsService.getShiftById` بلا حارس ⇒ 500 دائماً + `migrateJsonShiftToSqlite` (:1470) ميتة بلا مستدعٍ وداخلها استدعاء غير محمي | اكتشاف الشريحة 7 — D-36 مرتبط بـ OV-S9-01 | الشريحة 8 |
+| D-37 | دلالة «اليوم» في المؤشرات بـ toISOString (UTC) بينما shift_date بتوقيت الرياض — قد يختلفان حوالي منتصف الليل؛ البوابة (F5a) تتوقع السلوك الحالي فأُجل | اكتشاف الشريحة 8 | يُقيَّم بعد OV |
+| D-38 | `playUrgentAlertSound()` في showPeakAlert (app.js:1546) يعزف بلا فحص soundSettings.master — عكس S4-03 (صوت رغم الكتم)؛ تُرك لأن تنبيهات الذروة «عاجلة» تصميمياً | اكتشاف الشريحة 8 | بقرار المالك |
+| D-39 | weekly/monthly-dashboard و/api/shifts/archive و/api/shifts/search ما زالت تستخدم readShifts() ذات السقوط JSON — نفس علة S9-02/D-27 كاملة لم تُسمَّ في OV | اكتشاف الشريحة 8 | شريحة 9 |
