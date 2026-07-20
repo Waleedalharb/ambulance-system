@@ -48,6 +48,7 @@ const ChatIntegration = {
      * Connect WebSocket for real-time message delivery on ALL pages
      */
     connectWebSocket() {
+        this._stopped = false;
         const token = localStorage.getItem('authToken');
         if (!token) return;
 
@@ -85,6 +86,8 @@ const ChatIntegration = {
             this.ws.onclose = function() {
                 self.connected = false;
                 self.stopHeartbeat();
+                if (self._stopped) return; // فُكّ عمداً عبر AuthGate — بلا إعادة اتصال
+                if (typeof AuthGate !== 'undefined' && !AuthGate.isAuthenticated()) return; // إيقاف نهائي عند فشل المصادقة — بلا عاصفة
                 const delay = Math.min(1000 * Math.pow(2, self.reconnectAttempts), self.maxReconnectDelay);
                 self.reconnectAttempts++;
                 console.log('[ChatIntegration] Disconnected, reconnecting in', delay, 'ms');
@@ -422,6 +425,7 @@ const ChatIntegration = {
      * Destroy on logout
      */
     destroy() {
+        this._stopped = true;
         this.stopHeartbeat();
         if (this.ws) {
             try { this.ws.close(); } catch(e) {}
@@ -436,9 +440,15 @@ function updateChatBadge() {
     }
 }
 
-// Auto-init when DOM is ready
+// Auto-init when DOM is ready — AuthGate: عبر البوابة على index.html (يُحمَّل هذا الملف قبل auth-manager.js،
+// لذا يُحسم وجود البوابة عند DOMContentLoaded)؛ الصفحات بلا بوابة تحافظ على السلوك السابق.
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => ChatIntegration.init(), 1000);
+    if (typeof AuthGate !== 'undefined') {
+        AuthGate.onStart(() => ChatIntegration.init());
+        AuthGate.onStop(() => ChatIntegration.destroy());
+    } else {
+        setTimeout(() => ChatIntegration.init(), 1000);
+    }
 });
 
 // Listen for cross-tab chat updates via BroadcastChannel

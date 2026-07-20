@@ -562,11 +562,27 @@
         }
     }
 
-    // Initialize
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { window.aiAssistant = new AIAssistant(); });
+    // Initialize — AuthGate: لا نسخة ولا زر قبل المصادقة (index.html)؛
+    // الصفحات التي لا تحمّل AuthManager تحافظ على السلوك السابق.
+    function initAIAssistant() {
+        if (!window.aiAssistant) window.aiAssistant = new AIAssistant();
+    }
+    if (window.AuthGate) {
+        AuthGate.onStart(initAIAssistant);
+        // تفكيك عند الخروج/انتهاء الجلسة — الزر لا يبقى فوق شاشة الدخول
+        AuthGate.onStop(function() {
+            if (window.aiAssistant) {
+                try {
+                    if (window.aiAssistant.container) window.aiAssistant.container.remove();
+                    if (window.aiAssistant.panel) window.aiAssistant.panel.remove();
+                } catch (e) {}
+                window.aiAssistant = null;
+            }
+        });
+    } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAIAssistant);
     } else {
-        window.aiAssistant = new AIAssistant();
+        initAIAssistant();
     }
 
     // Global toggle function for external buttons (topbar, sidebar, etc.)

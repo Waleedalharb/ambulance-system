@@ -53,6 +53,8 @@
     // ==========================
     async function flushErrors() {
         if (queue.length === 0) return;
+        // AuthGate: لا إرسال قبل المصادقة — تبقى الأخطاء في الطابور حتى تسجيل الدخول
+        if (!getAuthToken()) return;
         var batch = queue.splice(0, queue.length);
 
         try {

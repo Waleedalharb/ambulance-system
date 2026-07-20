@@ -63,6 +63,7 @@
     var reconnectDelay = 3000;
     var pingInterval = null;
     var tokenRefreshInProgress = false;
+    var stopped = false; // AuthGate: إيقاف نهائي — بلا إعادة اتصال بعد الخروج/انتهاء الجلسة
 
     // Token refresh: call /api/auth/refresh to get a new token
     async function refreshToken() {
@@ -97,6 +98,7 @@
     }
 
     function connect() {
+        if (stopped) return;
         try {
             // Include auth token in WebSocket connection
             var token = localStorage.getItem('authToken');
@@ -465,8 +467,15 @@
                 updateConnectionStatusUI(false);
             }
             if (pingInterval) clearInterval(pingInterval);
-            // If closed due to authentication failure (code 1008), try refreshing token first
+            if (stopped) return; // أُغلق عمداً عبر AuthGate — بلا إعادة اتصال
+            // If closed due to authentication failure (code 1008)
             if (event && event.code === 1008) {
+                // AuthGate: فشل مصادقة ⇒ إيقاف نهائي بلا عاصفة إعادة اتصال —
+                // بوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار AuthManager
+                if (typeof AuthGate !== 'undefined') {
+                    console.log('🔴 WebSocket closed due to auth failure (1008) — terminal halt, no reconnect');
+                    return;
+                }
                 console.log('🔴 WebSocket closed due to auth failure, attempting token refresh...');
                 refreshToken().then(function(success) {
                     if (success) {
@@ -482,7 +491,23 @@
         };
     }
 
+    function disconnect() {
+        stopped = true;
+        wsConnected = false;
+        reconnectAttempts = 0;
+        if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+        }
+        if (ws) {
+            try { ws.close(); } catch(e) {}
+            ws = null;
+        }
+    }
+
     function scheduleReconnect() {
+        if (stopped) return;
+        if (typeof AuthGate !== 'undefined' && !AuthGate.isAuthenticated()) return; // لا إعادة اتصال خارج البوابة
         reconnectAttempts++;
         if (reconnectAttempts <= maxReconnectAttempts) {
             var delay = Math.min(reconnectDelay * reconnectAttempts, 30000);
@@ -496,11 +521,16 @@
 
     function startFallbackPolling() {
         console.log('🔄 Starting fallback polling (30s)');
-        setInterval(function() {
+        var poll = function() {
             if (typeof syncUpdate === 'function') {
                 syncUpdate();
             }
-        }, 30000);
+        };
+        if (typeof AuthGate !== 'undefined') {
+            AuthGate.setInterval(poll, 30000); // يُمسح تلقائياً عند الخروج/انتهاء الجلسة
+        } else {
+            setInterval(poll, 30000);
+        }
     }
 
     // Notify server when tab/browser closes
@@ -509,6 +539,24 @@
             ws.send(JSON.stringify({ type: 'logout', timestamp: Date.now() }));
         }
     });
-    
-    connect();
+
+    // AuthGate: الاتصال فقط عند المصادقة والفك عند الخروج (index.html).
+    // يُحسم عند DOMContentLoaded لأن هذا الملف يُحمَّل قبل auth-manager.js.
+    // الصفحات بلا AuthGate (report-entry, operations-command) تحافظ على السلوك السابق.
+    function boot() {
+        if (typeof AuthGate !== 'undefined') {
+            AuthGate.onStart(function() {
+                stopped = false;
+                connect();
+            });
+            AuthGate.onStop(disconnect);
+        } else {
+            connect();
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
 })();

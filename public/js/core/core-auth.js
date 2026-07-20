@@ -212,6 +212,16 @@
 
         refresh: function() {
             return _doRefresh();
+        },
+
+        // --- Require Auth (page gate) ---
+        // No token → redirect to the main page (which shows the login overlay).
+        requireAuth: function(redirectTo) {
+            if (!_getAccessToken()) {
+                global.location.href = redirectTo || '/';
+                return false;
+            }
+            return true;
         }
     };
 

@@ -33,9 +33,9 @@ async function loadCurrentShift() {
         currentShiftStatus = 'none';
     }
 }
-// Call immediately and periodically
-loadCurrentShift();
-setInterval(loadCurrentShift, 60000); // Refresh every minute
+// AuthGate: لا جلب تشغيلي قبل المصادقة — التشغيل الفوري عند start والتكرار عبر البوابة
+AuthGate.onStart(function() { loadCurrentShift(); });
+AuthGate.setInterval(loadCurrentShift, 60000); // Refresh every minute
 var allShifts = [];
 var isViewingArchiveShift = false;
 var currentViewingShift = null;
@@ -152,8 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hideLogin();
             applyUserPermissions(data.user);
             if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
-            loadAllData();
-            loadNotifications();
+            AuthGate.start(); // الإقلاع التشغيلي الموحّد (loadAllData + loadNotifications + SSE + المؤقتات) عبر البوابة
             addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
         } catch (e) {
             loginError.textContent = e.message || 'فشل في تسجيل الدخول';
@@ -183,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hideLogin();
             applyUserPermissions(user);
             if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + (user.role === 'admin' ? 'مدير' : user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
-            loadAllData();
+            AuthGate.start(); // جلسة صالحة عند تحميل الصفحة — الإقلاع التشغيلي عبر البوابة
         } else {
             hideSkeleton();
             showLogin();
@@ -538,9 +537,19 @@ function connectSSE() {
         
         sseSource.onerror = function(err) {
             sseConnected = false;
+            // إيقاف نهائي: رفض الخادم الاتصال (401/403 ⇒ readyState=CLOSED) — بلا عاصفة إعادة اتصال
+            if (sseSource && sseSource.readyState === EventSource.CLOSED) {
+                console.log('🔴 SSE: connection refused (auth failure) — terminal halt, no reconnect');
+                try { sseSource.close(); } catch(e) {}
+                sseSource = null;
+                return; // بوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار 401 في AuthManager
+            }
+            // لا إعادة اتصال خارج حالة المصادقة
+            if (typeof AuthGate !== 'undefined' && !AuthGate.isAuthenticated()) return;
             console.log('❌ SSE error, reconnecting...');
             // Close and reconnect manually after delay
             setTimeout(function() {
+                if (typeof AuthGate !== 'undefined' && !AuthGate.isAuthenticated()) return;
                 if (sseSource) {
                     try { sseSource.close(); } catch(e) {}
                 }
@@ -553,9 +562,23 @@ function connectSSE() {
     }
 }
 
+// AuthGate: فكّ اتصال SSE والاستطلاع الاحتياطي عند الخروج/انتهاء الجلسة
+AuthGate.onStop(function() {
+    if (sseSource) {
+        try { sseSource.close(); } catch(e) {}
+        sseSource = null;
+    }
+    sseConnected = false;
+    if (wsFallbackInterval) {
+        clearInterval(wsFallbackInterval);
+        wsFallbackInterval = null;
+    }
+});
+
 // Reconnect SSE on token refresh
 AuthManager.onAuthEvent(function(event, data) {
     if (event === 'refresh') {
+        if (typeof AuthGate !== 'undefined' && !AuthGate.isAuthenticated()) return; // لا اتصال خارج البوابة
         console.log('Token refreshed, reconnecting SSE...');
         connectSSE();
     }
@@ -8302,17 +8325,21 @@ function exportAllShiftsPDF() {
 // ربط الأحداث الرئيسية
 // ============================================
 document.addEventListener('DOMContentLoaded', async function() {
-    connectSSE();
+    // ── ربط واجهة خالص (لا شبكة) — يبقى كما هو قبل المصادقة ──
     loadBrandLogo();
     initSoundSettings();
     var currentDateEl = document.getElementById("currentDate");
     if (currentDateEl) currentDateEl.innerText = getSaudiDate();
     buildCentersTable();
-    loadShifts();
-    loadAllData();
     setupAutoAuditLogging();
-    loadNotifications();
-    setTimeout(checkForAlerts, 1000);
+    // ── الإقلاع التشغيلي — خلف AuthGate فقط (لا يعمل قبل المصادقة) ──
+    AuthGate.onStart(function() {
+        connectSSE();
+        loadShifts();
+        loadAllData();
+        loadNotifications();
+        AuthGate.setTimeout(checkForAlerts, 1000);
+    });
     // ربط أزرار toolbar بعد اكتمال DOM
     var btn = document.getElementById("newShiftBtn"); if (btn) btn.onclick = startNewShift;
     btn = document.getElementById("shiftBtn"); if (btn) btn.onclick = function() { location.href='radio-completion.html?v=34'; };
@@ -8332,8 +8359,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     btn = document.getElementById("returnToCurrentBtn"); if (btn) btn.onclick = returnToCurrentShift;
 });
 
-// فحص التنبيهات كل 10 ثواني
-setInterval(checkForAlerts, 10000);
+// فحص التنبيهات كل 10 ثواني — عبر AuthGate (لا يعمل قبل المصادقة ويتوقف عند الخروج)
+AuthGate.setInterval(checkForAlerts, 10000);
 
 // ============================================
 // تغيير الرقم السري
@@ -8415,9 +8442,9 @@ window.onclick = function(e) {
 };
 
 // ============================================
-// تحديث تلقائي كل 3 ثواني
+// تحديث تلقائي كل 3 ثواني — عبر AuthGate (لا يعمل قبل المصادقة ويتوقف عند الخروج)
 // ============================================
-setInterval(function() {
+AuthGate.setInterval(function() {
     if (!isViewingArchiveShift) { 
         checkForUpdates(); 
         console.log('🔄 تحديث تلقائي للبيانات - ' + getSaudiTime());
@@ -10760,7 +10787,8 @@ function exportPeakArchive() {
 
 // ----- التحميل الأولي من الخادم -----
 // كنس الخطط المنتهية انتقل إلى الخدمة (PositioningService.list) — لا منطق تشغيلي في الواجهة
-loadPeakPlans();
+// AuthGate: التحميل الأولي عند المصادقة فقط — لا جلب قبل تسجيل الدخول
+AuthGate.onStart(function() { loadPeakPlans(); });
 
 // Update the sidebar button
 var sidebarPeak = document.getElementById('sidebarPeak');

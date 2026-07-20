@@ -159,6 +159,7 @@
 
     function _showLoginScreen(message) {
         _sessionExpired = true;
+        AuthGate.stop(); // فشل مصادقة نهائي — تفكيك كل الأنظمة التشغيلية
         _emitEvent('session_expired', { message: message || 'Session expired' });
 
         var loginScreen = document.getElementById('loginScreen');
@@ -323,6 +324,94 @@
     }
 
     // ==========================================
+    // AUTH GATE — مالك الإقلاع التشغيلي الموحّد
+    // لا يعمل أي نظام تشغيلي (جلب، مؤقتات، SSE/WS) قبل المصادقة،
+    // ويُفكَّك كل شيء عند الخروج أو انتهاء الجلسة.
+    // ==========================================
+    var AuthGate = (function() {
+        var _state = 'anonymous'; // 'anonymous' | 'authenticated'
+        var _startCallbacks = [];
+        var _stopCallbacks = [];
+        var _intervals = []; // { fn, ms, id }
+        var _timeouts = [];  // { fn, ms, id, fired }
+
+        function _armTimeout(rec) {
+            rec.id = setTimeout(function() {
+                rec.fired = true;
+                rec.id = null;
+                try { rec.fn(); } catch (e) { console.error('[AuthGate] timeout callback error:', e); }
+            }, rec.ms);
+        }
+
+        function start() {
+            if (_state === 'authenticated') return; // مرة واحدة بالضبط لكل تسجيل دخول
+            _state = 'authenticated';
+            var i;
+            for (i = 0; i < _intervals.length; i++) {
+                if (_intervals[i].id === null) {
+                    _intervals[i].id = setInterval(_intervals[i].fn, _intervals[i].ms);
+                }
+            }
+            for (i = 0; i < _timeouts.length; i++) {
+                if (!_timeouts[i].fired && _timeouts[i].id === null) {
+                    _armTimeout(_timeouts[i]);
+                }
+            }
+            for (i = 0; i < _startCallbacks.length; i++) {
+                try { _startCallbacks[i](); } catch (e) { console.error('[AuthGate] start callback error:', e); }
+            }
+        }
+
+        function stop() {
+            if (_state !== 'authenticated') return;
+            _state = 'anonymous';
+            var i;
+            for (i = 0; i < _intervals.length; i++) {
+                if (_intervals[i].id !== null) {
+                    clearInterval(_intervals[i].id);
+                    _intervals[i].id = null;
+                }
+            }
+            for (i = 0; i < _timeouts.length; i++) {
+                if (_timeouts[i].id !== null) {
+                    clearTimeout(_timeouts[i].id);
+                    _timeouts[i].id = null;
+                }
+            }
+            for (i = 0; i < _stopCallbacks.length; i++) {
+                try { _stopCallbacks[i](); } catch (e) { console.error('[AuthGate] stop callback error:', e); }
+            }
+        }
+
+        return {
+            start: start,
+            stop: stop,
+            isAuthenticated: function() { return _state === 'authenticated'; },
+            onStart: function(fn) {
+                _startCallbacks.push(fn);
+                if (_state === 'authenticated') {
+                    try { fn(); } catch (e) { console.error('[AuthGate] start callback error:', e); }
+                }
+            },
+            onStop: function(fn) {
+                _stopCallbacks.push(fn);
+            },
+            setInterval: function(fn, ms) {
+                var rec = { fn: fn, ms: ms, id: null };
+                _intervals.push(rec);
+                if (_state === 'authenticated') rec.id = setInterval(fn, ms);
+                return rec;
+            },
+            setTimeout: function(fn, ms) {
+                var rec = { fn: fn, ms: ms, id: null, fired: false };
+                _timeouts.push(rec);
+                if (_state === 'authenticated') _armTimeout(rec);
+                return rec;
+            }
+        };
+    })();
+
+    // ==========================================
     // PUBLIC API
     // ==========================================
 
@@ -364,6 +453,7 @@
             }
 
             _emitEvent('logout', { user: userName });
+            AuthGate.stop(); // تسجيل الخروج — تفكيك كل الأنظمة التشغيلية قبل إعادة التحميل
 
             // Notify server to deactivate this session
             if (token) {
@@ -502,5 +592,6 @@
 
     // Expose globally
     global.AuthManager = AuthManager;
+    global.AuthGate = AuthGate;
 
 })(window);
