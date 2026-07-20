@@ -17,6 +17,7 @@ const logger = {
   info: (msg) => console.log(`[DB] ${new Date().toISOString()} INFO: ${msg}`),
   error: (msg, err) => console.error(`[DB] ${new Date().toISOString()} ERROR: ${msg}`, err ? (err.message || err) : ''),
   warn: (msg) => console.warn(`[DB] ${new Date().toISOString()} WARN: ${msg}`),
+  debug: (msg) => console.log(`[DB] ${new Date().toISOString()} DEBUG: ${msg}`),
 };
 
 // ============================================
@@ -561,6 +562,193 @@ const TABLE_SCHEMAS = [
     success INTEGER DEFAULT 1,
     error_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // ── Server-referenced tables (schemas extracted verbatim from the
+  // production database; the server reads them via raw SQL and previously
+  // only production had them — fresh databases failed on these endpoints) ──
+  `CREATE TABLE IF NOT EXISTS shift_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
+    alert_type TEXT NOT NULL CHECK(alert_type IN ('high_pending', 'low_completion', 'staff_shortage', 'workload_spike', 'closure_delay', 'repeated_notes')),
+    severity TEXT DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
+    message TEXT NOT NULL,
+    suggested_reason TEXT,
+    is_acknowledged INTEGER DEFAULT 0,
+    acknowledged_by TEXT,
+    acknowledged_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_audit_trail (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    action_type TEXT NOT NULL CHECK(action_type IN ('created', 'modified', 'reviewed', 'approved', 'deleted', 'data_added', 'data_updated', 'export', 'alert_acked')),
+    actor_id TEXT NOT NULL,
+    actor_name TEXT,
+    actor_role TEXT,
+    action_detail TEXT,
+    old_data TEXT,
+    new_data TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    total_reports INTEGER DEFAULT 0,
+    completed_reports INTEGER DEFAULT 0,
+    pending_reports INTEGER DEFAULT 0,
+    suspended_reports INTEGER DEFAULT 0,
+    total_completions INTEGER DEFAULT 0,
+    total_forms INTEGER DEFAULT 0,
+    staff_count INTEGER DEFAULT 0,
+    team_count INTEGER DEFAULT 0,
+    vehicle_count INTEGER DEFAULT 0,
+    completion_rate REAL DEFAULT 0,
+    avg_response_time REAL DEFAULT 0,
+    avg_closure_time REAL DEFAULT 0,
+    critical_cases INTEGER DEFAULT 0,
+    health_score REAL DEFAULT 0,
+    data_completeness REAL DEFAULT 0,
+    notes_count INTEGER DEFAULT 0,
+    event_count INTEGER DEFAULT 0,
+    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_timeline_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL CHECK(event_type IN ('start', 'team_checkin', 'report_received', 'report_completed', 'shift_change', 'form_filed', 'note_added', 'alert_triggered', 'peak_mission', 'end')),
+    event_title TEXT NOT NULL,
+    event_description TEXT,
+    event_data TEXT,
+    event_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT,
+    created_by_name TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_kpi_daily (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    total_shifts INTEGER DEFAULT 0,
+    total_reports INTEGER DEFAULT 0,
+    completed_reports INTEGER DEFAULT 0,
+    open_reports INTEGER DEFAULT 0,
+    suspended_reports INTEGER DEFAULT 0,
+    total_staff INTEGER DEFAULT 0,
+    total_teams INTEGER DEFAULT 0,
+    total_vehicles INTEGER DEFAULT 0,
+    completion_rate REAL DEFAULT 0,
+    avg_response_time REAL DEFAULT 0,
+    avg_closure_time REAL DEFAULT 0,
+    top_center TEXT,
+    top_report_type TEXT,
+    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_kpi_weekly (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_start TEXT NOT NULL,
+    week_end TEXT NOT NULL,
+    total_shifts INTEGER DEFAULT 0,
+    total_reports INTEGER DEFAULT 0,
+    avg_daily_reports REAL DEFAULT 0,
+    peak_day TEXT,
+    peak_day_count INTEGER DEFAULT 0,
+    lowest_day TEXT,
+    lowest_day_count INTEGER DEFAULT 0,
+    completion_rate REAL DEFAULT 0,
+    total_operating_hours REAL DEFAULT 0,
+    total_staff INTEGER DEFAULT 0,
+    total_teams INTEGER DEFAULT 0,
+    total_vehicles INTEGER DEFAULT 0,
+    avg_staff_per_shift REAL DEFAULT 0,
+    comparison_last_week REAL DEFAULT 0,
+    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_kpi_monthly (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    total_shifts INTEGER DEFAULT 0,
+    total_reports INTEGER DEFAULT 0,
+    total_operating_hours REAL DEFAULT 0,
+    total_staff INTEGER DEFAULT 0,
+    total_teams INTEGER DEFAULT 0,
+    total_vehicles INTEGER DEFAULT 0,
+    morning_shifts INTEGER DEFAULT 0,
+    night_shifts INTEGER DEFAULT 0,
+    completion_rate REAL DEFAULT 0,
+    avg_performance REAL DEFAULT 0,
+    comparison_last_month REAL DEFAULT 0,
+    comparison_chart_data TEXT,
+    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_comparison_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comparison_name TEXT,
+    shift_a_id INTEGER NOT NULL,
+    shift_b_id INTEGER NOT NULL,
+    shift_a_date TEXT,
+    shift_b_date TEXT,
+    comparison_data TEXT NOT NULL,
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_reports_generated (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_type TEXT NOT NULL CHECK(report_type IN ('daily', 'weekly', 'monthly', 'shift_detail')),
+    report_date_from TEXT,
+    report_date_to TEXT,
+    shift_id INTEGER,
+    report_data TEXT,
+    file_path TEXT,
+    file_format TEXT DEFAULT 'pdf',
+    generated_by TEXT,
+    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_roster_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_data_json TEXT NOT NULL,
+    operation_type TEXT DEFAULT 'edit' CHECK(operation_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
+    created_by TEXT NOT NULL,
+    created_by_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    applied_at DATETIME,
+    reverted_at DATETIME
+  );`,
+  `CREATE TABLE IF NOT EXISTS notification_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_type TEXT DEFAULT 'shift_change' CHECK(notification_type IN ('shift_change', 'system', 'alert')),
+    recipient_id INTEGER NOT NULL,
+    recipient_name TEXT,
+    recipient_phone TEXT,
+    message TEXT NOT NULL,
+    channel TEXT DEFAULT 'in-app' CHECK(channel IN ('in-app', 'whatsapp', 'sms', 'email')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'read')),
+    roster_id INTEGER,
+    shift_date TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    sent_at DATETIME,
+    delivered_at DATETIME,
+    opened_at DATETIME,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+  `CREATE TABLE IF NOT EXISTS shift_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    roster_id INTEGER,
+    employee_id INTEGER NOT NULL,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    proposed_shift_code TEXT NOT NULL,
+    old_shift_code TEXT,
+    requested_by TEXT NOT NULL,
+    requested_by_name TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'cancelled')),
+    reason TEXT,
+    reviewed_by TEXT,
+    reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -606,34 +794,40 @@ async function initTables() {
 }
 
 // ============================================
+// MIGRATION HELPER: idempotent, per-column ensure.
+// Reads PRAGMA table_info instead of matching error text, so one failing
+// ALTER can never skip the remaining columns in the same migration block.
+// ============================================
+async function ensureColumn(table, column, definition) {
+  try {
+    const cols = await all(`PRAGMA table_info(${table})`);
+    if (cols.some(c => c.name === column)) {
+      logger.debug(`Column already present, skipping: ${table}.${column}`);
+      return false;
+    }
+    await exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    logger.info(`Added column: ${table}.${column} ${definition}`);
+    return true;
+  } catch (err) {
+    logger.warn(`ensureColumn ${table}.${column}: ${err.message}`);
+    return false;
+  }
+}
+
+// ============================================
 // MIGRATIONS: Add shift_id columns & new tables
 // ============================================
 async function runMigrations() {
   logger.info('Running database migrations...');
 
   // Add shift_id columns to existing tables (backward-compatible)
-  const migrations = [
-    `ALTER TABLE reports ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
-    `ALTER TABLE shift_completions ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE`,
-    `ALTER TABLE ops_files ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
-    `ALTER TABLE timeline ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
-    `ALTER TABLE announcements ADD COLUMN shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL`,
-    // F3: report type column — single source for type breakdowns
-    `ALTER TABLE report_times ADD COLUMN type TEXT`
-  ];
-
-  for (const sql of migrations) {
-    try {
-      await exec(sql);
-      logger.info(`Migration executed: ${sql}`);
-    } catch (err) {
-      if (err.message && err.message.includes('duplicate column')) {
-        logger.info(`Column already exists, skipping: ${sql}`);
-      } else {
-        logger.warn(`Migration warning: ${err.message}`);
-      }
-    }
-  }
+  // F3: report_times.type — single source for type breakdowns
+  await ensureColumn('reports', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
+  await ensureColumn('shift_completions', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE CASCADE');
+  await ensureColumn('ops_files', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
+  await ensureColumn('timeline', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
+  await ensureColumn('announcements', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
+  await ensureColumn('report_times', 'type', 'TEXT');
 
   // F4: drop the dead daily_reports store (derived daily report replaces it)
   try {
@@ -682,30 +876,15 @@ async function runMigrations() {
   // ── New unified tables (Phase 1: JSON → SQLite) ──
 
   // Add status column to shifts table
-  try {
-    await exec(`ALTER TABLE shifts ADD COLUMN status TEXT DEFAULT 'active' CHECK(status IN ('active', 'pending_handover', 'archived'))`);
-    await exec(`ALTER TABLE shifts ADD COLUMN archived_at DATETIME`);
-    logger.info('Added status column to shifts');
-  } catch (err) {
-    if (err.message && err.message.includes('duplicate column')) {
-      logger.info('shifts status column already exists');
-    } else {
-      logger.warn('shifts status migration: ' + err.message);
-    }
-  }
+  await ensureColumn('shifts', 'status', `TEXT DEFAULT 'active' CHECK(status IN ('active', 'pending_handover', 'archived'))`);
+  await ensureColumn('shifts', 'archived_at', 'DATETIME');
 
-  // Add created_at/updated_at columns to shifts (required by StorageAdapter)
-  try {
-    await exec(`ALTER TABLE shifts ADD COLUMN created_at DATETIME`);
-    await exec(`ALTER TABLE shifts ADD COLUMN updated_at DATETIME`);
-    logger.info('Added created_at/updated_at columns to shifts');
-  } catch (err) {
-    if (err.message && err.message.includes('duplicate column')) {
-      logger.info('shifts created_at/updated_at columns already exist');
-    } else {
-      logger.warn('shifts created_at/updated_at migration: ' + err.message);
-    }
-  }
+  // Add created_at/updated_at/end_time columns to shifts (required by
+  // StorageAdapter — endShift writes end_time; previously only databases
+  // touched by the manual migrate-shifts-table.js script had it)
+  await ensureColumn('shifts', 'created_at', 'DATETIME');
+  await ensureColumn('shifts', 'updated_at', 'DATETIME');
+  await ensureColumn('shifts', 'end_time', 'DATETIME');
 
   // Rebuild shifts table when a legacy CHECK constraint blocks the current
   // lifecycle states (e.g. CHECK(status IN ('active','archived','closed'))).
@@ -826,27 +1005,11 @@ async function runMigrations() {
     logger.warn('shift_snapshots table creation: ' + err.message);
   }
   // Real databases predate the snapshot_hash column — add it idempotently.
-  try {
-    await exec(`ALTER TABLE shift_snapshots ADD COLUMN snapshot_hash TEXT`);
-    logger.info('Added snapshot_hash to shift_snapshots');
-  } catch (err) {
-    if (!(err.message && err.message.includes('duplicate column'))) {
-      logger.warn('shift_snapshots snapshot_hash migration: ' + err.message);
-    }
-  }
+  await ensureColumn('shift_snapshots', 'snapshot_hash', 'TEXT');
 
   // Explicit Shift↔Conversation link (Archive Contract §5, owner decision):
   // NULL = general conversation, never archived.
-  try {
-    await exec(`ALTER TABLE chat_conversations ADD COLUMN shift_id INTEGER`);
-    logger.info('Added shift_id to chat_conversations');
-  } catch (err) {
-    if (err.message && err.message.includes('duplicate column')) {
-      logger.info('chat_conversations.shift_id already exists');
-    } else {
-      logger.warn('chat_conversations shift_id migration: ' + err.message);
-    }
-  }
+  await ensureColumn('chat_conversations', 'shift_id', 'INTEGER');
   try {
     await exec(`CREATE INDEX IF NOT EXISTS idx_chat_conv_shift ON chat_conversations(shift_id)`);
   } catch (err) { /* index is best-effort */ }
@@ -976,44 +1139,22 @@ async function runMigrations() {
   }
 
   // KB migrations: add columns to existing kb_documents for backward compatibility
-  try {
-    const kbCols = [
-      { name: 'doc_id', type: 'TEXT' },
-      { name: 'mime_type', type: 'TEXT' },
-      { name: 'file_path', type: 'TEXT' },
-      { name: 'description', type: 'TEXT' },
-      { name: 'uploader', type: 'TEXT' },
-      { name: 'upload_date', type: 'TEXT' },
-      { name: 'is_active', type: 'INTEGER', default: '1' },
-      { name: 'meta', type: 'TEXT' }
-    ];
-    for (const col of kbCols) {
-      try {
-        await exec(`ALTER TABLE kb_documents ADD COLUMN ${col.name} ${col.type} ${col.default ? 'DEFAULT ' + col.default : ''}`);
-        logger.info(`Added kb_documents column: ${col.name}`);
-      } catch (colErr) {
-        if (colErr.message && colErr.message.includes('duplicate column')) {
-          logger.info(`Column ${col.name} already exists, skipping`);
-        } else {
-          logger.warn(`Column ${col.name} migration warning: ${colErr.message}`);
-        }
-      }
-    }
-  } catch (err) {
-    logger.warn('KB documents column migration warning: ' + err.message);
+  const kbCols = [
+    { name: 'doc_id', type: 'TEXT' },
+    { name: 'mime_type', type: 'TEXT' },
+    { name: 'file_path', type: 'TEXT' },
+    { name: 'description', type: 'TEXT' },
+    { name: 'uploader', type: 'TEXT' },
+    { name: 'upload_date', type: 'TEXT' },
+    { name: 'is_active', type: 'INTEGER', default: '1' },
+    { name: 'meta', type: 'TEXT' }
+  ];
+  for (const col of kbCols) {
+    await ensureColumn('kb_documents', col.name, `${col.type}${col.default ? ' DEFAULT ' + col.default : ''}`);
   }
 
   // KB migrations: add doc_id to kb_chunks
-  try {
-    await exec(`ALTER TABLE kb_chunks ADD COLUMN doc_id INTEGER REFERENCES kb_documents(id) ON DELETE CASCADE`);
-    logger.info('Added kb_chunks column: doc_id');
-  } catch (err) {
-    if (err.message && err.message.includes('duplicate column')) {
-      logger.info('Column doc_id already exists in kb_chunks, skipping');
-    } else {
-      logger.warn('kb_chunks doc_id migration warning: ' + err.message);
-    }
-  }
+  await ensureColumn('kb_chunks', 'doc_id', 'INTEGER REFERENCES kb_documents(id) ON DELETE CASCADE');
 
   // Create kb_chat_sessions table
   try {
