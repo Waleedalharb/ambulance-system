@@ -705,6 +705,12 @@ function handleSSEEvent(data) {
         case 'audit_log_added':
             renderAuditLog();
             break;
+        case 'notification_created':
+        case 'notification_new':
+            // D-21: إشعار موجه وصل عبر SSE — تحديث جرس الإشعارات فوراً
+            // بدل انتظار إعادة التحميل (كان النوعان بلا معالج إطلاقاً)
+            loadNotifications();
+            break;
         case 'connected':
             console.log('SSE:', data.message);
             break;

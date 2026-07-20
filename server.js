@@ -64,16 +64,13 @@ try {
 }
 
 // ── Phase 1: Unified Operations Service (JSON → SQLite) ──
-if (db) {
-    try {
-        opsService = require('./services/operations.service');
-        opsService.init(db);
-        console.log('✅ Operations Service initialized');
-    } catch (err) {
-        console.error('⚠️ Operations Service failed:', err.message);
-        opsService = null;
-    }
-}
+// D-13: services/operations.service غير موجود أصلاً — كتلة require كانت تفشل
+// عند كل إقلاع (تحذير + opsService=null دائماً). الخدمة استُبدلت فعلياً بـ
+// services/shift-service.js عبر Operations Engine، والمستدعون المتبقون
+// (resolveShiftId /api/shifts/:id وغيرها) محميون بـ if (opsService && ...)
+// ويسقطون لمسارات fallback سليمة. يُثبَّت null صراحةً ليختفي التحذير بلا
+// أي تغيير سلوكي.
+opsService = null;
 
 // AI Monitor Agent — System health, alerts & auto-healing
 const aiMonitor = require('./ai-monitor');
@@ -519,6 +516,10 @@ function broadcastToAll(data) {
 
 // Helper: broadcast only to authenticated clients whose role is in `roles`
 // (OV-S4-02: personal/privileged events must not reach every user)
+// D-21: الاستهداف أصبح ثنائي القناة — WS (للشات/الحضور) + SSE الموجه
+// (القناة التشغيلية الوحيدة بعد OV-S6). قبل هذا الإصلاح كانت الأحداث
+// الموجهة بالأدوار (مثل audit_log_added) تُرسل عبر WS فقط فلا تصل أي
+// صفحة تشغيلية لأن WebSocket محجوز للشات.
 function broadcastToRoles(roles, data) {
     var message = JSON.stringify(data);
     clients.forEach(function(client) {
@@ -530,9 +531,12 @@ function broadcastToRoles(roles, data) {
             }
         }
     });
+    sendSSEToRoles(roles, data);
 }
 
 // Helper: broadcast only to authenticated clients whose user id is in `userIds`
+// D-21: ثنائي القناة (WS + SSE موجه) — إشعارات مستخدم محدد كانت تُبث للجميع
+// عبر broadcast() العام أو تضيع عبر WS الذي لا تستمع له الصفحات التشغيلية.
 function broadcastToUsers(userIds, data) {
     var message = JSON.stringify(data);
     var ids = (userIds || []).map(function(id) { return String(id); });
@@ -545,6 +549,7 @@ function broadcastToUsers(userIds, data) {
             }
         }
     });
+    sendSSEToUsers(userIds, data);
 }
 
 // Helper: get online users list
@@ -900,6 +905,40 @@ function broadcastSSE(data) {
             return true;
         } catch (e) {
             console.error('SSE broadcast error:', e.message);
+            return false;
+        }
+    });
+}
+
+// D-21: بث SSE موجه — عملاء SSE يحملون user (من /api/sse بعد authenticate).
+// يستدعى من broadcastToUsers/broadcastToRoles حتى تصل الأحداث الموجهة عبر
+// القناة التشغيلية (SSE) للمستهدفين فقط، لا لكل المتصلين.
+function sendSSEToUsers(userIds, data) {
+    var message = 'data: ' + JSON.stringify(data) + '\n\n';
+    var ids = (userIds || []).map(function(id) { return String(id); });
+    sseClients = sseClients.filter(function(client) {
+        try {
+            if (client.user && ids.indexOf(String(client.user.id)) !== -1) {
+                client.res.write(message);
+            }
+            return true;
+        } catch (e) {
+            console.error('SSE targeted broadcast error:', e.message);
+            return false;
+        }
+    });
+}
+
+function sendSSEToRoles(roles, data) {
+    var message = 'data: ' + JSON.stringify(data) + '\n\n';
+    sseClients = sseClients.filter(function(client) {
+        try {
+            if (client.user && roles.indexOf(client.user.role) !== -1) {
+                client.res.write(message);
+            }
+            return true;
+        } catch (e) {
+            console.error('SSE role broadcast error:', e.message);
             return false;
         }
     });
@@ -6814,7 +6853,9 @@ app.post('/api/notifications', authenticate, async (req, res) => {
                 type: type || 'info'
             });
         }
-        broadcast({
+        // D-21: إشعار موجه لمستخدم محدد — يُرسل للمستهدف فقط عبر broadcastToUsers
+        // (WS + SSE موجه)، لا عبر broadcast() العام الذي كان يبثه لكل المتصلين.
+        broadcastToUsers([targetUserId], {
             type: 'notification_created',
             message: 'تم إنشاء إشعار جديد',
             notification: { id: notificationId, user_id: targetUserId, title, message, type }
@@ -7680,7 +7721,8 @@ app.post('/api/notifications/send', authenticate, authorize(['admin', 'director'
             old_value: old_value || null, new_value: new_value || null
         });
         await db.NotificationLog.markAsSent(id);
-        broadcast({
+        // D-21: إشعار موجه — للمستلم فقط (كان يُبث للجميع عبر broadcast العام)
+        broadcastToUsers([recipient_id], {
             type: 'notification_new',
             payload: { notification_id: id, recipient_id, message }
         });
@@ -8669,10 +8711,10 @@ async function initRAG() {
                         { title: 'الإشعارات والتنبيهات', content: 'الإشعارات: تظهر فوراً عند حدوث أحداث مهمة. يمكن تخصيص الصوت من الإعدادات. شريط التنبيهات يظهر التنبيهات العاجلة فور وصولها. مؤشرات القوى العاملة تساعد في تحديد المراكز الناقصة.', source: 'دليل المستخدم', category: 'الإشعارات' }
                     ];
                     for (const item of defaults) {
-                        const ch = chunkDocument(item.content, 500, 50);
+                        const ch = ragEngine.chunkDocument(item.content, 500, 50);
                         for (let i = 0; i < ch.length; i++) {
-                            const tokens = preprocessText(ch[i]);
-                            const tf = computeTF(tokens);
+                            const tokens = ragEngine.preprocessText(ch[i]);
+                            const tf = ragEngine.computeTF(tokens);
                             await db.AIKnowledgeChunks.create({
                                 title: item.title,
                                 content: ch[i],
@@ -9093,10 +9135,10 @@ app.post('/api/ai/v2/knowledge', authenticate, authorize(['admin', 'director']),
         
         // Store in ai_knowledge_chunks
         if (db && db.AIKnowledgeChunks) {
-            const chunks = chunkDocument(content, 500, 50);
+            const chunks = ragEngine.chunkDocument(content, 500, 50);
             for (let i = 0; i < chunks.length; i++) {
-                const tokens = preprocessText(chunks[i]);
-                const tf = computeTF(tokens);
+                const tokens = ragEngine.preprocessText(chunks[i]);
+                const tf = ragEngine.computeTF(tokens);
                 await db.AIKnowledgeChunks.create({
                     title: title,
                     content: chunks[i],

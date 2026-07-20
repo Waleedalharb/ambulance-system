@@ -749,6 +749,27 @@ const TABLE_SCHEMAS = [
     reviewed_by TEXT,
     reviewed_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // D-05: shift_audit_log — exists in production (schema below copied
+  // verbatim from the production sqlite_master entry) but was never created
+  // by code, so fresh databases lacked it. CREATE TABLE IF NOT EXISTS never
+  // touches the existing production table.
+  `CREATE TABLE IF NOT EXISTS shift_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    roster_id INTEGER,
+    employee_id INTEGER,
+    team_id INTEGER,
+    shift_date TEXT NOT NULL,
+    old_shift_code TEXT,
+    new_shift_code TEXT,
+    old_team_id INTEGER,
+    new_team_id INTEGER,
+    changed_by TEXT NOT NULL,
+    changed_by_name TEXT,
+    change_type TEXT DEFAULT 'edit' CHECK(change_type IN ('edit', 'swap', 'bulk', 'delete', 'add')),
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -2642,6 +2663,433 @@ async function init(runMigration = false) {
 }
 
 // ============================================
+// CRUD: SHIFT ANALYTICS / AUDIT NAMESPACES (Slice 7 — dbAvailable unblock)
+// هذه المنافذ الـ13 تغطي جداول موجودة أصلاً في الإنتاج (مخططاتها في
+// TABLE_SCHEMAS أعلاه) — الناقص كان كائنات CRUD فقط، وغيابها أبقى
+// dbAvailable() في server.js=false دائماً فعطّل ~35 نقطة نهاية بصمت.
+// الأعمدة المقيدة بـ CHECK تُتحقق ضد قوائم الإنتاج حرفياً حتى لا يخترق
+// أي مستدعٍ القيود.
+// ============================================
+const SHIFT_ALERT_TYPES = ['high_pending', 'low_completion', 'staff_shortage', 'workload_spike', 'closure_delay', 'repeated_notes'];
+const SHIFT_ALERT_SEVERITIES = ['info', 'warning', 'critical'];
+const SHIFT_AUDIT_TRAIL_ACTIONS = ['created', 'modified', 'reviewed', 'approved', 'deleted', 'data_added', 'data_updated', 'export', 'alert_acked'];
+const SHIFT_TIMELINE_EVENT_TYPES = ['start', 'team_checkin', 'report_received', 'report_completed', 'shift_change', 'form_filed', 'note_added', 'alert_triggered', 'peak_mission', 'end'];
+const SHIFT_AUDIT_LOG_CHANGE_TYPES = ['edit', 'swap', 'bulk', 'delete', 'add'];
+const NOTIFICATION_LOG_TYPES = ['shift_change', 'system', 'alert'];
+const NOTIFICATION_LOG_CHANNELS = ['in-app', 'whatsapp', 'sms', 'email'];
+const NOTIFICATION_LOG_STATUSES = ['pending', 'sent', 'delivered', 'failed', 'read'];
+const SHIFT_CHANGE_REQUEST_STATUSES = ['pending', 'approved', 'denied', 'cancelled'];
+const ROSTER_DRAFT_OPERATION_TYPES = ['edit', 'swap', 'bulk', 'delete', 'add'];
+const SHIFT_REPORT_TYPES = ['daily', 'weekly', 'monthly', 'shift_detail'];
+
+function _jsonOrRaw(v) {
+  if (v === undefined || v === null) return null;
+  return typeof v === 'object' ? JSON.stringify(v) : v;
+}
+
+const ShiftMetrics = {
+  async getByShift(shiftId) {
+    return get('SELECT * FROM shift_metrics WHERE shift_id = ? ORDER BY id DESC LIMIT 1', [shiftId]);
+  },
+  async create(data) {
+    const result = await run(
+      `INSERT INTO shift_metrics (shift_id, total_reports, completed_reports, pending_reports, suspended_reports, total_completions, total_forms, staff_count, team_count, vehicle_count, completion_rate, avg_response_time, avg_closure_time, critical_cases, health_score, data_completeness, notes_count, event_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.shift_id, data.total_reports || 0, data.completed_reports || 0, data.pending_reports || 0,
+       data.suspended_reports || 0, data.total_completions || 0, data.total_forms || 0, data.staff_count || 0,
+       data.team_count || 0, data.vehicle_count || 0, data.completion_rate || 0, data.avg_response_time || 0,
+       data.avg_closure_time || 0, data.critical_cases || 0, data.health_score || 0, data.data_completeness || 0,
+       data.notes_count || 0, data.event_count || 0]
+    );
+    return result.id;
+  },
+  async update(id, data) {
+    return run(
+      `UPDATE shift_metrics SET total_reports = ?, completed_reports = ?, pending_reports = ?, suspended_reports = ?, total_completions = ?, total_forms = ?, staff_count = ?, team_count = ?, vehicle_count = ?, completion_rate = ?, avg_response_time = ?, avg_closure_time = ?, critical_cases = ?, health_score = ?, data_completeness = ?, notes_count = ?, event_count = ?, calculated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
+      [data.total_reports || 0, data.completed_reports || 0, data.pending_reports || 0, data.suspended_reports || 0,
+       data.total_completions || 0, data.total_forms || 0, data.staff_count || 0, data.team_count || 0,
+       data.vehicle_count || 0, data.completion_rate || 0, data.avg_response_time || 0, data.avg_closure_time || 0,
+       data.critical_cases || 0, data.health_score || 0, data.data_completeness || 0, data.notes_count || 0,
+       data.event_count || 0, id]
+    );
+  },
+  // upsert by shift_id (shift-archive-engine persists snapshot metrics via save)
+  async save(data) {
+    const existing = await this.getByShift(data.shift_id);
+    if (existing) {
+      await this.update(existing.id, data);
+      return existing.id;
+    }
+    return this.create(data);
+  }
+};
+
+const ShiftAlerts = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_alerts ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async getByShift(shiftId, limit = 50) {
+    return all('SELECT * FROM shift_alerts WHERE shift_id = ? ORDER BY created_at DESC LIMIT ?', [shiftId, limit]);
+  },
+  async getUnacknowledged(limit = 20) {
+    return all('SELECT * FROM shift_alerts WHERE is_acknowledged = 0 ORDER BY created_at DESC LIMIT ?', [limit]);
+  },
+  async create(data) {
+    if (!SHIFT_ALERT_TYPES.includes(data.alert_type)) throw new Error('ShiftAlerts.create: alert_type غير صالح: ' + data.alert_type);
+    if (!data.message) throw new Error('ShiftAlerts.create: message مطلوب');
+    const result = await run(
+      `INSERT INTO shift_alerts (shift_id, alert_type, severity, message, suggested_reason, is_acknowledged, acknowledged_by, acknowledged_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.shift_id || null, data.alert_type,
+       SHIFT_ALERT_SEVERITIES.includes(data.severity) ? data.severity : 'warning',
+       data.message, data.suggested_reason || null,
+       data.is_acknowledged ? 1 : 0, data.acknowledged_by || null, data.acknowledged_at || null]
+    );
+    return result.id;
+  },
+  async acknowledge(id, acknowledgedBy) {
+    return run('UPDATE shift_alerts SET is_acknowledged = 1, acknowledged_by = ?, acknowledged_at = CURRENT_TIMESTAMP WHERE id = ?', [acknowledgedBy || null, id]);
+  }
+};
+
+// KPI upserts: تحديث تجميعي جزئي — الأعمدة الممررة فقط تُحدَّث عند التعارض،
+// وغير الممررة تبقى كما هي (مستدعيان بشكلين: لقطة كاملة من مولّد البيانات،
+// وتحديث جزئي لكل مناوبة من محرك الأرشفة).
+function _partialUpsertSql(table, conflictTarget, insertCols, providedCols) {
+  const placeholders = insertCols.map(() => '?').join(', ');
+  if (providedCols.length === 0) {
+    return `INSERT INTO ${table} (${insertCols.join(', ')}) VALUES (${placeholders}) ON CONFLICT(${conflictTarget}) DO NOTHING;`;
+  }
+  const sets = providedCols.map(c => `${c} = excluded.${c}`).join(', ');
+  return `INSERT INTO ${table} (${insertCols.join(', ')}) VALUES (${placeholders}) ON CONFLICT(${conflictTarget}) DO UPDATE SET ${sets};`;
+}
+
+const ShiftKpiDaily = {
+  async getByDate(date) {
+    return get('SELECT * FROM shift_kpi_daily WHERE date = ?', [date]);
+  },
+  async upsert(data) {
+    if (!data.date) throw new Error('ShiftKpiDaily.upsert: date مطلوب');
+    // محرك الأرشفة يمرر staff_count — العمود الحقيقي total_staff
+    const cols = {
+      total_shifts: data.total_shifts,
+      total_reports: data.total_reports,
+      completed_reports: data.completed_reports,
+      open_reports: data.open_reports,
+      suspended_reports: data.suspended_reports,
+      total_staff: data.total_staff !== undefined ? data.total_staff : data.staff_count,
+      total_teams: data.total_teams,
+      total_vehicles: data.total_vehicles,
+      completion_rate: data.completion_rate,
+      avg_response_time: data.avg_response_time,
+      avg_closure_time: data.avg_closure_time,
+      top_center: data.top_center,
+      top_report_type: data.top_report_type
+    };
+    const provided = Object.keys(cols).filter(k => cols[k] !== undefined);
+    const insertCols = ['date', ...provided];
+    const sql = _partialUpsertSql('shift_kpi_daily', 'date', insertCols, provided);
+    const result = await run(sql, insertCols.map(c => c === 'date' ? data.date : cols[c]));
+    return result.id;
+  }
+};
+
+const ShiftKpiWeekly = {
+  async getByWeekStart(weekStart) {
+    return get('SELECT * FROM shift_kpi_weekly WHERE week_start = ? ORDER BY id DESC LIMIT 1', [weekStart]);
+  },
+  async upsert(data) {
+    if (!data.week_start) throw new Error('ShiftKpiWeekly.upsert: week_start مطلوب');
+    // week_end NOT NULL ولا يمرره محرك الأرشفة — يُشتق (week_start + 6 أيام)
+    let weekEnd = data.week_end;
+    if (!weekEnd) {
+      const d = new Date(data.week_start + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 6);
+      weekEnd = d.toISOString().slice(0, 10);
+    }
+    // محرك الأرشفة يمرر avg_completion_rate — العمود الحقيقي completion_rate
+    const cols = {
+      week_end: weekEnd,
+      total_shifts: data.total_shifts,
+      total_reports: data.total_reports,
+      avg_daily_reports: data.avg_daily_reports,
+      peak_day: data.peak_day,
+      peak_day_count: data.peak_day_count,
+      lowest_day: data.lowest_day,
+      lowest_day_count: data.lowest_day_count,
+      completion_rate: data.completion_rate !== undefined ? data.completion_rate : data.avg_completion_rate,
+      total_operating_hours: data.total_operating_hours,
+      total_staff: data.total_staff,
+      total_teams: data.total_teams,
+      total_vehicles: data.total_vehicles,
+      avg_staff_per_shift: data.avg_staff_per_shift,
+      comparison_last_week: data.comparison_last_week
+    };
+    const provided = Object.keys(cols).filter(k => cols[k] !== undefined);
+    const existing = await this.getByWeekStart(data.week_start);
+    if (existing) {
+      if (provided.length > 0) {
+        await run(`UPDATE shift_kpi_weekly SET ${provided.map(c => `${c} = ?`).join(', ')}, calculated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
+          [...provided.map(c => cols[c]), existing.id]);
+      }
+      return existing.id;
+    }
+    const insertCols = ['week_start', ...provided];
+    const result = await run(
+      `INSERT INTO shift_kpi_weekly (${insertCols.join(', ')}) VALUES (${insertCols.map(() => '?').join(', ')});`,
+      insertCols.map(c => c === 'week_start' ? data.week_start : cols[c])
+    );
+    return result.id;
+  }
+};
+
+const ShiftKpiMonthly = {
+  async getByMonthYear(month, year) {
+    return get('SELECT * FROM shift_kpi_monthly WHERE month = ? AND year = ? ORDER BY id DESC LIMIT 1', [month, year]);
+  },
+  async upsert(data) {
+    // محرك الأرشفة يمرر month_start ('YYYY-MM-01') — العمودان الحقيقيان month/year
+    let month = data.month;
+    let year = data.year;
+    if ((month === undefined || year === undefined) && data.month_start) {
+      const parts = String(data.month_start).split('-');
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+    }
+    if (!month || !year) throw new Error('ShiftKpiMonthly.upsert: month/year مطلوبان');
+    const cols = {
+      total_shifts: data.total_shifts,
+      total_reports: data.total_reports,
+      total_operating_hours: data.total_operating_hours,
+      total_staff: data.total_staff,
+      total_teams: data.total_teams,
+      total_vehicles: data.total_vehicles,
+      morning_shifts: data.morning_shifts,
+      night_shifts: data.night_shifts,
+      completion_rate: data.completion_rate !== undefined ? data.completion_rate : data.avg_completion_rate,
+      avg_performance: data.avg_performance,
+      comparison_last_month: data.comparison_last_month,
+      comparison_chart_data: _jsonOrRaw(data.comparison_chart_data)
+    };
+    const provided = Object.keys(cols).filter(k => cols[k] !== undefined);
+    const existing = await this.getByMonthYear(month, year);
+    if (existing) {
+      if (provided.length > 0) {
+        await run(`UPDATE shift_kpi_monthly SET ${provided.map(c => `${c} = ?`).join(', ')}, calculated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
+          [...provided.map(c => cols[c]), existing.id]);
+      }
+      return existing.id;
+    }
+    const insertCols = ['month', 'year', ...provided];
+    const result = await run(
+      `INSERT INTO shift_kpi_monthly (${insertCols.join(', ')}) VALUES (${insertCols.map(() => '?').join(', ')});`,
+      insertCols.map(c => (c === 'month' ? month : (c === 'year' ? year : cols[c])))
+    );
+    return result.id;
+  }
+};
+
+const ShiftAuditTrail = {
+  async getByShift(shiftId, limit = 100) {
+    return all('SELECT * FROM shift_audit_trail WHERE shift_id = ? ORDER BY created_at DESC, id DESC LIMIT ?', [shiftId, limit]);
+  },
+  async create(data) {
+    // بعض المستدعين (shift-archive-engine) يمررون event_type/event_title بدل
+    // action_type — القيمة الأصلية تُحفظ في action_detail ويُستخدم أقرب نوع صالح
+    // حتى لا يُخترق قيد CHECK أبداً.
+    let actionType = data.action_type;
+    let detail = data.action_detail || data.event_title || '';
+    if (!SHIFT_AUDIT_TRAIL_ACTIONS.includes(actionType)) {
+      const original = actionType || data.event_type;
+      actionType = 'data_updated';
+      if (original) detail = `[${original}] ${detail}`;
+    }
+    const actorId = data.actor_id !== undefined && data.actor_id !== null ? String(data.actor_id)
+      : (data.created_by !== undefined && data.created_by !== null ? String(data.created_by) : 'system');
+    const result = await run(
+      `INSERT INTO shift_audit_trail (shift_id, action_type, actor_id, actor_name, actor_role, action_detail, old_data, new_data, ip_address, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.shift_id, actionType, actorId,
+       data.actor_name || data.created_by_name || null, data.actor_role || null,
+       detail, _jsonOrRaw(data.old_data),
+       _jsonOrRaw(data.new_data) || _jsonOrRaw(data.event_data),
+       data.ip_address || null, data.user_agent || null]
+    );
+    return result.id;
+  }
+};
+
+const ShiftAuditLog = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_audit_log ORDER BY created_at DESC, id DESC LIMIT ?', [limit]);
+  },
+  async getByEmployee(employeeId, limit = 50) {
+    return all('SELECT * FROM shift_audit_log WHERE employee_id = ? ORDER BY created_at DESC, id DESC LIMIT ?', [employeeId, limit]);
+  },
+  async getByDateRange(dateFrom, dateTo, limit = 50) {
+    return all('SELECT * FROM shift_audit_log WHERE shift_date >= ? AND shift_date <= ? ORDER BY created_at DESC, id DESC LIMIT ?', [dateFrom, dateTo, limit]);
+  },
+  async create(data) {
+    if (!data.shift_date) throw new Error('ShiftAuditLog.create: shift_date مطلوب');
+    const result = await run(
+      `INSERT INTO shift_audit_log (roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, changed_by, changed_by_name, change_type, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.roster_id || null, data.employee_id || null, data.team_id || null, data.shift_date,
+       data.old_shift_code || null, data.new_shift_code || null,
+       data.old_team_id || null, data.new_team_id || null,
+       String(data.changed_by || 'system'), data.changed_by_name || null,
+       SHIFT_AUDIT_LOG_CHANGE_TYPES.includes(data.change_type) ? data.change_type : 'edit',
+       data.reason || null]
+    );
+    return result.id;
+  }
+};
+
+const ShiftTimelineEvents = {
+  async getByShift(shiftId, limit = 50) {
+    return all('SELECT * FROM shift_timeline_events WHERE shift_id = ? ORDER BY event_time ASC, id ASC LIMIT ?', [shiftId, limit]);
+  },
+  async create(data) {
+    if (!SHIFT_TIMELINE_EVENT_TYPES.includes(data.event_type)) throw new Error('ShiftTimelineEvents.create: event_type غير صالح: ' + data.event_type);
+    if (!data.event_title) throw new Error('ShiftTimelineEvents.create: event_title مطلوب');
+    if (!data.shift_id) throw new Error('ShiftTimelineEvents.create: shift_id مطلوب');
+    // event_time يُدرج فقط عند تمريره — تمرير NULL صراحةً كان يلغي DEFAULT
+    // CURRENT_TIMESTAMP في المخطط (رُصد في تحقق الشريحة 7)
+    const hasTime = !!data.event_time;
+    const cols = ['shift_id', 'event_type', 'event_title', 'event_description', 'event_data'];
+    const vals = [data.shift_id, data.event_type, data.event_title, data.event_description || null, _jsonOrRaw(data.event_data)];
+    if (hasTime) { cols.push('event_time'); vals.push(data.event_time); }
+    cols.push('created_by', 'created_by_name');
+    vals.push(data.created_by !== undefined && data.created_by !== null ? String(data.created_by) : null, data.created_by_name || null);
+    const result = await run(
+      `INSERT INTO shift_timeline_events (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')});`,
+      vals
+    );
+    return result.id;
+  }
+};
+
+const ShiftComparisonSnapshots = {
+  async getById(id) {
+    return get('SELECT * FROM shift_comparison_snapshots WHERE id = ?', [id]);
+  },
+  async create(data) {
+    if (!data.comparison_data) throw new Error('ShiftComparisonSnapshots.create: comparison_data مطلوب');
+    const result = await run(
+      `INSERT INTO shift_comparison_snapshots (comparison_name, shift_a_id, shift_b_id, shift_a_date, shift_b_date, comparison_data, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      [data.comparison_name || null, data.shift_a_id, data.shift_b_id,
+       data.shift_a_date || null, data.shift_b_date || null,
+       _jsonOrRaw(data.comparison_data), data.created_by || null]
+    );
+    return result.id;
+  }
+};
+
+const ShiftReportsGenerated = {
+  async getById(id) {
+    return get('SELECT * FROM shift_reports_generated WHERE id = ?', [id]);
+  },
+  async create(data) {
+    if (!SHIFT_REPORT_TYPES.includes(data.report_type)) throw new Error('ShiftReportsGenerated.create: report_type غير صالح: ' + data.report_type);
+    const result = await run(
+      `INSERT INTO shift_reports_generated (report_type, report_date_from, report_date_to, shift_id, report_data, file_path, file_format, generated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.report_type, data.report_date_from || null, data.report_date_to || null,
+       data.shift_id || null, _jsonOrRaw(data.report_data), data.file_path || null,
+       data.file_format || 'pdf', data.generated_by || null]
+    );
+    return result.id;
+  }
+};
+
+const ShiftRosterDrafts = {
+  async getByCreatedBy(createdBy, limit = 50) {
+    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? ORDER BY id DESC LIMIT ?', [createdBy, limit]);
+  },
+  async getPendingByCreatedBy(createdBy) {
+    return all('SELECT * FROM shift_roster_drafts WHERE created_by = ? AND applied_at IS NULL AND reverted_at IS NULL ORDER BY id DESC', [createdBy]);
+  },
+  async create(data) {
+    if (!data.draft_data_json) throw new Error('ShiftRosterDrafts.create: draft_data_json مطلوب');
+    const result = await run(
+      `INSERT INTO shift_roster_drafts (draft_data_json, operation_type, created_by, created_by_name)
+       VALUES (?, ?, ?, ?);`,
+      [_jsonOrRaw(data.draft_data_json),
+       ROSTER_DRAFT_OPERATION_TYPES.includes(data.operation_type) ? data.operation_type : 'edit',
+       String(data.created_by || 'system'), data.created_by_name || null]
+    );
+    return result.id;
+  },
+  async markReverted(id) {
+    return run('UPDATE shift_roster_drafts SET reverted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  }
+};
+
+const NotificationLog = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM notification_log ORDER BY created_at DESC, id DESC LIMIT ?', [limit]);
+  },
+  async getByRecipient(recipientId, limit = 50) {
+    return all('SELECT * FROM notification_log WHERE recipient_id = ? ORDER BY created_at DESC, id DESC LIMIT ?', [recipientId, limit]);
+  },
+  async getByStatus(status, limit = 50) {
+    return all('SELECT * FROM notification_log WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?', [status, limit]);
+  },
+  async create(data) {
+    if (!data.recipient_id && data.recipient_id !== 0) throw new Error('NotificationLog.create: recipient_id مطلوب');
+    if (!data.message) throw new Error('NotificationLog.create: message مطلوب');
+    const result = await run(
+      `INSERT INTO notification_log (notification_type, recipient_id, recipient_name, recipient_phone, message, channel, status, roster_id, shift_date, old_value, new_value)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [NOTIFICATION_LOG_TYPES.includes(data.notification_type) ? data.notification_type : 'shift_change',
+       data.recipient_id, data.recipient_name || null, data.recipient_phone || null, data.message,
+       NOTIFICATION_LOG_CHANNELS.includes(data.channel) ? data.channel : 'in-app',
+       NOTIFICATION_LOG_STATUSES.includes(data.status) ? data.status : 'pending',
+       data.roster_id || null, data.shift_date || null, data.old_value || null, data.new_value || null]
+    );
+    return result.id;
+  },
+  async markAsSent(id) {
+    return run("UPDATE notification_log SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+  },
+  async markAsDelivered(id) {
+    return run("UPDATE notification_log SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+  }
+};
+
+const ShiftChangeRequests = {
+  async getAll(limit = 50) {
+    return all('SELECT * FROM shift_change_requests ORDER BY created_at DESC, id DESC LIMIT ?', [limit]);
+  },
+  async getByStatus(status, limit = 50) {
+    return all('SELECT * FROM shift_change_requests WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?', [status, limit]);
+  },
+  async getById(id) {
+    return get('SELECT * FROM shift_change_requests WHERE id = ?', [id]);
+  },
+  async create(data) {
+    if (!data.employee_id || !data.shift_date || !data.proposed_shift_code) {
+      throw new Error('ShiftChangeRequests.create: employee_id/shift_date/proposed_shift_code مطلوبة');
+    }
+    const result = await run(
+      `INSERT INTO shift_change_requests (roster_id, employee_id, team_id, shift_date, proposed_shift_code, old_shift_code, requested_by, requested_by_name, status, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.roster_id || null, data.employee_id, data.team_id || null, data.shift_date,
+       data.proposed_shift_code, data.old_shift_code || null,
+       String(data.requested_by || 'system'), data.requested_by_name || null,
+       SHIFT_CHANGE_REQUEST_STATUSES.includes(data.status) ? data.status : 'pending',
+       data.reason || null]
+    );
+    return result.id;
+  },
+  async updateStatus(id, status, reviewedBy) {
+    if (!SHIFT_CHANGE_REQUEST_STATUSES.includes(status)) throw new Error('ShiftChangeRequests.updateStatus: status غير صالحة: ' + status);
+    return run('UPDATE shift_change_requests SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?', [status, reviewedBy || null, id]);
+  }
+};
+
+// ============================================
 // EXPORTS
 // ============================================
 module.exports = {
@@ -2697,6 +3145,21 @@ module.exports = {
   ChatMessages,
   ChatMessageReads,
   ChatAttachments,
+
+  // Shift analytics / audit (Slice 7 — unblock dbAvailable)
+  ShiftMetrics,
+  ShiftAlerts,
+  ShiftKpiDaily,
+  ShiftKpiWeekly,
+  ShiftKpiMonthly,
+  ShiftAuditTrail,
+  ShiftAuditLog,
+  ShiftTimelineEvents,
+  ShiftComparisonSnapshots,
+  ShiftReportsGenerated,
+  ShiftRosterDrafts,
+  NotificationLog,
+  ShiftChangeRequests,
 
   // Migration
   migrateAll

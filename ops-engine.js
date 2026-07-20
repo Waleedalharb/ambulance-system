@@ -233,6 +233,135 @@ class OperationsEngine {
             if (e.form_type !== 'air_ambulance') return;
             safeBroadcast({ type: 'air_ambulance_cleared', message: 'تم حذف جميع بلاغات الإسعاف الجوي' });
         });
+
+        // ─── OV-S7: مشتركا التدقيق المركزي والجدول الزمني ───
+        // OV-S5-01: بلاغات الإرسالية (إنشاء/تراجع) وحفظ التكميل لم تكن تُدقَّق
+        // إطلاقاً. OV-S9-05: shift_timeline_events بقي فارغاً لأن لا كاتب له.
+        // ملاحظة مقصودة: دورة حياة المناوبة (بدء/إنهاء/أرشفة) تُدقَّق أصلاً في
+        // audit_log عبر ShiftManager/ShiftService (storage.logAudit) — الاشتراك
+        // فيها هنا كان سيضاعف السجلات، لذا يغطي مشترك التدقيق الأحداث اليتيمة فقط.
+        const dbm = this.storage && this.storage.db;
+
+        const safeAudit = (entry) => {
+            if (!dbm || !dbm.AuditLog) return;
+            Promise.resolve(dbm.AuditLog.create(entry)).catch((err) => {
+                console.error('[OpsEngine] Audit subscriber error:', err.message);
+            });
+        };
+
+        const safeTimeline = (entry) => {
+            if (!dbm || !dbm.ShiftTimelineEvents || !entry.shift_id) return;
+            Promise.resolve(dbm.ShiftTimelineEvents.create(entry)).catch((err) => {
+                console.error('[OpsEngine] Timeline subscriber error:', err.message);
+            });
+        };
+
+        // بلاغ إرسالية جديد → audit (report_created) + timeline (report_received)
+        this.bus.on('DispatchLogCreated', (e) => {
+            safeAudit({
+                shift_id: e.shift_id,
+                user_id: e.actor ? e.actor.id : null,
+                user_name: e.actor ? e.actor.name : null,
+                action: 'report_created',
+                detail: `بلاغ جديد — ${e.center} / ${e.unit}`,
+                type: 'reports'
+            });
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'report_received',
+                event_title: `بلاغ وارد — ${e.center} / ${e.unit}`,
+                event_description: `العدد الجديد: ${e.new_count} (إجمالي المناوبة: ${e.total_reports})`,
+                event_data: { center: e.center, unit: e.unit, new_count: e.new_count, total_reports: e.total_reports },
+                created_by: e.actor ? e.actor.id : null,
+                created_by_name: e.actor ? e.actor.name : null
+            });
+        });
+
+        // تراجع عن بلاغ → audit (report_undone)
+        this.bus.on('DispatchUndone', (e) => {
+            safeAudit({
+                shift_id: e.shift_id,
+                user_id: e.actor ? e.actor.id : null,
+                user_name: e.actor ? e.actor.name : null,
+                action: 'report_undone',
+                detail: `تراجع عن بلاغ — ${e.center} / ${e.unit}`,
+                type: 'reports'
+            });
+        });
+
+        // حفظ تكميل → audit (completion_saved)
+        this.bus.on('CompletionUpdated', (e) => {
+            safeAudit({
+                shift_id: e.shift_id,
+                user_id: e.actor ? e.actor.id : null,
+                user_name: e.actor ? e.actor.name : null,
+                action: 'completion_saved',
+                detail: `حفظ تكميل المناوبة (${e.shift_type || ''})`,
+                type: 'completions'
+            });
+        });
+
+        // بدء المناوبة → timeline (start)
+        this.bus.on('ShiftStarted', (e) => {
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'start',
+                event_title: `بدء المناوبة (${e.shift_type || ''})`,
+                created_by: e.user_id,
+                created_by_name: e.user_name
+            });
+        });
+
+        // إنهاء المناوبة → timeline (end — بانتظار اعتماد التسليم)
+        this.bus.on('ShiftEnded', (e) => {
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'end',
+                event_title: 'إنهاء المناوبة (بانتظار اعتماد التسليم)',
+                event_description: e.notes || null,
+                created_by: e.user_id,
+                created_by_name: e.user_name
+            });
+        });
+
+        // أرشفة المناوبة → timeline (end — الاعتماد النهائي)
+        this.bus.on('ShiftArchived', (e) => {
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'end',
+                event_title: 'اعتماد التسليم وأرشفة المناوبة',
+                created_by: e.user_id,
+                created_by_name: e.user_name
+            });
+        });
+
+        // ملاحظة مناوبة → timeline (note_added)
+        this.bus.on('ShiftNoteAdded', (e) => {
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'note_added',
+                event_title: 'تحديث سجل الملاحظات',
+                event_description: `عدد الملاحظات: ${e.count}`
+            });
+        });
+
+        // نموذج محفوظ → timeline (form_filed)
+        const FORM_TITLES = {
+            incident: 'حادث',
+            senior_shift: 'مناوبة كبار الضباط',
+            e_case: 'حالة طوارئ',
+            escalation: 'بلاغ تصعيد',
+            daily_report: 'تقرير يومي',
+            air_ambulance: 'بلاغ إسعاف جوي'
+        };
+        this.bus.on('FormSubmitted', (e) => {
+            safeTimeline({
+                shift_id: e.shift_id,
+                event_type: 'form_filed',
+                event_title: `نموذج محفوظ — ${FORM_TITLES[e.form_type] || e.form_type}`,
+                event_data: { form_type: e.form_type, form_id: e.form_id }
+            });
+        });
     }
 
     // ─── Initialization ───

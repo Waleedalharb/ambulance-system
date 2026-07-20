@@ -1209,7 +1209,11 @@ class ShiftArchiveEngine {
         };
 
         try {
-            const shiftDate = snapshot.shift ? snapshot.shift.shiftDate : null;
+            // المناوبات SQLite-المصدر تصل بشكل snake_case (shift_date) بينما
+            // مناوبات JSON القديمة camelCase (shiftDate) — بدون هذا التوافق كان
+            // shiftDate=null لكل مناوبة SQLite فتُتخطى مرحلة KPI بصمت (رُصد في
+            // تحقق الشريحة 7 بعد فك حظر dbAvailable).
+            const shiftDate = snapshot.shift ? (snapshot.shift.shiftDate || snapshot.shift.shift_date) : null;
             if (!shiftDate) return results;
 
             // Update daily KPI
