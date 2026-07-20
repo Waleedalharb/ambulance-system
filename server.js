@@ -362,8 +362,9 @@ function initWebSocket(server) {
                 ws.lastSeen = Date.now();
 
                 if (msg.type === 'chat_typing') {
-                    // Only broadcast to conversation subscribers
-                    broadcastToConversation(msg.conversationId, { type: 'chat_typing', conversationId: msg.conversationId, user: ws.user });
+                    // Only broadcast to conversation participants (DB-backed, fail-closed)
+                    broadcastToConversation(msg.conversationId, { type: 'chat_typing', conversationId: msg.conversationId, user: ws.user })
+                        .catch(function(e) { console.error('[WS] chat_typing broadcast error:', e.message); });
                 }
                 if (msg.type === 'chat_subscribe') {
                     ws.chatConversations = ws.chatConversations || [];
@@ -477,35 +478,28 @@ function broadcast(data) {
     broadcastSSE(data);
 }
 
-// Helper: broadcast to conversation subscribers only
-// CRITICAL: Broadcast to ALL authenticated clients (not just subscribers)
-// This ensures EVERY participant receives messages instantly, even if they
-// haven't opened the specific conversation yet.
-function broadcastToConversation(conversationId, data) {
+// Helper: broadcast to conversation PARTICIPANTS only (DB-backed).
+// SECURITY (OV-S8-01): private chat content must never leave the participant
+// set. Participants are loaded from the database on every call; if the lookup
+// fails we send to NOBODY (fail-closed) — never fall back to public broadcast.
+async function broadcastToConversation(conversationId, data) {
     var message = JSON.stringify(data);
-    var sentCount = 0;
-
-    // Phase 1: Send to explicit subscribers first (immediate delivery)
-    clients.forEach(function(client) {
-        if (client.readyState === WebSocket.OPEN && client.chatConversations) {
-            if (client.chatConversations.includes(conversationId)) {
-                try {
-                    client.send(message);
-                    sentCount++;
-                } catch (e) {
-                    console.error('[WS] Subscriber broadcast error:', e.message);
-                }
-            }
+    var participantIds;
+    try {
+        if (!db || !db.ChatParticipants) {
+            throw new Error('ChatParticipants store unavailable');
         }
-    });
+        var rows = await db.ChatParticipants.getAll(conversationId);
+        participantIds = (rows || []).map(function(r) { return String(r.user_id); });
+    } catch (e) {
+        console.error('[WS] FAIL-CLOSED: participant lookup failed for conversation', conversationId, '-', e.message);
+        return; // fail-closed: do not deliver to anyone
+    }
 
-    // Phase 2: Send to ALL other authenticated clients (the CRITICAL fix)
-    // This ensures messages reach users who haven't subscribed yet,
-    // or are on other pages (index.html, dashboard, etc.)
+    var sentCount = 0;
     clients.forEach(function(client) {
-        if (client.readyState === WebSocket.OPEN && client.isAuthenticated) {
-            var isSubscribed = client.chatConversations && client.chatConversations.includes(conversationId);
-            if (!isSubscribed) {
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated && client.user) {
+            if (participantIds.indexOf(String(client.user.id)) !== -1) {
                 try {
                     client.send(message);
                     sentCount++;
@@ -516,7 +510,7 @@ function broadcastToConversation(conversationId, data) {
         }
     });
 
-    console.log('[WS] Broadcast to', sentCount, 'clients for conversation', conversationId, '- type:', data.type);
+    console.log('[WS] Broadcast to', sentCount, 'participant clients for conversation', conversationId, '- type:', data.type);
 }
 
 // Helper: broadcast to ALL authenticated connected clients
@@ -528,6 +522,36 @@ function broadcastToAll(data) {
                 client.send(message);
             } catch (e) {
                 console.error('Broadcast to all error:', e.message);
+            }
+        }
+    });
+}
+
+// Helper: broadcast only to authenticated clients whose role is in `roles`
+// (OV-S4-02: personal/privileged events must not reach every user)
+function broadcastToRoles(roles, data) {
+    var message = JSON.stringify(data);
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated && client.user && roles.indexOf(client.user.role) !== -1) {
+            try {
+                client.send(message);
+            } catch (e) {
+                console.error('Broadcast to roles error:', e.message);
+            }
+        }
+    });
+}
+
+// Helper: broadcast only to authenticated clients whose user id is in `userIds`
+function broadcastToUsers(userIds, data) {
+    var message = JSON.stringify(data);
+    var ids = (userIds || []).map(function(id) { return String(id); });
+    clients.forEach(function(client) {
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated && client.user && ids.indexOf(String(client.user.id)) !== -1) {
+            try {
+                client.send(message);
+            } catch (e) {
+                console.error('Broadcast to users error:', e.message);
             }
         }
     });
@@ -1013,8 +1037,8 @@ app.post('/api/auth/login', validateBody({
         
         await logAuthEvent(user.id, user.username, 'login', 'login successful', true, null, sessionId, req);
         
-        // Broadcast login notification via WebSocket
-        broadcast({
+        // Broadcast login notification to privileged roles only (OV-S4-02)
+        broadcastToRoles(['admin', 'director'], {
             type: 'user_login',
             message: 'تسجيل دخول جديد: ' + user.name,
             user: { id: user.id, name: user.name, role: user.role }
@@ -1246,7 +1270,7 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
         users[userIndex].password = await bcrypt.hash(newPassword, salt);
         await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2));
 
-        broadcast({ type: 'password_changed', message: 'تم تغيير كلمة المرور', username: user.username });
+        broadcastToUsers([user.id], { type: 'password_changed', message: 'تم تغيير كلمة المرور', username: user.username });
         res.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
     } catch (error) {
         console.error('Change password error:', error);
@@ -1695,7 +1719,8 @@ async function addAuditLogEntry(action, details, category, user, role, userId, s
             console.log('[DB] SQLite audit_log save failed in helper:', dbErr.message);
         }
         
-        broadcast({
+        // OV-S4-02: audit trail entries are privileged — admins/directors only
+        broadcastToRoles(['admin', 'director'], {
             type: 'audit_log_added',
             message: 'تم إضافة سجل تدقيق جديد',
             entry: newEntry
@@ -6697,7 +6722,8 @@ app.post('/api/audit-log', authenticate, async (req, res) => {
             console.log('[DB] SQLite audit_log save failed:', dbErr.message);
         }
         
-        broadcast({
+        // OV-S4-02: same event as the helper — privileged roles only
+        broadcastToRoles(['admin', 'director'], {
             type: 'audit_log_added',
             message: 'تم إضافة سجل تدقيق جديد',
             entry: newEntry
@@ -9406,9 +9432,8 @@ app.post('/api/chat/conversations/:id/messages', authenticate, async (req, res) 
             [result.id]
         );
         message.read_by = [];
-        // Broadcast to conversation subscribers
-        // ENHANCED: Broadcast to ALL participants (subscribers + all authenticated clients)
-                    broadcastToConversation(convId, { type: 'chat_message', conversationId: convId, message: message });
+        // Broadcast to conversation participants only (DB-backed, fail-closed)
+        await broadcastToConversation(convId, { type: 'chat_message', conversationId: convId, message: message });
         res.json({ success: true, message });
     } catch (err) {
         console.error('Send message error:', err);
@@ -9442,9 +9467,8 @@ app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
             'UPDATE chat_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?;',
             [message.conversation_id, userId]
         );
-        // Broadcast read receipt to conversation participants
-        // ENHANCED: Broadcast read receipt with timestamp to ALL participants
-                    broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId, readAt: new Date().toISOString() });
+        // Broadcast read receipt to conversation participants only (fail-closed)
+        await broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId, readAt: new Date().toISOString() });
         // Broadcast read receipt to conversation participants
         res.json({ success: true, message: 'تم الت标记 كمقروء' });
     } catch (err) {
@@ -9616,8 +9640,8 @@ app.put('/api/chat/conversations/:id/leave', authenticate, async (req, res) => {
             }
         }
         await db.run('DELETE FROM chat_participants WHERE conversation_id = ? AND user_id = ?;', [convId, userId]);
-        // Broadcast system message
-        broadcastToConversation(convId, {
+        // Broadcast system message to participants only (fail-closed)
+        await broadcastToConversation(convId, {
             type: 'chat_conversation_update',
             conversationId: convId,
             event: 'user_left',
