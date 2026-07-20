@@ -83,19 +83,7 @@ function dbAvailable() {
     return db && db.Employees && db.Teams && db.ShiftCodes && db.ShiftRoster && db.TeamAssignments && db.LeaveRequests && db.ShiftScheduleAuto && db.StaffingAlerts && db.Shifts && db.Reports && db.ShiftCompletions && db.ShiftForms && db.KBDocuments && db.KBChunks && db.KBChatHistory && db.KBChatSessions && db.KBChatMessages && db.KBQueries && db.ChatConversations && db.ChatParticipants && db.ChatMessages && db.ChatMessageReads && db.ShiftAuditLog && db.NotificationLog && db.ShiftRosterDrafts && db.ShiftChangeRequests && db.ShiftMetrics && db.ShiftKpiDaily && db.ShiftKpiWeekly && db.ShiftKpiMonthly && db.ShiftTimelineEvents && db.ShiftAlerts && db.ShiftComparisonSnapshots && db.ShiftReportsGenerated && db.ShiftAuditTrail;
 }
 
-// Helper: safe DB response
-function dbResponse(res, promise, fallback) {
-    if (!dbAvailable()) {
-        return res.status(503).json({ 
-            error: 'قاعدة البيانات غير متوفرة', 
-            fallback: fallback !== undefined ? fallback : null 
-        });
-    }
-    promise.then(data => res.json(data)).catch(err => {
-        console.error('DB error:', err);
-        res.status(500).json({ error: 'خطأ في قاعدة البيانات' });
-    });
-}
+// D-10: حُذفت dbResponse — لم يكن لها أي مستدعٍ (grep شامل على المستودع).
 
 // Helper: resolve shift_id — SQLite is source of truth (Phase 2+3)
 async function resolveShiftId(req, shiftDate, shiftType) {
@@ -151,50 +139,9 @@ async function addShiftAuditLog(data) {
     }
 }
 
-// Helper: add entry to shift_audit_trail
-async function addShiftAuditTrail(data) {
-    if (!dbAvailable() || !db.ShiftAuditTrail) return null;
-    try {
-        return await db.ShiftAuditTrail.create(data);
-    } catch (e) {
-        console.error('addShiftAuditTrail error:', e.message);
-        return null;
-    }
-}
-
-// ============================================
-// SYNC: JSON Shift → SQLite
-// ============================================
-async function syncShiftToDB(shift) {
-    if (!dbAvailable() || !db.Shifts) return;
-    try {
-        const existing = await db.get('SELECT id FROM shifts WHERE id = ?', [shift.id]);
-        if (existing) {
-            await db.run(
-                `UPDATE shifts SET shift_name = ?, shift_date = ?, shift_type = ?, total_reports = ?, rapid_locations = ?, centers_data = ?, vehicle_data = ?, fuel_data = ?, general_notes = ?, last_update = ? WHERE id = ?`,
-                [
-                    shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
-                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
-                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
-                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString(), shift.id
-                ]
-            );
-        } else {
-            await db.run(
-                `INSERT INTO shifts (id, shift_name, shift_date, shift_type, total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, last_update) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    shift.id, shift.shiftName || '', shift.shiftDate || '', shift.shiftType || '', shift.totalReports || 0,
-                    JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
-                    JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
-                    shift.generalNotes || '', shift.lastUpdate || new Date().toISOString()
-                ]
-            );
-        }
-        console.log('[SYNC] Shift synced to SQLite:', shift.id, shift.shiftType);
-    } catch (err) {
-        console.error('[SYNC] Failed to sync shift to SQLite:', err.message);
-    }
-}
+// D-11: حُذفت addShiftAuditTrail و syncShiftToDB — grep دقيق على المستودع كاملاً
+// (بما فيه public/ وservices/ وscripts/) لم يجد أي مستدعٍ حقيقي لأي منهما؛
+// addShiftAuditLog بقيت لأنها مستدعاة فعلاً (مسارات shift-roster أدناه).
 
 
 // ============================================
@@ -504,7 +451,10 @@ async function broadcastToConversation(conversationId, data) {
 function broadcastToAll(data) {
     var message = JSON.stringify(data);
     clients.forEach(function(client) {
-        if (client.readyState === WebSocket.OPEN) {
+        // D-22: الاسم يَعِد بالبث "للجميع" لكن القناة محجوزة للشات المصادَق —
+        // نتحقق من isAuthenticated صراحةً (دفاع بالعمق: الاتصال غير المصادَق
+        // يُرفض عند المصافحة، لكن لا نعتمد على ذلك وحده).
+        if (client.readyState === WebSocket.OPEN && client.isAuthenticated) {
             try {
                 client.send(message);
             } catch (e) {
@@ -1470,6 +1420,16 @@ async function readShifts() {
     }
 }
 
+// OV-S9 (SSOT): قراءة المناوبات من SQLite حصراً — بلا أي سقوط إلى JSON.
+// تُستخدم في نقاط المؤشرات (daily/executive dashboard و health-score) حتى
+// تتفق الأرقام كلها على قاعدة واحدة (كان readShifts يسقط إلى shift-data.json
+// البائت عند فراغ SQLite فيقدّم بيانات قديمة كأنها حية — OV-S9-02/D-27).
+async function readShiftsFromDb() {
+    if (!dbAvailable() || !db.Shifts) return [];
+    const rows = await db.Shifts.getAll();
+    return (rows || []).map(normalizeShiftRow);
+}
+
 // ═══ Archive slice: مخازن محتوى المناوبة الموحدة (SQLite single source) ═══
 // The legacy JSON files (notes/events/absences/peak-plans/report-entry) are
 // frozen; rows keep their legacy string ids and full payload in `data`.
@@ -2102,39 +2062,15 @@ app.get('/api/last-update', (req, res) => {
 // API: المناوبات
 // ============================================
 app.get('/api/shifts', authenticate, async (req, res) => {
-    // Phase 2+3: Read from SQLite first, fallback to JSON
+    // D-27: SQLite هو المصدر الوحيد (SSOT). أُزيل فرع opsService (null دائماً
+    // بعد الشريحة 7) وأُزيل السقوط إلى JSON — كان يقدّم shift-data.json البائت
+    // كأنه حيّ كلما فرغت القاعدة. قاعدة جديدة فارغة ⇒ قائمة فارغة (سلوك صحيح).
     try {
-        let shifts = [];
-        
-        // 1. Try SQLite (source of truth)
-        if (opsService && opsService.getAllShifts) {
-            shifts = await opsService.getAllShifts(100);
-            if (shifts && shifts.length > 0) {
-                // Normalize SQLite format to JSON-like format for frontend compatibility
-                shifts = shifts.map(s => ({
-                    id: s.id,
-                    shiftName: s.shift_name || s.shiftName,
-                    shiftDate: s.shift_date || s.shiftDate,
-                    shiftTime: s.shift_time || s.shiftTime,
-                    shiftType: s.shift_type || s.shiftType,
-                    shiftDay: s.shift_day || s.shiftDay,
-                    startTime: s.start_time || s.startTime,
-                    totalReports: s.total_reports || s.totalReports || 0,
-                    status: s.status || 'active',
-                    archivedAt: s.archived_at || s.archivedAt,
-                    lastUpdate: s.last_update || s.lastUpdate,
-                    generalNotes: s.general_notes || s.generalNotes,
-                    createdAt: s.created_at || s.createdAt
-                }));
-            }
+        if (!db || !db.Shifts) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         }
-        
-        // 2. Fallback: JSON files
-        if (shifts.length === 0) {
-            shifts = await readShifts();
-        }
-        
-        res.json(shifts);
+        const rows = await db.Shifts.getAll();
+        res.json((rows || []).map(normalizeShiftRow));
     } catch (error) {
         console.error('[Shifts] Error:', error);
         res.status(500).json({ error: 'فشل في جلب المناوبات' });
@@ -2542,22 +2478,9 @@ app.post('/api/emergency/edit-shift', authenticate, authorize(['admin']), async 
     }
 });
 
-// Get shift status
-app.get('/api/shift/:id/status', authenticate, async (req, res) => {
-    try {
-        const shift = await opsService.getShiftById(parseInt(req.params.id));
-        if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
-        res.json({
-            id: shift.id,
-            status: shift.status,
-            shiftType: shift.shift_type,
-            shiftDate: shift.shift_date,
-            archivedAt: shift.archived_at
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'فشل في جلب الحالة' });
-    }
-});
+// OV-S9-01: حُذف GET /api/shift/:id/status — كان ميتاً (opsService=null بعد
+// الشريحة 7 ⇒ 500 دائماً) وبلا أي مستهلك في public/ (grep شامل). البديل الحي:
+// GET /api/current-shift و GET /api/shifts/:id(\d+).
 
 app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
@@ -2781,53 +2704,12 @@ app.post('/api/shift-archive', authenticate, async (req, res) => {
         res.status(500).json({ success: false, error: 'فشل في أرشفة المناوبة: ' + error.message });
     }
 });
-app.get('/api/shift-status', async (req, res) => {
-    try {
-        const activeShift = await db.getActiveShift();
-        if (!activeShift) {
-            return res.json({ isActive: false, message: 'لا توجد مناوبة نشطة' });
-        }
-        
-        const status = await db.getShiftStatus(activeShift.id);
-        res.json(status);
-    } catch (error) {
-        console.error('Error getting shift status:', error);
-        res.status(500).json({ error: 'فشل في جلب حالة المناوبة' });
-    }
-});
-
-// GET /api/shift-timeline/:shiftId - الأحداث الزمنية
-// TODO: أعد إضافة authenticate بعد الاختبار
-app.get('/api/shift-timeline/:shiftId', async (req, res) => {
-    try {
-        const shiftId = parseInt(req.params.shiftId);
-        const events = await db.getTimelineEvents(shiftId, 100);
-        res.json({ success: true, events });
-    } catch (error) {
-        console.error('Error getting timeline:', error);
-        res.status(500).json({ error: 'فشل في جلب السجل الزمني' });
-    }
-});
-
-// POST /api/shift-timeline/:shiftId - إضافة حدث زمني
-app.post('/api/shift-timeline/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
-    try {
-        const shiftId = parseInt(req.params.shiftId);
-        const { eventType, title, description, data } = req.body;
-        const eventId = await db.addTimelineEvent(shiftId, {
-            type: eventType,
-            title: title,
-            description: description,
-            data: data,
-            createdBy: req.user ? req.user.id : 'system',
-            createdByName: req.user ? req.user.name : 'النظام'
-        });
-        res.json({ success: true, eventId });
-    } catch (error) {
-        console.error('Error adding timeline event:', error);
-        res.status(500).json({ error: 'فشل في إضافة الحدث' });
-    }
-});
+// OV-S9-01: حُذفت ثلاث نقاط ميتة (دليل الوفاة: الدوال المستدعاة غير موجودة في
+// db.js ⇒ 500 دائماً مؤكد حياً، ولا مستهلك في public/ كاملة بـ grep شامل):
+//   - GET  /api/shift-status        (db.getActiveShift/getShiftStatus مفقودتان، بلا authenticate)
+//   - GET  /api/shift-timeline/:id  (db.getTimelineEvents مفقودة، بلا authenticate — ثغرة كامنة)
+//   - POST /api/shift-timeline/:id  (db.addTimelineEvent مفقودة)
+// البديل الحي للسجل الزمني: GET /api/shifts/:id/timeline (أُصلح في الشريحة 7).
 
 // GET /api/shift-snapshot/:shiftId - آخر لقطة محفوظة
 // مقيّد: اللقطات تحوي بيانات تشغيلية ومحادثات (قرار المالك بعد شريحة الأرشفة)
@@ -3154,8 +3036,13 @@ app.get('/api/shifts/:id/metrics', authenticate, async (req, res) => {
 app.get('/api/shifts/:id/health-score', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.id);
-        const shifts = await readShifts();
-        const metrics = await calculateShiftMetrics(shiftId, shifts);
+        // OV-S9-03: الحسم من SQLite مباشرة (نمط /api/current-shift) — بلا JSON.
+        // كان readShifts يسقط إلى shift-data.json البائت فلا يجد المناوبة
+        // النشطة (معرّفات JSON ≠ معرّفات القاعدة) ⇒ 404 دائماً.
+        if (!dbAvailable()) {
+            return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        }
+        const metrics = await calculateShiftMetrics(shiftId, []);
         if (!metrics) {
             return res.status(404).json({ error: 'المناوبة غير موجودة' });
         }
@@ -3182,8 +3069,10 @@ app.get('/api/shifts/daily-dashboard', authenticate, async (req, res) => {
         }
         let kpi = await db.ShiftKpiDaily.getByDate(date);
         if (!kpi) {
-            // Calculate from shifts
-            const shifts = await readShifts();
+            // OV-S9-02: الحساب من SQLite حصراً (SSOT) — readShiftsFromDb بدل
+            // readShifts التي كانت تسقط إلى JSON البائت فتتضارب الأرقام مع
+            // executive-dashboard (0 مقابل 2 لنفس اليوم).
+            const shifts = await readShiftsFromDb();
             const dayShifts = shifts.filter(s => s.shiftDate === date);
             let totalReports = 0, completedReports = 0, openReports = 0, suspendedReports = 0;
             let totalStaff = 0, totalTeams = 0, totalVehicles = 0;
@@ -3200,13 +3089,15 @@ app.get('/api/shifts/daily-dashboard', authenticate, async (req, res) => {
                     totalTeams += m.team_count;
                     totalVehicles += m.vehicle_count;
                 }
-                if (s.savedReports) {
-                    Object.keys(s.savedReports).forEach(k => {
-                        const [center, unit] = k.split('|');
-                        if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
-                        if (unit) typeCounts[unit] = (typeCounts[unit] || 0) + (s.savedReports[k].count || 0);
-                    });
-                }
+                // تجميع المراكز/الأنواع من shift_reports (SQLite) — savedReports
+                // كان حقلاً JSON-only لا وجود له في مصدر الحقيقة.
+                try {
+                    const srs = await db.Shifts.getShiftReports(s.id);
+                    for (const sr of srs || []) {
+                        if (sr.center) centerCounts[sr.center] = (centerCounts[sr.center] || 0) + (sr.count || 0);
+                        if (sr.unit) typeCounts[sr.unit] = (typeCounts[sr.unit] || 0) + (sr.count || 0);
+                    }
+                } catch (e) { /* best-effort */ }
             }
             const topCenter = Object.entries(centerCounts).sort((a, b) => b[1] - a[1])[0];
             const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
@@ -3351,7 +3242,9 @@ app.get('/api/shifts/monthly-dashboard', authenticate, async (req, res) => {
 // GET /api/shifts/executive-dashboard - executive summary
 app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
     try {
-        const shifts = await readShifts();
+        // OV-S9-02: نفس مصدر daily-dashboard حرفاً (SQLite عبر readShiftsFromDb)
+        // حتى يتطابق الرقمان على نفس القاعدة — لا JSON.
+        const shifts = await readShiftsFromDb();
         const today = new Date().toISOString().split('T')[0];
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -3378,12 +3271,13 @@ app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
             if (s.shiftDate === today) {
                 daily.total_reports += s.totalReports || 0;
             }
-            if (s.savedReports) {
-                Object.keys(s.savedReports).forEach(k => {
-                    const [center] = k.split('|');
-                    if (center) centerCounts[center] = (centerCounts[center] || 0) + (s.savedReports[k].count || 0);
-                });
-            }
+            // تجميع المراكز من shift_reports (SQLite) — savedReports حقل JSON-only.
+            try {
+                const srs = dbAvailable() ? await db.Shifts.getShiftReports(s.id) : [];
+                for (const sr of srs || []) {
+                    if (sr.center) centerCounts[sr.center] = (centerCounts[sr.center] || 0) + (sr.count || 0);
+                }
+            } catch (e) { /* best-effort */ }
             trends.push({ date: s.shiftDate, reports: s.totalReports || 0, completion_rate: m ? m.completion_rate : 0 });
         }
 
@@ -5759,9 +5653,17 @@ app.get('/api/admin/auto-fix/logs', authenticate, authorize(['admin']), async (r
 // ============================================
 app.post('/api/frontend-errors', async (req, res) => {
     try {
-        const { errors, sessionId } = req.body;
-        if (!errors || !Array.isArray(errors)) {
-            return res.status(400).json({ error: 'Invalid payload' });
+        // OV-S2-04: العقد المرجعي هو { errors: [...], sessionId } كما يرسله
+        // public/js/frontend-monitor.js. كانت أي حمولة أخرى (كائن خطأ مفرد
+        // بلا غلاف) تُرفض 400 حتى لو كانت صالحة المحتوى — نطبّعها الآن إلى
+        // نفس الشكل بدل الرفض (الجذر: صرامة الشكل لا صرامة المحتوى).
+        let { errors, sessionId } = req.body || {};
+        if (!Array.isArray(errors)) {
+            if (req.body && typeof req.body === 'object' && (req.body.type || req.body.message)) {
+                errors = [req.body];
+            } else {
+                return res.status(400).json({ error: 'Invalid payload' });
+            }
         }
         for (const err of errors) {
             await db.run(
@@ -7219,16 +7121,9 @@ app.get('/api/shift-roster', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
-    try {
-        const entry = await db.ShiftRoster.getById(req.params.id);
-        if (!entry) return res.status(404).json({ error: 'السجل غير موجود' });
-        res.json({ success: true, entry });
-    } catch (error) {
-        console.error('ShiftRoster GET error:', error);
-        res.status(500).json({ error: 'فشل في جلب السجل' });
-    }
-});
+// D-35: GET /:id نُقل إلى ما بعد المسارات الثابتة (audit-log / drafts / stats) —
+// تسجيله هنا كان يظلّلها جميعاً فيطابق «audit-log» كأنه id.
+// انظر التعليق عند إعادة تسجيله أسفل مسار /stats.
 
 app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
     employee_id: { required: true, type: 'number' },
@@ -7822,6 +7717,20 @@ app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// D-35: المسارات الثابتة قبل المتغيرة — /:id يُسجَّل الآن بعد /stats و/drafts
+// و/audit-log حتى لا يبتلعها. (المسارات ذات المقطعين مثل employee-schedule/:id
+// لا تتأثر أصلاً بمسار مقطع واحد.)
+app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
+    try {
+        const entry = await db.ShiftRoster.getById(req.params.id);
+        if (!entry) return res.status(404).json({ error: 'السجل غير موجود' });
+        res.json({ success: true, entry });
+    } catch (error) {
+        console.error('ShiftRoster GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب السجل' });
     }
 });
 

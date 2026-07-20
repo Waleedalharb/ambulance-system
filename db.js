@@ -2477,16 +2477,38 @@ async function migrateReports() {
 }
 
 async function migrateShifts() {
+  // D-26: توحيد مع reconcile المناوبات في runMigrations (~سطر 951):
+  //  - نفس حسم المسار (RENDER_DISK_PATH || DATA_DIR || ./data) بدل DATA_DIR الثابت
+  //  - حفظ معرّف JSON الأصلي بدل توليد معرّفات جديدة
+  //  - الإدراج كـ archived بدل إرث DEFAULT 'active' (كان يصنع 19 مناوبة active
+  //    زائفة على أي قاعدة جديدة عند اختلاف المسارين)
   try {
     const existing = await Shifts.getAll();
     if (existing.length > 0) {
       logger.warn('Shifts table already has data. Skipping migration.');
       return;
     }
-    const dataPath = path.join(DATA_DIR, 'shift-data.json');
+    const dataPath = path.join(
+      process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data'),
+      'shift-data.json'
+    );
     const shifts = JSON.parse(await fs.readFile(dataPath, 'utf8'));
     for (const shift of shifts) {
-      const shiftId = await Shifts.create(shift);
+      const status = shift.status === 'active' ? 'archived' : (shift.status || 'archived');
+      const result = await run(
+        `INSERT INTO shifts (id, shift_name, shift_date, shift_time, shift_type, shift_day, start_time,
+         total_reports, rapid_locations, centers_data, vehicle_data, fuel_data, general_notes, last_update, status, archived_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          shift.id ?? null, shift.shiftName || '', shift.shiftDate || '', shift.shiftTime || '',
+          shift.shiftType || '', shift.shiftDay || '', shift.startTime || '', shift.totalReports || 0,
+          JSON.stringify(shift.rapidLocations || {}), JSON.stringify(shift.centersData || {}),
+          JSON.stringify(shift.vehicleData || {}), JSON.stringify(shift.fuelData || {}),
+          shift.generalNotes || '', shift.lastUpdate || null, status,
+          shift.archivedAt || new Date().toISOString()
+        ]
+      );
+      const shiftId = shift.id ?? result.id;
       if (shift.savedReports && typeof shift.savedReports === 'object') {
         for (const [key, report] of Object.entries(shift.savedReports)) {
           const [center, unit] = key.split('|');
@@ -2495,7 +2517,7 @@ async function migrateShifts() {
         }
       }
     }
-    logger.info(`✅ Migrated ${shifts.length} shifts to SQLite`);
+    logger.info(`✅ Migrated ${shifts.length} shifts to SQLite (ids preserved, archived)`);
   } catch (error) {
     if (error.code === 'ENOENT') {
       logger.warn('No shift-data.json found. Skipping shifts migration.');

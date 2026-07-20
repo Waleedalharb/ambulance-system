@@ -710,6 +710,12 @@ function handleSSEEvent(data) {
             // D-21: إشعار موجه وصل عبر SSE — تحديث جرس الإشعارات فوراً
             // بدل انتظار إعادة التحميل (كان النوعان بلا معالج إطلاقاً)
             loadNotifications();
+            // OV-S4-03: ربط حدث الإشعار الفعلي بالصوت عبر showNotification —
+            // كانت هذه الأحداث تصل صامتة تماماً (لا toast ولا صوت) رغم
+            // soundSettings.master. الصوت يمر عبر دوال play* التي تحترم
+            // master/toggles، فلا صوت إلا بموافقة المستخدم.
+            var _n = data.notification || data.payload || {};
+            showNotification(_n.title || 'إشعار جديد', _n.message || data.message || '', 'info', 4000);
             break;
         case 'connected':
             console.log('SSE:', data.message);
