@@ -286,6 +286,11 @@
                 return response.json().catch(function() {
                     return {};
                 }).then(function(data) {
+                    // إبطال/عدم صلاحية التوكن = نهاية جلسة نهائية (وليس رفض صلاحية عادي)
+                    if (data.code === 'TOKEN_REVOKED' || data.code === 'TOKEN_INVALID') {
+                        _clearTokens();
+                        _showLoginScreen('انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى');
+                    }
                     return Promise.reject(new Error(data.error || 'Access denied'));
                 });
             }
@@ -471,6 +476,11 @@
             _refreshPromise = null;
             _pendingRequests = [];
 
+            // مزامنة الخروج مع بقية التبويبات المفتوحة
+            if (_authChannel) {
+                try { _authChannel.postMessage({ type: 'logout' }); } catch (e) {}
+            }
+
             setTimeout(function() {
                 location.reload();
             }, 500);
@@ -581,6 +591,36 @@
         }
 
     };
+
+    // ==========================================
+    // CROSS-TAB LOGOUT SYNC
+    // ==========================================
+    // خروج من تبويب آخر ⇒ إنهاء الجلسة محلياً فوراً (الجلسة أُبطلت في السيرفر أصلاً)
+    function _handleExternalLogout() {
+        _clearTokens();
+        _showLoginScreen('تم تسجيل الخروج من تبويب آخر');
+    }
+
+    var _authChannel = null;
+    try {
+        if (typeof BroadcastChannel !== 'undefined') {
+            _authChannel = new BroadcastChannel('auth');
+            _authChannel.onmessage = function(event) {
+                if (event.data && event.data.type === 'logout') {
+                    _handleExternalLogout();
+                }
+            };
+        }
+    } catch (e) {
+        _authChannel = null;
+    }
+
+    // Fallback للمتصفحات بلا BroadcastChannel: إزالة مفتاح التوكن في تبويب آخر
+    global.addEventListener('storage', function(event) {
+        if (event.key === STORAGE_KEYS.ACCESS_TOKEN && event.newValue === null) {
+            _handleExternalLogout();
+        }
+    });
 
     // ==========================================
     // OVERRIDE window.fetch

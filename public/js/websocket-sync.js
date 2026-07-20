@@ -3,11 +3,9 @@
 // يتصل بالخادم ويستقبل broadcast updates + يعرض إشعارات + يحدث البيانات
 // ============================================
 (function() {
-    var authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-        console.log('Sync: no authToken, skipping WebSocket');
-        return;
-    }
+    // لا إنهاء مبكر عند غياب التوكن هنا: هذا الملف يُحمَّل قبل تسجيل الدخول،
+    // والخروج المبكر كان يمنع تسجيل AuthGate.onStart فلا يتصل WS بعد الدخول إلا بإعادة تحميل.
+    // الفحص الفعلي للتوكن يتم داخل connect() وعبر بوابة AuthGate.
 
     // =====================
     // إشعارات — أضف للجرس إذا كان متوفر، وإلا Toast fallback
@@ -62,40 +60,7 @@
     var maxReconnectAttempts = 10;
     var reconnectDelay = 3000;
     var pingInterval = null;
-    var tokenRefreshInProgress = false;
     var stopped = false; // AuthGate: إيقاف نهائي — بلا إعادة اتصال بعد الخروج/انتهاء الجلسة
-
-    // Token refresh: call /api/auth/refresh to get a new token
-    async function refreshToken() {
-        if (tokenRefreshInProgress) return false;
-        tokenRefreshInProgress = true;
-        try {
-            var token = localStorage.getItem('authToken');
-            if (!token) return false;
-            var resp = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-            });
-            if (resp.ok) {
-                var data = await resp.json();
-                if (data.success && data.token) {
-                    localStorage.setItem('authToken', data.token);
-                    console.log('✅ Token refreshed successfully');
-                    return true;
-                }
-            }
-            // If refresh failed, clear token and redirect to login
-            console.error('❌ Token refresh failed, clearing auth');
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('currentUser');
-            return false;
-        } catch (e) {
-            console.error('Token refresh error:', e);
-            return false;
-        } finally {
-            tokenRefreshInProgress = false;
-        }
-    }
 
     function connect() {
         if (stopped) return;
@@ -470,21 +435,10 @@
             if (stopped) return; // أُغلق عمداً عبر AuthGate — بلا إعادة اتصال
             // If closed due to authentication failure (code 1008)
             if (event && event.code === 1008) {
-                // AuthGate: فشل مصادقة ⇒ إيقاف نهائي بلا عاصفة إعادة اتصال —
-                // بوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار AuthManager
-                if (typeof AuthGate !== 'undefined') {
-                    console.log('🔴 WebSocket closed due to auth failure (1008) — terminal halt, no reconnect');
-                    return;
-                }
-                console.log('🔴 WebSocket closed due to auth failure, attempting token refresh...');
-                refreshToken().then(function(success) {
-                    if (success) {
-                        reconnectAttempts = 0; // reset attempts on successful refresh
-                        setTimeout(connect, 1000);
-                    } else {
-                        scheduleReconnect();
-                    }
-                });
+                // فشل مصادقة ⇒ إيقاف نهائي بلا عاصفة إعادة اتصال.
+                // تجديد التوكن مسؤولية AuthManager وحدها (fetch الملفوف يعالج 401)،
+                // وبوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار AuthManager.
+                console.log('🔴 WebSocket closed due to auth failure (1008) — terminal halt, no reconnect');
                 return;
             }
             scheduleReconnect();

@@ -515,6 +515,52 @@ const TABLE_SCHEMAS = [
     mime_type TEXT,
     size INTEGER DEFAULT 0,
     upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // Auth: Token Blacklist (session lifecycle — revocation)
+  `CREATE TABLE IF NOT EXISTS token_blacklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL,
+    token_type TEXT DEFAULT 'access',
+    user_id TEXT,
+    session_id INTEGER,
+    reason TEXT,
+    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME
+  );`,
+
+  // Auth: Sessions (session lifecycle — tracking & revocation)
+  `CREATE TABLE IF NOT EXISTS auth_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT,
+    access_token_hash TEXT,
+    refresh_token_hash TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+    session_last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+    session_expires DATETIME,
+    refresh_expires DATETIME,
+    is_active INTEGER DEFAULT 1,
+    logout_time DATETIME,
+    logout_reason TEXT
+  );`,
+
+  // Auth: Logs (login/logout/refresh audit trail)
+  `CREATE TABLE IF NOT EXISTS auth_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    username TEXT,
+    action_type TEXT NOT NULL,
+    action_detail TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    session_id INTEGER,
+    success INTEGER DEFAULT 1,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`
 ];
 
@@ -1793,6 +1839,62 @@ const AuditLog = {
 };
 
 // ============================================
+// AUTH: TOKEN BLACKLIST / SESSIONS / LOGS
+// ============================================
+// better-sqlite3 لا يقبل booleans — تُحوَّل إلى 1/0 (is_active, success تصل من server.js كـ true/false)
+function _authBindVal(v) {
+  if (v === true) return 1;
+  if (v === false) return 0;
+  return v === undefined ? null : v;
+}
+
+const TokenBlacklist = {
+  async add(tokenHash) {
+    const result = await run('INSERT INTO token_blacklist (token_hash) VALUES (?)', [tokenHash]);
+    return result.id;
+  },
+  async isBlacklisted(tokenHash) {
+    const row = await get('SELECT id FROM token_blacklist WHERE token_hash = ? LIMIT 1', [tokenHash]);
+    return !!row;
+  }
+};
+
+// whitelist للأعمدة الحقيقية فقط — المفاتيح غير المعروفة (مثل expires_at) تُتجاهل
+const AUTH_SESSION_COLUMNS = ['user_id', 'username', 'role', 'access_token_hash', 'refresh_token_hash', 'ip_address', 'user_agent', 'session_start', 'session_last_active', 'session_expires', 'refresh_expires', 'is_active', 'logout_time', 'logout_reason'];
+
+const AuthSessions = {
+  async create(data) {
+    const cols = AUTH_SESSION_COLUMNS.filter(c => data[c] !== undefined);
+    const sql = `INSERT INTO auth_sessions (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
+    const result = await run(sql, cols.map(c => _authBindVal(data[c])));
+    return { id: result.id };
+  },
+  async getByUser(userId) {
+    return all('SELECT * FROM auth_sessions WHERE user_id = ?', [userId]);
+  },
+  async update(id, data) {
+    const cols = AUTH_SESSION_COLUMNS.filter(c => data[c] !== undefined);
+    if (cols.length === 0) return { changes: 0 };
+    const sql = `UPDATE auth_sessions SET ${cols.map(c => c + ' = ?').join(', ')} WHERE id = ?`;
+    return run(sql, [...cols.map(c => _authBindVal(data[c])), id]);
+  }
+};
+
+const AUTH_LOG_COLUMNS = ['user_id', 'username', 'action_type', 'action_detail', 'ip_address', 'user_agent', 'session_id', 'success', 'error_message'];
+
+const AuthLogs = {
+  async create(data) {
+    const cols = AUTH_LOG_COLUMNS.filter(c => data[c] !== undefined);
+    const sql = `INSERT INTO auth_logs (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`;
+    const result = await run(sql, cols.map(c => _authBindVal(data[c])));
+    return { id: result.id };
+  },
+  async getByUser(userId) {
+    return all('SELECT * FROM auth_logs WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+  }
+};
+
+// ============================================
 
 
 // ============================================
@@ -2433,6 +2535,9 @@ module.exports = {
   Notifications,
   ShiftCompletions,
   AuditLog,
+  TokenBlacklist,
+  AuthSessions,
+  AuthLogs,
   ShiftForms,
   KBDocuments,
   KBChunks,
