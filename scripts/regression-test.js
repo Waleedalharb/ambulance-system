@@ -34,6 +34,36 @@ async function api(method, path, body, expectStatus = 200) {
     return { status: res.status, data, ok: res.status === expectStatus };
 }
 
+// OV-S6 (قناة لحظية واحدة): عميل SSE أدنى للبوابة — الأحداث التشغيلية أصبحت
+// تُبث عبر SSE فقط (broadcast() = SSE)، وWebSocket محجوز حصرياً للشات.
+// اختبارات المزامنة اللحظية أدناه تستمع على /api/sse بدل /ws (العقد الجديد).
+function listenSSE(path, onEvent) {
+    const http = require('http');
+    const state = { opened: false, onOpen: null };
+    const req = http.get(BASE + path, (res) => {
+        let buf = '';
+        res.on('data', (chunk) => {
+            if (!state.opened) { state.opened = true; if (state.onOpen) state.onOpen(); }
+            buf += chunk.toString('utf8');
+            let idx;
+            while ((idx = buf.indexOf('\n\n')) !== -1) {
+                const frame = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                const dataLine = frame.split('\n').find(l => l.indexOf('data:') === 0);
+                if (dataLine) {
+                    try { onEvent(JSON.parse(dataLine.slice(5).trim())); } catch (_) {}
+                }
+            }
+        });
+        res.on('error', () => {});
+    });
+    req.on('error', () => {});
+    return {
+        onOpen: (fn) => { if (state.opened) fn(); else state.onOpen = fn; },
+        close: () => { try { req.destroy(); } catch (_) {} }
+    };
+}
+
 async function main() {
     console.log(`\n═══ Regression Test @ ${BASE} ═══\n`);
 
@@ -332,41 +362,36 @@ async function main() {
     if (dr) await api('DELETE', `/api/daily-reports/${dr.id}`);
     if (air) await api('DELETE', `/api/delete-air-ambulance/${air.id}`);
 
-    // ─── 13. WebSocket live sync (shift_started + new_report) ───
-    let wsStarted = false, wsReport = false, wsPlanAdded = false, wsPlanDeleted = false, wsPlanId = null, wsNoteAdded = false;
+    // ─── 13. SSE live sync (shift_started + new_report) — OV-S6: SSE هي القناة التشغيلية الوحيدة ───
+    // (كان هذا الاختبار يستمع عبر WebSocket — الازدواج القديم؛ عُدّل ليعكس العقد الجديد)
+    let sseStarted = false, sseReport = false, ssePlanAdded = false, ssePlanDeleted = false, ssePlanId = null, sseNoteAdded = false;
     try {
-        const WebSocket = require('ws');
         await new Promise((resolve) => {
-            const ws = new WebSocket(`ws://localhost:3080/ws?token=${TOKEN}`);
-            const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(); }, 10000);
-            ws.on('open', async () => {
+            const timer = setTimeout(() => { try { sse.close(); } catch (_) {} resolve(); }, 10000);
+            const sse = listenSSE(`/api/sse?token=${encodeURIComponent(TOKEN)}`, (m) => {
+                if (m.type === 'shift_started') sseStarted = true;
+                if (m.type === 'new_report' && m.center === 'منفوحة') sseReport = true;
+                if (m.type === 'peak_plan_added' && m.plan && m.plan.title === 'خطة SSE regression') { ssePlanAdded = true; ssePlanId = m.plan.id; }
+                if (m.type === 'peak_plan_deleted' && m.planId === ssePlanId) ssePlanDeleted = true;
+                if (m.type === 'shift_note_added') sseNoteAdded = true;
+                if (sseStarted && sseReport && ssePlanAdded && ssePlanDeleted && sseNoteAdded) { clearTimeout(timer); sse.close(); resolve(); }
+            });
+            sse.onOpen(async () => {
                 const st = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
-                const wsShift = st.data && st.data.shiftId;
+                const sseShift = st.data && st.data.shiftId;
                 await api('POST', '/api/report', { center: 'منفوحة', unit: 'جنوب 3' });
-                const wp = await api('POST', '/api/peak-plans', { title: 'خطة WS regression', location: 'موقع WS' });
+                const wp = await api('POST', '/api/peak-plans', { title: 'خطة SSE regression', location: 'موقع SSE' });
                 const pid = wp.data && wp.data.plan && wp.data.plan.id;
                 if (pid) await api('DELETE', `/api/peak-plans/${pid}`);
-                if (wsShift) await api('POST', `/api/shift-notes/${wsShift}`, { notes: [{ text: 'ملاحظة WS regression' }] });
+                if (sseShift) await api('POST', `/api/shift-notes/${sseShift}`, { notes: [{ text: 'ملاحظة SSE regression' }] });
             });
-            ws.on('message', (raw) => {
-                try {
-                    const m = JSON.parse(raw.toString());
-                    if (m.type === 'shift_started') wsStarted = true;
-                    if (m.type === 'new_report' && m.center === 'منفوحة') wsReport = true;
-                    if (m.type === 'peak_plan_added' && m.plan && m.plan.title === 'خطة WS regression') { wsPlanAdded = true; wsPlanId = m.plan.id; }
-                    if (m.type === 'peak_plan_deleted' && m.planId === wsPlanId) wsPlanDeleted = true;
-                    if (m.type === 'shift_note_added') wsNoteAdded = true;
-                    if (wsStarted && wsReport && wsPlanAdded && wsPlanDeleted && wsNoteAdded) { clearTimeout(timer); ws.terminate(); resolve(); }
-                } catch (_) {}
-            });
-            ws.on('error', () => { clearTimeout(timer); resolve(); });
         });
     } catch (e) {}
-    record('التحديث اللحظي عبر WebSocket (new_report)', wsReport);
-    record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', wsStarted);
-    record('بث إنشاء التمركز لحظياً (PositioningStarted ← peak_plan_added)', wsPlanAdded);
-    record('بث إنهاء التمركز لحظياً (PositioningEnded ← peak_plan_deleted)', wsPlanDeleted);
-    record('بث تحديث سجل الملاحظات لحظياً (ShiftNoteAdded ← shift_note_added)', wsNoteAdded);
+    record('التحديث اللحظي عبر SSE (new_report)', sseReport);
+    record('بث بدء المناوبة لحظياً (shift_started عبر ShiftStarted)', sseStarted);
+    record('بث إنشاء التمركز لحظياً (PositioningStarted ← peak_plan_added)', ssePlanAdded);
+    record('بث إنهاء التمركز لحظياً (PositioningEnded ← peak_plan_deleted)', ssePlanDeleted);
+    record('بث تحديث سجل الملاحظات لحظياً (ShiftNoteAdded ← shift_note_added)', sseNoteAdded);
 
     // ─── 13b. Archive slice: auto-archive + direct archive produce seals (bug fix verification) ───
     const autoSnap = await api('GET', `/api/shift-snapshot/${shift2Id}`);
@@ -379,13 +404,20 @@ async function main() {
     if (mk2Id) await api('DELETE', `/api/shifts/${mk2Id}`);
 
     // ─── 13c. Event Activation Slice (Catalog D-3..D-7): adopted events broadcast via engine ───
-    let wsShiftDel = false, wsPlanUpd = false, wsNoteDel = false, wsFormDel = false, wsFormClr = false;
+    // (OV-S6: كان يستمع عبر WebSocket — الازدواج القديم؛ عُدّل للاستماع عبر SSE، القناة الوحيدة)
+    let sseShiftDel = false, ssePlanUpd = false, sseNoteDel = false, sseFormDel = false, sseFormClr = false;
     try {
-        const WebSocket = require('ws');
         await new Promise((resolve) => {
-            const ws = new WebSocket(`ws://localhost:3080/ws?token=${TOKEN}`);
-            const timer = setTimeout(() => { try { ws.terminate(); } catch (_) {} resolve(); }, 12000);
-            ws.on('open', async () => {
+            const timer = setTimeout(() => { try { sse2.close(); } catch (_) {} resolve(); }, 12000);
+            const sse2 = listenSSE(`/api/sse?token=${encodeURIComponent(TOKEN)}`, (m) => {
+                if (m.type === 'shift_deleted') sseShiftDel = true;
+                if (m.type === 'peak_plan_updated') ssePlanUpd = true;
+                if (m.type === 'shift_note_deleted') sseNoteDel = true;
+                if (m.type === 'incident_deleted') sseFormDel = true;
+                if (m.type === 'air_ambulance_cleared') sseFormClr = true;
+                if (sseShiftDel && ssePlanUpd && sseNoteDel && sseFormDel && sseFormClr) { clearTimeout(timer); sse2.close(); resolve(); }
+            });
+            sse2.onOpen(async () => {
                 const p = await api('POST', '/api/peak-plans', { title: 'خطة تفعيل regression', location: 'موقع تفعيل' });
                 const pid = p.data && p.data.plan && p.data.plan.id;
                 if (pid) await api('PUT', `/api/peak-plans/${pid}`, { title: 'خطة تفعيل معدلة' });
@@ -403,25 +435,13 @@ async function main() {
                 if (mk3Id) await api('DELETE', `/api/shifts/${mk3Id}`);
                 if (pid) await api('DELETE', `/api/peak-plans/${pid}`);
             });
-            ws.on('message', (raw) => {
-                try {
-                    const m = JSON.parse(raw.toString());
-                    if (m.type === 'shift_deleted') wsShiftDel = true;
-                    if (m.type === 'peak_plan_updated') wsPlanUpd = true;
-                    if (m.type === 'shift_note_deleted') wsNoteDel = true;
-                    if (m.type === 'incident_deleted') wsFormDel = true;
-                    if (m.type === 'air_ambulance_cleared') wsFormClr = true;
-                    if (wsShiftDel && wsPlanUpd && wsNoteDel && wsFormDel && wsFormClr) { clearTimeout(timer); ws.terminate(); resolve(); }
-                } catch (_) {}
-            });
-            ws.on('error', () => { clearTimeout(timer); resolve(); });
         });
     } catch (e) {}
-    record('بث PositioningUpdated لحظياً (Catalog D-4 ← peak_plan_updated)', wsPlanUpd);
-    record('بث ShiftNoteDeleted لحظياً (Catalog D-5 ← shift_note_deleted)', wsNoteDel);
-    record('بث FormDeleted لحظياً (Catalog D-6 ← incident_deleted)', wsFormDel);
-    record('بث FormsCleared لحظياً (Catalog D-7 ← air_ambulance_cleared)', wsFormClr);
-    record('بث ShiftDeleted لحظياً (Catalog D-3 ← shift_deleted)', wsShiftDel);
+    record('بث PositioningUpdated لحظياً (Catalog D-4 ← peak_plan_updated)', ssePlanUpd);
+    record('بث ShiftNoteDeleted لحظياً (Catalog D-5 ← shift_note_deleted)', sseNoteDel);
+    record('بث FormDeleted لحظياً (Catalog D-6 ← incident_deleted)', sseFormDel);
+    record('بث FormsCleared لحظياً (Catalog D-7 ← air_ambulance_cleared)', sseFormClr);
+    record('بث ShiftDeleted لحظياً (Catalog D-3 ← shift_deleted)', sseShiftDel);
 
     // ─── 13d. F1: تكامل الواجهة (التمركز) — توسيع العقد + الإنهاء داخل الخدمة + إزالة الكود الميت ───
     const f1Payload = { title: 'خطة F1', location: 'موقع F1', planType: 'peak', teamType: 'advanced', unit: 'جنوب 5', notes: 'ملاحظة F1', lat: 24.1, lng: 46.1 };
@@ -736,7 +756,7 @@ async function main() {
     await api('POST', '/api/schedule/files', { files: f6FilesList }); // استعادة
     record('F6 ④: تطابق الشاشتين على /api/schedule/employees + runtime POST⇒GET (موظفون وملفات)', f6BothFetch && f6EmpPut.ok && f6EmpMatch && f6EmpRestored && f6FilesMatch, `static=${f6BothFetch} emp=${f6EmpMatch} restore=${f6EmpRestored} files=${f6FilesMatch}`);
 
-    // ⑤ لا مصدر أول محلي: صفر مفتاح الملفات المحلي، مستمعا WS صحيحان، تعريف loadFromServer واحد، المفاتيح الأربعة غائبة، لا بذور موظفين ثابتة
+    // ⑤ لا مصدر أول محلي: صفر مفتاح الملفات المحلي، مستمعا المزامنة (SSE) صحيحان، تعريف loadFromServer واحد، المفاتيح الأربعة غائبة، لا بذور موظفين ثابتة
     const f6NoSavedFiles = !f6SsSrc.includes('ss_savedFiles');
     const f6WsEmp = f6WsSrc.includes('fetchEmployeesFromServerSilent');
     const f6WsFiles = f6WsSrc.includes('loadSavedFiles');
@@ -744,7 +764,7 @@ async function main() {
     const f6OneLfs = (f6SsSrc.match(/function loadFromServer\(/g) || []).length === 1;
     const f6KeysGone = !f6AdmSrc.includes('importedEmployees') && !f6AdmSrc.includes('plannerEmployees') && !f6AdmSrc.includes('lastImportedFile') && !f6AdmSrc.includes('shift-planner-data');
     const f6NoSeeds = !f6RcSrc.includes('generateDemoData') && /function generateDemoData\(\)[\s\S]{0,500}?return \[\];/.test(f6SsSrc);
-    record('F6 ⑤: لا مصدر أول محلي (مفتاح الملفات صفر، مستمعا WS، loadFromServer واحد، المفاتيح الأربعة، لا بذور)', f6NoSavedFiles && f6WsEmp && f6WsFiles && f6SsFilesApi && f6OneLfs && f6KeysGone && f6NoSeeds, `files=${f6NoSavedFiles} ws=${f6WsEmp}/${f6WsFiles} api=${f6SsFilesApi} lfs=${f6OneLfs} keys=${f6KeysGone} seeds=${f6NoSeeds}`);
+    record('F6 ⑤: لا مصدر أول محلي (مفتاح الملفات صفر، مستمعا المزامنة SSE، loadFromServer واحد، المفاتيح الأربعة، لا بذور)', f6NoSavedFiles && f6WsEmp && f6WsFiles && f6SsFilesApi && f6OneLfs && f6KeysGone && f6NoSeeds, `files=${f6NoSavedFiles} sync=${f6WsEmp}/${f6WsFiles} api=${f6SsFilesApi} lfs=${f6OneLfs} keys=${f6KeysGone} seeds=${f6NoSeeds}`);
 
     // ⑥ Phase 2 Final Cleanup: زر «تحميل من السيرفر» اليدوي مربوط بالمصدر الرسمي المؤقت (JSON) لا بالمسار العلائقي الفارغ (إصلاح خلل — كان مكسوراً إنتاجياً)
     const f6BtnWired = f6SsSrc.includes('onclick="loadFromServerManual()"');
