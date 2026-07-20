@@ -51,6 +51,15 @@
 | ~~D-27~~ | /api/shifts يسقط إلى JSON بائت — SQLite فقط | الشريحة 8 (4671521) |
 | ~~D-35~~ | تظليل مسارات roster — أُعيد الترتيب | الشريحة 8 (4671521) |
 | ~~D-36~~ | /api/shift/:id/status مكسور بلا مستهلك — حُذف (OV-S9-01) | الشريحة 8 (4671521) |
+| ~~D-15~~ | token_blacklist بلا expires_at/purge — تعبئة + تنظيف دوري | الشريحة 9 (b6e952d) |
+| ~~D-16~~ | logout_time/logout_reason لا تُعبّآن — تُعبّآن عند الخروج | الشريحة 9 (b6e952d) |
+| ~~D-28~~ | سباق loadCurrentShift — عدّاد تسلسلي يتجاهل الردود البائتة | الشريحة 9 (b6e952d) |
+| ~~D-29~~ | DELETE report-entry بلا ملكية — النشطة فقط والأرشيف للقراءة | الشريحة 9 (b6e952d) |
+| ~~D-32~~ | TokenPreCheck يكتب المفتاح القديم فقط — يكتب الاثنين | الشريحة 9 (b6e952d) |
+| ~~D-34~~ | smart-schedule/ai-assistant تقرأ المفتاح القديم — قراءة موحدة | الشريحة 9 (b6e952d) |
+| ~~D-39~~ | weekly/monthly/archive/search بسقوط JSON — readShiftsFromDb | الشريحة 9 (b6e952d) |
+| ~~D-17/D-18~~ | تدقيق الجداول/الأعمدة — أُنجز كتدقيق (لا حذف): 8 ميت-مؤكد فارغ + 6 ميت-مؤكد فيه بيانات (audit_logs, password_settings, control_notes, peak_alerts, peak_logs, peak_missions, shift_data_integrity) مرشحة لقرار مالك (أرشفة ثم إسقاط) | الشريحة 9 (تقرير التدقيق) |
+
 
 | D-26 | تناقض مسارَي تهجير المناوبات في db.js: `migrateShifts()` يقرأ `data/shift-data.json` من مسار ثابت (يتجاهل DATA_DIR) ويدرج **بلا عمود status** (يرث `active` افتراضياً) وبمعرّفات تلقائية جديدة، بينما reconcile (~db.js:951) يقرأ DATA_DIR ويحفظ المعرّف ويُدرج `archived` — على قاعدة جديدة ينتج 19 مناوبة legacy «active» زائفة تلوّث أي بيئة جديدة | اكتشاف الشريحة 5 (تحقق المنفّذ) — لم يؤثر على البوابة | يُقيَّم مع شريحة دورة المناوبة/8 |
 | D-27 | `GET /api/shifts` يسقط إلى JSON عند فراغ SQLite (مسار fallback عام) | اكتشاف الشريحة 5 | شريحة 8 |
