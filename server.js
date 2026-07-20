@@ -1180,7 +1180,10 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
             try {
                 const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
                 if (db && db.TokenBlacklist) {
-                    await db.TokenBlacklist.add(tokenHash);
+                    // D-15: ختم expires_at من exp التوكن (req.user هو التوكن المفكوك
+                    // بعد تحقق authenticate) حتى يلتقطه التنظيف الدوري لاحقاً
+                    const expiresAt = req.user && req.user.exp ? new Date(req.user.exp * 1000) : null;
+                    await db.TokenBlacklist.add(tokenHash, expiresAt);
                 }
             } catch (e) {
                 console.error('Token blacklist error:', e.message);
@@ -1191,9 +1194,15 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
         try {
             if (db && db.AuthSessions && sessionToDeactivate) {
                 if (db && db.TokenBlacklist && sessionToDeactivate.refresh_token_hash) {
-                    await db.TokenBlacklist.add(sessionToDeactivate.refresh_token_hash);
+                    // D-15: صلاحية توكن التحديث من عمود refresh_expires في الجلسة
+                    await db.TokenBlacklist.add(sessionToDeactivate.refresh_token_hash, sessionToDeactivate.refresh_expires || null);
                 }
-                await db.AuthSessions.update(sessionToDeactivate.id, { is_active: false });
+                // D-16: تعبئة logout_time/logout_reason — كانتا تُتركان NULL دائماً
+                await db.AuthSessions.update(sessionToDeactivate.id, {
+                    is_active: false,
+                    logout_time: new Date().toISOString(),
+                    logout_reason: 'manual_logout'
+                });
             }
         } catch (e) {
             console.error('Session deactivate error:', e.message);
@@ -2090,29 +2099,10 @@ app.get('/api/shifts/archive', authenticate, async (req, res) => {
 
         let shifts = [];
         
-        // 1. Try SQLite
-        if (opsService && opsService.getAllShifts) {
-            shifts = await opsService.getAllShifts(1000);
-            shifts = shifts.map(s => ({
-                id: s.id,
-                shiftName: s.shift_name || s.shiftName,
-                shiftDate: s.shift_date || s.shiftDate,
-                shiftTime: s.shift_time || s.shiftTime,
-                shiftType: s.shift_type || s.shiftType,
-                shiftDay: s.shift_day || s.shiftDay,
-                startTime: s.start_time || s.startTime,
-                totalReports: s.total_reports || s.totalReports || 0,
-                status: s.status || 'active',
-                archivedAt: s.archived_at || s.archivedAt,
-                lastUpdate: s.last_update || s.lastUpdate,
-                generalNotes: s.general_notes || s.generalNotes
-            }));
-        }
-        
-        // 2. Fallback: JSON
-        if (shifts.length === 0) {
-            shifts = await readShifts();
-        }
+        // D-39: SSOT — SQLite حصراً عبر readShiftsFromDb (كبقية مسارات
+        // المؤشرات بعد الشريحة 8). كان السقوط إلى readShifts() يقرأ
+        // shift-data.json البائت عند فراغ SQLite فيقدّم أرشيفاً متضارباً.
+        shifts = await readShiftsFromDb();
 
         // Apply filters
         if (dateFrom) shifts = shifts.filter(s => (s.shiftDate || '') >= dateFrom);
@@ -2622,8 +2612,8 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
 });
 
 // POST /api/shift-save - حفظ موثوق للمناوبة
-// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
-app.post('/api/shift-save', authenticate, async (req, res) => {
+// OV-S9-04: authorize كبقية مسارات دورة حياة المناوبة (start-new-shift/end)
+app.post('/api/shift-save', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftId, shiftData } = req.body;
         if (!shiftId) {
@@ -2645,8 +2635,8 @@ app.post('/api/shift-save', authenticate, async (req, res) => {
 });
 
 // POST /api/shift-archive - أرشفة صريحة
-// TODO: أعد إضافة authorize(['admin', 'director']) بعد الاختبار
-app.post('/api/shift-archive', authenticate, async (req, res) => {
+// OV-S9-04: authorize كبقية مسارات دورة حياة المناوبة (start-new-shift/end)
+app.post('/api/shift-archive', authenticate, authorize(['admin', 'director']), async (req, res) => {
     try {
         const { shiftId, supervisorName, supervisorId } = req.body;
         if (!shiftId) {
@@ -3139,7 +3129,8 @@ app.get('/api/shifts/weekly-dashboard', authenticate, async (req, res) => {
         }
         let kpi = await db.ShiftKpiWeekly.getByWeekStart(weekStart);
         if (!kpi) {
-            const shifts = await readShifts();
+            // D-39: SSOT — SQLite حصراً (كان readShifts يسقط إلى JSON البائت)
+            const shifts = await readShiftsFromDb();
             const weekShifts = shifts.filter(s => s.shiftDate >= weekStart && s.shiftDate <= weekEnd);
             let totalReports = 0, totalStaff = 0, totalTeams = 0, totalVehicles = 0, completedReports = 0;
             const dayCounts = {};
@@ -3194,7 +3185,8 @@ app.get('/api/shifts/monthly-dashboard', authenticate, async (req, res) => {
         }
         let kpi = await db.ShiftKpiMonthly.getByMonthYear(month, year);
         if (!kpi) {
-            const shifts = await readShifts();
+            // D-39: SSOT — SQLite حصراً (كان readShifts يسقط إلى JSON البائت)
+            const shifts = await readShiftsFromDb();
             const monthShifts = shifts.filter(s => {
                 if (!s.shiftDate) return false;
                 const d = new Date(s.shiftDate);
@@ -3312,7 +3304,8 @@ app.get('/api/shifts/search', authenticate, async (req, res) => {
         const status = req.query.status;
         const limit = parseInt(req.query.limit) || 50;
 
-        let shifts = await readShifts();
+        // D-39: SSOT — SQLite حصراً (كان readShifts يسقط إلى JSON البائت)
+        let shifts = await readShiftsFromDb();
         let results = [];
 
         for (const s of shifts) {
@@ -6893,6 +6886,19 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
 
 app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
     try {
+        // D-29: تحقق ملكية/حالة — القرار المتبنّى (الأبسط المتسق مع POST الذي
+        // يختم بالمناوبة النشطة حصراً): الحذف مسموح فقط على سجلات المناوبة
+        // النشطة؛ سجلات المناوبات المؤرشفة/المنتهية للقراءة فقط (حتى admin —
+        // الأرشيف مختوم). سجل بلا مناوبة نشطة خلفه لا يُحذف.
+        const row = await db.get('SELECT id, shift_id FROM report_entries WHERE id = ?', [req.params.id]);
+        if (!row) {
+            return res.status(404).json({ success: false, error: 'البلاغ غير موجود' });
+        }
+        const activeShift = opsEngine ? await opsEngine.shifts.getActiveShift() : null;
+        if (!activeShift || Number(row.shift_id) !== Number(activeShift.id)) {
+            return res.status(403).json({ success: false, error: 'لا يمكن حذف بلاغ مناوبة غير نشطة — الأرشيف للقراءة فقط' });
+        }
+
         await db.run('DELETE FROM report_entries WHERE id = ?', [req.params.id]);
 
         broadcast({
@@ -9763,6 +9769,21 @@ server.listen(PORT, async () => {
     
     // Initialize DB after server starts
     await initDatabase();
+    
+    // D-15: تنظيف token_blacklist — عند الإقلاع ثم كل 24 ساعة.
+    // محافظ: يحذف فقط الصفوف ذات expires_at المنتهية فعلاً؛ بلا مكتبات جديدة.
+    if (db && db.TokenBlacklist && db.TokenBlacklist.purgeExpired) {
+        const runBlacklistPurge = async () => {
+            try {
+                const removed = await db.TokenBlacklist.purgeExpired();
+                if (removed > 0) console.log(`[D-15] token_blacklist purge: removed ${removed} expired row(s)`);
+            } catch (e) {
+                console.error('[D-15] token_blacklist purge error:', e.message);
+            }
+        };
+        await runBlacklistPurge();
+        setInterval(runBlacklistPurge, 24 * 60 * 60 * 1000).unref();
+    }
     
     // ═══════════════════════════════════════════════════════════
     // Initialize Operations Engine (Single Source of Truth)

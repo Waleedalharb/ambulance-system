@@ -1684,6 +1684,10 @@ window.addEventListener('load', function() {
                 }).then(function(data) {
                     if (data.success && data.token) {
                         localStorage.setItem('authToken', data.token);
+                        // D-32: المفتاح الجديد أيضاً — AuthManager/app.js يقرآن
+                        // auth_access_token أولاً، فبقاؤه بائتاً بعد التجديد يرسل
+                        // توكناً منتهياً رغم نجاح التجديد
+                        localStorage.setItem('auth_access_token', data.token);
                         console.log('[TokenPreCheck] Token refreshed successfully');
                     } else {
                         throw new Error('no token');

@@ -292,7 +292,7 @@
 
         result.innerHTML = '<div class="text-center mt-3"><div class="spinner"></div><span>جاري التحميل...</span></div>';
 
-        var token = localStorage.getItem('authToken') || '';
+        var token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
         if (token) {
             var parts = monthYear.split('-');
             var month = parts[1] ? parseInt(parts[1]) : new Date().getMonth() + 1;

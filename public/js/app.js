@@ -15,13 +15,22 @@ var currentShiftStatus = null;  // 'active' | 'pending_handover' | 'archived' | 
 // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
 // يُكتب localStorage.currentShiftId فقط بعد تأكيد الخادم، ويُمسح فوراً عند
 // تأكيد «لا مناوبة نشطة» أو اختلاف المعرّف.
+// D-28: رقم تسلسلي للطلبات — ردّ متأخر من استدعاء أقدم لا يُطبَّق أبداً
+// (كان رد «لا مناوبة» القديم يمسح الـ cache بعد أن كتبته مناوبة بدأت للتو).
+var loadCurrentShiftSeq = 0;
 async function loadCurrentShift() {
+    var mySeq = ++loadCurrentShiftSeq;
     try {
         const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
         const res = await fetch('/api/current-shift', {
             headers: token ? { 'Authorization': 'Bearer ' + token } : {}
         });
         const data = await res.json();
+        // D-28: تجاهل أي رد وصل بعد بدء طلب أحدث — الأحدث وحده يكتب الحالة
+        if (mySeq !== loadCurrentShiftSeq) {
+            console.log('[Shift] D-28: stale response ignored (seq ' + mySeq + ' < ' + loadCurrentShiftSeq + ')');
+            return;
+        }
         if (data.success && data.shift && data.shift.id) {
             currentShiftId = data.shift.id;
             currentShiftStatus = data.shift.status || 'active';
@@ -3764,6 +3773,9 @@ async function startNewShift() {
             // ============================================
             // STEP 1: Store new shift ID
             // ============================================
+            // OV-S5-02: التقط معرّف المناوبة السابقة قبل الاستبدال — تنظيف
+            // مفاتيح reportTypes_ أدناه يجب أن يحذف مفتاح القديمة لا الجديدة
+            var previousShiftId = currentShiftId;
             currentShiftId = result.shiftId;
             try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
             
@@ -3775,10 +3787,13 @@ async function startNewShift() {
             // centersData = {};
             lastKnownUpdate = 0;
             
-            // Clear report type stats (if using localStorage for types)
+            // OV-S5-02: تنظيف مفاتيح إحصاءات أنواع البلاغات للمناوبة السابقة
+            // (كان الكود يحذف مفتاح المناوبة الجديدة بعد كتابة currentShiftId
+            // فتتراكم مفاتيح المناوبات القديمة يتيمةً في localStorage)
             try {
-                var typeStorageKey = 'reportTypes_' + result.shiftId;
-                localStorage.removeItem('reportTypes_' + (currentShiftId || 'old'));
+                if (previousShiftId && previousShiftId !== result.shiftId) {
+                    localStorage.removeItem('reportTypes_' + previousShiftId);
+                }
             } catch(e) {}
             
             // ============================================
@@ -4451,7 +4466,8 @@ async function deleteCurrentShift() {
         var response = await fetch('/api/shifts/' + targetId, { method: 'DELETE' });
         var result = await response.json();
         if (result.success) {
-            alert("✅ تم حذف المناوبة");
+            // S7: إشعار غير حاجب بدل alert الأصلي
+            showNotification('حذف المناوبة', 'تم حذف المناوبة بنجاح', 'success', 4000);
             if (targetId === currentShiftId) { currentShiftId = null; }
             if (targetId === viewingShiftId) {
                 viewingShiftId = null;
@@ -5378,7 +5394,7 @@ async function deleteIncidentRecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف بلاغ الحادث:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadIncidentRecords();
@@ -5611,7 +5627,7 @@ async function deleteSeniorRecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف مناوبة كبار المسعفين:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadSeniorShifts();
@@ -5755,7 +5771,7 @@ async function deleteAirRecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف بلاغ الإسعاف الجوي:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadAirRecords();
@@ -5894,7 +5910,7 @@ async function deleteDailyRecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف التقرير اليومي:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadDailyRecords();
@@ -6130,7 +6146,7 @@ async function deleteERecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف حالة E:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadERecords();
@@ -6313,7 +6329,7 @@ async function deleteEscalationRecord(id) {
         if (!response.ok) throw new Error('status=' + response.status);
     } catch (e) {
         console.error('❌ فشل في حذف بلاغ التصعيد:', e);
-        alert('❌ فشل في الحفظ — تحقق من الاتصال');
+        alert('❌ فشل في الحذف — تحقق من الاتصال');
         return;
     }
     await loadEscalationRecords();

@@ -2011,13 +2011,27 @@ function _authBindVal(v) {
 }
 
 const TokenBlacklist = {
-  async add(tokenHash) {
-    const result = await run('INSERT INTO token_blacklist (token_hash) VALUES (?)', [tokenHash]);
+  // D-15: expires_at يُعبَّأ من exp التوكن عند الإبطال حتى يمكن تنظيف الصفوف
+  // المنتهية دورياً بدل تراكمها إلى الأبد (صفوف بلا expires_at تُبقى — محافظة).
+  // يُخزَّن بصيغة SQLite datetime ('YYYY-MM-DD HH:MM:SS' UTC) حتى تكون
+  // المقارنة النصية مع datetime('now') صحيحة.
+  async add(tokenHash, expiresAt) {
+    let exp = null;
+    if (expiresAt) {
+      const d = new Date(expiresAt);
+      if (!isNaN(d.getTime())) exp = d.toISOString().replace('T', ' ').slice(0, 19);
+    }
+    const result = await run('INSERT INTO token_blacklist (token_hash, expires_at) VALUES (?, ?)', [tokenHash, exp]);
     return result.id;
   },
   async isBlacklisted(tokenHash) {
     const row = await get('SELECT id FROM token_blacklist WHERE token_hash = ? LIMIT 1', [tokenHash]);
     return !!row;
+  },
+  // D-15: تنظيف محافظ — يحذف فقط الصفوف التي ثبت انتهاء توكنها
+  async purgeExpired() {
+    const result = await run("DELETE FROM token_blacklist WHERE expires_at IS NOT NULL AND expires_at < datetime('now')");
+    return result.changes || 0;
   }
 };
 

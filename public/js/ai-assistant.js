@@ -68,7 +68,7 @@
 
         async getCurrentUser() {
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 if (!token) return null;
                 const res = await fetch('/api/auth/me', {
                     headers: { 'Authorization': 'Bearer ' + token }
@@ -265,7 +265,7 @@
 
         async loadSessions() {
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 if (!token) return;
                 const res = await fetch(`${AI_CONFIG.apiBase}/sessions`, {
                     headers: { 'Authorization': 'Bearer ' + token }
@@ -321,7 +321,7 @@
 
         async loadSessionMessages(sessionId) {
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 if (!token) return;
                 this.showTyping();
                 const res = await fetch(`${AI_CONFIG.apiBase}/sessions/${sessionId}/messages`, {
@@ -360,7 +360,7 @@
 
         async deleteSession(sessionId) {
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 if (!token) return;
                 const res = await fetch(`${AI_CONFIG.apiBase}/sessions/${sessionId}`, {
                     method: 'DELETE',
@@ -380,7 +380,7 @@
 
         async loadSuggestedQuestions() {
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 const res = await fetch(`${AI_CONFIG.apiBase}/suggest?count=${AI_CONFIG.suggestionsCount}`, {
                     headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                 });
@@ -506,7 +506,7 @@
             this.showTyping();
 
             try {
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
                 const res = await fetch(`${AI_CONFIG.apiBase}/ask`, {
                     method: 'POST',
                     headers: {

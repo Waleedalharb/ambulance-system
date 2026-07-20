@@ -9,7 +9,7 @@
     var unreadCount = 0;
 
     function getToken() {
-        return localStorage.getItem('authToken') || '';
+        return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '';
     }
 
     // ==========================================
