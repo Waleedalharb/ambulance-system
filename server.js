@@ -338,8 +338,8 @@ function initWebSocket(server) {
                 user: ws.user,
                 lastSeen: Date.now()
             });
-            // Broadcast user_online to all connected clients
-            broadcast({
+            // Broadcast user_online to all connected WS clients (presence = chat — OV-S6: WS-only)
+            broadcastToAll({
                 type: 'user_online',
                 userId: ws.user.id,
                 name: ws.user.name,
@@ -407,7 +407,7 @@ function initWebSocket(server) {
                     console.log('👋 User logged out (tab close):', ws.user ? ws.user.name : 'unknown');
                     if (ws.user && ws.user.id) {
                         onlineUsers.delete(ws.user.id);
-                        broadcast({
+                        broadcastToAll({
                             type: 'user_offline',
                             userId: ws.user.id,
                             name: ws.user.name,
@@ -427,8 +427,8 @@ function initWebSocket(server) {
             // Remove from online users
             if (ws.user && ws.user.id) {
                 onlineUsers.delete(ws.user.id);
-                // Broadcast user_offline to all connected clients
-                broadcast({
+                // Broadcast user_offline to all connected WS clients (presence = chat — OV-S6: WS-only)
+                broadcastToAll({
                     type: 'user_offline',
                     userId: ws.user.id,
                     name: ws.user.name,
@@ -458,23 +458,13 @@ function initWebSocket(server) {
     }, 30000);
 }
 
-// دالة لبث الرسائل لجميع المتصلين (WebSocket + SSE)
+// دالة لبث الأحداث التشغيلية العامة لجميع المتصلين — SSE فقط.
+// OV-S6 (قناة لحظية واحدة): SSE هو القناة الوحيدة للأحداث التشغيلية server→client.
+// WebSocket محجوز حصرياً للشات ثنائي الاتجاه عبر الدوال الموجهة
+// (broadcastToConversation / broadcastToAll / broadcastToRoles / broadcastToUsers).
+// كان البث المزدوج (WS + SSE) يوصل كل حدث مرتين لكل عميل متصل بالقناتين
+// (toast مزدوج + جلب مزدوج — OV-S4-01 / D-14).
 function broadcast(data) {
-    var message = JSON.stringify(data);
-    // بث عبر WebSocket
-    clients = clients.filter(function(client) {
-        if (client.readyState === WebSocket.OPEN) {
-            try {
-                client.send(message);
-                return true;
-            } catch (e) {
-                console.error('Broadcast send error:', e.message);
-                return false;
-            }
-        }
-        return false;
-    });
-    // بث عبر SSE
     broadcastSSE(data);
 }
 

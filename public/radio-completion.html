@@ -392,22 +392,37 @@ var REASONS = [
 var globalNotes = '';
 
 // ============================================
-// WEBSOCKET SYNC
+// LIVE SYNC (SSE) — OV-S6: قناة لحظية واحدة
+// حُوّل النقل من WebSocket إلى EventSource على /api/sse (نفس قناة app.js).
+// ملاحظة توثيقية: لم يكن لهذه الصفحة onmessage أصلاً (لم تستقبل شيئاً)،
+// ورسالتا team_status_changed/completion_saved اللتان كانتا تُرسلان عبر WS
+// لم يكن الخادم يعالجهما إطلاقاً (سلسلة ميتة — موثقة في تقرير OV-S6).
 // ============================================
-var ws = null;
-var wsConnected = false;
+var sseSync = null;
+var sseConnected = false;
 
-function initWebSocket() {
-    var token = localStorage.getItem('authToken');
+function getRadioToken() {
+    // OV-S6: مفتاح التوكن الموحد — auth_access_token أولاً ثم authToken احتياطاً
+    return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+}
+
+function initLiveSync() {
+    var token = getRadioToken();
     if (!token) return;
-    var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(wsProtocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
-    ws.onopen = function() { wsConnected = true; };
-    ws.onclose = function(event) {
-        wsConnected = false;
-        if (event && event.code === 1008) {
+    if (sseSync) {
+        try { sseSync.close(); } catch(e) {}
+        sseSync = null;
+    }
+    sseSync = new EventSource('/api/sse?token=' + encodeURIComponent(token));
+    sseSync.onopen = function() { sseConnected = true; };
+    // لا onmessage: هذه الصفحة لم تكن تستهلك أي حدث وارد (كما كان الحال مع WS)
+    sseSync.onerror = function() {
+        sseConnected = false;
+        if (sseSync && sseSync.readyState === EventSource.CLOSED) {
             // Auth failure - try refresh token then reconnect
-            console.log('🔴 Radio WS auth failed, refreshing token...');
+            console.log('🔴 Radio SSE auth failed, refreshing token...');
+            try { sseSync.close(); } catch(e) {}
+            sseSync = null;
             fetch('/api/auth/refresh', {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
@@ -417,44 +432,34 @@ function initWebSocket() {
             }).then(function(data) {
                 if (data.success && data.token) {
                     localStorage.setItem('authToken', data.token);
-                    console.log('✅ Radio WS token refreshed, reconnecting...');
-                    setTimeout(initWebSocket, 1000);
+                    localStorage.setItem('auth_access_token', data.token);
+                    console.log('✅ Radio SSE token refreshed, reconnecting...');
+                    setTimeout(initLiveSync, 1000);
                 } else {
                     throw new Error('no token');
                 }
             }).catch(function(e) {
-                console.error('❌ Radio WS token refresh failed:', e);
+                console.error('❌ Radio SSE token refresh failed:', e);
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('auth_access_token');
                 localStorage.removeItem('currentUser');
-                setTimeout(initWebSocket, 5000);
+                setTimeout(initLiveSync, 5000);
             });
             return;
         }
-        setTimeout(initWebSocket, 5000);
+        // EventSource يعيد الاتصال تلقائياً للأخطاء العابرة
     };
 }
 
+// سلسلة ميتة موثقة (OV-S6): الخادم لا يعالج team_status_changed/completion_saved
+// إطلاقاً (لا handler في ws.on('message'))، فكانت هذه الدوال لا-عملية فعلياً.
+// تُبقى كـ no-ops حفاظاً على المستدعين مع توثيق الجذر بدل إخفائه.
 function broadcastTeamStatus(teamId, status) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            type: 'team_status_changed',
-            teamId: teamId,
-            status: status,
-            shiftDate: getShiftDate(),
-            shiftType: getShiftType()
-        }));
-    }
+    // no-op — كان يرسل عبر WS رسالة لا يعالجها الخادم
 }
 
 function broadcastCompletionSaved() {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            type: 'completion_saved',
-            shiftDate: getShiftDate(),
-            shiftType: getShiftType(),
-            teams: teamStatus
-        }));
-    }
+    // no-op — كان يرسل عبر WS رسالة لا يعالجها الخادم
 }
 
 // ============================================
@@ -591,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
     initStatuses();
     loadFromSmartSchedule();
-    initWebSocket();
+    initLiveSync();
     
     // Phase 2+3: Fetch current shift_id from server on load
     fetchCurrentShiftId().then(function(sid) {

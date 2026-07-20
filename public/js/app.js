@@ -595,6 +595,10 @@ AuthManager.onAuthEvent(function(event, data) {
 });
 
 function handleSSEEvent(data) {
+    // OV-S6: بعد إزالة websocket-sync.js من index.html أصبحت هذه القناة (SSE) هي
+    // الناقل الوحيد للأحداث التشغيلية على الصفحة الرئيسية. الفروع أدناه تغطي
+    // بالضبط الأنواع التي كانت تستهلكها الصفحة عبر websocket-sync (أي أن
+    // معالجاتها معرّفة فعلاً في app.js) وتستدعي نفس المعالجات الموجودة.
     switch(data.type) {
         case 'new_report':
             showNotification('بلاغ جديد', data.message, 'info', 5000);
@@ -607,6 +611,9 @@ function handleSSEEvent(data) {
             showNotification('تم التحديث', 'تم تحديث الثيم من قبل مشرف آخر', 'info', 3000);
             applyGlobalTheme();
             break;
+        case 'theme_removed':
+            applyGlobalTheme();
+            break;
         case 'shift_archived':
             // OV-S5: الأرشفة تُبث لحظياً — التقارب الفوري بدل انتظار استطلاع الـ 60ث
             showNotification('أرشفة مناوبة', data.message || 'تمت أرشفة المناوبة', 'info', 5000);
@@ -615,10 +622,98 @@ function handleSSEEvent(data) {
         case 'shift_started':
             // OV-S5: بدء مناوبة جديدة (من أي عميل) — جلب الحقيقة من الخادم فوراً
             loadCurrentShift();
+            loadShifts();
+            loadAllData();
+            break;
+        case 'shift_updated':
+        case 'shift_deleted':
+            loadShifts();
+            loadAllData();
+            break;
+        case 'vacations_updated':
+        case 'vacations_cleared':
+            loadVacations();
+            renderControlList(false);
+            break;
+        case 'air_ambulance_saved':
+        case 'air_ambulance_deleted':
+        case 'air_ambulance_cleared':
+            loadAirRecords();
+            break;
+        case 'peak_mission_added':
+        case 'peak_alert_resolved':
+        case 'peak_mission_deleted':
+            checkForAlerts();
+            loadPeakPlans();
+            break;
+        case 'peak_plan_added':
+        case 'peak_plan_updated':
+        case 'peak_plan_deleted':
+            loadPeakPlans();
+            checkForAlerts();
+            break;
+        case 'doc_uploaded':
+        case 'doc_deleted':
+            loadDocsData();
+            break;
+        case 'ops_files_uploaded':
+        case 'ops_file_deleted':
+            opsLoadData();
+            break;
+        case 'monthly_table_uploaded':
+        case 'monthly_table_deleted':
+            loadSavedTable(true);
+            break;
+        case 'report_entry_added':
+        case 'report_entry_deleted':
+        case 'report_entry_cleared':
+            loadAllData();
+            break;
+        case 'incident_added':
+        case 'incident_deleted':
+            loadIncidentRecords();
+            loadAllData();
+            break;
+        case 'senior_shift_added':
+        case 'senior_shift_deleted':
+            loadSeniorShifts();
+            loadAllData();
+            break;
+        case 'e_case_added':
+        case 'e_case_deleted':
+            loadERecords();
+            loadAllData();
+            break;
+        case 'escalation_added':
+        case 'escalation_deleted':
+            loadEscalationRecords();
+            loadAllData();
+            break;
+        case 'daily_report_added':
+        case 'daily_report_deleted':
+            loadDailyRecords();
+            loadAllData();
+            break;
+        case 'shift_absence_added':
+        case 'shift_absence_deleted':
+            loadAbsenceRecords();
+            break;
+        case 'shift_note_added':
+        case 'shift_note_deleted':
+            loadShiftNotes();
+            break;
+        case 'audit_log_added':
+            renderAuditLog();
             break;
         case 'connected':
             console.log('SSE:', data.message);
             break;
+    }
+    // توازن الإشعارات مع سلوك websocket-sync السابق: أي حدث يحمل message
+    // كان يُظهر Toast عاماً (showNotification fallback) — باستثناء الأنواع
+    // التي لها إشعارها الخاص أعلاه حتى لا يتضاعف الإشعار.
+    if (data.message && data.type !== 'new_report' && data.type !== 'theme_updated' && data.type !== 'shift_archived' && data.type !== 'connected') {
+        showNotification('تحديث', data.message, 'info', 3000);
     }
 }
 

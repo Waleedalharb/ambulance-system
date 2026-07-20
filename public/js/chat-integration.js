@@ -14,6 +14,14 @@ const ChatIntegration = {
     notifiedMessages: {},
 
     /**
+     * OV-S6: مفتاح التوكن الموحد — auth_access_token (AuthManager) أولاً ثم authToken (القديم) احتياطاً.
+     * جذر D-14: قراءة المفتاح القديم فقط كانت تفتح socket بلا توكن صالح فيبقى عالقاً/يُرفض.
+     */
+    getToken() {
+        return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+    },
+
+    /**
      * Initialize — connect WebSocket for instant delivery
      */
     async init() {
@@ -40,7 +48,7 @@ const ChatIntegration = {
      * Check if user is authenticated
      */
     isAuthenticated() {
-        const token = localStorage.getItem('authToken');
+        const token = this.getToken();
         return !!token;
     },
 
@@ -49,7 +57,7 @@ const ChatIntegration = {
      */
     connectWebSocket() {
         this._stopped = false;
-        const token = localStorage.getItem('authToken');
+        const token = this.getToken();
         if (!token) return;
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -105,6 +113,30 @@ const ChatIntegration = {
         // Ignore ping/pong
         if (data.type === 'pong' || data.type === 'ping' || data.type === 'connected') return;
         if (data.type === 'online_users_list') return;
+
+        // OV-S6: أحداث الحضور أصبحت WS-only (broadcastToAll) وتصل عبر هذه القناة.
+        // نفس منطق websocket-sync.js السابق حرفياً حتى يستمر تحديث واجهة المتصلين.
+        if (data.type === 'user_online' || data.type === 'user_offline') {
+            if (data.onlineUsers) {
+                window.onlineUsersList = data.onlineUsers;
+                if (typeof updateOnlineUsersUI === 'function') {
+                    updateOnlineUsersUI(data.onlineUsers);
+                }
+            }
+            if (typeof updateUserStatusIndicator === 'function') {
+                updateUserStatusIndicator(data.userId, data.type === 'user_online');
+            }
+            return;
+        }
+        if (data.type === 'online_users') {
+            if (data.users) {
+                window.onlineUsersList = data.users;
+                if (typeof updateOnlineUsersUI === 'function') {
+                    updateOnlineUsersUI(data.users);
+                }
+            }
+            return;
+        }
 
         // NEW: Handle incoming chat messages — INSTANT NOTIFICATION
         if (data.type === 'chat_message' && data.message && data.conversationId) {
@@ -223,7 +255,7 @@ const ChatIntegration = {
      */
     async updateBadge() {
         try {
-            const token = localStorage.getItem('authToken');
+            const token = this.getToken();
             if (!token) return;
 
             const res = await fetch('/api/chat/conversations', {
@@ -369,7 +401,7 @@ const ChatIntegration = {
         list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</p>';
 
         try {
-            const token = localStorage.getItem('authToken');
+            const token = this.getToken();
             if (!token) {
                 list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">يرجى تسجيل الدخول</p>';
                 return;

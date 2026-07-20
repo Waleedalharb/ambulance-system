@@ -1,10 +1,14 @@
 // ============================================
-// WebSocket Sync Client — جميع الصفحات
-// يتصل بالخادم ويستقبل broadcast updates + يعرض إشعارات + يحدث البيانات
+// Sync Client (SSE) — جميع الصفحات
+// OV-S6 (قناة لحظية واحدة): النقل حُوّل من WebSocket إلى Server-Sent Events
+// على /api/sse — نفس قناة app.js. WebSocket أصبح محجوزاً حصرياً للشات.
+// يستقبل broadcast updates + يعرض إشعارات + يحدث البيانات
+// عقد المعالجة الخارجي لم يتغير: syncUpdate، showSyncToast،
+// updateConnectionStatusUI، وكل فروع switch لأنواع الأحداث كما هي.
 // ============================================
 (function() {
     // لا إنهاء مبكر عند غياب التوكن هنا: هذا الملف يُحمَّل قبل تسجيل الدخول،
-    // والخروج المبكر كان يمنع تسجيل AuthGate.onStart فلا يتصل WS بعد الدخول إلا بإعادة تحميل.
+    // والخروج المبكر كان يمنع تسجيل AuthGate.onStart فلا يتصل SSE بعد الدخول إلا بإعادة تحميل.
     // الفحص الفعلي للتوكن يتم داخل connect() وعبر بوابة AuthGate.
 
     // =====================
@@ -53,61 +57,59 @@
         document.head.appendChild(style);
     }
 
-    var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var ws = null;
-    var wsConnected = false;
+    // OV-S6: مفتاح التوكن الموحد — auth_access_token (AuthManager) أولاً ثم authToken (القديم) احتياطاً
+    function getSyncToken() {
+        return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+    }
+
+    var es = null;
+    var sseConnected = false;
     var reconnectAttempts = 0;
     var maxReconnectAttempts = 10;
     var reconnectDelay = 3000;
-    var pingInterval = null;
     var stopped = false; // AuthGate: إيقاف نهائي — بلا إعادة اتصال بعد الخروج/انتهاء الجلسة
 
     function connect() {
         if (stopped) return;
+        // Include auth token in SSE connection (same contract as app.js /api/sse?token=)
+        var token = getSyncToken();
+        if (!token) {
+            console.log('Sync: no auth token, skipping SSE connect');
+            return;
+        }
         try {
-            // Include auth token in WebSocket connection
-            var token = localStorage.getItem('authToken');
-            if (!token) {
-                console.log('Sync: no authToken, skipping WebSocket connect');
-                return;
+            if (es) {
+                try { es.close(); } catch(e) {}
+                es = null;
             }
-            ws = new WebSocket(wsProtocol + '//' + location.host + '/ws?token=' + encodeURIComponent(token));
+            es = new EventSource('/api/sse?token=' + encodeURIComponent(token));
         } catch(e) {
-            console.error('WebSocket creation failed:', e);
+            console.error('SSE creation failed:', e);
             scheduleReconnect();
             return;
         }
-        
-        ws.onopen = function() {
-            wsConnected = true;
+
+        es.onopen = function() {
+            sseConnected = true;
             reconnectAttempts = 0;
-            console.log('✅ Sync WebSocket connected');
+            console.log('✅ Sync SSE connected');
             // Update UI status indicator
             if (typeof updateConnectionStatusUI === 'function') {
                 updateConnectionStatusUI(true);
             }
-            // Send presence ping every 20 seconds
-            if (pingInterval) clearInterval(pingInterval);
-            pingInterval = setInterval(function() {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'chat_presence' }));
-                }
-            }, 20000);
         };
 
-        ws.onmessage = function(event) {
+        es.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
                 console.log('📡 Sync received:', data.type, data.message || '');
 
-                // Handle server ping
-                if (data.type === 'ping') {
-                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                if (data.type === 'ping' || data.type === 'pong') {
                     return;
                 }
 
                 if (data.type === 'connected') {
-                    console.log('WS:', data.message);
+                    console.log('SSE:', data.message);
                     return;
                 }
 
@@ -334,7 +336,7 @@
                     case 'completion_updated':
                     case 'team_status_changed':
                         // Completion/Radio status updated — refresh workforce and distribution
-                        // Update readyTeamNames directly from WebSocket data for instant reflection
+                        // Update readyTeamNames directly from the event data for instant reflection
                         if (data.teamId && data.status) {
                             window.readyTeamNames = window.readyTeamNames || {};
                             var tid = data.teamId;
@@ -393,14 +395,14 @@
                         break;
                     case 'user_online':
                     case 'user_offline':
-                        // Update global online users list
+                        // أحداث حضور (شات) — لا تصل هنا بعد OV-S6 (أصبحت WS-only عبر broadcastToAll)
+                        // يبقى الفرع للتوافق إن عاد الحدث عبر القناة العامة مستقبلاً
                         if (data.onlineUsers) {
                             window.onlineUsersList = data.onlineUsers;
                             if (typeof updateOnlineUsersUI === 'function') {
                                 updateOnlineUsersUI(data.onlineUsers);
                             }
                         }
-                        // Update specific user status if shown in chat/user list
                         if (typeof updateUserStatusIndicator === 'function') {
                             updateUserStatusIndicator(data.userId, data.type === 'user_online');
                         }
@@ -418,44 +420,44 @@
                         console.log('Sync: unknown type', data.type);
                 }
             } catch(e) {
-                console.error('Sync WS parse error:', e);
+                console.error('Sync SSE parse error:', e);
             }
         };
 
-        ws.onerror = function(err) {
-            console.error('Sync WebSocket error:', err);
-        };
-
-        ws.onclose = function(event) {
-            wsConnected = false;
+        es.onerror = function(err) {
+            var wasConnected = sseConnected;
+            sseConnected = false;
             if (typeof updateConnectionStatusUI === 'function') {
                 updateConnectionStatusUI(false);
             }
-            if (pingInterval) clearInterval(pingInterval);
-            if (stopped) return; // أُغلق عمداً عبر AuthGate — بلا إعادة اتصال
-            // If closed due to authentication failure (code 1008)
-            if (event && event.code === 1008) {
-                // فشل مصادقة ⇒ إيقاف نهائي بلا عاصفة إعادة اتصال.
-                // تجديد التوكن مسؤولية AuthManager وحدها (fetch الملفوف يعالج 401)،
-                // وبوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار AuthManager.
-                console.log('🔴 WebSocket closed due to auth failure (1008) — terminal halt, no reconnect');
+            if (stopped) {
+                try { es && es.close(); } catch(e) {}
+                return; // أُغلق عمداً عبر AuthGate — بلا إعادة اتصال
+            }
+            // إيقاف نهائي: رفض الخادم الاتصال (401/403 ⇒ readyState=CLOSED) — بلا عاصفة إعادة اتصال.
+            // تجديد التوكن مسؤولية AuthManager وحدها (fetch الملفوف يعالج 401)،
+            // وبوابة المصادقة تعيد التطبيق لحالة anonymous عبر مسار AuthManager.
+            if (es && es.readyState === EventSource.CLOSED) {
+                console.log('🔴 Sync SSE: connection refused (auth failure) — terminal halt, no reconnect');
+                try { es.close(); } catch(e) {}
+                es = null;
                 return;
             }
+            // خطأ عابر: نغلق يدوياً ونعيد الاتصال بتراجع تدريجي (نفس سياسة WS السابقة)
+            console.log('❌ Sync SSE error' + (wasConnected ? ' (was connected)' : '') + ', scheduling reconnect...');
+            try { es && es.close(); } catch(e) {}
+            es = null;
             scheduleReconnect();
         };
     }
 
     function disconnect() {
         stopped = true;
-        wsConnected = false;
+        sseConnected = false;
         reconnectAttempts = 0;
-        if (pingInterval) {
-            clearInterval(pingInterval);
-            pingInterval = null;
-        }
-        if (ws) {
-            try { ws.close(); } catch(e) {}
-            ws = null;
+        if (es) {
+            try { es.close(); } catch(e) {}
+            es = null;
         }
     }
 
@@ -465,10 +467,10 @@
         reconnectAttempts++;
         if (reconnectAttempts <= maxReconnectAttempts) {
             var delay = Math.min(reconnectDelay * reconnectAttempts, 30000);
-            console.log('Sync WebSocket closed, reconnecting in ' + delay + 'ms (attempt ' + reconnectAttempts + '/' + maxReconnectAttempts + ')');
+            console.log('Sync SSE closed, reconnecting in ' + delay + 'ms (attempt ' + reconnectAttempts + '/' + maxReconnectAttempts + ')');
             setTimeout(connect, delay);
         } else {
-            console.log('Sync WebSocket: max reconnect attempts reached, falling back to polling');
+            console.log('Sync SSE: max reconnect attempts reached, falling back to polling');
             startFallbackPolling();
         }
     }
@@ -486,13 +488,6 @@
             setInterval(poll, 30000);
         }
     }
-
-    // Notify server when tab/browser closes
-    window.addEventListener('beforeunload', function() {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'logout', timestamp: Date.now() }));
-        }
-    });
 
     // AuthGate: الاتصال فقط عند المصادقة والفك عند الخروج (index.html).
     // يُحسم عند DOMContentLoaded لأن هذا الملف يُحمَّل قبل auth-manager.js.
