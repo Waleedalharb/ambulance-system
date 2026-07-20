@@ -1454,6 +1454,9 @@ async function saveRecords(records) {
     // أو اختلاف المعرّف يُمسح المخزن ويُعامل كعدم وجود مناوبة (لا كتابة بمعرّف بائت).
     var shiftId = await fetchVerifiedShiftId();
 
+    var saveFailed = false;
+    var saveErrorMsg = '';
+
     // POST new records
     for (var i = 0; i < records.length; i++) {
         if (!serverIds[records[i].id]) {
@@ -1462,7 +1465,7 @@ async function saveRecords(records) {
                 if (shiftId) {
                     record.shift_id = parseInt(shiftId);
                 }
-                await fetch('/api/report-entry', {
+                var postResp = await fetch('/api/report-entry', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1470,7 +1473,16 @@ async function saveRecords(records) {
                     },
                     body: JSON.stringify(record)
                 });
+                // S5-T: صدق الواجهة — رد 400 (لا مناوبة نشطة / معرّف لا يطابق) يُعرض كما هو، لا نجاح زائف
+                if (!postResp.ok) {
+                    var errBody = {};
+                    try { errBody = await postResp.json(); } catch (parseErr) {}
+                    saveFailed = true;
+                    saveErrorMsg = errBody.error || 'فشل في حفظ البلاغ';
+                }
             } catch(e) {
+                saveFailed = true;
+                saveErrorMsg = 'تعذّر الاتصال بالخادم';
                 console.error('Failed to POST record:', e);
             }
         }
@@ -1497,7 +1509,15 @@ async function saveRecords(records) {
         }
     }
 
+    // S5-T: عند الفشل نعرض رسالة الخادم الصادقة ونعيد مزامنة الحالة من الخادم
+    // (السجل لم يُنشأ فعلاً — لا نعتمد النسخة المحلية كأنها محفوظة).
+    if (saveFailed) {
+        showToast(saveErrorMsg || 'فشل في حفظ البلاغ', 'error');
+        serverRecordsCache = await getRecords();
+        return false;
+    }
     serverRecordsCache = records.slice();
+    return true;
 }
 
 function getTodayDate() {
@@ -1836,7 +1856,14 @@ async function saveQuickReport(event) {
 
     var records = (await getRecords()).slice();
     records.unshift(record);
-    await saveRecords(records);
+    var quickSaved = await saveRecords(records);
+    if (!quickSaved) {
+        // S5-T: فشل الحفظ — رسالة الخادم الصادقة عُرضت؛ لا نجاح زائف ولا عداد
+        renderCenters();
+        await renderTable();
+        await updateStats();
+        return;
+    }
 
     // تحديث العداد المؤقت
     if (!tempUnitCounters[currentQuickUnit]) {
@@ -1895,7 +1922,14 @@ async function saveAdvancedReport(event) {
 
     var records = (await getRecords()).slice();
     records.unshift(record);
-    await saveRecords(records);
+    var advSaved = await saveRecords(records);
+    if (!advSaved) {
+        // S5-T: فشل الحفظ — رسالة الخادم الصادقة عُرضت؛ لا نجاح زائف ولا عداد
+        renderCenters();
+        await renderTable();
+        await updateStats();
+        return;
+    }
 
     if (unit) {
         if (!tempUnitCounters[unit]) {

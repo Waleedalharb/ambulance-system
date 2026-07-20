@@ -6884,14 +6884,35 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
         if (!record || typeof record !== 'object') {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
+
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+
+        // ─── S5-T: ختم سيرفري من مصدر الحقيقة الواحد (نفس آلية الشريحة 4) ───
+        // المناوبة النشطة هي مصدر الحقيقة الوحيد؛ لا يُثق بأي shiftId قادم من العميل.
+        // بلا مناوبة نشطة ⇒ رفض 400. إن أرسل العميل معرّف مناوبة فلا بد أن يطابق
+        // النشطة (منتهية/مؤرشفة/مزوّر/غير صحيح ⇒ رفض 400). الختم النهائي سيرفري دائماً.
+        const activeShift = await opsEngine.shifts.getActiveShift();
+        if (!activeShift) {
+            return res.status(400).json({ error: 'لا توجد مناوبة نشطة - ابدأ مناوبة أولاً' });
+        }
+        const clientShiftId = record.shiftId != null ? record.shiftId
+            : (record.shift_id != null ? record.shift_id : null);
+        if (clientShiftId != null && Number(clientShiftId) !== Number(activeShift.id)) {
+            console.warn(`[ReportEntry] S5-T رفض — shiftId العميل(${clientShiftId}) لا يطابق النشطة(${activeShift.id})`);
+            return res.status(400).json({ error: 'معرّف المناوبة المرسل لا يطابق المناوبة النشطة' });
+        }
+
         const records = await contentList('report_entries');
+        // id/createdAt/shiftId سيرفرية فوق جسم الطلب — لا يقبل أي ختم من العميل
         const newRecord = {
-            id: Date.now().toString(),
             ...record,
-            createdAt: new Date().toISOString()
+            id: Date.now().toString(),
+            createdAt: new Date().toISOString(),
+            shiftId: activeShift.id,
+            shift_id: activeShift.id
         };
-        // Archive slice: SQLite + explicit shift stamp (dispatch log belongs to the active shift)
-        await contentInsert('report_entries', await getActiveShiftId(), newRecord);
+        // Archive slice: SQLite + explicit shift stamp — القيمة المؤكدة نفسها من getActiveShift
+        await contentInsert('report_entries', activeShift.id, newRecord);
 
         broadcast({
             type: 'report_entry_added',
