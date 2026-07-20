@@ -111,21 +111,29 @@ async function main() {
     const cur2 = await api('GET', '/api/current-shift');
     record('تساق عدّاد المناوبة مع البلاغات (مزامنة)', cur2.ok && cur2.data.shift && cur2.data.shift.totalReports === 1, `totalReports=${cur2.data.shift && cur2.data.shift.totalReports}`);
 
-    // ─── 6. Completion: save + update + read ───
+    // ─── 6. Completion: server-stamped SSOT (OV-S6-01) + read by shift_id ───
+    // The active shift row is the stamp source; client type/date are ignored.
+    const activeShift = cur.data.shift; // { id, type, date, ... } — مناوبة 'ليل' بدأت في الخطوة 4
     const comp1 = await api('POST', '/api/shift-completion', {
-        shiftType: 'ليل', shiftDate: '2026-07-17', shift_id: shiftId,
+        shiftType: 'صباح', shiftDate: '2026-07-17', shift_id: shiftId, // ختم واجهة خاطئ عمداً
         teams: { 'جنوب 3': { status: 'ready', centerName: 'منفوحة' } }, notes: 'regression', timestamp: new Date().toISOString()
     });
-    record('حفظ التكميل', comp1.ok && comp1.data.success, JSON.stringify(comp1.data));
+    record('حفظ التكميل (الختم سيرفري SSOT)', comp1.ok && comp1.data.success && comp1.data.corrected === true
+        && comp1.data.stampedShiftType === activeShift.type && comp1.data.stampedShiftDate === activeShift.date,
+        JSON.stringify({ corrected: comp1.data && comp1.data.corrected, stampedShiftType: comp1.data && comp1.data.stampedShiftType, stampedShiftDate: comp1.data && comp1.data.stampedShiftDate }));
 
-    const compLatest = await api('GET', '/api/completion/latest?shiftDate=2026-07-17&shiftType=' + encodeURIComponent('ليل'));
-    record('قراءة التكميل المحفوظ', compLatest.ok && compLatest.data.success && compLatest.data.completion && !!compLatest.data.completion.teams['جنوب 3']);
+    const compLatest = await api('GET', `/api/completion/latest?shiftDate=${encodeURIComponent(activeShift.date)}&shiftType=${encodeURIComponent(activeShift.type)}`);
+    const compById = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const foundByDateType = compLatest.ok && compLatest.data.success && compLatest.data.completion && !!compLatest.data.completion.teams['جنوب 3'];
+    const foundByShiftId = compById.ok && compById.data.success && compById.data.completion && !!compById.data.completion.teams['جنوب 3']
+        && compById.data.completion.shiftType === activeShift.type && compById.data.completion.shiftDate === activeShift.date;
+    record('قراءة التكميل المحفوظ (date+type و shift_id)', foundByDateType && foundByShiftId, `dateType=${foundByDateType} shiftId=${foundByShiftId}`);
 
     const comp2 = await api('POST', '/api/shift-completion', {
-        shiftType: 'ليل', shiftDate: '2026-07-17', shift_id: shiftId,
+        shiftType: 'صباح', shiftDate: '2026-07-17', shift_id: shiftId, // ختم خاطئ عمداً مجدداً
         teams: { 'جنوب 3': { status: 'missing', centerName: 'منفوحة' } }, notes: 'regression-2', timestamp: new Date().toISOString()
     });
-    const compLatest2 = await api('GET', '/api/completion/latest?shiftDate=2026-07-17&shiftType=' + encodeURIComponent('ليل'));
+    const compLatest2 = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
     const updated = compLatest2.data && compLatest2.data.completion && compLatest2.data.completion.teams['جنوب 3'] && compLatest2.data.completion.teams['جنوب 3'].status === 'missing';
     record('تعديل التكميل ينعكس', comp2.ok && !!updated);
 

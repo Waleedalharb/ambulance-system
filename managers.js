@@ -278,6 +278,17 @@ class CompletionManager {
 
     async getLatestCompletion(shiftDate, shiftType) {
         const row = await this.storage.getLatestCompletion(shiftDate, shiftType);
+        return CompletionManager._normalize(row);
+    }
+
+    // OV-S6-01: latest completion bound to a shift row, regardless of the
+    // stamped type label (historically mis-stamped rows remain readable).
+    async getLatestByShiftId(shiftId) {
+        const row = await this.storage.getLatestCompletionByShiftId(shiftId);
+        return CompletionManager._normalize(row);
+    }
+
+    static _normalize(row) {
         if (!row) return null;
 
         return {

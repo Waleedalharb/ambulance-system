@@ -484,6 +484,8 @@ function getSaudiTime() {
 }
 function getShiftType() {
     if (window.overrideShiftType) return window.overrideShiftType;
+    // OV-S6-01: المناوبة النشطة مصدر الحقيقة — لا اشتقاق من ساعة الجدار إلا في وضع التحضير
+    if (window.activeShiftContext && window.activeShiftContext.type) return window.activeShiftContext.type;
     var hour = getSaudiTime().getHours();
     // Morning shift: 05:00 - 16:59
     // Night shift: 17:00 - 04:59
@@ -491,6 +493,7 @@ function getShiftType() {
 }
 function getShiftDate() {
     if (window.overrideShiftDate) return window.overrideShiftDate;
+    if (window.activeShiftContext && window.activeShiftContext.date) return window.activeShiftContext.date;
     var st = getSaudiTime();
     var y = st.getFullYear();
     var m = st.getMonth(); // 0-indexed
@@ -548,12 +551,33 @@ async function fetchCurrentShiftId() {
             _cachedShiftId = data.shift.id;
             localStorage.setItem('currentShiftId', String(data.shift.id));
             console.log('[fetchCurrentShiftId] From server:', data.shift.id);
+            // OV-S6-01: adopt the active shift's type/date as page context (SSOT)
+            applyActiveShiftContext(data.shift);
             return data.shift.id;
+        }
+        // Server confirmed: no active shift → prep mode. Clear any stale id.
+        if (data.success) {
+            _cachedShiftId = null;
+            window.activeShiftContext = null;
+            try { localStorage.removeItem('currentShiftId'); } catch(e) {}
         }
     } catch (e) {
         console.error('[fetchCurrentShiftId] Error:', e);
     }
     return getCurrentShiftId();
+}
+
+// OV-S6-01: عند وجود مناوبة نشطة تُعتمد قيم صفها (النوع/التاريخ كما هما بلا توحيد)
+// في الشارة والقراءة والحفظ، ويُمنع اشتقاق ساعة الجدار. وضع تحرير الأرشيف
+// (overrideShiftDate من URL) له الأولوية ولا يُمس.
+function applyActiveShiftContext(shift) {
+    if (!shift || !shift.id) return;
+    if (window.overrideShiftDate) return; // وضع تحرير الأرشيف — أولوية للـ URL
+    window.activeShiftContext = { id: shift.id, type: shift.type, date: shift.date };
+    var badge = document.getElementById('shiftBadge');
+    if (badge && shift.type && shift.date) {
+        badge.textContent = shift.type + ' — ' + shift.date + ' (مناوبة نشطة #' + shift.id + ')';
+    }
 }
 
 // ============================================

@@ -504,7 +504,8 @@ window.addEventListener('load', function() {
         </div>
         <div class="toolbar">
             <!-- ===== المجموعة الأولى: من اليمين ===== -->
-            <button id="newShiftBtn" class="btn btn-shift-status on" disabled style="opacity:1; cursor:default;">
+            <!-- OV-S3-03: الحالة الابتدائية «off» — لا «نشطة» قبل تأكيد السيرفر (updateShiftStatus يصحح فور الجلب) -->
+            <button id="newShiftBtn" class="btn btn-shift-status off" disabled style="opacity:1; cursor:default;">
                 <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
                 <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>

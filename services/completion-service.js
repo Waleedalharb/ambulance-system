@@ -96,6 +96,16 @@ class CompletionService {
     }
 
     /**
+     * OV-S6-01: latest completion by shift_id (label-agnostic read).
+     *
+     * @param {number} shiftId
+     * @returns {Object|null} normalized completion or null when none exists
+     */
+    async getLatestByShiftId(shiftId) {
+        return this.engine.completions.getLatestByShiftId(shiftId);
+    }
+
+    /**
      * Classify a team entry as ready (مكتمل) or not-ready (ناقص).
      * The radio UI stores status 'ready' for complete teams; every other
      * status ('missing', 'offline', 'pending', ...) is not-ready.

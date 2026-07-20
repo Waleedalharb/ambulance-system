@@ -12,6 +12,9 @@ const compression = require('compression');
 const cors = require('cors');
 const { ShiftArchiveEngine } = require('./shift-archive-engine');
 const { createEngine, getEngine } = require('./ops-engine');
+// OV-S6-01: server-side shift type/date derivation (prep mode stamping)
+// (aliased: server.js already defines its own identical getCurrentShiftType)
+const { getCurrentShiftType: deriveServerShiftType, getSaudiDateString } = require('./managers');
 
 // ═══════════════════════════════════════════════════════════
 // Operations Engine v1.0 — The New Single Source of Truth
@@ -4316,20 +4319,45 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
     // Slice 1: Route → CompletionService → SQLite tx → COMMIT →
     // CompletionUpdated (+ CenterStatusChanged on ready/not-ready flips).
     try {
-        const { shiftType, shiftDate, teams, notes } = req.body;
-        if (!shiftType || !shiftDate || !teams) {
+        const { teams, notes } = req.body;
+        const clientShiftType = req.body.shiftType;
+        const clientShiftDate = req.body.shiftDate;
+        if (!clientShiftType || !clientShiftDate || !teams) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
 
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
-        const shiftId = await opsEngine.shifts.resolveShiftId(req, shiftDate, shiftType);
+        // ─── OV-S6-01: Server-stamped shift identity (SSOT) ───
+        // The active shift ROW is the single source of truth. Client-derived
+        // type/date (wall-clock) are NEVER trusted for the stamp.
+        let shiftType, shiftDate, shiftId, corrected = false;
+        const activeShift = await opsEngine.shifts.getActiveShift();
+        if (activeShift) {
+            // Active shift: stamp verbatim from its row (no label unification)
+            shiftType = activeShift.shift_type;
+            shiftDate = activeShift.shift_date;
+            shiftId = activeShift.id;
+        } else {
+            // Prep mode (no active shift): the SERVER derives the upcoming
+            // type/date; client values are ignored here too.
+            shiftType = deriveServerShiftType();
+            shiftDate = getSaudiDateString();
+            shiftId = null;
+        }
+        if (clientShiftType !== shiftType || clientShiftDate !== shiftDate) {
+            corrected = true;
+            console.warn(`[ShiftCompletion] OV-S6-01 stamp correction — client(${clientShiftType}/${clientShiftDate}) → server(${shiftType}/${shiftDate}, shift_id=${shiftId})`);
+        }
 
         if (completionService) {
             const result = await completionService.saveCompletion(
                 { shiftType, shiftDate, teams, notes, shiftId }, req.user
             );
-            return res.json({ success: true, message: 'تم حفظ التكميل', ...result });
+            return res.json({
+                success: true, message: 'تم حفظ التكميل', ...result,
+                corrected, stampedShiftType: shiftType, stampedShiftDate: shiftDate
+            });
         }
 
         // Legacy fallback (services unavailable): original inline path
@@ -4337,7 +4365,10 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
             shiftId, shiftType, shiftDate, teams, notes, req.user
         );
 
-        res.json({ success: true, message: 'تم حفظ التكميل', ...result });
+        res.json({
+            success: true, message: 'تم حفظ التكميل', ...result,
+            corrected, stampedShiftType: shiftType, stampedShiftDate: shiftDate
+        });
     } catch (error) {
         console.error('[API] Error saving shift-completion:', error);
         res.status(500).json({ error: 'فشل في حفظ التكميل' });
@@ -4352,9 +4383,24 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
     // Slice 1: Route → CompletionService → SQLite (read)
     try {
         const { shiftDate, shiftType } = req.query;
-        if (!shiftDate || !shiftType) return res.status(400).json({ error: 'shiftDate and shiftType required' });
+        const shiftIdParam = req.query.shift_id || req.query.shiftId || null;
 
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+
+        // OV-S6-01: read by shift_id — label-agnostic, so historically
+        // mis-stamped completions stay visible through their own shift.
+        if (shiftIdParam) {
+            const shiftId = parseInt(shiftIdParam);
+            if (isNaN(shiftId)) return res.status(400).json({ error: 'shift_id غير صالح' });
+            const byShift = completionService
+                ? await completionService.getLatestByShiftId(shiftId)
+                : await opsEngine.completions.getLatestByShiftId(shiftId);
+            if (!byShift) return res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
+            return res.json({ success: true, completion: byShift });
+        }
+
+        // Backward-compatible path: latest by shift date + type
+        if (!shiftDate || !shiftType) return res.status(400).json({ error: 'shiftDate and shiftType required' });
 
         const completion = completionService
             ? await completionService.getLatest({ shiftDate, shiftType })

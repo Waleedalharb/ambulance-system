@@ -23,14 +23,17 @@ async function loadCurrentShift() {
             currentShiftId = data.shift.id;
             currentShiftStatus = data.shift.status || 'active';
             console.log('[Shift] Loaded from server:', currentShiftId, 'status:', currentShiftStatus);
-        } else {
+        } else if (data.success) {
+            // Server confirmed: no active shift — honest empty state
             currentShiftId = null;
             currentShiftStatus = 'none';
         }
+        // OV-S3-03: button/display always re-rendered from the state variable
+        if (typeof updateShiftStatus === 'function') updateShiftStatus();
     } catch (e) {
-        console.error('[Shift] Failed to load current shift:', e);
-        currentShiftId = null;
-        currentShiftStatus = 'none';
+        // OV-S3-03: network failure must NOT destroy the last known truth —
+        // keep previous state instead of nulling it into a false "no shift"
+        console.error('[Shift] Failed to load current shift (keeping last known state):', e);
     }
 }
 // AuthGate: لا جلب تشغيلي قبل المصادقة — التشغيل الفوري عند start والتكرار عبر البوابة
@@ -1792,7 +1795,11 @@ async function renderAdvancedDistribution() {
         } catch(e) { shiftType = 'صباح'; }
         
         if (AuthManager.isLoggedIn()) {
-            var response = await AuthManager.apiRequest('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType));
+            // OV-S6-01: عند معرفة المناوبة النشطة نقرأ بـ shift_id (مقاوم لأخطاء الختم التاريخية)،
+            // ويبقى استعلام date+type مساراً احتياطياً في وضع التحضير
+            var completionUrl = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
+            if (currentShiftId) completionUrl += '&shift_id=' + encodeURIComponent(currentShiftId);
+            var response = await AuthManager.apiRequest(completionUrl);
             var data = await response.json();
             if (data.success && data.completion && data.completion.teams) {
                 hasCompletion = true;
@@ -3191,7 +3198,10 @@ function updateWorkforceStats() {
 
     // Try to get accurate ready-team count from completion (source of truth)
     if (AuthManager.isLoggedIn()) {
-        AuthManager.apiRequest('/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType))
+        // OV-S6-01: shift_id عند توفره (مقاوم لأخطاء الختم التاريخية) + date+type احتياطياً
+        var completionUrl = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
+        if (currentShiftId) completionUrl += '&shift_id=' + encodeURIComponent(currentShiftId);
+        AuthManager.apiRequest(completionUrl)
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success && data.completion && data.completion.teams) {
@@ -3490,6 +3500,11 @@ function openShiftModal() {
                 }
             }
             if (currentShift) {
+                // OV-S6-01: الشارة تفضّل نوع/تاريخ المناوبة النشطة (SSOT) على اشتقاق ساعة الجدار
+                var typeBadgeActive = document.getElementById('shiftModalTypeBadge');
+                if (typeBadgeActive && currentShift.shiftType) {
+                    typeBadgeActive.innerHTML = '<span style="background:var(--gold);color:#333;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">' + currentShift.shiftType + '</span> ' + (currentShift.shiftDate || '') + ' — تسجيل بيانات تكميل النوبة';
+                }
                 loadShiftToForm(currentShift);
             } else {
                 clearShiftForm();
@@ -3621,7 +3636,8 @@ async function startNewShift() {
     try {
         var response = await AuthManager.apiRequest('/api/start-new-shift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftType: normalizedType }) });
         var result = await response.json();
-        if (result.success) {
+        // OV-S3-03: «نشطة» فقط بعد نجاح مؤكد من السيرفر (success + shiftId)
+        if (result.success && result.shiftId) {
             // ============================================
             // STEP 1: Store new shift ID
             // ============================================
@@ -3668,11 +3684,17 @@ async function startNewShift() {
             await loadAllData();
             
             showNotification('مناوبة جديدة', 'تم بدء المناوبة ' + (normalizedType === 'صباح' ? 'الصباحية' : 'الليلية') + ' بنجاح. جميع البيانات تبدأ من الصفر.', 'success', 5000);
-        } else { 
-            alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف")); 
+        } else {
+            alert("❌ فشل في بدء المناوبة: " + (result.error || "خطأ غير معروف"));
+            // OV-S3-03: لا كتابة متفائلة أصلاً (currentShiftId/localStorage لا يُكتبان إلا بعد النجاح المؤكد)
+            // — نعيد مزامنة الزر/العرض مع حقيقة السيرفر فوراً لإغلاق أي حالة وسطية
+            await loadCurrentShift();
         }
-    } catch (error) { 
-        alert("❌ خطأ في الاتصال: " + error.message); 
+    } catch (error) {
+        alert("❌ خطأ في الاتصال: " + error.message);
+        // OV-S3-03: فشل أوفلاين — نعيد قراءة الحقيقة من السيرفر ونعكس أي عرض وسطي
+        try { await loadCurrentShift(); } catch(e2) {}
+        if (typeof updateShiftStatus === 'function') updateShiftStatus();
     }
 }
 

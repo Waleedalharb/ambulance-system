@@ -122,6 +122,15 @@ class StorageAdapter {
         );
     }
 
+    // OV-S6-01: read by shift_id — label-agnostic, so even historically
+    // mis-stamped rows stay visible through their own shift.
+    async getLatestCompletionByShiftId(shiftId) {
+        return this.db.get(
+            'SELECT * FROM shift_completions WHERE shift_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+            [shiftId]
+        );
+    }
+
     // ─── Audit Log ───
     async logAudit(data) {
         await this.db.run(
