@@ -129,10 +129,7 @@ async function resolveShiftId(req, shiftDate, shiftType) {
         } catch (e) {}
     }
     
-    // 5. Legacy: currentShiftId global
-    if (currentShiftId) return currentShiftId;
-    
-    // 6. Legacy: infer from date+type in JSON
+    // 5. Legacy: infer from date+type in JSON
     if (shiftDate && shiftType) {
         try {
             const shifts = await readShifts();
@@ -617,7 +614,8 @@ const archiveEngine = new ShiftArchiveEngine(db, STORAGE_PATH);
 console.log('[ArchiveEngine] Shift Archive Engine v2.0 initialized');
 
 let lastUpdateTime = Date.now();
-let currentShiftId = null;
+// OV-S5: أُزيل المتغير العام currentShiftId نهائياً — حالة المناوبة تُشتق دائماً
+// من القاعدة عبر OpsEngine (مصدر الحقيقة الوحيد)، لا من حالة ذاكرة قابلة للبَيات.
 
 // ============================================
 // نظام النوبة التلقائي (Auto-Shift System)
@@ -720,17 +718,8 @@ async function ensureDataDir() {
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'operational'), { recursive: true });
         await fs.mkdir(path.join(STORAGE_PATH, 'uploads', 'chat'), { recursive: true });
         await initDefaultUsers();
-        // Restore currentShiftId from shifts list on startup
-        try {
-            const shifts = await readShifts();
-            const shiftType = getCurrentShiftType();
-            const shiftDate = getCurrentShiftDate();
-            const currentShift = shifts.find(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
-            if (currentShift) {
-                currentShiftId = currentShift.id;
-                console.log('✅ تم استعادة المناوبة الحالية: ' + currentShift.shiftName);
-            }
-        } catch (e) { /* ignore */ }
+        // OV-S5: لا استعادة لحالة مناوبة في الذاكرة عند الإقلاع —
+        // المناوبة النشطة تُقرأ من القاعدة عند كل طلب (مصدر الحقيقة الوحيد).
         console.log('✅ تم التأكد من وجود مجلدات البيانات');
     } catch (e) {
         console.error('❌ خطأ في إنشاء مجلدات البيانات:', e.message);
@@ -2009,14 +1998,18 @@ app.get('/api/data', authenticate, async (req, res) => {
         const shiftType = getCurrentShiftType();
         const shiftDate = getCurrentShiftDate();
         
-        // Find current shift ID from shifts list if not set in memory
-        if (!currentShiftId) {
-            try {
-                const shifts = await readShifts();
-                const currentShift = shifts.find(s => s.shiftDate === shiftDate && normalizeShiftType(s.shiftType) === normalizeShiftType(shiftType));
-                if (currentShift) currentShiftId = currentShift.id;
-            } catch (e) { /* ignore */ }
-        }
+        // OV-S5: معرّف المناوبة النشطة يُشتق من القاعدة عبر OpsEngine في كل طلب
+        // (نفس نمط /api/current-shift — مصدر الحقيقة الوحيد). لا حالة ذاكرة:
+        // مناوبة منتهية/مؤرشفة لا تبقى «نشطة»، وتحديث مناوبة قديمة لا ينشّطها.
+        let currentShiftId = null;
+        try {
+            if (opsEngine) {
+                const session = await opsEngine.shifts.getCurrentSession();
+                if (session && session.currentShift && session.currentShift.id) {
+                    currentShiftId = session.currentShift.id;
+                }
+            }
+        } catch (e) { /* ignore — يبقى null */ }
         
         // Ensure centersData is never empty — protects dispatch display on new shifts
         var safeCentersData = centersData;
@@ -2635,7 +2628,8 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             }
         }
         
-        if (targetShift) currentShiftId = targetShift.id;
+        // OV-S5: تحديث مناوبة (قديمة أو مؤرشفة) لا يجعلها «نشطة» —
+        // أُزيل السطر الذي كان يضبط currentShiftId عند أي تحديث.
 
         // Create notifications for admin/director
         try {
@@ -2847,9 +2841,6 @@ app.delete('/api/shifts/:id', authenticate, authorize(['admin']), async (req, re
         // Audit log
         await addAuditLogEntry('shift_deleted', 'تم حذف المناوبة: ' + id, 'shifts', req.user.name, req.user.role, req.user.id);
 
-        if (currentShiftId === id) {
-            currentShiftId = null;
-        }
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف المناوبة' });

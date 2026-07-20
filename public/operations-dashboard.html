@@ -805,6 +805,8 @@ function renderArchive(data) {
             '<td>' +
                 '<button class="btn btn-sm btn-primary" onclick="viewShift(' + (s.id || s.shift_id) + ')"><i class="fas fa-eye"></i></button> ' +
                 (s.status === 'active' ? '<button class="btn btn-sm" style="background:var(--warning);color:white;border-color:var(--warning)" onclick="endShift(' + s.id + ')"><i class="fas fa-flag-checkered"></i></button>' : '') +
+                // OV-S5: صفوف «بانتظار التسليم» تحصل على زر اعتماد التسليم (ختم + أرشفة سيرفرياً)
+                (s.status === 'pending_handover' ? ' <button class="btn btn-sm" style="background:var(--success,#10B981);color:white;border-color:var(--success,#10B981)" onclick="approveHandover(' + s.id + ')"><i class="fas fa-check-double"></i> اعتماد التسليم</button>' : '') +
             '</td>' +
             '</tr>';
     });
@@ -1013,6 +1015,77 @@ async function endShift(id) {
     }
 }
 
+// OV-S5: اعتماد التسليم — الختم والأرشفة يتمان سيرفرياً عبر المسار idempotent
+// /api/shift/:id/handover-approve (يرفض 400 إن لم تكن pending_handover، 404 إن لم توجد)
+async function approveHandover(id) {
+    if (!confirm('اعتماد التسليم سيختم المناوبة ويؤرشفها نهائياً. هل أنت متأكد؟')) return;
+    try {
+        var res = await fetch('/api/shift/' + id + '/handover-approve', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({})
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (res.ok && data.success) {
+            showToast(data.message || 'تم اعتماد التسليم وأرشفة المناوبة', 'success');
+            loadArchive();
+            loadLiveStats();
+        } else if (res.status === 403) {
+            showToast('غير مصرّح لك باعتماد التسليم (يتطلب صلاحية مشرف أو مدير)', 'error');
+        } else if (res.status === 400) {
+            showToast(data.error || 'المناوبة ليست بانتظار التسليم — حدّث القائمة', 'error');
+            loadArchive();
+        } else if (res.status === 404) {
+            showToast(data.error || 'المناوبة غير موجودة — حدّث القائمة', 'error');
+            loadArchive();
+        } else {
+            showToast(data.error || 'فشل في اعتماد التسليم', 'error');
+        }
+    } catch (e) {
+        showToast('خطأ في الاتصال بالخادم', 'error');
+    }
+}
+
+// ============================================
+// OV-S5: لحظية المناوبات — SSE بنفس عقد app.js
+// (المسار الفعلي /api/sse والتوكن عبر ?token= كما في authenticate)
+// يعيد تحميل القوائم عند shift_archived و shift_started، ويُغلق عند مغادرة الصفحة.
+// ============================================
+var dashSseSource = null;
+function connectDashboardSSE() {
+    try {
+        var sseToken = AuthCore.getToken();
+        if (!sseToken) return; // بلا توكن: يبقى الاستطلاع الدوري (60ث) هو البديل
+        dashSseSource = new EventSource('/api/sse?token=' + encodeURIComponent(sseToken));
+        dashSseSource.onmessage = function(event) {
+            try {
+                var data = JSON.parse(event.data);
+                if (data.type === 'shift_archived' || data.type === 'shift_started') {
+                    loadArchive();
+                    loadLiveStats();
+                }
+            } catch (e) { /* ignore malformed event */ }
+        };
+        dashSseSource.onerror = function() {
+            // EventSource يعيد الاتصال تلقائياً؛ عند رفض نهائي (401/403) نغلق بلا عاصفة
+            if (dashSseSource && dashSseSource.readyState === EventSource.CLOSED) {
+                try { dashSseSource.close(); } catch (e) {}
+                dashSseSource = null;
+            }
+        };
+    } catch (e) {
+        console.log('[Dashboard] SSE غير مدعوم — الاعتماد على الاستطلاع الدوري');
+    }
+}
+function closeDashboardSSE() {
+    if (dashSseSource) {
+        try { dashSseSource.close(); } catch (e) {}
+        dashSseSource = null;
+    }
+}
+window.addEventListener('beforeunload', closeDashboardSSE);
+window.addEventListener('pagehide', closeDashboardSSE);
+
 // ============================================
 // TAB 3: REPORTS
 // ============================================
@@ -1204,6 +1277,7 @@ function refreshAll() {
 // Init
 loadLiveStats();
 setInterval(loadLiveStats, 60000); // Refresh every minute
+connectDashboardSSE(); // OV-S5: تحديث لحظي عند أرشفة/بدء المناوبات
 </script>
 
 </body>

@@ -12,6 +12,9 @@ var currentShiftId = null;
 var currentShiftStatus = null;  // 'active' | 'pending_handover' | 'archived' | 'none'
 
 // ── Fetch active shift from server on load ──
+// OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
+// يُكتب localStorage.currentShiftId فقط بعد تأكيد الخادم، ويُمسح فوراً عند
+// تأكيد «لا مناوبة نشطة» أو اختلاف المعرّف.
 async function loadCurrentShift() {
     try {
         const token = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
@@ -22,11 +25,15 @@ async function loadCurrentShift() {
         if (data.success && data.shift && data.shift.id) {
             currentShiftId = data.shift.id;
             currentShiftStatus = data.shift.status || 'active';
+            // كتابة بعد تأكيد الخادم فقط — تُصحّح أي معرّف بائت أو مختلف في الـ cache
+            try { localStorage.setItem('currentShiftId', String(currentShiftId)); } catch(e) {}
             console.log('[Shift] Loaded from server:', currentShiftId, 'status:', currentShiftStatus);
         } else if (data.success) {
             // Server confirmed: no active shift — honest empty state
             currentShiftId = null;
             currentShiftStatus = 'none';
+            // الخادم أكّد عدم وجود مناوبة نشطة ⇒ مسح الـ cache البائت فوراً
+            try { localStorage.removeItem('currentShiftId'); } catch(e) {}
         }
         // OV-S3-03: button/display always re-rendered from the state variable
         if (typeof updateShiftStatus === 'function') updateShiftStatus();
@@ -599,6 +606,15 @@ function handleSSEEvent(data) {
         case 'theme_updated':
             showNotification('تم التحديث', 'تم تحديث الثيم من قبل مشرف آخر', 'info', 3000);
             applyGlobalTheme();
+            break;
+        case 'shift_archived':
+            // OV-S5: الأرشفة تُبث لحظياً — التقارب الفوري بدل انتظار استطلاع الـ 60ث
+            showNotification('أرشفة مناوبة', data.message || 'تمت أرشفة المناوبة', 'info', 5000);
+            loadCurrentShift();
+            break;
+        case 'shift_started':
+            // OV-S5: بدء مناوبة جديدة (من أي عميل) — جلب الحقيقة من الخادم فوراً
+            loadCurrentShift();
             break;
         case 'connected':
             console.log('SSE:', data.message);

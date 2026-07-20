@@ -529,12 +529,16 @@ function getShiftTimeStr() {
 var _cachedShiftId = null;
 
 function getCurrentShiftId() {
-    // Return cached value immediately (sync)
+    // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
+    // هذا التابع «تلميح متزامن» فقط: لا يُستدعى إلا من fetchCurrentShiftId بعد
+    // محاولة التحقق من /api/current-shift. عند تعذّر الاتصال يُبقي آخر قيمة
+    // معروفة بدل إسقاطها إلى «لا مناوبة» زائفة، ولا يُنشئ مناوبة منه إطلاقاً.
+    // (لا يُعتمد في الذاكرة الدائمة — _cachedShiftId لا يُضبط إلا من رد الخادم)
     if (_cachedShiftId) return _cachedShiftId;
-    // Try localStorage as fallback
+    // تلميح من الـ cache عند تعذّر الوصول للخادم فقط
     var stored = localStorage.getItem('currentShiftId');
     if (stored) {
-        try { var parsed = parseInt(stored); if (!isNaN(parsed) && parsed > 0) { _cachedShiftId = parsed; return parsed; } } catch(e) {}
+        try { var parsed = parseInt(stored); if (!isNaN(parsed) && parsed > 0) { return parsed; } } catch(e) {}
     }
     return null;
 }
@@ -778,6 +782,7 @@ function loadSavedCompletion() {
             if (result.shift_id || result.completion.shift_id) {
                 var sid = result.shift_id || result.completion.shift_id;
                 console.log('[loadSavedCompletion] Storing shift_id from server:', sid);
+                // OV-S5: كتابة الـ cache بعد تأكيد الخادم فقط — المصدر الوحيد للحقيقة هو الخادم
                 localStorage.setItem('currentShiftId', String(sid));
             }
             renderAll();

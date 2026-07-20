@@ -1414,6 +1414,32 @@ async function getRecords() {
     return serverRecordsCache;
 }
 
+// OV-S5: جلب معرّف المناوبة النشطة من الخادم (مصدر الحقيقة الوحيد).
+// التخزين المحلي cache غير موثوق يُتحقق منه مع الخادم دائماً:
+// - خادم أكّد مناوبة ⇒ اعتماد معرّفها وتصحيح الـ cache.
+// - خادم أكّد «لا مناوبة» ⇒ مسح الـ cache وإرجاع null.
+// - تعذّر الاتصال ⇒ null (لا نثق بمعرّف غير مؤكد إطلاقاً).
+async function fetchVerifiedShiftId() {
+    try {
+        var token = AuthCore.getToken();
+        var res = await fetch('/api/current-shift', {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        var data = await res.json();
+        if (data.success && data.shift && data.shift.id) {
+            try { localStorage.setItem('currentShiftId', String(data.shift.id)); } catch(e) {}
+            return data.shift.id;
+        }
+        if (data.success) {
+            try { localStorage.removeItem('currentShiftId'); } catch(e) {}
+            return null;
+        }
+    } catch (e) {
+        console.error('[Shift] تعذّر التحقق من المناوبة النشطة:', e);
+    }
+    return null;
+}
+
 async function saveRecords(records) {
     var authToken = AuthCore.getToken();
     var serverRecords = serverRecordsCache || [];
@@ -1423,8 +1449,10 @@ async function saveRecords(records) {
         serverIds[serverRecords[i].id] = true;
     }
 
-    // Get current shift_id if available
-    var shiftId = localStorage.getItem('currentShiftId');
+    // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
+    // لا يُستخدم معرّف مخزّن قبل تأكيده من /api/current-shift؛ عند رد «لا مناوبة»
+    // أو اختلاف المعرّف يُمسح المخزن ويُعامل كعدم وجود مناوبة (لا كتابة بمعرّف بائت).
+    var shiftId = await fetchVerifiedShiftId();
 
     // POST new records
     for (var i = 0; i < records.length; i++) {
