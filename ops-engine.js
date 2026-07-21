@@ -132,6 +132,16 @@ class OperationsEngine {
             });
         });
 
+        // W1-B: operational events appended → NEW additive SSE type
+        // (existing clients ignore unknown types; W1-D listeners will use it)
+        this.bus.on('StaffingEventsAppended', (e) => {
+            safeBroadcast({
+                type: 'staffing_events_updated',
+                shiftId: e.shift_id,
+                count: e.count
+            });
+        });
+
         // ─── Slice 2: Shift lifecycle events → legacy WS shapes (byte-identical) ───
 
         // ShiftStarted → existing 'shift_started' message (was broadcast by the route)

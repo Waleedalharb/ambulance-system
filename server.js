@@ -9947,6 +9947,8 @@ server.listen(PORT, async () => {
             const VehicleEventsService = require('./services/vehicle-events-service');
             staffingEventsService = new StaffingEventsService({ storage: opsEngine.storage, engine: opsEngine });
             vehicleEventsService = new VehicleEventsService({ storage: opsEngine.storage, engine: opsEngine });
+            // W1-B: late binding — CompletionService هو نقطة الكتابة الوحيدة للأحداث
+            if (completionService) completionService.staffingEventsService = staffingEventsService;
             console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);

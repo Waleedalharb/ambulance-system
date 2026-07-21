@@ -21,6 +21,9 @@ class CompletionService {
         if (!bus) throw new Error('CompletionService requires an event bus');
         this.engine = engine;
         this.bus = bus;
+        // W1-B: late-bound StaffingEventsService (wired in server.js after both
+        // services exist — same pattern as ArchiveService late binding).
+        this.staffingEventsService = null;
     }
 
     /**
@@ -43,8 +46,33 @@ class CompletionService {
         // so we can diff ready/not-ready classifications afterwards.
         const previous = await this.engine.completions.getLatestCompletion(shiftDate, shiftType);
 
+        // W1-B: the event-translation diff must be against the previous
+        // completion OF THIS SAME SHIFT (not another shift sharing the
+        // date+type label) — otherwise a new shift starting with identical
+        // statuses would silently produce zero events.
+        const previousByShift = shiftId
+            ? await this.engine.completions.getLatestByShiftId(shiftId)
+            : null;
+
+        // W1-B: ONE atomic transaction — compatibility write (shift_completions)
+        // + operational events (operational_events) commit together or roll
+        // back together. Events are appended ONLY when a real shift container
+        // exists (shiftId); prep-mode saves (shiftId=null) keep the legacy
+        // compatibility write only (events are shift-scoped by architecture).
+        let appendedEvents = 0;
         const result = await this.engine.runInTransaction(async () => {
-            return this.engine.completions.saveCompletion(shiftId, shiftType, shiftDate, teams, notes, actor);
+            const res = await this.engine.completions.saveCompletion(shiftId, shiftType, shiftDate, teams, notes, actor);
+            if (res && res.success && shiftId && this.staffingEventsService && teams && typeof teams === 'object') {
+                const tr = await this.staffingEventsService.appendCompletionEvents({
+                    shiftId, shiftDate, shiftType,
+                    teams,
+                    previousTeams: (previousByShift && previousByShift.teams) || null,
+                    actor,
+                    createdAt: new Date().toISOString()
+                });
+                appendedEvents = tr.appended;
+            }
+            return res;
         });
 
         if (result && result.success) {
@@ -57,6 +85,18 @@ class CompletionService {
                 completion_id: result.completionId,
                 actor: actorInfo
             });
+
+            // W1-B: operational events were appended → notify live listeners
+            // (additive SSE type; existing clients ignore unknown types).
+            if (appendedEvents > 0) {
+                this.bus.emit('StaffingEventsAppended', {
+                    shift_id: shiftId,
+                    shift_date: shiftDate,
+                    shift_type: shiftType,
+                    count: appendedEvents,
+                    actor: actorInfo
+                });
+            }
 
             // Ready/not-ready (مكتمل/ناقص) diff per team.
             const prevTeams = (previous && previous.teams) || {};

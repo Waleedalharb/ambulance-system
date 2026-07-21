@@ -167,6 +167,84 @@ async function main() {
     const updated = compLatest2.data && compLatest2.data.completion && compLatest2.data.completion.teams['جنوب 3'] && compLatest2.data.completion.teams['جنوب 3'].status === 'missing';
     record('تعديل التكميل ينعكس', comp2.ok && !!updated);
 
+    // ─── 6b. W1-B: ترجمة التكميل إلى أحداث تشغيلية (معاملة واحدة + منع تكرار + ختم سيرفري) ───
+    // comp1 (ready) وcomp2 (missing بلا سبب) أنتجا حدثين لهذه المناوبة حتى الآن
+    const w1bTl0 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
+    const w1bEv0 = (w1bTl0.data && w1bTl0.data.events) || [];
+    const w1bStampsOk = w1bEv0.length === 2 && w1bEv0.every(e =>
+        e.shift_id === shiftId && e.shift_date === activeShift.date && e.shift_type === activeShift.type
+        && e.domain === 'staffing' && e.actor_name && e.actor_id && e.created_at);
+    record('W1-B ①: حفظا التكميل السابقان أنتجا حدثين مختومين سيرفريًا (shift/date/type/actor/time)', w1bTl0.ok && w1bStampsOk,
+        `events=${w1bEv0.length} types=${w1bEv0.map(e => e.event_type).join(',')}`);
+
+    // سيناريو 3 فرق: جاهز (كان ناقصًا) / ناقص بمسعف غائب معروف / خارج الخدمة ⇒ 4 أحداث
+    const w1bPayload1 = {
+        shiftType: activeShift.type, shiftDate: activeShift.date,
+        teams: {
+            'جنوب 3': { status: 'ready', centerName: 'منفوحة' },
+            'جنوب 7': { status: 'missing', reason: 'مسعف غائب', missingPerson: 'محمد القحطاني', centerName: 'الشفاء' },
+            'جنوب 9': { status: 'offline', centerName: 'السويدي' }
+        },
+        notes: 'w1b-1', timestamp: new Date().toISOString()
+    };
+    const w1bSave1 = await api('POST', '/api/shift-completion', w1bPayload1);
+    const w1bTl1 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
+    const w1bEv1 = (w1bTl1.data && w1bTl1.data.events) || [];
+    const w1bDelta1 = w1bEv1.slice(w1bEv0.length);
+    const w1bTypes1 = w1bDelta1.map(e => e.event_type).sort().join(',');
+    const w1bAbsence = w1bDelta1.find(e => e.event_type === 'absence');
+    record('W1-B ②: حفظ 3 فرق أنتج 4 أحداث صحيحة (ready+missing+absence+offline) وabsence مربوط بالشخص',
+        w1bSave1.ok && w1bDelta1.length === 4 && w1bTypes1 === 'absence,missing,offline,ready'
+        && w1bAbsence && w1bAbsence.entity_id === 'محمد القحطاني' && w1bAbsence.team_id === 'جنوب 7' && w1bAbsence.center === 'الشفاء',
+        `delta=${w1bDelta1.length} types=${w1bTypes1}`);
+
+    // إعادة الحفظ بنفس البيانات ⇒ صفر أحداث جديدة (منع التكرار مع الحفظ التلقائي)
+    const w1bSave2 = await api('POST', '/api/shift-completion', { ...w1bPayload1, notes: 'w1b-2' });
+    const w1bTl2 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
+    const w1bEv2 = (w1bTl2.data && w1bTl2.data.events) || [];
+    record('W1-B ③: إعادة الحفظ المتطابق لا تُنتج أي حدث مكرر', w1bSave2.ok && w1bEv2.length === w1bEv1.length,
+        `before=${w1bEv1.length} after=${w1bEv2.length}`);
+
+    // عودة «جنوب 7» جاهزًا ⇒ حدث ready + حدث arrival للشخص (إغلاق دلالي + مدة مشتقة)
+    const w1bPayload3 = {
+        ...w1bPayload1,
+        teams: {
+            'جنوب 3': { status: 'ready', centerName: 'منفوحة' },
+            'جنوب 7': { status: 'ready', centerName: 'الشفاء' },
+            'جنوب 9': { status: 'offline', centerName: 'السويدي' }
+        },
+        notes: 'w1b-3'
+    };
+    const w1bSave3 = await api('POST', '/api/shift-completion', w1bPayload3);
+    const w1bTl3 = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
+    const w1bEv3 = (w1bTl3.data && w1bTl3.data.events) || [];
+    const w1bDelta3 = w1bEv3.slice(w1bEv2.length);
+    const w1bArrival = w1bDelta3.find(e => e.event_type === 'arrival');
+    const w1bState = await api('GET', `/api/staffing/state?shift_id=${shiftId}`);
+    const w1bPerson = ((w1bState.data && w1bState.data.entities) || []).find(en => en.entityId === 'محمد القحطاني');
+    const w1bPair = w1bPerson && w1bPerson.closedPairs && w1bPerson.closedPairs[0];
+    record('W1-B ④: عودة الفريق جاهزًا ⇒ ready+arrival والغياب يُغلق دلاليًا بمدة مشتقة',
+        w1bSave3.ok && w1bDelta3.length === 2 && !!w1bArrival && w1bArrival.entity_id === 'محمد القحطاني'
+        && !!w1bPerson && w1bPerson.open.length === 0 && !!w1bPair && w1bPair.closedBy.type === 'arrival' && typeof w1bPair.durationMs === 'number',
+        `delta=${w1bDelta3.length} closed=${w1bPair ? w1bPair.event_type + '→' + w1bPair.closedBy.type : 'none'}`);
+
+    // القراءة القديمة (الإسقاط التوافقي) لم تتغير: آخر حفظ يظهر كما كان سابقًا
+    const w1bCompat = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1bCompatTeams = w1bCompat.data && w1bCompat.data.completion && w1bCompat.data.completion.teams;
+    record('W1-B ⑤: الإسقاط التوافقي shift_completions سليم (قراءة قديمة متطابقة)',
+        !!(w1bCompatTeams && w1bCompatTeams['جنوب 7'] && w1bCompatTeams['جنوب 7'].status === 'ready'
+        && w1bCompatTeams['جنوب 9'] && w1bCompatTeams['جنوب 9'].status === 'offline'),
+        `s7=${w1bCompatTeams && w1bCompatTeams['جنوب 7'] && w1bCompatTeams['جنوب 7'].status}`);
+
+    // الأداء: زمن حفظ التكميل بعد إضافة الأحداث يبقى ضمن العتبة (R-4)
+    const w1bT0 = Date.now();
+    for (let i = 0; i < 5; i++) await api('POST', '/api/shift-completion', { ...w1bPayload3, notes: 'w1b-perf' });
+    const w1bPerfAvg = (Date.now() - w1bT0) / 5;
+    const w1bTlEnd = await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`);
+    const w1bEvEnd = (w1bTlEnd.data && w1bTlEnd.data.events) || [];
+    record('W1-B ⑥: زمن حفظ التكميل ضمن العتبة (<150ms) وحفظات الأداء لم تُنتج أحداثًا (نفس البصمة)',
+        w1bPerfAvg < 150 && w1bEvEnd.length === w1bEv3.length, `avg=${w1bPerfAvg.toFixed(1)}ms events=${w1bEvEnd.length}`);
+
     // ─── 7. Indicators / dashboards ───
     const wf = await api('GET', `/api/workforce-stats/${shiftId}`);
     record('إحصائيات القوى العاملة للمناوبة', wf.status === 200, `status=${wf.status}`);

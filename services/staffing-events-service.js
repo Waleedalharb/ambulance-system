@@ -81,6 +81,89 @@ class StaffingEventsService {
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         return { shiftId, ...deriveIndicators(events, DOMAIN) };
     }
+
+    /**
+     * W1-B: ترجمة حفظ التكميل إلى أحداث تشغيلية (تُستدعى من CompletionService
+     * داخل نفس معاملة الحفظ — لا معاملة خاصة هنا، ولا جلب للمناوبة:
+     * الأختام تصل مُختومة سيرفريًا من المسار).
+     *
+     * قواعد الترجمة (حفريات الواجهة الحالية — لا تغيير عليها):
+     *  - بصمة الفريق = (status|reason|missingPerson)؛ لا حدث إن لم تتغير
+     *    عن آخر تكميل محفوظ «لنفس المناوبة» ⇒ لا تكرار مع الحفظ التلقائي.
+     *  - pending = لم يُبتّ فيه ⇒ لا حدث.
+     *  - ready   ⇒ حدث ready (readiness_basis=direct؛ الدعم يأتي في شرائح لاحقة).
+     *  - missing ⇒ حدث missing + حدث شخصي (absence/late) عند سبب يستلزم اسمًا.
+     *  - offline ⇒ حدث offline.
+     *  - ready بعد missing بشخص معروف ⇒ حدث arrival لذلك الشخص (يُغلق غيابه/تأخيره).
+     *
+     * @returns {{ appended: number, events: Array }}
+     */
+    async appendCompletionEvents({ shiftId, shiftDate, shiftType, teams, previousTeams, actor, createdAt }) {
+        const out = [];
+        if (!shiftId || !teams || typeof teams !== 'object') return { appended: 0, events: out };
+        const prev = (previousTeams && typeof previousTeams === 'object') ? previousTeams : {};
+        const actorId = String((actor && actor.id) || 'system');
+        const actorName = (actor && (actor.name || actor.username)) || 'system';
+        const at = createdAt || new Date().toISOString();
+
+        // أسباب الواجهة التي تستلزم اسمًا → نوع الحدث الشخصي
+        const PERSON_REASON_MAP = { 'مسعف غائب': 'absence', 'مسعف متأخر': 'late' };
+
+        for (const teamId of Object.keys(teams)) {
+            const cur = teams[teamId] || {};
+            const old = prev[teamId] || null;
+            const sig = [cur.status || '', cur.reason || '', cur.missingPerson || ''].join('|');
+            const oldSig = old ? [old.status || '', old.reason || '', old.missingPerson || ''].join('|') : null;
+            if (sig === oldSig) continue; // لا تغيير ⇒ لا حدث (منع التكرار)
+            const status = cur.status || 'pending';
+            if (status === 'pending') continue; // لم يُبتّ فيه
+
+            const base = {
+                shiftId, shiftDate, shiftType, domain: DOMAIN,
+                teamId, center: cur.centerName || null,
+                actorId, actorName, createdAt: at,
+                payload: {
+                    source: 'completion',
+                    prevStatus: old ? old.status || null : null,
+                    prevReason: old ? old.reason || null : null,
+                    prevMissingPerson: old ? old.missingPerson || null : null
+                }
+            };
+
+            if (status === 'ready' || status === 'missing' || status === 'offline') {
+                const id = await this.storage.appendOperationalEvent({
+                    ...base,
+                    eventType: status,
+                    reason: cur.reason || null,
+                    readinessBasis: status === 'ready' ? 'direct' : null
+                });
+                out.push({ id, eventType: status, teamId });
+            }
+
+            // حدث شخصي عند سبب يستلزم اسمًا واسم معروف (أفضل جهد موثق — R-6)
+            const personEvent = PERSON_REASON_MAP[cur.reason];
+            if (status === 'missing' && personEvent && cur.missingPerson) {
+                const id = await this.storage.appendOperationalEvent({
+                    ...base,
+                    entityId: cur.missingPerson, entityName: cur.missingPerson,
+                    eventType: personEvent, reason: cur.reason
+                });
+                out.push({ id, eventType: personEvent, entityId: cur.missingPerson, teamId });
+            }
+
+            // عودة الفريق جاهزًا بعد نقص بشخص معروف ⇒ وصول ذلك الشخص
+            if (status === 'ready' && old && old.status === 'missing'
+                && PERSON_REASON_MAP[old.reason] && old.missingPerson) {
+                const id = await this.storage.appendOperationalEvent({
+                    ...base,
+                    entityId: old.missingPerson, entityName: old.missingPerson,
+                    eventType: 'arrival'
+                });
+                out.push({ id, eventType: 'arrival', entityId: old.missingPerson, teamId });
+            }
+        }
+        return { appended: out.length, events: out };
+    }
 }
 
 module.exports = StaffingEventsService;
