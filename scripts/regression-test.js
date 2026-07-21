@@ -775,6 +775,60 @@ async function main() {
     const f6BtnNotRelational = !f6SsSrc.includes('onclick="loadFromServer()"');
     record('F6 ⑥: زر «تحميل من السيرفر» مربوط بالمصدر JSON (إصلاح خلل — كان علائقياً فارغاً)', f6BtnWired && f6BtnHandler && f6BtnNotRelational, `wired=${f6BtnWired} handler=${f6BtnHandler} notRelational=${f6BtnNotRelational}`);
 
+    // ─── 13m. W1-A: السجل التشغيلي الموحّد (operational_events) — الشريحة التأسيسية ───
+    // ① ساكن: db.js يعرّف الجدولين والفهارس الخمسة (الترحيل ذاتي عند الإقلاع)
+    const w1DbSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'db.js'), 'utf8');
+    const w1TablesOk = /CREATE TABLE IF NOT EXISTS operational_events\b/.test(w1DbSrc)
+        && /CREATE TABLE IF NOT EXISTS operational_shift_snapshots\b/.test(w1DbSrc);
+    const w1IdxOk = ['idx_op_events_shift', 'idx_op_events_entity', 'idx_op_events_shift_domain', 'idx_op_events_corrects', 'idx_op_snapshots_shift']
+        .every(ix => w1DbSrc.includes(ix));
+    record('W1-A ①: تعريف جدولَي operational_events/snapshots + الفهارس الخمسة في db.js', w1TablesOk && w1IdxOk, `tables=${w1TablesOk} indexes=${w1IdxOk}`);
+
+    // ② تشغيلي: المسارات الستة محمية (401 بلا توكن)
+    const w1SavedTok = TOKEN; TOKEN = null;
+    const w1NoAuth = await api('GET', '/api/staffing/state', undefined, 401);
+    TOKEN = w1SavedTok;
+    record('W1-A ②: مسارات الأحداث محمية بالمصادقة (401 بلا توكن)', w1NoAuth.status === 401, `status=${w1NoAuth.status}`);
+
+    // ③ تشغيلي: المسارات الستة ترجع 200 بأشكال صادقة (فارغة عند غياب أحداث — لا بيانات مختلقة)
+    const w1StState = await api('GET', '/api/staffing/state');
+    const w1StTimeline = await api('GET', '/api/staffing/timeline');
+    const w1StInd = await api('GET', '/api/staffing/indicators');
+    const w1VhState = await api('GET', '/api/vehicles/state');
+    const w1VhTimeline = await api('GET', '/api/vehicles/timeline');
+    const w1VhInd = await api('GET', '/api/vehicles/indicators');
+    const w1ReadShapesOk =
+        w1StState.ok && w1StState.data && w1StState.data.success === true && Array.isArray(w1StState.data.entities) &&
+        w1StTimeline.ok && w1StTimeline.data && Array.isArray(w1StTimeline.data.events) &&
+        w1StInd.ok && w1StInd.data && typeof w1StInd.data.openByType === 'object' && typeof w1StInd.data.totalByType === 'object' &&
+        w1VhState.ok && w1VhState.data && Array.isArray(w1VhState.data.entities) &&
+        w1VhTimeline.ok && w1VhTimeline.data && Array.isArray(w1VhTimeline.data.events) &&
+        w1VhInd.ok && w1VhInd.data && typeof w1VhInd.data.vehiclesByStatus === 'object';
+    record('W1-A ③: المسارات الستة ترد 200 بأشكال صادقة (state/timeline/indicators × staffing/vehicles)', w1ReadShapesOk,
+        `st=${w1StState.status}/${w1StTimeline.status}/${w1StInd.status} vh=${w1VhState.status}/${w1VhTimeline.status}/${w1VhInd.status}`);
+
+    // ④ تشغيلي: shift_id غير رقمي ⇒ 400 (لا 500)
+    const w1BadShift = await api('GET', '/api/staffing/state?shift_id=abc', undefined, 400);
+    record('W1-A ④: رفض shift_id غير صالح (400)', w1BadShift.status === 400, `status=${w1BadShift.status}`);
+
+    // ⑤ وحدات: رزنامة النطاقات + الطيّ الدلالي (إغلاق/مدة مشتقة) + المؤشرات
+    const w1Core = require('../services/operational-events-core');
+    const w1ValidType = w1Core.isValidEventType('staffing', 'absence') && !w1Core.isValidEventType('staffing', 'bogus') && w1Core.isValidEventType('vehicle', 'status_change');
+    const w1Ev = [
+        { id: 1, domain: 'staffing', entity_id: 'E1', entity_name: 'اختبار', team_id: null, center: null, event_type: 'absence', created_at: '2026-07-21T07:00:00.000Z' },
+        { id: 2, domain: 'staffing', entity_id: 'E1', entity_name: 'اختبار', team_id: null, center: null, event_type: 'arrival', created_at: '2026-07-21T08:30:00.000Z' }
+    ];
+    const w1Folded = w1Core.foldEvents(w1Ev, 'staffing');
+    const w1Pair = w1Folded[0] && w1Folded[0].closedPairs && w1Folded[0].closedPairs[0];
+    const w1FoldOk = w1Folded.length === 1 && w1Folded[0].open.length === 0 && !!w1Pair
+        && w1Pair.durationMs === 90 * 60 * 1000 && w1Pair.closedBy && w1Pair.closedBy.type === 'arrival';
+    const w1VehInd = w1Core.deriveIndicators([
+        { id: 1, domain: 'vehicle', entity_id: 'V1', event_type: 'status_change', status: 'breakdown', created_at: '2026-07-21T09:00:00.000Z' },
+        { id: 2, domain: 'vehicle', entity_id: 'V2', event_type: 'status_change', status: 'active', created_at: '2026-07-21T09:05:00.000Z' }
+    ], 'vehicle');
+    const w1VehOk = w1VehInd.vehiclesByStatus.breakdown === 1 && w1VehInd.vehiclesByStatus.active === 1;
+    record('W1-A ⑤: رزنامة النطاقات + الطيّ الدلالي (إغلاق absence بـ arrival، مدة 90د) + مؤشرات المركبات', w1ValidType && w1FoldOk && w1VehOk, `types=${w1ValidType} fold=${w1FoldOk} veh=${w1VehOk}`);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

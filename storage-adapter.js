@@ -156,6 +156,64 @@ class StorageAdapter {
     async all(sql, params = []) {
         return this.db.all(sql, params);
     }
+
+    // ─── W1-A: Operational Event Log (append-only — لا توجد دوال UPDATE/DELETE هنا أصلًا) ───
+    async appendOperationalEvent(e) {
+        const result = await this.db.run(
+            `INSERT INTO operational_events
+             (shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, center,
+              event_type, status, reason, readiness_basis, corrects_event_id, payload, note,
+              actor_id, actor_name, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [e.shiftId, e.shiftDate, e.shiftType, e.domain, e.entityId || null, e.entityName || null,
+             e.teamId || null, e.center || null, e.eventType, e.status || null, e.reason || null,
+             e.readinessBasis || null, e.correctsEventId || null,
+             e.payload ? JSON.stringify(e.payload) : null, e.note || null,
+             e.actorId, e.actorName, e.createdAt]
+        );
+        return result.id;
+    }
+
+    async getOperationalEventsByShift(shiftId, domain = null) {
+        if (domain) {
+            return this.db.all(
+                'SELECT * FROM operational_events WHERE shift_id = ? AND domain = ? ORDER BY created_at ASC, id ASC',
+                [shiftId, domain]
+            );
+        }
+        return this.db.all(
+            'SELECT * FROM operational_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC',
+            [shiftId]
+        );
+    }
+
+    async getOperationalEventsByEntity(domain, entityId, limit = 500) {
+        return this.db.all(
+            'SELECT * FROM operational_events WHERE domain = ? AND entity_id = ? ORDER BY created_at ASC, id ASC LIMIT ?',
+            [domain, entityId, limit]
+        );
+    }
+
+    async getOperationalEventById(id) {
+        return this.db.get('SELECT * FROM operational_events WHERE id = ?', [id]);
+    }
+
+    // اللقطات: تُكتب مرة واحدة (UNIQUE(shift_id, domain)) — إعادة الكتابة ممنوعة معماريًا
+    async appendOperationalSnapshot(shiftId, domain, snapshotJson, eventsHash, createdAt) {
+        const result = await this.db.run(
+            `INSERT INTO operational_shift_snapshots (shift_id, domain, snapshot_json, events_hash, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+            [shiftId, domain, JSON.stringify(snapshotJson), eventsHash || null, createdAt]
+        );
+        return result.id;
+    }
+
+    async getOperationalSnapshot(shiftId, domain) {
+        return this.db.get(
+            'SELECT * FROM operational_shift_snapshots WHERE shift_id = ? AND domain = ?',
+            [shiftId, domain]
+        );
+    }
 }
 
 module.exports = StorageAdapter;

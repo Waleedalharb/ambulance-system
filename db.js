@@ -304,6 +304,42 @@ const TABLE_SCHEMAS = [
     created_at TEXT
   );`,
 
+  // ─── W1-A: Operational Event Log (السجل التشغيلي الموحّد — append-only) ───
+  // الأصل الوحيد لحالات الأفراد والمركبات؛ لا UPDATE/DELETE إطلاقًا.
+  // الختم (shift_id/date/type/actor/created_at) سيرفري دائمًا.
+  `CREATE TABLE IF NOT EXISTS operational_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL,
+    shift_date TEXT NOT NULL,
+    shift_type TEXT NOT NULL,
+    domain TEXT NOT NULL CHECK(domain IN ('staffing', 'vehicle', 'center', 'logistics')),
+    entity_id TEXT,
+    entity_name TEXT,
+    team_id TEXT,
+    center TEXT,
+    event_type TEXT NOT NULL,
+    status TEXT,
+    reason TEXT,
+    readiness_basis TEXT,
+    corrects_event_id INTEGER,
+    payload TEXT,
+    note TEXT,
+    actor_id TEXT NOT NULL,
+    actor_name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );`,
+
+  // W1-A: لقطات إغلاق المناوبة الثابتة (تُكتب مرة واحدة عند الأرشفة — W1-E)
+  `CREATE TABLE IF NOT EXISTS operational_shift_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL,
+    domain TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    events_hash TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(shift_id, domain)
+  );`,
+
   // Staffing Alerts
   `CREATE TABLE IF NOT EXISTS staffing_alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -792,6 +828,11 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_date ON staffing_alerts(alert_date);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_staffing_alerts_resolved ON staffing_alerts(resolved);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_shift_completions_date_type ON shift_completions(shift_date, shift_type);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_shift ON operational_events(shift_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_entity ON operational_events(domain, entity_id, created_at);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_shift_domain ON operational_events(shift_id, domain);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_corrects ON operational_events(corrects_event_id);`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_op_snapshots_shift ON operational_shift_snapshots(shift_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_status ON kb_documents(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_category ON kb_documents(category);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_doc_id ON kb_documents(doc_id);`);

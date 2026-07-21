@@ -30,6 +30,8 @@ let positioningService = null; // Slice 4: single owner of peak_plans writes
 let notesService = null; // Slice 5: single owner of shift_notes writes
 let formsService = null; // Slice 6: single owner of all form writes (form_type)
 let indicatorService = null; // F5a: read-only operational indicators
+let staffingEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث القوى البشرية
+let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث المركبات
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -4328,6 +4330,100 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
     } catch (error) {
         console.error('[API] Error getting shift-completion:', error);
         res.status(500).json({ error: 'فشل في جلب التكميل' });
+    }
+});
+
+// ============================================
+// W1-A: الأحداث التشغيلية — قراءات القوى البشرية والمركبات
+// السجل الموحّد operational_events هو المصدر الرسمي الوحيد.
+// هذه الشريحة قراءة فقط؛ الكتابة تُفعَّل في W1-B عبر ترجمة التكميل.
+// ============================================
+async function resolveEventsShiftId(req) {
+    const raw = req.query.shift_id || req.query.shiftId || null;
+    if (raw !== null && raw !== undefined && raw !== '') {
+        const id = parseInt(raw);
+        if (isNaN(id)) return { error: 'shift_id غير صالح' };
+        return { shiftId: id };
+    }
+    const active = await opsEngine.shifts.getActiveShift();
+    return { shiftId: active ? active.id : null };
+}
+
+app.get('/api/staffing/state', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const state = await staffingEventsService.getState(resolved.shiftId);
+        res.json({ success: true, ...state });
+    } catch (error) {
+        console.error('[API] Error staffing state:', error);
+        res.status(500).json({ error: 'فشل في جلب حالة القوى البشرية' });
+    }
+});
+
+app.get('/api/staffing/timeline', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const timeline = await staffingEventsService.getTimeline(resolved.shiftId, req.query.entity_id || null);
+        res.json({ success: true, ...timeline });
+    } catch (error) {
+        console.error('[API] Error staffing timeline:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل القوى البشرية' });
+    }
+});
+
+app.get('/api/staffing/indicators', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const indicators = await staffingEventsService.getIndicators(resolved.shiftId);
+        res.json({ success: true, ...indicators });
+    } catch (error) {
+        console.error('[API] Error staffing indicators:', error);
+        res.status(500).json({ error: 'فشل في جلب مؤشرات القوى البشرية' });
+    }
+});
+
+app.get('/api/vehicles/state', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const state = await vehicleEventsService.getState(resolved.shiftId);
+        res.json({ success: true, ...state });
+    } catch (error) {
+        console.error('[API] Error vehicles state:', error);
+        res.status(500).json({ error: 'فشل في جلب حالة المركبات' });
+    }
+});
+
+app.get('/api/vehicles/timeline', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const timeline = await vehicleEventsService.getTimeline(resolved.shiftId, req.query.entity_id || null);
+        res.json({ success: true, ...timeline });
+    } catch (error) {
+        console.error('[API] Error vehicles timeline:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل المركبات' });
+    }
+});
+
+app.get('/api/vehicles/indicators', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const indicators = await vehicleEventsService.getIndicators(resolved.shiftId);
+        res.json({ success: true, ...indicators });
+    } catch (error) {
+        console.error('[API] Error vehicles indicators:', error);
+        res.status(500).json({ error: 'فشل في جلب مؤشرات المركبات' });
     }
 });
 
@@ -9844,6 +9940,14 @@ server.listen(PORT, async () => {
             const FormsService = require('./services/forms-service');
             formsService = new FormsService({ db, bus: opsEngine.bus, getActiveShiftId });
             console.log('✅ FormsService wired (Slice 6)');
+
+            // W1-A: Staffing/Vehicle Events — السجل التشغيلي الموحّد (operational_events)
+            // قراءات فقط في هذه الشريحة؛ الكتابة تُفعَّل في W1-B عبر ترجمة التكميل
+            const StaffingEventsService = require('./services/staffing-events-service');
+            const VehicleEventsService = require('./services/vehicle-events-service');
+            staffingEventsService = new StaffingEventsService({ storage: opsEngine.storage, engine: opsEngine });
+            vehicleEventsService = new VehicleEventsService({ storage: opsEngine.storage, engine: opsEngine });
+            console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
@@ -9852,6 +9956,8 @@ server.listen(PORT, async () => {
             positioningService = null;
             notesService = null;
             formsService = null;
+            staffingEventsService = null;
+            vehicleEventsService = null;
         }
     }
     
