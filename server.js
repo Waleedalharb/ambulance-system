@@ -6608,12 +6608,101 @@ app.get('/api/disk-usage', authenticate, authorize(['admin', 'director']), async
 app.get('/api/shift-events/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
+        // W1-E-B: قراءة هجينة (D1) — الاشتقاق من السجل أولًا، ويسقط إلى
+        // الجدول التوافقي عند: غياب الأحداث، أو أحداث حقبة ما قبل إغناء الظرف.
+        const derived = await w1eDeriveShiftEvents(shiftId);
+        if (derived) return res.json({ success: true, events: derived });
         const events = await contentListByShift('shift_events', shiftId);
         res.json({ success: true, events });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب الأحداث' });
     }
 });
+
+// ─── W1-E-B: اشتقاق سجلات المحتوى من operational_events (قراءة فقط) ───
+// يعيد null ⇒ يسقط المسار إلى الجدول التوافقي (D1). إعادة البناء حرفية:
+// نفس الحقول والأنواع والترتيب (created_at DESC, id DESC — id نصي ⇒ مقارنة معجمية).
+function w1eParsePayload(p) { try { return p ? JSON.parse(p) : null; } catch (_) { return null; } }
+function w1eSortLikeContent(rows) {
+    rows.sort((a, b) => {
+        if (a._sec !== b._sec) return a._sec < b._sec ? 1 : -1;
+        return a.id < b.id ? 1 : (a.id > b.id ? -1 : 0);
+    });
+    return rows;
+}
+
+async function w1eDeriveShiftEvents(shiftId) {
+    try {
+        if (!opsEngine || !opsEngine.storage) return null;
+        const rows = await opsEngine.storage.getOperationalEventsByShift(shiftId, 'logistics');
+        const notes = rows.filter(e => e.event_type === 'note' && (w1eParsePayload(e.payload) || {}).source === 'shift_events');
+        if (!notes.length) return null;
+        if (notes.some(e => { const p = w1eParsePayload(e.payload); return !p || p.rowId == null; })) return null; // حقبة ما قبل الإغناء
+        const deleted = new Set();
+        for (const e of rows) {
+            if (e.event_type !== 'correction') continue;
+            const p = w1eParsePayload(e.payload);
+            if (!p || p.source !== 'shift_events' || p.action !== 'deleted') continue;
+            if (p.rowId != null) { deleted.add(String(p.rowId)); continue; }
+            try { const d = JSON.parse(p.deletedRow || '{}'); if (d.id != null) deleted.add(String(d.id)); } catch (_) {}
+        }
+        const out = notes
+            .filter(e => !deleted.has(String(w1eParsePayload(e.payload).rowId)))
+            .map(e => {
+                const p = w1eParsePayload(e.payload);
+                return {
+                    id: String(p.rowId), shiftId: e.shift_id,
+                    type: p.type, description: p.description,
+                    timestamp: p.rowTimestamp, createdAt: p.rowCreatedAt,
+                    _sec: String(p.rowCreatedAt || '').slice(0, 19)
+                };
+            });
+        w1eSortLikeContent(out);
+        return out.map(({ _sec, ...r }) => r);
+    } catch (_) { return null; } // فشل الاشتقاق لا يكسر القراءة — سقوط آمن
+}
+
+async function w1eDeriveShiftAbsences(shiftId) {
+    try {
+        if (!opsEngine || !opsEngine.storage) return null;
+        const rows = await opsEngine.storage.getOperationalEventsByShift(shiftId, 'staffing');
+        const abs = rows.filter(e => e.event_type === 'absence' && (w1eParsePayload(e.payload) || {}).source === 'shift_absences_bulk');
+        if (!abs.length) return null;
+        if (abs.some(e => { const p = w1eParsePayload(e.payload); return !p || p.rowId == null; })) return null; // حقبة ما قبل الإغناء
+        // طيّ تسلسلي: الإزالة (withdrawn/deleted) تُقصي أحدث absence مفتوح يطابقها
+        // بالمعرف أو بالاسم — لأن إعادة الإرسال المتطابق قد يجدد معرف الصف
+        // التوافقي (id متقلب في العقد القديم) بينما يبقى الاسم هو المفتاح الثابت.
+        const open = [];
+        for (const e of rows) {
+            const p = w1eParsePayload(e.payload);
+            if (e.event_type === 'absence' && p && p.source === 'shift_absences_bulk') {
+                open.push({ rowId: String(p.rowId), e });
+                continue;
+            }
+            if (e.event_type !== 'correction' || !p) continue;
+            if (p.source !== 'shift_absences_bulk' && p.source !== 'shift_absences') continue;
+            const name = e.entity_id || (p.withdrawnRow && (p.withdrawnRow.name || p.withdrawnRow.employee || p.withdrawnRow.person)) || null;
+            let rowId = p.rowId != null ? String(p.rowId) : null;
+            if (!rowId && p.withdrawnRow && p.withdrawnRow.id != null) rowId = String(p.withdrawnRow.id);
+            if (!rowId && p.deletedRow) { try { const d = JSON.parse(p.deletedRow); if (d.id != null) rowId = String(d.id); } catch (_) {} }
+            for (let i = open.length - 1; i >= 0; i--) {
+                if ((rowId && open[i].rowId === rowId) || (name && open[i].e.entity_id === name)) { open.splice(i, 1); break; }
+            }
+        }
+        const out = open.map(({ rowId, e }) => {
+            const row = { name: e.entity_id };
+            if (e.center != null) row.center = e.center;
+            row.shiftId = e.shift_id;
+            row.id = rowId;
+            if (e.reason) row.reason = e.reason;
+            row._sec = String(e.created_at || '').slice(0, 19);
+            return row;
+        });
+        w1eSortLikeContent(out);
+        return out.map(({ _sec, ...r }) => r);
+    } catch (_) { return null; } // فشل الاشتقاق لا يكسر القراءة — سقوط آمن
+}
+
 
 app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
     try {
@@ -6632,12 +6721,15 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
         };
         // W1-C Facade: نفس العقد ظاهريًا + حدث تشغيلي موثق (logistics/note)
         // داخل نفس المعاملة وبختم سيرفري — السجل الرسمي لا يعتمد وقت العميل.
+        // W1-E-B: الظرف يحمل هوية الصف القديم (rowId/rowTimestamp/rowCreatedAt)
+        // لتعيد القراءة المشتقة بناء العقد حرفيًا (Parity) — هوية حدث فقط،
+        // لا بيانات نموذج (D2).
         const stamp = await w1cShiftStamp(shiftId);
         await withTx(async () => {
             await contentInsert('shift_events', shiftId, newEvent);
             await w1cAppendOpEvent(shiftId, stamp, {
                 domain: 'logistics', eventType: 'note',
-                payload: { source: 'shift_events', type, description }
+                payload: { source: 'shift_events', type, description, rowId: newEvent.id, rowTimestamp: newEvent.timestamp, rowCreatedAt: newEvent.createdAt }
             }, req.user);
         });
         broadcast({
@@ -6688,6 +6780,11 @@ app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res)
 app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
+        // W1-E-B: قراءة هجينة (D1) — الغياب الحالي = أحداث absence غير المسحوبة
+        // (correction: withdrawn/deleted) من السجل؛ يسقط للجدول التوافقي عند
+        // غياب الأحداث أو أحداث حقبة ما قبل إغناء الظرف.
+        const derived = await w1eDeriveShiftAbsences(shiftId);
+        if (derived) return res.json({ success: true, absences: derived });
         const absences = await contentListByShift('shift_absences', shiftId);
         res.json({ success: true, absences });
     } catch (error) {
@@ -6724,7 +6821,8 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
                         domain: 'staffing', eventType: 'absence',
                         entityId: n, entityName: n, center: a.center || null,
                         reason: a.reason || null,
-                        payload: { source: 'shift_absences_bulk' }
+                        // W1-E-B: rowId = هوية الصف فقط (لإعادة بناء العقد حرفيًا) — لا بيانات نموذج (D2)
+                        payload: { source: 'shift_absences_bulk', rowId: String(a.id) }
                     }, req.user);
                 }
             }

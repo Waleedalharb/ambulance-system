@@ -1031,6 +1031,88 @@ async function main() {
     const f6BtnNotRelational = !f6SsSrc.includes('onclick="loadFromServer()"');
     record('F6 ⑥: زر «تحميل من السيرفر» مربوط بالمصدر JSON (إصلاح خلل — كان علائقياً فارغاً)', f6BtnWired && f6BtnHandler && f6BtnNotRelational, `wired=${f6BtnWired} handler=${f6BtnHandler} notRelational=${f6BtnNotRelational}`);
 
+    // ─── 13l. W1-E-B: قراءات shift-events/absences مشتقة + Parity حرفي صارم ───
+    // قارئ توافقي مباشر من SQLite (نفس منطق contentListByShift حرفيًا) لمقارنة
+    // حقلًا-بحقل: أسماء الحقول، الأنواع، القيم، والترتيب — شفافية 100% للمستهلك.
+    function w1ebCompat(table, sid) {
+        if (!process.env.DB_PATH) return null;
+        const Database = require('better-sqlite3');
+        const dbc = new Database(process.env.DB_PATH, { readonly: true });
+        const rows = dbc.prepare(`SELECT * FROM ${table} WHERE shift_id = ? ORDER BY created_at DESC, id DESC`).all(sid);
+        dbc.close();
+        return rows.map(r => { let d = {}; try { d = JSON.parse(r.data); } catch (_) {} return { ...d, id: r.id, shiftId: r.shift_id }; });
+    }
+    function w1ebParity(apiRows, dbRows) {
+        if (!Array.isArray(apiRows) || !Array.isArray(dbRows) || apiRows.length !== dbRows.length) return false;
+        for (let i = 0; i < apiRows.length; i++) {
+            const a = apiRows[i], b = dbRows[i];
+            if (Object.keys(a).sort().join('|') !== Object.keys(b).sort().join('|')) return false;
+            for (const k of Object.keys(a)) {
+                if (typeof a[k] !== typeof b[k]) return false;
+                if (a[k] !== b[k]) return false;
+            }
+        }
+        return true;
+    }
+
+    const w1ebStart = await api('POST', '/api/start-new-shift', { shiftType: 'ليل' });
+    const w1ebShift = w1ebStart.data && w1ebStart.data.shiftId;
+
+    // أحداث المناوبة: POST حدثين ⇒ Parity؛ DELETE الأول ⇒ Parity
+    const w1ebEvP1 = await api('POST', `/api/shift-events/${w1ebShift}`, { type: 'صيانة', description: 'فحص دوري للمركبة' });
+    await api('POST', `/api/shift-events/${w1ebShift}`, { type: 'دعم', description: 'وصول دعم لوجستي' });
+    const w1ebEvG1 = await api('GET', `/api/shift-events/${w1ebShift}`);
+    record('W1-E-B ①: Parity حرفي لسجل الأحداث بعد POST (مشتق ≡ توافقي: حقول/أنواع/قيم/ترتيب)',
+        !!(w1ebShift && w1ebEvG1.ok && w1ebParity(w1ebEvG1.data && w1ebEvG1.data.events, w1ebCompat('shift_events', w1ebShift))),
+        `api=${(w1ebEvG1.data && w1ebEvG1.data.events || []).length} db=${(w1ebCompat('shift_events', w1ebShift) || []).length}`);
+    const w1ebEvId1 = w1ebEvP1.data && w1ebEvP1.data.event && w1ebEvP1.data.event.id;
+    await api('DELETE', `/api/shift-events/${w1ebShift}/${w1ebEvId1}`);
+    const w1ebEvG2 = await api('GET', `/api/shift-events/${w1ebShift}`);
+    record('W1-E-B ②: Parity حرفي بعد DELETE (الحذف الموثق ينعكس في المشتق)',
+        w1ebParity(w1ebEvG2.data && w1ebEvG2.data.events, w1ebCompat('shift_events', w1ebShift)),
+        `api=${(w1ebEvG2.data && w1ebEvG2.data.events || []).length}`);
+
+    // الغيابات (بمعرفات صريحة — العقد الرسمي المستقر): bulk ⇒ Parity
+    await api('POST', `/api/shift-absences/${w1ebShift}`, { absences: [
+        { id: 'w1eb-a1', name: 'غياب أول', center: 'منفوحة' },
+        { id: 'w1eb-a2', name: 'غياب ثانٍ', center: 'الشفاء' }
+    ] });
+    const w1ebAbG1 = await api('GET', `/api/shift-absences/${w1ebShift}`);
+    record('W1-E-B ③: Parity حرفي للغيابات بعد الاستبدال الجماعي',
+        w1ebParity(w1ebAbG1.data && w1ebAbG1.data.absences, w1ebCompat('shift_absences', w1ebShift)),
+        `api=${(w1ebAbG1.data && w1ebAbG1.data.absences || []).length}`);
+    // سحب «غياب أول» بالاستبدال ⇒ Parity (correction يزيله من المشتق)
+    await api('POST', `/api/shift-absences/${w1ebShift}`, { absences: [{ id: 'w1eb-a2', name: 'غياب ثانٍ', center: 'الشفاء' }] });
+    const w1ebAbG2 = await api('GET', `/api/shift-absences/${w1ebShift}`);
+    record('W1-E-B ④: Parity حرفي بعد سحب غياب بالاستبدال (withdrawn يُقصى من المشتق)',
+        w1ebParity(w1ebAbG2.data && w1ebAbG2.data.absences, w1ebCompat('shift_absences', w1ebShift)),
+        `api=${(w1ebAbG2.data && w1ebAbG2.data.absences || []).length}`);
+    // حذف فردي ⇒ Parity (قائمة فارغة من مصدرين)
+    await api('DELETE', `/api/shift-absences/${w1ebShift}/w1eb-a2`);
+    const w1ebAbG3 = await api('GET', `/api/shift-absences/${w1ebShift}`);
+    record('W1-E-B ⑤: Parity حرفي بعد الحذف الفردي (فارغ من المصدرين)',
+        w1ebParity(w1ebAbG3.data && w1ebAbG3.data.absences, w1ebCompat('shift_absences', w1ebShift)),
+        `api=${(w1ebAbG3.data && w1ebAbG3.data.absences || []).length}`);
+
+    // ⑥ السقوط الصادق: مناوبة إنتاجية قديمة بلا أحداث ⇒ القراءة التوافقية حرفيًا (D1)
+    let w1ebLegacyOk = false, w1ebLegacyId = null;
+    const w1ebShifts = await api('GET', '/api/shifts');
+    for (const s of (w1ebShifts.data || []).slice(0, 15)) {
+        if (s.id === w1ebShift) continue;
+        const tl = await api('GET', `/api/staffing/timeline?shift_id=${s.id}`);
+        if (((tl.data && tl.data.events) || []).length > 0) continue;
+        const gE = await api('GET', `/api/shift-events/${s.id}`);
+        const gA = await api('GET', `/api/shift-absences/${s.id}`);
+        if (gE.ok && gA.ok && w1ebParity(gE.data.events, w1ebCompat('shift_events', s.id))
+            && w1ebParity(gA.data.absences, w1ebCompat('shift_absences', s.id))) {
+            w1ebLegacyOk = true; w1ebLegacyId = s.id; break;
+        }
+    }
+    record('W1-E-B ⑥: مناوبة قديمة بلا أحداث تُقرأ توافقيًا بـ Parity حرفي (سقوط صادق)',
+        w1ebLegacyOk, `legacyShift=${w1ebLegacyId}`);
+
+    if (w1ebShift) await api('DELETE', `/api/shifts/${w1ebShift}`);
+
     // ─── 13m. W1-A: السجل التشغيلي الموحّد (operational_events) — الشريحة التأسيسية ───
     // ① ساكن: db.js يعرّف الجدولين والفهارس الخمسة (الترحيل ذاتي عند الإقلاع)
     const w1DbSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'db.js'), 'utf8');
