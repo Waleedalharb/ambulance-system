@@ -630,11 +630,14 @@ async function main() {
     const f5UiOk = !f5Html.includes('[12,8,15,10,7,5,3]') && !f5Html.includes('(placeholder') && f5Html.includes('/api/indicators/dashboard');
     record('F5a UI: operations-dashboard بلا بيانات ثابتة ومربوطة بالمسار الجديد', f5UiOk);
 
-    // ③ (قرار B): المسارات المحروسة بـ dbAvailable بلا تغيير — السلوك الصفري الحالي نفسه
-    const f5Guarded = await api('GET', '/api/shifts/daily-dashboard');
+    // ③ (قرار B مُحدَّث بعد OV-S9-02): المسار لم يعد صفرياً مجمداً — يحسب حياً من
+    // SQLite (SSOT). التحقق الحتمي: يوم فارغ صراحة (?date=1999-01-01) ⇒ أصفار صادقة
+    // بلا بيانات مختلقة. (النسخة السابقة قارنت تاريخ UTC بـ shift_date المحلي فكانت
+    // تنجح ليلاً فقط 00:00–03:00 الرياض — تجليّ الدين D-37، وليس سلوكاً مقصوداً.)
+    const f5Guarded = await api('GET', '/api/shifts/daily-dashboard?date=1999-01-01');
     const f5G = f5Guarded.data || {};
     const f5GuardedSame = f5Guarded.ok && f5G.success === true && f5G.total_shifts === 0 && f5G.total_reports === 0;
-    record('F5a: المسارات المحروسة لم تُحيَ (سلوكها كما قبل الشريحة)', f5GuardedSame, `total_shifts=${f5G.total_shifts} total_reports=${f5G.total_reports}`);
+    record('F5a: المسارات المحروسة — أصفار صادقة ليوم فارغ (حساب حي من SSOT بلا اختلاق)', f5GuardedSame, `total_shifts=${f5G.total_shifts} total_reports=${f5G.total_reports}`);
 
     // ④ server.js بلا 'unified' + الملفان محذوفان
     const f5SrvSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'server.js'), 'utf8');
