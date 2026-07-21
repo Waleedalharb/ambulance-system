@@ -245,6 +245,63 @@ async function main() {
     record('W1-B ⑥: زمن حفظ التكميل ضمن العتبة (<150ms) وحفظات الأداء لم تُنتج أحداثًا (نفس البصمة)',
         w1bPerfAvg < 150 && w1bEvEnd.length === w1bEv3.length, `avg=${w1bPerfAvg.toFixed(1)}ms events=${w1bEvEnd.length}`);
 
+    // ─── 6c. W1-E-A: قراءة هجينة لـ completion/latest (الأحداث أولًا + paramedics من الإسقاط دومًا) ───
+    // ① الحالات تُقدَّم مشتقة من السجل (آخر أحداث: ready/ready/offline) وتطابق آخر حفظ
+    const w1eLatest = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1eTeams = w1eLatest.data && w1eLatest.data.completion && w1eLatest.data.completion.teams;
+    record('W1-E-A ①: completion/latest يقدّم الحالات المشتقة من السجل (ready/ready/offline)',
+        !!(w1eTeams && w1eTeams['جنوب 3'] && w1eTeams['جنوب 3'].status === 'ready'
+        && w1eTeams['جنوب 7'] && w1eTeams['جنوب 7'].status === 'ready'
+        && w1eTeams['جنوب 9'] && w1eTeams['جنوب 9'].status === 'offline'),
+        `s3=${w1eTeams && w1eTeams['جنوب 3'] && w1eTeams['جنوب 3'].status} s7=${w1eTeams && w1eTeams['جنوب 7'] && w1eTeams['جنوب 7'].status} s9=${w1eTeams && w1eTeams['جنوب 9'] && w1eTeams['جنوب 9'].status}`);
+
+    // ② paramedics تصل دائمًا من shift_completions (D2) — حفظ بمسعفين بنفس البصمة ⇒ صفر أحداث جديدة
+    const w1eEvB = ((await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`)).data.events || []).length;
+    await api('POST', '/api/shift-completion', {
+        ...w1bPayload3,
+        teams: { ...w1bPayload3.teams, 'جنوب 3': { status: 'ready', centerName: 'منفوحة', paramedics: ['مسعف أول', 'مسعف ثانٍ'] } },
+        notes: 'w1e-paramedics'
+    });
+    const w1eLatest2 = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1eT3 = w1eLatest2.data && w1eLatest2.data.completion && w1eLatest2.data.completion.teams['جنوب 3'];
+    const w1eEvA = ((await api('GET', `/api/staffing/timeline?shift_id=${shiftId}`)).data.events || []).length;
+    record('W1-E-A ②: paramedics من الإسقاط دومًا (D2) وحفظها بلا حدث جديد (نفس البصمة)',
+        !!(w1eT3 && Array.isArray(w1eT3.paramedics) && w1eT3.paramedics.length === 2
+        && w1eT3.status === 'ready' && w1eEvA === w1eEvB),
+        `paramedics=${w1eT3 && JSON.stringify(w1eT3.paramedics)} events=${w1eEvB}→${w1eEvA}`);
+
+    // ③ السقوط للمناوبات القديمة: مناوبة بلا أحداث staffing ⇒ بيانات الإسقاط كما هي (D1)
+    let w1eLegacy = null, w1eLegacyShift = null;
+    const w1eShifts = await api('GET', '/api/shifts');
+    for (const s of (w1eShifts.data || []).slice(0, 15)) {
+        if (s.id === shiftId) continue;
+        const tl = await api('GET', `/api/staffing/timeline?shift_id=${s.id}`);
+        const evCount = ((tl.data && tl.data.events) || []).length;
+        if (evCount > 0) continue;
+        const c = await api('GET', `/api/completion/latest?shift_id=${s.id}`);
+        if (c.ok && c.data && c.data.success && c.data.completion && c.data.completion.teams && Object.keys(c.data.completion.teams).length) {
+            w1eLegacy = c.data.completion; w1eLegacyShift = s.id; break;
+        }
+        const c2 = await api('GET', `/api/completion/latest?shiftDate=${encodeURIComponent(s.shiftDate || '')}&shiftType=${encodeURIComponent(s.shiftType || '')}`);
+        if (c2.ok && c2.data && c2.data.success && c2.data.completion && c2.data.completion.teams && Object.keys(c2.data.completion.teams).length) {
+            w1eLegacy = c2.data.completion; w1eLegacyShift = s.id; break;
+        }
+    }
+    record('W1-E-A ③: مناوبة قديمة بلا أحداث تُقرأ من الإسقاط التوافقي كما هي (سقوط صادق)',
+        !!(w1eLegacy && Object.keys(w1eLegacy.teams).length > 0),
+        `legacyShift=${w1eLegacyShift} teams=${w1eLegacy ? Object.keys(w1eLegacy.teams).length : 'none'}`);
+
+    // ④ عقد المغلف بلا تغيير (نفس الحقول الثمانية بالضبط)
+    const w1eKeys = w1eLatest2.data && w1eLatest2.data.completion ? Object.keys(w1eLatest2.data.completion).sort().join(',') : '';
+    record('W1-E-A ④: عقد الاستجابة ثابت (حقول المغلف الثمانية بلا زيادة)',
+        w1eKeys === 'createdAt,createdBy,id,notes,shiftDate,shiftId,shiftType,teams', `keys=${w1eKeys}`);
+
+    // ⑤ أداء القراءة الهجينة ضمن العتبة
+    const w1eT0 = Date.now();
+    const w1ePerf = await api('GET', `/api/completion/latest?shift_id=${shiftId}`);
+    const w1eMs = Date.now() - w1eT0;
+    record('W1-E-A ⑤: زمن القراءة الهجينة ضمن العتبة (<150ms)', w1ePerf.ok && w1eMs < 150, `ms=${w1eMs}`);
+
     // ─── 7. Indicators / dashboards ───
     const wf = await api('GET', `/api/workforce-stats/${shiftId}`);
     record('إحصائيات القوى العاملة للمناوبة', wf.status === 200, `status=${wf.status}`);

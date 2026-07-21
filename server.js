@@ -4341,7 +4341,7 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
                 ? await completionService.getLatestByShiftId(shiftId)
                 : await opsEngine.completions.getLatestByShiftId(shiftId);
             if (!byShift) return res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
-            return res.json({ success: true, completion: byShift });
+            return res.json({ success: true, completion: await w1eHybridCompletion(byShift) });
         }
 
         // Backward-compatible path: latest by shift date + type
@@ -4352,12 +4352,38 @@ app.get('/api/completion/latest', authenticate, async (req, res) => {
             : await opsEngine.completions.getLatestCompletion(shiftDate, shiftType);
         if (!completion) return res.json({ success: false, message: 'لا يوجد تكميل محفوظ لهذه المناوبة' });
 
-        res.json({ success: true, completion });
+        res.json({ success: true, completion: await w1eHybridCompletion(completion) });
     } catch (error) {
         console.error('[API] Error getting shift-completion:', error);
         res.status(500).json({ error: 'فشل في جلب التكميل' });
     }
 });
+
+// W1-E-A: القراءة الهجينة (قرارا D1+D2) — operational_events أولًا:
+// الحالات (status/reason/missingPerson) تُشتق من السجل عند وجود أحداث،
+// والمغلف (id/notes/createdBy/createdAt) وقوائم المسعفين (paramedics)
+// تبقى دائمًا من الإسقاط التوافقي shift_completions. بلا أحداث (مناوبات
+// قديمة) أو عند فشل الاشتقاق ⇒ الإسقاط كما هو بلا أي تغيير. العقد ثابت.
+async function w1eHybridCompletion(completion) {
+    if (!completion || !completion.shiftId || !staffingEventsService) return completion;
+    try {
+        const derived = await staffingEventsService.getCompletionTeamsView(completion.shiftId);
+        if (!derived) return completion;
+        const teams = { ...(completion.teams || {}) };
+        for (const k of Object.keys(derived)) {
+            const d = derived[k];
+            const cur = teams[k] || {};
+            const merged = { ...cur, status: d.status };
+            // لا تُضاف مفاتيح جديدة للعقد إلا عندما تحمل قيمة فعلية
+            if (d.reason || 'reason' in cur) merged.reason = d.reason;
+            if (d.missingPerson || 'missingPerson' in cur) merged.missingPerson = d.missingPerson;
+            teams[k] = merged; // paramedics لا تُمس — بيانات نموذج من الإسقاط (D2)
+        }
+        return { ...completion, teams };
+    } catch (_) {
+        return completion; // فشل الاشتقاق لا يكسر القراءة — سقوط آمن للإسقاط
+    }
+}
 
 // ============================================
 // W1-A: الأحداث التشغيلية — قراءات القوى البشرية والمركبات

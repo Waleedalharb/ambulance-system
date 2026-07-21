@@ -164,6 +164,38 @@ class StaffingEventsService {
         }
         return { appended: out.length, events: out };
     }
+
+    /**
+     * W1-E-A: عرض حالات الفرق المشتق من السجل (الطبقة المشتقة من القراءة الهجينة).
+     * الحالة = أحدث حدث جاهزية على مستوى الفريق (ready/missing/offline)،
+     * وmissingPerson = الشخص الذي ما زال غيابه/تأخيره مفتوحًا دلاليًا لذلك الفريق.
+     * يعيد null عند غياب أحداث الجاهزية ⇒ يسقط المسار إلى الإسقاط التوافقي
+     * (مناوبات ما قبل W1-B). لا يعيد paramedics إطلاقًا — بيانات النموذج
+     * تبقى في shift_completions (قرار D2: السجل Event Log فقط).
+     */
+    async getCompletionTeamsView(shiftId) {
+        if (!shiftId) return null;
+        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        if (!events.length) return null;
+        const TEAM_STATUSES = ['ready', 'missing', 'offline'];
+        const out = {};
+        for (const e of events) {
+            if (!e.team_id || e.entity_id) continue; // أحداث الفريق فقط (بلا كيان شخصي)
+            if (TEAM_STATUSES.includes(e.event_type)) {
+                out[e.team_id] = { status: e.event_type, reason: e.reason || '', missingPerson: '' };
+            }
+        }
+        if (!Object.keys(out).length) return null;
+        // الشخص المفتوح غيابه/تأخيره لفريق ناقص (arrival يغلقه دلاليًا)
+        const folded = foldEvents(events, DOMAIN);
+        for (const f of folded) {
+            if (!f.entityId || !f.teamId || !out[f.teamId]) continue;
+            if (out[f.teamId].status !== 'missing') continue;
+            const stillOpen = f.open.some(o => o.event_type === 'absence' || o.event_type === 'late');
+            if (stillOpen) out[f.teamId].missingPerson = f.entityId;
+        }
+        return out;
+    }
 }
 
 module.exports = StaffingEventsService;
