@@ -381,6 +381,56 @@ async function main() {
     const abGet = await api('GET', `/api/shift-absences/${shift2Id}`);
     const abList = abGet.data && abGet.data.absences || [];
     record('سجل الغيابات عبر SQLite (كتابة/قراءة)', abPost.ok && abList.some(a => a.name === 'غياب اختبار'), `absences=${abList.length}`);
+
+    // ─── W1-C: Facade فوق الكتّاب الموازيين — أحداث موثقة + عقود بلا تغيير ───
+    // ① حفظ الغياب أعلاه ولّد حدث absence تشغيليًا بختم سيرفري (staffing domain)
+    const w1cTl1 = await api('GET', `/api/staffing/timeline?shift_id=${shift2Id}`);
+    const w1cEv1 = (w1cTl1.data && w1cTl1.data.events) || [];
+    const w1cAbs = w1cEv1.find(e => e.event_type === 'absence' && e.entity_id === 'غياب اختبار');
+    record('W1-C ①: POST غياب جماعي ولّد حدث absence بختم سيرفري (actor/time/shift من السيرفر)',
+        !!(w1cAbs && w1cAbs.shift_id === shift2Id && w1cAbs.actor_name && w1cAbs.created_at && w1cAbs.center === 'منفوحة'),
+        `events=${w1cEv1.length} found=${!!w1cAbs}`);
+
+    // ② إعادة إرسال نفس القائمة ⇒ صفر أحداث جديدة (منع التكرار في Bulk Replace)
+    await api('POST', `/api/shift-absences/${shift2Id}`, { absences: [{ name: 'غياب اختبار', center: 'منفوحة' }] });
+    const w1cTl2 = await api('GET', `/api/staffing/timeline?shift_id=${shift2Id}`);
+    const w1cEv2 = (w1cTl2.data && w1cTl2.data.events) || [];
+    record('W1-C ②: إعادة الاستبدال المتطابق لم تُنتج أحداثًا مكررة', w1cEv2.length === w1cEv1.length,
+        `before=${w1cEv1.length} after=${w1cEv2.length}`);
+
+    // ③ إزالة الاسم من القائمة (قائمة فارغة) ⇒ حدث correction موثق للمسحوب
+    await api('POST', `/api/shift-absences/${shift2Id}`, { absences: [] });
+    const w1cTl3 = await api('GET', `/api/staffing/timeline?shift_id=${shift2Id}`);
+    const w1cEv3 = (w1cTl3.data && w1cTl3.data.events) || [];
+    const w1cCorr = w1cEv3.find(e => e.event_type === 'correction' && e.entity_id === 'غياب اختبار');
+    record('W1-C ③: سحب الغياب بالاستبدال وُثق كـ correction (التاريخ لا يُفقد)',
+        w1cEv3.length === w1cEv2.length + 1 && !!w1cCorr && !!(w1cCorr.payload || '').includes('withdrawn'),
+        `events=${w1cEv3.length} correction=${!!w1cCorr}`);
+
+    // ④ DELETE فردي: حذف فيزيائي (العقد) + correction موثق — والقراءة القديمة تخلو من المحذوف
+    await api('POST', `/api/shift-absences/${shift2Id}`, { absences: [{ name: 'غياب مؤقت', center: 'الشفاء' }] });
+    const w1cAbGet = await api('GET', `/api/shift-absences/${shift2Id}`);
+    const w1cAbItem = ((w1cAbGet.data && w1cAbGet.data.absences) || []).find(a => a.name === 'غياب مؤقت');
+    const w1cDel = w1cAbItem ? await api('DELETE', `/api/shift-absences/${shift2Id}/${w1cAbItem.id}`) : { ok: false };
+    const w1cAbGet2 = await api('GET', `/api/shift-absences/${shift2Id}`);
+    const w1cAbList2 = (w1cAbGet2.data && w1cAbGet2.data.absences) || [];
+    const w1cTl4 = await api('GET', `/api/staffing/timeline?shift_id=${shift2Id}`);
+    const w1cEv4 = (w1cTl4.data && w1cTl4.data.events) || [];
+    const w1cDelCorr = w1cEv4.find(e => e.event_type === 'correction' && e.entity_id === 'غياب مؤقت');
+    record('W1-C ④: DELETE فردي ⇒ حذف فيزيائي (العقد) + correction موثق بالمحذوف',
+        w1cDel.ok && w1cAbList2.length === 0 && !!w1cDelCorr && !!(w1cDelCorr.payload || '').includes('deleted'),
+        `del=${w1cDel.ok} list=${w1cAbList2.length} correction=${!!w1cDelCorr}`);
+
+    // ⑤ عقود الاستجابة كما هي: POST يرجع {success,event} وDELETE يرجع {success:true}
+    const w1cEvShape = await api('POST', `/api/shift-events/${shift2Id}`, { type: 'عقد', description: 'تحقق شكل الاستجابة' });
+    const w1cEvId = w1cEvShape.data && w1cEvShape.data.event && w1cEvShape.data.event.id;
+    const w1cDelShape = w1cEvId ? await api('DELETE', `/api/shift-events/${shift2Id}/${w1cEvId}`) : { ok: false };
+    record('W1-C ⑤: عقود Request/Response لم تتغير (event بنفس الحقول + delete بنجاح)',
+        !!(w1cEvShape.ok && w1cEvShape.data.success === true && w1cEvShape.data.event
+        && w1cEvShape.data.event.type === 'عقد' && w1cEvShape.data.event.shiftId === shift2Id
+        && w1cEvShape.data.event.timestamp && w1cEvShape.data.event.createdAt)
+        && w1cDelShape.ok && w1cDelShape.data && w1cDelShape.data.success === true,
+        `post=${w1cEvShape.status} delete=${w1cDelShape.status}`);
     const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });
     const ppGet = await api('GET', '/api/peak-plans');
     const ppList = ppGet.data && ppGet.data.plans || [];

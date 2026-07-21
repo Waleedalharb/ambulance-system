@@ -1465,6 +1465,32 @@ async function withTx(fn) {
     if (opsEngine && typeof opsEngine.runInTransaction === 'function') return opsEngine.runInTransaction(fn);
     return fn();
 }
+
+// W1-C: ختم سيرفري للأحداث التشغيلية من صف المناوبة نفسه (SSOT).
+// يعيد null عند غياب الصف ⇒ يُتخطى الحدث التشغيلي ويبقى السلوك القديم كما هو.
+async function w1cShiftStamp(shiftId) {
+    try {
+        if (!opsEngine || !opsEngine.storage) return null;
+        const s = await opsEngine.storage.getShiftById(shiftId);
+        return s ? { shiftDate: s.shift_date, shiftType: s.shift_type } : null;
+    } catch (e) { return null; }
+}
+
+// W1-C: إلحاق حدث تشغيلي عبر البوابة الرسمية فقط (StorageAdapter) — ختم سيرفري دائمًا.
+async function w1cAppendOpEvent(shiftId, stamp, e, actor) {
+    if (!stamp) return null; // بلا صف مناوبة ⇒ لا حدث (توافق قديم بلا تغيير)
+    return opsEngine.storage.appendOperationalEvent({
+        shiftId, shiftDate: stamp.shiftDate, shiftType: stamp.shiftType,
+        domain: e.domain, entityId: e.entityId || null, entityName: e.entityName || null,
+        teamId: e.teamId || null, center: e.center || null,
+        eventType: e.eventType, status: e.status || null, reason: e.reason || null,
+        correctsEventId: e.correctsEventId || null,
+        payload: e.payload || null, note: e.note || null,
+        actorId: String((actor && actor.id) || 'system'),
+        actorName: (actor && (actor.name || actor.username)) || 'system',
+        createdAt: new Date().toISOString()
+    });
+}
 async function getActiveShiftId() {
     try {
         const active = opsEngine && opsEngine.shifts ? await opsEngine.shifts.getActiveShift() : null;
@@ -6529,16 +6555,25 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
             timestamp: timestamp || new Date().toISOString(),
             createdAt: new Date().toISOString()
         };
-        await contentInsert('shift_events', shiftId, newEvent);
+        // W1-C Facade: نفس العقد ظاهريًا + حدث تشغيلي موثق (logistics/note)
+        // داخل نفس المعاملة وبختم سيرفري — السجل الرسمي لا يعتمد وقت العميل.
+        const stamp = await w1cShiftStamp(shiftId);
+        await withTx(async () => {
+            await contentInsert('shift_events', shiftId, newEvent);
+            await w1cAppendOpEvent(shiftId, stamp, {
+                domain: 'logistics', eventType: 'note',
+                payload: { source: 'shift_events', type, description }
+            }, req.user);
+        });
         broadcast({
             type: 'shift_event_added',
             message: 'تم إضافة حدث جديد للمناوبة',
             event: newEvent
         });
-        
+
         // Audit log
         await addAuditLogEntry('shift_event_added', 'تم إضافة حدث جديد للمناوبة', 'shifts', req.user.name, req.user.role, req.user.id);
-        
+
         res.json({ success: true, event: newEvent });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الحدث' });
@@ -6548,7 +6583,20 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res) => {
     try {
         const { shiftId, eventId } = req.params;
-        await db.run('DELETE FROM shift_events WHERE shift_id = ? AND id = ?', [parseInt(shiftId), eventId]);
+        // W1-C Facade: الحذف الفيزيائي يبقى (عقد القراءة القديم) لكن لا يُفقد
+        // أي تاريخ — حدث correction موثق يحمل نسخة المحذوف كاملة بنفس المعاملة.
+        const existing = await db.get('SELECT * FROM shift_events WHERE shift_id = ? AND id = ?', [parseInt(shiftId), eventId]);
+        const stamp = await w1cShiftStamp(parseInt(shiftId));
+        await withTx(async () => {
+            await db.run('DELETE FROM shift_events WHERE shift_id = ? AND id = ?', [parseInt(shiftId), eventId]);
+            if (existing) {
+                await w1cAppendOpEvent(parseInt(shiftId), stamp, {
+                    domain: 'logistics', eventType: 'correction',
+                    payload: { source: 'shift_events', action: 'deleted', deletedRow: existing.data },
+                    note: 'حذف موثق من سجل أحداث المناوبة'
+                }, req.user);
+            }
+        });
         broadcast({
             type: 'shift_event_deleted',
             message: 'تم حذف حدث من المناوبة',
@@ -6580,11 +6628,41 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         const newAbsences = absences.map((a, i) => ({ ...a, shiftId, id: a.id ? String(a.id) : (Date.now() + i).toString() }));
+        // W1-C Facade: الاستبدال الجماعي يبقى كما هو (عقد)، لكن الفرق الحقيقي
+        // فقط يُولّد أحداثًا: اسم جديد ⇒ absence، اسم أُزيل ⇒ correction موثق،
+        // اسم باقٍ ⇒ لا شيء (منع تكرار مع إعادة الإرسال المتطابق).
+        const previousAbsences = await contentListByShift('shift_absences', shiftId);
+        const nameOf = (a) => (a && (a.name || a.employee || a.person)) || null;
+        const prevNames = new Set(previousAbsences.map(nameOf).filter(Boolean));
+        const newNames = new Set(newAbsences.map(nameOf).filter(Boolean));
+        const stamp = await w1cShiftStamp(shiftId);
         // Archive slice: bulk-replace inside one transaction (same semantics as the JSON write)
         await withTx(async () => {
             await db.run('DELETE FROM shift_absences WHERE shift_id = ?', [shiftId]);
             for (const a of newAbsences) {
                 await contentInsert('shift_absences', shiftId, a);
+            }
+            for (const a of newAbsences) {
+                const n = nameOf(a);
+                if (n && !prevNames.has(n)) {
+                    await w1cAppendOpEvent(shiftId, stamp, {
+                        domain: 'staffing', eventType: 'absence',
+                        entityId: n, entityName: n, center: a.center || null,
+                        reason: a.reason || null,
+                        payload: { source: 'shift_absences_bulk' }
+                    }, req.user);
+                }
+            }
+            for (const old of previousAbsences) {
+                const n = nameOf(old);
+                if (n && !newNames.has(n)) {
+                    await w1cAppendOpEvent(shiftId, stamp, {
+                        domain: 'staffing', eventType: 'correction',
+                        entityId: n, entityName: n, center: old.center || null,
+                        payload: { source: 'shift_absences_bulk', action: 'withdrawn', withdrawnRow: old },
+                        note: 'سُحب من سجل الغياب بالاستبدال الجماعي'
+                    }, req.user);
+                }
             }
         });
         broadcast({
@@ -6600,7 +6678,24 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
 app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, res) => {
     try {
         const { shiftId, absenceId } = req.params;
-        await db.run('DELETE FROM shift_absences WHERE shift_id = ? AND id = ?', [parseInt(shiftId), absenceId]);
+        // W1-C Facade: حذف فيزيائي (عقد) + correction موثق بنسخة المحذوف بمعاملة واحدة
+        const existing = await db.get('SELECT * FROM shift_absences WHERE shift_id = ? AND id = ?', [parseInt(shiftId), absenceId]);
+        const stamp = await w1cShiftStamp(parseInt(shiftId));
+        await withTx(async () => {
+            await db.run('DELETE FROM shift_absences WHERE shift_id = ? AND id = ?', [parseInt(shiftId), absenceId]);
+            if (existing) {
+                let parsed = null;
+                try { parsed = JSON.parse(existing.data); } catch (_) {}
+                await w1cAppendOpEvent(parseInt(shiftId), stamp, {
+                    domain: 'staffing', eventType: 'correction',
+                    entityId: parsed && parsed.name ? String(parsed.name) : null,
+                    entityName: parsed && parsed.name ? String(parsed.name) : null,
+                    center: parsed && parsed.center ? parsed.center : null,
+                    payload: { source: 'shift_absences', action: 'deleted', deletedRow: existing.data },
+                    note: 'حذف موثق من سجل الغياب'
+                }, req.user);
+            }
+        });
         broadcast({
             type: 'shift_absence_deleted',
             message: 'تم حذف غياب من المناوبة',
