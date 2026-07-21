@@ -833,6 +833,25 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_shift_domain ON operational_events(shift_id, domain);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_corrects ON operational_events(corrects_event_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_snapshots_shift ON operational_shift_snapshots(shift_id);`);
+    // W1-D (قرار 7-3): سجل مركبات مرجعي بمعرف ثابت مستقل عن الاسم.
+    // الحالة التشغيلية لا تُحفظ هنا إطلاقًا — تُشتق من operational_events فقط (SSOT).
+    await exec(`CREATE TABLE IF NOT EXISTS vehicles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      team_id INTEGER,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+    // توليد/تحديث ذاتي من سجل الفرق: المعرف veh_<teams.id> ثابت لا يتغير
+    // (AUTOINCREMENT لا يعيد الاستخدام)، والاسم العرضي يتبع اسم الفريق
+    // الحالي — إعادة تسمية الفريق لا تكسر تاريخ المركبة.
+    await exec(`INSERT OR IGNORE INTO vehicles (id, name, team_id, sort_order, is_active)
+                SELECT 'veh_' || id, name, id, sort_order, is_active FROM teams;`);
+    await exec(`UPDATE vehicles SET
+                  name = (SELECT name FROM teams WHERE teams.id = vehicles.team_id),
+                  sort_order = (SELECT sort_order FROM teams WHERE teams.id = vehicles.team_id)
+                WHERE team_id IN (SELECT id FROM teams);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_status ON kb_documents(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_category ON kb_documents(category);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_doc_id ON kb_documents(doc_id);`);

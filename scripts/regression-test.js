@@ -431,6 +431,77 @@ async function main() {
         && w1cEvShape.data.event.timestamp && w1cEvShape.data.event.createdAt)
         && w1cDelShape.ok && w1cDelShape.data && w1cDelShape.data.success === true,
         `post=${w1cEvShape.status} delete=${w1cDelShape.status}`);
+
+    // ─── W1-D: لوحة المركبات + السجل المصغر — سجل مرجعي بمعرف ثابت + اشتقاق سيرفري فقط ───
+    // ① السجل المرجعي: معرف ثابت veh_<teamId> مستقل عن الاسم (قرار 7-3 المعدّل)
+    const w1dReg = await api('GET', '/api/vehicles/registry');
+    const w1dVehicles = (w1dReg.data && w1dReg.data.vehicles) || [];
+    const w1dRegOk = w1dReg.ok && w1dVehicles.length > 0
+        && w1dVehicles.every(v => /^veh_\d+$/.test(v.id) && !!v.name && !!v.team_id);
+    record('W1-D ①: سجل المركبات بمعرف ثابت veh_<teamId> مستقل عن الاسم', w1dRegOk, `count=${w1dVehicles.length}`);
+
+    // ② كتابة حدث عبر المسار الجديد فقط: قبول صحيح (ختم سيرفري بالمناوبة النشطة)
+    //    + رفض حالة غير صالحة (400) + رفض breakdown بلا سبب (400) + رفض مركبة غير موجودة (404)
+    const w1dV1 = w1dVehicles[0] || {};
+    const w1dBadStatus = await api('POST', '/api/vehicles/events', { vehicleId: w1dV1.id, status: 'flying' }, 400);
+    const w1dNoReason = await api('POST', '/api/vehicles/events', { vehicleId: w1dV1.id, status: 'breakdown' }, 400);
+    const w1dNotFound = await api('POST', '/api/vehicles/events', { vehicleId: 'veh_999999', status: 'active' }, 404);
+    const w1dPost = await api('POST', '/api/vehicles/events', { vehicleId: w1dV1.id, status: 'breakdown', reason: 'عطل اختبار regression' });
+    record('W1-D ②: POST /api/vehicles/events — قبول مختوم سيرفريًا + رفض (حالة/بلا سبب/مركبة غير موجودة)',
+        w1dPost.ok && w1dPost.data && w1dPost.data.success === true && w1dPost.data.shiftId === shift2Id
+        && w1dBadStatus.status === 400 && w1dNoReason.status === 400 && w1dNotFound.status === 404,
+        `post=${w1dPost.status} badStatus=${w1dBadStatus.status} noReason=${w1dNoReason.status} notFound=${w1dNotFound.status}`);
+
+    // ③ اللوحة تُشتق من operational_events فقط: العدادات + الحالة/السبب/since تطابق timeline
+    const w1dBoard = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+    const w1dCounters = (w1dBoard.data && w1dBoard.data.counters) || {};
+    const w1dBV = ((w1dBoard.data && w1dBoard.data.vehicles) || []).find(v => v.id === w1dV1.id);
+    const w1dTl = await api('GET', `/api/vehicles/timeline?shift_id=${shift2Id}`);
+    const w1dTlEv = ((w1dTl.data && w1dTl.data.events) || []).find(e => e.entity_id === w1dV1.id && e.status === 'breakdown');
+    record('W1-D ③: اللوحة مشتقة من السجل (breakdown=1 + status/reason/since تطابق timeline)',
+        w1dBoard.ok && w1dCounters.breakdown === 1 && !!w1dBV && w1dBV.status === 'breakdown'
+        && w1dBV.reason === 'عطل اختبار regression' && !!w1dBV.since && !!w1dTlEv,
+        `breakdown=${w1dCounters.breakdown} status=${w1dBV && w1dBV.status} timelineEvent=${!!w1dTlEv}`);
+
+    // ④ بث لحظي: كتابة حدث مركبة تبث vehicles_updated عبر SSE (إعادة المركبة «عاملة»)
+    let sseVehiclesUpdated = false;
+    try {
+        await new Promise((resolve) => {
+            const timer = setTimeout(() => { try { sseV.close(); } catch (_) {} resolve(); }, 8000);
+            const sseV = listenSSE(`/api/sse?token=${encodeURIComponent(TOKEN)}`, (m) => {
+                if (m.type === 'vehicles_updated' && m.shiftId === shift2Id) {
+                    sseVehiclesUpdated = true;
+                    clearTimeout(timer); sseV.close(); resolve();
+                }
+            });
+            sseV.onOpen(async () => {
+                await api('POST', '/api/vehicles/events', { vehicleId: w1dV1.id, status: 'active' });
+            });
+        });
+    } catch (e) {}
+    record('W1-D ④: بث vehicles_updated لحظيًا عبر SSE عند كتابة حدث مركبة', sseVehiclesUpdated);
+
+    // ⑤ لا مصدر حقيقة ثانٍ: جدول vehicles بلا عمود حالة + الواجهة بلا localStorage للمركبات
+    //    + عناصر W1-D موجودة في الصفحة (قسم المركبات/السجل المصغر/معالج SSE/خطاف التهيئة)
+    const w1dFs = require('fs'), w1dPath = require('path');
+    const w1dDbSrc = w1dFs.readFileSync(w1dPath.join(__dirname, '..', 'db.js'), 'utf8');
+    const w1dRcSrc = w1dFs.readFileSync(w1dPath.join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
+    const w1dVehTable = (w1dDbSrc.match(/CREATE TABLE IF NOT EXISTS vehicles \(([\s\S]*?)\)/) || [])[1] || '';
+    const w1dNoStatusCol = !/\bstatus\b/i.test(w1dVehTable);
+    const w1dNoVehLS = !/localStorage\.(setItem|getItem)\([^)]*vehic/i.test(w1dRcSrc);
+    const w1dUiOk = w1dRcSrc.includes('id="vehiclesSection"') && w1dRcSrc.includes('mini-log')
+        && w1dRcSrc.includes("'vehicles_updated'") && w1dRcSrc.includes('loadVehiclesBoard();')
+        && w1dRcSrc.includes('loadStaffingLog();');
+    record('W1-D ⑤: لا مصدر حقيقة ثانٍ (جدول بلا status + واجهة بلا localStorage) + عناصر الواجهة موجودة',
+        w1dNoStatusCol && w1dNoVehLS && w1dUiOk,
+        `noStatusCol=${w1dNoStatusCol} noVehLS=${w1dNoVehLS} ui=${w1dUiOk}`);
+
+    // ⑥ أداء اللوحة ضمن العتبة (<150ms)
+    const w1dT0 = Date.now();
+    const w1dBoardPerf = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+    const w1dBoardMs = Date.now() - w1dT0;
+    record('W1-D ⑥: زمن جلب لوحة المركبات ضمن العتبة (<150ms)', w1dBoardPerf.ok && w1dBoardMs < 150, `ms=${w1dBoardMs}`);
+
     const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });
     const ppGet = await api('GET', '/api/peak-plans');
     const ppList = ppGet.data && ppGet.data.plans || [];

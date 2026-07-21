@@ -298,6 +298,30 @@ function navigateToPage(url) {
     <div class="cards-grid" id="specialCards"></div>
 </div>
 
+<!-- Vehicles (W1-D) — عرض فوق السجل الرسمي: العدادات والحالة مشتقة سيرفريًا -->
+<style>
+    .mini-log { margin-top:4px; padding-top:3px; border-top:1px dashed var(--border,#333); font-size:0.62rem; color:var(--muted); line-height:1.6; min-height:0; }
+    .mini-log:empty { display:none; }
+    .mini-log .ml-item { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vehicle-card { cursor:pointer; }
+    .vehicle-card .card-status { font-weight:700; }
+    .vehicle-card.st-active .card-status { color:var(--success,#28c76f); }
+    .vehicle-card.st-reserve .card-status { color:var(--warning,#ff9f43); }
+    .vehicle-card.st-breakdown .card-status { color:var(--danger,#ea5455); }
+    .vehicle-card.st-out_of_service .card-status { color:var(--gray,#82868b); }
+    .vehicle-card .v-reason { font-size:0.62rem; color:var(--muted); margin-top:2px; }
+</style>
+<div class="section" id="vehiclesSection">
+    <div class="section-title"><i class="fas fa-ambulance"></i> المركبات</div>
+    <div class="dashboard">
+        <div class="dash-card green"><div class="value" id="vehActive">0</div><div class="label">🚑 عاملة</div></div>
+        <div class="dash-card yellow"><div class="value" id="vehReserve">0</div><div class="label">🔄 احتياط</div></div>
+        <div class="dash-card red"><div class="value" id="vehBreakdown">0</div><div class="label">🛠️ متعطلة</div></div>
+        <div class="dash-card gray"><div class="value" id="vehOut">0</div><div class="label">🔴 خارج الخدمة</div></div>
+    </div>
+    <div class="cards-grid" id="vehicleCards"></div>
+</div>
+
 <!-- Notes -->
 <div class="notes-section">
     <div class="notes-box">
@@ -415,7 +439,16 @@ function initLiveSync() {
     }
     sseSync = new EventSource('/api/sse?token=' + encodeURIComponent(token));
     sseSync.onopen = function() { sseConnected = true; };
-    // لا onmessage: هذه الصفحة لم تكن تستهلك أي حدث وارد (كما كان الحال مع WS)
+    // W1-D: أول استهلاك فعلي لهذه الصفحة — تحديث العرض فقط عند أحداث السجل الرسمي
+    // (مركبات/أفراد/تكميل). لا منطق أعمال: إعادة جلب من الخادم ثم عرض.
+    sseSync.onmessage = function(ev) {
+        try {
+            var data = JSON.parse(ev.data);
+            if (!data || !data.type) return;
+            if (data.type === 'vehicles_updated') loadVehiclesBoard();
+            else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated') loadStaffingLog();
+        } catch (e) { /* إطار غير JSON — يُتجاهل */ }
+    };
     sseSync.onerror = function() {
         sseConnected = false;
         if (sseSync && sseSync.readyState === EventSource.CLOSED) {
@@ -597,7 +630,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initStatuses();
     loadFromSmartSchedule();
     initLiveSync();
-    
+    loadStaffingLog();   // W1-D: سجل الأفراد المصغر (عرض فقط من السجل الرسمي)
+    loadVehiclesBoard(); // W1-D: لوحة المركبات (اشتقاق سيرفري)
+
     // Phase 2+3: Fetch current shift_id from server on load
     fetchCurrentShiftId().then(function(sid) {
         console.log('[Init] Shift ID from server:', sid);
@@ -907,6 +942,7 @@ function renderAll() {
     renderCenterCards();
     renderSpecialCards();
     updateDashboard();
+    renderMiniLogs(); // W1-D: سجل مصغر أسفل كل بطاقة (عرض فقط من السجل الرسمي)
 }
 
 function renderRapidCards() {
@@ -996,6 +1032,7 @@ function renderCard(name, teamId, type, status) {
         '<div class="card-status">' + STATUS_LABELS[status.status] + '</div>' +
         '<div class="paramedics">' + paramedicsHtml + '</div>' +
         '<div class="reason-bar">' + reasonsHtml + '</div>' +
+        '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
     '</div>';
 }
 
@@ -1035,6 +1072,97 @@ function setMissingPerson(teamId, personName) {
     teamStatus[teamId].missingPerson = personName;
     renderAll();
     triggerAutoSave();
+}
+
+// ============================================
+// W1-D: سجل الأفراد المصغر + لوحة المركبات (عرض فقط — الاشتقاق سيرفري بالكامل)
+// لا حساب حالة هنا: العدادات والحالات تُعرض كما تصل من الخادم (SSOT).
+// ============================================
+var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
+var w1dStaffingEvents = [];
+var VEHICLE_STATUS_CYCLE = ['active', 'reserve', 'breakdown', 'out_of_service'];
+var VEHICLE_STATUS_LABELS = { active: '🚑 عاملة', reserve: '🔄 احتياط', breakdown: '🛠️ متعطلة', out_of_service: '🔴 خارج الخدمة' };
+
+function w1dAuthHeaders() {
+    var t = AuthCore.getToken();
+    return t ? { 'Authorization': 'Bearer ' + t } : null;
+}
+
+function loadStaffingLog() {
+    var h = w1dAuthHeaders(); if (!h) return;
+    fetch('/api/staffing/timeline', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            if (!d || !d.success) return;
+            w1dStaffingEvents = d.events || [];
+            renderMiniLogs();
+        }).catch(function() { /* عرض فقط — الفشل صامت */ });
+}
+
+function renderMiniLogs() {
+    var byTeam = {};
+    w1dStaffingEvents.forEach(function(e) {
+        if (!e.team_id) return;
+        (byTeam[e.team_id] = byTeam[e.team_id] || []).push(e);
+    });
+    Object.keys(teamStatus).forEach(function(teamId) {
+        var el = document.getElementById('miniLog_' + teamId);
+        if (!el) return;
+        el.innerHTML = (byTeam[teamId] || []).slice(-3).map(function(e) {
+            var t = (e.created_at || '').slice(11, 16);
+            var who = e.entity_id ? ' — ' + e.entity_id : '';
+            return '<span class="ml-item">' + t + ' ' + (W1D_EVENT_LABELS[e.event_type] || e.event_type) + who + '</span>';
+        }).join('');
+    });
+}
+
+function loadVehiclesBoard() {
+    var h = w1dAuthHeaders(); if (!h) return;
+    fetch('/api/vehicles/board', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            if (!d || !d.success) return;
+            renderVehiclesBoard(d);
+        }).catch(function() { /* عرض فقط */ });
+}
+
+function renderVehiclesBoard(board) {
+    var c = board.counters || {};
+    document.getElementById('vehActive').textContent = c.active || 0;
+    document.getElementById('vehReserve').textContent = c.reserve || 0;
+    document.getElementById('vehBreakdown').textContent = c.breakdown || 0;
+    document.getElementById('vehOut').textContent = c.out_of_service || 0;
+    var container = document.getElementById('vehicleCards');
+    if (!container) return;
+    container.innerHTML = (board.vehicles || []).map(function(v) {
+        var st = v.status || 'unset';
+        var reasonHtml = v.reason ? '<div class="v-reason">' + v.reason + '</div>' : '';
+        return '<div class="team-card vehicle-card st-' + st + '" onclick="cycleVehicleStatus(\'' + v.id + '\', \'' + st + '\', \'' + v.name + '\')">' +
+            '<div class="card-name">' + v.name + '</div>' +
+            '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
+            reasonHtml +
+        '</div>';
+    }).join('');
+}
+
+function cycleVehicleStatus(vehicleId, currentStatus, name) {
+    var idx = VEHICLE_STATUS_CYCLE.indexOf(currentStatus);
+    var next = VEHICLE_STATUS_CYCLE[(idx + 1) % VEHICLE_STATUS_CYCLE.length];
+    var reason = null;
+    if (next === 'breakdown' || next === 'out_of_service') {
+        reason = window.prompt('سبب ' + (next === 'breakdown' ? 'العطل' : 'الإخراج من الخدمة') + ' — ' + name + '؟');
+        if (!reason) return; // أُلغي — لا حدث
+    }
+    var h = w1dAuthHeaders(); if (!h) return;
+    h['Content-Type'] = 'application/json';
+    fetch('/api/vehicles/events', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId, status: next, reason: reason }) })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل حفظ حالة المركبة'), 'error'); return; }
+            showToast(name + ' — ' + VEHICLE_STATUS_LABELS[next], next === 'active' ? 'success' : '');
+            loadVehiclesBoard();
+        })
+        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
 }
 
 function nameOfTeam(id) {

@@ -187,6 +187,15 @@ class StorageAdapter {
         );
     }
 
+    // ─── W1-D: سجل المركبات المرجعي (قرار 7-3) — قراءة فقط هنا؛ التوليد ذاتي في db.js ───
+    async getVehicles() {
+        return this.db.all('SELECT * FROM vehicles WHERE is_active = 1 ORDER BY sort_order ASC, id ASC');
+    }
+
+    async getVehicleById(id) {
+        return this.db.get('SELECT * FROM vehicles WHERE id = ?', [String(id)]);
+    }
+
     async getOperationalEventsByEntity(domain, entityId, limit = 500) {
         return this.db.all(
             'SELECT * FROM operational_events WHERE domain = ? AND entity_id = ? ORDER BY created_at ASC, id ASC LIMIT ?',

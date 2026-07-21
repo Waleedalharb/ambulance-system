@@ -4453,6 +4453,55 @@ app.get('/api/vehicles/indicators', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// W1-D: لوحة المركبات — السجل المرجعي (معرف ثابت) + الحالة المشتقة + كتابة الأحداث
+// الكتابة عبر VehicleEventsService فقط (ختم سيرفري)؛ لا جدول حالات إطلاقًا.
+// ============================================
+app.get('/api/vehicles/registry', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const vehicles = await opsEngine.storage.getVehicles();
+        res.json({ success: true, vehicles });
+    } catch (error) {
+        console.error('[API] Error vehicles registry:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل المركبات' });
+    }
+});
+
+app.get('/api/vehicles/board', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const board = await vehicleEventsService.getBoard(resolved.shiftId);
+        res.json({ success: true, ...board });
+    } catch (error) {
+        console.error('[API] Error vehicles board:', error);
+        res.status(500).json({ error: 'فشل في جلب لوحة المركبات' });
+    }
+});
+
+app.post('/api/vehicles/events', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, status, reason, note } = req.body || {};
+        if (!vehicleId || !status) return res.status(400).json({ error: 'بيانات ناقصة' });
+        const vehicle = await opsEngine.storage.getVehicleById(vehicleId);
+        if (!vehicle) return res.status(404).json({ error: 'مركبة غير موجودة في السجل' });
+        const result = await vehicleEventsService.appendEvent({
+            entityId: vehicle.id, entityName: vehicle.name,
+            eventType: 'status_change', status, reason, note
+        }, req.user);
+        // بث إضافي (لا يكسر العملاء الحاليين) لتحديث لوحات المركبات لحظيًا
+        broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle event:', error);
+        res.status(500).json({ error: 'فشل في حفظ حالة المركبة' });
+    }
+});
+
 
 // ============================================
 // API: المستندات (التحديثات التشغيلية)

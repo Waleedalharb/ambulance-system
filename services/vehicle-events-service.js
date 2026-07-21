@@ -78,6 +78,34 @@ class VehicleEventsService {
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         return { shiftId, ...deriveIndicators(events, DOMAIN) };
     }
+
+    /**
+     * W1-D: لوحة المركبات — السجل المرجعي (معرف ثابت) + الحالة المشتقة من
+     * operational_events فقط. لا يُحفظ أي وضع حالي في أي جدول:
+     * الحالة = آخر status_change في طيّ الأحداث، والعدادات تُجمع هنا
+     * حتى تبقى الواجهة بلا أي منطق أعمال (Zero Business Logic).
+     */
+    async getBoard(shiftId) {
+        const registry = await this.storage.getVehicles();
+        const events = shiftId ? await this.storage.getOperationalEventsByShift(shiftId, DOMAIN) : [];
+        const folded = foldEvents(events, DOMAIN);
+        const byId = new Map(folded.map(f => [f.entityId, f]));
+        const counters = { active: 0, reserve: 0, breakdown: 0, out_of_service: 0, unset: 0 };
+        const vehicles = registry.map(v => {
+            const f = byId.get(v.id);
+            const lastStatus = f ? [...f.open].reverse().find(o => o.status) : null;
+            const status = lastStatus ? lastStatus.status : null;
+            counters[status || 'unset']++;
+            return {
+                id: v.id, name: v.name, teamId: v.team_id,
+                status,
+                reason: lastStatus ? lastStatus.reason || null : null,
+                since: lastStatus ? lastStatus.created_at : null,
+                inWorkshop: f ? f.open.some(o => o.event_type === 'workshop_in') : false
+            };
+        });
+        return { shiftId: shiftId || null, counters, vehicles };
+    }
 }
 
 module.exports = VehicleEventsService;
