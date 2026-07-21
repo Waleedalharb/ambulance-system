@@ -2234,24 +2234,43 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                 }
                 // Shift Completions (Takmeel)
                 if (db.ShiftCompletions && db.ShiftCompletions.getByShift) {
-                    const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
-                    if (Array.isArray(dbCompletions) && dbCompletions.length > 0) {
-                        const completionsObj = {};
-                        dbCompletions.forEach(c => {
-                            let teamsData = c.teams_data || c.teamsData;
-                            if (typeof teamsData === 'string') {
-                                try { teamsData = JSON.parse(teamsData); } catch(e) { teamsData = {}; }
+                    // W1-E-C: قسم completions فقط (بقرار المالك) — قراءة هجينة:
+                    // عند وجود أحداث جاهزية للمناوبة ⇒ الحالات مشتقة من السجل
+                    // (status/reason/missingPerson) وبيانات النموذج (paramedics…)
+                    // من أحدث إسقاط توافقي (D1+D2). بلا أحداث ⇒ الفرع القديم
+                    // يعمل كما هو حرفيًا — بما فيه خلل F1 الموثق (دين مستقل).
+                    let w1eDerived = false;
+                    try {
+                        const derivedView = staffingEventsService ? await staffingEventsService.getCompletionTeamsView(shiftId) : null;
+                        if (derivedView) {
+                            const latestC = completionService ? await completionService.getLatestByShiftId(shiftId) : null;
+                            const hybridC = latestC ? await w1eHybridCompletion(latestC) : null;
+                            if (hybridC && hybridC.teams && Object.keys(hybridC.teams).length) {
+                                response.completions = hybridC.teams;
+                                w1eDerived = true;
                             }
-                            if (teamsData && typeof teamsData === 'object') {
-                                Object.keys(teamsData).forEach(teamKey => {
-                                    completionsObj[teamKey] = teamsData[teamKey];
-                                });
-                            } else {
-                                const key = c.team || c.shift_type || 'general';
-                                completionsObj[key] = c;
-                            }
-                        });
-                        if (Object.keys(completionsObj).length > 0) response.completions = completionsObj;
+                        }
+                    } catch (_) { /* فشل الاشتقاق ⇒ الفرع القديم — لا كسر للأرشيف */ }
+                    if (!w1eDerived) {
+                        const dbCompletions = await db.ShiftCompletions.getByShift(shiftId);
+                        if (Array.isArray(dbCompletions) && dbCompletions.length > 0) {
+                            const completionsObj = {};
+                            dbCompletions.forEach(c => {
+                                let teamsData = c.teams_data || c.teamsData;
+                                if (typeof teamsData === 'string') {
+                                    try { teamsData = JSON.parse(teamsData); } catch(e) { teamsData = {}; }
+                                }
+                                if (teamsData && typeof teamsData === 'object') {
+                                    Object.keys(teamsData).forEach(teamKey => {
+                                        completionsObj[teamKey] = teamsData[teamKey];
+                                    });
+                                } else {
+                                    const key = c.team || c.shift_type || 'general';
+                                    completionsObj[key] = c;
+                                }
+                            });
+                            if (Object.keys(completionsObj).length > 0) response.completions = completionsObj;
+                        }
                     }
                 }
                 // Forms
@@ -6724,6 +6743,10 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
         // W1-E-B: الظرف يحمل هوية الصف القديم (rowId/rowTimestamp/rowCreatedAt)
         // لتعيد القراءة المشتقة بناء العقد حرفيًا (Parity) — هوية حدث فقط،
         // لا بيانات نموذج (D2).
+        // W1-E-B Note (بقرار المالك): rowId وحقول الهوية حل انتقالي لضمان
+        // التوافق مع العقود الحالية، وتُراجع عند إزالة طبقة التوافق بعد
+        // اجتياز SSOT Verification Gate — التصميم النهائي يتطلب Stable ID
+        // مستقلًا عن الجداول القديمة.
         const stamp = await w1cShiftStamp(shiftId);
         await withTx(async () => {
             await contentInsert('shift_events', shiftId, newEvent);

@@ -1113,6 +1113,63 @@ async function main() {
 
     if (w1ebShift) await api('DELETE', `/api/shifts/${w1ebShift}`);
 
+    // ─── 13l-2. W1-E-C: قسم completions في تفاصيل الأرشيف — اشتقاق هجين (النطاق مقيد بقرار المالك) ───
+    function w1ecStable(o) {
+        if (Array.isArray(o)) return '[' + o.map(w1ecStable).join(',') + ']';
+        if (o && typeof o === 'object') return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + w1ecStable(o[k])).join(',') + '}';
+        return JSON.stringify(o);
+    }
+
+    // ① مناوبة بأحداث ⇒ قسم completions مشتق هجينًا ويطابق completion/latest حرفيًا (نفس المصدر)
+    const w1ecArch = await api('GET', `/api/shifts/${shiftId}`);
+    const w1ecLatestTeams = ((await api('GET', `/api/completion/latest?shift_id=${shiftId}`)).data.completion || {}).teams;
+    const w1ecComp = w1ecArch.data && w1ecArch.data.completions;
+    record('W1-E-C ①: completions الأرشيف مشتقة هجينًا (ready/offline + paramedics من الإسقاط) وتطابق completion/latest حرفيًا',
+        !!(w1ecArch.ok && w1ecComp && w1ecComp['جنوب 7'] && w1ecComp['جنوب 7'].status === 'ready'
+        && w1ecComp['جنوب 9'] && w1ecComp['جنوب 9'].status === 'offline'
+        && w1ecComp['جنوب 3'] && JSON.stringify(w1ecComp['جنوب 3'].paramedics) === JSON.stringify(['مسعف أول', 'مسعف ثانٍ'])
+        && w1ecStable(w1ecComp) === w1ecStable(w1ecLatestTeams)),
+        `s7=${w1ecComp && w1ecComp['جنوب 7'] && w1ecComp['جنوب 7'].status} parity=${w1ecStable(w1ecComp) === w1ecStable(w1ecLatestTeams)}`);
+
+    // ② مناوبة قديمة بلا أحداث ⇒ الفرع القديم حرفيًا (F1 محفوظ — دين موثق لا يُصلح هنا)
+    let w1ecLegacyOk = false, w1ecLegacyId = null;
+    if (process.env.DB_PATH) {
+        const W1ecDB = require('better-sqlite3');
+        const dbc = new W1ecDB(process.env.DB_PATH, { readonly: true });
+        const cand = dbc.prepare('SELECT DISTINCT shift_id FROM shift_completions WHERE shift_id IS NOT NULL').all();
+        for (const r of cand) {
+            const tl = await api('GET', `/api/staffing/timeline?shift_id=${r.shift_id}`);
+            if (((tl.data && tl.data.events) || []).length > 0) continue;
+            const rows = dbc.prepare('SELECT * FROM shift_completions WHERE shift_id = ? ORDER BY id DESC').all(r.shift_id);
+            const expected = {};
+            rows.forEach(c => {
+                let t = c.teams_data;
+                if (typeof t === 'string') { try { t = JSON.parse(t); } catch (e) { t = {}; } }
+                if (t && typeof t === 'object') Object.keys(t).forEach(k => { expected[k] = t[k]; });
+            });
+            if (!Object.keys(expected).length) continue;
+            const arch = await api('GET', `/api/shifts/${r.shift_id}`);
+            if (arch.ok && arch.data && w1ecStable(arch.data.completions) === w1ecStable(expected)) {
+                w1ecLegacyOk = true; w1ecLegacyId = r.shift_id; break;
+            }
+        }
+        dbc.close();
+    }
+    record('W1-E-C ②: مناوبة قديمة بلا أحداث — قسم completions بالفرع القديم حرفيًا (تطابق كامل مع دمج shift_completions)',
+        w1ecLegacyOk, `legacyShift=${w1ecLegacyId}`);
+
+    // ③ قيد النطاق: الاشتقاق داخل قسم completions فقط + الفرع القديم وفولباك centersData محفوظان نصًا
+    const w1ecSrvSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'server.js'), 'utf8');
+    record('W1-E-C ③: النطاق مقيد (اشتقاق داخل completions فقط + الفرع القديم وفولباك centersData محفوظان)',
+        w1ecSrvSrc.includes('w1eDerived') && w1ecSrvSrc.includes('dbCompletions.forEach') && w1ecSrvSrc.includes('shift.centersData'),
+        `derived=${w1ecSrvSrc.includes('w1eDerived')} legacy=${w1ecSrvSrc.includes('dbCompletions.forEach')} fallback=${w1ecSrvSrc.includes('shift.centersData')}`);
+
+    // ④ أداء تفاصيل الأرشيف ضمن العتبة
+    const w1ecT0 = Date.now();
+    const w1ecPerf = await api('GET', `/api/shifts/${shiftId}`);
+    const w1ecMs = Date.now() - w1ecT0;
+    record('W1-E-C ④: زمن تفاصيل الأرشيف ضمن العتبة (<150ms)', w1ecPerf.ok && w1ecMs < 150, `ms=${w1ecMs}`);
+
     // ─── 13m. W1-A: السجل التشغيلي الموحّد (operational_events) — الشريحة التأسيسية ───
     // ① ساكن: db.js يعرّف الجدولين والفهارس الخمسة (الترحيل ذاتي عند الإقلاع)
     const w1DbSrc = f4Fs.readFileSync(f4Path.join(__dirname, '..', 'db.js'), 'utf8');
