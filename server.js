@@ -4673,6 +4673,46 @@ app.post('/api/vehicles/assignment/switch', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// V-B ②: دعم المركبات — المركبة تبقى لفريقها الأصلي وتدعم فريقًا آخر مؤقتًا.
+// الدعم يدخل في جاهزية الفريق المدعوم (اشتقاق سيرفري) ويُغلق بإنهاء الدعم.
+// ============================================
+app.post('/api/vehicles/support', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, targetTeamId, note } = req.body || {};
+        if (!vehicleId || targetTeamId == null || targetTeamId === '') return res.status(400).json({ error: 'بيانات ناقصة: المركبة والفريق المدعوم إلزاميان' });
+        const result = await vehicleEventsService.supportVehicle({ vehicleId, targetTeamId, note }, req.user);
+        if (result.appended > 0) {
+            broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+            broadcast({ type: 'staffing_events_updated', shiftId: result.shiftId }); // الدعم يغيّر الجاهزية
+        }
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle support:', error);
+        res.status(500).json({ error: 'فشل في إرسال المركبة دعمًا' });
+    }
+});
+
+app.post('/api/vehicles/support/end', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, note } = req.body || {};
+        if (!vehicleId) return res.status(400).json({ error: 'بيانات ناقصة: المركبة إلزامية' });
+        const result = await vehicleEventsService.endVehicleSupport({ vehicleId, note }, req.user);
+        if (result.appended > 0) {
+            broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+            broadcast({ type: 'staffing_events_updated', shiftId: result.shiftId });
+        }
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle support end:', error);
+        res.status(500).json({ error: 'فشل في إنهاء دعم المركبة' });
+    }
+});
+
 
 // ============================================
 // API: المستندات (التحديثات التشغيلية)

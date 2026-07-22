@@ -761,6 +761,104 @@ async function main() {
         } finally { vbdb.close(); }
     }
 
+    // ─── 12f. V-B ②: دعم المركبات — مؤقت، الفريق الأصلي محفوظ، يدخل في الجاهزية ───
+    if (process.env.DB_PATH) {
+        const VfDB = require('better-sqlite3');
+        const vfdb = new VfDB(process.env.DB_PATH, { readonly: true });
+        try {
+            const vfTeams = vfdb.prepare('SELECT * FROM teams WHERE is_active = 1 ORDER BY id ASC LIMIT 3').all();
+            const vfT1 = vfTeams[0], vfT2 = vfTeams[1], vfT3 = vfTeams[2];
+            // مركبات اختبار نظيفة (بلا أحداث تعيين سابقة) — تسامح مع بيانات تشغيلية حقيقية
+            const vfVehs = vfdb.prepare(`SELECT v.id FROM vehicles v WHERE v.is_active = 1
+                AND NOT EXISTS (SELECT 1 FROM operational_events e WHERE e.domain='vehicle' AND e.entity_id = v.id
+                    AND e.event_type IN ('assignment','assignment_end'))
+                ORDER BY v.id LIMIT 3`).all();
+            const vfVeh = vfVehs[0].id, vfVehB = vfVehs[1].id, vfVehC = vfVehs[2].id;
+            const vfSupCount = () => vfdb.prepare(`SELECT COUNT(*) AS c FROM operational_events
+                WHERE domain='center' AND event_type IN ('supported','support_lifted')`).get().c;
+            const vfSupBase = vfSupCount(); // خط أساس — قد توجد أحداث دعم تشغيلية سابقة
+            // تعيين أصلي: vfVeh → vfT1 (فريقها الأصلي) / vfVehB → vfT2 (مركبة الفريق المدعوم الأصلية)
+            await api('POST', '/api/vehicles/assignment', { vehicleId: vfVeh, teamId: vfT1.id });
+            await api('POST', '/api/vehicles/assignment', { vehicleId: vfVehB, teamId: vfT2.id });
+
+            // ① الرفض قبل أي كتابة: فريق غير موجود 400 + مركبة غير موجودة 404 + دعم الفريق الأصلي 400 + بلا تعيين أصلي 400
+            const vfBadTeam = await api('POST', '/api/vehicles/support', { vehicleId: vfVeh, targetTeamId: 999999 }, 400);
+            const vfNoVeh = await api('POST', '/api/vehicles/support', { vehicleId: 'veh_999999', targetTeamId: vfT2.id }, 404);
+            const vfHome = await api('POST', '/api/vehicles/support', { vehicleId: vfVeh, targetTeamId: vfT1.id }, 400);
+            const vfNoHome = await api('POST', '/api/vehicles/support', { vehicleId: vfVehC, targetTeamId: vfT2.id }, 400);
+            record('V-B ②①: رفض دعم غير صالح قبل أي كتابة (فريق/مركبة/الفريق الأصلي/بلا تعيين أصلي)',
+                vfBadTeam.status === 400 && vfNoVeh.status === 404 && vfHome.status === 400 && vfNoHome.status === 400
+                && vfSupCount() === vfSupBase,
+                `badTeam=${vfBadTeam.status} noVeh=${vfNoVeh.status} home=${vfHome.status} noHome=${vfNoHome.status}`);
+
+            // ② دعم صحيح: المركبة تبقى لفريقها الأصلي + تظهر داعمة للفريق المدعوم + قائمة دعم مشتقة
+            const vfSup = await api('POST', '/api/vehicles/support', { vehicleId: vfVeh, targetTeamId: vfT2.id, note: 'دعم اختبار V-B' });
+            const vfBoard1 = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vfV1 = ((vfBoard1.data && vfBoard1.data.vehicles) || []).find(v => v.id === vfVeh);
+            const vfSupEntry = ((vfBoard1.data && vfBoard1.data.support) || []).find(s => s.vehicleId === vfVeh);
+            record('V-B ②②: دعم مركبة — تبقى لفريقها الأصلي + supportingTeamId + قائمة الدعم المشتقة',
+                vfSup.ok && vfSup.data.appended === 1 && vfSup.data.homeTeamId === vfT1.id
+                && !!vfV1 && vfV1.teamId === vfT1.id && vfV1.supportingTeamId === vfT2.id
+                && !!vfSupEntry && vfSupEntry.homeTeamId === vfT1.id && vfSupEntry.targetTeamId === vfT2.id,
+                `teamId=${vfV1 && vfV1.teamId} supporting=${vfV1 && vfV1.supportingTeamId}`);
+
+            // ③ idempotency + رفض دعم فريق ثانٍ أثناء دعم مفتوح (بلا كتابة)
+            const vfDup = await api('POST', '/api/vehicles/support', { vehicleId: vfVeh, targetTeamId: vfT2.id });
+            const vfOther = await api('POST', '/api/vehicles/support', { vehicleId: vfVeh, targetTeamId: vfT3.id }, 400);
+            record('V-B ②③: idempotency (تكرار نفس الدعم يُتخطى) + رفض دعم فريق ثانٍ أثناء دعم مفتوح',
+                vfDup.ok && vfDup.data.appended === 0 && vfDup.data.skipped === 'already-supporting'
+                && vfOther.status === 400 && vfSupCount() === vfSupBase + 1,
+                `dup=${vfDup.data && vfDup.data.appended} other=${vfOther.status}`);
+
+            // ④ الجاهزية: مركبة الدعم الصالحة تُبقي vehicleOk رغم عطل المركبة الأصلية للفريق المدعوم،
+            //    وتعطّل مركبة الدعم أيضًا يعيد الاشتقاق الطبيعي (الدعم لا يغطي عطلًا)
+            await api('POST', '/api/vehicles/events', { vehicleId: vfVehB, status: 'breakdown', reason: 'عطل اختبار دعم V-B' });
+            const vfSt1 = await api('GET', `/api/staffing/state?shift_id=${shift2Id}`);
+            const vfTeamWithSupport = (vfSt1.data.teams || {})[vfT2.name];
+            await api('POST', '/api/vehicles/events', { vehicleId: vfVeh, status: 'breakdown', reason: 'عطل مركبة الدعم — اختبار' });
+            const vfSt2 = await api('GET', `/api/staffing/state?shift_id=${shift2Id}`);
+            const vfTeamSupportBroken = (vfSt2.data.teams || {})[vfT2.name];
+            await api('POST', '/api/vehicles/events', { vehicleId: vfVeh, status: 'active' });
+            record('V-B ②④: الدعم يدخل في الجاهزية — دعم صالح يحفظ vehicleOk رغم عطل الأصلية، وعطل الداعم يعيد الاشتقاق',
+                !!vfTeamWithSupport && vfTeamWithSupport.vehicleOk === true
+                && (vfTeamWithSupport.supportVehicleIds || []).includes(vfVeh)
+                && !!vfTeamSupportBroken && vfTeamSupportBroken.vehicleOk === false,
+                `withSupport=${vfTeamWithSupport && vfTeamWithSupport.vehicleOk} supportBroken=${vfTeamSupportBroken && vfTeamSupportBroken.vehicleOk}`);
+
+            // ⑤ إنهاء الدعم: إغلاق دلالي + idempotent + اللوحة تعود (الفريق الأصلي فقط)
+            const vfEnd = await api('POST', '/api/vehicles/support/end', { vehicleId: vfVeh, note: 'إنهاء دعم اختبار' });
+            const vfEnd2 = await api('POST', '/api/vehicles/support/end', { vehicleId: vfVeh });
+            const vfBoard2 = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vfV2 = ((vfBoard2.data && vfBoard2.data.vehicles) || []).find(v => v.id === vfVeh);
+            const vfStillListed = ((vfBoard2.data && vfBoard2.data.support) || []).some(s => s.vehicleId === vfVeh);
+            record('V-B ②⑤: إنهاء الدعم يغلق المفتوح (idempotent) — المركبة تعود لفريقها الأصلي فقط',
+                vfEnd.ok && vfEnd.data.appended === 1 && vfEnd2.ok && vfEnd2.data.appended === 0
+                && !vfStillListed && !!vfV2 && vfV2.teamId === vfT1.id && vfV2.supportingTeamId === null
+                && vfSupCount() === vfSupBase + 2,
+                `appended=${vfEnd.data && vfEnd.data.appended}/${vfEnd2.data && vfEnd2.data.appended}`);
+
+            // ⑥ خط المركبة الزمني يدمج أحداث الدعم مرتبة (supported ثم support_lifted)
+            const vfTl = await api('GET', `/api/vehicles/timeline?shift_id=${shift2Id}&entity_id=${vfVeh}`);
+            const vfTlTypes = ((vfTl.data && vfTl.data.events) || []).map(e => e.event_type);
+            record('V-B ②⑥: خط المركبة الزمني يدمج أحداث الدعم مرتبة',
+                vfTl.ok && vfTlTypes.includes('supported') && vfTlTypes.includes('support_lifted')
+                && vfTlTypes.indexOf('supported') < vfTlTypes.indexOf('support_lifted'),
+                vfTlTypes.join('>'));
+
+            // ⑦ ربط الواجهة: زر الدعم/إنهاء الدعم + المساران + الشارة
+            const vfRcSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
+            record('V-B ②⑦: الواجهة مربوطة (دعم/إنهاء الدعم من الشاشة + شارة «يدعم» + المساران)',
+                vfRcSrc.includes("'/api/vehicles/support'") && vfRcSrc.includes("'/api/vehicles/support/end'")
+                && vfRcSrc.includes('endVehicleSupport') && vfRcSrc.includes('supportingTeamId')
+                && vfRcSrc.includes('يدعم:'));
+
+            // تنظيف: إنهاء تعيين مركبتي الاختبار وإعادة حالة الثانية
+            await api('POST', '/api/vehicles/events', { vehicleId: vfVehB, status: 'active' });
+            await api('POST', '/api/vehicles/assignment/end', { vehicleId: vfVeh });
+            await api('POST', '/api/vehicles/assignment/end', { vehicleId: vfVehB });
+        } finally { vfdb.close(); }
+    }
+
     const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });
     const ppGet = await api('GET', '/api/peak-plans');
     const ppList = ppGet.data && ppGet.data.plans || [];

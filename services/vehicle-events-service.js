@@ -11,6 +11,13 @@ const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators, DOMAIN
 
 const DOMAIN = 'vehicle';
 
+// V-B ②: دعم المركبات — يُنمذج اليوم بأحداث نطاق center المعتمدة مسبقًا
+// (supported/support_lifted — إغلاق دلالي جاهز، بلا أنواع جديدة بقرار المالك).
+// معزول في ثوابت: اعتماد نوع مستقل لاحقًا = تعديل هذه الأسطر الثلاثة فقط.
+const SUPPORT_DOMAIN = 'center';
+const SUPPORT_OPEN = 'supported';
+const SUPPORT_CLOSE = 'support_lifted';
+
 class VehicleEventsService {
     constructor({ storage, engine }) {
         if (!storage) throw new Error('VehicleEventsService requires a StorageAdapter');
@@ -211,16 +218,111 @@ class VehicleEventsService {
         });
     }
 
+    // ─── V-B ②: دعم المركبات — المركبة تبقى مرتبطة بفريقها الأصلي دائمًا ───
+    // الدعم مؤقت وموثق (بقرار المالك: سيناريو «أ» + يدخل في جاهزية المدعوم).
+    // لا يُمس تعيين الفريق الأصلي؛ الدعم حدث مستقل بإغلاق دلالي.
+
+    /** الدعم المفتوح حاليًا لمركبة (عبر كامل خطها الزمني) أو null. */
+    async _openSupport(vehicleId) {
+        const events = await this.storage.getOperationalEventsByEntity(SUPPORT_DOMAIN, vehicleId);
+        let open = null;
+        for (const e of events) {
+            if (e.event_type === SUPPORT_OPEN) { if (!open) open = e; }
+            else if (e.event_type === SUPPORT_CLOSE) { if (open) open = null; }
+        }
+        return open;
+    }
+
+    /** إلحاق حدث دعم مختوم سيرفريًا (الكيان = المركبة، الفريق = المدعوم). */
+    async _appendSupportEvent({ shift, vehicle, teamId, center, eventType, note, actor, homeTeamId }) {
+        const payload = { source: 'vehicle-support-vb', kind: 'vehicle_support' };
+        if (homeTeamId != null) payload.homeTeamId = String(homeTeamId);
+        return this.storage.appendOperationalEvent({
+            shiftId: shift.id, shiftDate: shift.shift_date, shiftType: shift.shift_type,
+            domain: SUPPORT_DOMAIN,
+            entityId: vehicle.id, entityName: vehicle.call_sign || vehicle.plate_number,
+            teamId: teamId != null ? String(teamId) : null, center: center || null,
+            eventType, note: note || null, payload,
+            actorId: String(actor.id), actorName: actor.name || actor.username,
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    /**
+     * إرسال مركبة دعمًا لفريق آخر. يشترط تعيينًا أصليًا مفتوحًا (المركبة تذهب
+     * من فريقها)، ويُرفض الدعم لفريقها الأصلي أو أثناء دعم مفتوح لفريق آخر.
+     */
+    async supportVehicle({ vehicleId, targetTeamId, note }, actor) {
+        if (!vehicleId || targetTeamId == null || targetTeamId === '') {
+            const err = new Error('بيانات ناقصة: المركبة والفريق المدعوم إلزاميان');
+            err.statusCode = 400;
+            throw err;
+        }
+        // التحقق الكامل قبل أي كتابة
+        const vehicle = await this._requireVehicle(vehicleId);
+        const team = await this._requireTeam(targetTeamId);
+        const shift = await this._requireActiveShift();
+        const home = await this._openAssignment(vehicle.id);
+        if (!home) {
+            const err = new Error('المركبة غير معيّنة لفريق أصلي — عيّنها أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (String(home.team_id) === String(team.id)) {
+            const err = new Error('المركبة معيّنة لهذا الفريق أصلًا — لا حاجة للدعم');
+            err.statusCode = 400;
+            throw err;
+        }
+        const openSupport = await this._openSupport(vehicle.id);
+        if (openSupport && String(openSupport.team_id) === String(team.id)) {
+            return { success: true, appended: 0, skipped: 'already-supporting', shiftId: shift.id, vehicleId: vehicle.id, teamId: team.id };
+        }
+        if (openSupport) {
+            const err = new Error('المركبة تدعم فريقًا آخر حاليًا — أنهِ الدعم الحالي أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        const eventId = await this._appendSupportEvent({
+            shift, vehicle, teamId: team.id, center: team.center, eventType: SUPPORT_OPEN, note, actor, homeTeamId: home.team_id
+        });
+        return { success: true, appended: 1, eventId, shiftId: shift.id, vehicleId: vehicle.id, teamId: team.id, homeTeamId: Number(home.team_id) };
+    }
+
+    /** إنهاء دعم مركبة (إغلاق دلالي). بلا دعم مفتوح = يُتخطى (idempotent). */
+    async endVehicleSupport({ vehicleId, note }, actor) {
+        if (!vehicleId) {
+            const err = new Error('بيانات ناقصة: المركبة إلزامية');
+            err.statusCode = 400;
+            throw err;
+        }
+        const vehicle = await this._requireVehicle(vehicleId);
+        const shift = await this._requireActiveShift();
+        const openSupport = await this._openSupport(vehicle.id);
+        if (!openSupport) {
+            return { success: true, appended: 0, skipped: 'no-open-support', shiftId: shift.id, vehicleId: vehicle.id };
+        }
+        const eventId = await this._appendSupportEvent({
+            shift, vehicle, teamId: openSupport.team_id, center: openSupport.center, eventType: SUPPORT_CLOSE, note, actor
+        });
+        return { success: true, appended: 1, eventId, shiftId: shift.id, vehicleId: vehicle.id, teamId: openSupport.team_id != null ? Number(openSupport.team_id) : null };
+    }
+
     /** الحالة الحالية المشتقة لكل مركبة (آخر حالة + تاريخ مفتوح). */
     async getState(shiftId) {
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         return { shiftId, domain: DOMAIN, entities: foldEvents(events, DOMAIN) };
     }
 
-    /** تاريخ مركبة (أو كل المركبات) — كاملًا ومرتبًا، لا حذف إطلاقًا. */
+    /** تاريخ مركبة (أو كل المركبات) — كاملًا ومرتبًا، لا حذف إطلاقًا.
+     *  V-B ②: أحداث الدعم تُدمج في خط المركبة الزمني (الكيان يربطها بالمركبة). */
     async getTimeline(shiftId, entityId = null) {
         let events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         if (entityId) events = events.filter(e => e.entity_id === entityId);
+        const supportEvents = entityId
+            ? await this.storage.getOperationalEventsByEntity(SUPPORT_DOMAIN, entityId)
+            : await this.storage.getOperationalEventsByShift(shiftId, SUPPORT_DOMAIN);
+        events = events.concat(supportEvents)
+            .sort((a, b) => (a.created_at === b.created_at ? a.id - b.id : (a.created_at < b.created_at ? -1 : 1)));
         return { shiftId, domain: DOMAIN, entityId: entityId || null, events };
     }
 
@@ -243,6 +345,18 @@ class VehicleEventsService {
         const counters = { active: 0, reserve: 0, breakdown: 0, out_of_service: 0, unset: 0 };
         const vehicles = [];
         const unassigned = [];
+        // V-B ②: الدعم المفتوح لكل المركبات (دفعة واحدة — supported يفتح / support_lifted يغلق)
+        const supportRows = await this.storage.all(
+            `SELECT entity_id, team_id, event_type, created_at FROM operational_events
+             WHERE domain = ? AND event_type IN (?, ?) ORDER BY created_at ASC, id ASC`,
+            [SUPPORT_DOMAIN, SUPPORT_OPEN, SUPPORT_CLOSE]
+        );
+        const openSupportByVeh = {};
+        for (const e of supportRows) {
+            if (e.event_type === SUPPORT_OPEN) openSupportByVeh[e.entity_id] = e;
+            else delete openSupportByVeh[e.entity_id];
+        }
+        const homeByVeh = {};
         for (const v of registry) {
             const events = await this.storage.getOperationalEventsByEntity(DOMAIN, v.id);
             const f = foldEvents(events, DOMAIN)[0] || null;
@@ -259,14 +373,29 @@ class VehicleEventsService {
             };
             if (!openAssignment) { unassigned.push(base); continue; } // غير معيّنة — قائمة مستقلة (V-B ①)
             counters[status || 'unset']++;
+            homeByVeh[v.id] = openAssignment.team_id;
+            const openSupport = openSupportByVeh[v.id] || null;
             vehicles.push({
                 ...base,
-                teamId: openAssignment.team_id != null ? Number(openAssignment.team_id) : null
+                teamId: openAssignment.team_id != null ? Number(openAssignment.team_id) : null,
+                supportingTeamId: openSupport && openSupport.team_id != null ? Number(openSupport.team_id) : null
             });
         }
+        // V-B ②: قائمة الدعم المفتوح — اشتقاق سيرفري (مركبة/فريق أصلي/فريق مدعوم/منذ)
+        const support = Object.keys(openSupportByVeh).map(vehId => {
+            const v = registry.find(r => r.id === vehId);
+            const s = openSupportByVeh[vehId];
+            return {
+                vehicleId: vehId,
+                name: v ? (v.call_sign || v.plate_number) : vehId,
+                homeTeamId: homeByVeh[vehId] != null ? Number(homeByVeh[vehId]) : null,
+                targetTeamId: s.team_id != null ? Number(s.team_id) : null,
+                since: s.created_at
+            };
+        });
         // V-B ①: unassigned — اشتقاق سيرفري لغير المعيّنة (احتياط/أوفر لاب/صيانة)
         // لتغذية سير عمل التعيين في الواجهة. vehicles/counters بلا أي تغيير (Parity V-A).
-        return { shiftId: shiftId || null, counters, vehicles, unassigned };
+        return { shiftId: shiftId || null, counters, vehicles, unassigned, support };
     }
 }
 

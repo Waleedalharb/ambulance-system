@@ -434,6 +434,25 @@ class StaffingEventsService {
         const vehByTeamId = {};
         for (const vehId of Object.keys(vehAssignByVeh)) vehByTeamId[vehAssignByVeh[vehId]] = vehId;
 
+        // V-B ②: دعم المركبات — دعم مفتوح لكل فريق (نطاق center: supported/support_lifted؛
+        // نفس أحداث خدمة المركبات — اعتماد نوع مستقل لاحقًا يُحدّث هذا الاستعلام فقط)
+        const supportByTeamId = {};
+        try {
+            const supEvents = await this.storage.all(
+                `SELECT entity_id, team_id, event_type FROM operational_events
+                 WHERE domain = 'center' AND event_type IN ('supported','support_lifted')
+                 ORDER BY created_at ASC, id ASC`
+            );
+            const openSup = {};
+            for (const e of supEvents) {
+                if (e.event_type === 'supported') openSup[e.entity_id] = String(e.team_id);
+                else delete openSup[e.entity_id];
+            }
+            for (const vehId of Object.keys(openSup)) {
+                (supportByTeamId[openSup[vehId]] = supportByTeamId[openSup[vehId]] || []).push(vehId);
+            }
+        } catch (_) { /* بلا أحداث دعم */ }
+
         const teams = {};
         const wf = { ...emptyWf };
         for (const t of teamRows) {
@@ -485,7 +504,14 @@ class StaffingEventsService {
 
             const vehId = vehByTeamId[String(t.id)] || null;
             const vehSt = vehId ? (vehStatus[vehId] || null) : null;
-            const vehicleOk = !vehSt || (vehSt !== 'breakdown' && vehSt !== 'out_of_service');
+            const ownVehicleOk = !vehSt || (vehSt !== 'breakdown' && vehSt !== 'out_of_service');
+            // V-B ②: مركبة دعم صالحة (غير متعطلة/خارج الخدمة) تُحسب في جاهزية الفريق المدعوم
+            const supportVehicleIds = supportByTeamId[String(t.id)] || [];
+            const supportVehicleOk = supportVehicleIds.some(id => {
+                const st = vehStatus[id];
+                return !st || (st !== 'breakdown' && st !== 'out_of_service');
+            });
+            const vehicleOk = ownVehicleOk || supportVehicleOk;
 
             const openTeamEv = teamOpen[t.name] || [];
             const explicitOffline = openTeamEv.some(o => o.event_type === 'offline');
@@ -520,7 +546,8 @@ class StaffingEventsService {
                 vacant: Math.max(0, required - activeCount),
                 vehicleId: vehId,
                 vehicleStatus: vehSt,
-                vehicleOk
+                vehicleOk,
+                supportVehicleIds
             };
 
             // مجاميع القوى (تُشتق هنا فقط)

@@ -1165,8 +1165,19 @@ function loadVehiclesBoard() {
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
             if (!d || !d.success) return;
-            renderVehiclesBoard(d);
+            // V-B ②: أسماء الفرق لشارات الدعم — تُجلب مرة واحدة من الخادم
+            if (vbTeamsCache) { renderVehiclesBoard(d); return; }
+            fetch('/api/teams', { headers: h })
+                .then(function(r2) { return r2.ok ? r2.json() : null; })
+                .then(function(t) { vbTeamsCache = (t && t.teams) || []; })
+                .catch(function() { /* تُعرض الأرقام */ })
+                .finally(function() { renderVehiclesBoard(d); });
         }).catch(function() { /* عرض فقط */ });
+}
+
+function teamNameOf(id) {
+    var t = (vbTeamsCache || []).find(function(x) { return Number(x.id) === Number(id); });
+    return t ? t.name : ('فريق ' + id);
 }
 
 function renderVehiclesBoard(board) {
@@ -1182,14 +1193,20 @@ function renderVehiclesBoard(board) {
         var nm = String(v.name).replace(/'/g, "\\'");
         var reasonHtml = v.reason ? '<div class="v-reason">' + v.reason + '</div>' : '';
         // V-B ①: أزرار النقل/الإنهاء — إجراءات عبر مسارات الخادم فقط (بلا حساب محلي)
+        // V-B ②: زر الدعم/إنهاء الدعم + شارة «يدعم» — المركبة تبقى لفريقها الأصلي
+        var supBadge = v.supportingTeamId != null ? '<div class="v-reason">🤝 يدعم: ' + teamNameOf(v.supportingTeamId) + '</div>' : '';
+        var supBtn = v.supportingTeamId != null
+            ? '<button class="v-end" onclick="event.stopPropagation(); endVehicleSupport(\'' + v.id + '\', \'' + nm + '\')"><i class="fas fa-times"></i> إنهاء الدعم</button>'
+            : '<button onclick="event.stopPropagation(); openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'support\', ' + v.teamId + ')"><i class="fas fa-handshake"></i> دعم</button>';
         var actions = '<div class="v-actions">' +
             '<button onclick="event.stopPropagation(); openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')"><i class="fas fa-exchange-alt"></i> نقل</button>' +
+            supBtn +
             '<button class="v-end" onclick="event.stopPropagation(); endVehicleAssignment(\'' + v.id + '\', \'' + nm + '\')"><i class="fas fa-unlink"></i> إنهاء</button>' +
         '</div>';
         return '<div class="team-card vehicle-card st-' + st + '" onclick="openVehicleStatusModal(\'' + v.id + '\', \'' + st + '\', \'' + nm + '\')">' +
             '<div class="card-name">' + v.name + '</div>' +
             '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
-            reasonHtml + actions +
+            reasonHtml + supBadge + actions +
         '</div>';
     }).join('');
     // V-B ①: غير المعيّنة — من board.unassigned (اشتقاق سيرفري) + زر تعيين
@@ -1218,16 +1235,21 @@ function renderVehiclesBoard(board) {
 var vbAssignCtx = null;   // { vehicleId, name, mode: 'assign'|'switch' }
 var vbTeamsCache = null;  // فرق من /api/teams (خادم) — تُجلب عند الحاجة
 
-function openVehicleAssignModal(vehicleId, name, mode) {
-    vbAssignCtx = { vehicleId: vehicleId, name: name, mode: mode };
+function openVehicleAssignModal(vehicleId, name, mode, homeTeamId) {
+    vbAssignCtx = { vehicleId: vehicleId, name: name, mode: mode, homeTeamId: homeTeamId != null ? Number(homeTeamId) : null };
     document.getElementById('vehicleAssignTitle').textContent =
-        (mode === 'switch' ? 'نقل المركبة إلى فريق آخر' : 'تعيين المركبة إلى فريق') + ' — ' + name;
+        (mode === 'switch' ? 'نقل المركبة إلى فريق آخر' : mode === 'support' ? 'إرسال المركبة دعمًا إلى فريق' : 'تعيين المركبة إلى فريق') + ' — ' + name;
     document.getElementById('vehicleAssignNote').value = '';
     var sel = document.getElementById('vehicleAssignTeam');
     sel.innerHTML = '<option value="">جارٍ تحميل الفرق...</option>';
     document.getElementById('vehicleAssignModal').classList.add('active');
     var fill = function(teams) {
-        sel.innerHTML = '<option value="">— اختر الفريق —</option>' + teams.map(function(t) {
+        var list = teams;
+        // وضع الدعم: الفريق الأصلي لا يظهر ضمن الخيارات (المركبة معيّنة له أصلًا)
+        if (mode === 'support' && vbAssignCtx.homeTeamId != null) {
+            list = teams.filter(function(t) { return Number(t.id) !== vbAssignCtx.homeTeamId; });
+        }
+        sel.innerHTML = '<option value="">— اختر الفريق —</option>' + list.map(function(t) {
             return '<option value="' + t.id + '">' + t.name + (t.center ? ' (' + t.center + ')' : '') + '</option>';
         }).join('');
     };
@@ -1252,16 +1274,41 @@ function confirmVehicleAssign() {
     var teamId = document.getElementById('vehicleAssignTeam').value;
     if (!teamId) { showToast('⚠️ اختر الفريق أولاً', 'error'); return; }
     var note = document.getElementById('vehicleAssignNote').value || null;
-    var url = vbAssignCtx.mode === 'switch' ? '/api/vehicles/assignment/switch' : '/api/vehicles/assignment';
+    var mode = vbAssignCtx.mode;
+    var url = mode === 'switch' ? '/api/vehicles/assignment/switch'
+        : mode === 'support' ? '/api/vehicles/support'
+        : '/api/vehicles/assignment';
+    var body = mode === 'support'
+        ? { vehicleId: vbAssignCtx.vehicleId, targetTeamId: Number(teamId), note: note }
+        : { vehicleId: vbAssignCtx.vehicleId, teamId: Number(teamId), note: note };
     var h = w1dAuthHeaders(); if (!h) return;
     h['Content-Type'] = 'application/json';
-    fetch(url, { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vbAssignCtx.vehicleId, teamId: Number(teamId), note: note }) })
+    fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) })
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
         .then(function(res) {
             if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل العملية'), 'error'); return; }
             var skipped = res.d && res.d.skipped;
-            showToast(skipped ? 'المركبة معيّنة لهذا الفريق مسبقًا' : (vbAssignCtx.mode === 'switch' ? '✅ تم نقل ' + vbAssignCtx.name : '✅ تم تعيين ' + vbAssignCtx.name), skipped ? '' : 'success');
+            var msg = skipped ? (mode === 'support' ? 'المركبة تدعم هذا الفريق مسبقًا' : 'المركبة معيّنة لهذا الفريق مسبقًا')
+                : mode === 'switch' ? '✅ تم نقل ' + vbAssignCtx.name
+                : mode === 'support' ? '🤝 ' + vbAssignCtx.name + ' يدعم الآن الفريق'
+                : '✅ تم تعيين ' + vbAssignCtx.name;
+            showToast(msg, skipped ? '' : 'success');
             closeVehicleAssignModal();
+            loadVehiclesBoard();
+        })
+        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
+}
+
+// V-B ②: إنهاء دعم مركبة — تعود للاشتقاق الطبيعي ضمن فريقها الأصلي
+function endVehicleSupport(vehicleId, name) {
+    if (!window.confirm('إنهاء دعم ' + name + '؟ ستعود للعمل ضمن فريقها الأصلي فقط.')) return;
+    var h = w1dAuthHeaders(); if (!h) return;
+    h['Content-Type'] = 'application/json';
+    fetch('/api/vehicles/support/end', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId }) })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل إنهاء الدعم'), 'error'); return; }
+            showToast(res.d && res.d.skipped ? 'لا يوجد دعم مفتوح لهذه المركبة' : '✅ انتهى دعم ' + name, res.d && res.d.skipped ? '' : 'success');
             loadVehiclesBoard();
         })
         .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
