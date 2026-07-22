@@ -3313,116 +3313,54 @@ function calculateLiveReportStats() {
 // ============================================
 // مؤشرات القوى العاملة
 // ============================================
+// VA: مرآة لحظية لشاشة التكميل من نفس المصدر (SSOT) — GET /api/staffing/state
+// يعيد workforce المشتق سيرفريًا (totalStaff/totalCars/readinessRate/missingTeams).
+// لا حساب محلي إطلاقًا هنا: الأرقام تُعرض كما تصل، و«—» الصادقة عند غياب البيانات.
+var workforceStateTeams = null; // مرآة فرق مشتقة سيرفريًا (تُقرأ فقط — لا تُحسب)
+
 function updateWorkforceStats() {
-    var token = AuthManager.getToken();
-    var shiftDate = '';
-    var shiftType = '';
-    try {
-        if (typeof getShiftDate === 'function') shiftDate = getShiftDate();
-        else if (typeof getCurrentShiftDate === 'function') shiftDate = getCurrentShiftDate();
-        else shiftDate = new Date().toISOString().split('T')[0];
-    } catch(e) { shiftDate = new Date().toISOString().split('T')[0]; }
-    try {
-        if (typeof getShiftType === 'function') shiftType = getShiftType();
-        else if (typeof getCurrentShiftType === 'function') shiftType = getCurrentShiftType();
-        else shiftType = 'صباح';
-    } catch(e) { shiftType = 'صباح'; }
-
-    // Try to get accurate ready-team count from completion (source of truth)
-    if (AuthManager.isLoggedIn()) {
-        // OV-S6-01: shift_id عند توفره (مقاوم لأخطاء الختم التاريخية) + date+type احتياطياً
-        var completionUrl = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
-        if (currentShiftId) completionUrl += '&shift_id=' + encodeURIComponent(currentShiftId);
-        AuthManager.apiRequest(completionUrl)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success && data.completion && data.completion.teams) {
-                updateWorkforceFromCompletion(data.completion.teams);
-            } else {
-                updateWorkforceStatsFallback();
+    if (!AuthManager.isLoggedIn()) { updateWorkforceStatsFallback(); return; }
+    var url = '/api/staffing/state';
+    if (currentShiftId) url += '?shift_id=' + encodeURIComponent(currentShiftId);
+    AuthManager.apiRequest(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.success && data.workforce) {
+            workforceStateTeams = data.teams || null;
+            var wf = data.workforce;
+            if (wf.readinessRate == null) {
+                // لا فرق محسومة مشتقة بعد — الحالة الصادقة «—» (ممنوع اختلاق أرقام)
+                updateWorkforceDisplay('—', '—', '—', '—');
+                return;
             }
-        })
-        .catch(function(e) {
-            console.log('[updateWorkforceStats] Completion fetch failed, using fallback:', e);
+            updateWorkforceDisplay(wf.totalStaff, wf.totalCars, wf.readinessRate, wf.missingTeams || 0);
+        } else {
             updateWorkforceStatsFallback();
-        });
-    } else {
-        updateWorkforceStatsFallback();
-    }
-}
-
-function updateWorkforceFromCompletion(teams) {
-    var totalStaff = 0;
-    var staffKnown = false; // بقرار المالك: لا افتراضي مختلق — يُجمع المسجل فقط، وعند غياب كل القيم «—»
-    var readyTeams = 0;
-    var totalOperational = 0;
-    
-    for (var teamId in teams) {
-        var team = teams[teamId];
-        // Only count operational teams (جنوب 1-16, سريع 1-5)
-        var isOperational = (/^rapid_[1-5]$/.test(teamId) || /^جنوب [1-9]$/.test(teamId) || /^جنوب 1[0-6]$/.test(teamId));
-        if (!isOperational) continue;
-        totalOperational++;
-        if (team.status === 'ready') {
-            var sc = parseInt(team.staffCount);
-            if (!isNaN(sc)) { totalStaff += sc; staffKnown = true; }
-            readyTeams++;
         }
-    }
-    
-    var readiness = totalOperational > 0 ? Math.round((readyTeams / totalOperational) * 100) : 0;
-    var missingTeams = totalOperational - readyTeams;
-    updateWorkforceDisplay(staffKnown ? totalStaff : '—', readyTeams, readiness, missingTeams);
+    })
+    .catch(function(e) {
+        console.log('[updateWorkforceStats] staffing state fetch failed, using fallback:', e);
+        updateWorkforceStatsFallback();
+    });
 }
 
 function updateWorkforceStatsFallback() {
-    var shiftData = null;
-    if (currentShiftId) {
-        var shift = allShifts.find(function(s) { return s.id === currentShiftId; });
-        if (shift && shift.centersData) {
-            shiftData = shift.centersData;
-        }
-    }
-    
-    if (shiftData && Object.keys(shiftData).length > 0) {
-        updateWorkforceFromShiftData(shiftData);
-        return;
-    }
-
-    // F5b: أُزيل الافتراضي المختلق 2/1 ومضاعفات مفاتيح البلاغات (بيانات وهمية ممنوعة).
-    // لا مصدر حقيقي آخر للقوى خارج نموذج المناوبة المحفوظ:
-    //   - centersData أسماء وحدات نصية فقط (بلا staffCount/carsCount فعلية)
-    //   - shift_completions غير متاح هنا بحكم التصميم (الوصول للـ fallback يعني غيابه)
-    // ← الحالة الصادقة «—»
+    // F5b/VA: لا مصدر حقيقي متاح ⇒ الحالة الصادقة «—» (لا افتراضي مختلق إطلاقًا)
     updateWorkforceDisplay('—', '—', '—', '—');
 }
 
-function updateWorkforceFromShiftData(shiftData) {
-    var totalStaff = 0;
-    var totalCars = 0;
-    var readyCenters = 0;
-    var missingCenters = 0;
-    var centerCount = 0;
-    
-    for (var center in shiftData) {
-        var data = shiftData[center];
-        var staff = parseInt(data.staffCount) || 0;
-        var cars = parseInt(data.carsCount) || 0;
-        totalStaff += staff;
-        totalCars += cars;
-        centerCount++;
-        // Rapid teams need 1+ staff, regular centers need 2+ staff
-        var isRapid = data.isRapid || center.indexOf('سريع') !== -1 || center.indexOf('rapid') !== -1;
-        var staffThreshold = isRapid ? 1 : 2;
-        if (staff >= staffThreshold && cars >= 1) {
-            readyCenters++;
-        } else {
-            missingCenters++;
-        }
-    }
-    
-    var readiness = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-    updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters);
+// VA: مُنعش موحّد من المصدر الواحد — يحل محل الحساب المحلي المحذوف
+// (calculateWorkforceStatsLocally). مُهرب (debounced) حتى لا يُجهد الخادم
+// عند الاستدعاءات المتتالية من نموذج التكميل.
+var _wfRefreshTimer = null;
+function refreshWorkforceFromServer(shiftId) {
+    if (_wfRefreshTimer) clearTimeout(_wfRefreshTimer);
+    _wfRefreshTimer = setTimeout(function() {
+        _wfRefreshTimer = null;
+        updateWorkforceStats();
+        var sid = shiftId || currentShiftId;
+        if (sid) loadWorkforceStats(sid);
+    }, 400);
 }
 
 function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
@@ -4566,12 +4504,6 @@ function safeTeamId(teamName) {
     return teamName.replace(/\s+/g, '_');
 }
 
-function isParamedicPresent(shiftCode) {
-    if (!shiftCode || shiftCode === '-' || shiftCode === '') return false;
-    var absentCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
-    return absentCodes.indexOf(shiftCode.toString().toUpperCase()) === -1;
-}
-
 function renderTeamParamedics(teamName, type, index, paramedics) {
     var safeName = safeTeamId(teamName);
     var container = document.getElementById('paramedics_' + safeName);
@@ -4579,12 +4511,16 @@ function renderTeamParamedics(teamName, type, index, paramedics) {
     var staffInputId = type === 'rapid' ? 'rapid_staff_' + index : 'staff_' + index;
     var staffInput = document.getElementById(staffInputId);
     var fallbackDiv = document.getElementById('fallback_' + staffInputId);
-    
+
     if (!container) return;
-    
+
+    // VA: عداد الفرقة من اشتقاق الخادم (state.teams[teamName].activeCount) —
+    // لا اشتقاق محلي من رموز الإكسل. حالة كل مسعف (النقطة) من حقل status
+    // الذي يوفره الخادم نفسه في /api/shift-completion/:shiftId/:teamName.
+    var derivedTeam = (workforceStateTeams && workforceStateTeams[teamName]) || null;
     var presentCount = 0;
     var html = '';
-    
+
     if (paramedics.length === 0) {
         html = '<div class="paramedic-no-data">لا يوجد مسعفين مسندين</div>';
         if (fallbackDiv) fallbackDiv.style.display = 'block';
@@ -4592,7 +4528,7 @@ function renderTeamParamedics(teamName, type, index, paramedics) {
         if (fallbackDiv) fallbackDiv.style.display = 'none';
         for (var i = 0; i < paramedics.length; i++) {
             var p = paramedics[i];
-            var isPresent = isParamedicPresent(p.shift_code);
+            var isPresent = p.status ? (p.status === 'حاضر') : !!(p.shift_code && p.shift_code !== '-');
             if (isPresent) presentCount++;
             var dotClass = isPresent ? 'present' : 'absent';
             var statusText = isPresent ? 'حاضر' : 'غائب';
@@ -4604,23 +4540,24 @@ function renderTeamParamedics(teamName, type, index, paramedics) {
             html += '</div>';
         }
     }
-    
+
     container.innerHTML = html;
-    
+
     if (countDisplay) {
-        countDisplay.textContent = presentCount + ' حاضر';
+        countDisplay.textContent = (derivedTeam ? derivedTeam.activeCount : presentCount) + ' حاضر';
     }
-    
+
     if (staffInput) {
-        staffInput.value = presentCount;
+        // تعبئة تلقائية لحقل النموذج (يظل قابلًا للتحرير ويُحفظ ضمن centersData)
+        staffInput.value = derivedTeam ? derivedTeam.activeCount : presentCount;
     }
-    
+
     if (type === 'rapid') {
         updateRapidStatusIcon(index);
     } else {
         updateStatusIcon(index);
     }
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     updateShiftKPIs();
 }
 
@@ -4641,6 +4578,14 @@ async function fetchTeamParamedics(shiftId, teamName, type, index) {
 
 async function loadTeamParamedics(shiftId) {
     if (!shiftId) return;
+    // VA: جلب اشتقاق الفرق من المصدر الواحد أولًا — عدادات الأفراد لكل فرقة
+    // (staffCountDisplay_*) تُعرض من state.teams[teamName].activeCount المشتق
+    // سيرفريًا، لا من اشتقاق محلي لرموز الإكسل.
+    try {
+        var stRes = await AuthManager.apiRequest('/api/staffing/state?shift_id=' + encodeURIComponent(shiftId));
+        var stData = await stRes.json();
+        if (stData && stData.success && stData.teams) workforceStateTeams = stData.teams;
+    } catch (e) { /* عرض فقط — الفشل صامت */ }
     var teams = [];
     for (var r = 0; r < rapidTeams.length; r++) {
         teams.push({ name: rapidTeams[r].name, type: 'rapid', index: r });

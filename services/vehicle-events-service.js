@@ -80,30 +80,35 @@ class VehicleEventsService {
     }
 
     /**
-     * W1-D: لوحة المركبات — السجل المرجعي (معرف ثابت) + الحالة المشتقة من
-     * operational_events فقط. لا يُحفظ أي وضع حالي في أي جدول:
-     * الحالة = آخر status_change في طيّ الأحداث، والعدادات تُجمع هنا
-     * حتى تبقى الواجهة بلا أي منطق أعمال (Zero Business Logic).
+     * لوحة المركبات — السجل المرجعي (هوية ثابتة) + الحالة المشتقة من
+     * operational_events فقط. لا يُحفظ أي وضع حالي في أي جدول (SSOT).
+     * V-A (v9 + قرار المالك 1): صفر تغيير مرئي — تُعرض المركبات المعيّنة فقط
+     * (آخر assignment مفتوح = teamId)، وغير المعيّنة (احتياط/أوفر لاب/صيانة)
+     * لا تظهر حتى V-B/V-D. الحالة تُشتق عبر كامل خط المركبة الزمني
+     * (Asset Timeline — ليست محصورة بالمناوبة).
      */
     async getBoard(shiftId) {
         const registry = await this.storage.getVehicles();
-        const events = shiftId ? await this.storage.getOperationalEventsByShift(shiftId, DOMAIN) : [];
-        const folded = foldEvents(events, DOMAIN);
-        const byId = new Map(folded.map(f => [f.entityId, f]));
         const counters = { active: 0, reserve: 0, breakdown: 0, out_of_service: 0, unset: 0 };
-        const vehicles = registry.map(v => {
-            const f = byId.get(v.id);
+        const vehicles = [];
+        for (const v of registry) {
+            const events = await this.storage.getOperationalEventsByEntity(DOMAIN, v.id);
+            const f = foldEvents(events, DOMAIN)[0] || null;
+            const openAssignment = f ? [...f.open].reverse().find(o => o.event_type === 'assignment') : null;
+            if (!openAssignment) continue; // غير معيّنة — لا تظهر (قرار المالك 1)
             const lastStatus = f ? [...f.open].reverse().find(o => o.status) : null;
             const status = lastStatus ? lastStatus.status : null;
             counters[status || 'unset']++;
-            return {
-                id: v.id, name: v.name, teamId: v.team_id,
+            vehicles.push({
+                id: v.id,
+                name: v.call_sign || v.plate_number,
+                teamId: openAssignment.team_id != null ? Number(openAssignment.team_id) : null,
                 status,
                 reason: lastStatus ? lastStatus.reason || null : null,
                 since: lastStatus ? lastStatus.created_at : null,
                 inWorkshop: f ? f.open.some(o => o.event_type === 'workshop_in') : false
-            };
-        });
+            });
+        }
         return { shiftId: shiftId || null, counters, vehicles };
     }
 }

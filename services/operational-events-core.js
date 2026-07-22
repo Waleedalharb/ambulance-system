@@ -30,10 +30,20 @@ const DOMAIN_REGISTRY = {
         openStates: ['absence', 'late', 'exit', 'assignment', 'overlap', 'external_support', 'volunteer_support']
     },
     vehicle: {
-        eventTypes: ['status_change', 'workshop_in', 'workshop_out', 'note', 'correction'],
+        // V-A (v9): توسعة تعريفية فقط — التعيين/دورة الحياة/الصيانة/العدادات/السمات.
+        // لا خدمات ولا مسارات جديدة هنا (تلك في V-B)؛ الأنواع تُقبل في السجل من الآن.
+        eventTypes: [
+            'status_change', 'workshop_in', 'workshop_out', 'note', 'correction',
+            'assignment', 'assignment_end',
+            'maintenance_requested', 'maintenance_record', 'odometer_log',
+            'asset_metadata_updated',
+            'acquired', 'received', 'entered_service',
+            'ownership_transfer', 'decommissioned', 'scrapped'
+        ],
         statuses: ['active', 'reserve', 'breakdown', 'out_of_service'],
         closureRules: {
-            workshop_out: ['workshop_in']
+            workshop_out: ['workshop_in'],
+            assignment_end: ['assignment']
         },
         reasonRequiredStatuses: ['breakdown', 'out_of_service']
     },

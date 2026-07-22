@@ -326,7 +326,7 @@ function navigateToPage(url) {
 <div class="notes-section">
     <div class="notes-box">
         <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل</h3>
-        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value; triggerAutoSave();"></textarea>
+        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value; saveNotesDebounced();"></textarea>
     </div>
 </div>
 

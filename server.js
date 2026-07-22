@@ -4063,6 +4063,45 @@ app.get('/api/workforce-stats/:shiftId', authenticate, async (req, res) => {
             fuelStatus[center] = fuelLvl;
         }
 
+        // VA: طبقة الاشتقاق الموحّد — أعداد القوى للمراكز ذات الفرق المشتقة تأتي
+        // من سجل staffing (نفس deriveTeamReadiness الذي تستهلكه الشاشة والرئيسية).
+        // المراكز بلا فرق مشتقة (بيانات قديمة/يدوية) تبقى على حساب centersData.
+        if (staffingEventsService) {
+            try {
+                const dw = await staffingEventsService.deriveWorkforce(shiftId);
+                const dteams = (dw && dw.teams) || {};
+                const centerAgg = {};
+                for (const tName of Object.keys(dteams)) {
+                    const td = dteams[tName];
+                    if (!td || td.status === 'pending' || !td.center) continue;
+                    const agg = centerAgg[td.center] || (centerAgg[td.center] = { staff: 0, allReady: true, teams: 0 });
+                    agg.staff += td.activeCount || 0;
+                    if (td.status !== 'ready') agg.allReady = false;
+                    agg.teams++;
+                }
+                for (const center of Object.keys(centerAgg)) {
+                    const agg = centerAgg[center];
+                    const had = Object.prototype.hasOwnProperty.call(distribution, center);
+                    if (had) {
+                        const oldStaff = distribution[center];
+                        totalStaff -= oldStaff;
+                        const oldReady = oldStaff >= 2 && (carDistribution[center] || 0) >= 1;
+                        if (oldReady) readyCenters--; else missingCenters--;
+                    } else {
+                        centerCount++;
+                        carDistribution[center] = 0;
+                        vehicleStatus[center] = '';
+                        fuelStatus[center] = '';
+                    }
+                    distribution[center] = agg.staff;
+                    totalStaff += agg.staff;
+                    if (agg.allReady) readyCenters++; else missingCenters++;
+                }
+            } catch (e) {
+                console.warn('[workforce-stats] staffing derivation overlay failed:', e.message);
+            }
+        }
+
         const readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
         res.json({
             totalStaff,
@@ -4282,11 +4321,13 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
 app.post('/api/shift-completion', authenticate, async (req, res) => {
     // Slice 1: Route → CompletionService → SQLite tx → COMMIT →
     // CompletionUpdated (+ CenterStatusChanged on ready/not-ready flips).
+    // VA: عقدان — events[] (أحداث أشخاص، التدفق الجديد) أو teams (أحكام قديمة
+    // تُترجم عبر المسار الحالي — توافقية كاملة بلا كسر صامت).
     try {
-        const { teams, notes } = req.body;
+        const { teams, notes, events } = req.body;
         const clientShiftType = req.body.shiftType;
         const clientShiftDate = req.body.shiftDate;
-        if (!clientShiftType || !clientShiftDate || !teams) {
+        if (!clientShiftType || !clientShiftDate || (!teams && !Array.isArray(events))) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
 
@@ -4314,10 +4355,30 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
             console.warn(`[ShiftCompletion] OV-S6-01 stamp correction — client(${clientShiftType}/${clientShiftDate}) → server(${shiftType}/${shiftDate}, shift_id=${shiftId})`);
         }
 
+        // ─── VA: تدفق أحداث الأشخاص — القرار لا يسبق البيانات ───
+        if (Array.isArray(events)) {
+            if (!completionService) return res.status(503).json({ error: 'Engine unavailable' });
+            try {
+                const result = await completionService.savePersonEvents(
+                    { shiftType, shiftDate, events, notes, shiftId }, req.user
+                );
+                lastUpdateTime = Date.now(); // VA: الاستطلاع الاحتياطي يلتقط الكتابة
+                return res.json({
+                    success: true, message: 'تم حفظ التكميل', ...result,
+                    corrected, stampedShiftType: shiftType, stampedShiftDate: shiftDate
+                });
+            } catch (e) {
+                const code = e.statusCode || 500;
+                if (code >= 500) console.error('[API] Error saving person events:', e);
+                return res.status(code).json({ error: e.message || 'فشل في حفظ التكميل' });
+            }
+        }
+
         if (completionService) {
             const result = await completionService.saveCompletion(
                 { shiftType, shiftDate, teams, notes, shiftId }, req.user
             );
+            lastUpdateTime = Date.now(); // VA: الاستطلاع الاحتياطي يلتقط الكتابة
             return res.json({
                 success: true, message: 'تم حفظ التكميل', ...result,
                 corrected, stampedShiftType: shiftType, stampedShiftDate: shiftDate
@@ -4328,6 +4389,7 @@ app.post('/api/shift-completion', authenticate, async (req, res) => {
         const result = await opsEngine.completions.saveCompletion(
             shiftId, shiftType, shiftDate, teams, notes, req.user
         );
+        lastUpdateTime = Date.now();
 
         res.json({
             success: true, message: 'تم حفظ التكميل', ...result,
@@ -4456,6 +4518,20 @@ app.get('/api/staffing/indicators', authenticate, async (req, res) => {
     } catch (error) {
         console.error('[API] Error staffing indicators:', error);
         res.status(500).json({ error: 'فشل في جلب مؤشرات القوى البشرية' });
+    }
+});
+
+// VA: القوى المتاحة للدعم — اشتقاق سيرفري من نفس المصدر (جدولة بلا نشاط مفتوح)
+app.get('/api/staffing/available-support', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const avail = await staffingEventsService.getAvailableSupport(resolved.shiftId);
+        res.json({ success: true, ...avail });
+    } catch (error) {
+        console.error('[API] Error available support:', error);
+        res.status(500).json({ error: 'فشل في جلب القوى المتاحة للدعم' });
     }
 });
 

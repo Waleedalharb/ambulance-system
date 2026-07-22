@@ -307,11 +307,13 @@ const TABLE_SCHEMAS = [
   // ─── W1-A: Operational Event Log (السجل التشغيلي الموحّد — append-only) ───
   // الأصل الوحيد لحالات الأفراد والمركبات؛ لا UPDATE/DELETE إطلاقًا.
   // الختم (shift_id/date/type/actor/created_at) سيرفري دائمًا.
+  // V-A: shift_id/date/type nullable — أحداث تأسيس الأصول (initial_seed) تُزرع
+  // بلا مناوبة (قرار المالك 2 في ملحق V-A). القواعد القديمة تُرحَّل في runMigrations.
   `CREATE TABLE IF NOT EXISTS operational_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    shift_id INTEGER NOT NULL,
-    shift_date TEXT NOT NULL,
-    shift_type TEXT NOT NULL,
+    shift_id INTEGER,
+    shift_date TEXT,
+    shift_type TEXT,
     domain TEXT NOT NULL CHECK(domain IN ('staffing', 'vehicle', 'center', 'logistics')),
     entity_id TEXT,
     entity_name TEXT,
@@ -833,25 +835,9 @@ async function initTables() {
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_shift_domain ON operational_events(shift_id, domain);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_events_corrects ON operational_events(corrects_event_id);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_op_snapshots_shift ON operational_shift_snapshots(shift_id);`);
-    // W1-D (قرار 7-3): سجل مركبات مرجعي بمعرف ثابت مستقل عن الاسم.
-    // الحالة التشغيلية لا تُحفظ هنا إطلاقًا — تُشتق من operational_events فقط (SSOT).
-    await exec(`CREATE TABLE IF NOT EXISTS vehicles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      team_id INTEGER,
-      sort_order INTEGER DEFAULT 0,
-      is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`);
-    // توليد/تحديث ذاتي من سجل الفرق: المعرف veh_<teams.id> ثابت لا يتغير
-    // (AUTOINCREMENT لا يعيد الاستخدام)، والاسم العرضي يتبع اسم الفريق
-    // الحالي — إعادة تسمية الفريق لا تكسر تاريخ المركبة.
-    await exec(`INSERT OR IGNORE INTO vehicles (id, name, team_id, sort_order, is_active)
-                SELECT 'veh_' || id, name, id, sort_order, is_active FROM teams;`);
-    await exec(`UPDATE vehicles SET
-                  name = (SELECT name FROM teams WHERE teams.id = vehicles.team_id),
-                  sort_order = (SELECT sort_order FROM teams WHERE teams.id = vehicles.team_id)
-                WHERE team_id IN (SELECT id FROM teams);`);
+    // V-A: جدولا vehicles القديم (W1-D) والتوليد الذاتي من teams أُزيلا من هنا —
+    // إعادة البناء بالمخطط الجديد (v9) + زرع السجل الرسمي تتم في runMigrations
+    // عبر migrateFleetVA() (كشف PRAGMA + foreign_keys=OFF + معاملة).
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_status ON kb_documents(status);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_category ON kb_documents(category);`);
     await exec(`CREATE INDEX IF NOT EXISTS idx_kb_documents_doc_id ON kb_documents(doc_id);`);
@@ -909,6 +895,8 @@ async function runMigrations() {
   await ensureColumn('timeline', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
   await ensureColumn('announcements', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
   await ensureColumn('report_times', 'type', 'TEXT');
+  // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
+  await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
 
   // F4: drop the dead daily_reports store (derived daily report replaces it)
   try {
@@ -1006,6 +994,61 @@ async function runMigrations() {
     }
   } catch (err) {
     logger.warn('shifts CHECK rebuild migration: ' + err.message);
+  }
+
+  // V-A: rebuild operational_events when a legacy NOT NULL on shift_id/date/type
+  // blocks NULL-stamped asset seed events (owner decision: initial_seed events
+  // carry shift_id = NULL). Rows are preserved verbatim; same rebuild pattern
+  // as shifts above (foreign_keys OFF + single transaction). New databases get
+  // the nullable DDL from TABLE_SCHEMAS directly and skip this.
+  try {
+    const oeRow = await get(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'operational_events'`);
+    if (oeRow && oeRow.sql && oeRow.sql.includes('shift_id INTEGER NOT NULL')) {
+      logger.info('Rebuilding operational_events: legacy NOT NULL shift stamp detected');
+      db.pragma('foreign_keys = OFF');
+      beginTransaction();
+      try {
+        await exec(`CREATE TABLE operational_events_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          shift_id INTEGER,
+          shift_date TEXT,
+          shift_type TEXT,
+          domain TEXT NOT NULL CHECK(domain IN ('staffing', 'vehicle', 'center', 'logistics')),
+          entity_id TEXT,
+          entity_name TEXT,
+          team_id TEXT,
+          center TEXT,
+          event_type TEXT NOT NULL,
+          status TEXT,
+          reason TEXT,
+          readiness_basis TEXT,
+          corrects_event_id INTEGER,
+          payload TEXT,
+          note TEXT,
+          actor_id TEXT NOT NULL,
+          actor_name TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )`);
+        await exec(`INSERT INTO operational_events_new
+          (id, shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, center,
+           event_type, status, reason, readiness_basis, corrects_event_id, payload, note,
+           actor_id, actor_name, created_at)
+          SELECT id, shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, center,
+           event_type, status, reason, readiness_basis, corrects_event_id, payload, note,
+           actor_id, actor_name, created_at FROM operational_events`);
+        await exec(`DROP TABLE operational_events`);
+        await exec(`ALTER TABLE operational_events_new RENAME TO operational_events`);
+        commitTransaction();
+        db.pragma('foreign_keys = ON');
+        logger.info('operational_events rebuilt with nullable shift stamp');
+      } catch (oeErr) {
+        rollbackTransaction();
+        db.pragma('foreign_keys = ON');
+        throw oeErr;
+      }
+    }
+  } catch (err) {
+    logger.warn('operational_events nullable-stamp rebuild: ' + err.message);
   }
 
   // Reconcile legacy JSON shifts into SQLite (X2 single-source adoption):
@@ -1285,7 +1328,219 @@ async function runMigrations() {
     logger.warn('kb_queries table creation warning: ' + err.message);
   }
 
+  // V-A: المراكز + إعادة بناء الأسطول v9 + زرع السجل الرسمي + أحداث الافتتاح
+  // + تصحيح مركزَي سريع 3/4 (C7) + system_metadata — كلها idempotent.
+  await migrateFleetVA();
+
   logger.info('Migrations complete');
+}
+
+// ============================================
+// V-A: FLEET REBUILD (v9) — centers + vehicles + system_metadata + seed events
+// المصدر الملزم: VEHICLE-REDESIGN-PROPOSAL.md §1 (السجل الرسمي) + §2 (المخطط)
+// وقرارات المالك في ملحق V-A-DISCOVERY-REPORT.md.
+// ============================================
+const FLEET_SEED_AT = '2026-07-21T08:00:00.000Z'; // تاريخ السجل الرسمي (حتمي ومستقر)
+
+// السجل الرسمي §1 حرفيًا (26 مركبة: veh_000001..veh_000026 — عنوان الوثيقة
+// يقول 27 لكن الصفوف المعتمدة 26 فقط؛ لا مركبة لجنوب 11 بقرار C3).
+// designation: 'نقطة دائمة' / 'نقطة مؤقتة' (§2.2) • ownerCenter بإملاء teams.center
+// الرسمي ('الشفاء') • veh_000018 مالكها «فرقة الصيانة المتنقلة» وليس مركزًا ⇒ NULL.
+const FLEET_ROSTER = [
+  { id: 'veh_000001', callSign: 'جنوب 1', plate: '8572 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'المنصورة' },
+  { id: 'veh_000002', callSign: 'جنوب 2', plate: '8565 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الخالدية' },
+  { id: 'veh_000003', callSign: 'جنوب 3', plate: '8561 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'منفوحة' },
+  { id: 'veh_000004', callSign: 'جنوب 4', plate: '8905 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الدار البيضاء' },
+  { id: 'veh_000005', callSign: 'جنوب 5', plate: '8912 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الدار البيضاء' },
+  { id: 'veh_000006', callSign: 'جنوب 6', plate: '8901 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الإسكان' },
+  { id: 'veh_000007', callSign: 'جنوب 7', plate: '8578 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الحائر' },
+  { id: 'veh_000008', callSign: 'جنوب 8', plate: '8904 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الشفاء' },
+  { id: 'veh_000009', callSign: 'جنوب 9', plate: '8560 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'عكاظ' },
+  { id: 'veh_000010', callSign: 'جنوب 10', plate: '8069 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'ديراب' },
+  { id: 'veh_000011', callSign: 'جنوب 12', plate: '8913 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'أساسية', ownerCenter: 'الشفاء' },
+  { id: 'veh_000012', callSign: 'جنوب 13', plate: '8902 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'أساسية', ownerCenter: 'عكاظ' },
+  { id: 'veh_000013', callSign: 'جنوب 14', plate: '8579 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'أساسية', ownerCenter: 'الإسكان' },
+  { id: 'veh_000014', callSign: 'سريع 1', plate: '9783 ر هـ ع', type: 'تاهو', year: 2023, category: 'تدخل سريع', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الدار البيضاء' },
+  { id: 'veh_000015', callSign: 'سريع 2', plate: '3066 ر هـ ص', type: 'تاهو', year: 2023, category: 'تدخل سريع', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الشفاء' },
+  { id: 'veh_000016', callSign: 'سريع 3', plate: '1009 ح ص ح', type: 'فورتشنر', year: 2014, category: 'تدخل سريع', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'الخالدية' },
+  { id: 'veh_000017', callSign: 'سريع 4', plate: '1989 ح ص ح', type: 'سكوبيا', year: 2016, category: 'تدخل سريع', designation: 'نقطة دائمة', adminStatus: 'أساسية', ownerCenter: 'المنصورة' },
+  { id: 'veh_000018', callSign: 'صيانة متنقلة', plate: '6118 ب ا ي', type: 'سفانا', year: 2015, category: 'سيارة خدمة', designation: 'نقطة دائمة', adminStatus: 'خدمة', ownerCenter: null },
+  { id: 'veh_000019', callSign: 'احتياط', plate: '8564 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000020', callSign: 'احتياط', plate: '8569 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000021', callSign: 'احتياط', plate: '8907 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000022', callSign: 'احتياط', plate: '8395 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000023', callSign: 'احتياط', plate: '8906 س ح ص', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000024', callSign: 'احتياط', plate: '4794 ب ق ك', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000025', callSign: 'احتياط', plate: '4959 ب ق و', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' },
+  { id: 'veh_000026', callSign: 'احتياط', plate: '4962 ب ق و', type: 'فورد', year: 2024, category: 'إسعاف', designation: 'نقطة مؤقتة', adminStatus: 'احتياط', ownerCenter: 'المنصورة' }
+];
+
+// التعيينات الافتتاحية: مركبات النقاط الدائمة الـ14 بفرقها المطابقة فقط
+// (قرار المالك 1: صفر تغيير مرئي — الأوفر لاب/الصيانة/الاحتياط بلا تعيين).
+const FLEET_OPENING_ASSIGNMENTS = {
+  veh_000001: 'جنوب 1', veh_000002: 'جنوب 2', veh_000003: 'جنوب 3', veh_000004: 'جنوب 4',
+  veh_000005: 'جنوب 5', veh_000006: 'جنوب 6', veh_000007: 'جنوب 7', veh_000008: 'جنوب 8',
+  veh_000009: 'جنوب 9', veh_000010: 'جنوب 10',
+  veh_000014: 'سريع 1', veh_000015: 'سريع 2', veh_000016: 'سريع 3', veh_000017: 'سريع 4'
+};
+
+// slugs ثابتة للمراكز التسعة (المفاتيح بإملاء teams.center الرسمي)
+const CENTER_SLUGS = {
+  'المنصورة': 'ctr_mansoura',
+  'الخالدية': 'ctr_khaldiya',
+  'منفوحة': 'ctr_manfouha',
+  'الدار البيضاء': 'ctr_dar_albayda',
+  'الإسكان': 'ctr_iskan',
+  'الحائر': 'ctr_hair',
+  'الشفاء': 'ctr_shifa',
+  'عكاظ': 'ctr_okaz',
+  'ديراب': 'ctr_dirab'
+};
+const CENTER_PREFERRED_ORDER = ['المنصورة', 'الخالدية', 'منفوحة', 'الدار البيضاء', 'الإسكان', 'الحائر', 'الشفاء', 'عكاظ', 'ديراب'];
+
+const VEHICLES_DDL = `CREATE TABLE IF NOT EXISTS vehicles (
+  id              TEXT PRIMARY KEY,
+  plate_number    TEXT NOT NULL,
+  call_sign       TEXT,
+  vehicle_type    TEXT NOT NULL,
+  model_year      INTEGER NOT NULL,
+  category        TEXT NOT NULL,
+  designation     TEXT NOT NULL,
+  admin_status    TEXT NOT NULL DEFAULT 'أساسية',
+  owner_center_id TEXT REFERENCES centers(id),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL
+);`;
+
+async function migrateFleetVA() {
+  // ── C7: تصحيح مركزَي سريع 3/4 للقواعد القائمة (idempotent) ──
+  await run(`UPDATE teams SET center = 'الخالدية' WHERE name = 'سريع 3' AND center = 'المنصورة'`);
+  await run(`UPDATE teams SET center = 'المنصورة' WHERE name = 'سريع 4' AND center = 'الفرق الإضافية'`);
+
+  // ── centers (§2.1): إنشاء + زرع المراكز التسعة من teams.center الفعلية ──
+  await exec(`CREATE TABLE IF NOT EXISTS centers (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL
+  );`);
+  const centersCount = await get('SELECT COUNT(*) AS c FROM centers');
+  if (centersCount.c === 0) {
+    const distinct = await all(`SELECT DISTINCT center FROM teams WHERE center IS NOT NULL AND center <> 'الفرق الإضافية'`);
+    const names = distinct.map(r => r.center);
+    const ordered = CENTER_PREFERRED_ORDER.filter(n => names.includes(n))
+      .concat(names.filter(n => !CENTER_PREFERRED_ORDER.includes(n)));
+    for (let i = 0; i < ordered.length; i++) {
+      const id = CENTER_SLUGS[ordered[i]] || ('ctr_center_' + (i + 1));
+      await run('INSERT INTO centers (id, name, sort_order, is_active, created_at) VALUES (?, ?, ?, 1, ?)',
+        [id, ordered[i], i + 1, FLEET_SEED_AT]);
+    }
+    logger.info(`Seeded ${ordered.length} centers (V-A)`);
+  }
+
+  // ── vehicles (§2.2): كشف الجدول القديم (بلا plate_number) وإعادة بنائه ──
+  // الصفوف القديمة مولّدة ذاتيًا ومهملة ⇒ DROP + CREATE (نمط shifts: FK OFF + معاملة).
+  const vCols = await all(`PRAGMA table_info(vehicles)`);
+  if (vCols.length && !vCols.some(c => c.name === 'plate_number')) {
+    logger.info('Rebuilding vehicles table: legacy W1-D schema detected (V-A)');
+    db.pragma('foreign_keys = OFF');
+    beginTransaction();
+    try {
+      await exec(`DROP TABLE vehicles`);
+      await exec(VEHICLES_DDL);
+      commitTransaction();
+      db.pragma('foreign_keys = ON');
+      logger.info('vehicles table rebuilt with v9 schema');
+    } catch (rebuildErr) {
+      rollbackTransaction();
+      db.pragma('foreign_keys = ON');
+      throw rebuildErr;
+    }
+  } else {
+    await exec(VEHICLES_DDL);
+  }
+
+  // ── زرع السجل الرسمي (فقط إذا كان الجدول فارغًا) ──
+  const vehiclesCount = await get('SELECT COUNT(*) AS c FROM vehicles');
+  if (vehiclesCount.c === 0) {
+    const centerRows = await all('SELECT id, name FROM centers');
+    const centerIdByName = new Map(centerRows.map(r => [r.name, r.id]));
+    for (let i = 0; i < FLEET_ROSTER.length; i++) {
+      const v = FLEET_ROSTER[i];
+      const ownerId = v.ownerCenter ? (centerIdByName.get(v.ownerCenter) || null) : null;
+      if (v.ownerCenter && !ownerId) {
+        logger.warn(`V-A seed: owner center not found for ${v.id}: ${v.ownerCenter}`);
+      }
+      await run(`INSERT INTO vehicles
+        (id, plate_number, call_sign, vehicle_type, model_year, category, designation, admin_status, owner_center_id, sort_order, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [v.id, v.plate, v.callSign, v.type, v.year, v.category, v.designation, v.adminStatus, ownerId, i + 1, FLEET_SEED_AT]);
+    }
+    logger.info(`Seeded ${FLEET_ROSTER.length} vehicles from official roster (V-A)`);
+  }
+
+  // ── system_metadata (قرار المالك 5): تتبع الهجرات ──
+  await exec(`CREATE TABLE IF NOT EXISTS system_metadata (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT
+  );`);
+  const metaSeed = [['schema_version', '2'], ['fleet_schema', 'v9'], ['migration', 'V-A']];
+  for (const [k, v] of metaSeed) {
+    await run('INSERT OR IGNORE INTO system_metadata (key, value, updated_at) VALUES (?, ?, ?)', [k, v, FLEET_SEED_AT]);
+  }
+
+  // ── أحداث الافتتاح (قرار المالك 2): فقط عند غياب أي حدث vehicle سابق ──
+  // زرع مباشر عبر طبقة التخزين (نفس أعمدة appendOperationalEvent) — لا عبر
+  // VehicleEventsService لأنه يتطلب مناوبة نشطة. الختم: system/system-migration،
+  // shift_* = NULL، created_at = تاريخ السجل الرسمي (حتمي).
+  const vehEventCount = await get(`SELECT COUNT(*) AS c FROM operational_events WHERE domain = 'vehicle'`);
+  if (vehEventCount.c === 0) {
+    const teamRows = await all('SELECT id, name, center FROM teams');
+    const teamByName = new Map(teamRows.map(t => [t.name, t]));
+    const insertSeedEvent = async (e) => run(
+      `INSERT INTO operational_events
+       (shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, center,
+        event_type, status, reason, readiness_basis, corrects_event_id, payload, note,
+        actor_id, actor_name, created_at)
+       VALUES (NULL, NULL, NULL, 'vehicle', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'V-A initial fleet seed', 'system', 'system-migration', ?)`,
+      [e.entityId, e.entityName, e.teamId || null, e.center || null, e.eventType,
+       e.status || null, e.reason || 'initial_seed', e.payload || null, FLEET_SEED_AT]
+    );
+    beginTransaction();
+    try {
+      // 1) دورة الحياة: acquired + entered_service لكل مركبة (52 حدثًا)
+      for (const v of FLEET_ROSTER) {
+        await insertSeedEvent({ entityId: v.id, entityName: v.callSign, eventType: 'acquired' });
+        await insertSeedEvent({ entityId: v.id, entityName: v.callSign, eventType: 'entered_service' });
+      }
+      // 2) الحالة الرسمية: عطل لـ veh_000017 وveh_000019
+      for (const id of ['veh_000017', 'veh_000019']) {
+        const v = FLEET_ROSTER.find(r => r.id === id);
+        await insertSeedEvent({ entityId: id, entityName: v.callSign, eventType: 'status_change', status: 'breakdown', reason: 'حالة السجل الرسمي 2026-07-21' });
+      }
+      // 3) طلبات صيانة مذكورة بالسجل: سريع 3 وسريع 4 (بانتظار التأكيد الميداني)
+      for (const id of ['veh_000016', 'veh_000017']) {
+        const v = FLEET_ROSTER.find(r => r.id === id);
+        await insertSeedEvent({ entityId: id, entityName: v.callSign, eventType: 'maintenance_requested', payload: JSON.stringify({ source: 'migration', verified: false }) });
+      }
+      // 4) التعيينات الافتتاحية لمركبات النقاط الدائمة الـ14
+      for (const [vehId, teamName] of Object.entries(FLEET_OPENING_ASSIGNMENTS)) {
+        const team = teamByName.get(teamName);
+        if (!team) { logger.warn(`V-A seed: team not found for assignment: ${teamName}`); continue; }
+        const v = FLEET_ROSTER.find(r => r.id === vehId);
+        await insertSeedEvent({ entityId: vehId, entityName: v.callSign, teamId: String(team.id), center: team.center, eventType: 'assignment' });
+      }
+      commitTransaction();
+      const total = await get(`SELECT COUNT(*) AS c FROM operational_events WHERE domain = 'vehicle'`);
+      logger.info(`Seeded ${total.c} opening vehicle events (V-A)`);
+    } catch (seedErr) {
+      rollbackTransaction();
+      throw seedErr;
+    }
+  }
 }
 
 // ============================================
@@ -1687,8 +1942,8 @@ const DEFAULT_TEAMS = [
   { name: 'جنوب 19', center: 'الفرق الإضافية', team_type: 'جنوب', sort_order: 19 },
   { name: 'سريع 1', center: 'الدار البيضاء', team_type: 'سريع', sort_order: 101 },
   { name: 'سريع 2', center: 'الشفاء', team_type: 'سريع', sort_order: 102 },
-  { name: 'سريع 3', center: 'المنصورة', team_type: 'سريع', sort_order: 103 },
-  { name: 'سريع 4', center: 'الفرق الإضافية', team_type: 'سريع', sort_order: 104 }
+  { name: 'سريع 3', center: 'الخالدية', team_type: 'سريع', sort_order: 103 },
+  { name: 'سريع 4', center: 'المنصورة', team_type: 'سريع', sort_order: 104 }
 ];
 
 async function seedShiftCodes() {

@@ -489,13 +489,15 @@ async function main() {
         && w1cDelShape.ok && w1cDelShape.data && w1cDelShape.data.success === true,
         `post=${w1cEvShape.status} delete=${w1cDelShape.status}`);
 
-    // ─── W1-D: لوحة المركبات + السجل المصغر — سجل مرجعي بمعرف ثابت + اشتقاق سيرفري فقط ───
-    // ① السجل المرجعي: معرف ثابت veh_<teamId> مستقل عن الاسم (قرار 7-3 المعدّل)
+    // ─── W1-D/V-A: لوحة المركبات — سجل مرجعي v9 بمعرف ثابت + اشتقاق سيرفري فقط ───
+    // ① V-A (v9): السجل المرجعي الجديد — 26 مركبة من السجل الرسمي (veh_000001..26)
+    //    بلا team_id وبلا حالة تشغيلية مخزنة (C9/C14/C17)
     const w1dReg = await api('GET', '/api/vehicles/registry');
     const w1dVehicles = (w1dReg.data && w1dReg.data.vehicles) || [];
-    const w1dRegOk = w1dReg.ok && w1dVehicles.length > 0
-        && w1dVehicles.every(v => /^veh_\d+$/.test(v.id) && !!v.name && !!v.team_id);
-    record('W1-D ①: سجل المركبات بمعرف ثابت veh_<teamId> مستقل عن الاسم', w1dRegOk, `count=${w1dVehicles.length}`);
+    const w1dRegOk = w1dReg.ok && w1dVehicles.length === 26
+        && w1dVehicles.every(v => /^veh_\d{6}$/.test(v.id) && !!v.plate_number && !!v.vehicle_type
+            && !!v.admin_status && !('team_id' in v) && !('status' in v));
+    record('V-A ①: سجل الأسطول v9 — 26 مركبة بمعرف ثابت وبلا team_id/status مخزنين', w1dRegOk, `count=${w1dVehicles.length}`);
 
     // ② كتابة حدث عبر المسار الجديد فقط: قبول صحيح (ختم سيرفري بالمناوبة النشطة)
     //    + رفض حالة غير صالحة (400) + رفض breakdown بلا سبب (400) + رفض مركبة غير موجودة (404)
@@ -510,13 +512,14 @@ async function main() {
         `post=${w1dPost.status} badStatus=${w1dBadStatus.status} noReason=${w1dNoReason.status} notFound=${w1dNotFound.status}`);
 
     // ③ اللوحة تُشتق من operational_events فقط: العدادات + الحالة/السبب/since تطابق timeline
+    //    V-A: العداد المتوقع breakdown=2 (افتتاحية veh_000017 + عطل الاختبار على veh_000001)
     const w1dBoard = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
     const w1dCounters = (w1dBoard.data && w1dBoard.data.counters) || {};
     const w1dBV = ((w1dBoard.data && w1dBoard.data.vehicles) || []).find(v => v.id === w1dV1.id);
     const w1dTl = await api('GET', `/api/vehicles/timeline?shift_id=${shift2Id}`);
     const w1dTlEv = ((w1dTl.data && w1dTl.data.events) || []).find(e => e.entity_id === w1dV1.id && e.status === 'breakdown');
-    record('W1-D ③: اللوحة مشتقة من السجل (breakdown=1 + status/reason/since تطابق timeline)',
-        w1dBoard.ok && w1dCounters.breakdown === 1 && !!w1dBV && w1dBV.status === 'breakdown'
+    record('W1-D ③: اللوحة مشتقة من السجل (breakdown=2 + status/reason/since تطابق timeline)',
+        w1dBoard.ok && w1dCounters.breakdown === 2 && !!w1dBV && w1dBV.status === 'breakdown'
         && w1dBV.reason === 'عطل اختبار regression' && !!w1dBV.since && !!w1dTlEv,
         `breakdown=${w1dCounters.breakdown} status=${w1dBV && w1dBV.status} timelineEvent=${!!w1dTlEv}`);
 
@@ -538,18 +541,18 @@ async function main() {
     } catch (e) {}
     record('W1-D ④: بث vehicles_updated لحظيًا عبر SSE عند كتابة حدث مركبة', sseVehiclesUpdated);
 
-    // ⑤ لا مصدر حقيقة ثانٍ: جدول vehicles بلا عمود حالة + الواجهة بلا localStorage للمركبات
-    //    + عناصر W1-D موجودة في الصفحة (قسم المركبات/السجل المصغر/معالج SSE/خطاف التهيئة)
+    // ⑤ لا مصدر حقيقة ثانٍ: جدول vehicles بلا عمود حالة تشغيلية وبلا team_id (v9/C14)
+    //    + الواجهة بلا localStorage للمركبات + عناصر الواجهة موجودة
     const w1dFs = require('fs'), w1dPath = require('path');
     const w1dDbSrc = w1dFs.readFileSync(w1dPath.join(__dirname, '..', 'db.js'), 'utf8');
     const w1dRcSrc = w1dFs.readFileSync(w1dPath.join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
     const w1dVehTable = (w1dDbSrc.match(/CREATE TABLE IF NOT EXISTS vehicles \(([\s\S]*?)\)/) || [])[1] || '';
-    const w1dNoStatusCol = !/\bstatus\b/i.test(w1dVehTable);
+    const w1dNoStatusCol = !/\bstatus\b/i.test(w1dVehTable) && !/\bteam_id\b/i.test(w1dVehTable);
     const w1dNoVehLS = !/localStorage\.(setItem|getItem)\([^)]*vehic/i.test(w1dRcSrc);
     const w1dUiOk = w1dRcSrc.includes('id="vehiclesSection"') && w1dRcSrc.includes('mini-log')
         && w1dRcSrc.includes("'vehicles_updated'") && w1dRcSrc.includes('loadVehiclesBoard();')
         && w1dRcSrc.includes('loadStaffingLog();');
-    record('W1-D ⑤: لا مصدر حقيقة ثانٍ (جدول بلا status + واجهة بلا localStorage) + عناصر الواجهة موجودة',
+    record('W1-D ⑤: لا مصدر حقيقة ثانٍ (جدول بلا status/team_id + واجهة بلا localStorage) + عناصر الواجهة موجودة',
         w1dNoStatusCol && w1dNoVehLS && w1dUiOk,
         `noStatusCol=${w1dNoStatusCol} noVehLS=${w1dNoVehLS} ui=${w1dUiOk}`);
 
@@ -558,6 +561,69 @@ async function main() {
     const w1dBoardPerf = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
     const w1dBoardMs = Date.now() - w1dT0;
     record('W1-D ⑥: زمن جلب لوحة المركبات ضمن العتبة (<150ms)', w1dBoardPerf.ok && w1dBoardMs < 150, `ms=${w1dBoardMs}`);
+
+    // ⑦ V-A (قرار المالك 1): اللوحة تعرض المركبات المعيّنة فقط — 14 بـ teamId (صفر تغيير مرئي)
+    const vaBoardOnly = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+    const vaBoardVehicles = (vaBoardOnly.data && vaBoardOnly.data.vehicles) || [];
+    record('V-A ⑦: اللوحة تعرض المعيّنة فقط (14 مركبة كلها بـ teamId — صفر تغيير مرئي)',
+        vaBoardOnly.ok && vaBoardVehicles.length === 14 && vaBoardVehicles.every(v => v.teamId != null),
+        `shown=${vaBoardVehicles.length}`);
+
+    // ─── V-A: المراكز + أحداث الافتتاح + system_metadata + تصحيح C7 (قراءات DB مباشرة) ───
+    if (process.env.DB_PATH) {
+        const VaDB = require('better-sqlite3');
+        const vadbc = new VaDB(process.env.DB_PATH, { readonly: true });
+        try {
+            // ⑧ المراكز التسعة الرسمية مزروعة (من teams.center الفعلية — بلا «الفرق الإضافية»)
+            const centersRows = vadbc.prepare('SELECT * FROM centers').all();
+            record('V-A ⑧: جدول centers مزروع بالمراكز التسعة الرسمية',
+                centersRows.length === 9 && !centersRows.some(c => c.name === 'الفرق الإضافية'),
+                `centers=${centersRows.length}`);
+
+            // ⑨ أحداث الافتتاح: 52 دورة حياة + 2 عطل + 2 طلب صيانة + 14 تعيين = 70
+            //    مختومة system-migration وبلا مناوبة (قرار المالك 2) — وidempotent (لا تكرار)
+            const seedEv = vadbc.prepare(`SELECT event_type AS t, COUNT(*) AS c FROM operational_events
+                WHERE domain='vehicle' AND actor_name='system-migration' GROUP BY event_type`).all();
+            const seedMap = Object.fromEntries(seedEv.map(r => [r.t, r.c]));
+            const nullShift = vadbc.prepare(`SELECT COUNT(*) AS c FROM operational_events
+                WHERE domain='vehicle' AND actor_name='system-migration' AND shift_id IS NOT NULL`).get().c;
+            record('V-A ⑨: أحداث الافتتاح (26 acquired + 26 entered_service + 2 breakdown + 2 maintenance_requested + 14 assignment) بلا مناوبة',
+                seedMap.acquired === 26 && seedMap.entered_service === 26
+                && seedMap.status_change === 2 && seedMap.maintenance_requested === 2
+                && seedMap.assignment === 14 && nullShift === 0,
+                JSON.stringify(seedMap) + ` nullShift=${nullShift}`);
+
+            // ⑩ system_metadata: schema_version=2 / fleet_schema=v9 / migration=V-A
+            const metaRows = vadbc.prepare('SELECT key, value FROM system_metadata').all();
+            const metaMap = Object.fromEntries(metaRows.map(r => [r.key, r.value]));
+            record('V-A ⑩: system_metadata (schema_version=2 + fleet_schema=v9 + migration=V-A)',
+                metaMap.schema_version === '2' && metaMap.fleet_schema === 'v9' && metaMap.migration === 'V-A',
+                JSON.stringify(metaMap));
+
+            // ⑪ تصحيح C7: سريع 3 = الخالدية / سريع 4 = المنصورة
+            const fast3 = vadbc.prepare(`SELECT center FROM teams WHERE name = 'سريع 3'`).get();
+            const fast4 = vadbc.prepare(`SELECT center FROM teams WHERE name = 'سريع 4'`).get();
+            record('V-A ⑪: تصحيح مركزَي سريع 3/4 (C7)',
+                !!(fast3 && fast3.center === 'الخالدية' && fast4 && fast4.center === 'المنصورة'),
+                `fast3=${fast3 && fast3.center} fast4=${fast4 && fast4.center}`);
+
+            // ⑫ مخطط vehicles بلا team_id وبلا status تشغيلية (C14/C17) — مستوى DB
+            const vCols = vadbc.prepare('PRAGMA table_info(vehicles)').all().map(c => c.name);
+            record('V-A ⑫: مخطط vehicles بلا team_id وبلا status (DB level)',
+                !vCols.includes('team_id') && !vCols.includes('status'),
+                vCols.join(','));
+
+            // ⑬ مطابقة حقلية للسجل الرسمي: لوحتا veh_000001 وveh_000017 + مالك veh_000004 (C1)
+            const v1 = vadbc.prepare(`SELECT * FROM vehicles WHERE id = 'veh_000001'`).get();
+            const v17 = vadbc.prepare(`SELECT * FROM vehicles WHERE id = 'veh_000017'`).get();
+            const v4 = vadbc.prepare(`SELECT v.owner_center_id, c.name AS cname FROM vehicles v
+                LEFT JOIN centers c ON c.id = v.owner_center_id WHERE v.id = 'veh_000004'`).get();
+            record('V-A ⑬: مطابقة السجل الرسمي (لوحة 8572/1989 + جنوب 4 ← الدار البيضاء C1)',
+                !!(v1 && v1.plate_number === '8572 س ح ص' && v17 && v17.plate_number === '1989 ح ص ح'
+                && v4 && v4.cname === 'الدار البيضاء'),
+                `v1=${v1 && v1.plate_number} v17=${v17 && v17.plate_number} v4=${v4 && v4.cname}`);
+        } finally { vadbc.close(); }
+    }
 
     const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });
     const ppGet = await api('GET', '/api/peak-plans');
