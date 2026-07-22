@@ -562,12 +562,24 @@ async function main() {
     const w1dBoardMs = Date.now() - w1dT0;
     record('W1-D ⑥: زمن جلب لوحة المركبات ضمن العتبة (<150ms)', w1dBoardPerf.ok && w1dBoardMs < 150, `ms=${w1dBoardMs}`);
 
-    // ⑦ V-A (قرار المالك 1): اللوحة تعرض المركبات المعيّنة فقط — 14 بـ teamId (صفر تغيير مرئي)
+    // ⑦ V-A (قرار المالك 1): اللوحة تعرض المركبات المعيّنة فقط — بـ teamId (صفر تغيير مرئي)
+    //    العدد المتوقع يُحسب مستقلًا من السجل (تسامح مع أحداث تشغيلية حقيقية بعد البذر)
     const vaBoardOnly = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
     const vaBoardVehicles = (vaBoardOnly.data && vaBoardOnly.data.vehicles) || [];
-    record('V-A ⑦: اللوحة تعرض المعيّنة فقط (14 مركبة كلها بـ teamId — صفر تغيير مرئي)',
-        vaBoardOnly.ok && vaBoardVehicles.length === 14 && vaBoardVehicles.every(v => v.teamId != null),
-        `shown=${vaBoardVehicles.length}`);
+    let vaExpectedAssigned = 14;
+    if (process.env.DB_PATH) {
+        const VaDB7 = require('better-sqlite3');
+        const vadb7 = new VaDB7(process.env.DB_PATH, { readonly: true });
+        try {
+            vaExpectedAssigned = vadb7.prepare(`SELECT COUNT(*) AS c FROM (
+                SELECT entity_id, SUM(CASE WHEN event_type='assignment' THEN 1 WHEN event_type='assignment_end' THEN -1 ELSE 0 END) AS open_cnt
+                FROM operational_events WHERE domain='vehicle' AND event_type IN ('assignment','assignment_end')
+                GROUP BY entity_id) WHERE open_cnt > 0`).get().c;
+        } finally { vadb7.close(); }
+    }
+    record('V-A ⑦: اللوحة تعرض المعيّنة فقط (تطابق حساب مستقل من السجل + كلها بـ teamId — صفر تغيير مرئي)',
+        vaBoardOnly.ok && vaBoardVehicles.length === vaExpectedAssigned && vaBoardVehicles.every(v => v.teamId != null),
+        `shown=${vaBoardVehicles.length} expected=${vaExpectedAssigned}`);
 
     // ─── V-A: المراكز + أحداث الافتتاح + system_metadata + تصحيح C7 (قراءات DB مباشرة) ───
     if (process.env.DB_PATH) {
@@ -623,6 +635,130 @@ async function main() {
                 && v4 && v4.cname === 'الدار البيضاء'),
                 `v1=${v1 && v1.plate_number} v17=${v17 && v17.plate_number} v4=${v4 && v4.cname}`);
         } finally { vadbc.close(); }
+    }
+
+    // ─── 12e. V-B ①: خدمة تعيين المركبات التفاعلية + التبديل الذري (C28) ───
+    if (process.env.DB_PATH) {
+        const VbDB = require('better-sqlite3');
+        const vbdb = new VbDB(process.env.DB_PATH, { readonly: true });
+        try {
+            const vbTeams = vbdb.prepare('SELECT * FROM teams WHERE is_active = 1 ORDER BY id ASC LIMIT 2').all();
+            const vbT1 = vbTeams[0], vbT2 = vbTeams[1];
+            // مركبة اختبار نظيفة (بلا أحداث تعيين سابقة) — تسامح مع بيانات تشغيلية حقيقية في القاعدة
+            const vbVehRow = vbdb.prepare(`SELECT v.id FROM vehicles v WHERE v.is_active = 1
+                AND NOT EXISTS (SELECT 1 FROM operational_events e WHERE e.domain='vehicle' AND e.entity_id = v.id
+                    AND e.event_type IN ('assignment','assignment_end'))
+                ORDER BY v.id LIMIT 1`).get();
+            const vbVeh = vbVehRow.id;
+            // خط أساس اللوحة — الأعداد تُقاس نسبيًا (لا افتراض لحالة البذر الأولية)
+            const vbBoardBase = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vbBaseAssigned = ((vbBoardBase.data && vbBoardBase.data.vehicles) || []).length;
+            const vbBaseUnassigned = ((vbBoardBase.data && vbBoardBase.data.unassigned) || []).length;
+            const vbCount = () => vbdb.prepare(`SELECT event_type AS t, COUNT(*) AS c FROM operational_events
+                WHERE domain='vehicle' AND entity_id=? GROUP BY event_type`).all(vbVeh)
+                .reduce((m, r) => { m[r.t] = r.c; return m; }, {});
+
+            // ① الرفض قبل أي كتابة: بلا فريق 400 + مركبة غير موجودة 404 + فريق غير موجود 400
+            const vbNoTeam = await api('POST', '/api/vehicles/assignment', { vehicleId: vbVeh }, 400);
+            const vbNoVeh = await api('POST', '/api/vehicles/assignment', { vehicleId: 'veh_999999', teamId: vbT1.id }, 404);
+            const vbBadTeam = await api('POST', '/api/vehicles/assignment', { vehicleId: vbVeh, teamId: 999999 }, 400);
+            record('V-B ①: رفض ناقص/غير موجود قبل أي كتابة (بلا فريق 400 + مركبة 404 + فريق 400)',
+                vbNoTeam.status === 400 && vbNoVeh.status === 404 && vbBadTeam.status === 400 && !vbCount().assignment,
+                `noTeam=${vbNoTeam.status} noVeh=${vbNoVeh.status} badTeam=${vbBadTeam.status}`);
+
+            // ② تعيين مركبة غير معيّنة — مختوم سيرفريًا بالمناوبة النشطة + team_id الرقمي + مركز الفريق
+            const vbAssign = await api('POST', '/api/vehicles/assignment', { vehicleId: vbVeh, teamId: vbT1.id, note: 'تعيين اختبار V-B' });
+            const vbEv1 = vbdb.prepare(`SELECT * FROM operational_events WHERE domain='vehicle' AND entity_id=? AND event_type='assignment'`).get(vbVeh);
+            record('V-B ②: تعيين مركبة لفريق — مختوم سيرفريًا (مناوبة نشطة + team_id رقمي + center الفريق)',
+                vbAssign.ok && vbAssign.data.appended === 1 && vbAssign.data.shiftId === shift2Id
+                && !!vbEv1 && vbEv1.shift_id === shift2Id && vbEv1.team_id === String(vbT1.id) && vbEv1.center === vbT1.center,
+                `appended=${vbAssign.data && vbAssign.data.appended} team_id=${vbEv1 && vbEv1.team_id}`);
+
+            // ③ idempotency: تكرار نفس التعيين يُتخطى بلا حدث جديد
+            const vbDup = await api('POST', '/api/vehicles/assignment', { vehicleId: vbVeh, teamId: vbT1.id });
+            record('V-B ③: idempotency — تكرار التعيين لنفس الفريق يُتخطى (appended=0 ولا حدث جديد)',
+                vbDup.ok && vbDup.data.appended === 0 && vbDup.data.skipped === 'already-assigned' && vbCount().assignment === 1,
+                `appended=${vbDup.data && vbDup.data.appended} count=${vbCount().assignment}`);
+
+            // ④ تعيين مباشر أثناء تعيين مفتوح لفريق آخر يُرفض (400) ولا يكتب شيئًا
+            const vbConflict = await api('POST', '/api/vehicles/assignment', { vehicleId: vbVeh, teamId: vbT2.id }, 400);
+            record('V-B ④: تعيين مباشر أثناء تعيين مفتوح لفريق آخر يُرفض بلا كتابة',
+                vbConflict.status === 400 && vbCount().assignment === 1 && !vbCount().assignment_end,
+                `status=${vbConflict.status}`);
+
+            // ⑤ التبديل الذري (C28): assignment_end + assignment في عملية واحدة — مفتوح واحد فقط للفريق الجديد
+            const vbSwitch = await api('POST', '/api/vehicles/assignment/switch', { vehicleId: vbVeh, teamId: vbT2.id, note: 'نقل اختبار V-B' });
+            const vbTlAfter = vbdb.prepare(`SELECT event_type, team_id FROM operational_events
+                WHERE domain='vehicle' AND entity_id=? AND event_type IN ('assignment','assignment_end') ORDER BY id ASC`).all(vbVeh);
+            const vbSeq = vbTlAfter.map(e => e.event_type).join('>');
+            const vbLastAssign = [...vbTlAfter].reverse().find(e => e.event_type === 'assignment');
+            record('V-B ⑤: التبديل الذري — إغلاق القديم + فتح الجديد في عملية واحدة (appended=2 + التسلسل الصحيح)',
+                vbSwitch.ok && vbSwitch.data.appended === 2 && !!vbSwitch.data.endEventId
+                && vbSeq === 'assignment>assignment_end>assignment' && vbLastAssign && vbLastAssign.team_id === String(vbT2.id),
+                `appended=${vbSwitch.data && vbSwitch.data.appended} seq=${vbSeq}`);
+
+            // ⑥ اللوحة تعكس التبديل فورًا (teamId = الفريق الجديد + المعروض 15)
+            const vbBoard1 = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vbBV1 = ((vbBoard1.data && vbBoard1.data.vehicles) || []).find(v => v.id === vbVeh);
+            record('V-B ⑥: اللوحة مشتقة من الأحداث — المركبة المنقولة تظهر بـ teamId الجديد',
+                vbBoard1.ok && !!vbBV1 && vbBV1.teamId === vbT2.id && vbBoard1.data.vehicles.length === vbBaseAssigned + 1,
+                `teamId=${vbBV1 && vbBV1.teamId} shown=${vbBoard1.data && vbBoard1.data.vehicles.length} baseline=${vbBaseAssigned}`);
+
+            // ⑦ تبديل بفريق غير موجود يُرفض قبل أي كتابة (C28: لا تحديث جزئي)
+            const vbBeforeFail = vbCount();
+            const vbSwitchBad = await api('POST', '/api/vehicles/assignment/switch', { vehicleId: vbVeh, teamId: 999999 }, 400);
+            const vbAfterFail = vbCount();
+            record('V-B ⑦: تبديل بفريق غير موجود يُرفض قبل أي كتابة (صفر أحداث جديدة)',
+                vbSwitchBad.status === 400
+                && vbAfterFail.assignment === vbBeforeFail.assignment && (vbAfterFail.assignment_end || 0) === (vbBeforeFail.assignment_end || 0),
+                `status=${vbSwitchBad.status}`);
+
+            // ⑧ إنهاء التعيين يغلق المفتوح دلاليًا — اللوحة تعود إلى المعيّنة الافتتاحية (14)
+            const vbEnd = await api('POST', '/api/vehicles/assignment/end', { vehicleId: vbVeh, note: 'إنهاء اختبار V-B' });
+            const vbBoard2 = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            record('V-B ⑧: إنهاء التعيين يغلق المفتوح — اللوحة تعود لخط الأساس والمركبة تختفي (المعيّنة فقط تُعرض)',
+                vbEnd.ok && vbEnd.data.appended === 1 && vbBoard2.ok
+                && vbBoard2.data.vehicles.length === vbBaseAssigned && !vbBoard2.data.vehicles.some(v => v.id === vbVeh)
+                && vbCount().assignment_end === 2,
+                `appended=${vbEnd.data && vbEnd.data.appended} shown=${vbBoard2.data && vbBoard2.data.vehicles.length} baseline=${vbBaseAssigned}`);
+
+            // ⑨ إنهاء بلا تعيين مفتوح يُتخطى (idempotent)
+            const vbEnd2 = await api('POST', '/api/vehicles/assignment/end', { vehicleId: vbVeh });
+            record('V-B ⑨: إنهاء بلا تعيين مفتوح يُتخطى (appended=0 — idempotent)',
+                vbEnd2.ok && vbEnd2.data.appended === 0 && vbEnd2.data.skipped === 'no-open-assignment'
+                && vbCount().assignment_end === 2,
+                `appended=${vbEnd2.data && vbEnd2.data.appended}`);
+
+            // ⑩ اللوحة تُرجع غير المعيّنة اشتقاقًا سيرفريًا (unassigned) — بلا تغيير على vehicles/counters
+            const vbBoard3 = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vbUnassigned = (vbBoard3.data && vbBoard3.data.unassigned) || [];
+            record('V-B ⑩: board.unassigned — غير المعيّنة مشتقة سيرفريًا (خط الأساس + مركبة الاختبار عادت إليها)',
+                vbBoard3.ok && vbUnassigned.length === vbBaseUnassigned && vbUnassigned.some(v => v.id === vbVeh)
+                && vbBoard3.data.vehicles.length === vbBaseAssigned,
+                `unassigned=${vbUnassigned.length} baseline=${vbBaseUnassigned} assigned=${vbBoard3.data && vbBoard3.data.vehicles.length}`);
+
+            // ⑪ ربط الواجهة: سير العمل كامل من الشاشة (قسم غير المعيّنة + نموذج + المسارات الثلاثة + فرق من الخادم) وبلا localStorage
+            const vbRcSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'radio-completion.html'), 'utf8');
+            const vbUiWired = vbRcSrc.includes('unassignedVehicleCards') && vbRcSrc.includes('vehicleAssignModal')
+                && vbRcSrc.includes("'/api/vehicles/assignment'") && vbRcSrc.includes("'/api/vehicles/assignment/switch'")
+                && vbRcSrc.includes("'/api/vehicles/assignment/end'") && vbRcSrc.includes("'/api/teams'")
+                && vbRcSrc.includes('openVehicleAssignModal') && vbRcSrc.includes('endVehicleAssignment')
+                && !/localStorage\.(setItem|getItem)\([^)]*vehic/i.test(vbRcSrc);
+            record('V-B ⑪: الواجهة مربوطة بالكامل (تعيين/نقل/إنهاء من الشاشة + فرق من /api/teams + بلا localStorage)',
+                vbUiWired);
+
+            // ⑫ منتقي الحالة (إصلاح دورة الحالات): تغيير لأي حالة في أي وقت — انتقال عكسي مباشر مقبول
+            //    (breakdown→active)، آخر حدث يمثل الحالة، ولا بقايا للتدوير الأحادي في الواجهة
+            const vbSt1 = await api('POST', '/api/vehicles/events', { vehicleId: vbVeh, status: 'breakdown', reason: 'اختبار انتقال عكسي V-B' });
+            const vbSt2 = await api('POST', '/api/vehicles/events', { vehicleId: vbVeh, status: 'active' });
+            const vbBoardSt = await api('GET', `/api/vehicles/board?shift_id=${shift2Id}`);
+            const vbStVeh = ((vbBoardSt.data && vbBoardSt.data.unassigned) || []).find(v => v.id === vbVeh);
+            record('V-B ⑫: منتقي الحالة — تغيير لأي حالة في أي وقت (انتقال عكسي breakdown→active + آخر حدث يمثل الحالة + لا تدوير أحادي)',
+                vbSt1.ok && vbSt2.ok && !!vbStVeh && vbStVeh.status === 'active'
+                && vbRcSrc.includes('vehicleStatusModal') && vbRcSrc.includes('openVehicleStatusModal')
+                && vbRcSrc.includes('confirmVehicleStatus') && !vbRcSrc.includes('cycleVehicleStatus'),
+                `status=${vbStVeh && vbStVeh.status}`);
+        } finally { vbdb.close(); }
     }
 
     const ppPost = await api('POST', '/api/peak-plans', { title: 'خطة regression', location: 'موقع اختبار' });

@@ -310,6 +310,18 @@ function navigateToPage(url) {
     .vehicle-card.st-breakdown .card-status { color:var(--danger,#ea5455); }
     .vehicle-card.st-out_of_service .card-status { color:var(--gray,#82868b); }
     .vehicle-card .v-reason { font-size:0.62rem; color:var(--muted); margin-top:2px; }
+    /* V-B ①: إجراءات التعيين/النقل/الإنهاء */
+    .vehicle-card .v-actions { display:flex; gap:4px; margin-top:6px; }
+    .vehicle-card .v-actions button { flex:1; font-size:0.62rem; padding:3px 4px; border:1px solid var(--border,#333); border-radius:6px; background:transparent; color:var(--text,#eee); cursor:pointer; }
+    .vehicle-card .v-actions button:hover { background:var(--primary,#2563eb); border-color:var(--primary,#2563eb); color:#fff; }
+    .vehicle-card .v-actions button.v-end:hover { background:var(--danger,#ea5455); border-color:var(--danger,#ea5455); }
+    #vehicleAssignModal .modal-box, #vehicleStatusModal .modal-box { max-width:340px; }
+    #vehicleAssignModal select, #vehicleAssignModal input, #vehicleStatusModal input { width:100%; padding:8px; margin:6px 0; border:1px solid var(--border,#333); border-radius:8px; background:var(--bg,#1e1e1e); color:var(--text,#eee); font-family:inherit; }
+    .vs-options { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:6px 0; }
+    .vs-options button { padding:8px 4px; font-size:0.75rem; border:1px solid var(--border,#333); border-radius:8px; background:transparent; color:var(--text,#eee); cursor:pointer; font-family:inherit; }
+    .vs-options button:hover { border-color:var(--primary,#2563eb); }
+    .vs-options button.vs-selected { background:var(--primary,#2563eb); border-color:var(--primary,#2563eb); color:#fff; font-weight:700; }
+    .vs-options button .vs-current { display:block; font-size:0.58rem; opacity:0.75; }
 </style>
 <div class="section" id="vehiclesSection">
     <div class="section-title"><i class="fas fa-ambulance"></i> المركبات</div>
@@ -320,6 +332,37 @@ function navigateToPage(url) {
         <div class="dash-card gray"><div class="value" id="vehOut">0</div><div class="label">🔴 خارج الخدمة</div></div>
     </div>
     <div class="cards-grid" id="vehicleCards"></div>
+    <!-- V-B ①: المركبات غير المعيّنة — تُملأ من board.unassigned (اشتقاق سيرفري) -->
+    <div id="unassignedVehiclesWrap" style="display:none">
+        <div class="section-title" style="font-size:0.85rem;margin-top:12px"><i class="fas fa-warehouse"></i> مركبات غير معيّنة</div>
+        <div class="cards-grid" id="unassignedVehicleCards"></div>
+    </div>
+</div>
+
+<!-- V-B ①: نموذج تعيين/نقل مركبة — الاختيار من الفرق القادمة من الخادم فقط -->
+<div class="modal-overlay" id="vehicleAssignModal">
+    <div class="modal-box">
+        <h3 id="vehicleAssignTitle" style="margin:0 0 8px;font-size:1rem">تعيين مركبة</h3>
+        <select id="vehicleAssignTeam"></select>
+        <input id="vehicleAssignNote" placeholder="ملاحظة (اختياري)">
+        <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn-finish" style="flex:1;background:var(--primary)" onclick="confirmVehicleAssign()"><i class="fas fa-check"></i> تأكيد</button>
+            <button class="btn-finish" style="flex:1;background:var(--muted,#82868b)" onclick="closeVehicleAssignModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- V-B ②: نموذج تغيير حالة المركبة — اختيار مباشر لأي حالة في أي وقت (كل تغيير حدث جديد، آخر حدث يمثل الحالة) -->
+<div class="modal-overlay" id="vehicleStatusModal">
+    <div class="modal-box">
+        <h3 id="vehicleStatusTitle" style="margin:0 0 8px;font-size:1rem">تغيير حالة المركبة</h3>
+        <div class="vs-options" id="vehicleStatusOptions"></div>
+        <input id="vehicleStatusReason" placeholder="السبب (إلزامي عند العطل/الإخراج من الخدمة)" style="display:none">
+        <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn-finish" style="flex:1;background:var(--primary)" onclick="confirmVehicleStatus()"><i class="fas fa-check"></i> تأكيد</button>
+            <button class="btn-finish" style="flex:1;background:var(--muted,#82868b)" onclick="closeVehicleStatusModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
 </div>
 
 <!-- Notes -->
@@ -1080,7 +1123,7 @@ function setMissingPerson(teamId, personName) {
 // ============================================
 var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
 var w1dStaffingEvents = [];
-var VEHICLE_STATUS_CYCLE = ['active', 'reserve', 'breakdown', 'out_of_service'];
+var VEHICLE_STATUS_ORDER = ['active', 'reserve', 'breakdown', 'out_of_service'];
 var VEHICLE_STATUS_LABELS = { active: '🚑 عاملة', reserve: '🔄 احتياط', breakdown: '🛠️ متعطلة', out_of_service: '🔴 خارج الخدمة' };
 
 function w1dAuthHeaders() {
@@ -1136,30 +1179,157 @@ function renderVehiclesBoard(board) {
     if (!container) return;
     container.innerHTML = (board.vehicles || []).map(function(v) {
         var st = v.status || 'unset';
+        var nm = String(v.name).replace(/'/g, "\\'");
         var reasonHtml = v.reason ? '<div class="v-reason">' + v.reason + '</div>' : '';
-        return '<div class="team-card vehicle-card st-' + st + '" onclick="cycleVehicleStatus(\'' + v.id + '\', \'' + st + '\', \'' + v.name + '\')">' +
+        // V-B ①: أزرار النقل/الإنهاء — إجراءات عبر مسارات الخادم فقط (بلا حساب محلي)
+        var actions = '<div class="v-actions">' +
+            '<button onclick="event.stopPropagation(); openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')"><i class="fas fa-exchange-alt"></i> نقل</button>' +
+            '<button class="v-end" onclick="event.stopPropagation(); endVehicleAssignment(\'' + v.id + '\', \'' + nm + '\')"><i class="fas fa-unlink"></i> إنهاء</button>' +
+        '</div>';
+        return '<div class="team-card vehicle-card st-' + st + '" onclick="openVehicleStatusModal(\'' + v.id + '\', \'' + st + '\', \'' + nm + '\')">' +
             '<div class="card-name">' + v.name + '</div>' +
             '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
-            reasonHtml +
+            reasonHtml + actions +
         '</div>';
     }).join('');
+    // V-B ①: غير المعيّنة — من board.unassigned (اشتقاق سيرفري) + زر تعيين
+    var wrap = document.getElementById('unassignedVehiclesWrap');
+    var uGrid = document.getElementById('unassignedVehicleCards');
+    var list = board.unassigned || [];
+    if (wrap && uGrid) {
+        wrap.style.display = list.length ? '' : 'none';
+        uGrid.innerHTML = list.map(function(v) {
+            var st = v.status || 'unset';
+            var nm = String(v.name).replace(/'/g, "\\'");
+            return '<div class="team-card vehicle-card st-' + st + '">' +
+                '<div class="card-name">' + v.name + '</div>' +
+                '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
+                '<div class="v-actions">' +
+                    '<button onclick="openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'assign\')"><i class="fas fa-link"></i> تعيين</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
 }
 
-function cycleVehicleStatus(vehicleId, currentStatus, name) {
-    var idx = VEHICLE_STATUS_CYCLE.indexOf(currentStatus);
-    var next = VEHICLE_STATUS_CYCLE[(idx + 1) % VEHICLE_STATUS_CYCLE.length];
+// ============================================
+// V-B ①: سير عمل التعيين/النقل/الإنهاء — الواجهة ترسل فقط، الخادم يقرر ويحسب
+// ============================================
+var vbAssignCtx = null;   // { vehicleId, name, mode: 'assign'|'switch' }
+var vbTeamsCache = null;  // فرق من /api/teams (خادم) — تُجلب عند الحاجة
+
+function openVehicleAssignModal(vehicleId, name, mode) {
+    vbAssignCtx = { vehicleId: vehicleId, name: name, mode: mode };
+    document.getElementById('vehicleAssignTitle').textContent =
+        (mode === 'switch' ? 'نقل المركبة إلى فريق آخر' : 'تعيين المركبة إلى فريق') + ' — ' + name;
+    document.getElementById('vehicleAssignNote').value = '';
+    var sel = document.getElementById('vehicleAssignTeam');
+    sel.innerHTML = '<option value="">جارٍ تحميل الفرق...</option>';
+    document.getElementById('vehicleAssignModal').classList.add('active');
+    var fill = function(teams) {
+        sel.innerHTML = '<option value="">— اختر الفريق —</option>' + teams.map(function(t) {
+            return '<option value="' + t.id + '">' + t.name + (t.center ? ' (' + t.center + ')' : '') + '</option>';
+        }).join('');
+    };
+    if (vbTeamsCache) { fill(vbTeamsCache); return; }
+    var h = w1dAuthHeaders(); if (!h) return;
+    fetch('/api/teams', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            vbTeamsCache = (d && d.teams) || [];
+            fill(vbTeamsCache);
+        })
+        .catch(function() { sel.innerHTML = '<option value="">تعذر تحميل الفرق</option>'; });
+}
+
+function closeVehicleAssignModal() {
+    document.getElementById('vehicleAssignModal').classList.remove('active');
+    vbAssignCtx = null;
+}
+
+function confirmVehicleAssign() {
+    if (!vbAssignCtx) return;
+    var teamId = document.getElementById('vehicleAssignTeam').value;
+    if (!teamId) { showToast('⚠️ اختر الفريق أولاً', 'error'); return; }
+    var note = document.getElementById('vehicleAssignNote').value || null;
+    var url = vbAssignCtx.mode === 'switch' ? '/api/vehicles/assignment/switch' : '/api/vehicles/assignment';
+    var h = w1dAuthHeaders(); if (!h) return;
+    h['Content-Type'] = 'application/json';
+    fetch(url, { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vbAssignCtx.vehicleId, teamId: Number(teamId), note: note }) })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل العملية'), 'error'); return; }
+            var skipped = res.d && res.d.skipped;
+            showToast(skipped ? 'المركبة معيّنة لهذا الفريق مسبقًا' : (vbAssignCtx.mode === 'switch' ? '✅ تم نقل ' + vbAssignCtx.name : '✅ تم تعيين ' + vbAssignCtx.name), skipped ? '' : 'success');
+            closeVehicleAssignModal();
+            loadVehiclesBoard();
+        })
+        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
+}
+
+function endVehicleAssignment(vehicleId, name) {
+    if (!window.confirm('إنهاء تعيين ' + name + '؟ ستعود إلى قائمة غير المعيّنة.')) return;
+    var h = w1dAuthHeaders(); if (!h) return;
+    h['Content-Type'] = 'application/json';
+    fetch('/api/vehicles/assignment/end', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId }) })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل إنهاء التعيين'), 'error'); return; }
+            showToast(res.d && res.d.skipped ? 'لا يوجد تعيين مفتوح لهذه المركبة' : '✅ تم إنهاء تعيين ' + name, res.d && res.d.skipped ? '' : 'success');
+            loadVehiclesBoard();
+        })
+        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
+}
+
+// V-B ②: منتقي حالة المركبة — تغيير لأي حالة في أي وقت (لا تدوير أحادي الاتجاه).
+// كل تأكيد = حدث status_change جديد (append-only)؛ آخر حدث يمثل الحالة الحالية.
+var vbStatusCtx = null; // { vehicleId, name, current, selected }
+
+function openVehicleStatusModal(vehicleId, currentStatus, name) {
+    vbStatusCtx = { vehicleId: vehicleId, name: name, current: currentStatus, selected: null };
+    document.getElementById('vehicleStatusTitle').textContent = 'تغيير حالة المركبة — ' + name;
+    document.getElementById('vehicleStatusReason').value = '';
+    document.getElementById('vehicleStatusReason').style.display = 'none';
+    document.getElementById('vehicleStatusOptions').innerHTML = VEHICLE_STATUS_ORDER.map(function(st) {
+        var cur = st === currentStatus ? '<span class="vs-current">الحالة الحالية</span>' : '';
+        return '<button type="button" data-st="' + st + '" onclick="selectVehicleStatus(\'' + st + '\')">' +
+            (VEHICLE_STATUS_LABELS[st] || st) + cur + '</button>';
+    }).join('');
+    document.getElementById('vehicleStatusModal').classList.add('active');
+}
+
+function selectVehicleStatus(st) {
+    if (!vbStatusCtx) return;
+    vbStatusCtx.selected = st;
+    var btns = document.getElementById('vehicleStatusOptions').querySelectorAll('button');
+    btns.forEach(function(b) { b.classList.toggle('vs-selected', b.getAttribute('data-st') === st); });
+    document.getElementById('vehicleStatusReason').style.display =
+        (st === 'breakdown' || st === 'out_of_service') ? '' : 'none';
+}
+
+function closeVehicleStatusModal() {
+    document.getElementById('vehicleStatusModal').classList.remove('active');
+    vbStatusCtx = null;
+}
+
+function confirmVehicleStatus() {
+    if (!vbStatusCtx) return;
+    var next = vbStatusCtx.selected;
+    if (!next) { showToast('⚠️ اختر الحالة الجديدة أولاً', 'error'); return; }
+    if (next === vbStatusCtx.current) { closeVehicleStatusModal(); return; } // لا تغيير — لا حدث
     var reason = null;
     if (next === 'breakdown' || next === 'out_of_service') {
-        reason = window.prompt('سبب ' + (next === 'breakdown' ? 'العطل' : 'الإخراج من الخدمة') + ' — ' + name + '؟');
-        if (!reason) return; // أُلغي — لا حدث
+        reason = document.getElementById('vehicleStatusReason').value.trim();
+        if (!reason) { showToast('⚠️ السبب إلزامي عند العطل/الإخراج من الخدمة', 'error'); return; }
     }
     var h = w1dAuthHeaders(); if (!h) return;
     h['Content-Type'] = 'application/json';
-    fetch('/api/vehicles/events', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId, status: next, reason: reason }) })
+    fetch('/api/vehicles/events', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vbStatusCtx.vehicleId, status: next, reason: reason }) })
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
         .then(function(res) {
             if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل حفظ حالة المركبة'), 'error'); return; }
-            showToast(name + ' — ' + VEHICLE_STATUS_LABELS[next], next === 'active' ? 'success' : '');
+            showToast(vbStatusCtx.name + ' — ' + VEHICLE_STATUS_LABELS[next], next === 'active' ? 'success' : '');
+            closeVehicleStatusModal();
             loadVehiclesBoard();
         })
         .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });

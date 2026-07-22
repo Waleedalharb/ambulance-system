@@ -4623,6 +4623,56 @@ app.post('/api/vehicles/events', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// V-B ①: تعيين المركبات للفرق — خدمة التعيين التفاعلية + التبديل الذري (C28)
+// تعيين / إنهاء / نقل بين الفرق عبر VehicleEventsService فقط (ختم سيرفري،
+// append-only، معاملة واحدة للتبديل). لا حالة مخزنة — الأحداث هي المصدر.
+// ============================================
+app.post('/api/vehicles/assignment', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, teamId, note } = req.body || {};
+        if (!vehicleId || teamId == null || teamId === '') return res.status(400).json({ error: 'بيانات ناقصة: المركبة والفريق إلزاميان' });
+        const result = await vehicleEventsService.assignVehicle({ vehicleId, teamId, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle assignment:', error);
+        res.status(500).json({ error: 'فشل في تعيين المركبة' });
+    }
+});
+
+app.post('/api/vehicles/assignment/end', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, note } = req.body || {};
+        if (!vehicleId) return res.status(400).json({ error: 'بيانات ناقصة: المركبة إلزامية' });
+        const result = await vehicleEventsService.endVehicleAssignment({ vehicleId, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle assignment end:', error);
+        res.status(500).json({ error: 'فشل في إنهاء تعيين المركبة' });
+    }
+});
+
+app.post('/api/vehicles/assignment/switch', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { vehicleId, teamId, note } = req.body || {};
+        if (!vehicleId || teamId == null || teamId === '') return res.status(400).json({ error: 'بيانات ناقصة: المركبة والفريق إلزاميان' });
+        const result = await vehicleEventsService.switchVehicleAssignment({ vehicleId, teamId, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle assignment switch:', error);
+        res.status(500).json({ error: 'فشل في نقل المركبة بين الفرق' });
+    }
+});
+
 
 // ============================================
 // API: المستندات (التحديثات التشغيلية)
