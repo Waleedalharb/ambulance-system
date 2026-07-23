@@ -707,6 +707,15 @@ function handleSSEEvent(data) {
         case 'shift_absence_deleted':
             loadAbsenceRecords();
             break;
+        // SR-1: القوى البشرية/المركبات — أي حدث في السجل الرسمي يُعيد جلب
+        // المؤشرات من /api/staffing/state (المصدر الوحيد). لا حساب محلي.
+        case 'staffing_events_updated':
+        case 'completion_updated':
+        case 'team_status_changed':
+        case 'vehicles_updated':
+        case 'roster_synced': // SR-2: مزامنة الجدولة ← القاعدة
+            refreshWorkforceFromServer(data.shiftId);
+            break;
         case 'shift_note_added':
         case 'shift_note_deleted':
             loadShiftNotes();
@@ -3327,13 +3336,7 @@ function updateWorkforceStats() {
     .then(function(data) {
         if (data && data.success && data.workforce) {
             workforceStateTeams = data.teams || null;
-            var wf = data.workforce;
-            if (wf.readinessRate == null) {
-                // لا فرق محسومة مشتقة بعد — الحالة الصادقة «—» (ممنوع اختلاق أرقام)
-                updateWorkforceDisplay('—', '—', '—', '—');
-                return;
-            }
-            updateWorkforceDisplay(wf.totalStaff, wf.totalCars, wf.readinessRate, wf.missingTeams || 0);
+            updateWorkforceDisplay(data.workforce);
         } else {
             updateWorkforceStatsFallback();
         }
@@ -3346,56 +3349,58 @@ function updateWorkforceStats() {
 
 function updateWorkforceStatsFallback() {
     // F5b/VA: لا مصدر حقيقي متاح ⇒ الحالة الصادقة «—» (لا افتراضي مختلق إطلاقًا)
-    updateWorkforceDisplay('—', '—', '—', '—');
+    updateWorkforceDisplay(null);
 }
 
-// VA: مُنعش موحّد من المصدر الواحد — يحل محل الحساب المحلي المحذوف
-// (calculateWorkforceStatsLocally). مُهرب (debounced) حتى لا يُجهد الخادم
-// عند الاستدعاءات المتتالية من نموذج التكميل.
+// VA: مُنعش موحّد من المصدر الواحد — يحل محل الحساب المحلي المحذوف نهائيًا.
+// مُهرب (debounced) حتى لا يُجهد الخادم عند الاستدعاءات المتتالية (أحداث SSE).
 var _wfRefreshTimer = null;
 function refreshWorkforceFromServer(shiftId) {
     if (_wfRefreshTimer) clearTimeout(_wfRefreshTimer);
     _wfRefreshTimer = setTimeout(function() {
         _wfRefreshTimer = null;
         updateWorkforceStats();
-        var sid = shiftId || currentShiftId;
-        if (sid) loadWorkforceStats(sid);
     }, 400);
 }
 
-function updateWorkforceDisplay(totalStaff, totalCars, readiness, missingCenters) {
-    // F5b: يقبل «—» (الحالة الصادقة عند غياب مصدر حقيقي) — يتخطى النسب والاتجاهات الرقمية
-    var honest = (totalStaff === '—');
+// SR-1: العرض من كائن workforce المشتق سيرفريًا حرفيًا — بلا أهداف مختلقة
+// (حُذفت «/30 هدف» و«/20 هدف» و«/10 مركز» ومقارنات «الأسبوع الماضي»).
+// المقام الوحيد المستخدم حقيقي: totalRequired للكادر، وعدد الفرق للجاهزية/النقص.
+function updateWorkforceDisplay(wf) {
+    var honest = !wf || wf.readinessRate == null;
+    var totalStaff = honest ? '—' : wf.totalStaff;
+    var totalCars = honest ? '—' : wf.totalCars;
+    var readiness = honest ? 0 : wf.readinessRate;
+    var missingTeams = honest ? '—' : (wf.missingTeams || 0);
+    var totalRequired = honest ? 0 : (wf.totalRequired || 0);
+    var totalTeams = honest ? 0 : ((wf.readyTeams || 0) + (wf.missingTeams || 0) + (wf.offlineTeams || 0) + (wf.pendingTeams || 0));
+    var decidedTeams = honest ? 0 : ((wf.readyTeams || 0) + (wf.missingTeams || 0) + (wf.offlineTeams || 0));
+
     animateValue('wfTotalStaff', totalStaff);
     animateValue('wfTotalCars', totalCars);
     var el_wfReadiness = document.getElementById('wfReadiness'); if (el_wfReadiness) el_wfReadiness.innerText = honest ? '—' : readiness + '%';
-    var el_wfMissingCenters = document.getElementById('wfMissingCenters'); if (el_wfMissingCenters) el_wfMissingCenters.innerText = missingCenters;
+    var el_wfMissingCenters = document.getElementById('wfMissingCenters'); if (el_wfMissingCenters) el_wfMissingCenters.innerText = missingTeams;
 
-    var staffPct = honest ? 0 : Math.min((totalStaff / 30) * 100, 100);
-    var carsPct = honest ? 0 : Math.min((totalCars / 20) * 100, 100);
-    var missingPct = honest ? 0 : Math.min((missingCenters / 10) * 100, 100);
+    var staffPct = (honest || totalRequired <= 0) ? 0 : Math.min((wf.totalStaff / totalRequired) * 100, 100);
+    var missingPct = (honest || totalTeams <= 0) ? 0 : Math.min(((wf.missingTeams || 0) / totalTeams) * 100, 100);
 
     var el_wfStaffProgress = document.getElementById('wfStaffProgress'); if (el_wfStaffProgress) el_wfStaffProgress.style.width = staffPct + '%';
-    var el_wfCarsProgress = document.getElementById('wfCarsProgress'); if (el_wfCarsProgress) el_wfCarsProgress.style.width = carsPct + '%';
     var el_wfReadinessProgress = document.getElementById('wfReadinessProgress'); if (el_wfReadinessProgress) el_wfReadinessProgress.style.width = (honest ? 0 : readiness) + '%';
     var el_wfMissingProgress = document.getElementById('wfMissingProgress'); if (el_wfMissingProgress) el_wfMissingProgress.style.width = missingPct + '%';
+    // السيارات: لا مقام حقيقي متاح في workforce ⇒ يُخفى الشريط ويُعرض العدد نصًا فقط
+    var el_wfCarsProgress = document.getElementById('wfCarsProgress');
+    if (el_wfCarsProgress && el_wfCarsProgress.parentElement) el_wfCarsProgress.parentElement.style.display = 'none';
 
-    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = honest ? '—' : totalStaff + ' / 30 هدف';
-    var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = honest ? '—' : totalCars + ' / 20 هدف';
-    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = honest ? '—' : readiness + '% جاهز';
-    var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = honest ? '—' : missingCenters + ' / 10 مركز';
+    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = honest ? '—' : (totalRequired > 0 ? wf.totalStaff + ' / ' + totalRequired + ' مطلوب' : wf.totalStaff + ' مسعف');
+    var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = honest ? '—' : wf.totalCars + ' مركبة عاملة';
+    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = honest ? '—' : readiness + '% جاهز (' + (wf.readyTeams || 0) + '/' + decidedTeams + ' فرقة)';
+    var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = honest ? '—' : (wf.missingTeams || 0) + ' فرقة ناقصة';
 
-    if (!honest) {
-        updateTrend('wfStaffTrend', totalStaff, 20);
-        updateTrend('wfCarsTrend', totalCars, 15);
-        updateTrend('wfReadinessTrend', readiness, 70);
-        updateTrend('wfMissingTrend', missingCenters, 3);
-    } else {
-        var trendIds = ['wfStaffTrend', 'wfCarsTrend', 'wfReadinessTrend', 'wfMissingTrend'];
-        for (var ti = 0; ti < trendIds.length; ti++) {
-            var trendEl = document.getElementById(trendIds[ti]);
-            if (trendEl) { trendEl.className = 'wf-card-trend neutral'; trendEl.innerText = '—'; }
-        }
+    // الاتجاهات: لا مقارنة حقيقية متاحة ⇒ «—» محايد دائمًا (حُذفت خطوط الأساس المختلقة)
+    var trendIds = ['wfStaffTrend', 'wfCarsTrend', 'wfReadinessTrend', 'wfMissingTrend'];
+    for (var ti = 0; ti < trendIds.length; ti++) {
+        var trendEl = document.getElementById(trendIds[ti]);
+        if (trendEl) { trendEl.className = 'wf-card-trend neutral'; trendEl.innerText = '—'; }
     }
 
     var el_wfLastUpdate = document.getElementById('wfLastUpdate'); if (el_wfLastUpdate) el_wfLastUpdate.innerText = getSaudiTime();
@@ -3414,31 +3419,6 @@ function animateValue(elementId, value) {
     el.innerText = value;
     el.classList.add('pop');
     setTimeout(function() { el.classList.remove('pop'); }, 500);
-}
-
-function updateTrend(elementId, current, baseline) {
-    var el = document.getElementById(elementId);
-    if (!el) return;
-    var diff = current - baseline;
-    var percent = baseline > 0 ? Math.round((diff / baseline) * 100) : 0;
-    el.className = 'wf-card-trend';
-    var arrow = '', valClass = '';
-    if (percent > 5) {
-        el.classList.add('up');
-        arrow = '▲';
-        valClass = 'up';
-    } else if (percent < -5) {
-        el.classList.add('down');
-        arrow = '▼';
-        valClass = 'down';
-    } else {
-        el.classList.add('neutral');
-        arrow = '—';
-        valClass = 'neutral';
-    }
-    var label = percent > 5 || percent < -5 ? Math.abs(percent) + '%' : 'مستقر';
-    var suffix = 'عن الأسبوع الماضي';
-    el.innerHTML = '<span class="wf-trend-arrow">' + arrow + '</span><span class="wf-trend-value">' + label + '</span><span class="wf-trend-label">' + suffix + '</span>';
 }
 
 function refreshWorkforceStats() {
@@ -4261,7 +4241,7 @@ function loadDraftToForm(draftData) {
         document.getElementById('generalNotes').value = draftData.generalNotes;
     }
     
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     updateShiftKPIs();
 }
 
@@ -4487,9 +4467,7 @@ function loadShiftToForm(shift) {
     updateShiftKPIs();
     loadShiftComparison();
     initAutoSave();
-    setTimeout(calculateWorkforceStatsLocally, 100);
-    if (shift.id) { 
-        loadWorkforceStats(shift.id); 
+    if (shift.id) {
         loadTeamParamedics(shift.id);
     }
 }
@@ -4793,56 +4771,6 @@ function displayShiftReportStats(reportsData) {
         div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#1e466e;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#1e466e;"></div></div><span class="percent">' + percentage + '%</span>';
         listContainer.appendChild(div);
     });
-}
-
-async function loadWorkforceStats(shiftId) {
-    try {
-        var response = await fetch('/api/workforce-stats/' + shiftId);
-        var stats = await response.json();
-        if (stats.error) { var el_workforceStats_d31 = document.getElementById('workforceStats'); if (el_workforceStats_d31) el_workforceStats_d31.style.display = 'none'; return; }
-        var el_workforceStats_d32 = document.getElementById('workforceStats'); if (el_workforceStats_d32) el_workforceStats_d32.style.display = 'block';
-        var el_totalStaffDisplay = document.getElementById('totalStaffDisplay'); if (el_totalStaffDisplay) el_totalStaffDisplay.innerText = stats.totalStaff;
-        var el_totalCarsDisplay = document.getElementById('totalCarsDisplay'); if (el_totalCarsDisplay) el_totalCarsDisplay.innerText = stats.totalCars;
-        var el_missingCentersDisplay = document.getElementById('missingCentersDisplay'); if (el_missingCentersDisplay) el_missingCentersDisplay.innerText = stats.missingCenters;
-        var el_staffSubText = document.getElementById('staffSubText'); if (el_staffSubText) el_staffSubText.innerText = 'موزعين على ' + stats.centerCount + ' مركز';
-        var el_carsSubText = document.getElementById('carsSubText'); if (el_carsSubText) el_carsSubText.innerText = 'إجمالي السيارات';
-        var el_missingSubText = document.getElementById('missingSubText'); if (el_missingSubText) el_missingSubText.innerText = stats.missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : stats.missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-        var el_readinessSubText = document.getElementById('readinessSubText'); if (el_readinessSubText) el_readinessSubText.innerText = stats.readyCenters + ' / ' + stats.centerCount + ' مركز جاهز';
-        var circumference = 2 * Math.PI * 42;
-        var offset = circumference - (stats.readinessRate / 100) * circumference;
-        var circle = document.getElementById('readinessCircle');
-        var text = document.getElementById('readinessText');
-        var color = '#c0392b';
-        if (stats.readinessRate >= 80) color = '#2a7f3e';
-        else if (stats.readinessRate >= 50) color = '#f39c12';
-        circle.setAttribute('stroke', color);
-        circle.style.strokeDashoffset = offset;
-        text.textContent = stats.readinessRate + '%';
-        var distList = document.getElementById('distributionList');
-        distList.innerHTML = '';
-        var total = stats.totalStaff || 1;
-        for (var center in stats.distribution) {
-            var count = stats.distribution[center];
-            var barWidth = Math.round((count / total) * 100);
-            var isReady = count >= 2;
-            var div = document.createElement('div');
-            div.className = 'distribution-bar';
-            div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
-            distList.appendChild(div);
-        }
-        var carDistList = document.getElementById('carDistributionList');
-        carDistList.innerHTML = '';
-        var totalCars = stats.totalCars || 1;
-        for (var center2 in stats.carDistribution) {
-            var count2 = stats.carDistribution[center2];
-            var barWidth2 = Math.round((count2 / totalCars) * 100);
-            var hasCar = count2 >= 1;
-            var div2 = document.createElement('div');
-            div2.className = 'distribution-bar';
-            div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
-            carDistList.appendChild(div2);
-        }
-    } catch (error) { console.error(error); var el_workforceStats_d33 = document.getElementById('workforceStats'); if (el_workforceStats_d33) el_workforceStats_d33.style.display = 'none'; }
 }
 
 // ============================================
@@ -6895,7 +6823,7 @@ function setRapidComplete(index) {
     if (staffInput) staffInput.value = 1;
     if (carsInput) carsInput.value = 1;
     updateRapidStatusIcon(index);
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     updateShiftKPIs();
     var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
     if (countDisplay) countDisplay.textContent = '1 حاضر';
@@ -6907,7 +6835,7 @@ function setRapidIncomplete(index) {
     if (staffInput) staffInput.value = 0;
     if (carsInput) carsInput.value = 0;
     updateRapidStatusIcon(index);
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     updateShiftKPIs();
     var countDisplay = document.getElementById('staffCountDisplay_' + safeTeamId(rapidTeams[index].name));
     if (countDisplay) countDisplay.textContent = '0 حاضر';
@@ -6976,7 +6904,7 @@ function buildCentersTable() {
                     var hidden = document.getElementById('rapid_staff_' + idx);
                     if (hidden) hidden.value = this.value;
                     updateRapidStatusIcon(idx); 
-                    calculateWorkforceStatsLocally(); 
+                    refreshWorkforceFromServer(); 
                     updateShiftKPIs();
                 };
             }(r));
@@ -6996,7 +6924,7 @@ function buildCentersTable() {
                         }
                     }
                     updateRapidStatusIcon(idx); 
-                    calculateWorkforceStatsLocally(); 
+                    refreshWorkforceFromServer(); 
                     updateShiftKPIs();
                 };
             }(r));
@@ -7005,7 +6933,7 @@ function buildCentersTable() {
         carsInput.addEventListener('input', function(idx) { 
             return function() { 
                 updateRapidStatusIcon(idx); 
-                calculateWorkforceStatsLocally(); 
+                refreshWorkforceFromServer(); 
             };
         }(r));
         
@@ -7075,7 +7003,7 @@ function buildCentersTable() {
                     var hidden = document.getElementById('staff_' + idx);
                     if (hidden) hidden.value = this.value;
                     updateStatusIcon(idx); 
-                    calculateWorkforceStatsLocally(); 
+                    refreshWorkforceFromServer(); 
                     updateShiftKPIs();
                 };
             }(i));
@@ -7096,7 +7024,7 @@ function buildCentersTable() {
                         }
                     }
                     updateStatusIcon(idx); 
-                    calculateWorkforceStatsLocally(); 
+                    refreshWorkforceFromServer(); 
                     updateShiftKPIs();
                 };
             }(i));
@@ -7105,7 +7033,7 @@ function buildCentersTable() {
         carsInput.addEventListener('input', function(idx) { 
             return function() { 
                 updateStatusIcon(idx); 
-                calculateWorkforceStatsLocally(); 
+                refreshWorkforceFromServer(); 
             };
         }(i));
         
@@ -7135,70 +7063,6 @@ function updateStatusIcon(index) {
             iconSpan.innerHTML = '❌'; 
             iconSpan.className = 'status-icon status-not'; 
         }
-    }
-}
-
-function calculateWorkforceStatsLocally() {
-    var centerRows = document.querySelectorAll('#centersTableBody tr');
-    var totalStaff = 0, totalCars = 0, readyCenters = 0, missingCenters = 0, centerCount = 0;
-    var distribution = {}, carDistribution = {};
-    centerRows.forEach(function(tr) {
-        var centerName = tr.querySelector('td:first-child')?.innerText || '';
-        var staffInput = tr.querySelector('input[id^="staff_"]');
-        var carsInput = tr.querySelector('input[id^="cars_"]');
-        if (staffInput && carsInput) {
-            var staffCount = parseInt(staffInput.value) || 0;
-            var carsCount = parseInt(carsInput.value) || 0;
-            totalStaff += staffCount; totalCars += carsCount; centerCount++;
-            distribution[centerName] = staffCount; carDistribution[centerName] = carsCount;
-            if (staffCount >= 2 && carsCount >= 1) readyCenters++; else missingCenters++;
-        }
-    });
-    var readinessRate = centerCount > 0 ? Math.round((readyCenters / centerCount) * 100) : 0;
-    var el_workforceStats_d53 = document.getElementById('workforceStats'); if (el_workforceStats_d53) el_workforceStats_d53.style.display = 'block';
-    var el_totalStaffDisplay = document.getElementById('totalStaffDisplay'); if (el_totalStaffDisplay) el_totalStaffDisplay.innerText = totalStaff;
-    var el_totalCarsDisplay = document.getElementById('totalCarsDisplay'); if (el_totalCarsDisplay) el_totalCarsDisplay.innerText = totalCars;
-    var el_missingCentersDisplay = document.getElementById('missingCentersDisplay'); if (el_missingCentersDisplay) el_missingCentersDisplay.innerText = missingCenters;
-    var el_staffSubText = document.getElementById('staffSubText'); if (el_staffSubText) el_staffSubText.innerText = 'موزعين على ' + centerCount + ' مركز';
-    var el_carsSubText = document.getElementById('carsSubText'); if (el_carsSubText) el_carsSubText.innerText = 'إجمالي السيارات';
-    var el_missingSubText = document.getElementById('missingSubText'); if (el_missingSubText) el_missingSubText.innerText = missingCenters === 1 ? 'مركز ناقص (بحاجة 2 مسعف + سيارة)' : missingCenters + ' مراكز ناقصة (بحاجة 2 مسعف + سيارة)';
-    var el_readinessSubText = document.getElementById('readinessSubText'); if (el_readinessSubText) el_readinessSubText.innerText = readyCenters + ' / ' + centerCount + ' مركز جاهز';
-    var circumference = 2 * Math.PI * 42;
-    var offset = circumference - (readinessRate / 100) * circumference;
-    var circle = document.getElementById('readinessCircle');
-    var text = document.getElementById('readinessText');
-    var color = '#c0392b';
-    if (readinessRate >= 80) color = '#2a7f3e';
-    else if (readinessRate >= 50) color = '#f39c12';
-    circle.setAttribute('stroke', color);
-    circle.style.strokeDashoffset = offset;
-    text.textContent = readinessRate + '%';
-    var distList = document.getElementById('distributionList');
-    distList.innerHTML = '';
-    var total = totalStaff || 1;
-    for (var center in distribution) {
-        var count = distribution[center];
-        var barWidth = Math.round((count / total) * 100);
-        var isReady = count >= 2;
-        var div = document.createElement('div');
-        div.className = 'distribution-bar';
-        div.innerHTML = '<span class="name">' + center + '</span><span class="count" style="' + (isReady ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth + '%; background:' + (isReady ? '#2a7f3e' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth + '%</span>';
-        distList.appendChild(div);
-    }
-    var carDistList = document.getElementById('carDistributionList');
-    carDistList.innerHTML = '';
-    var totalCarsValue = totalCars || 1;
-    for (var center2 in carDistribution) {
-        var count2 = carDistribution[center2];
-        var barWidth2 = Math.round((count2 / totalCarsValue) * 100);
-        var hasCar = count2 >= 1;
-        var div2 = document.createElement('div');
-        div2.className = 'distribution-bar';
-        div2.innerHTML = '<span class="name">' + center2 + '</span><span class="count" style="' + (hasCar ? 'color:#2a7f3e;' : 'color:#c0392b;') + '">' + count2 + '</span><div class="bar-track"><div class="bar-fill" style="width:' + barWidth2 + '%; background:' + (hasCar ? '#2980b9' : '#c0392b') + ';"></div></div><span class="percent">' + barWidth2 + '%</span>';
-        carDistList.appendChild(div2);
-    }
-    if (totalStaff > 0 || totalCars > 0) {
-        updateWorkforceDisplay(totalStaff, totalCars, readinessRate, missingCenters);
     }
 }
 
@@ -7620,7 +7484,7 @@ function applyPreset(preset) {
         if (vehicleSelect) updateVehicleStatusIcon(i);
     }
 
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     addShiftEvent('note', '\u26a1 تم تطبيق: ' + getPresetLabel(preset), 'manual');
     showToast('\u2705 تم تطبيق "' + getPresetLabel(preset) + '"', 'success');
 }
@@ -7891,7 +7755,7 @@ function setCenterComplete(index) {
     }
     
     updateStatusIcon(index);
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     
     var row = document.getElementById('center-row-' + index);
     if (row) {
@@ -7922,7 +7786,7 @@ function setCenterIncomplete(index) {
     }
     
     updateStatusIcon(index);
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     
     var row = document.getElementById('center-row-' + index);
     if (row) {
@@ -7955,7 +7819,7 @@ function setAllCentersComplete() {
         }
         updateStatusIcon(i);
     }
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     addShiftEvent('complete', 'تم تكميل جميع المراكز تلقائياً', 'auto');
     showToast('✅ تم تعيين جميع المراكز كمكتملة', 'success');
 }
@@ -7978,7 +7842,7 @@ function setAllCentersIncomplete() {
         }
         updateStatusIcon(i);
     }
-    calculateWorkforceStatsLocally();
+    refreshWorkforceFromServer();
     showToast('⚠️ تم تعيين جميع المراكز كناقصة', 'alert');
 }
 

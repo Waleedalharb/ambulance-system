@@ -28,6 +28,74 @@ const NIGHT_ONLY_CODES = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN']
 const SHARED_CODES = ['CP24', 'M', 'ME', 'F', 'O12', 'O10', 'O6'];
 const OFF_CODES = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
 
+// ─── بند 15: اشتقاق سجلات التأخير (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل ───
+// يربط حدث arrival بحدث late نفسه (إغلاق دلالي)، ويطبّق آخر correction لوقت الحضور.
+// لا يمس حالة الفرقة إطلاقًا — معلومات Timeline فقط.
+function parsePayload(p) {
+    if (!p) return {};
+    if (typeof p === 'object') return p;
+    try { return JSON.parse(p); } catch (_) { return {}; }
+}
+function deriveLateRecords(events) {
+    const sorted = (events || []).slice().sort((a, b) =>
+        String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
+    const openLate = {};   // entity_id -> [late events]
+    const pairs = [];      // { entity, teamId, startedAt, arrivedAt, arrivalEventId }
+    const corrections = {}; // entity_id -> [{ at, createdAt }]
+    for (const e of sorted) {
+        const ent = e.entity_id;
+        if (!ent) continue;
+        if (e.event_type === 'late') {
+            (openLate[ent] = openLate[ent] || []).push(e);
+        } else if (e.event_type === 'arrival') {
+            const q = openLate[ent];
+            if (q && q.length) {
+                const late = q.shift(); // يُغلق أقدم تأخير مفتوح (نفس قاعدة foldEvents)
+                pairs.push({
+                    employee: ent,
+                    teamId: late.team_id || e.team_id || null,
+                    startedAt: late.created_at,
+                    arrivedAt: e.created_at,
+                    arrivalEventId: e.id || null
+                });
+            }
+        } else if (e.event_type === 'correction') {
+            const p = parsePayload(e.payload);
+            const correctedAt = p.arrivalAt || null;
+            if (correctedAt && !isNaN(new Date(correctedAt).getTime())) {
+                (corrections[ent] = corrections[ent] || []).push({ at: correctedAt, createdAt: e.created_at });
+            }
+        }
+    }
+    // التصحيح يطبَّق على أحدث زوج وصول لنفس الموظف (الأحداث append-only — التصحيح حدث تدقيق)
+    for (const ent of Object.keys(corrections)) {
+        const entPairs = pairs.filter(p => p.employee === ent);
+        if (!entPairs.length) continue;
+        const latestCorrection = corrections[ent][corrections[ent].length - 1];
+        entPairs[entPairs.length - 1].arrivedAt = latestCorrection.at;
+    }
+    const records = pairs.map(p => {
+        const mins = Math.max(0, Math.round((new Date(p.arrivedAt) - new Date(p.startedAt)) / 60000));
+        return {
+            employee: p.employee, teamId: p.teamId,
+            startedAt: p.startedAt, arrivedAt: p.arrivedAt,
+            durationMinutes: mins, status: 'arrived'
+        };
+    });
+    // تأخير بلا وصول — «لم يحضر»
+    for (const ent of Object.keys(openLate)) {
+        for (const late of openLate[ent]) {
+            records.push({
+                employee: ent, teamId: late.team_id || null,
+                startedAt: late.created_at, arrivedAt: null,
+                durationMinutes: null, status: 'not_arrived'
+            });
+        }
+    }
+    records.sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
+    return records;
+}
+
 // تحويل تاريخ المناوبة (قد يحمل أرقامًا عربية أو صيغة D/M/YYYY) إلى ISO
 function toIsoDate(shiftDate) {
     if (!shiftDate || typeof shiftDate !== 'string') return shiftDate;
@@ -46,12 +114,71 @@ class StaffingEventsService {
      * @param {Object} deps
      * @param {Object} deps.storage - StorageAdapter (البوابة الوحيدة)
      * @param {Object} deps.engine  - OperationsEngine (المناوبة النشطة + المعاملات)
+     *
+     * SR-2: لا scheduleProvider ولا أي جسر — shift_roster هو المصدر الوحيد
+     * للكادر أثناء التشغيل (يُغذّى عبر RosterSyncService من الجدولة).
      */
     constructor({ storage, engine }) {
         if (!storage) throw new Error('StaffingEventsService requires a StorageAdapter');
         if (!engine) throw new Error('StaffingEventsService requires an OperationsEngine');
         this.storage = storage;
         this.engine = engine;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // عقد الفصل (بقرار المالك): الحالة التشغيلية = قرار المشرف — تُخزَّن ولا تُشتق.
+    // جدول مستقل بسيط shift_team_status: آخر قرار لكل فرقة في المناوبة
+    // (Upsert — آخر ضغطة تحكم دائمًا). أحداث الأشخاص تبقى في
+    // operational_events ولا يملك أي منها مسار كتابة إلى هذا الجدول إطلاقًا.
+    // ═══════════════════════════════════════════════════════════
+
+    async _runWrite(sql, params) {
+        const s = this.storage;
+        if (typeof s.run === 'function') return s.run(sql, params || []);
+        if (typeof s.exec === 'function') return s.exec(sql, params || []);
+        if (s.db && typeof s.db.run === 'function') return s.db.run(sql, params || []);
+        throw new Error('Storage adapter lacks a write method (run/exec)');
+    }
+
+    async _ensureDecisionTable() {
+        if (this._decisionTableReady) return;
+        await this._runWrite(`CREATE TABLE IF NOT EXISTS shift_team_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shift_id INTEGER NOT NULL,
+            team_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            reason TEXT,
+            updated_by TEXT,
+            updated_at TEXT NOT NULL,
+            UNIQUE(shift_id, team_id)
+        )`);
+        this._decisionTableReady = true;
+    }
+
+    async _upsertDecision({ shiftId, teamId, status, reason, actor, at }) {
+        await this._ensureDecisionTable();
+        await this._runWrite(
+            `INSERT INTO shift_team_status (shift_id, team_id, status, reason, updated_by, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(shift_id, team_id) DO UPDATE SET
+               status = excluded.status,
+               reason = excluded.reason,
+               updated_by = excluded.updated_by,
+               updated_at = excluded.updated_at`,
+            [shiftId, canonicalTeamId(teamId), status, reason || null, actor || null, at]
+        );
+    }
+
+    /** قرارات المشرف للمناوبة — المصدر الوحيد لحالة الفرق (Current State). */
+    async getTeamDecisions(shiftId) {
+        await this._ensureDecisionTable();
+        const rows = await this.storage.all(
+            'SELECT team_id, status, reason, updated_by, updated_at FROM shift_team_status WHERE shift_id = ?',
+            [shiftId]
+        );
+        const out = {};
+        for (const r of rows) out[canonicalTeamId(r.team_id)] = r;
+        return out;
     }
 
     /**
@@ -112,7 +239,9 @@ class StaffingEventsService {
     async getTimeline(shiftId, entityId = null) {
         let events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         if (entityId) events = events.filter(e => e.entity_id === entityId);
-        return { shiftId, domain: DOMAIN, entityId: entityId || null, events };
+        // بند 15: سجلات التأخير المشتقة (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل
+        const lateRecords = deriveLateRecords(events);
+        return { shiftId, domain: DOMAIN, entityId: entityId || null, events, lateRecords };
     }
 
     /** مؤشرات القوى البشرية — تُشتق هنا فقط ولا تُحسب في مكان آخر. */
@@ -179,13 +308,11 @@ class StaffingEventsService {
             };
 
             if (status === 'ready' || status === 'missing' || status === 'offline') {
-                const id = await this.storage.appendOperationalEvent({
-                    ...base,
-                    eventType: status,
-                    reason: cur.reason || null,
-                    readinessBasis: status === 'ready' ? 'direct' : null
+                // عقد الفصل: قرارات الحالة ← جدول القرار المستقل (Upsert)، لا سجل الأحداث.
+                await this._upsertDecision({
+                    shiftId, teamId, status, reason: cur.reason || null, actor: actorName, at
                 });
-                out.push({ id, eventType: status, teamId });
+                out.push({ decision: status, teamId });
             }
 
             // حدث شخصي عند سبب يستلزم اسمًا واسم معروف (أفضل جهد موثق — R-6)
@@ -223,24 +350,24 @@ class StaffingEventsService {
      */
     async getCompletionTeamsView(shiftId) {
         if (!shiftId) return null;
-        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
-        if (!events.length) return null;
-        const TEAM_STATUSES = ['ready', 'missing', 'offline'];
+        // عقد الفصل: الحالة من جدول قرار المشرف (وليست من أحداث الأشخاص)
+        const decisions = await this.getTeamDecisions(shiftId);
+        const keys = Object.keys(decisions);
+        if (!keys.length) return null;
         const out = {};
-        for (const e of events) {
-            if (!e.team_id || e.entity_id) continue; // أحداث الفريق فقط (بلا كيان شخصي)
-            if (TEAM_STATUSES.includes(e.event_type)) {
-                out[e.team_id] = { status: e.event_type, reason: e.reason || '', missingPerson: '' };
-            }
+        for (const k of keys) {
+            const d = decisions[k];
+            out[k] = { status: d.status, reason: d.reason || '', missingPerson: '' };
         }
-        if (!Object.keys(out).length) return null;
-        // الشخص المفتوح غيابه/تأخيره لفريق ناقص (arrival يغلقه دلاليًا)
+        // الشخص المفتوح غيابه/تأخيره لفريق ناقص (arrival يغلقه دلاليًا) — من سجل الأشخاص
+        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         const folded = foldEvents(events, DOMAIN);
         for (const f of folded) {
-            if (!f.entityId || !f.teamId || !out[f.teamId]) continue;
-            if (out[f.teamId].status !== 'missing') continue;
+            if (!f.entityId || !f.teamId) continue;
+            const key = canonicalTeamId(f.teamId);
+            if (!out[key] || out[key].status !== 'missing') continue;
             const stillOpen = f.open.some(o => o.event_type === 'absence' || o.event_type === 'late');
-            if (stillOpen) out[f.teamId].missingPerson = f.entityId;
+            if (stillOpen) out[key].missingPerson = f.entityId;
         }
         return out;
     }
@@ -262,9 +389,9 @@ class StaffingEventsService {
         const actorName = (actor && (actor.name || actor.username)) || 'system';
         const at = createdAt || new Date().toISOString();
 
-        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'support_end', 'offline', 'ready'];
+        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'support_end', 'offline', 'ready', 'missing', 'correction'];
         const NEEDS_REASON = ['absence', 'late', 'offline'];
-        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'support_end', 'assignment'];
+        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'support_end', 'assignment', 'correction'];
 
         // التحقق الكامل قبل أي كتابة (القرار لا يسبق البيانات)
         for (const ev of events) {
@@ -285,6 +412,12 @@ class StaffingEventsService {
                 err.statusCode = 400;
                 throw err;
             }
+            // بند 15: تصحيح وقت الحضور — وقت صالح إلزامي (صلاحية المشرف على المسار)
+            if (type === 'correction' && (!ev.arrivalAt || isNaN(new Date(ev.arrivalAt).getTime()))) {
+                const err = new Error('وقت الحضور المصحَّح غير صالح');
+                err.statusCode = 400;
+                throw err;
+            }
             // كل الأنواع مرتبطة بفريق إلا دعم الاحتياط (external_support بلا فريق هدف)
             const teamId = canonicalTeamId(ev.supportTargetTeamId || ev.teamId);
             if (!teamId && type !== 'external_support') {
@@ -301,17 +434,21 @@ class StaffingEventsService {
             const f = folded.find(x => x.entityId === entityId);
             return f ? f.open : [];
         };
-        const teamOpenOf = (teamId) => {
-            const f = folded.find(x => !x.entityId && canonicalTeamId(x.teamId) === teamId);
-            return f ? f.open : [];
-        };
-
         for (const ev of events) {
             const type = ev.type;
             const employee = ev.employeeName || ev.employeeId || null;
             const teamId = canonicalTeamId(ev.supportTargetTeamId || ev.teamId);
-            const isTeamEvent = (type === 'offline' || type === 'ready' || type === 'missing');
 
+            // عقد الفصل (بقرار المالك): قرارات الحالة (ready/missing/offline) ← جدول
+            // القرار المستقل (Upsert — آخر ضغطة تحكم دائمًا، بلا شروط تخطٍّ)،
+            // ولا تُلحق في سجل الأحداث إطلاقًا. السجل للأشخاص فقط.
+            if (type === 'ready' || type === 'missing' || type === 'offline') {
+                await this._upsertDecision({ shiftId, teamId, status: type, reason: ev.reason || null, actor: actorName, at });
+                out.push({ decision: type, teamId });
+                continue;
+            }
+
+            // أحداث الأشخاص ← operational_events كما هي (لا تُمس).
             // منع التكرار/الإغلاق الفارغ (idempotency تشغيلية)
             if (employee) {
                 const open = openOf(employee);
@@ -320,38 +457,35 @@ class StaffingEventsService {
                 if (type === 'assignment' && open.some(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'arrival' && !open.some(o => o.event_type === 'absence' || o.event_type === 'late')) continue;
                 if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support')) continue;
-            } else if (isTeamEvent) {
-                const open = teamOpenOf(teamId);
-                if (type === 'offline' && open.some(o => o.event_type === 'offline')) continue;
-                if (type === 'ready' && !open.some(o => o.event_type === 'offline' || o.event_type === 'missing')) continue;
             }
 
+            const payload = { source: 'completion-person-events' };
+            if (type === 'correction') { payload.corrects = 'arrival_time'; payload.arrivalAt = ev.arrivalAt; }
             const id = await this.storage.appendOperationalEvent({
                 shiftId, shiftDate, shiftType, domain: DOMAIN,
-                entityId: isTeamEvent ? null : employee,
-                entityName: isTeamEvent ? null : employee,
+                entityId: employee,
+                entityName: employee,
                 teamId, center: ev.center || null,
                 eventType: type,
                 reason: ev.reason || null,
-                readinessBasis: type === 'external_support' ? 'external_support' : (type === 'ready' ? 'direct' : null),
-                payload: { source: 'completion-person-events' },
+                readinessBasis: type === 'external_support' ? 'external_support' : null,
+                payload,
                 actorId, actorName, createdAt: at
             });
             out.push({ id, eventType: type, entityId: employee, teamId });
             // حدّث الطيّ المحلي حتى تتسلسل قرارات الإغلاق/الفتح داخل نفس الدفعة
-            const synth = { id, domain: DOMAIN, entity_id: isTeamEvent ? null : employee, entity_name: isTeamEvent ? null : employee, team_id: teamId, event_type: type, reason: ev.reason || null, created_at: at };
-            const key = isTeamEvent ? '(team:' + (teamId || '') + ')' : employee;
-            let f = folded.find(x => (isTeamEvent ? (!x.entityId && canonicalTeamId(x.teamId) === teamId) : x.entityId === employee));
+            const synth = { id, domain: DOMAIN, entity_id: employee, entity_name: employee, team_id: teamId, event_type: type, reason: ev.reason || null, created_at: at };
+            let f = folded.find(x => x.entityId === employee);
             if (!f) {
-                f = { entityId: isTeamEvent ? null : employee, entityName: isTeamEvent ? null : employee, teamId, open: [], lastEvent: null, closedCount: 0, corrections: 0 };
+                f = { entityId: employee, entityName: employee, teamId, open: [], lastEvent: null, closedCount: 0, corrections: 0 };
                 folded.push(f);
             }
-            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support'], ready: ['missing', 'offline'] };
+            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support'] };
             const closes = CLOSES[type];
             if (closes) {
                 const idx = f.open.findIndex(o => closes.includes(o.event_type));
                 if (idx >= 0) f.open.splice(idx, 1);
-            } else {
+            } else if (type !== 'correction') { // التصحيح حدث تدقيق — ليس حالة مفتوحة
                 f.open.push(synth);
             }
             f.lastEvent = synth;
@@ -401,6 +535,9 @@ class StaffingEventsService {
             if (!code || OFF_CODES.includes(code) || !validCodes.includes(code)) continue;
             (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, jobTitle: r.job_title || null });
         }
+
+        // SR-2: أُزيل جسر جدولة JSON نهائيًا — الكادر من shift_roster فقط.
+        // roster فارغ ⇒ كادر فارغ (صادق) حتى تتم مزامنة الجدولة عبر RosterSyncService.
 
         // طيّ أحداث staffing
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
@@ -453,11 +590,14 @@ class StaffingEventsService {
             }
         } catch (_) { /* بلا أحداث دعم */ }
 
+        // عقد الفصل: قرارات المشرف من جدول الحالة — المصدر الوحيد لحالة الفرق
+        const decisions = await this.getTeamDecisions(shiftId);
+
         const teams = {};
         const wf = { ...emptyWf };
         for (const t of teamRows) {
             const required = t.requiredPersonnel || 2;
-            const crew = crewByTeamId[t.id] || [];
+            const crew = crewByTeamId[t.id] || []; // SR-2: roster فقط — لا بديل
             const crewNames = new Set(crew.map(c => c.name));
             const members = [];
             const absentees = [];
@@ -513,31 +653,18 @@ class StaffingEventsService {
             });
             const vehicleOk = ownVehicleOk || supportVehicleOk;
 
-            const openTeamEv = teamOpen[t.name] || [];
-            const explicitOffline = openTeamEv.some(o => o.event_type === 'offline');
-            const hasRoster = crew.length > 0;
-
-            let status;
-            if (explicitOffline) {
-                status = 'offline';
-            } else if (!vehicleOk) {
-                status = 'offline';
-            } else if (hasRoster) {
-                if (activeCount === 0) status = 'offline';
-                else if (activeCount < required) status = 'missing';
-                else status = 'ready';
-            } else if (absentees.length > 0) {
-                status = 'missing'; // نقص مسجل بلا كادر مجدول معروف
-            } else if (supporters.length > 0) {
-                status = activeCount >= required ? 'ready' : 'missing';
-            } else {
-                // بلا كادر وبلا أحداث أشخاص: آخر قرار فريق من السجل (توافق قديم) أو بانتظار
-                const last = teamLastEvent[t.name];
-                status = (last && ['ready', 'missing', 'offline'].includes(last.event_type)) ? last.event_type : 'pending';
-            }
+            // عقد الفصل (بقرار المالك): الحالة التشغيلية = آخر قرار للمشرف من جدول
+            // shift_team_status — ولا تُشتق إطلاقًا من الغياب/التأخير/المركبة/الدعم.
+            // كل تلك الحقائق تبقى معروضة (members/absentees/vehicleOk/supporters)
+            // كمعلومة للمشرف، لكن لا يملك أي منها تغيير الحالة.
+            // الافتراضي قبل أي قرار: pending (لم يُكمَّل).
+            const decision = decisions[t.name] || null;
+            const status = decision ? decision.status : 'pending';
 
             teams[t.name] = {
                 status,
+                // يُحافظ على شكل الاستجابة الأصلي: سبب قرار الحالة (خارج الخدمة مثلًا) أو فارغ
+                reason: (decision && decision.reason) || '',
                 activeCount,
                 requiredPersonnel: required,
                 center: t.center || null,
@@ -547,7 +674,11 @@ class StaffingEventsService {
                 vehicleId: vehId,
                 vehicleStatus: vehSt,
                 vehicleOk,
-                supportVehicleIds
+                supportVehicleIds,
+                // بند 13: آخر قرار للمشرف (الحالة/السبب/من/متى) — يُعرض في التفاصيل/الـ Tooltip
+                lastDecision: decision
+                    ? { status: decision.status, reason: decision.reason || null, by: decision.updated_by || null, at: decision.updated_at || null }
+                    : null
             };
 
             // مجاميع القوى (تُشتق هنا فقط)

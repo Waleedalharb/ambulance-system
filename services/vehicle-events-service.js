@@ -233,6 +233,14 @@ class VehicleEventsService {
         return open;
     }
 
+    /** آخر حالة تشغيلية للمركبة من سجلها (نفس اشتقاق getBoard — آخر status يحكم). */
+    async _lastVehicleStatus(vehicleId) {
+        const events = await this.storage.getOperationalEventsByEntity(DOMAIN, vehicleId);
+        const f = foldEvents(events, DOMAIN)[0] || null;
+        const last = f ? [...f.open].reverse().find(o => o.status) : null;
+        return last ? last.status : null;
+    }
+
     /** إلحاق حدث دعم مختوم سيرفريًا (الكيان = المركبة، الفريق = المدعوم). */
     async _appendSupportEvent({ shift, vehicle, teamId, center, eventType, note, actor, homeTeamId }) {
         const payload = { source: 'vehicle-support-vb', kind: 'vehicle_support' };
@@ -265,6 +273,13 @@ class VehicleEventsService {
         const home = await this._openAssignment(vehicle.id);
         if (!home) {
             const err = new Error('المركبة غير معيّنة لفريق أصلي — عيّنها أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        // بند 14 (بقرار المالك): لا حالة مستحيلة — لا دعم بمركبة خارج الخدمة أو متعطلة
+        const vehStatus = await this._lastVehicleStatus(vehicle.id);
+        if (vehStatus === 'out_of_service' || vehStatus === 'breakdown') {
+            const err = new Error('لا يمكن إرسال مركبة خارج الخدمة أو متعطلة للدعم');
             err.statusCode = 400;
             throw err;
         }

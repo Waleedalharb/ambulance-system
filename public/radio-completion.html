@@ -11,8 +11,8 @@
 :root {
     --bg:#F8FAFC; --card:#FFFFFF; --border:#E2E8F0; --text:#1E293B; --muted:#64748B;
     --green:#10B981; --green-light:#ECFDF5; --yellow:#F59E0B; --yellow-light:#FFFBEB;
-    --red:#EF4444; --red-light:#FEF2F2; --gray:#94A3B8; --gray-light:#F1F5F9;
-    --primary:#2563EB; --gold:#FFD700;
+    --red:#EF4444; --red-light:#FEF2F2; --blue:#3B82F6; --blue-light:#EFF6FF;
+    --gray:#94A3B8; --gray-light:#F1F5F9; --primary:#2563EB; --gold:#FFD700;
     --shadow:0 4px 20px rgba(0,0,0,0.08);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -26,110 +26,162 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .btn-home { background:var(--primary); color:#fff; }
 .btn-print { background:var(--green); color:#fff; }
 
-/* Progress Dashboard */
-.dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; padding:1.5rem; max-width:1400px; margin:0 auto; }
-.dash-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem; text-align:center; box-shadow:var(--shadow); }
-.dash-card .value { font-size:2.5rem; font-weight:800; }
-.dash-card .label { font-size:0.85rem; color:var(--muted); margin-top:0.25rem; }
+/* Page Loading Overlay */
+.page-loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity 0.3s ease; }
+.page-loading-overlay.hidden { opacity:0; pointer-events:none; }
+.page-loading-overlay .spinner { width:50px; height:50px; border:4px solid #E2E8F0; border-top-color:#2563EB; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.page-loading-overlay .loading-text { color:#64748B; font-size:1rem; font-weight:600; }
+
+/* Live Dashboard — لوحة معلومات صغيرة تتحدث لحظيًا */
+.dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.75rem; padding:1rem 1.5rem 0.5rem; max-width:1400px; margin:0 auto; }
+.dash-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:0.85rem; text-align:center; box-shadow:var(--shadow); }
+.dash-card .value { font-size:1.8rem; font-weight:800; }
+.dash-card .label { font-size:0.75rem; color:var(--muted); margin-top:0.2rem; }
 .dash-card.green .value { color:var(--green); }
 .dash-card.yellow .value { color:var(--yellow); }
 .dash-card.red .value { color:var(--red); }
+.dash-card.blue .value { color:var(--blue); }
 .dash-card.gray .value { color:var(--gray); }
 
-.progress-bar { background:var(--gray-light); border-radius:12px; height:24px; overflow:hidden; margin-top:0.5rem; position:relative; }
+.progress-wrap { max-width:1400px; margin:0 auto; padding:0.5rem 1.5rem 1rem; }
+.progress-bar { background:var(--gray-light); border-radius:12px; height:24px; overflow:hidden; position:relative; }
 .progress-fill { height:100%; border-radius:12px; transition:width 0.5s ease, background 0.3s; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:#fff; }
 
-/* Section Headers */
-.section { max-width:1400px; margin:0 auto; padding:0 1.5rem 1.5rem; }
-.section-title { font-size:1.1rem; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; }
+/* Sections */
+.section { max-width:1400px; margin:0 auto; padding:0 1.5rem 1.25rem; }
+.section-title { font-size:1.05rem; font-weight:700; margin-bottom:0.85rem; display:flex; align-items:center; gap:0.5rem; }
 .section-title i { color:var(--gold); }
-
-/* Page Loading Overlay */
-.page-loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
-.page-loading-overlay.hidden { opacity: 0; pointer-events: none; }
-.page-loading-overlay .spinner { width: 50px; height: 50px; border: 4px solid #E2E8F0; border-top-color: #2563EB; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.page-loading-overlay .loading-text { color: #64748B; font-size: 1rem; font-weight: 600; }
+.section-empty { color:var(--muted); font-size:0.85rem; padding:0.75rem 0; }
 
 /* Cards Grid */
 .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 
-.team-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:1rem; cursor:pointer; transition:all 0.2s; position:relative; overflow:hidden; }
-.team-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
-
-.team-card .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
-.team-card .card-type { font-size:0.65rem; font-weight:700; padding:2px 8px; border-radius:8px; text-transform:uppercase; }
+.team-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:1rem; transition:box-shadow 0.2s; position:relative; overflow:hidden; }
+.team-card .card-type { font-size:0.65rem; font-weight:700; padding:2px 8px; border-radius:8px; display:inline-block; }
 .team-card .card-type.rapid { background:var(--yellow-light); color:#92400E; }
 .team-card .card-type.center { background:#DBEAFE; color:#1E40AF; }
-.team-card .card-name { font-size:1rem; font-weight:700; }
+.team-card .card-type.special { background:#F3E8FF; color:#7E22CE; }
+.team-card .card-name { font-size:1rem; font-weight:700; margin-top:0.45rem; }
+.team-card .card-center { font-size:0.65rem; color:var(--muted); margin-top:2px; }
 .team-card .card-status { font-size:0.75rem; font-weight:600; padding:4px 12px; border-radius:20px; display:inline-block; margin-top:0.5rem; }
-
-.team-card .paramedics { font-size:0.75rem; color:var(--muted); margin-top:0.5rem; min-height:2rem; }
+.team-card .paramedics { font-size:0.75rem; color:var(--muted); margin-top:0.5rem; min-height:1.6rem; }
 .team-card .paramedics .name { display:inline-block; background:var(--gray-light); padding:2px 8px; border-radius:6px; margin:2px; }
 
-/* Status Colors */
 .team-card.status-ready { border-color:var(--green); background:var(--green-light); }
 .team-card.status-ready .card-status { background:var(--green); color:#fff; }
-
 .team-card.status-missing { border-color:var(--yellow); background:var(--yellow-light); }
 .team-card.status-missing .card-status { background:var(--yellow); color:#fff; }
-
 .team-card.status-offline { border-color:var(--red); background:var(--red-light); }
 .team-card.status-offline .card-status { background:var(--red); color:#fff; }
-
 .team-card.status-pending { border-color:var(--gray); background:var(--gray-light); }
 .team-card.status-pending .card-status { background:var(--gray); color:#fff; }
 
-/* Reason Buttons (shown when missing) */
-.reason-bar { display:none; flex-direction:column; gap:6px; margin-top:0.5rem; }
-.team-card.status-missing .reason-bar { display:flex; }
-.reason-row { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
-.reason-btn { font-size:0.65rem; padding:3px 8px; border-radius:6px; border:none; cursor:pointer; background:#fff; color:var(--text); border:1px solid var(--border); }
-.reason-btn:hover { background:var(--yellow-light); border-color:var(--yellow); }
-.reason-btn.active { background:var(--yellow); color:#fff; }
+/* الغائب وسببه — ظاهر مباشرة على البطاقة بلا نوافذ */
+.miss-info { font-size:0.68rem; color:#92400E; margin-top:4px; font-weight:700; }
+.miss-info .btn-arrive { margin-inline-start:6px; font-size:0.62rem; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-family:inherit; background:var(--green); color:#fff; }
+.miss-info .btn-arrive:hover { filter:brightness(0.92); }
 
-/* Paramedic selector dropdown */
-.paramedic-select {
-    font-size:0.7rem; padding:3px 6px; border-radius:6px; border:1px solid var(--yellow);
-    background:#fff; color:var(--text); min-width:100px; cursor:pointer;
-}
-.paramedic-select:focus { outline:none; border-color:var(--primary); }
-.paramedic-label { font-size:0.65rem; color:var(--muted); margin-left:4px; }
+/* بند 15: سجل التأخير (بدأ/حضر/المدة) — عرض فقط من اشتقاق الخادم */
+.late-rec { display:block; font-size:0.62rem; color:#92400E; line-height:1.7; background:#FFFBEB; border-radius:6px; padding:2px 6px; margin-top:2px; }
+.late-rec .edit-time { border:none; background:none; cursor:pointer; font-size:0.62rem; padding:0 2px; }
 
-/* Quick Actions */
-.actions-bar { display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap; }
-.actions-bar .btn { font-size:0.65rem; padding:4px 10px; border-radius:6px; border:none; cursor:pointer; }
+/* أزرار البطاقة الثلاثة — ضغطة واحدة = إجراء واحد */
+.actions-bar { display:flex; gap:0.4rem; margin-top:0.6rem; }
+.actions-bar .btn { flex:1; font-size:0.68rem; padding:6px 4px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-family:inherit; transition:filter 0.15s; }
+.actions-bar .btn:hover { filter:brightness(0.92); }
 .btn-ready { background:var(--green); color:#fff; }
 .btn-missing { background:var(--yellow); color:#fff; }
 .btn-offline { background:var(--red); color:#fff; }
 
-/* Notes Section */
-.notes-section {
-    max-width:1400px; margin:0 auto; padding:0 1.5rem 1.5rem;
-}
-.notes-box {
-    background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem;
-    box-shadow:var(--shadow);
-}
-.notes-box h3 { font-size:1rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
-.notes-box h3 i { color:var(--primary); }
-.notes-box textarea {
-    width:100%; min-height:100px; padding:0.75rem; border-radius:8px;
-    border:1px solid var(--border); font-family:inherit; font-size:0.9rem;
-    resize:vertical; background:var(--bg);
-}
-.notes-box textarea:focus { outline:none; border-color:var(--primary); }
+/* سجل مصغر أسفل البطاقة (عرض فقط من السجل الرسمي) */
+.mini-log { margin-top:4px; padding-top:3px; border-top:1px dashed var(--border); font-size:0.62rem; color:var(--muted); line-height:1.6; }
+.mini-log:empty { display:none; }
+.mini-log .ml-item { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-/* Summary Panel */
-.summary-panel { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.5rem; margin-top:1rem; box-shadow:var(--shadow); }
-.summary-panel h3 { font-size:1rem; margin-bottom:1rem; }
-.summary-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-.summary-table th { background:var(--bg); padding:0.6rem; text-align:right; border-bottom:2px solid var(--border); }
-.summary-table td { padding:0.6rem; border-bottom:1px solid var(--border); }
-.summary-table .status-badge { padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; }
+/* بطاقات المركبات — ألوان حالة واضحة ونصوص قصيرة */
+.vehicle-card .v-status { font-size:0.72rem; font-weight:700; padding:4px 12px; border-radius:20px; display:inline-block; margin-top:0.5rem; }
+.vehicle-card .v-status.vs-active { background:var(--green); color:#fff; }
+.vehicle-card .v-status.vs-reserve { background:var(--blue); color:#fff; }
+.vehicle-card .v-status.vs-support { background:var(--yellow); color:#fff; }
+.vehicle-card .v-status.vs-out { background:var(--red); color:#fff; }
+.vehicle-card .v-status.vs-unset { background:var(--gray); color:#fff; }
+.vehicle-card .v-team { font-size:0.68rem; color:var(--text); margin-top:4px; font-weight:700; }
+.vehicle-card .v-reason { font-size:0.62rem; color:var(--muted); margin-top:2px; }
+.vehicle-card .v-actions { display:flex; gap:4px; margin-top:6px; }
+.vehicle-card .v-actions button { flex:1; font-size:0.65rem; padding:5px 3px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); cursor:pointer; font-weight:700; font-family:inherit; transition:all 0.15s; }
+.vehicle-card .v-actions button:hover { background:var(--primary); border-color:var(--primary); color:#fff; }
+.vehicle-card .v-actions button.v-end:hover { background:var(--red); border-color:var(--red); }
+
+/* النوافذ الصغيرة الوحيدة: نقص / سبب خارج الخدمة / اختيار فريق مركبة */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.modal-overlay.active { display:flex; }
+.modal-box { background:var(--card); border-radius:16px; padding:1.25rem; max-width:340px; width:90%; box-shadow:0 25px 50px rgba(0,0,0,0.25); border:1px solid var(--border); }
+.modal-box h3 { margin:0 0 8px; font-size:1rem; }
+.modal-box label { display:block; font-size:0.75rem; font-weight:700; color:var(--muted); margin-top:6px; }
+.modal-box select, .modal-box input { width:100%; padding:8px; margin:6px 0; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-family:inherit; font-size:0.85rem; }
+.modal-box .mm-actions { display:flex; gap:8px; margin-top:10px; }
+.modal-box .mm-actions button { flex:1; padding:9px; border:none; border-radius:10px; font-weight:700; font-size:0.85rem; cursor:pointer; font-family:inherit; }
+.mm-save { background:var(--primary); color:#fff; }
+.mm-save.red { background:var(--red); }
+.mm-cancel { background:var(--gray-light); color:var(--muted); }
+
+/* سؤال قرار الحالة بعد تسجيل نقص — خيارات مباشرة، النظام لا يفترض قرارًا */
+.decision-options { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+.decision-options button { width:100%; padding:9px; border:none; border-radius:10px; font-weight:700; font-size:0.85rem; cursor:pointer; font-family:inherit; }
+.decision-options .d-keep { background:var(--gray-light); color:var(--muted); }
+.decision-options .d-ready { background:var(--green); color:#fff; }
+.decision-options .d-missing { background:var(--yellow); color:#fff; }
+/* قفل الأزرار أثناء الطلب (بند 12) */
+.actions-bar .btn:disabled, .vehicle-card .v-actions button:disabled { opacity:0.45; cursor:not-allowed; filter:none; }
+
+/* Summary Modal (واسع — عرض فقط) */
+.modal-box.wide { max-width:700px; max-height:85vh; overflow-y:auto; padding:0; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; background:var(--bg); border-bottom:1px solid var(--border); border-radius:16px 16px 0 0; }
+.modal-header h2 { margin:0; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem; }
+.modal-header h2 i { color:var(--primary); }
+.modal-header .close { cursor:pointer; font-size:1.5rem; color:var(--muted); background:none; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.modal-header .close:hover { background:var(--red-light); color:var(--red); }
+.modal-body { padding:1.5rem; }
+.modal-footer { display:flex; gap:0.75rem; justify-content:center; padding:1rem 1.5rem 1.5rem; border-top:1px solid var(--border); }
+.modal-footer .btn { padding:0.5rem 1.25rem; border-radius:8px; border:none; cursor:pointer; font-size:0.85rem; font-weight:600; font-family:inherit; }
+
+.summary-table { width:100%; border-collapse:separate; border-spacing:0; font-size:0.85rem; border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+.summary-table th { background:var(--bg); padding:0.7rem; text-align:right; font-weight:700; border-bottom:2px solid var(--border); font-size:0.8rem; }
+.summary-table td { padding:0.7rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+.summary-table tr:last-child td { border-bottom:none; }
+.status-badge { padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; display:inline-block; }
 .badge-ready { background:var(--green-light); color:var(--green); }
 .badge-missing { background:var(--yellow-light); color:var(--yellow); }
 .badge-offline { background:var(--red-light); color:var(--red); }
+.badge-pending { background:var(--gray-light); color:var(--gray); }
+
+.modal-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin:1.25rem 0; }
+.modal-stat { background:var(--bg); border-radius:14px; padding:1rem; text-align:center; border:1px solid var(--border); }
+.modal-stat .value { font-size:1.7rem; font-weight:800; }
+.modal-stat .label { font-size:0.78rem; color:var(--muted); font-weight:600; }
+.modal-stat.green .value { color:var(--green); }
+.modal-stat.yellow .value { color:var(--yellow); }
+.modal-stat.red .value { color:var(--red); }
+.modal-notes { margin-top:1rem; padding:1rem; background:var(--yellow-light); border-radius:12px; border-right:4px solid var(--yellow); }
+.modal-notes .title { font-weight:700; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem; }
+.modal-notes .title i { color:var(--yellow); }
+.modal-notes .content { font-size:0.9rem; white-space:pre-wrap; line-height:1.6; }
+.modal-info { text-align:center; color:var(--muted); font-size:0.85rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); }
+
+/* Notes */
+.notes-section { max-width:1400px; margin:0 auto; padding:0 1.5rem 1.25rem; }
+.notes-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem; box-shadow:var(--shadow); }
+.notes-box h3 { font-size:1rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+.notes-box h3 i { color:var(--primary); }
+.notes-box textarea { width:100%; min-height:90px; padding:0.75rem; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:0.9rem; resize:vertical; background:var(--bg); }
+.notes-box textarea:focus { outline:none; border-color:var(--primary); }
+
+/* Finish */
+.finish-bar { display:flex; flex-direction:column; align-items:center; padding:1rem 2rem 2rem; gap:0.5rem; }
+.btn-finish { padding:1rem 3rem; font-size:1.1rem; font-weight:700; border-radius:16px; border:none; cursor:pointer; background:var(--primary); color:#fff; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
+.btn-finish:hover { transform:scale(1.03); }
+.btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
 
 /* Toast */
 .toast-container { position:fixed; top:1rem; left:1rem; z-index:300; }
@@ -138,75 +190,23 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .toast.error { background:var(--red); }
 @keyframes toastIn { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
 
-/* Finish Button */
-.finish-bar { display:flex; justify-content:center; padding:2rem; gap:1rem; }
-.btn-finish { padding:1rem 3rem; font-size:1.1rem; font-weight:700; border-radius:16px; border:none; cursor:pointer; background:var(--primary); color:#fff; box-shadow:var(--shadow); transition:all 0.2s; }
-.btn-finish:hover { transform:scale(1.05); }
-.btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
-
-/* Modal - Platform Identity Style */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
-.modal-overlay.active { display:flex; }
-.modal-box { background:var(--card); border-radius:20px; padding:0; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.25); border:1px solid var(--border); }
-.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; background:var(--bg); border-bottom:1px solid var(--border); border-radius:20px 20px 0 0; }
-.modal-header h2 { margin:0; font-size:1.25rem; display:flex; align-items:center; gap:0.5rem; }
-.modal-header h2 i { color:var(--primary); }
-.modal-header .close { cursor:pointer; font-size:1.5rem; color:var(--muted); background:none; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
-.modal-header .close:hover { background:var(--red-light); color:var(--red); }
-.modal-body { padding:1.5rem; }
-.modal-footer { display:flex; gap:0.75rem; justify-content:center; padding:1rem 1.5rem 1.5rem; border-top:1px solid var(--border); }
-
-/* Summary Table - Clean Platform Style */
-.summary-table { width:100%; border-collapse:separate; border-spacing:0; font-size:0.85rem; border-radius:12px; overflow:hidden; border:1px solid var(--border); }
-.summary-table th { background:var(--bg); padding:0.75rem; text-align:right; font-weight:700; color:var(--text); border-bottom:2px solid var(--border); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; }
-.summary-table td { padding:0.75rem; border-bottom:1px solid var(--border); vertical-align:middle; }
-.summary-table tr:last-child td { border-bottom:none; }
-.summary-table tr:hover td { background:var(--gray-light); }
-.summary-table .status-badge { padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; display:inline-block; }
-.badge-ready { background:var(--green-light); color:var(--green); }
-.badge-missing { background:var(--yellow-light); color:var(--yellow); }
-.badge-offline { background:var(--red-light); color:var(--red); }
-.badge-pending { background:var(--gray-light); color:var(--gray); }
-
-/* Stats Grid in Modal */
-.modal-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin:1.5rem 0; }
-.modal-stat { background:var(--bg); border-radius:16px; padding:1.25rem; text-align:center; border:1px solid var(--border); }
-.modal-stat .value { font-size:2rem; font-weight:800; margin-bottom:0.25rem; }
-.modal-stat .label { font-size:0.8rem; color:var(--muted); font-weight:600; }
-.modal-stat.green .value { color:var(--green); }
-.modal-stat.yellow .value { color:var(--yellow); }
-.modal-stat.red .value { color:var(--red); }
-
-/* Notes in Modal */
-.modal-notes { margin-top:1rem; padding:1rem; background:var(--yellow-light); border-radius:12px; border-right:4px solid var(--yellow); }
-.modal-notes .title { font-weight:700; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem; }
-.modal-notes .title i { color:var(--yellow); }
-.modal-notes .content { font-size:0.9rem; white-space:pre-wrap; line-height:1.6; }
-
-/* Modal Info Footer */
-.modal-info { text-align:center; color:var(--muted); font-size:0.85rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); }
-
 /* Print */
 @media print {
-    .top-bar, .finish-bar, .btn, .notes-section, .dashboard, .section, .toast-container { display:none !important; }
+    .top-bar, .finish-bar, .notes-section, .dashboard, .section, .toast-container, .actions-bar { display:none !important; }
     .modal-overlay { display:flex !important; position:static; background:transparent; }
-    .modal-box { box-shadow:none; border:1px solid #ccc; max-height:none; width:100%; max-width:100%; }
-    .modal-header { background:#f8fafc; border-bottom:2px solid #ccc; }
+    .modal-box.wide { box-shadow:none; border:1px solid #ccc; max-height:none; width:100%; max-width:100%; }
     .modal-footer { display:none !important; }
-    .team-card { break-inside:avoid; page-break-inside:avoid; }
     body { background:#fff; }
     .summary-table { border:1px solid #ccc; }
-    .summary-table th { background:#f1f5f9; }
 }
 
-/* Responsive */
 @media (max-width:768px) {
     .cards-grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
     .dashboard { grid-template-columns:repeat(2,1fr); }
     .modal-stats { grid-template-columns:1fr; }
-    .modal-box { width:95%; max-height:90vh; }
 }
 </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
@@ -224,7 +224,6 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 (function() {
     var token = AuthCore.getToken();
     if (!token && window.location.pathname.indexOf('login') === -1) {
-        // login.html does not exist — root serves index with the in-app login screen
         window.location.href = '/';
         return;
     }
@@ -247,120 +246,107 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 </div>
 
 <script>
-// Smooth navigation - preserve session
 function navigateToPage(url) {
     var overlay = document.getElementById('pageLoadingOverlay');
-    if (overlay) overlay.style.display = 'flex';
+    if (overlay) { overlay.classList.remove('hidden'); overlay.style.display = 'flex'; }
     setTimeout(function() { window.location.href = url; }, 100);
 }
 </script>
 
-<!-- Dashboard -->
+<!-- لوحة المعلومات — تتحدث لحظيًا من الخادم -->
 <div class="dashboard">
-    <div class="dash-card green">
-        <div class="value" id="countReady">0</div>
-        <div class="label">✅ جاهز</div>
-    </div>
-    <div class="dash-card yellow">
-        <div class="value" id="countMissing">0</div>
-        <div class="label">⚠️ ناقص</div>
-    </div>
-    <div class="dash-card red">
-        <div class="value" id="countOffline">0</div>
-        <div class="label">🔴 خارج الخدمة</div>
-    </div>
-    <div class="dash-card gray">
-        <div class="value" id="countPending">0</div>
-        <div class="label">⏳ باقي</div>
-    </div>
+    <div class="dash-card green"><div class="value" id="dashReady">—</div><div class="label">✅ فرق جاهزة</div></div>
+    <div class="dash-card yellow"><div class="value" id="dashMissing">—</div><div class="label">⚠️ فرق ناقصة</div></div>
+    <div class="dash-card red"><div class="value" id="dashOffline">—</div><div class="label">🔴 فرق خارج الخدمة</div></div>
+    <div class="dash-card blue"><div class="value" id="dashVehSupport">—</div><div class="label">🤝 مركبات داعمة</div></div>
+    <div class="dash-card gray"><div class="value" id="dashVehOut">—</div><div class="label">⛔ مركبات خارج الخدمة</div></div>
+    <div class="dash-card green"><div class="value" id="dashReadyPct">—</div><div class="label">📊 نسبة الجاهزية</div></div>
 </div>
-<div class="section">
+<div class="progress-wrap">
     <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width:0%; background:var(--gray);">0%</div>
+        <div class="progress-fill" id="progressFill" style="width:0%; background:var(--gray);">—</div>
     </div>
 </div>
 
 <!-- Rapid Teams -->
-<div class="section">
+<div class="section" id="rapidSection" style="display:none">
     <div class="section-title"><i class="fas fa-bolt"></i> فرق التدخل السريع</div>
     <div class="cards-grid" id="rapidCards"></div>
 </div>
 
 <!-- Centers -->
-<div class="section">
+<div class="section" id="centersSection" style="display:none">
     <div class="section-title"><i class="fas fa-hospital"></i> مراكز الإسعاف</div>
     <div class="cards-grid" id="centerCards"></div>
 </div>
 
 <!-- Special Teams -->
-<div class="section">
+<div class="section" id="specialSection" style="display:none">
     <div class="section-title"><i class="fas fa-users"></i> الفرق الخاصة</div>
     <div class="cards-grid" id="specialCards"></div>
 </div>
 
-<!-- Vehicles (W1-D) — عرض فوق السجل الرسمي: العدادات والحالة مشتقة سيرفريًا -->
-<style>
-    .mini-log { margin-top:4px; padding-top:3px; border-top:1px dashed var(--border,#333); font-size:0.62rem; color:var(--muted); line-height:1.6; min-height:0; }
-    .mini-log:empty { display:none; }
-    .mini-log .ml-item { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .vehicle-card { cursor:pointer; }
-    .vehicle-card .card-status { font-weight:700; }
-    .vehicle-card.st-active .card-status { color:var(--success,#28c76f); }
-    .vehicle-card.st-reserve .card-status { color:var(--warning,#ff9f43); }
-    .vehicle-card.st-breakdown .card-status { color:var(--danger,#ea5455); }
-    .vehicle-card.st-out_of_service .card-status { color:var(--gray,#82868b); }
-    .vehicle-card .v-reason { font-size:0.62rem; color:var(--muted); margin-top:2px; }
-    /* V-B ①: إجراءات التعيين/النقل/الإنهاء */
-    .vehicle-card .v-actions { display:flex; gap:4px; margin-top:6px; }
-    .vehicle-card .v-actions button { flex:1; font-size:0.62rem; padding:3px 4px; border:1px solid var(--border,#333); border-radius:6px; background:transparent; color:var(--text,#eee); cursor:pointer; }
-    .vehicle-card .v-actions button:hover { background:var(--primary,#2563eb); border-color:var(--primary,#2563eb); color:#fff; }
-    .vehicle-card .v-actions button.v-end:hover { background:var(--danger,#ea5455); border-color:var(--danger,#ea5455); }
-    #vehicleAssignModal .modal-box, #vehicleStatusModal .modal-box { max-width:340px; }
-    #vehicleAssignModal select, #vehicleAssignModal input, #vehicleStatusModal input { width:100%; padding:8px; margin:6px 0; border:1px solid var(--border,#333); border-radius:8px; background:var(--bg,#1e1e1e); color:var(--text,#eee); font-family:inherit; }
-    .vs-options { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:6px 0; }
-    .vs-options button { padding:8px 4px; font-size:0.75rem; border:1px solid var(--border,#333); border-radius:8px; background:transparent; color:var(--text,#eee); cursor:pointer; font-family:inherit; }
-    .vs-options button:hover { border-color:var(--primary,#2563eb); }
-    .vs-options button.vs-selected { background:var(--primary,#2563eb); border-color:var(--primary,#2563eb); color:#fff; font-weight:700; }
-    .vs-options button .vs-current { display:block; font-size:0.58rem; opacity:0.75; }
-</style>
+<div class="section" id="teamsLoadingNote">
+    <div class="section-empty"><i class="fas fa-circle-notch fa-spin"></i> جارٍ تحميل فرق المناوبة من الخادم…</div>
+</div>
+
+<!-- Vehicles -->
 <div class="section" id="vehiclesSection">
     <div class="section-title"><i class="fas fa-ambulance"></i> المركبات</div>
-    <div class="dashboard">
-        <div class="dash-card green"><div class="value" id="vehActive">0</div><div class="label">🚑 عاملة</div></div>
-        <div class="dash-card yellow"><div class="value" id="vehReserve">0</div><div class="label">🔄 احتياط</div></div>
-        <div class="dash-card red"><div class="value" id="vehBreakdown">0</div><div class="label">🛠️ متعطلة</div></div>
-        <div class="dash-card gray"><div class="value" id="vehOut">0</div><div class="label">🔴 خارج الخدمة</div></div>
-    </div>
     <div class="cards-grid" id="vehicleCards"></div>
-    <!-- V-B ①: المركبات غير المعيّنة — تُملأ من board.unassigned (اشتقاق سيرفري) -->
     <div id="unassignedVehiclesWrap" style="display:none">
         <div class="section-title" style="font-size:0.85rem;margin-top:12px"><i class="fas fa-warehouse"></i> مركبات غير معيّنة</div>
         <div class="cards-grid" id="unassignedVehicleCards"></div>
     </div>
+    <div class="section-empty" id="vehiclesEmpty" style="display:none">لا توجد مركبات مسجلة في هذه المناوبة.</div>
 </div>
 
-<!-- V-B ①: نموذج تعيين/نقل مركبة — الاختيار من الفرق القادمة من الخادم فقط -->
-<div class="modal-overlay" id="vehicleAssignModal">
+<!-- نموذج النقص — النافذة الوحيدة للفرق: موظف + سبب ثم حفظ -->
+<div class="modal-overlay" id="missingModal">
     <div class="modal-box">
-        <h3 id="vehicleAssignTitle" style="margin:0 0 8px;font-size:1rem">تعيين مركبة</h3>
-        <select id="vehicleAssignTeam"></select>
-        <input id="vehicleAssignNote" placeholder="ملاحظة (اختياري)">
-        <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn-finish" style="flex:1;background:var(--primary)" onclick="confirmVehicleAssign()"><i class="fas fa-check"></i> تأكيد</button>
-            <button class="btn-finish" style="flex:1;background:var(--muted,#82868b)" onclick="closeVehicleAssignModal()"><i class="fas fa-times"></i> إلغاء</button>
+        <h3 id="missingTitle">تسجيل نقص</h3>
+        <label for="missingEmployee"><i class="fas fa-user"></i> الموظف (من طاقم الفرقة)</label>
+        <select id="missingEmployee"></select>
+        <label for="missingReason"><i class="fas fa-circle-question"></i> السبب</label>
+        <select id="missingReason"></select>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmMissing()"><i class="fas fa-check"></i> حفظ</button>
+            <button class="mm-cancel" onclick="closeMissingModal()"><i class="fas fa-times"></i> إلغاء</button>
         </div>
     </div>
 </div>
 
-<!-- V-B ②: نموذج تغيير حالة المركبة — اختيار مباشر لأي حالة في أي وقت (كل تغيير حدث جديد، آخر حدث يمثل الحالة) -->
-<div class="modal-overlay" id="vehicleStatusModal">
+<!-- سؤال سبب الخروج من الخدمة — مربع صغير فقط، يظهر عند إلزامية السبب -->
+<div class="modal-overlay" id="offlineModal">
     <div class="modal-box">
-        <h3 id="vehicleStatusTitle" style="margin:0 0 8px;font-size:1rem">تغيير حالة المركبة</h3>
-        <div class="vs-options" id="vehicleStatusOptions"></div>
-        <input id="vehicleStatusReason" placeholder="السبب (إلزامي عند العطل/الإخراج من الخدمة)" style="display:none">
-        <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn-finish" style="flex:1;background:var(--primary)" onclick="confirmVehicleStatus()"><i class="fas fa-check"></i> تأكيد</button>
-            <button class="btn-finish" style="flex:1;background:var(--muted,#82868b)" onclick="closeVehicleStatusModal()"><i class="fas fa-times"></i> إلغاء</button>
+        <h3 id="offlineTitle">خارج الخدمة</h3>
+        <label for="offlineReason"><i class="fas fa-circle-question"></i> السبب</label>
+        <input id="offlineReason" placeholder="مثال: عطل مركبة">
+        <div class="mm-actions">
+            <button class="mm-save red" onclick="confirmOffline()"><i class="fas fa-check"></i> حفظ</button>
+            <button class="mm-cancel" onclick="closeOfflineModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- سؤال قرار الحالة بعد تسجيل نقص (بند 9) — النظام لا يفترض قرارًا نيابة عن المشرف -->
+<div class="modal-overlay" id="decisionModal">
+    <div class="modal-box">
+        <h3 id="decisionTitle">تم تسجيل الحدث</h3>
+        <p id="decisionText" style="font-size:0.8rem;color:var(--muted);margin-top:2px">هل تريد تغيير حالة الفرقة؟</p>
+        <div class="decision-options" id="decisionOptions"></div>
+    </div>
+</div>
+
+<!-- منتقي الفريق الصغير للمركبات — تعيين/نقل/دعم -->
+<div class="modal-overlay" id="vehicleTeamModal">
+    <div class="modal-box">
+        <h3 id="vehicleTeamTitle">تعيين مركبة</h3>
+        <label for="vehicleTeamSelect"><i class="fas fa-users"></i> الفريق</label>
+        <select id="vehicleTeamSelect"></select>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmVehicleTeam()"><i class="fas fa-check"></i> حفظ</button>
+            <button class="mm-cancel" onclick="closeVehicleTeamModal()"><i class="fas fa-times"></i> إلغاء</button>
         </div>
     </div>
 </div>
@@ -369,14 +355,14 @@ function navigateToPage(url) {
 <div class="notes-section">
     <div class="notes-box">
         <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل</h3>
-        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="globalNotes=this.value; saveNotesDebounced();"></textarea>
+        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="saveNotesDebounced();"></textarea>
     </div>
 </div>
 
-<!-- Summary View Button (Auto-save active - no manual save needed) -->
+<!-- Summary Button -->
 <div class="finish-bar">
-    <button class="btn-finish" id="finishBtn" onclick="finishShift()" style="background:var(--primary)"><i class="fas fa-eye"></i> عرض الملخص</button>
-    <div id="autoSaveIndicator" style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">
+    <button class="btn-finish" id="finishBtn" onclick="finishShift()"><i class="fas fa-eye"></i> عرض الملخص</button>
+    <div style="font-size:0.75rem;color:var(--muted);">
         <i class="fas fa-sync fa-spin" style="display:none" id="saveSpinner"></i>
         <span id="saveStatus">يتم الحفظ تلقائياً...</span>
     </div>
@@ -384,14 +370,14 @@ function navigateToPage(url) {
 
 <!-- Summary Modal -->
 <div class="modal-overlay" id="summaryModal">
-    <div class="modal-box">
+    <div class="modal-box wide">
         <div class="modal-header">
             <h2><i class="fas fa-flag-checkered"></i> ملخص تكميل المناوبة</h2>
             <button class="close" onclick="document.getElementById('summaryModal').classList.remove('active')">&times;</button>
         </div>
         <div class="modal-body" id="summaryContent"></div>
         <div class="modal-footer">
-            <button class="btn btn-print" onclick="printSummary()"><i class="fas fa-print"></i> طباعة الملخص</button>
+            <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة الملخص</button>
             <button class="btn btn-home" onclick="document.getElementById('summaryModal').classList.remove('active')"><i class="fas fa-times"></i> إغلاق</button>
         </div>
     </div>
@@ -400,11 +386,26 @@ function navigateToPage(url) {
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
-// ============================================
-// CONFIGURATION
-// ============================================
-var centerNumbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
-var centerList = centerNumbers.map(function(n) { return 'جنوب ' + n; });
+// ============================================================
+// تكميل سريع — واجهة مُعاد بناؤها فوق نفس المعمارية المستقرة.
+// لا منطق أعمال هنا: كل حالة تُشتق سيرفريًا (SSOT)، الواجهة ترسل
+// أحداثًا بالعقد الموجود وتعيد الجلب ثم تعرض فقط.
+// العقود المستخدمة (بلا أي تعديل):
+//   GET  /api/current-shift
+//   GET  /api/staffing/state?shift_id=      (الفرق + القوى — SSOT)
+//   GET  /api/staffing/timeline             (سجل الأحداث المصغر)
+//   GET  /api/vehicles/board                (المركبات — اشتقاق سيرفري)
+//   GET  /api/teams                         (أسماء الفرق لمنتقي المركبات)
+//   GET  /api/completion/latest             (الملاحظات المحفوظة)
+//   POST /api/shift-completion {events[], notes?}  (ready/offline/absence/late)
+//   POST /api/vehicles/assignment | /assignment/switch | /support | /support/end
+//   SSE  /api/sse  (vehicles_updated / staffing_events_updated /
+//                   completion_updated / team_status_changed / roster_synced)
+// ============================================================
+
+// ------------------------------------
+// CONFIG
+// ------------------------------------
 var rapidTeams = [
     { name: 'rapid_1', displayName: 'تدخل سريع 1' },
     { name: 'rapid_2', displayName: 'تدخل سريع 2' },
@@ -412,92 +413,202 @@ var rapidTeams = [
     { name: 'rapid_4', displayName: 'تدخل سريع 4' },
     { name: 'rapid_5', displayName: 'تدخل سريع 5' }
 ];
+var centerList = [];
+for (var ci = 1; ci <= 16; ci++) centerList.push('جنوب ' + ci);
+var specialTeams = [
+    { id: 'بنك_الدم', name: 'بنك الدم' },
+    { id: 'إجازة', name: 'الإجازة' },
+    { id: 'قائد_ميداني', name: 'القائد الميداني' },
+    { id: 'تحكم_تنسيق', name: 'التحكم والتنسيق' },
+    { id: 'دعم_لوجستي', name: 'الدعم اللوجستي' },
+    { id: 'باص_استجابة', name: 'باص الاستجابة' },
+    { id: 'المنتدبين', name: 'المنتدبين' }
+];
+var OPERATIONAL_TEAMS = {};
+rapidTeams.forEach(function(t) { OPERATIONAL_TEAMS[t.name] = true; });
+centerList.forEach(function(c) { OPERATIONAL_TEAMS[c] = true; });
 
-// ============================================
-// TEAM → CENTER MAPPING (for Coverage & Archive)
-// ============================================
 var TEAM_CENTER_MAP = {
-    'rapid_1': 'المنصورة',
-    'rapid_2': 'الشفاء',
-    'rapid_3': 'المنصورة',
-    'جنوب 1': 'المنصورة',
-    'جنوب 2': 'الخالدية',
-    'جنوب 3': 'منفوحة',
-    'جنوب 4': 'الدار البيضاء',
-    'جنوب 5': 'الدار البيضاء',
-    'جنوب 6': 'الإسكان',
-    'جنوب 7': 'الحائر',
-    'جنوب 8': 'الشفاء',
-    'جنوب 9': 'عكاظ',
-    'جنوب 10': 'ديراب',
-    'جنوب 11': 'المنصورة',
-    'جنوب 12': 'المنصورة',
-    'جنوب 13': 'المنصورة',
-    'جنوب 14': 'المنصورة',
-    'جنوب 15': 'المنصورة',
-    'جنوب 16': 'المنصورة'
+    'rapid_1': 'المنصورة', 'rapid_2': 'الشفاء', 'rapid_3': 'المنصورة',
+    'جنوب 1': 'المنصورة', 'جنوب 2': 'الخالدية', 'جنوب 3': 'منفوحة',
+    'جنوب 4': 'الدار البيضاء', 'جنوب 5': 'الدار البيضاء', 'جنوب 6': 'الإسكان',
+    'جنوب 7': 'الحائر', 'جنوب 8': 'الشفاء', 'جنوب 9': 'عكاظ',
+    'جنوب 10': 'ديراب', 'جنوب 11': 'المنصورة', 'جنوب 12': 'المنصورة',
+    'جنوب 13': 'المنصورة', 'جنوب 14': 'المنصورة', 'جنوب 15': 'المنصورة', 'جنوب 16': 'المنصورة'
 };
 
-function getTeamCenter(teamId) {
-    return TEAM_CENTER_MAP[teamId] || 'غير محدد';
+var STATUS_LABELS = { ready: '✅ جاهزة', missing: '⚠️ ناقصة', offline: '🔴 خارج الخدمة', pending: '⏳ باقي' };
+// أسباب النقص المعتمدة — كل سبب يُترجم لحدث شخص في السجل الرسمي:
+// غياب/تكليف/إجازة = absence (الموظف غير متاح) ، تأخير = late.
+var MISSING_REASONS = ['غياب', 'تأخير', 'تكليف', 'إجازة'];
+var MISSING_REASON_EVENT = { 'غياب': 'absence', 'تأخير': 'late', 'تكليف': 'absence', 'إجازة': 'absence' };
+
+var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
+
+// ------------------------------------
+// STATE (كلها قراءة فقط من الخادم — لا مصدر محلي)
+// ------------------------------------
+var serverTeamsState = null;   // فرق مشتقة سيرفريًا من /api/staffing/state
+var serverWorkforce = null;    // مجاميع القوى المشتقة سيرفريًا
+var vehiclesBoard = null;      // لوحة المركبات المشتقة سيرفريًا
+var vbTeamsCache = null;       // فرق /api/teams (أسماء + مراكز لمنتقي المركبات)
+var staffingEvents = [];       // سجل الأحداث المصغر (/api/staffing/timeline)
+var lateRecords = [];          // بند 15: سجلات التأخير المشتقة سيرفريًا (بدأ/حضر/المدة)
+
+// ------------------------------------
+// UTILS
+// ------------------------------------
+function showToast(msg, type) {
+    if (window.ToastCore && ToastCore.show) { ToastCore.show(msg, type, 3000); return; }
+    var c = document.getElementById('toastContainer');
+    if (!c) return;
+    var t = document.createElement('div');
+    t.className = 'toast ' + (type || '');
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(function() { t.remove(); }, 3000);
+}
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+function authHeaders() {
+    var t = AuthCore.getToken();
+    return t ? { 'Authorization': 'Bearer ' + t } : null;
+}
+function displayNameOf(teamId) {
+    var r = rapidTeams.find(function(t) { return t.name === teamId; });
+    if (r) return r.displayName;
+    var s = specialTeams.find(function(t) { return t.id === teamId; });
+    if (s) return s.name;
+    return teamId;
+}
+function getTeamCenter(teamId) { return TEAM_CENTER_MAP[teamId] || ''; }
+// يطابق canonicalTeamId في الخادم: rapid_N / تدخل سريع N ⇒ «سريع N»
+function serverTeamKey(teamId) {
+    var m = String(teamId).match(/^(?:rapid_|تدخل سريع\s*)(\d+)$/);
+    if (m) return 'سريع ' + parseInt(m[1], 10);
+    return String(teamId);
 }
 
-// teamStatus: { teamId: { status, reason, missingPerson, paramedics[] } }
-var teamStatus = {};
-var smartScheduleData = [];
+// ------------------------------------
+// SHIFT DETECTION (Saudi Time - Asia/Riyadh)
+// ------------------------------------
+function getSaudiTime() {
+    var now = new Date();
+    var parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Riyadh',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    }).formatToParts(now);
+    var y, m, d, h, min, s;
+    parts.forEach(function(p) {
+        if (p.type === 'year') y = p.value;
+        if (p.type === 'month') m = p.value;
+        if (p.type === 'day') d = p.value;
+        if (p.type === 'hour') h = p.value;
+        if (p.type === 'minute') min = p.value;
+        if (p.type === 'second') s = p.value;
+    });
+    return new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':' + s);
+}
+function getShiftType() {
+    if (window.overrideShiftType) return window.overrideShiftType;
+    if (window.activeShiftContext && window.activeShiftContext.type) return window.activeShiftContext.type;
+    var hour = getSaudiTime().getHours();
+    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+}
+function getShiftDate() {
+    if (window.overrideShiftDate) return window.overrideShiftDate;
+    if (window.activeShiftContext && window.activeShiftContext.date) return window.activeShiftContext.date;
+    var st = getSaudiTime();
+    var y = st.getFullYear(), m = st.getMonth(), d = st.getDate(), hour = st.getHours();
+    if (hour < 5) {
+        d = d - 1;
+        if (d < 1) {
+            m = m - 1;
+            if (m < 0) { m = 11; y = y - 1; }
+            var daysInMonth = [31, (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            d = daysInMonth[m];
+        }
+    }
+    return y + '-' + (m + 1).toString().padStart(2, '0') + '-' + d.toString().padStart(2, '0');
+}
+function getShiftTimeStr() {
+    var st = getSaudiTime();
+    return st.getHours().toString().padStart(2, '0') + ':' + st.getMinutes().toString().padStart(2, '0');
+}
 
-var STATUS_CYCLE = ['pending', 'ready', 'missing', 'offline'];
-var STATUS_LABELS = { ready: '✅ جاهز', missing: '⚠️ ناقص', offline: '🔴 خارج الخدمة', pending: '⏳ باقي' };
-var REASONS = [
-    { label: 'لا يوجد سائق', needsName: false },
-    { label: 'مسعف غائب', needsName: true },
-    { label: 'مسعف متأخر', needsName: true },
-    { label: 'مركبة عاطلة', needsName: false },
-    { label: 'نقص معدات', needsName: false },
-    { label: 'سبب آخر', needsName: false }
-];
-var globalNotes = '';
+// ------------------------------------
+// SHIFT ID (من الخادم فقط — لا اشتقاق محلي للمناوبة النشطة)
+// ------------------------------------
+var _cachedShiftId = null;
+function getCurrentShiftId() {
+    if (_cachedShiftId) return _cachedShiftId;
+    var stored = localStorage.getItem('currentShiftId');
+    if (stored) {
+        var parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return null;
+}
+function fetchCurrentShiftId() {
+    var token = AuthCore.getToken() || '';
+    return fetch('/api/current-shift', { headers: token ? { 'Authorization': 'Bearer ' + token } : {} })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.shift && data.shift.id) {
+                _cachedShiftId = data.shift.id;
+                localStorage.setItem('currentShiftId', String(data.shift.id));
+                applyActiveShiftContext(data.shift);
+                return data.shift.id;
+            }
+            if (data.success) {
+                _cachedShiftId = null;
+                window.activeShiftContext = null;
+                try { localStorage.removeItem('currentShiftId'); } catch (e) {}
+            }
+            return getCurrentShiftId();
+        })
+        .catch(function() { return getCurrentShiftId(); });
+}
+function applyActiveShiftContext(shift) {
+    if (!shift || !shift.id) return;
+    if (window.overrideShiftDate) return; // وضع تحرير الأرشيف — أولوية للـ URL
+    window.activeShiftContext = { id: shift.id, type: shift.type, date: shift.date };
+    var badge = document.getElementById('shiftBadge');
+    if (badge && shift.type && shift.date) {
+        badge.textContent = shift.type + ' — ' + shift.date + ' (مناوبة نشطة #' + shift.id + ')';
+    }
+}
 
-// ============================================
-// LIVE SYNC (SSE) — OV-S6: قناة لحظية واحدة
-// حُوّل النقل من WebSocket إلى EventSource على /api/sse (نفس قناة app.js).
-// ملاحظة توثيقية: لم يكن لهذه الصفحة onmessage أصلاً (لم تستقبل شيئاً)،
-// ورسالتا team_status_changed/completion_saved اللتان كانتا تُرسلان عبر WS
-// لم يكن الخادم يعالجهما إطلاقاً (سلسلة ميتة — موثقة في تقرير OV-S6).
-// ============================================
+// ------------------------------------
+// LIVE SYNC (SSE) — قناة لحظية واحدة: أي تغيير في السجل الرسمي
+// ⇒ إعادة جلب الحالة المشتقة من الخادم ثم عرضها. لا حساب محلي.
+// ------------------------------------
 var sseSync = null;
-var sseConnected = false;
-
 function getRadioToken() {
-    // OV-S6: مفتاح التوكن الموحد — auth_access_token أولاً ثم authToken احتياطاً
     return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
 }
-
 function initLiveSync() {
     var token = getRadioToken();
     if (!token) return;
-    if (sseSync) {
-        try { sseSync.close(); } catch(e) {}
-        sseSync = null;
-    }
+    if (sseSync) { try { sseSync.close(); } catch (e) {} sseSync = null; }
     sseSync = new EventSource('/api/sse?token=' + encodeURIComponent(token));
-    sseSync.onopen = function() { sseConnected = true; };
-    // W1-D: أول استهلاك فعلي لهذه الصفحة — تحديث العرض فقط عند أحداث السجل الرسمي
-    // (مركبات/أفراد/تكميل). لا منطق أعمال: إعادة جلب من الخادم ثم عرض.
     sseSync.onmessage = function(ev) {
         try {
             var data = JSON.parse(ev.data);
             if (!data || !data.type) return;
-            if (data.type === 'vehicles_updated') loadVehiclesBoard();
-            else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated') loadStaffingLog();
+            if (data.type === 'vehicles_updated') { loadVehiclesBoard(); loadStaffingState(); }
+            else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated' || data.type === 'team_status_changed') { loadStaffingState(); loadStaffingLog(); }
+            else if (data.type === 'roster_synced') { loadStaffingState(); }
         } catch (e) { /* إطار غير JSON — يُتجاهل */ }
     };
     sseSync.onerror = function() {
-        sseConnected = false;
         if (sseSync && sseSync.readyState === EventSource.CLOSED) {
-            // Auth failure - try refresh token then reconnect
-            console.log('🔴 Radio SSE auth failed, refreshing token...');
-            try { sseSync.close(); } catch(e) {}
+            try { sseSync.close(); } catch (e) {}
             sseSync = null;
             fetch('/api/auth/refresh', {
                 method: 'POST',
@@ -509,800 +620,639 @@ function initLiveSync() {
                 if (data.success && data.token) {
                     localStorage.setItem('authToken', data.token);
                     localStorage.setItem('auth_access_token', data.token);
-                    console.log('✅ Radio SSE token refreshed, reconnecting...');
                     setTimeout(initLiveSync, 1000);
-                } else {
-                    throw new Error('no token');
-                }
-            }).catch(function(e) {
-                console.error('❌ Radio SSE token refresh failed:', e);
+                } else { throw new Error('no token'); }
+            }).catch(function() {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('auth_access_token');
                 localStorage.removeItem('currentUser');
                 setTimeout(initLiveSync, 5000);
             });
-            return;
         }
-        // EventSource يعيد الاتصال تلقائياً للأخطاء العابرة
+        // EventSource يعيد الاتصال تلقائيًا للأخطاء العابرة
     };
 }
 
-// سلسلة ميتة موثقة (OV-S6): الخادم لا يعالج team_status_changed/completion_saved
-// إطلاقاً (لا handler في ws.on('message'))، فكانت هذه الدوال لا-عملية فعلياً.
-// تُبقى كـ no-ops حفاظاً على المستدعين مع توثيق الجذر بدل إخفائه.
-function broadcastTeamStatus(teamId, status) {
-    // no-op — كان يرسل عبر WS رسالة لا يعالجها الخادم
-}
-
-function broadcastCompletionSaved() {
-    // no-op — كان يرسل عبر WS رسالة لا يعالجها الخادم
-}
-
-// ============================================
-// SHIFT DETECTION (Saudi Time - Asia/Riyadh)
-// ============================================
-function getSaudiTime() {
-    // Use Intl.DateTimeFormat for precise Saudi timezone (UTC+3, no DST)
-    var now = new Date();
-    var parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Asia/Riyadh',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-    }).formatToParts(now);
-    
-    var y, m, d, h, min, s;
-    parts.forEach(function(p) {
-        if (p.type === 'year') y = p.value;
-        if (p.type === 'month') m = p.value;
-        if (p.type === 'day') d = p.value;
-        if (p.type === 'hour') h = p.value;
-        if (p.type === 'minute') min = p.value;
-        if (p.type === 'second') s = p.value;
-    });
-    
-    return new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':' + s);
-}
-function getShiftType() {
-    if (window.overrideShiftType) return window.overrideShiftType;
-    // OV-S6-01: المناوبة النشطة مصدر الحقيقة — لا اشتقاق من ساعة الجدار إلا في وضع التحضير
-    if (window.activeShiftContext && window.activeShiftContext.type) return window.activeShiftContext.type;
-    var hour = getSaudiTime().getHours();
-    // Morning shift: 05:00 - 16:59
-    // Night shift: 17:00 - 04:59
-    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
-}
-function getShiftDate() {
-    if (window.overrideShiftDate) return window.overrideShiftDate;
-    if (window.activeShiftContext && window.activeShiftContext.date) return window.activeShiftContext.date;
-    var st = getSaudiTime();
-    var y = st.getFullYear();
-    var m = st.getMonth(); // 0-indexed
-    var d = st.getDate();
-    var hour = st.getHours();
-    
-    // Night shift runs 17:00 - 04:59 and belongs to the PREVIOUS day
-    // e.g., 01:26 on July 5 = still Night Shift of July 4
-    if (hour < 5) {
-        d = d - 1;
-        // Handle month/year boundary
-        if (d < 1) {
-            m = m - 1;
-            if (m < 0) { m = 11; y = y - 1; }
-            // Days in month (simplified for EMS needs, accurate enough)
-            var daysInMonth = [31, (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            d = daysInMonth[m];
-        }
-    }
-    
-    return y + '-' + (m + 1).toString().padStart(2, '0') + '-' + d.toString().padStart(2, '0');
-}
-function getShiftTimeStr() {
-    var st = getSaudiTime();
-    var h = st.getHours().toString().padStart(2,'0');
-    var min = st.getMinutes().toString().padStart(2,'0');
-    return h + ':' + min;
-}
-
-// ============================================
-// SHIFT ID HELPER (async — fetches from server)
-// ============================================
-var _cachedShiftId = null;
-
-function getCurrentShiftId() {
-    // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
-    // هذا التابع «تلميح متزامن» فقط: لا يُستدعى إلا من fetchCurrentShiftId بعد
-    // محاولة التحقق من /api/current-shift. عند تعذّر الاتصال يُبقي آخر قيمة
-    // معروفة بدل إسقاطها إلى «لا مناوبة» زائفة، ولا يُنشئ مناوبة منه إطلاقاً.
-    // (لا يُعتمد في الذاكرة الدائمة — _cachedShiftId لا يُضبط إلا من رد الخادم)
-    if (_cachedShiftId) return _cachedShiftId;
-    // تلميح من الـ cache عند تعذّر الوصول للخادم فقط
-    var stored = localStorage.getItem('currentShiftId');
-    if (stored) {
-        try { var parsed = parseInt(stored); if (!isNaN(parsed) && parsed > 0) { return parsed; } } catch(e) {}
-    }
-    return null;
-}
-
-async function fetchCurrentShiftId() {
-    // Fetch from server API
-    try {
-        var token = AuthCore.getToken() || '';
-        var res = await fetch('/api/current-shift', {
-            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
-        });
-        var data = await res.json();
-        if (data.success && data.shift && data.shift.id) {
-            _cachedShiftId = data.shift.id;
-            localStorage.setItem('currentShiftId', String(data.shift.id));
-            console.log('[fetchCurrentShiftId] From server:', data.shift.id);
-            // OV-S6-01: adopt the active shift's type/date as page context (SSOT)
-            applyActiveShiftContext(data.shift);
-            return data.shift.id;
-        }
-        // Server confirmed: no active shift → prep mode. Clear any stale id.
-        if (data.success) {
-            _cachedShiftId = null;
-            window.activeShiftContext = null;
-            try { localStorage.removeItem('currentShiftId'); } catch(e) {}
-        }
-    } catch (e) {
-        console.error('[fetchCurrentShiftId] Error:', e);
-    }
-    return getCurrentShiftId();
-}
-
-// OV-S6-01: عند وجود مناوبة نشطة تُعتمد قيم صفها (النوع/التاريخ كما هما بلا توحيد)
-// في الشارة والقراءة والحفظ، ويُمنع اشتقاق ساعة الجدار. وضع تحرير الأرشيف
-// (overrideShiftDate من URL) له الأولوية ولا يُمس.
-function applyActiveShiftContext(shift) {
-    if (!shift || !shift.id) return;
-    if (window.overrideShiftDate) return; // وضع تحرير الأرشيف — أولوية للـ URL
-    window.activeShiftContext = { id: shift.id, type: shift.type, date: shift.date };
-    var badge = document.getElementById('shiftBadge');
-    if (badge && shift.type && shift.date) {
-        badge.textContent = shift.type + ' — ' + shift.date + ' (مناوبة نشطة #' + shift.id + ')';
-    }
-}
-
-// ============================================
-// INIT
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
-    initStatuses();
-    loadFromSmartSchedule();
-    initLiveSync();
-    loadStaffingLog();   // W1-D: سجل الأفراد المصغر (عرض فقط من السجل الرسمي)
-    loadVehiclesBoard(); // W1-D: لوحة المركبات (اشتقاق سيرفري)
-
-    // Phase 2+3: Fetch current shift_id from server on load
-    fetchCurrentShiftId().then(function(sid) {
-        console.log('[Init] Shift ID from server:', sid);
-    });
-    
-    // Check for URL params (from archive edit)
-    var urlParams = new URLSearchParams(window.location.search);
-    var dateParam = urlParams.get('date');
-    var typeParam = urlParams.get('type');
-    if (dateParam) {
-        // Override shift detection for editing past shifts
-        window.overrideShiftDate = dateParam;
-        window.overrideShiftType = typeParam || getShiftType();
-        document.getElementById('shiftBadge').textContent = window.overrideShiftType + ' — ' + dateParam + ' (أرشيف)';
-    }
-});
-
-function initStatuses() {
-    rapidTeams.forEach(function(t) {
-        teamStatus[t.name] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-    });
-    centerList.forEach(function(c) {
-        teamStatus[c] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-    });
-    // Special teams
-    var specialTeams = ['بنك_الدم', 'إجازة', 'قائد_ميداني', 'تحكم_تنسيق', 'دعم_لوجستي', 'باص_استجابة', 'المنتدبين'];
-    specialTeams.forEach(function(t) {
-        teamStatus[t] = { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-    });
-    renderAll();
-    // Load saved completion from server after paramedics are assigned
-    setTimeout(loadSavedCompletion, 500);
-}
-
-// ============================================
-// LOAD PARAMEDICS FROM SMART SCHEDULE
-// ============================================
-function loadFromSmartSchedule() {
-    // F6: Server-First — الخادم (/api/schedule/employees) هو المصدر الأول دائماً (جلب صامت).
-    // نجاح غير فارغ ← يُعتمد + write-through للكاشين؛ نجاح فارغ (= لا بيانات رُفعت بعد) أو فشل شبكة/مصادقة أو لا توكن ← الكاش.
-    var token = AuthCore.getToken();
-    var serverFetch = token
-        ? fetch('/api/schedule/employees', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(result) {
-            if (result && result.success && Array.isArray(result.employees) && result.employees.length > 0) {
-                return result.employees;
-            }
-            return null;
-        })
-        .catch(function(e) {
-            console.warn('[F6] تعذر جلب الموظفين من الخادم — السقوط للكاش:', e);
-            return null;
-        })
-        : Promise.resolve(null);
-
-    serverFetch.then(function(serverEmployees) {
-        if (serverEmployees) {
-            smartScheduleData = serverEmployees;
-            assignParamedics();
-            renderAll();
-            // F6: write-through — تحديث الكاشين تلقائياً بعد نجاح الاتصال (كانت localStorage فقط)
-            writeEmployeesToCaches(serverEmployees);
-            // After paramedics loaded, try loading saved completion (كما كان في المسار الخادمي)
-            loadSavedCompletion();
-            return;
-        }
-        // Fallback فقط عند فشل/فراغ الخادم: IndexedDB ثم localStorage
-        loadFromIndexedDBFallback();
-    });
-}
-
-// F6: كتابة الكاشين (IndexedDB + localStorage) بعد نجاح الجلب الخادمي
-function writeEmployeesToCaches(list) {
-    try { localStorage.setItem('ss_employees', JSON.stringify(list)); } catch(e) {}
-    try {
-        var req = indexedDB.open('SmartScheduleDB_v13', 3);
-        req.onupgradeneeded = function(e) {
-            var db = e.target.result;
-            if (!db.objectStoreNames.contains('employees')) {
-                db.createObjectStore('employees', { keyPath: 'id' });
-            }
-        };
-        req.onsuccess = function(e) {
-            var db = e.target.result;
-            if (!db.objectStoreNames.contains('employees')) { db.close(); return; }
-            var tx = db.transaction('employees', 'readwrite');
-            var store = tx.objectStore('employees');
-            store.clear();
-            for (var i = 0; i < list.length; i++) store.put(list[i]);
-            tx.oncomplete = function() { db.close(); };
-        };
-    } catch(e) {}
-}
-
-// F6: قراءة الكاش — تُستدعى فقط بعد فشل/فراغ الخادم (كانت نقطة الدخول الأولى قبل F6)
-function loadFromIndexedDBFallback() {
-    try {
-        var req = indexedDB.open('SmartScheduleDB_v13', 2);
-        req.onsuccess = function(e) {
-            var db = e.target.result;
-            if (!db.objectStoreNames.contains('employees')) {
-                tryLocalStorageFallback();
-                return;
-            }
-            var tx = db.transaction('employees', 'readonly');
-            var store = tx.objectStore('employees');
-            var getReq = store.getAll();
-            getReq.onsuccess = function(e) {
-                var employees = e.target.result || [];
-                db.close();
-                if (employees.length === 0) { tryLocalStorageFallback(); return; }
-                smartScheduleData = employees;
-                assignParamedics();
-                renderAll();
-            };
-            getReq.onerror = function() { db.close(); tryLocalStorageFallback(); };
-        };
-        req.onerror = function() { tryLocalStorageFallback(); };
-    } catch(err) { tryLocalStorageFallback(); }
-}
-
-function tryLocalStorageFallback() {
-    var data = localStorage.getItem('ss_employees');
-    if (data) {
-        try {
-            var employees = JSON.parse(data);
-            if (Array.isArray(employees) && employees.length > 0) {
-                smartScheduleData = employees;
-                assignParamedics();
-                renderAll();
-                return;
-            }
-        } catch(e) {}
-    }
-    showNoScheduleData();
-}
-
-// F6: الحالة الفارغة — نفس رسالة/توست اليوم حرفياً (كانت في tryServerFallback المحذوفة)
-function showNoScheduleData() {
-    showToast('⚠️ لا يوجد بيانات في نظام الجداول. ارفع ملف Excel أولاً.', 'error');
-    renderAll();
-}
-
-// ============================================
-// LOAD SAVED COMPLETION FROM SERVER
-// ============================================
-function loadSavedCompletion() {
-    var token = AuthCore.getToken();
-    console.log('[loadSavedCompletion] Token:', token ? 'exists' : 'missing');
-    if (!token) return;
-    
-    var shiftType = getShiftType();
-    var shiftDate = getShiftDate();
-    console.log('[loadSavedCompletion] Loading for:', shiftDate, shiftType);
-    
-    // Phase 2+3: Fetch shift_id from server first
-    fetchCurrentShiftId().then(function(shiftId) {
-        var url = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
-        if (shiftId) url += '&shift_id=' + shiftId;
-        return fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
-    })
-    .then(function(r) { 
-        console.log('[loadSavedCompletion] Response status:', r.status);
-        return r.json(); 
-    })
-    .then(function(result) {
-        console.log('[loadSavedCompletion] Response:', result);
-        if (result.success && result.completion && result.completion.teams) {
-            var savedTeams = result.completion.teams;
-            Object.keys(savedTeams).forEach(function(teamId) {
-                if (teamStatus[teamId]) {
-                    teamStatus[teamId].status = savedTeams[teamId].status || 'pending';
-                    teamStatus[teamId].reason = savedTeams[teamId].reason || '';
-                    teamStatus[teamId].missingPerson = savedTeams[teamId].missingPerson || '';
-                    teamStatus[teamId].paramedics = savedTeams[teamId].paramedics || [];
-                }
-            });
-            // Load notes
-            if (result.completion.notes) {
-                document.getElementById('globalNotes').value = result.completion.notes;
-                globalNotes = result.completion.notes;
-            }
-            // If server returned shift_id, store it for future saves
-            if (result.shift_id || result.completion.shift_id) {
-                var sid = result.shift_id || result.completion.shift_id;
-                console.log('[loadSavedCompletion] Storing shift_id from server:', sid);
-                // OV-S5: كتابة الـ cache بعد تأكيد الخادم فقط — المصدر الوحيد للحقيقة هو الخادم
-                localStorage.setItem('currentShiftId', String(sid));
-            }
-            renderAll();
-            showToast('✅ تم تحميل التكميل المحفوظ لهذه المناوبة', 'success');
-        } else {
-            console.log('[loadSavedCompletion] No saved completion found');
-        }
-    })
-    .catch(function(e) {
-        console.error('[loadSavedCompletion] Error:', e);
-    });
-}
-
-// Normalize team name from various formats to internal key
-function normalizeTeamName(rawName) {
-    var name = String(rawName || '').trim();
-    // Convert Arabic-Indic numerals to Western numerals
-    var arabicToWestern = {
-        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
-        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
-    };
-    var normalized = name.split('').map(function(c) { return arabicToWestern[c] || c; }).join('');
-    // Direct fallback: explicit Arabic names (most common case)
-    if (normalized === 'تدخل سريع 1') return 'rapid_1';
-    if (normalized === 'تدخل سريع 2') return 'rapid_2';
-    if (normalized === 'تدخل سريع 3') return 'rapid_3';
-    if (normalized === 'تدخل سريع 4') return 'rapid_4';
-    if (normalized === 'تدخل سريع 5') return 'rapid_5';
-    if (normalized.indexOf('جنوب') !== -1) {
-        var m = normalized.match(/(\d+)/);
-        if (m) return 'جنوب ' + parseInt(m[1]);
-    }
-    // Special teams (including variations from Excel)
-    if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
-    if (normalized === 'المنتدبين') return 'المنتدبين';
-    if (normalized === 'مناوبو بنك الدم') return 'بنك_الدم';  // ← Excel full name
-    if (normalized === 'بنك الدم') return 'بنك_الدم';
-    if (normalized === 'الاجازة') return 'إجازة';  // ← Excel uses Alif-lam variant
-    if (normalized === 'الإجازة') return 'إجازة';
-    if (normalized === 'إجازة') return 'إجازة';
-    if (normalized === 'التحكم والتنسيق') return 'تحكم_تنسيق';
-    if (normalized === 'الدعم اللوجستي') return 'دعم_لوجستي';
-    if (normalized === 'مناوبو باص الاستجابة') return 'باص_استجابة';
-    if (normalized === 'المنتدبين') return 'المنتدبين';
-    // Direct match (already normalized)
-    if (teamStatus[normalized]) return normalized;
-    // Try to find by checking all rapid team display names
-    for (var i = 0; i < rapidTeams.length; i++) {
-        if (rapidTeams[i].displayName === normalized || rapidTeams[i].name === normalized) {
-            return rapidTeams[i].name;
-        }
-    }
-    return normalized; // fallback
-}
-
-function assignParamedics() {
-    var shiftType = getShiftType();
-    var todayDate = getShiftDate();
-    var availableDates = [];
-    var dateSet = {};
-
-    smartScheduleData.forEach(function(emp) {
-        (emp.schedule || []).forEach(function(s) {
-            if (s.date && !dateSet[s.date]) {
-                dateSet[s.date] = true;
-                availableDates.push(s.date);
-            }
-        });
-    });
-    availableDates.sort();
-
-    var targetDate = todayDate;
-    if (availableDates.indexOf(todayDate) === -1 && availableDates.length > 0) {
-        targetDate = availableDates[0];
-        showToast('⚠️ جدول اليوم غير موجود، يُعرض تاريخ: ' + targetDate, 'error');
-    }
-
-    if (availableDates.length === 0) return;
-
-    smartScheduleData.forEach(function(emp) {
-        var rawTeamName = String(emp.team || '').trim();
-        var teamId = normalizeTeamName(rawTeamName);
-        
-        if (!teamId || !teamStatus[teamId]) {
-            // Log unmapped teams for debugging
-            console.log('[assignParamedics] Unmapped team:', rawTeamName, '→ normalized:', teamId);
-            return;
-        }
-        
-        var hasShift = false;
-        (emp.schedule || []).forEach(function(s) {
-            if (s.date === targetDate) {
-                var code = String(s.shiftCode || s.shift || '').toUpperCase();
-                var dayCodes = ['D','D12','M','ME','D10','D11','D8','D6','CPD','CP8'];
-                var nightCodes = ['N','N12','LN8','LN10','CPN','N10','N11','N8','N6'];
-                var sharedCodes = ['CP24','F','O12','O10','O6'];
-                if (shiftType === 'صباح' && dayCodes.indexOf(code) !== -1) hasShift = true;
-                if (shiftType === 'ليل' && nightCodes.indexOf(code) !== -1) hasShift = true;
-                if (sharedCodes.indexOf(code) !== -1) hasShift = true;
-            }
-        });
-
-        if (hasShift) {
-            if (!teamStatus[teamId].paramedics) teamStatus[teamId].paramedics = [];
-            teamStatus[teamId].paramedics.push(String(emp.name || ''));
-        }
-    });
-    
-    console.log('[assignParamedics] Assigned teams:', Object.keys(teamStatus).filter(function(k) { return teamStatus[k].paramedics && teamStatus[k].paramedics.length > 0; }));
-}
-
-// ============================================
-// RENDER
-// ============================================
-function renderAll() {
-    renderRapidCards();
-    renderCenterCards();
-    renderSpecialCards();
-    updateDashboard();
-    renderMiniLogs(); // W1-D: سجل مصغر أسفل كل بطاقة (عرض فقط من السجل الرسمي)
-}
-
-function renderRapidCards() {
-    var container = document.getElementById('rapidCards');
-    if (!container) return;
-    var html = '';
-    rapidTeams.forEach(function(t) {
-        var status = teamStatus[t.name] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-        // Only show teams that have paramedics on this shift
-        if (!status.paramedics || status.paramedics.length === 0) return;
-        html += renderCard(t.displayName, t.name, 'rapid', status);
-    });
-    container.innerHTML = html;
-}
-
-function renderCenterCards() {
-    var container = document.getElementById('centerCards');
-    if (!container) return;
-    var html = '';
-    centerList.forEach(function(c) {
-        var status = teamStatus[c] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-        // Only show centers that have paramedics on this shift
-        if (!status.paramedics || status.paramedics.length === 0) return;
-        html += renderCard(c, c, 'center', status);
-    });
-    container.innerHTML = html;
-}
-
-function renderSpecialCards() {
-    var container = document.getElementById('specialCards');
-    if (!container) return;
-    var specialTeams = [
-        { id: 'بنك_الدم', name: 'بنك الدم' },
-        { id: 'إجازة', name: 'الإجازة' },
-        { id: 'قائد_ميداني', name: 'القائد الميداني' },
-        { id: 'تحكم_تنسيق', name: 'التحكم والتنسيق' },
-        { id: 'دعم_لوجستي', name: 'الدعم اللوجستي' },
-        { id: 'باص_استجابة', name: 'باص الاستجابة' },
-        { id: 'المنتدبين', name: 'المنتدبين' }
-    ];
-    var html = '';
-    specialTeams.forEach(function(t) {
-        var status = teamStatus[t.id] || { status: 'pending', reason: '', missingPerson: '', paramedics: [] };
-        // Only show special teams that have paramedics on this shift
-        if (!status.paramedics || status.paramedics.length === 0) return;
-        html += renderCard(t.name, t.id, 'special', status);
-    });
-    container.innerHTML = html;
-}
-
-function renderCard(name, teamId, type, status) {
-    var paramedics = (status.paramedics || []).filter(function(n) { return n; });
-    var paramedicsHtml = paramedics.length > 0
-        ? paramedics.map(function(p) { return '<span class="name">' + p + '</span>'; }).join('')
-        : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
-
-    // Build reason buttons with paramedic selector for needsName reasons
-    var reasonsHtml = '';
-    REASONS.forEach(function(r) {
-        var active = status.reason === r.label ? 'active' : '';
-        var rowHtml = '<button class="reason-btn ' + active + '" onclick="setReason(\'' + teamId + '\', \'' + r.label + '\'); event.stopPropagation();">' + r.label + '</button>';
-
-        // If this reason needs a name and it's selected, show dropdown
-        if (r.needsName && status.reason === r.label) {
-            var selectHtml = '<select class="paramedic-select" onclick="event.stopPropagation();" onchange="setMissingPerson(\'' + teamId + '\', this.value); event.stopPropagation();">' +
-                '<option value="">اختر المسعف...</option>';
-            paramedics.forEach(function(p) {
-                var selected = status.missingPerson === p ? ' selected' : '';
-                selectHtml += '<option value="' + p + '"' + selected + '>' + p + '</option>';
-            });
-            selectHtml += '</select>';
-            rowHtml += selectHtml;
-        }
-
-        reasonsHtml += '<div class="reason-row">' + rowHtml + '</div>';
-    });
-
-    var centerName = getTeamCenter(teamId);
-    var centerHtml = centerName !== 'غير محدد' ? '<div style="font-size:0.65rem; color:var(--muted); margin-top:2px;"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
-    
-    return '<div class="team-card status-' + status.status + '" onclick="cycleStatus(\'' + teamId + '\')">' +
-        '<div class="card-header">' +
-            '<span class="card-type ' + type + '">' + (type === 'rapid' ? '⚡ سريع' : '🏥 مركز') + '</span>' +
-        '</div>' +
-        '<div class="card-name">' + name + '</div>' +
-        centerHtml +
-        '<div class="card-status">' + STATUS_LABELS[status.status] + '</div>' +
-        '<div class="paramedics">' + paramedicsHtml + '</div>' +
-        '<div class="reason-bar">' + reasonsHtml + '</div>' +
-        '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
-    '</div>';
-}
-
-// ============================================
-// INTERACTIONS
-// ============================================
-function cycleStatus(teamId) {
-    var current = teamStatus[teamId] || { status: 'pending' };
-    var idx = STATUS_CYCLE.indexOf(current.status);
-    var nextIdx = (idx + 1) % STATUS_CYCLE.length;
-    var nextStatus = STATUS_CYCLE[nextIdx];
-
-    teamStatus[teamId].status = nextStatus;
-    if (nextStatus !== 'missing') {
-        teamStatus[teamId].reason = '';
-        teamStatus[teamId].missingPerson = '';
-    }
-
-    renderAll();
-    broadcastTeamStatus(teamId, nextStatus);
-    showToast(nameOfTeam(teamId) + ' — ' + STATUS_LABELS[nextStatus], nextStatus === 'ready' ? 'success' : '');
-    
-    // Auto-save to server (silent) so changes reflect immediately in all systems
-    saveToServer(true);
-}
-
-function setReason(teamId, reason) {
-    if (!teamStatus[teamId]) teamStatus[teamId] = { status: 'missing', reason: '', missingPerson: '', paramedics: [] };
-    teamStatus[teamId].reason = reason;
-    teamStatus[teamId].missingPerson = '';
-    renderAll();
-    triggerAutoSave();
-}
-
-function setMissingPerson(teamId, personName) {
-    if (!teamStatus[teamId]) return;
-    teamStatus[teamId].missingPerson = personName;
-    renderAll();
-    triggerAutoSave();
-}
-
-// ============================================
-// W1-D: سجل الأفراد المصغر + لوحة المركبات (عرض فقط — الاشتقاق سيرفري بالكامل)
-// لا حساب حالة هنا: العدادات والحالات تُعرض كما تصل من الخادم (SSOT).
-// ============================================
-var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
-var w1dStaffingEvents = [];
-var VEHICLE_STATUS_ORDER = ['active', 'reserve', 'breakdown', 'out_of_service'];
-var VEHICLE_STATUS_LABELS = { active: '🚑 عاملة', reserve: '🔄 احتياط', breakdown: '🛠️ متعطلة', out_of_service: '🔴 خارج الخدمة' };
-
-function w1dAuthHeaders() {
-    var t = AuthCore.getToken();
-    return t ? { 'Authorization': 'Bearer ' + t } : null;
+// ------------------------------------
+// LOADERS — كلها جلب من الخادم ثم عرض (لا منطق أعمال)
+// ------------------------------------
+function loadStaffingState() {
+    var h = authHeaders();
+    if (!h) return Promise.resolve();
+    return fetchCurrentShiftId().then(function(sid) {
+        var url = '/api/staffing/state' + (sid ? '?shift_id=' + encodeURIComponent(sid) : '');
+        return fetch(url, { headers: h });
+    }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+        if (!d || !d.success) return;
+        serverTeamsState = d.teams || {};
+        serverWorkforce = d.workforce || null;
+        renderAll();
+    }).catch(function() { /* عرض فقط — الفشل صامت، يعاد عبر SSE/المؤقت */ });
 }
 
 function loadStaffingLog() {
-    var h = w1dAuthHeaders(); if (!h) return;
+    var h = authHeaders();
+    if (!h) return;
     fetch('/api/staffing/timeline', { headers: h })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
             if (!d || !d.success) return;
-            w1dStaffingEvents = d.events || [];
+            staffingEvents = d.events || [];
+            lateRecords = d.lateRecords || []; // بند 15 — مشتقة سيرفريًا بالكامل
             renderMiniLogs();
-        }).catch(function() { /* عرض فقط — الفشل صامت */ });
-}
-
-function renderMiniLogs() {
-    var byTeam = {};
-    w1dStaffingEvents.forEach(function(e) {
-        if (!e.team_id) return;
-        (byTeam[e.team_id] = byTeam[e.team_id] || []).push(e);
-    });
-    Object.keys(teamStatus).forEach(function(teamId) {
-        var el = document.getElementById('miniLog_' + teamId);
-        if (!el) return;
-        el.innerHTML = (byTeam[teamId] || []).slice(-3).map(function(e) {
-            var t = (e.created_at || '').slice(11, 16);
-            var who = e.entity_id ? ' — ' + e.entity_id : '';
-            return '<span class="ml-item">' + t + ' ' + (W1D_EVENT_LABELS[e.event_type] || e.event_type) + who + '</span>';
-        }).join('');
-    });
+        }).catch(function() { /* عرض فقط */ });
 }
 
 function loadVehiclesBoard() {
-    var h = w1dAuthHeaders(); if (!h) return;
+    var h = authHeaders();
+    if (!h) return;
     fetch('/api/vehicles/board', { headers: h })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
             if (!d || !d.success) return;
-            // V-B ②: أسماء الفرق لشارات الدعم — تُجلب مرة واحدة من الخادم
-            if (vbTeamsCache) { renderVehiclesBoard(d); return; }
-            fetch('/api/teams', { headers: h })
-                .then(function(r2) { return r2.ok ? r2.json() : null; })
-                .then(function(t) { vbTeamsCache = (t && t.teams) || []; })
-                .catch(function() { /* تُعرض الأرقام */ })
-                .finally(function() { renderVehiclesBoard(d); });
+            vehiclesBoard = d;
+            renderVehiclesBoard();
+            updateDashboard();
         }).catch(function() { /* عرض فقط */ });
 }
 
-function teamNameOf(id) {
-    var t = (vbTeamsCache || []).find(function(x) { return Number(x.id) === Number(id); });
-    return t ? t.name : ('فريق ' + id);
+function loadTeams() {
+    var h = authHeaders();
+    if (!h) return Promise.resolve();
+    return fetch('/api/teams', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) { vbTeamsCache = (d && d.teams) || []; })
+        .catch(function() { vbTeamsCache = vbTeamsCache || []; });
 }
 
-function renderVehiclesBoard(board) {
-    var c = board.counters || {};
-    document.getElementById('vehActive').textContent = c.active || 0;
-    document.getElementById('vehReserve').textContent = c.reserve || 0;
-    document.getElementById('vehBreakdown').textContent = c.breakdown || 0;
-    document.getElementById('vehOut').textContent = c.out_of_service || 0;
-    var container = document.getElementById('vehicleCards');
-    if (!container) return;
-    container.innerHTML = (board.vehicles || []).map(function(v) {
-        var st = v.status || 'unset';
-        var nm = String(v.name).replace(/'/g, "\\'");
-        var reasonHtml = v.reason ? '<div class="v-reason">' + v.reason + '</div>' : '';
-        // V-B ①: أزرار النقل/الإنهاء — إجراءات عبر مسارات الخادم فقط (بلا حساب محلي)
-        // V-B ②: زر الدعم/إنهاء الدعم + شارة «يدعم» — المركبة تبقى لفريقها الأصلي
-        var supBadge = v.supportingTeamId != null ? '<div class="v-reason">🤝 يدعم: ' + teamNameOf(v.supportingTeamId) + '</div>' : '';
-        var supBtn = v.supportingTeamId != null
-            ? '<button class="v-end" onclick="event.stopPropagation(); endVehicleSupport(\'' + v.id + '\', \'' + nm + '\')"><i class="fas fa-times"></i> إنهاء الدعم</button>'
-            : '<button onclick="event.stopPropagation(); openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'support\', ' + v.teamId + ')"><i class="fas fa-handshake"></i> دعم</button>';
-        var actions = '<div class="v-actions">' +
-            '<button onclick="event.stopPropagation(); openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')"><i class="fas fa-exchange-alt"></i> نقل</button>' +
-            supBtn +
-            '<button class="v-end" onclick="event.stopPropagation(); endVehicleAssignment(\'' + v.id + '\', \'' + nm + '\')"><i class="fas fa-unlink"></i> إنهاء</button>' +
-        '</div>';
-        return '<div class="team-card vehicle-card st-' + st + '" onclick="openVehicleStatusModal(\'' + v.id + '\', \'' + st + '\', \'' + nm + '\')">' +
-            '<div class="card-name">' + v.name + '</div>' +
-            '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
-            reasonHtml + supBadge + actions +
-        '</div>';
-    }).join('');
-    // V-B ①: غير المعيّنة — من board.unassigned (اشتقاق سيرفري) + زر تعيين
-    var wrap = document.getElementById('unassignedVehiclesWrap');
-    var uGrid = document.getElementById('unassignedVehicleCards');
-    var list = board.unassigned || [];
-    if (wrap && uGrid) {
-        wrap.style.display = list.length ? '' : 'none';
-        uGrid.innerHTML = list.map(function(v) {
-            var st = v.status || 'unset';
-            var nm = String(v.name).replace(/'/g, "\\'");
-            return '<div class="team-card vehicle-card st-' + st + '">' +
-                '<div class="card-name">' + v.name + '</div>' +
-                '<div class="card-status">' + (VEHICLE_STATUS_LABELS[st] || '⏳ لم تُحدد') + '</div>' +
-                '<div class="v-actions">' +
-                    '<button onclick="openVehicleAssignModal(\'' + v.id + '\', \'' + nm + '\', \'assign\')"><i class="fas fa-link"></i> تعيين</button>' +
-                '</div>' +
-            '</div>';
+function loadSavedNotes() {
+    var h = authHeaders();
+    if (!h) return;
+    var shiftType = getShiftType(), shiftDate = getShiftDate();
+    fetchCurrentShiftId().then(function(shiftId) {
+        var url = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
+        if (shiftId) url += '&shift_id=' + shiftId;
+        return fetch(url, { headers: h });
+    }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(result) {
+        if (result && result.success && result.completion && result.completion.notes) {
+            document.getElementById('globalNotes').value = result.completion.notes;
+        }
+        if (result && (result.shift_id || (result.completion && result.completion.shift_id))) {
+            var sid = result.shift_id || result.completion.shift_id;
+            localStorage.setItem('currentShiftId', String(sid));
+        }
+    }).catch(function() { /* الملاحظات عرض فقط */ });
+}
+</script>
+
+<script>
+// ------------------------------------
+// RENDER — فرق المناوبة الحالية فقط (أي فريق بلا أفراد مجدولين لا يظهر)
+// ------------------------------------
+function rosterDataOf(teamId) {
+    if (!serverTeamsState) return null;
+    return serverTeamsState[serverTeamKey(teamId)] || null;
+}
+function teamInCurrentRoster(teamId) {
+    var d = rosterDataOf(teamId);
+    return !!(d && (d.members || []).length > 0);
+}
+
+function renderAll() {
+    renderTeamSections();
+    updateDashboard();
+    renderMiniLogs();
+}
+
+function renderTeamSections() {
+    var note = document.getElementById('teamsLoadingNote');
+    if (!serverTeamsState) {
+        if (note) note.style.display = '';
+        return; // لم تصل حالة الخادم بعد
+    }
+    if (note) note.style.display = 'none';
+    renderTeamSection('rapidSection', 'rapidCards',
+        rapidTeams.map(function(t) { return { id: t.name, name: t.displayName, type: 'rapid' }; }));
+    renderTeamSection('centersSection', 'centerCards',
+        centerList.map(function(c) { return { id: c, name: c, type: 'center' }; }));
+    renderTeamSection('specialSection', 'specialCards',
+        specialTeams.map(function(t) { return { id: t.id, name: t.name, type: 'special' }; }));
+}
+
+function renderTeamSection(sectionId, gridId, teams) {
+    var section = document.getElementById(sectionId);
+    var grid = document.getElementById(gridId);
+    if (!section || !grid) return;
+    var html = '';
+    teams.forEach(function(t) {
+        if (!teamInCurrentRoster(t.id)) return; // ليس في جدول المناوبة — لا يظهر إطلاقًا
+        html += renderCard(t.id, t.name, t.type, rosterDataOf(t.id));
+    });
+    grid.innerHTML = html;
+    section.style.display = html ? '' : 'none';
+}
+
+function renderCard(teamId, name, type, d) {
+    var status = (d && d.status) || 'pending';
+    var members = d ? (d.members || []) : [];
+    var paramedicsHtml = members.length > 0
+        ? members.map(function(m) { return '<span class="name">' + escapeHtml(m.name) + '</span>'; }).join('')
+        : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
+
+    // عدم إخفاء المعلومات: الغائب/المتأخر وسببه يظهران مباشرة على البطاقة
+    // بند 15: زر «✋ حضر» بضغطة واحدة — الخادم يختم الوقت تلقائيًا، ولا يمس حالة الفرقة
+    var missInfoHtml = '';
+    var absentees = (d && d.absentees) || [];
+    if (absentees.length > 0) {
+        missInfoHtml = absentees.map(function(a) {
+            var nm = String(a.name).replace(/'/g, "\\'");
+            return '<div class="miss-info">👤 ' + escapeHtml(a.name) + (a.reason ? ' — السبب: ' + escapeHtml(a.reason) : '') +
+                ' <button class="btn-arrive" onclick="personArrived(\'' + teamId + '\', \'' + nm + '\')">✋ حضر</button></div>';
         }).join('');
+    }
+
+    var centerName = getTeamCenter(teamId);
+    var centerHtml = centerName ? '<div class="card-center"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
+    var typeLabel = type === 'rapid' ? '⚡ سريع' : type === 'center' ? '🏥 مركز' : '👥 خاصة';
+
+    // الأزرار الثلاثة مباشرة على البطاقة — ضغطة واحدة = إجراء واحد (الوحدات التشغيلية)
+    var actionsHtml = OPERATIONAL_TEAMS[teamId]
+        ? '<div class="actions-bar" data-team="' + teamId + '">' +
+            '<button class="btn btn-ready" onclick="cardSetReady(\'' + teamId + '\')">🟢 جاهزة</button>' +
+            '<button class="btn btn-missing" onclick="openMissingModal(\'' + teamId + '\')">🟡 ناقصة</button>' +
+            '<button class="btn btn-offline" onclick="cardSetOffline(\'' + teamId + '\')">🔴 خارج الخدمة</button>' +
+          '</div>'
+        : '';
+
+    // بند 13: آخر قرار للمشرف (من الخادم) — في الـ Tooltip، ليس على البطاقة
+    var ld = d && d.lastDecision;
+    var titleAttr = ld
+        ? ' title="آخر قرار: ' + (STATUS_LABELS[ld.status] || ld.status) +
+          (ld.by ? ' · بواسطة: ' + ld.by : '') +
+          (ld.at ? ' · الساعة: ' + String(ld.at).slice(11, 16) : '') + '"'
+        : '';
+
+    return '<div class="team-card status-' + status + '"' + titleAttr + '>' +
+        '<span class="card-type ' + type + '">' + typeLabel + '</span>' +
+        '<div class="card-name">' + escapeHtml(name) + '</div>' +
+        centerHtml +
+        '<div class="card-status">' + (STATUS_LABELS[status] || status) + '</div>' +
+        '<div class="paramedics">' + paramedicsHtml + '</div>' +
+        missInfoHtml +
+        actionsHtml +
+        '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
+    '</div>';
+}
+
+// سجل الأحداث المصغر أسفل كل بطاقة (عرض فقط من السجل الرسمي)
+function renderMiniLogs() {
+    var byTeam = {};
+    staffingEvents.forEach(function(e) {
+        if (!e.team_id) return;
+        (byTeam[e.team_id] = byTeam[e.team_id] || []).push(e);
+    });
+    var allIds = rapidTeams.map(function(t) { return t.name; }).concat(centerList, specialTeams.map(function(t) { return t.id; }));
+    allIds.forEach(function(teamId) {
+        var el = document.getElementById('miniLog_' + teamId);
+        if (!el) return;
+        var key = serverTeamKey(teamId);
+        // بند 15: سجلات التأخير المرتبطة (بدأ/حضر/المدة) — كلها محسوبة سيرفريًا، الواجهة تعرض فقط
+        var lateHtml = lateRecords.filter(function(r) { return r.teamId === key; }).map(function(r) {
+            var nm = String(r.employee).replace(/'/g, "\\'");
+            var start = (r.startedAt || '').slice(11, 16);
+            if (r.status === 'arrived') {
+                var arr = (r.arrivedAt || '').slice(11, 16);
+                return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — تأخر<br>' +
+                    'بدأ: ' + start + ' · حضر: ' + arr + ' · مدة التأخير: ' + r.durationMinutes + ' دقيقة' +
+                    ' <button class="edit-time" title="تعديل وقت الحضور" onclick="editArrivalTime(\'' + teamId + '\', \'' + nm + '\', \'' + arr + '\')">✏️</button></span>';
+            }
+            return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — تأخر<br>' +
+                'بدأ: ' + start + ' · الحالة: لم يحضر</span>';
+        }).join('');
+        var eventsHtml = (byTeam[key] || []).slice(-3).map(function(e) {
+            var t = (e.created_at || '').slice(11, 16);
+            var who = e.entity_id ? ' — ' + e.entity_id : '';
+            var why = e.reason ? ' (' + e.reason + ')' : '';
+            return '<span class="ml-item">' + t + ' ' + (W1D_EVENT_LABELS[e.event_type] || e.event_type) + who + why + '</span>';
+        }).join('');
+        el.innerHTML = lateHtml + eventsHtml;
+    });
+}
+
+// ------------------------------------
+// DASHBOARD — لوحة المعلومات + شريط التقدم (من اشتقاق الخادم حرفيًا)
+// ------------------------------------
+function updateDashboard() {
+    try {
+        var wf = serverWorkforce;
+        var ready = wf ? (wf.readyTeams || 0) : 0;
+        var missing = wf ? (wf.missingTeams || 0) : 0;
+        var offline = wf ? (wf.offlineTeams || 0) : 0;
+        var pending = wf ? (wf.pendingTeams || 0) : 0;
+        var total = ready + missing + offline + pending;
+
+        document.getElementById('dashReady').textContent = wf ? ready : '—';
+        document.getElementById('dashMissing').textContent = wf ? missing : '—';
+        document.getElementById('dashOffline').textContent = wf ? offline : '—';
+        document.getElementById('dashReadyPct').textContent = (wf && total > 0) ? Math.round((ready / total) * 100) + '%' : '—';
+
+        // المركبات (من لوحة المركبات المشتقة سيرفريًا)
+        if (vehiclesBoard) {
+            var c = vehiclesBoard.counters || {};
+            var supporting = (vehiclesBoard.vehicles || []).filter(function(v) { return v.supportingTeamId != null; }).length;
+            document.getElementById('dashVehSupport').textContent = supporting;
+            document.getElementById('dashVehOut').textContent = c.out_of_service || 0;
+        }
+
+        // شريط التقدم — كما هو: نسبة إنجاز التكميل (المُنهية من الإجمالي)
+        var done = ready + missing + offline;
+        var pct = (wf && total > 0) ? Math.round((done / total) * 100) : 0;
+        var fill = document.getElementById('progressFill');
+        if (fill) {
+            fill.style.width = pct + '%';
+            fill.textContent = wf ? pct + '% (' + done + '/' + total + ')' : '—';
+            fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
+        }
+
+        var finishBtn = document.getElementById('finishBtn');
+        if (finishBtn) {
+            finishBtn.disabled = !wf || pending > 0;
+            if (!wf) finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> جارٍ تحميل الحالة...';
+            else if (pending > 0) finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + pending + ' فريق';
+            else finishBtn.innerHTML = '<i class="fas fa-eye"></i> عرض الملخص';
+        }
+    } catch (err) {
+        console.error('[updateDashboard]', err);
     }
 }
 
-// ============================================
-// V-B ①: سير عمل التعيين/النقل/الإنهاء — الواجهة ترسل فقط، الخادم يقرر ويحسب
-// ============================================
-var vbAssignCtx = null;   // { vehicleId, name, mode: 'assign'|'switch' }
-var vbTeamsCache = null;  // فرق من /api/teams (خادم) — تُجلب عند الحاجة
+// ------------------------------------
+// إرسال أحداث الأشخاص — POST /api/shift-completion بعقد events
+// (العقد نفسه دون أي تغيير؛ يُستخدم أيضًا لحفظ الملاحظات)
+// ------------------------------------
+function postPersonEvents(events, notes) {
+    var token = AuthCore.getToken();
+    if (!token) {
+        showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
+        return Promise.resolve(null);
+    }
+    var payload = { shiftType: getShiftType(), shiftDate: getShiftDate(), events: events };
+    if (notes != null) payload.notes = notes;
+    return fetch('/api/shift-completion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload)
+    }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, d: d }; });
+    }).then(function(res) {
+        if (!res.ok || !res.d || !res.d.success) {
+            showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل في الحفظ'), 'error');
+            return null;
+        }
+        return res.d;
+    }).catch(function() {
+        showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
+        return null;
+    });
+}
 
-function openVehicleAssignModal(vehicleId, name, mode, homeTeamId) {
+// بند 12: قفل أزرار البطاقة حتى يعود رد الخادم — يمنع تسابق الضغطات
+function lockTeamCard(teamId, locked) {
+    var bar = document.querySelector('.actions-bar[data-team="' + teamId + '"]');
+    if (!bar) return;
+    var btns = bar.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) btns[i].disabled = locked;
+}
+
+function afterTeamEvent() {
+    // الحالة قرار مخزّن في الخادم ويُبث لكل الشاشات — الواجهة تعيد الجلب فقط (عرض)
+    loadStaffingState().then(function() { loadStaffingLog(); });
+}
+
+// ------------------------------------
+// أزرار البطاقة الثلاثة — ضغطة واحدة = إجراء واحد
+// ------------------------------------
+// 🟢 جاهزة: ضغطة واحدة بلا أي نافذة — قرار المشرف يُخزَّن (آخر ضغطة تحكم)
+function cardSetReady(teamId) {
+    lockTeamCard(teamId, true);
+    postPersonEvents([{ type: 'ready', teamId: teamId }]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast('✅ ' + displayNameOf(teamId) + ' جاهزة', 'success');
+        afterTeamEvent();
+    });
+}
+
+// ✋ حضر (بند 15): ضغطة واحدة — الخادم يختم وقت الحضور الحالي تلقائيًا (لا إدخال يدوي).
+// حدث معلوماتي في Timeline فقط — لا يغيّر حالة الفرقة إطلاقًا ولا يُظهر سؤال قرار.
+function personArrived(teamId, employee) {
+    lockTeamCard(teamId, true);
+    postPersonEvents([{ type: 'arrival', employeeName: employee, teamId: teamId }]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ حضر ' + employee : 'لا يوجد غياب/تأخير مفتوح لهذا الموظف', d.appended > 0 ? 'success' : '');
+        afterTeamEvent();
+    });
+}
+
+// ✏️ تعديل وقت الحضور (بند 15 — بصلاحية المشرف): تصحيح موثّق (correction) لا مسحًا للسجل.
+// الخادم يعيد حساب المدة — الواجهة ترسل الوقت المصحح فقط.
+function editArrivalTime(teamId, employee, currentHHMM) {
+    var input = prompt('تعديل وقت حضور ' + employee + ' (HH:MM)', currentHHMM || '');
+    if (!input) return;
+    var m = String(input).trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+    if (!m) { showToast('⚠️ صيغة الوقت غير صحيحة — استخدم HH:MM', 'error'); return; }
+    var iso = getShiftDate() + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00';
+    postPersonEvents([{ type: 'correction', employeeName: employee, teamId: teamId, arrivalAt: iso }]).then(function(d) {
+        if (!d) return;
+        showToast('✅ تم تصحيح وقت حضور ' + employee, 'success');
+        afterTeamEvent();
+    });
+}
+
+// 🔴 خارج الخدمة: السبب إلزامي سيرفريًا (مؤكد) — مربع سبب صغير مباشرة، بلا جسّ
+var offlineCtx = null; // { kind:'team'|'vehicle', teamId|vehicleId, name }
+function cardSetOffline(teamId) {
+    openOfflineModal({ kind: 'team', teamId: teamId, name: displayNameOf(teamId) });
+}
+function openOfflineModal(ctx) {
+    offlineCtx = ctx;
+    document.getElementById('offlineTitle').textContent = 'خارج الخدمة — ' + ctx.name;
+    document.getElementById('offlineReason').value = '';
+    document.getElementById('offlineModal').classList.add('active');
+    setTimeout(function() { document.getElementById('offlineReason').focus(); }, 50);
+}
+function closeOfflineModal() {
+    document.getElementById('offlineModal').classList.remove('active');
+    offlineCtx = null;
+}
+function confirmOffline() {
+    if (!offlineCtx) return;
+    var reason = document.getElementById('offlineReason').value.trim();
+    if (!reason) { showToast('⚠️ اكتب السبب أولاً', 'error'); return; }
+    var ctx = offlineCtx;
+    if (ctx.kind === 'vehicle') {
+        postVehicleStatus(ctx.vehicleId, 'out_of_service', reason).then(function(res) {
+            if (!res || !res.ok) { showToast('⚠️ ' + ((res && res.error) || 'فشل حفظ حالة المركبة'), 'error'); return; }
+            showToast('🔴 ' + ctx.name + ' خارج الخدمة', 'success');
+            closeOfflineModal();
+            loadVehiclesBoard();
+            loadStaffingState();
+        });
+        return;
+    }
+    lockTeamCard(ctx.teamId, true);
+    postPersonEvents([{ type: 'offline', teamId: ctx.teamId, reason: reason }]).then(function(d) {
+        if (!d) { lockTeamCard(ctx.teamId, false); return; }
+        showToast('🔴 ' + displayNameOf(ctx.teamId) + ' خارج الخدمة', 'success');
+        closeOfflineModal();
+        afterTeamEvent();
+    });
+}
+
+// 🟡 ناقصة: النافذة الوحيدة — موظف + سبب ثم حفظ، تُغلق فورًا ويرجع للبطاقات
+var missingCtx = null; // { teamId }
+function openMissingModal(teamId) {
+    var d = rosterDataOf(teamId);
+    var crew = d ? (d.members || []).map(function(m) { return m.name; }).filter(function(n) { return n; }) : [];
+    if (crew.length === 0) { showToast('⚠️ لا يوجد كادر مجدول لهذه الفرقة', 'error'); return; }
+    missingCtx = { teamId: teamId };
+    document.getElementById('missingTitle').textContent = 'تسجيل نقص — ' + displayNameOf(teamId);
+    document.getElementById('missingEmployee').innerHTML = '<option value="">— اختر الموظف —</option>' +
+        crew.map(function(p) { return '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'; }).join('');
+    document.getElementById('missingReason').innerHTML = '<option value="">— اختر السبب —</option>' +
+        MISSING_REASONS.map(function(r) { return '<option value="' + r + '">' + r + '</option>'; }).join('');
+    document.getElementById('missingModal').classList.add('active');
+}
+function closeMissingModal() {
+    document.getElementById('missingModal').classList.remove('active');
+    missingCtx = null;
+}
+function confirmMissing() {
+    if (!missingCtx) return;
+    var employee = document.getElementById('missingEmployee').value;
+    var reason = document.getElementById('missingReason').value;
+    if (!employee) { showToast('⚠️ اختر الموظف أولاً', 'error'); return; }
+    if (!reason) { showToast('⚠️ اختر السبب أولاً', 'error'); return; }
+    var teamId = missingCtx.teamId;
+    var ev = { type: MISSING_REASON_EVENT[reason], employeeName: employee, reason: reason, teamId: teamId };
+    lockTeamCard(teamId, true);
+    postPersonEvents([ev]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ تم تسجيل النقص — ' + displayNameOf(teamId) : 'الحدث مسجّل مسبقًا', d.appended > 0 ? 'success' : '');
+        closeMissingModal();
+        // بند 9: الحدث لا يغيّر الحالة إطلاقًا — على PENDING/READY نسأل المشرف،
+        // وعلى MISSING/OFFLINE يُحفظ الحدث فقط ويُغلق (الحالة معبّرة أصلًا).
+        var cur = rosterDataOf(teamId);
+        var st = (cur && cur.status) || 'pending';
+        if (st === 'missing' || st === 'offline') { afterTeamEvent(); return; }
+        openDecisionQuestion(teamId, employee, st);
+    });
+}
+
+// سؤال قرار الحالة بعد تسجيل نقص — النظام لا يفترض قرارًا نيابة عن المشرف
+var decisionCtx = null; // { teamId, currentStatus }
+function openDecisionQuestion(teamId, employee, currentStatus) {
+    decisionCtx = { teamId: teamId, currentStatus: currentStatus };
+    document.getElementById('decisionTitle').textContent = 'تم تسجيل غياب/تأخير: ' + employee;
+    document.getElementById('decisionText').textContent = 'حالة ' + displayNameOf(teamId) + ' الآن: ' + (STATUS_LABELS[currentStatus] || currentStatus) + ' — هل تريد تغييرها؟';
+    var opts = document.getElementById('decisionOptions');
+    var html = '';
+    if (currentStatus === 'ready') {
+        html += '<button class="d-keep" onclick="chooseDecision(\'keep\')">إبقاء «جاهزة»</button>';
+        html += '<button class="d-missing" onclick="chooseDecision(\'missing\')">🟡 تحويل إلى ناقصة</button>';
+    } else { // pending
+        html += '<button class="d-keep" onclick="chooseDecision(\'keep\')">إبقاء «باقي»</button>';
+        html += '<button class="d-ready" onclick="chooseDecision(\'ready\')">🟢 جاهزة</button>';
+        html += '<button class="d-missing" onclick="chooseDecision(\'missing\')">🟡 ناقصة</button>';
+    }
+    opts.innerHTML = html;
+    document.getElementById('decisionModal').classList.add('active');
+}
+function chooseDecision(choice) {
+    if (!decisionCtx) return;
+    var teamId = decisionCtx.teamId;
+    document.getElementById('decisionModal').classList.remove('active');
+    decisionCtx = null;
+    if (choice === 'keep') { afterTeamEvent(); return; }
+    postPersonEvents([{ type: choice, teamId: teamId }]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(choice === 'ready' ? '✅ ' + displayNameOf(teamId) + ' جاهزة' : '🟡 ' + displayNameOf(teamId) + ' ناقصة', 'success');
+        afterTeamEvent();
+    });
+}
+</script>
+
+<script>
+// ------------------------------------
+// المركبات — بطاقة صغيرة: الرقم + الحالة + الفريق الحالي + أزرار مباشرة
+// الدعم بالمركبة لا بالفرقة: تظهر «🚑 X تدعم Y» وتبقى فرقتها كما هي
+// ------------------------------------
+function teamNameOf(id) {
+    var t = (vbTeamsCache || []).find(function(x) { return Number(x.id) === Number(id); });
+    return t ? t.name : (id != null ? 'فريق ' + id : '—');
+}
+function vehicleStatusInfo(v) {
+    // بند 10: حالتا قرار فقط (جاهزة/خارج الخدمة) — الدعم شارة مستقلة وليس حالة
+    if (v.status === 'out_of_service' || v.status === 'breakdown') return { cls: 'vs-out', label: '🔴 خارج الخدمة' };
+    return { cls: 'vs-active', label: '🟢 جاهزة' };
+}
+
+function renderVehiclesBoard() {
+    if (!vehiclesBoard) return;
+    var assigned = vehiclesBoard.vehicles || [];
+    var unassigned = vehiclesBoard.unassigned || [];
+
+    document.getElementById('vehicleCards').innerHTML = assigned.map(function(v) {
+        return vehicleCardHtml(v, false);
+    }).join('');
+
+    var wrap = document.getElementById('unassignedVehiclesWrap');
+    var uGrid = document.getElementById('unassignedVehicleCards');
+    wrap.style.display = unassigned.length ? '' : 'none';
+    uGrid.innerHTML = unassigned.map(function(v) { return vehicleCardHtml(v, true); }).join('');
+
+    document.getElementById('vehiclesEmpty').style.display = (assigned.length || unassigned.length) ? 'none' : '';
+}
+
+function vehicleCardHtml(v, isUnassigned) {
+    var st = vehicleStatusInfo(v);
+    var nm = String(v.name).replace(/'/g, "\\'");
+    var teamLine = isUnassigned
+        ? '<div class="v-team" style="color:var(--muted)">الفريق: —</div>'
+        : '<div class="v-team">الفريق: ' + escapeHtml(teamNameOf(v.teamId)) + '</div>';
+    var supportLine = v.supportingTeamId != null
+        ? '<div class="v-reason">🤝 تدعم: ' + escapeHtml(teamNameOf(v.supportingTeamId)) + '</div>'
+        : '';
+    var reasonLine = (!isUnassigned && v.reason) ? '<div class="v-reason">' + escapeHtml(v.reason) + '</div>' : '';
+
+    // بند 10: أزرار القرار (جاهزة/خارج الخدمة) مباشرة — ضغطة واحدة لكل عملية
+    var decisionRow = '<div class="v-actions" data-veh="' + v.id + '" style="margin-bottom:4px">' +
+        '<button onclick="vehicleSetReady(\'' + v.id + '\', \'' + nm + '\', \'' + (v.status || '') + '\')">✅ جاهزة</button>' +
+        '<button class="v-end" onclick="vehicleSetOffline(\'' + v.id + '\', \'' + nm + '\')">🔴 خارج الخدمة</button>' +
+    '</div>';
+
+    // أزرار العمليات — كل زر ينفذ عملية واحدة
+    var ops;
+    if (isUnassigned) {
+        ops = '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'assign\')">📍 تعيين</button>';
+    } else if (v.supportingTeamId != null) {
+        ops = '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')">🔄 نقل</button>' +
+              '<button class="v-end" onclick="endVehicleSupport(\'' + v.id + '\', \'' + nm + '\')">⛔ إنهاء الدعم</button>';
+    } else {
+        ops = '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')">🔄 نقل</button>' +
+              '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'support\', ' + v.teamId + ')">🤝 دعم</button>';
+    }
+
+    return '<div class="team-card vehicle-card">' +
+        '<div class="card-name">🚑 ' + escapeHtml(String(v.name)) + '</div>' +
+        '<div class="v-status ' + st.cls + '">' + st.label + '</div>' +
+        teamLine + supportLine + reasonLine +
+        decisionRow +
+        '<div class="v-actions" data-veh="' + v.id + '">' + ops + '</div>' +
+    '</div>';
+}
+
+// قرارات حالة المركبة — نفس العقد الموجود POST /api/vehicles/events (آخر قرار يحكم)
+function postVehicleStatus(vehicleId, status, reason) {
+    var h = authHeaders();
+    if (!h) return Promise.resolve(null);
+    h['Content-Type'] = 'application/json';
+    return fetch('/api/vehicles/events', {
+        method: 'POST', headers: h,
+        body: JSON.stringify({ vehicleId: vehicleId, status: status, reason: reason || null })
+    }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, error: (d && d.error) || null }; });
+    }).catch(function() { return null; });
+}
+function lockVehicleCard(vehicleId, locked) {
+    var bars = document.querySelectorAll('.v-actions[data-veh="' + vehicleId + '"]');
+    bars.forEach(function(bar) {
+        var btns = bar.querySelectorAll('button');
+        for (var i = 0; i < btns.length; i++) btns[i].disabled = locked;
+    });
+}
+// ✅ جاهزة: ترجع المركبة جاهزة فورًا مهما كانت حالتها السابقة (آخر قرار يحكم)
+function vehicleSetReady(vehicleId, name, currentStatus) {
+    if (currentStatus === 'active') { showToast('المركبة جاهزة بالفعل'); return; }
+    lockVehicleCard(vehicleId, true);
+    postVehicleStatus(vehicleId, 'active', null).then(function(res) {
+        if (!res || !res.ok) {
+            showToast('⚠️ ' + ((res && res.error) || 'فشل حفظ حالة المركبة'), 'error');
+            lockVehicleCard(vehicleId, false);
+            return;
+        }
+        showToast('✅ ' + name + ' جاهزة', 'success');
+        loadVehiclesBoard();
+        loadStaffingState();
+    });
+}
+// 🔴 خارج الخدمة: مربع سبب صغير (إلزامي سيرفريًا)
+function vehicleSetOffline(vehicleId, name) {
+    openOfflineModal({ kind: 'vehicle', vehicleId: vehicleId, name: name });
+}
+
+// منتقي الفريق الصغير الوحيد للمركبات — تعيين/نقل/دعم: اختيار ثم حفظ
+var vbAssignCtx = null; // { vehicleId, name, mode: 'assign'|'switch'|'support', homeTeamId }
+function openVehicleTeamModal(vehicleId, name, mode, homeTeamId) {
     vbAssignCtx = { vehicleId: vehicleId, name: name, mode: mode, homeTeamId: homeTeamId != null ? Number(homeTeamId) : null };
-    document.getElementById('vehicleAssignTitle').textContent =
-        (mode === 'switch' ? 'نقل المركبة إلى فريق آخر' : mode === 'support' ? 'إرسال المركبة دعمًا إلى فريق' : 'تعيين المركبة إلى فريق') + ' — ' + name;
-    document.getElementById('vehicleAssignNote').value = '';
-    var sel = document.getElementById('vehicleAssignTeam');
+    document.getElementById('vehicleTeamTitle').textContent =
+        (mode === 'switch' ? '🔄 نقل المركبة إلى فريق' : mode === 'support' ? '🤝 دعم فريق بالمركبة' : '✅ تعيين المركبة إلى فريق') + ' — ' + name;
+    var sel = document.getElementById('vehicleTeamSelect');
     sel.innerHTML = '<option value="">جارٍ تحميل الفرق...</option>';
-    document.getElementById('vehicleAssignModal').classList.add('active');
+    document.getElementById('vehicleTeamModal').classList.add('active');
     var fill = function(teams) {
-        var list = teams;
-        // وضع الدعم: الفريق الأصلي لا يظهر ضمن الخيارات (المركبة معيّنة له أصلًا)
+        var list = teams || [];
         if (mode === 'support' && vbAssignCtx.homeTeamId != null) {
-            list = teams.filter(function(t) { return Number(t.id) !== vbAssignCtx.homeTeamId; });
+            list = list.filter(function(t) { return Number(t.id) !== vbAssignCtx.homeTeamId; });
         }
         sel.innerHTML = '<option value="">— اختر الفريق —</option>' + list.map(function(t) {
-            return '<option value="' + t.id + '">' + t.name + (t.center ? ' (' + t.center + ')' : '') + '</option>';
+            return '<option value="' + t.id + '">' + escapeHtml(t.name) + (t.center ? ' (' + escapeHtml(t.center) + ')' : '') + '</option>';
         }).join('');
     };
     if (vbTeamsCache) { fill(vbTeamsCache); return; }
-    var h = w1dAuthHeaders(); if (!h) return;
-    fetch('/api/teams', { headers: h })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(d) {
-            vbTeamsCache = (d && d.teams) || [];
-            fill(vbTeamsCache);
-        })
-        .catch(function() { sel.innerHTML = '<option value="">تعذر تحميل الفرق</option>'; });
+    loadTeams().then(function() { fill(vbTeamsCache); });
 }
-
-function closeVehicleAssignModal() {
-    document.getElementById('vehicleAssignModal').classList.remove('active');
+function closeVehicleTeamModal() {
+    document.getElementById('vehicleTeamModal').classList.remove('active');
     vbAssignCtx = null;
 }
-
-function confirmVehicleAssign() {
+function confirmVehicleTeam() {
     if (!vbAssignCtx) return;
-    var teamId = document.getElementById('vehicleAssignTeam').value;
+    var teamId = document.getElementById('vehicleTeamSelect').value;
     if (!teamId) { showToast('⚠️ اختر الفريق أولاً', 'error'); return; }
-    var note = document.getElementById('vehicleAssignNote').value || null;
     var mode = vbAssignCtx.mode;
     var url = mode === 'switch' ? '/api/vehicles/assignment/switch'
         : mode === 'support' ? '/api/vehicles/support'
         : '/api/vehicles/assignment';
     var body = mode === 'support'
-        ? { vehicleId: vbAssignCtx.vehicleId, targetTeamId: Number(teamId), note: note }
-        : { vehicleId: vbAssignCtx.vehicleId, teamId: Number(teamId), note: note };
-    var h = w1dAuthHeaders(); if (!h) return;
+        ? { vehicleId: vbAssignCtx.vehicleId, targetTeamId: Number(teamId), note: null }
+        : { vehicleId: vbAssignCtx.vehicleId, teamId: Number(teamId), note: null };
+    var h = authHeaders();
+    if (!h) return;
     h['Content-Type'] = 'application/json';
+    var name = vbAssignCtx.name;
     fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) })
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
         .then(function(res) {
             if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل العملية'), 'error'); return; }
             var skipped = res.d && res.d.skipped;
             var msg = skipped ? (mode === 'support' ? 'المركبة تدعم هذا الفريق مسبقًا' : 'المركبة معيّنة لهذا الفريق مسبقًا')
-                : mode === 'switch' ? '✅ تم نقل ' + vbAssignCtx.name
-                : mode === 'support' ? '🤝 ' + vbAssignCtx.name + ' يدعم الآن الفريق'
-                : '✅ تم تعيين ' + vbAssignCtx.name;
+                : mode === 'switch' ? '✅ تم نقل ' + name
+                : mode === 'support' ? '🤝 ' + name + ' تدعم الآن الفريق'
+                : '✅ تم تعيين ' + name;
             showToast(msg, skipped ? '' : 'success');
-            closeVehicleAssignModal();
+            closeVehicleTeamModal(); // يغلق مباشرة ويرجع للبطاقات
             loadVehiclesBoard();
+            loadStaffingState();
         })
         .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
 }
 
-// V-B ②: إنهاء دعم مركبة — تعود للاشتقاق الطبيعي ضمن فريقها الأصلي
+// ⛔ إنهاء الدعم — ضغطة واحدة: تعود المركبة لفريقها الأصلي (الفرقة لم تتحرك أصلًا)
 function endVehicleSupport(vehicleId, name) {
-    if (!window.confirm('إنهاء دعم ' + name + '؟ ستعود للعمل ضمن فريقها الأصلي فقط.')) return;
-    var h = w1dAuthHeaders(); if (!h) return;
+    var h = authHeaders();
+    if (!h) return;
     h['Content-Type'] = 'application/json';
     fetch('/api/vehicles/support/end', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId }) })
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
@@ -1310,288 +1260,114 @@ function endVehicleSupport(vehicleId, name) {
             if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل إنهاء الدعم'), 'error'); return; }
             showToast(res.d && res.d.skipped ? 'لا يوجد دعم مفتوح لهذه المركبة' : '✅ انتهى دعم ' + name, res.d && res.d.skipped ? '' : 'success');
             loadVehiclesBoard();
+            loadStaffingState();
         })
         .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
 }
 
-function endVehicleAssignment(vehicleId, name) {
-    if (!window.confirm('إنهاء تعيين ' + name + '؟ ستعود إلى قائمة غير المعيّنة.')) return;
-    var h = w1dAuthHeaders(); if (!h) return;
-    h['Content-Type'] = 'application/json';
-    fetch('/api/vehicles/assignment/end', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId }) })
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-        .then(function(res) {
-            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل إنهاء التعيين'), 'error'); return; }
-            showToast(res.d && res.d.skipped ? 'لا يوجد تعيين مفتوح لهذه المركبة' : '✅ تم إنهاء تعيين ' + name, res.d && res.d.skipped ? '' : 'success');
-            loadVehiclesBoard();
-        })
-        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
-}
-
-// V-B ②: منتقي حالة المركبة — تغيير لأي حالة في أي وقت (لا تدوير أحادي الاتجاه).
-// كل تأكيد = حدث status_change جديد (append-only)؛ آخر حدث يمثل الحالة الحالية.
-var vbStatusCtx = null; // { vehicleId, name, current, selected }
-
-function openVehicleStatusModal(vehicleId, currentStatus, name) {
-    vbStatusCtx = { vehicleId: vehicleId, name: name, current: currentStatus, selected: null };
-    document.getElementById('vehicleStatusTitle').textContent = 'تغيير حالة المركبة — ' + name;
-    document.getElementById('vehicleStatusReason').value = '';
-    document.getElementById('vehicleStatusReason').style.display = 'none';
-    document.getElementById('vehicleStatusOptions').innerHTML = VEHICLE_STATUS_ORDER.map(function(st) {
-        var cur = st === currentStatus ? '<span class="vs-current">الحالة الحالية</span>' : '';
-        return '<button type="button" data-st="' + st + '" onclick="selectVehicleStatus(\'' + st + '\')">' +
-            (VEHICLE_STATUS_LABELS[st] || st) + cur + '</button>';
-    }).join('');
-    document.getElementById('vehicleStatusModal').classList.add('active');
-}
-
-function selectVehicleStatus(st) {
-    if (!vbStatusCtx) return;
-    vbStatusCtx.selected = st;
-    var btns = document.getElementById('vehicleStatusOptions').querySelectorAll('button');
-    btns.forEach(function(b) { b.classList.toggle('vs-selected', b.getAttribute('data-st') === st); });
-    document.getElementById('vehicleStatusReason').style.display =
-        (st === 'breakdown' || st === 'out_of_service') ? '' : 'none';
-}
-
-function closeVehicleStatusModal() {
-    document.getElementById('vehicleStatusModal').classList.remove('active');
-    vbStatusCtx = null;
-}
-
-function confirmVehicleStatus() {
-    if (!vbStatusCtx) return;
-    var next = vbStatusCtx.selected;
-    if (!next) { showToast('⚠️ اختر الحالة الجديدة أولاً', 'error'); return; }
-    if (next === vbStatusCtx.current) { closeVehicleStatusModal(); return; } // لا تغيير — لا حدث
-    var reason = null;
-    if (next === 'breakdown' || next === 'out_of_service') {
-        reason = document.getElementById('vehicleStatusReason').value.trim();
-        if (!reason) { showToast('⚠️ السبب إلزامي عند العطل/الإخراج من الخدمة', 'error'); return; }
-    }
-    var h = w1dAuthHeaders(); if (!h) return;
-    h['Content-Type'] = 'application/json';
-    fetch('/api/vehicles/events', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vbStatusCtx.vehicleId, status: next, reason: reason }) })
-        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-        .then(function(res) {
-            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل حفظ حالة المركبة'), 'error'); return; }
-            showToast(vbStatusCtx.name + ' — ' + VEHICLE_STATUS_LABELS[next], next === 'active' ? 'success' : '');
-            closeVehicleStatusModal();
-            loadVehiclesBoard();
-        })
-        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
-}
-
-function nameOfTeam(id) {
-    var rapid = rapidTeams.find(function(t) { return t.name === id; });
-    if (rapid) return rapid.displayName;
-    return id;
-}
-
-var OPERATIONAL_TEAMS = ['rapid_1','rapid_2','rapid_3','rapid_4','rapid_5','جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','جنوب 6','جنوب 7','جنوب 8','جنوب 9','جنوب 10','جنوب 11','جنوب 12','جنوب 13','جنوب 14','جنوب 15','جنوب 16'];
-
-function isOperationalTeam(teamId) {
-    return OPERATIONAL_TEAMS.indexOf(teamId) !== -1;
-}
-
-// ============================================
-// DASHBOARD
-// ============================================
-function updateDashboard() {
-    try {
-        var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
-        var total = 0;
-        Object.keys(teamStatus).forEach(function(k) {
-            if (!isOperationalTeam(k)) return;
-            var paramedics = (teamStatus[k] && teamStatus[k].paramedics) || [];
-            if (paramedics.length === 0) return;
-            var s = teamStatus[k].status;
-            if (counts[s] !== undefined) counts[s]++;
-            total++;
+// ------------------------------------
+// الملاحظات — حفظ تلقائي عبر نفس عقد الأحداث (events فارغة + notes)
+// ------------------------------------
+var _notesSaveTimer = null;
+function saveNotesDebounced() {
+    if (_notesSaveTimer) clearTimeout(_notesSaveTimer);
+    _notesSaveTimer = setTimeout(function() {
+        setSaveStatus('جارٍ الحفظ...', true);
+        postPersonEvents([], document.getElementById('globalNotes').value.trim()).then(function(d) {
+            setSaveStatus(d ? 'تم الحفظ ✓' : 'فشل الحفظ', false);
         });
-
-        var elCountReady = document.getElementById('countReady');
-        var elCountMissing = document.getElementById('countMissing');
-        var elCountOffline = document.getElementById('countOffline');
-        var elCountPending = document.getElementById('countPending');
-        if (elCountReady) elCountReady.textContent = counts.ready;
-        if (elCountMissing) elCountMissing.textContent = counts.missing;
-        if (elCountOffline) elCountOffline.textContent = counts.offline;
-        if (elCountPending) elCountPending.textContent = counts.pending;
-
-        var done = counts.ready + counts.missing + counts.offline;
-        var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        var fill = document.getElementById('progressFill');
-        if (fill) {
-            fill.style.width = pct + '%';
-            fill.textContent = pct + '% (' + done + '/' + total + ')';
-            fill.style.background = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--gray)';
-        }
-
-        var finishBtn = document.getElementById('finishBtn');
-        if (finishBtn) {
-            finishBtn.disabled = counts.pending > 0;
-            if (counts.pending > 0) {
-                finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + counts.pending + ' فريق';
-            } else {
-                finishBtn.innerHTML = '<i class="fas fa-eye"></i> عرض الملخص';
-            }
-        }
-    } catch (err) {
-        console.error('[updateDashboard] Error updating dashboard:', err);
-    }
+    }, 1500);
+}
+function setSaveStatus(text, spinning) {
+    var spinner = document.getElementById('saveSpinner');
+    var status = document.getElementById('saveStatus');
+    if (spinner) spinner.style.display = spinning ? '' : 'none';
+    if (status) status.textContent = text;
 }
 
-// ============================================
-// FINISH & SUMMARY
-// ============================================
+// ------------------------------------
+// الملخص — فرق المناوبة الحالية فقط (عرض + طباعة)
+// ------------------------------------
 function finishShift() {
-    var modal = document.getElementById('summaryModal');
     var content = document.getElementById('summaryContent');
+    var rows = '';
+    var ordered = rapidTeams.map(function(t) { return { id: t.name, name: t.displayName }; })
+        .concat(centerList.map(function(c) { return { id: c, name: c }; }));
+    ordered.forEach(function(t) {
+        if (!teamInCurrentRoster(t.id)) return;
+        var d = rosterDataOf(t.id);
+        var status = (d && d.status) || 'pending';
+        var absentees = (d && d.absentees) || [];
+        var reasonText = absentees.length
+            ? absentees.map(function(a) { return escapeHtml(a.name) + (a.reason ? ' (' + escapeHtml(a.reason) + ')' : ''); }).join('، ')
+            : '-';
+        var crew = d ? (d.members || []).map(function(m) { return escapeHtml(m.name); }).join('، ') : '-';
+        var center = getTeamCenter(t.id) || '-';
+        rows += '<tr>' +
+            '<td>' + escapeHtml(t.name) + '</td>' +
+            '<td><small style="color:var(--muted);"><i class="fas fa-hospital"></i> ' + center + '</small></td>' +
+            '<td><span class="status-badge badge-' + status + '">' + (STATUS_LABELS[status] || status) + '</span></td>' +
+            '<td>' + reasonText + '</td>' +
+            '<td>' + (crew || '-') + '</td>' +
+        '</tr>';
+    });
+
+    var wf = serverWorkforce || {};
+    var ready = wf.readyTeams || 0, missing = wf.missingTeams || 0, offline = wf.offlineTeams || 0, pending = wf.pendingTeams || 0;
 
     var html = '<table class="summary-table">' +
-        '<tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>السبب</th><th>الكادر</th></tr>';
-
-    rapidTeams.forEach(function(t) {
-        var s = teamStatus[t.name] || {};
-        html += summaryRow(t.displayName, t.name, s);
-    });
-    centerList.forEach(function(c) {
-        var s = teamStatus[c] || {};
-        html += summaryRow(c, c, s);
-    });
-
-    html += '</table>';
-
-    var counts = { ready: 0, missing: 0, offline: 0, pending: 0 };
-    Object.keys(teamStatus).forEach(function(k) {
-        var st = teamStatus[k].status;
-        if (counts[st] !== undefined) counts[st]++;
-    });
-
-    html += '<div class="modal-stats">' +
-        '<div class="modal-stat green"><div class="value">' + counts.ready + '</div><div class="label">✅ جاهز</div></div>' +
-        '<div class="modal-stat yellow"><div class="value">' + counts.missing + '</div><div class="label">⚠️ ناقص</div></div>' +
-        '<div class="modal-stat red"><div class="value">' + counts.offline + '</div><div class="label">🔴 خارج الخدمة</div></div>' +
+        '<tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>الناقص</th><th>الكادر</th></tr>' +
+        rows + '</table>' +
+        '<div class="modal-stats">' +
+            '<div class="modal-stat green"><div class="value">' + ready + '</div><div class="label">✅ جاهزة</div></div>' +
+            '<div class="modal-stat yellow"><div class="value">' + missing + '</div><div class="label">⚠️ ناقصة</div></div>' +
+            '<div class="modal-stat red"><div class="value">' + offline + '</div><div class="label">🔴 خارج الخدمة</div></div>' +
         '</div>';
 
     var notes = document.getElementById('globalNotes').value.trim();
     if (notes) {
-        html += '<div class="modal-notes">' +
-            '<div class="title"><i class="fas fa-sticky-note"></i> ملاحظات التكميل</div>' +
-            '<div class="content">' + escapeHtml(notes) + '</div>' +
-            '</div>';
+        html += '<div class="modal-notes"><div class="title"><i class="fas fa-sticky-note"></i> ملاحظات التكميل</div>' +
+            '<div class="content">' + escapeHtml(notes) + '</div></div>';
     }
-
-    html += '<div class="modal-info">' +
-        '<i class="fas fa-calendar-alt"></i> ' + getShiftDate() +
+    html += '<div class="modal-info"><i class="fas fa-calendar-alt"></i> ' + getShiftDate() +
         ' &nbsp;|&nbsp; <i class="fas fa-clock"></i> ' + getShiftType() +
-        ' &nbsp;|&nbsp; <i class="fas fa-check-circle"></i> ' + (counts.ready + counts.missing + counts.offline) + ' / ' + (counts.ready + counts.missing + counts.offline + counts.pending) + ' فرقة' +
-        '</div>';
+        ' &nbsp;|&nbsp; <i class="fas fa-check-circle"></i> ' + (ready + missing + offline) + ' / ' + (ready + missing + offline + pending) + ' فرقة</div>';
 
     content.innerHTML = html;
-    modal.classList.add('active');
+    document.getElementById('summaryModal').classList.add('active');
 }
 
-function summaryRow(name, teamId, s) {
-    var statusClass = 'badge-' + (s.status || 'pending');
-    var statusText = STATUS_LABELS[s.status] || s.status;
-    var paramedics = (s.paramedics || []).filter(function(n) { return n; }).join('، ') || '-';
-    var centerName = getTeamCenter(teamId);
+// ------------------------------------
+// INIT
+// ------------------------------------
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
 
-    var reasonText = s.reason || '-';
-    if (s.missingPerson) {
-        reasonText += ' (' + s.missingPerson + ')';
+    // وضع تحرير الأرشيف (من صفحة الأرشيف): ?date=YYYY-MM-DD&type=...
+    var urlParams = new URLSearchParams(window.location.search);
+    var dateParam = urlParams.get('date');
+    var typeParam = urlParams.get('type');
+    if (dateParam) {
+        window.overrideShiftDate = dateParam;
+        window.overrideShiftType = typeParam || getShiftType();
+        document.getElementById('shiftBadge').textContent = window.overrideShiftType + ' — ' + dateParam + ' (أرشيف)';
     }
 
-    return '<tr>' +
-        '<td>' + name + '</td>' +
-        '<td><small style="color:var(--muted);"><i class="fas fa-hospital"></i> ' + centerName + '</small></td>' +
-        '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>' +
-        '<td>' + reasonText + '</td>' +
-        '<td>' + paramedics + '</td>' +
-        '</tr>';
-}
+    initLiveSync();
+    loadTeams();
+    loadStaffingState();
+    loadStaffingLog();
+    loadVehiclesBoard();
+    loadSavedNotes();
 
-function saveToServer(silent) {
-    var token = AuthCore.getToken();
-    if (!token) {
-        console.error('[saveToServer] No auth token found');
-        if (!silent) showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
-        return;
-    }
-    
-    // Phase 2+3: Fetch shift_id from server (async)
-    fetchCurrentShiftId().then(function(shiftId) {
-        // Enrich teamStatus with center names before saving
-        var enrichedTeams = {};
-        Object.keys(teamStatus).forEach(function(teamId) {
-            enrichedTeams[teamId] = Object.assign({}, teamStatus[teamId]);
-            enrichedTeams[teamId].centerName = getTeamCenter(teamId);
-        });
-        
-        var payload = {
-            shiftType: getShiftType(),
-            shiftDate: getShiftDate(),
-            teams: enrichedTeams,
-            notes: document.getElementById('globalNotes').value.trim(),
-            timestamp: new Date().toISOString()
-        };
-        // Include shift_id (Phase 2+3: tied to active shift)
-        if (shiftId) {
-            payload.shift_id = shiftId;
-        }
-        console.log('[saveToServer] Sending payload:', payload);
-        
-        return fetch('/api/shift-completion', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify(payload)
-        });
-    }).then(function(r) { 
-        console.log('[saveToServer] Response status:', r.status);
-        return r.json(); 
-    })
-    .then(function(d) {
-        console.log('[saveToServer] Response data:', d);
-        if (d.success) {
-            if (!silent) showToast('✅ تم حفظ التكميل في السيرفر', 'success');
-            onAutoSaveSuccess();
-            broadcastCompletionSaved();
-        } else {
-            if (!silent) showToast('⚠️ ' + (d.error || 'فشل في الحفظ'), 'error');
-            onAutoSaveError(d.error || 'فشل في الحفظ');
-        }
-    }).catch(function(e) {
-        console.error('[saveToServer] Error:', e);
-        if (!silent) showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
-        onAutoSaveError('خطأ في الاتصال');
-    });
-}
-
-function printSummary() {
-    window.print();
-}
-
-// ============================================
-// UTILS
-// ============================================
-function showToast(msg, type) {
-    ToastCore.show(msg, type, 3000);
-}
-
-function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+    // مرونة: إن تعذر أول جلب لحالة الفرق (شبكة/خادم) يُعاد المحاولة دوريًا حتى تصل
+    setInterval(function() {
+        if (!serverTeamsState) loadStaffingState();
+    }, 15000);
+});
 </script>
 
 <!-- RAG AI Assistant -->
-<!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
 

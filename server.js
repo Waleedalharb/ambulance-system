@@ -32,6 +32,7 @@ let formsService = null; // Slice 6: single owner of all form writes (form_type)
 let indicatorService = null; // F5a: read-only operational indicators
 let staffingEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث القوى البشرية
 let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث المركبات
+let rosterSyncService = null; // SR-2: المزامنة الوحيدة الجدولة ← employees + shift_roster (SSOT)
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -544,7 +545,8 @@ const INCIDENTS_PATH = path.join(STORAGE_PATH, 'incidents.json');
 const SENIOR_SHIFTS_PATH = path.join(STORAGE_PATH, 'senior-shifts.json');
 const E_CASES_PATH = path.join(STORAGE_PATH, 'e-cases.json');
 const ESCALATIONS_PATH = path.join(STORAGE_PATH, 'escalations.json');
-const SCHEDULE_EMPLOYEES_PATH = path.join(STORAGE_PATH, 'schedule-employees.json');
+// SCHEDULE_FILE: تجاوز اختياري لمسار ملف الجدولة — يعزل الاختبارات عن ملف التشغيل المشترك
+const SCHEDULE_EMPLOYEES_PATH = process.env.SCHEDULE_FILE || path.join(STORAGE_PATH, 'schedule-employees.json');
 const SCHEDULE_FILES_PATH = path.join(STORAGE_PATH, 'schedule-files.json');
 const REPORT_ENTRY_PATH = path.join(STORAGE_PATH, 'report-entry.json');
 const DASHBOARD_PATH = path.join(STORAGE_PATH, 'dashboard.json');
@@ -6678,12 +6680,38 @@ app.post('/api/schedule/employees', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
         await writeScheduleEmployees(employees);
+        // SR-2: JSON ملف استيراد فقط — الحفظ يُزامن فورًا إلى القاعدة
+        // (employees upsert بالرمز + إعادة بناء shift_roster) في معاملة ذرية.
+        // فشل المزامنة = فشل الحفظ كله حتى لا تبقى القاعدة بلا كادر محدث.
+        let syncStats = null;
+        if (rosterSyncService) {
+            try {
+                syncStats = await rosterSyncService.syncFromSchedule(employees);
+            } catch (syncErr) {
+                console.error('[RosterSync] فشل المزامنة بعد حفظ الجدولة:', syncErr);
+                return res.status(500).json({ error: 'فشل في مزامنة الكادر مع قاعدة البيانات' });
+            }
+        } else {
+            return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
+        }
         broadcast({
             type: 'schedule_employees_updated',
             message: 'تم تحديث بيانات الموظفين'
         });
-        res.json({ success: true });
+        broadcast({
+            type: 'roster_synced',
+            message: 'تمت مزامنة كادر المناوبات مع قاعدة البيانات',
+            stats: {
+                employeesSeen: syncStats.employeesSeen,
+                created: syncStats.created,
+                updated: syncStats.updated,
+                deactivated: syncStats.deactivated,
+                rosterRows: syncStats.rosterRows
+            }
+        });
+        res.json({ success: true, rosterSync: syncStats });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'فشل في حفظ بيانات الموظفين' });
     }
 });
@@ -6717,12 +6745,28 @@ app.post('/api/schedule/files', authenticate, async (req, res) => {
 app.delete('/api/schedule/employees', authenticate, authorize(['admin']), async (req, res) => {
     try {
         await writeScheduleEmployees([]);
+        // SR-2: مسح الجدولة = مسح roster بالكامل + تعطيل جميع الموظفين (لا حذف)
+        if (rosterSyncService) {
+            try {
+                await rosterSyncService.syncFromSchedule([]);
+            } catch (syncErr) {
+                console.error('[RosterSync] فشل مزامنة المسح:', syncErr);
+                return res.status(500).json({ error: 'فشل في مزامنة مسح الكادر مع قاعدة البيانات' });
+            }
+        } else {
+            return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
+        }
         broadcast({
             type: 'schedule_employees_cleared',
             message: 'تم حذف جميع بيانات الموظفين'
         });
+        broadcast({
+            type: 'roster_synced',
+            message: 'تم مسح كادر المناوبات من قاعدة البيانات'
+        });
         res.json({ success: true });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'فشل في حذف بيانات الموظفين' });
     }
 });
@@ -10404,6 +10448,11 @@ server.listen(PORT, async () => {
             const VehicleEventsService = require('./services/vehicle-events-service');
             staffingEventsService = new StaffingEventsService({ storage: opsEngine.storage, engine: opsEngine });
             vehicleEventsService = new VehicleEventsService({ storage: opsEngine.storage, engine: opsEngine });
+            // SR-2: RosterSyncService — القناة الوحيدة لكتابة employees/shift_roster
+            // من الجدولة. بعدها لا قراءة تشغيلية من JSON إطلاقًا.
+            const RosterSyncService = require('./services/roster-sync-service');
+            rosterSyncService = new RosterSyncService({ db });
+            console.log('✅ RosterSyncService wired (SR-2)');
             // W1-B: late binding — CompletionService هو نقطة الكتابة الوحيدة للأحداث
             if (completionService) completionService.staffingEventsService = staffingEventsService;
             console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');
@@ -10417,6 +10466,7 @@ server.listen(PORT, async () => {
             formsService = null;
             staffingEventsService = null;
             vehicleEventsService = null;
+            rosterSyncService = null;
         }
     }
     

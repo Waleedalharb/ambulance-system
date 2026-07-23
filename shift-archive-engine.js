@@ -370,7 +370,8 @@ class ShiftArchiveSnapshot {
             metrics: null,
             notes: [],
             events: [],
-            absences: []
+            absences: [],
+            operationalEvents: []
         };
 
         // 1. جلب بيانات المناوبة الأساسية
@@ -403,10 +404,13 @@ class ShiftArchiveSnapshot {
         // 10. جلب الأحداث
         snapshot.events = await this._getEvents(shiftId);
 
-        // 11. جلب الغيابات
-        snapshot.absences = await this._getAbsences(shiftId);
+        // 11. جلب الأحداث التشغيلية الموحدة (Timeline Events — مصدر الحقيقة للقوى البشرية)
+        snapshot.operationalEvents = await this._getOperationalEvents(shiftId);
 
-        // 12-14. Archive slice: تفاصيل البلاغات + التمركزات + المحادثات (D-6)
+        // 12. جلب الغيابات (الجداول القديمة + المشتقة من الأحداث التشغيلية)
+        snapshot.absences = await this._getAbsences(shiftId, snapshot.operationalEvents);
+
+        // 13-15. Archive slice: تفاصيل البلاغات + التمركزات + المحادثات (D-6)
         snapshot.reportEntries = await this._getReportEntries(shiftId);
         snapshot.positioning = await this._getPositioning(shiftId);
         snapshot.conversations = await this._getConversations(shiftId);
@@ -559,8 +563,37 @@ class ShiftArchiveSnapshot {
         return this._getContentRows('shift_events', shiftId);
     }
 
-    async _getAbsences(shiftId) {
-        return this._getContentRows('shift_absences', shiftId);
+    async _getOperationalEvents(shiftId) {
+        try {
+            if (!this.db || !this.db.all) return [];
+            const rows = await this.db.all(
+                'SELECT * FROM operational_events WHERE shift_id = ? ORDER BY created_at ASC',
+                [shiftId]
+            );
+            return Array.isArray(rows) ? rows : [];
+        } catch (err) {
+            console.error('[Snapshot] Error getting operational events:', err.message);
+            return [];
+        }
+    }
+
+    async _getAbsences(shiftId, operationalEvents) {
+        const legacy = await this._getContentRows('shift_absences', shiftId);
+        // Timeline Events هي مصدر الحقيقة: أحداث الغياب/التأخر الشخصية تُشتق من
+        // operational_events حتى لا تضيع في الأرشيف — تدفق الأحداث الجديد لا يكتب
+        // جدول shift_absences القديم، والتاريخ يُحفظ كاملًا (Append Only)
+        const derived = (Array.isArray(operationalEvents) ? operationalEvents : [])
+            .filter(e => e.domain === 'staffing' && (e.event_type === 'absence' || e.event_type === 'late'))
+            .map(e => ({
+                source: 'operational_events',
+                employee: e.entity_id || e.entity_name || '',
+                team: e.team_id || '',
+                center: e.center || '',
+                type: e.event_type, // absence = غياب، late = تأخر
+                reason: e.reason || '',
+                createdAt: e.created_at || null
+            }));
+        return [...legacy, ...derived];
     }
 
     async _getReportEntries(shiftId) {
@@ -1031,7 +1064,8 @@ class ShiftArchiveEngine {
                     metrics: snapshot.metrics,
                     notes: snapshot.notes,
                     events: snapshot.events,
-                    absences: snapshot.absences
+                    absences: snapshot.absences,
+                    operationalEvents: snapshot.operationalEvents
                 };
                 await fs.writeFile(shiftsPath, JSON.stringify(shifts, null, 2));
                 details.push({ step: 'shift_json', status: 'success' });
