@@ -1649,46 +1649,11 @@ window.addEventListener('load', function() {
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- Token Refresh Pre-Check — ensures valid token before app.js loads -->
-<script>
-(function() {
-    var token = localStorage.getItem('authToken');
-    if (token) {
-        // Check if token is valid by calling a lightweight endpoint
-        fetch('/api/auth/me', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        }).then(function(r) {
-            if (r.status === 403 || r.status === 401) {
-                console.log('[TokenPreCheck] Token invalid, attempting refresh...');
-                return fetch('/api/auth/refresh', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-                }).then(function(refreshR) {
-                    if (refreshR.ok) return refreshR.json();
-                    throw new Error('refresh failed');
-                }).then(function(data) {
-                    if (data.success && data.token) {
-                        localStorage.setItem('authToken', data.token);
-                        // D-32: المفتاح الجديد أيضاً — AuthManager/app.js يقرآن
-                        // auth_access_token أولاً، فبقاؤه بائتاً بعد التجديد يرسل
-                        // توكناً منتهياً رغم نجاح التجديد
-                        localStorage.setItem('auth_access_token', data.token);
-                        console.log('[TokenPreCheck] Token refreshed successfully');
-                    } else {
-                        throw new Error('no token');
-                    }
-                }).catch(function(e) {
-                    console.error('[TokenPreCheck] Token refresh failed:', e);
-                    localStorage.removeItem('authToken');
-                    localStorage.removeItem('currentUser');
-                });
-            }
-        }).catch(function(e) {
-            console.error('[TokenPreCheck] Error:', e);
-        });
-    }
-})();
-</script>
+<!-- فحص التوكن قبل الإقلاع يتولاه AuthManager.init (في app.js) عبر المسار
+     المركزي الصحيح: refresh token في الجسم + قراءة accessToken + تجديد
+     استباقي دوري — أُزيلت كتلة الفحص اليدوية القديمة لأنها كانت ترسل
+     access token لنقطة التجديد وتقرأ حقلًا غير موجود (data.token)
+     ثم تمسح التوكنات عند الفشل = خروج قسري كل ~15 دقيقة -->
 <!-- OV-S6: websocket-sync.js أُزيل من هذه الصفحة — app.js (SSE) هو القناة التشغيلية الوحيدة، وchat-integration.js (WS) للشات فقط -->
 <script src="js/frontend-monitor.js?v=3"></script>
 <script src="js/chat-integration.js"></script>

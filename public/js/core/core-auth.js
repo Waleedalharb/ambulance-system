@@ -36,6 +36,8 @@
     var LEGACY_TOKEN_KEY = 'authToken';
 
     var API_BASE = '';
+    var TOKEN_REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes before expiry (كما في auth-manager)
+    var PROACTIVE_CHECK_MS = 60 * 1000;       // فحص دقيق كل دقيقة في الخلفية
 
     // ==========================================
     // STATE
@@ -43,6 +45,7 @@
     var _originalFetch = global.fetch.bind(global);
     var _isRefreshing = false;
     var _refreshPromise = null;
+    var _proactiveTimer = null;
 
     // ==========================================
     // PRIVATE HELPERS
@@ -69,6 +72,30 @@
         return url.indexOf('/api/auth/login') !== -1 ||
                url.indexOf('/api/auth/refresh') !== -1 ||
                url.indexOf('/api/auth/logout') !== -1;
+    }
+
+    function _parseJwt(token) {
+        try {
+            var base64Url = token.split('.')[1];
+            var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // هل الـ access token منتهٍ أو على وشك (ضمن الهامش)؟ — JWT أولًا ثم الختم المخزن
+    function _isAccessExpiringSoon() {
+        var token = _getAccessToken();
+        if (!token) return true;
+        var payload = _parseJwt(token);
+        if (payload && payload.exp) return (payload.exp * 1000 - Date.now()) < TOKEN_REFRESH_MARGIN;
+        var stored = _getStorageItem(STORAGE_KEYS.TOKEN_EXPIRES);
+        if (stored) return (parseInt(stored, 10) - Date.now()) < TOKEN_REFRESH_MARGIN;
+        return false;
     }
 
     // ==========================================
@@ -121,7 +148,11 @@
             body: JSON.stringify({ refreshToken: refreshToken })
         }).then(function(response) {
             if (!response.ok) {
-                throw new Error('Refresh failed: ' + response.status);
+                // 401/403 = refresh token نفسه منتهٍ/ملغى/الجلسة غير نشطة — فشل نهائي
+                // (يميَّز بـ code حتى لا يُعامل كعطل شبكة عابر ولا يُعاد بصمت للأبد)
+                var err = new Error('Refresh failed: ' + response.status);
+                if (response.status === 401 || response.status === 403) err.code = 'REFRESH_INVALID';
+                throw err;
             }
             return response.json();
         }).then(function(data) {
@@ -138,6 +169,29 @@
         });
 
         return _refreshPromise;
+    }
+
+    // ==========================================
+    // PROACTIVE REFRESH — تجديد استباقي في الخلفية (بقرار المالك)
+    // كل دقيقة: إن كان الـ access token منتهيًا/قارب ويوجد refresh token صالح
+    // ⇒ جدّد بصمت. الأعطال العابرة تُتجاهل وتُعاد المحاولة بعد دقيقة؛
+    // لا رسالة ولا خروج طالما الـ refresh token صالح.
+    // ==========================================
+    function startProactiveRefresh() {
+        if (_proactiveTimer) return; // مؤقت واحد فقط
+        _proactiveTimer = setInterval(function() {
+            try {
+                if (!_getStorageItem(STORAGE_KEYS.REFRESH_TOKEN)) return;
+                if (!_isAccessExpiringSoon()) return;
+                _doRefresh().catch(function() { /* عابر — يُعاد تلقائيًا بعد دقيقة */ });
+            } catch (e) { /* لا شيء — الخلفية لا تسقط الصفحة */ }
+        }, PROACTIVE_CHECK_MS);
+        // فحص فوري عند التشغيل (تغطية فتح صفحة بتوكن منتهٍ)
+        try {
+            if (_getStorageItem(STORAGE_KEYS.REFRESH_TOKEN) && _isAccessExpiringSoon()) {
+                _doRefresh().catch(function() { /* عابر */ });
+            }
+        } catch (e) { /* تجاهل */ }
     }
 
     // ==========================================
@@ -221,8 +275,18 @@
                 global.location.href = redirectTo || '/';
                 return false;
             }
+            startProactiveRefresh(); // بوابة الصفحة = انطلاق التجديد الاستباقي أيضًا
             return true;
-        }
+        },
+
+        // --- Proactive background refresh (idempotent) ---
+        startProactiveRefresh: startProactiveRefresh
     };
+
+    // انطلاق تلقائي عند تحميل الوحدة إن وُجدت جلسة — أي صفحة تضمّن core-auth
+    // تحصل على التجديد الاستباقي بلا أي سطر إضافي
+    try {
+        if (_getStorageItem(STORAGE_KEYS.REFRESH_TOKEN)) startProactiveRefresh();
+    } catch (e) { /* تجاهل */ }
 
 })(window);

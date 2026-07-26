@@ -33,6 +33,7 @@
 
     var API_BASE = '';
     var TOKEN_REFRESH_MARGIN = 5 * 60 * 1000; // 5 minutes before expiry
+    var PROACTIVE_CHECK_MS = 60 * 1000;       // فحص كل دقيقة في الخلفية
 
     // ==========================================
     // STATE
@@ -43,6 +44,32 @@
     var _pendingRequests = [];
     var _sessionExpired = false;
     var _authEventListeners = [];
+    var _proactiveTimer = null;
+
+    // التجديد الاستباقي (بقرار المالك): لا ينتهي الـ access token أثناء العمل —
+    // فحص كل دقيقة، وإن قارب على الانتهاء ويوجد refresh token ⇒ تجديد صامت.
+    // الأعطال العابرة تُتجاهل وتُعاد بعد دقيقة؛ لا رسالة ولا خروج طالما
+    // الـ refresh token صالح. الخروج فقط بانتهائه أو بتسجيل خروج صريح.
+    function _startProactiveRefresh() {
+        if (_proactiveTimer) return;
+        _proactiveTimer = setInterval(function() {
+            try {
+                if (_sessionExpired) return;
+                if (!_getRefreshToken()) return;
+                var token = _getAccessToken();
+                var expiring;
+                if (!token) {
+                    expiring = true;
+                } else {
+                    var payload = _parseJwt(token);
+                    if (payload && payload.exp) expiring = (payload.exp * 1000 - Date.now()) < TOKEN_REFRESH_MARGIN;
+                    else expiring = _isTokenExpiringSoon();
+                }
+                if (!expiring) return;
+                _doRefresh().catch(function() { /* عابر — يُعاد بعد دقيقة */ });
+            } catch (e) { /* الخلفية لا تسقط الصفحة */ }
+        }, PROACTIVE_CHECK_MS);
+    }
 
     // ==========================================
     // PRIVATE HELPERS
@@ -434,6 +461,7 @@
                         _setTokens(data.accessToken, data.refreshToken, data.expiresIn || 900);
                         _setStorageItem(STORAGE_KEYS.USER, JSON.stringify(data.user));
                         _sessionExpired = false;
+                        _startProactiveRefresh(); // الجلسة بدأت — التجديد الاستباقي معها
                         _emitEvent('login', { user: data.user });
                         return data;
                     } else {
@@ -581,6 +609,7 @@
                         _showLoginScreen('انتهت صلاحية الجلسة');
                     });
                 }
+                _startProactiveRefresh(); // جلسة قائمة — التجديد الاستباقي يعمل من الإقلاع
             }
             _emitEvent('init', {});
         },
