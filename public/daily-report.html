@@ -397,6 +397,7 @@ tbody tr:hover { background: var(--g100); }
 
 <script src="js/core/core-auth.js"></script>
 <script src="js/core/core-toast.js"></script>
+<script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
 <script>
 // ===== Auth =====
@@ -425,7 +426,7 @@ function toggleDarkMode() {
 })();
 
 // ===== Format Arabic numbers =====
-function toAr(n) { return n.toLocaleString('ar-SA'); }
+function toAr(n) { return new Intl.NumberFormat('ar-SA').format(n); }
 function toArPct(n) { return (n * 100).toFixed(1) + '%'; }
 
 // ===== Load shift list =====

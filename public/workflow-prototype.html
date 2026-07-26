@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سير العمل الرسمي — نموذج تجريبي W-0</title>
+<style>
+:root {
+    --primary:#2563eb; --primary-dark:#1d4ed8; --green:#16a34a; --green-light:#dcfce7;
+    --yellow:#d97706; --yellow-light:#fef3c7; --red:#dc2626; --red-light:#fee2e2;
+    --bg:#f1f5f9; --card:#ffffff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
+    --gray:#475569; --gray-light:#e2e8f0;
+}
+* { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
+body { background:var(--bg); color:var(--text); padding-bottom:40px; }
+
+/* ─── شريط المحاكاة (للمراجعة فقط) ─── */
+.sim-bar { background:#0f172a; color:#e2e8f0; padding:8px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:0.8rem; position:sticky; top:0; z-index:100; }
+.sim-bar .tag { background:var(--yellow); color:#0f172a; font-weight:800; padding:2px 10px; border-radius:20px; }
+.sim-bar button { background:#1e293b; color:#e2e8f0; border:1px solid #334155; padding:5px 14px; border-radius:8px; cursor:pointer; font-size:0.8rem; }
+.sim-bar button.active { background:var(--primary); border-color:var(--primary); font-weight:700; }
+.sim-bar .sep { width:1px; height:20px; background:#334155; }
+
+/* ─── الرأس ─── */
+.page-header { background:linear-gradient(135deg,#1e3a8a,#2563eb); color:#fff; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.page-header .title { display:flex; align-items:center; gap:12px; }
+.page-header .logo { width:48px; height:48px; background:#fff; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.6rem; }
+.page-header h1 { font-size:1.3rem; }
+.page-header .sub { font-size:0.8rem; opacity:0.85; }
+.header-badges { display:flex; gap:8px; flex-wrap:wrap; }
+.hbadge { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); padding:5px 12px; border-radius:20px; font-size:0.78rem; font-weight:600; }
+.hbadge.ref { background:#fbbf24; color:#0f172a; border-color:#fbbf24; font-weight:800; }
+.hbadge.noref { background:transparent; border-style:dashed; opacity:0.8; }
+
+/* ─── شريط حالة سير العمل ─── */
+.status-track { background:var(--card); border-bottom:1px solid var(--border); padding:14px 24px; display:flex; align-items:center; gap:0; overflow-x:auto; }
+.step { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.step .dot { width:30px; height:30px; border-radius:50%; background:var(--gray-light); color:var(--muted); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:800; }
+.step .lbl { font-size:0.78rem; color:var(--muted); font-weight:600; }
+.step.done .dot { background:var(--green); color:#fff; }
+.step.done .lbl { color:var(--green); }
+.step.current .dot { background:var(--primary); color:#fff; box-shadow:0 0 0 4px rgba(37,99,235,0.2); }
+.step.current .lbl { color:var(--primary); font-weight:800; }
+.step .line { width:50px; height:2px; background:var(--gray-light); margin:0 10px; }
+.step.done + .step .line, .step .line.done { background:var(--green); }
+
+.container { max-width:1200px; margin:20px auto; padding:0 16px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+.card h2 { font-size:1rem; margin-bottom:12px; display:flex; align-items:center; gap:8px; color:var(--primary-dark); }
+.card h2 .icon { font-size:1.1rem; }
+
+/* ─── بيانات المناوبة ─── */
+.shift-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+.shift-item { background:var(--bg); border-radius:10px; padding:10px 14px; }
+.shift-item .k { font-size:0.72rem; color:var(--muted); font-weight:600; }
+.shift-item .v { font-size:1rem; font-weight:800; margin-top:2px; }
+
+/* ─── ملخص القوى ─── */
+.dash { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.dash-card { border-radius:12px; padding:14px 10px; text-align:center; border:1px solid var(--border); background:var(--bg); }
+.dash-card .value { font-size:1.7rem; font-weight:800; }
+.dash-card .label { font-size:0.72rem; color:var(--muted); font-weight:600; margin-top:2px; }
+.dash-card.green .value { color:var(--green); } .dash-card.red .value { color:var(--red); }
+.dash-card.yellow .value { color:var(--yellow); } .dash-card.blue .value { color:var(--primary); }
+
+/* ─── جدول الفرق ─── */
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+th { background:var(--bg); padding:10px 8px; font-size:0.75rem; color:var(--muted); border-bottom:2px solid var(--border); text-align:right; }
+td { padding:10px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr:last-child td { border-bottom:none; }
+.chip { display:inline-block; padding:3px 12px; border-radius:20px; font-size:0.72rem; font-weight:800; }
+.chip.ready { background:var(--green-light); color:var(--green); }
+.chip.missing { background:var(--yellow-light); color:var(--yellow); }
+.chip.offline { background:var(--red-light); color:var(--red); }
+.person { display:inline-block; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:3px 9px; margin:2px; font-size:0.76rem; }
+.person.absent { background:var(--red-light); border-color:#fecaca; color:var(--red); text-decoration:line-through; }
+.person.late { background:var(--yellow-light); border-color:#fde68a; color:var(--yellow); }
+.person.support { background:#dbeafe; border-color:#bfdbfe; color:var(--primary-dark); }
+.veh { font-size:0.76rem; color:var(--muted); }
+.veh b { color:var(--text); }
+
+/* ─── حقول المشرف ─── */
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:0.8rem; font-weight:700; margin-bottom:5px; color:var(--gray); }
+.field textarea { width:100%; min-height:64px; border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:0.85rem; resize:vertical; background:#fff; color:var(--text); }
+.field textarea[readonly] { background:var(--bg); color:var(--muted); }
+.review-box { display:flex; gap:18px; flex-wrap:wrap; background:var(--bg); border-radius:10px; padding:12px 16px; }
+.review-box label { display:flex; align-items:center; gap:7px; font-size:0.83rem; font-weight:600; cursor:pointer; }
+.review-box input { width:17px; height:17px; accent-color:var(--primary); }
+.review-box.disabled label { cursor:not-allowed; opacity:0.7; }
+
+/* ─── شريط الإجراءات ─── */
+.action-bar { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.btn { padding:11px 22px; border-radius:10px; border:none; font-size:0.88rem; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:7px; }
+.btn.primary { background:var(--primary); color:#fff; } .btn.primary:hover { background:var(--primary-dark); }
+.btn.green { background:var(--green); color:#fff; }
+.btn.gray { background:var(--gray-light); color:var(--gray); }
+.btn.outline { background:#fff; border:2px solid var(--border); color:var(--gray); }
+.btn.red-outline { background:#fff; border:2px solid #fecaca; color:var(--red); }
+.btn:disabled { opacity:0.45; cursor:not-allowed; }
+.lock-note { text-align:center; font-size:0.75rem; color:var(--muted); margin-top:8px; }
+.autosave { font-size:0.72rem; color:var(--muted); text-align:center; margin-top:6px; }
+
+/* ─── سجل النسخ ─── */
+.ver-status { font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:20px; }
+.ver-status.approved { background:var(--green-light); color:var(--green); }
+.ver-status.draft { background:var(--yellow-light); color:var(--yellow); }
+.ver-status.sent { background:#dbeafe; color:var(--primary-dark); }
+
+/* ─── معاينة PDF الحكومية ─── */
+.pdf-page { background:#fff; max-width:820px; margin:0 auto; border:1px solid #cbd5e1; box-shadow:0 4px 20px rgba(0,0,0,0.1); padding:0; font-size:0.82rem; }
+.pdf-head { display:flex; align-items:center; justify-content:space-between; border-bottom:3px double #1e3a8a; padding:16px 24px; }
+.pdf-head .logo-box { width:60px; height:60px; border:2px solid #1e3a8a; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:2rem; }
+.pdf-head .org { text-align:center; }
+.pdf-head .org .l1 { font-size:0.75rem; color:var(--muted); }
+.pdf-head .org .l2 { font-size:1.05rem; font-weight:800; color:#1e3a8a; }
+.pdf-head .org .l3 { font-size:0.8rem; color:var(--gray); }
+.pdf-title { text-align:center; padding:14px 24px 6px; }
+.pdf-title h3 { font-size:1.15rem; color:#1e3a8a; text-decoration:underline; text-underline-offset:6px; }
+.pdf-ref { display:flex; justify-content:space-between; padding:8px 24px; font-size:0.78rem; font-weight:700; background:#f8fafc; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.pdf-body { padding:16px 24px; }
+.pdf-body h4 { font-size:0.88rem; color:#1e3a8a; margin:14px 0 6px; border-right:4px solid #1e3a8a; padding-right:8px; }
+.pdf-body table { font-size:0.75rem; }
+.pdf-body th { background:#eff6ff; color:#1e3a8a; }
+.pdf-sign { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-top:24px; padding-top:14px; border-top:2px solid var(--border); }
+.pdf-sign .sig { text-align:center; font-size:0.75rem; }
+.pdf-sign .sig .role { font-weight:800; color:var(--gray); }
+.pdf-sign .sig .name { margin:8px 0; font-weight:700; }
+.pdf-sign .sig .line { border-top:1px solid var(--gray); margin-top:26px; padding-top:4px; color:var(--muted); }
+.pdf-review { margin-top:14px; font-size:0.75rem; background:#f8fafc; padding:10px 14px; border-radius:8px; }
+.pdf-foot { display:flex; align-items:flex-end; justify-content:space-between; padding:16px 24px; border-top:1px solid var(--border); margin-top:14px; }
+.qr-box { width:86px; height:86px; border:2px solid var(--text); border-radius:6px; display:flex; align-items:center; justify-content:center; }
+.stamp { width:95px; height:95px; border:3px solid rgba(37,99,235,0.55); border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; color:rgba(37,99,235,0.65); font-size:0.62rem; font-weight:800; transform:rotate(-12deg); }
+.pdf-bottom { background:#f8fafc; border-top:2px solid #1e3a8a; padding:8px 24px; display:flex; justify-content:space-between; font-size:0.68rem; color:var(--muted); }
+
+.view { display:none; } .view.active { display:block; }
+.mock-banner { background:var(--yellow-light); border:1px solid #fde68a; color:#92400e; text-align:center; font-size:0.75rem; font-weight:700; padding:6px; border-radius:8px; margin-bottom:14px; }
+</style>
+</head>
+<body>
+
+<!-- شريط المحاكاة — للمراجعة فقط، لن يوجد في النسخة الحقيقية -->
+<div class="sim-bar">
+    <span class="tag">نموذج تجريبي W-0 — بيانات وهمية</span>
+    <span>حالة النسخة:</span>
+    <button id="simDraft" class="active" onclick="setState('draft')">مسودة</button>
+    <button id="simApproved" onclick="setState('approved')">معتمدة</button>
+    <button id="simSent" onclick="setState('sent')">مرسلة</button>
+    <span class="sep"></span>
+    <span>العرض:</span>
+    <button id="tabMain" class="active" onclick="setView('main')">الشاشة الرئيسية</button>
+    <button id="tabPdf" onclick="setView('pdf')">معاينة PDF الرسمي</button>
+    <button id="tabArchive" onclick="setView('archive')">أرشيف سير العمل</button>
+</div>
+
+<!-- الرأس -->
+<div class="page-header">
+    <div class="title">
+        <div class="logo">🚑</div>
+        <div>
+            <h1>سير العمل الرسمي</h1>
+            <div class="sub">هيئة الهلال الأحمر السعودي — قطاع الجنوب</div>
+        </div>
+    </div>
+    <div class="header-badges">
+        <span class="hbadge">مناوبة صباح — 2026-07-24</span>
+        <span class="hbadge">الإصدار V2</span>
+        <span class="hbadge noref" id="refBadge">المرجع: يُمنح عند الاعتماد</span>
+    </div>
+</div>
+
+<!-- شريط حالة سير العمل -->
+<div class="status-track" id="statusTrack">
+    <div class="step" data-step="0"><div class="dot">1</div><div class="lbl">بانتظار الإعداد</div></div>
+    <div class="step" data-step="1"><div class="line"></div><div class="dot">2</div><div class="lbl">تم إعداده</div></div>
+    <div class="step" data-step="2"><div class="line"></div><div class="dot">3</div><div class="lbl">تم اعتماده</div></div>
+    <div class="step" data-step="3"><div class="line"></div><div class="dot">4</div><div class="lbl">تم إرساله</div></div>
+    <div class="step" data-step="4"><div class="line"></div><div class="dot">5</div><div class="lbl">تم استلامه</div></div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════ العرض الرئيسي ═══════════ -->
+<div class="view active" id="view-main">
+
+    <div class="mock-banner">كل البيانات أدناه مسحوبة تلقائيًا من التكميل (قراءة فقط) — لا يمكن تحريرها من هنا</div>
+
+    <!-- بيانات المناوبة -->
+    <div class="card">
+        <h2><span class="icon">📋</span> بيانات المناوبة</h2>
+        <div class="shift-grid">
+            <div class="shift-item"><div class="k">التاريخ</div><div class="v">2026-07-24</div></div>
+            <div class="shift-item"><div class="k">نوع المناوبة</div><div class="v">صباح</div></div>
+            <div class="shift-item"><div class="k">بداية المناوبة</div><div class="v">07:00</div></div>
+            <div class="shift-item"><div class="k">نهاية المناوبة</div><div class="v">17:00</div></div>
+            <div class="shift-item"><div class="k">رقم المناوبة</div><div class="v">1784892000000</div></div>
+            <div class="shift-item"><div class="k">وقت إنشاء اللقطة</div><div class="v">07:12</div></div>
+        </div>
+    </div>
+
+    <!-- ملخص القوى -->
+    <div class="card">
+        <h2><span class="icon">📊</span> ملخص القوى البشرية والمركبات</h2>
+        <div class="dash">
+            <div class="dash-card blue"><div class="value">146</div><div class="label">الكادر المجدول</div></div>
+            <div class="dash-card green"><div class="value">138</div><div class="label">الحاضرون</div></div>
+            <div class="dash-card red"><div class="value">3</div><div class="label">غياب</div></div>
+            <div class="dash-card yellow"><div class="value">2</div><div class="label">تأخر</div></div>
+            <div class="dash-card blue"><div class="value">2</div><div class="label">دعم مؤقت</div></div>
+            <div class="dash-card green"><div class="value">95%</div><div class="label">جاهزية الفرق</div></div>
+        </div>
+        <div class="dash" style="margin-top:10px">
+            <div class="dash-card green"><div class="value">24</div><div class="label">🚑 مركبات عاملة</div></div>
+            <div class="dash-card yellow"><div class="value">3</div><div class="label">🔄 احتياط</div></div>
+            <div class="dash-card red"><div class="value">1</div><div class="label">🛠️ متعطلة</div></div>
+            <div class="dash-card"><div class="value">2</div><div class="label">غير معيّنة</div></div>
+        </div>
+    </div>
+
+    <!-- جدول الفرق -->
+    <div class="card">
+        <h2><span class="icon">🚑</span> الفرق والكادر والمركبات</h2>
+        <table>
+            <thead><tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>الكادر</th><th>الدعم</th><th>المركبة</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><b>جنوب 1</b></td><td>المنصورة</td>
+                    <td><span class="chip ready">✅ جاهزة</span></td>
+                    <td><span class="person">سلطان عبدالحميد البشر</span><span class="person">مسفر مبارك حتيف</span></td>
+                    <td>—</td>
+                    <td class="veh"><b>91234</b> — عاملة</td>
+                </tr>
+                <tr>
+                    <td><b>جنوب 2</b></td><td>الخالدية</td>
+                    <td><span class="chip missing">⚠️ ناقصة</span></td>
+                    <td><span class="person">زياد عبدالله الرشيد</span><span class="person absent">سعد الغامدي (غياب)</span></td>
+                    <td><span class="person support">+ خالد العتيبي (دعم من جنوب 4)</span></td>
+                    <td class="veh"><b>92331</b> — عاملة</td>
+                </tr>
+                <tr>
+                    <td><b>جنوب 3</b></td><td>منفوحة</td>
+                    <td><span class="chip ready">✅ جاهزة</span></td>
+                    <td><span class="person">فيصل جلوي القبعي</span><span class="person late">حسن عليو (تأخر 40 د — حضر 07:40)</span></td>
+                    <td>—</td>
+                    <td class="veh"><b>93452</b> — عاملة</td>
+                </tr>
+                <tr>
+                    <td><b>جنوب 4</b></td><td>الدار البيضاء</td>
+                    <td><span class="chip ready">✅ جاهزة</span></td>
+                    <td><span class="person">إبراهيم السيد</span><span class="person">أحمد مصطفى الصالح</span></td>
+                    <td>—</td>
+                    <td class="veh"><b>94510</b> — عاملة</td>
+                </tr>
+                <tr>
+                    <td><b>تدخل سريع 1</b></td><td>المنصورة</td>
+                    <td><span class="chip offline">🔴 خارج الخدمة</span></td>
+                    <td><span class="person">ناصر عبدالهادي القحطاني</span> <span class="veh">(سبب: عطل مركبة — بانتظار الورشة)</span></td>
+                    <td>—</td>
+                    <td class="veh"><b>95021</b> — متعطلة</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ملاحظات التكميل -->
+    <div class="card">
+        <h2><span class="icon">📝</span> ملاحظات التكميل (كما سجّلها المشرف)</h2>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 16px;font-size:0.85rem;line-height:1.8">
+            تأخر وصول مركبة الورشة لفرقة تدخل سريع 1 — تمت المتابعة مع الصيانة. تم توزيع تغطية الخالدية على جنوب 4 مؤقتًا حتى وصول الدعم.
+        </div>
+    </div>
+
+    <!-- حقول المشرف -->
+    <div class="card">
+        <h2><span class="icon">✍️</span> حقول سير العمل (يملؤها المشرف)</h2>
+        <div class="field"><label>ملخص المناوبة</label><textarea id="f1">مناوبة صباحية اعتيادية، اكتمل التكميل 07:12، نقص واحد في الخالدية عولج بدعم مؤقت من الدار البيضاء.</textarea></div>
+        <div class="field"><label>الملاحظات التشغيلية</label><textarea id="f2">تعطل مركبة تدخل سريع 1 (95021) — بلاغ صيانة مرفوع 07:05.</textarea></div>
+        <div class="field"><label>أبرز الأحداث</label><textarea id="f3">لا توجد أحداث جوهرية حتى وقت إعداد سير العمل.</textarea></div>
+        <div class="field"><label>المشاكل التشغيلية</label><textarea id="f4">نقص الكادر في الخالدية بسبب غياب غير مُبلّغ.</textarea></div>
+        <div class="field"><label>التوصيات</label><textarea id="f5">متابعة بلاغ الصيانة، والتنبيه على ضرورة الإبلاغ المبكر عن الغياب.</textarea></div>
+
+        <div class="field">
+            <label>تمت مراجعة المناوبة بواسطة:</label>
+            <div class="review-box" id="reviewBox">
+                <label><input type="checkbox" checked> مشرف العمليات</label>
+                <label><input type="checkbox"> مدير القطاع</label>
+                <label><input type="checkbox"> المناوبة الإداري</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- شريط الإجراءات -->
+    <div class="card">
+        <div class="action-bar">
+            <button class="btn green" id="btnApprove" onclick="alert('محاكاة: اعتماد سير العمل — قفل + رقم مرجع + PDF + أرشفة')">✔️ اعتماد سير العمل</button>
+            <button class="btn primary" id="btnPdf" disabled onclick="setView('pdf')">📄 تحميل PDF</button>
+            <button class="btn outline" id="btnSend" disabled onclick="alert('محاكاة: الإرسال — سيسجل «بانتظار ربط خدمة البريد»')">✉️ إرسال للجهة المختصة</button>
+            <button class="btn gray" id="btnReissue" disabled onclick="alert('محاكاة: إعادة إصدار — نسخة V3 جديدة بسبب إلزامي')">🔁 إعادة إصدار</button>
+            <button class="btn red-outline" id="btnCancel" onclick="alert('محاكاة: إلغاء المسودة (موثق — لا يُحذف)')">✖️ إلغاء المسودة</button>
+        </div>
+        <div class="lock-note" id="lockNote">المسودة قابلة للتحرير — الحفظ تلقائي</div>
+        <div class="autosave" id="autosaveNote">✓ تم الحفظ تلقائيًا 07:14:22</div>
+    </div>
+
+    <!-- سجل النسخ -->
+    <div class="card">
+        <h2><span class="icon">🗂️</span> سجل النسخ</h2>
+        <table>
+            <thead><tr><th>الإصدار</th><th>المرجع</th><th>الحالة</th><th>أنشأها</th><th>اعتمدها</th><th>وقت الاعتماد</th><th>سبب الإصدار</th></tr></thead>
+            <tbody>
+                <tr><td><b>V2</b> (الحالية)</td><td id="verRefCell">—</td><td><span class="ver-status draft" id="verStatusCell">مسودة</span></td><td>وليد الحربي</td><td id="verApprCell">—</td><td id="verTimeCell">—</td><td>تعديل بيانات الدعم</td></tr>
+                <tr><td>V1</td><td>SRCA-SR-OPS-2026-000144</td><td><span class="ver-status approved">معتمدة</span></td><td>وليد الحربي</td><td>وليد الحربي</td><td>07:20</td><td>—</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ═══════════ معاينة PDF الرسمي ═══════════ -->
+<div class="view" id="view-pdf">
+    <div class="mock-banner">هذا شكل الوثيقة الرسمية المولّدة (تصميم حكومي — ليست نسخة من الشاشة)</div>
+    <div class="pdf-page">
+        <div class="pdf-head">
+            <div class="logo-box">🚑</div>
+            <div class="org">
+                <div class="l1">المملكة العربية السعودية</div>
+                <div class="l2">هيئة الهلال الأحمر السعودي</div>
+                <div class="l3">إدارة عمليات قطاع الجنوب</div>
+            </div>
+            <div class="logo-box" style="visibility:hidden"></div>
+        </div>
+        <div class="pdf-title"><h3>سير العمل الرسمي للمناوبة</h3></div>
+        <div class="pdf-ref">
+            <span>المرجع: <b>SRCA-SR-OPS-2026-000145</b></span>
+            <span>الإصدار: <b>V2</b></span>
+            <span>التاريخ: <b>2026-07-24</b></span>
+        </div>
+        <div class="pdf-body">
+            <h4>أولًا: بيانات المناوبة</h4>
+            <table>
+                <tr><th>النوع</th><th>التاريخ</th><th>البداية</th><th>النهاية</th><th>رقم المناوبة</th></tr>
+                <tr><td>صباح</td><td>2026-07-24</td><td>07:00</td><td>17:00</td><td>1784892000000</td></tr>
+            </table>
+            <h4>ثانيًا: الفرق والكادر</h4>
+            <table>
+                <tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>الكادر</th><th>المركبة</th></tr>
+                <tr><td>جنوب 1</td><td>المنصورة</td><td>جاهزة</td><td>سلطان البشر، مسفر حتيف</td><td>91234 — عاملة</td></tr>
+                <tr><td>جنوب 2</td><td>الخالدية</td><td>ناقصة (دعم)</td><td>زياد الرشيد — غياب: سعد الغامدي — دعم: خالد العتيبي</td><td>92331 — عاملة</td></tr>
+                <tr><td>جنوب 3</td><td>منفوحة</td><td>جاهزة</td><td>فيصل القبعي — تأخر: حسن عليو (حضر 07:40)</td><td>93452 — عاملة</td></tr>
+                <tr><td>تدخل سريع 1</td><td>المنصورة</td><td>خارج الخدمة</td><td>ناصر القحطاني</td><td>95021 — متعطلة</td></tr>
+            </table>
+            <h4>ثالثًا: ملخص القوى</h4>
+            <table>
+                <tr><th>الكادر</th><th>الحاضرون</th><th>غياب</th><th>تأخر</th><th>دعم</th><th>جاهزية الفرق</th></tr>
+                <tr><td>146</td><td>138</td><td>3</td><td>2</td><td>2</td><td>95%</td></tr>
+            </table>
+            <h4>رابعًا: ملخص المناوبة والملاحظات</h4>
+            <table>
+                <tr><td style="line-height:1.9">مناوبة صباحية اعتيادية، اكتمل التكميل 07:12، نقص واحد في الخالدية عولج بدعم مؤقت. تعطل مركبة تدخل سريع 1 وبلاغ صيانة مرفوع. التوصية: متابعة بلاغ الصيانة والتنبيه على الإبلاغ المبكر عن الغياب.</td></tr>
+            </table>
+            <div class="pdf-review">تمت مراجعة المناوبة بواسطة: ☑ مشرف العمليات &nbsp;&nbsp; ☐ مدير القطاع &nbsp;&nbsp; ☐ المناوبة الإداري</div>
+            <div class="pdf-sign">
+                <div class="sig"><div class="role">أعدّه</div><div class="name">وليد الحربي</div><div class="line">التوقيع</div></div>
+                <div class="sig"><div class="role">اعتمده</div><div class="name">وليد الحربي</div><div class="line">التوقيع / التوقيع الإلكتروني</div></div>
+                <div class="sig"><div class="role">الختم</div><div class="stamp">عمليات قطاع الجنوب<br>سير العمل الرسمي</div></div>
+            </div>
+            <div class="pdf-foot">
+                <div>
+                    <div class="qr-box">
+                        <svg width="70" height="70" viewBox="0 0 10 10"><rect width="3" height="3" x="0" y="0"/><rect width="3" height="3" x="7" y="0"/><rect width="3" height="3" x="0" y="7"/><rect x="4" y="1" width="1" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="5" y="7" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="4" y="4" width="2" height="2"/></svg>
+                    </div>
+                    <div style="font-size:0.6rem;text-align:center;margin-top:3px;color:var(--muted)">امسح للتحقق من الأصالة</div>
+                </div>
+                <div style="font-size:0.66rem;color:var(--muted);text-align:left;line-height:1.8">
+                    تحقق: SRCA-SR-OPS-2026-000145 • V2 • معتمدة<br>
+                    Hash: a3f9c21e7b4d8052…
+                </div>
+            </div>
+        </div>
+        <div class="pdf-bottom">
+            <span>SRCA-SR-OPS-2026-000145</span>
+            <span>صدرت إلكترونيًا من منصة عمليات قطاع الجنوب — 2026-07-24 07:25</span>
+            <span>صفحة 1 من 1</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ أرشيف سير العمل ═══════════ -->
+<div class="view" id="view-archive">
+    <div class="mock-banner">أرشيف سير العمل — كل نسخة تُفتح كما كانت يوم اعتمادها (لقطة مستقلة 100%)</div>
+    <div class="card">
+        <h2><span class="icon">🗄️</span> أرشيف سير العمل</h2>
+        <table>
+            <thead><tr><th>التاريخ</th><th>المناوبة</th><th>الإصدارات</th><th>آخر مرجع</th><th>حالة سير العمل</th><th></th></tr></thead>
+            <tbody>
+                <tr><td>2026-07-24</td><td>صباح</td><td>V1, V2</td><td>—</td><td><span class="chip missing">تم إعداده (مسودة V2)</span></td><td><button class="btn outline" style="padding:6px 14px;font-size:0.75rem">فتح</button></td></tr>
+                <tr><td>2026-07-23</td><td>ليل</td><td>V1</td><td>SRCA-SR-OPS-2026-000143</td><td><span class="chip ready">تم استلامه</span></td><td><button class="btn outline" style="padding:6px 14px;font-size:0.75rem">فتح</button></td></tr>
+                <tr><td>2026-07-23</td><td>صباح</td><td>V1, V2</td><td>SRCA-SR-OPS-2026-000141</td><td><span class="chip ready">تم إرساله</span></td><td><button class="btn outline" style="padding:6px 14px;font-size:0.75rem">فتح</button></td></tr>
+                <tr><td>2026-07-22</td><td>صباح</td><td>V1</td><td>SRCA-SR-OPS-2026-000138</td><td><span class="chip ready">تم اعتماده</span></td><td><button class="btn outline" style="padding:6px 14px;font-size:0.75rem">فتح</button></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<script>
+// ─── محاكاة الحالات (للمراجعة فقط) ───
+var STATES = {
+    draft:    { step: 1, ref: 'المرجع: يُمنح عند الاعتماد', refCls: 'hbadge noref', approve: false, pdf: true, send: true, reissue: true, cancel: false, lock: 'المسودة قابلة للتحرير — الحفظ تلقائي', verStatus: ['مسودة', 'ver-status draft'], verRef: '—', verAppr: '—', verTime: '—', readonly: false },
+    approved: { step: 2, ref: 'SRCA-SR-OPS-2026-000145', refCls: 'hbadge ref', approve: true, pdf: false, send: false, reissue: false, cancel: true, lock: '🔒 نسخة معتمدة ومقفلة — التعديل لمدير النظام فقط عبر «تعديل استثنائي» موثق', verStatus: ['معتمدة', 'ver-status approved'], verRef: 'SRCA-SR-OPS-2026-000145', verAppr: 'وليد الحربي', verTime: '07:25', readonly: true },
+    sent:     { step: 4, ref: 'SRCA-SR-OPS-2026-000145', refCls: 'hbadge ref', approve: true, pdf: false, send: true, reissue: false, cancel: true, lock: '🔒 نسخة مرسلة ومقفلة — أُرسلت 07:30 وتم تأكيد الاستلام 07:45', verStatus: ['مرسلة', 'ver-status sent'], verRef: 'SRCA-SR-OPS-2026-000145', verAppr: 'وليد الحربي', verTime: '07:25', readonly: true }
+};
+function setState(s) {
+    var st = STATES[s];
+    document.getElementById('simDraft').classList.toggle('active', s === 'draft');
+    document.getElementById('simApproved').classList.toggle('active', s === 'approved');
+    document.getElementById('simSent').classList.toggle('active', s === 'sent');
+    // شريط الحالة
+    var steps = document.querySelectorAll('#statusTrack .step');
+    steps.forEach(function(el, i) {
+        el.classList.remove('done', 'current');
+        if (i < st.step) el.classList.add('done');
+        else if (i === st.step) el.classList.add('current');
+    });
+    // المرجع والشارات
+    var rb = document.getElementById('refBadge');
+    rb.textContent = st.ref.indexOf('SRCA') === 0 ? 'المرجع: ' + st.ref : st.ref;
+    rb.className = st.refCls;
+    // الأزرار
+    document.getElementById('btnApprove').disabled = st.approve;
+    document.getElementById('btnPdf').disabled = st.pdf;
+    document.getElementById('btnSend').disabled = st.send;
+    document.getElementById('btnReissue').disabled = st.reissue;
+    document.getElementById('btnCancel').disabled = st.cancel;
+    document.getElementById('lockNote').textContent = st.lock;
+    document.getElementById('autosaveNote').style.display = st.readonly ? 'none' : '';
+    // الحقول
+    ['f1','f2','f3','f4','f5'].forEach(function(id) { document.getElementById(id).readOnly = st.readonly; });
+    document.getElementById('reviewBox').classList.toggle('disabled', st.readonly);
+    document.querySelectorAll('#reviewBox input').forEach(function(c) { c.disabled = st.readonly; });
+    // سجل النسخ
+    var vs = document.getElementById('verStatusCell');
+    vs.textContent = st.verStatus[0]; vs.className = st.verStatus[1];
+    document.getElementById('verRefCell').textContent = st.verRef;
+    document.getElementById('verApprCell').textContent = st.verAppr;
+    document.getElementById('verTimeCell').textContent = st.verTime;
+}
+function setView(v) {
+    ['main','pdf','archive'].forEach(function(x) {
+        document.getElementById('view-' + x).classList.toggle('active', x === v);
+        document.getElementById('tab' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('active', x === v);
+    });
+}
+setState('draft');
+</script>
+</body>
+</html>

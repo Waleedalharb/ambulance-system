@@ -78,8 +78,7 @@
 
                 var timeStr = '';
                 if (item.created_at) {
-                    var d = new Date(item.created_at);
-                    timeStr = d.toLocaleString('ar-SA', { hour12: false });
+                    timeStr = TimeRiyadh.formatDateTimeSec(item.created_at);
                 }
 
                 var isUnread = status !== 'read';

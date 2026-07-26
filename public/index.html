@@ -367,7 +367,7 @@ window.addEventListener('load', function() {
                     <i class="fas fa-clock"></i>
                     <span id="currentShiftDisplay">جاري التحميل...</span>
                 </button>
-                <button class="qa-btn" title="تكميل النوبة" onclick="navigateToPage('radio-completion.html?v=41')">
+                <button class="qa-btn" title="تكميل المراكز الإسعافية" onclick="navigateToPage('radio-completion.html?v=41')">
                     <i class="fas fa-clipboard-list"></i>
                     <span>تكميل</span>
                 </button>
@@ -509,7 +509,7 @@ window.addEventListener('load', function() {
                 <span class="shift-btn-dot" id="newShiftDot" style="display:inline-block;"></span>
                 <span class="shift-btn-text" id="newShiftText">جاري التحميل...</span>
             </button>
-            <button id="shiftBtn" class="btn btn-secondary" onclick="navigateToPage('radio-completion.html?v=41')"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+            <button id="shiftBtn" class="btn btn-secondary" onclick="navigateToPage('radio-completion.html?v=41')"><i class="fas fa-clipboard-list"></i> تكميل المراكز الإسعافية</button>
             <button id="distributionBtn" class="btn btn-teal"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
             <button class="btn btn-info" onclick="navigateToPage('smart-schedule.html?v=41')"><i class="fas fa-calendar-alt"></i> الجداول</button>
             <button id="seniorShiftBtn" class="btn btn-senior"><i class="fas fa-user-md"></i> كبار المسعفين</button>
@@ -1612,7 +1612,8 @@ window.addEventListener('load', function() {
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=41');"><i class="fas fa-clipboard-list"></i> تكميل النوبة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=41');"><i class="fas fa-clipboard-list"></i> تكميل المراكز الإسعافية</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('workflow.html');"><i class="fas fa-file-signature"></i> سير العمل الرسمي</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('distributionModal'); renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-chart-pie"></i> الإحصائيات والتقارير</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
@@ -1692,6 +1693,7 @@ window.addEventListener('load', function() {
 <script src="js/frontend-monitor.js?v=3"></script>
 <script src="js/chat-integration.js"></script>
 <script src="/js/auth-manager.js"></script>
+<script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
 <script src="js/app.js?v=46" defer></script>
 <script src="js/smart-toolbar.js?v=3" defer></script>

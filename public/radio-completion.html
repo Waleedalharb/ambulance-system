@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تكميل سريع (Radio Mode) | منصة الجنوب</title>
+<title>تكميل المراكز الإسعافية | منصة الجنوب</title>
 <link rel="icon" type="image/png" href="/favicon-32x32.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="/css/a11y.css?v=1">
@@ -81,6 +81,24 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .miss-info { font-size:0.68rem; color:#92400E; margin-top:4px; font-weight:700; }
 .miss-info .btn-arrive { margin-inline-start:6px; font-size:0.62rem; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-family:inherit; background:var(--green); color:#fff; }
 .miss-info .btn-arrive:hover { filter:brightness(0.92); }
+.pm { background:var(--gray-light); border-radius:8px; padding:4px 8px; margin:3px 0; text-align:right; }
+.pm .pm-job { font-size:0.66rem; font-weight:800; color:var(--text); }
+.pm .pm-name { font-size:0.72rem; font-weight:700; color:var(--muted); }
+.pm .pm-code { font-size:0.62rem; color:var(--muted); }
+.btn-cover { width:100%; margin-top:6px; padding:7px; border:1px dashed var(--border); border-radius:10px; background:transparent; color:var(--muted); font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
+.btn-cover:hover { border-color:var(--blue); color:var(--blue); }
+.cover-info { font-size:0.68rem; color:#065F46; margin-top:4px; font-weight:700; }
+.cover-info .btn-end-cover { margin-inline-start:6px; font-size:0.6rem; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-family:inherit; background:var(--red); color:#fff; }
+
+/* حوض الدعم المتاح (W-تكامل ③) — بطاقات الأفراد غير الموزعين من الخادم */
+.support-count { background:var(--blue); color:#fff; font-size:0.7rem; font-weight:700; padding:2px 10px; border-radius:12px; }
+.support-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:0.9rem; box-shadow:var(--shadow); }
+.support-card .sp-job { font-size:0.66rem; font-weight:800; color:var(--text); }
+.support-card .sp-name { font-size:0.88rem; font-weight:700; margin-top:2px; }
+.support-card .sp-meta { font-size:0.66rem; color:var(--muted); margin-top:2px; }
+.support-card .btn-support { width:100%; margin-top:8px; padding:7px; border:none; border-radius:10px; background:var(--blue); color:#fff; font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
+.support-card .btn-support:hover { filter:brightness(0.92); }
+.support-person { background:var(--gray-light); border-radius:10px; padding:8px 10px; font-size:0.75rem; line-height:1.8; margin-bottom:4px; }
 
 /* بند 15: سجل التأخير (بدأ/حضر/المدة) — عرض فقط من اشتقاق الخادم */
 .late-rec { display:block; font-size:0.62rem; color:#92400E; line-height:1.7; background:#FFFBEB; border-radius:6px; padding:2px 6px; margin-top:2px; }
@@ -182,6 +200,8 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .btn-finish { padding:1rem 3rem; font-size:1.1rem; font-weight:700; border-radius:16px; border:none; cursor:pointer; background:var(--primary); color:#fff; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
 .btn-finish:hover { transform:scale(1.03); }
 .btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
+.btn-workflow { padding:0.85rem 2.5rem; font-size:1.05rem; font-weight:700; border-radius:14px; border:2px solid var(--green); background:#fff; color:var(--green); cursor:pointer; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
+.btn-workflow:hover { background:var(--green); color:#fff; transform:scale(1.03); }
 
 /* Toast */
 .toast-container { position:fixed; top:1rem; left:1rem; z-index:300; }
@@ -219,6 +239,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 <!-- Session Check -->
 <script src="js/core/core-auth.js"></script>
 <script src="js/core/core-toast.js"></script>
+<script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
 <script>
 (function() {
@@ -236,7 +257,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 
 <div class="top-bar">
     <div style="display:flex; align-items:center; gap:1rem;">
-        <h1>🎙️ تكميل سريع</h1>
+        <h1>تكميل المراكز الإسعافية</h1>
         <span class="badge" id="shiftBadge">جاري التحميل...</span>
     </div>
     <div style="display:flex; gap:0.5rem;">
@@ -280,14 +301,20 @@ function navigateToPage(url) {
     <div class="cards-grid" id="centerCards"></div>
 </div>
 
-<!-- Special Teams -->
+<!-- Special Teams — القيادة والعمليات (تأتي من الخادم مثل بقية الفرق) -->
 <div class="section" id="specialSection" style="display:none">
-    <div class="section-title"><i class="fas fa-users"></i> الفرق الخاصة</div>
+    <div class="section-title"><i class="fas fa-star"></i> القيادة والعمليات</div>
     <div class="cards-grid" id="specialCards"></div>
 </div>
 
 <div class="section" id="teamsLoadingNote">
     <div class="section-empty"><i class="fas fa-circle-notch fa-spin"></i> جارٍ تحميل فرق المناوبة من الخادم…</div>
+</div>
+
+<!-- الدعم المتاح — القوى المجدولة غير الموزعة (حوض الأوفرلاب والدعم) من الخادم مباشرة -->
+<div class="section" id="supportSection" style="display:none">
+    <div class="section-title"><i class="fas fa-handshake"></i> الدعم المتاح <span class="support-count" id="supportCount"></span></div>
+    <div class="cards-grid" id="supportCards"></div>
 </div>
 
 <!-- Vehicles -->
@@ -329,6 +356,52 @@ function navigateToPage(url) {
     </div>
 </div>
 
+<!-- التغطية التشغيلية (بند 17) — توثيق من غطّى النقص: الاسم/الرقم/المركز/النوع -->
+<div class="modal-overlay" id="coverageModal">
+    <div class="modal-box">
+        <h3 id="coverageTitle">تغطية تشغيلية</h3>
+        <label for="coverageName"><i class="fas fa-user"></i> اسم الموظف</label>
+        <input id="coverageName" placeholder="مثال: محمد القحطاني">
+        <label for="coverageJobTitle"><i class="fas fa-user-tag"></i> المسمى الوظيفي</label>
+        <input id="coverageJobTitle" placeholder="مثال: فني إسعاف">
+        <label for="coverageNumber"><i class="fas fa-id-badge"></i> الرقم الوظيفي (اختياري)</label>
+        <input id="coverageNumber" placeholder="إن وجد">
+        <label for="coverageCenter"><i class="fas fa-hospital"></i> المركز الأصلي</label>
+        <select id="coverageCenter"></select>
+        <label for="coverageType"><i class="fas fa-handshake"></i> نوع التغطية</label>
+        <select id="coverageType">
+            <option value="volunteer">تطوع</option>
+            <option value="external">دعم من مركز آخر</option>
+            <option value="assignment">تكليف</option>
+            <option value="reserve">احتياط</option>
+        </select>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmCoverage()"><i class="fas fa-check"></i> حفظ التغطية</button>
+            <button class="mm-cancel" onclick="closeCoverageModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- تنفيذ دعم من حوض الدعم المتاح (W-تكامل ③) — الشخص يُختار من الحوض،
+     والمشرف يحدد الفريق المدعوم ونوع الدعم (تطوع/خلافة) ثم يحفظ -->
+<div class="modal-overlay" id="supportModal">
+    <div class="modal-box">
+        <h3 id="supportTitle">تنفيذ دعم</h3>
+        <div class="support-person" id="supportPersonInfo"></div>
+        <label for="supportType"><i class="fas fa-handshake"></i> نوع الدعم</label>
+        <select id="supportType">
+            <option value="volunteer">تطوع</option>
+            <option value="external">خلافة (قادم من موقع آخر)</option>
+        </select>
+        <label for="supportTargetTeam"><i class="fas fa-users"></i> الفريق المدعوم</label>
+        <select id="supportTargetTeam"></select>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmSupport()"><i class="fas fa-check"></i> حفظ الدعم</button>
+            <button class="mm-cancel" onclick="closeSupportModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
 <!-- سؤال قرار الحالة بعد تسجيل نقص (بند 9) — النظام لا يفترض قرارًا نيابة عن المشرف -->
 <div class="modal-overlay" id="decisionModal">
     <div class="modal-box">
@@ -362,6 +435,7 @@ function navigateToPage(url) {
 <!-- Summary Button -->
 <div class="finish-bar">
     <button class="btn-finish" id="finishBtn" onclick="finishShift()"><i class="fas fa-eye"></i> عرض الملخص</button>
+    <button class="btn-workflow" id="workflowBtn" style="display:none" onclick="navigateToPage('workflow.html')"><i class="fas fa-file-signature"></i> سير العمل الرسمي — جاهز للمراجعة والاعتماد</button>
     <div style="font-size:0.75rem;color:var(--muted);">
         <i class="fas fa-sync fa-spin" style="display:none" id="saveSpinner"></i>
         <span id="saveStatus">يتم الحفظ تلقائياً...</span>
@@ -387,7 +461,7 @@ function navigateToPage(url) {
 
 <script>
 // ============================================================
-// تكميل سريع — واجهة مُعاد بناؤها فوق نفس المعمارية المستقرة.
+// تكميل المراكز الإسعافية — واجهة مُعاد بناؤها فوق نفس المعمارية المستقرة.
 // لا منطق أعمال هنا: كل حالة تُشتق سيرفريًا (SSOT)، الواجهة ترسل
 // أحداثًا بالعقد الموجود وتعيد الجلب ثم تعرض فقط.
 // العقود المستخدمة (بلا أي تعديل):
@@ -404,38 +478,19 @@ function navigateToPage(url) {
 // ============================================================
 
 // ------------------------------------
-// CONFIG
+// CONFIG — W-تكامل ③: لا قوائم فرق ثابتة داخل الصفحة إطلاقًا.
+// كل الفرق تأتي من /api/staffing/state (نفس مصدر سير العمل والمؤشرات
+// والصفحة الرئيسية) مرتبةً من الخادم: قيادة/تحكم/تنسيق ← جنوب رقمي ← سريع.
+// التصنيف أدناه تجميع عرض فقط (أي قسم يظهر فيه الفريق) — ليس اشتقاقًا.
 // ------------------------------------
-var rapidTeams = [
-    { name: 'rapid_1', displayName: 'تدخل سريع 1' },
-    { name: 'rapid_2', displayName: 'تدخل سريع 2' },
-    { name: 'rapid_3', displayName: 'تدخل سريع 3' },
-    { name: 'rapid_4', displayName: 'تدخل سريع 4' },
-    { name: 'rapid_5', displayName: 'تدخل سريع 5' }
-];
-var centerList = [];
-for (var ci = 1; ci <= 16; ci++) centerList.push('جنوب ' + ci);
-var specialTeams = [
-    { id: 'بنك_الدم', name: 'بنك الدم' },
-    { id: 'إجازة', name: 'الإجازة' },
-    { id: 'قائد_ميداني', name: 'القائد الميداني' },
-    { id: 'تحكم_تنسيق', name: 'التحكم والتنسيق' },
-    { id: 'دعم_لوجستي', name: 'الدعم اللوجستي' },
-    { id: 'باص_استجابة', name: 'باص الاستجابة' },
-    { id: 'المنتدبين', name: 'المنتدبين' }
-];
-var OPERATIONAL_TEAMS = {};
-rapidTeams.forEach(function(t) { OPERATIONAL_TEAMS[t.name] = true; });
-centerList.forEach(function(c) { OPERATIONAL_TEAMS[c] = true; });
-
-var TEAM_CENTER_MAP = {
-    'rapid_1': 'المنصورة', 'rapid_2': 'الشفاء', 'rapid_3': 'المنصورة',
-    'جنوب 1': 'المنصورة', 'جنوب 2': 'الخالدية', 'جنوب 3': 'منفوحة',
-    'جنوب 4': 'الدار البيضاء', 'جنوب 5': 'الدار البيضاء', 'جنوب 6': 'الإسكان',
-    'جنوب 7': 'الحائر', 'جنوب 8': 'الشفاء', 'جنوب 9': 'عكاظ',
-    'جنوب 10': 'ديراب', 'جنوب 11': 'المنصورة', 'جنوب 12': 'المنصورة',
-    'جنوب 13': 'المنصورة', 'جنوب 14': 'المنصورة', 'جنوب 15': 'المنصورة', 'جنوب 16': 'المنصورة'
-};
+function serverTeamIds() { return serverTeamsState ? Object.keys(serverTeamsState) : []; }
+function teamTypeOf(teamId) {
+    if (/^سريع\s+\d/.test(teamId)) return 'rapid';
+    if (/^جنوب\s+\d/.test(teamId)) return 'center';
+    return 'special'; // القيادة الميدانية / التحكم العملياتي / تنسيق الاستجابة / أي فريق آخر من الخادم
+}
+// كل فريق في الحالة المشتقة فريق تشغيلي قابل للتكميل (قرارات المشرف تُخزَّن سيرفريًا لأي فريق)
+function isOperationalTeam(teamId) { return !!rosterDataOf(teamId); }
 
 var STATUS_LABELS = { ready: '✅ جاهزة', missing: '⚠️ ناقصة', offline: '🔴 خارج الخدمة', pending: '⏳ باقي' };
 // أسباب النقص المعتمدة — كل سبب يُترجم لحدث شخص في السجل الرسمي:
@@ -444,6 +499,12 @@ var MISSING_REASONS = ['غياب', 'تأخير', 'تكليف', 'إجازة'];
 var MISSING_REASON_EVENT = { 'غياب': 'absence', 'تأخير': 'late', 'تكليف': 'absence', 'إجازة': 'absence' };
 
 var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
+// وسما نوع الدعم في سجل التغطية — عرض فقط فوق supportType/coverageType القادمين من الخادم
+var SUPPORT_TYPE_LABELS = { volunteer_support: 'تطوع', external_support: 'دعم من مركز آخر', assignment: 'تكليف' };
+var COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط' };
+function supportTypeLabel(m) {
+    return COVERAGE_TYPE_LABELS[m.coverageType] || SUPPORT_TYPE_LABELS[m.supportType] || SUPPORT_TYPE_LABELS[m.state] || 'دعم';
+}
 
 // ------------------------------------
 // STATE (كلها قراءة فقط من الخادم — لا مصدر محلي)
@@ -478,14 +539,16 @@ function authHeaders() {
     return t ? { 'Authorization': 'Bearer ' + t } : null;
 }
 function displayNameOf(teamId) {
-    var r = rapidTeams.find(function(t) { return t.name === teamId; });
-    if (r) return r.displayName;
-    var s = specialTeams.find(function(t) { return t.id === teamId; });
-    if (s) return s.name;
+    // W-تكامل ③: أسماء الخادم هي أسماء العرض التشغيلية نفسها — لا خرائط ترجمة محلية
     return teamId;
 }
-function getTeamCenter(teamId) { return TEAM_CENTER_MAP[teamId] || ''; }
+// المركز من الحالة المشتقة سيرفريًا (teams.center) — لا خريطة ثابتة
+function getTeamCenter(teamId) {
+    var d = rosterDataOf(teamId);
+    return (d && d.center) || '';
+}
 // يطابق canonicalTeamId في الخادم: rapid_N / تدخل سريع N ⇒ «سريع N»
+// (توافقية قديمة فقط — المعرّفات الحالية تأتي من الخادم جاهزة)
 function serverTeamKey(teamId) {
     var m = String(teamId).match(/^(?:rapid_|تدخل سريع\s*)(\d+)$/);
     if (m) return 'سريع ' + parseInt(m[1], 10);
@@ -494,25 +557,12 @@ function serverTeamKey(teamId) {
 
 // ------------------------------------
 // SHIFT DETECTION (Saudi Time - Asia/Riyadh)
+// المنطق لم يتغير — مكوّنات الوقت تأتي الآن من TimeRiyadh.riyadhParts
+// حتى لا يبقى أي تنسيق أو تحويل وقت خارج الطبقة (TIME-POLICY.md)
 // ------------------------------------
 function getSaudiTime() {
-    var now = new Date();
-    var parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Asia/Riyadh',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-    }).formatToParts(now);
-    var y, m, d, h, min, s;
-    parts.forEach(function(p) {
-        if (p.type === 'year') y = p.value;
-        if (p.type === 'month') m = p.value;
-        if (p.type === 'day') d = p.value;
-        if (p.type === 'hour') h = p.value;
-        if (p.type === 'minute') min = p.value;
-        if (p.type === 'second') s = p.value;
-    });
-    return new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':' + s);
+    var p = TimeRiyadh.riyadhParts(new Date());
+    return new Date(p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute + ':' + p.second);
 }
 function getShiftType() {
     if (window.overrideShiftType) return window.overrideShiftType;
@@ -602,8 +652,8 @@ function initLiveSync() {
             var data = JSON.parse(ev.data);
             if (!data || !data.type) return;
             if (data.type === 'vehicles_updated') { loadVehiclesBoard(); loadStaffingState(); }
-            else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated' || data.type === 'team_status_changed') { loadStaffingState(); loadStaffingLog(); }
-            else if (data.type === 'roster_synced') { loadStaffingState(); }
+            else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated' || data.type === 'team_status_changed') { loadStaffingState(); loadStaffingLog(); loadAvailableSupport(); }
+            else if (data.type === 'roster_synced') { loadStaffingState(); loadAvailableSupport(); }
         } catch (e) { /* إطار غير JSON — يُتجاهل */ }
     };
     sseSync.onerror = function() {
@@ -733,12 +783,19 @@ function renderTeamSections() {
         return; // لم تصل حالة الخادم بعد
     }
     if (note) note.style.display = 'none';
-    renderTeamSection('rapidSection', 'rapidCards',
-        rapidTeams.map(function(t) { return { id: t.name, name: t.displayName, type: 'rapid' }; }));
-    renderTeamSection('centersSection', 'centerCards',
-        centerList.map(function(c) { return { id: c, name: c, type: 'center' }; }));
-    renderTeamSection('specialSection', 'specialCards',
-        specialTeams.map(function(t) { return { id: t.id, name: t.name, type: 'special' }; }));
+    // W-تكامل ③: الأقسام تُبنى من مفاتيح الحالة المشتقة سيرفريًا (مرتبة من
+    // الخادم) — لا قوائم ثابتة. التصنيف لتجميع العرض فقط.
+    var rapid = [], centers = [], special = [];
+    serverTeamIds().forEach(function(id) {
+        var ty = teamTypeOf(id);
+        var item = { id: id, name: id, type: ty };
+        if (ty === 'rapid') rapid.push(item);
+        else if (ty === 'center') centers.push(item);
+        else special.push(item);
+    });
+    renderTeamSection('rapidSection', 'rapidCards', rapid);
+    renderTeamSection('centersSection', 'centerCards', centers);
+    renderTeamSection('specialSection', 'specialCards', special);
 }
 
 function renderTeamSection(sectionId, gridId, teams) {
@@ -757,8 +814,28 @@ function renderTeamSection(sectionId, gridId, teams) {
 function renderCard(teamId, name, type, d) {
     var status = (d && d.status) || 'pending';
     var members = d ? (d.members || []) : [];
+    // أيقونة العرض حسب المسمى الوظيفي (خريطة عرض فقط — ليست اشتقاقًا)
+    function jobIcon(jt) {
+        var j = String(jt || '');
+        if (j.indexOf('أخصائي') !== -1) return '👨‍⚕️';
+        if (j.indexOf('قائد') !== -1 || j.indexOf('سائق') !== -1) return '🚗';
+        if (j.indexOf('فني') !== -1) return '🚑';
+        return '👤';
+    }
     var paramedicsHtml = members.length > 0
-        ? members.map(function(m) { return '<span class="name">' + escapeHtml(m.name) + '</span>'; }).join('')
+        ? members.map(function(m) {
+            if (m.role === 'support') return '<div class="pm">' +
+                (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
+                '<div class="pm-name">🤝 ' + escapeHtml(m.name) + '</div>' +
+                ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
+                (m.fromCenter ? '<div class="pm-code">قادم من: ' + escapeHtml(m.fromCenter) + '</div>' : '') +
+                '<div class="pm-code">نوع الدعم: ' + escapeHtml(supportTypeLabel(m)) + '</div></div>';
+            return '<div class="pm">' +
+                (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
+                '<div class="pm-name">' + escapeHtml(m.name) + '</div>' +
+                ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
+            '</div>';
+        }).join('')
         : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
 
     // عدم إخفاء المعلومات: الغائب/المتأخر وسببه يظهران مباشرة على البطاقة
@@ -773,17 +850,38 @@ function renderCard(teamId, name, type, d) {
         }).join('');
     }
 
+    // بند 17: التغطية التشغيلية النشطة (من الخادم — members بدور support) + زر الإنهاء
+    var coverInfoHtml = '';
+    var supporters = ((d && d.members) || []).filter(function(m) { return m && m.role === 'support'; });
+    if (supporters.length > 0) {
+        coverInfoHtml = supporters.map(function(s) {
+            var nm = String(s.name).replace(/'/g, "\\'");
+            return '<div class="cover-info">🤝 يغطي: ' + escapeHtml(s.name) +
+                (s.jobTitle ? ' — ' + escapeHtml(s.jobTitle) : '') +
+                ((s.code || s.employeeCode) ? ' (' + escapeHtml(String(s.code || s.employeeCode)) + ')' : '') +
+                (s.fromCenter ? ' — قادم من: ' + escapeHtml(s.fromCenter) : '') +
+                ' — ' + escapeHtml(supportTypeLabel(s)) +
+                ' <button class="btn-end-cover" onclick="endCoverage(\'' + teamId + '\', \'' + nm + '\')">⛔ إنهاء التغطية</button></div>';
+        }).join('');
+    }
+
     var centerName = getTeamCenter(teamId);
     var centerHtml = centerName ? '<div class="card-center"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
-    var typeLabel = type === 'rapid' ? '⚡ سريع' : type === 'center' ? '🏥 مركز' : '👥 خاصة';
+    // W-تكامل ③ب: شارة الفريق الديناميكي — مشتق من طاقم أوفرلاب (عرض فقط من الخادم)
+    var dynHtml = (d && d.dynamicCrew)
+        ? '<div class="card-center"><i class="fas fa-bolt"></i> احتياطي تشغيلي — طاقم ' + escapeHtml(d.dynamicCrew) + '</div>'
+        : '';
+    var typeLabel = type === 'rapid' ? '⚡ سريع' : type === 'center' ? '🏥 مركز' : '⭐ قيادة/عمليات';
 
-    // الأزرار الثلاثة مباشرة على البطاقة — ضغطة واحدة = إجراء واحد (الوحدات التشغيلية)
-    var actionsHtml = OPERATIONAL_TEAMS[teamId]
+    // الأزرار الثلاثة مباشرة على البطاقة — ضغطة واحدة = إجراء واحد
+    // W-تكامل ③: كل فريق في الحالة المشتقة قابل للتكميل (جنوب/سريع/قيادة/تحكم/تنسيق)
+    var actionsHtml = isOperationalTeam(teamId)
         ? '<div class="actions-bar" data-team="' + teamId + '">' +
             '<button class="btn btn-ready" onclick="cardSetReady(\'' + teamId + '\')">🟢 جاهزة</button>' +
             '<button class="btn btn-missing" onclick="openMissingModal(\'' + teamId + '\')">🟡 ناقصة</button>' +
             '<button class="btn btn-offline" onclick="cardSetOffline(\'' + teamId + '\')">🔴 خارج الخدمة</button>' +
-          '</div>'
+          '</div>' +
+          '<button class="btn-cover" onclick="openCoverageModal(\'' + teamId + '\')">🤝 تغطية تشغيلية</button>'
         : '';
 
     // بند 13: آخر قرار للمشرف (من الخادم) — في الـ Tooltip، ليس على البطاقة
@@ -791,16 +889,18 @@ function renderCard(teamId, name, type, d) {
     var titleAttr = ld
         ? ' title="آخر قرار: ' + (STATUS_LABELS[ld.status] || ld.status) +
           (ld.by ? ' · بواسطة: ' + ld.by : '') +
-          (ld.at ? ' · الساعة: ' + String(ld.at).slice(11, 16) : '') + '"'
+          (ld.at ? ' · الساعة: ' + TimeRiyadh.formatTime(ld.at) : '') + '"'
         : '';
 
     return '<div class="team-card status-' + status + '"' + titleAttr + '>' +
         '<span class="card-type ' + type + '">' + typeLabel + '</span>' +
         '<div class="card-name">' + escapeHtml(name) + '</div>' +
         centerHtml +
+        dynHtml +
         '<div class="card-status">' + (STATUS_LABELS[status] || status) + '</div>' +
         '<div class="paramedics">' + paramedicsHtml + '</div>' +
         missInfoHtml +
+        coverInfoHtml +
         actionsHtml +
         '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
     '</div>';
@@ -813,7 +913,7 @@ function renderMiniLogs() {
         if (!e.team_id) return;
         (byTeam[e.team_id] = byTeam[e.team_id] || []).push(e);
     });
-    var allIds = rapidTeams.map(function(t) { return t.name; }).concat(centerList, specialTeams.map(function(t) { return t.id; }));
+    var allIds = serverTeamIds(); // W-تكامل ③: السجلات المصغرة لفرق الخادم فقط
     allIds.forEach(function(teamId) {
         var el = document.getElementById('miniLog_' + teamId);
         if (!el) return;
@@ -821,9 +921,9 @@ function renderMiniLogs() {
         // بند 15: سجلات التأخير المرتبطة (بدأ/حضر/المدة) — كلها محسوبة سيرفريًا، الواجهة تعرض فقط
         var lateHtml = lateRecords.filter(function(r) { return r.teamId === key; }).map(function(r) {
             var nm = String(r.employee).replace(/'/g, "\\'");
-            var start = (r.startedAt || '').slice(11, 16);
+            var start = TimeRiyadh.formatTime(r.startedAt);
             if (r.status === 'arrived') {
-                var arr = (r.arrivedAt || '').slice(11, 16);
+                var arr = TimeRiyadh.formatTime(r.arrivedAt);
                 return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — تأخر<br>' +
                     'بدأ: ' + start + ' · حضر: ' + arr + ' · مدة التأخير: ' + r.durationMinutes + ' دقيقة' +
                     ' <button class="edit-time" title="تعديل وقت الحضور" onclick="editArrivalTime(\'' + teamId + '\', \'' + nm + '\', \'' + arr + '\')">✏️</button></span>';
@@ -832,7 +932,7 @@ function renderMiniLogs() {
                 'بدأ: ' + start + ' · الحالة: لم يحضر</span>';
         }).join('');
         var eventsHtml = (byTeam[key] || []).slice(-3).map(function(e) {
-            var t = (e.created_at || '').slice(11, 16);
+            var t = TimeRiyadh.formatTime(e.created_at);
             var who = e.entity_id ? ' — ' + e.entity_id : '';
             var why = e.reason ? ' (' + e.reason + ')' : '';
             return '<span class="ml-item">' + t + ' ' + (W1D_EVENT_LABELS[e.event_type] || e.event_type) + who + why + '</span>';
@@ -883,6 +983,12 @@ function updateDashboard() {
             else if (pending > 0) finishBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> باقي ' + pending + ' فريق';
             else finishBtn.innerHTML = '<i class="fas fa-eye"></i> عرض الملخص';
         }
+
+        // زر سير العمل الرسمي — يظهر فقط عند اكتمال التكميل (باقي 0)
+        var workflowBtn = document.getElementById('workflowBtn');
+        if (workflowBtn) {
+            workflowBtn.style.display = (wf && total > 0 && pending === 0) ? 'inline-block' : 'none';
+        }
     } catch (err) {
         console.error('[updateDashboard]', err);
     }
@@ -929,6 +1035,7 @@ function lockTeamCard(teamId, locked) {
 function afterTeamEvent() {
     // الحالة قرار مخزّن في الخادم ويُبث لكل الشاشات — الواجهة تعيد الجلب فقط (عرض)
     loadStaffingState().then(function() { loadStaffingLog(); });
+    loadAvailableSupport(); // الحوض يتغير مع أي حدث قوى (دعم/إنهاء/غياب/حضور)
 }
 
 // ------------------------------------
@@ -1052,9 +1159,9 @@ function confirmMissing() {
 
 // سؤال قرار الحالة بعد تسجيل نقص — النظام لا يفترض قرارًا نيابة عن المشرف
 var decisionCtx = null; // { teamId, currentStatus }
-function openDecisionQuestion(teamId, employee, currentStatus) {
+function openDecisionQuestion(teamId, employee, currentStatus, customTitle) {
     decisionCtx = { teamId: teamId, currentStatus: currentStatus };
-    document.getElementById('decisionTitle').textContent = 'تم تسجيل غياب/تأخير: ' + employee;
+    document.getElementById('decisionTitle').textContent = customTitle || ('تم تسجيل غياب/تأخير: ' + employee);
     document.getElementById('decisionText').textContent = 'حالة ' + displayNameOf(teamId) + ' الآن: ' + (STATUS_LABELS[currentStatus] || currentStatus) + ' — هل تريد تغييرها؟';
     var opts = document.getElementById('decisionOptions');
     var html = '';
@@ -1078,6 +1185,168 @@ function chooseDecision(choice) {
     postPersonEvents([{ type: choice, teamId: teamId }]).then(function(d) {
         if (!d) { lockTeamCard(teamId, false); return; }
         showToast(choice === 'ready' ? '✅ ' + displayNameOf(teamId) + ' جاهزة' : '🟡 ' + displayNameOf(teamId) + ' ناقصة', 'success');
+        afterTeamEvent();
+    });
+}
+
+// ─── بند 17: التغطية التشغيلية — توثيق رسمي لمن غطّى النقص ───
+// الخريطة: تطوع ← volunteer_support · دعم/تكليف/احتياط ← external_support (النوع في payload)
+// الخادم يختم وقت البداية تلقائيًا، والإنهاء حدث support_end — لا إدخال وقت يدوي.
+var COVERAGE_EVENT_TYPE = { volunteer: 'volunteer_support', external: 'external_support', assignment: 'external_support', reserve: 'external_support' };
+var coverageCtx = null; // { teamId }
+function openCoverageModal(teamId) {
+    coverageCtx = { teamId: teamId };
+    document.getElementById('coverageTitle').textContent = 'تغطية تشغيلية — ' + displayNameOf(teamId);
+    document.getElementById('coverageName').value = '';
+    document.getElementById('coverageJobTitle').value = '';
+    document.getElementById('coverageNumber').value = '';
+    document.getElementById('coverageType').value = 'volunteer';
+    // W-تكامل ③: المراكز من الحالة المشتقة سيرفريًا (teams.center) + الاحتياط — لا خريطة ثابتة
+    var centers = [];
+    serverTeamIds().forEach(function(id) {
+        var c = getTeamCenter(id);
+        if (c && centers.indexOf(c) === -1) centers.push(c);
+    });
+    centers.push('الاحتياط');
+    document.getElementById('coverageCenter').innerHTML = centers.map(function(c) {
+        return '<option value="' + c + '">' + c + '</option>';
+    }).join('');
+    document.getElementById('coverageModal').classList.add('active');
+}
+function closeCoverageModal() {
+    document.getElementById('coverageModal').classList.remove('active');
+    coverageCtx = null;
+}
+function confirmCoverage() {
+    if (!coverageCtx) return;
+    var name = document.getElementById('coverageName').value.trim();
+    var center = document.getElementById('coverageCenter').value;
+    var ctype = document.getElementById('coverageType').value;
+    if (!name) { showToast('⚠️ أدخل اسم الموظف', 'error'); return; }
+    var teamId = coverageCtx.teamId;
+    var ev = {
+        type: COVERAGE_EVENT_TYPE[ctype] || 'external_support',
+        employeeName: name,
+        teamId: teamId,
+        center: center,
+        coverageType: ctype,
+        jobTitle: document.getElementById('coverageJobTitle').value.trim() || undefined,
+        employeeNumber: document.getElementById('coverageNumber').value.trim() || undefined
+    };
+    lockTeamCard(teamId, true);
+    postPersonEvents([ev]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ تم تسجيل التغطية — ' + name : 'التغطية مسجّلة مسبقًا', d.appended > 0 ? 'success' : '');
+        closeCoverageModal();
+        // بند 17: التغطية لا تغيّر الحالة تلقائيًا — سؤال المشرف (ناقصة/باقي فقط)
+        var cur = rosterDataOf(teamId);
+        var st = (cur && cur.status) || 'pending';
+        if (st === 'ready' || st === 'offline') { afterTeamEvent(); return; }
+        openDecisionQuestion(teamId, name, st, 'تم تسجيل تغطية تشغيلية: ' + name);
+    });
+}
+// إنهاء التغطية — ضغطة واحدة، الخادم يختم وقت النهاية ويحسب المدة
+function endCoverage(teamId, employee) {
+    lockTeamCard(teamId, true);
+    postPersonEvents([{ type: 'support_end', employeeName: employee, teamId: teamId }]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ انتهت تغطية ' + employee : 'لا توجد تغطية مفتوحة لهذا الموظف', d.appended > 0 ? 'success' : '');
+        afterTeamEvent();
+    });
+}
+
+// ─── W-تكامل ③: حوض الدعم المتاح — القوى المجدولة غير الموزعة من الخادم ───
+// القاعدة التشغيلية: الأوفرلاب نوع مناوبة لا فريق — يبقى في هذا الحوض حتى
+// يوزّعه المشرف: نقص في فريق أساسي ← يُدمج داخله (يظهر ضمن الفريق لا كفريق
+// جديد) · اكتمال الفرق ← يوزَّع على فريق احتياطي (جنوب 11+) بنفس الآلية.
+// العرض: الاسم/المسمى/الكود/الموقع الحالي — وزر دعم مباشر لكل شخص.
+var availableSupport = null; // من /api/staffing/available-support — قراءة فقط
+function loadAvailableSupport() {
+    var h = authHeaders();
+    if (!h) return Promise.resolve();
+    return fetchCurrentShiftId().then(function(sid) {
+        var url = '/api/staffing/available-support' + (sid ? '?shift_id=' + encodeURIComponent(sid) : '');
+        return fetch(url, { headers: h });
+    }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+        if (!d || !d.success) return;
+        availableSupport = d.supporters || [];
+        renderAvailableSupport();
+    }).catch(function() { /* عرض فقط — الفشل صامت */ });
+}
+// الموقع الحالي بصدق: فريق مجدول ← اسمه · رمز O (أوفرلاب) ← «أوفرلاب — غير موزع» · غير ذلك ← «غير موزع بعد»
+function supportLocationLabel(p) {
+    if (p.team) return p.team;
+    var code = String(p.shiftCode || '').toUpperCase();
+    if (code.charAt(0) === 'O') return 'أوفرلاب — غير موزع';
+    return 'غير موزع بعد';
+}
+function renderAvailableSupport() {
+    var section = document.getElementById('supportSection');
+    var grid = document.getElementById('supportCards');
+    var count = document.getElementById('supportCount');
+    if (!section || !grid) return;
+    var list = availableSupport || [];
+    if (count) count.textContent = list.length ? list.length : '';
+    if (list.length === 0) {
+        grid.innerHTML = '';
+        section.style.display = 'none';
+        return;
+    }
+    grid.innerHTML = list.map(function(p, i) {
+        return '<div class="support-card">' +
+            (p.jobTitle ? '<div class="sp-job">' + escapeHtml(p.jobTitle) + '</div>' : '') +
+            '<div class="sp-name">' + escapeHtml(p.name) + '</div>' +
+            (p.employeeCode ? '<div class="sp-meta">الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) + '</div>' : '') +
+            '<div class="sp-meta">الموقع الحالي: ' + escapeHtml(supportLocationLabel(p)) + '</div>' +
+            '<button class="btn-support" onclick="openSupportModal(' + i + ')">🤝 دعم فريق</button>' +
+        '</div>';
+    }).join('');
+    section.style.display = '';
+}
+var supportCtx = null; // { person }
+function openSupportModal(idx) {
+    var p = (availableSupport || [])[idx];
+    if (!p) return;
+    supportCtx = { person: p };
+    document.getElementById('supportPersonInfo').innerHTML =
+        (p.jobTitle ? '<b>' + escapeHtml(p.jobTitle) + '</b><br>' : '') +
+        escapeHtml(p.name) +
+        (p.employeeCode ? '<br>الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) : '') +
+        '<br>الموقع الحالي: ' + escapeHtml(supportLocationLabel(p));
+    // الفرق المستهدفة = فرق الحالة المشتقة من الخادم (بترتيبه) — لا قائمة ثابتة
+    document.getElementById('supportTargetTeam').innerHTML = serverTeamIds().map(function(t) {
+        return '<option value="' + t + '">' + escapeHtml(t) + '</option>';
+    }).join('');
+    document.getElementById('supportType').value = 'volunteer';
+    document.getElementById('supportModal').classList.add('active');
+}
+function closeSupportModal() {
+    document.getElementById('supportModal').classList.remove('active');
+    supportCtx = null;
+}
+function confirmSupport() {
+    if (!supportCtx) return;
+    var p = supportCtx.person;
+    var teamId = document.getElementById('supportTargetTeam').value;
+    var ctype = document.getElementById('supportType').value;
+    if (!teamId) { showToast('⚠️ اختر الفريق المدعوم', 'error'); return; }
+    // نفس عقد أحداث التغطية المعتمد — لا تغيير سيرفري: تطوع ← volunteer_support · خلافة ← external_support
+    var ev = {
+        type: ctype === 'volunteer' ? 'volunteer_support' : 'external_support',
+        employeeName: p.name,
+        teamId: teamId,
+        coverageType: ctype,
+        jobTitle: p.jobTitle || undefined,
+        employeeNumber: p.employeeCode ? String(p.employeeCode) : undefined
+    };
+    if (p.team) ev.center = p.team;
+    else if (String(p.shiftCode || '').toUpperCase().charAt(0) === 'O') ev.center = 'أوفرلاب';
+    closeSupportModal();
+    lockTeamCard(teamId, true);
+    postPersonEvents([ev]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ تم تسجيل الدعم — ' + p.name + ' ← ' + teamId : 'الدعم مسجّل مسبقًا', d.appended > 0 ? 'success' : '');
         afterTeamEvent();
     });
 }
@@ -1141,7 +1410,8 @@ function vehicleCardHtml(v, isUnassigned) {
               '<button class="v-end" onclick="endVehicleSupport(\'' + v.id + '\', \'' + nm + '\')">⛔ إنهاء الدعم</button>';
     } else {
         ops = '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'switch\')">🔄 نقل</button>' +
-              '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'support\', ' + v.teamId + ')">🤝 دعم</button>';
+              '<button onclick="openVehicleTeamModal(\'' + v.id + '\', \'' + nm + '\', \'support\', ' + v.teamId + ')">🤝 دعم</button>' +
+              '<button class="v-end" onclick="endVehicleAssignment(\'' + v.id + '\', \'' + nm + '\')">⛔ إنهاء التعيين</button>';
     }
 
     return '<div class="team-card vehicle-card">' +
@@ -1265,6 +1535,23 @@ function endVehicleSupport(vehicleId, name) {
         .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); });
 }
 
+// ⛔ إنهاء التعيين — ضغطة واحدة: تعود المركبة إلى قائمة «غير المعيّنة» (حدث assignment_end في الخادم)
+function endVehicleAssignment(vehicleId, name) {
+    var h = authHeaders();
+    if (!h) return;
+    h['Content-Type'] = 'application/json';
+    lockVehicleCard(vehicleId, true);
+    fetch('/api/vehicles/assignment/end', { method: 'POST', headers: h, body: JSON.stringify({ vehicleId: vehicleId }) })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (!res.ok) { showToast('⚠️ ' + ((res.d && res.d.error) || 'فشل إنهاء التعيين'), 'error'); lockVehicleCard(vehicleId, false); return; }
+            showToast(res.d && res.d.skipped ? 'لا يوجد تعيين مفتوح لهذه المركبة' : '✅ انتهى تعيين ' + name + ' — عادت لغير المعيّنة', res.d && res.d.skipped ? '' : 'success');
+            loadVehiclesBoard();
+            loadStaffingState();
+        })
+        .catch(function() { showToast('⚠️ فشل الاتصال بالخادم', 'error'); lockVehicleCard(vehicleId, false); });
+}
+
 // ------------------------------------
 // الملاحظات — حفظ تلقائي عبر نفس عقد الأحداث (events فارغة + notes)
 // ------------------------------------
@@ -1291,8 +1578,8 @@ function setSaveStatus(text, spinning) {
 function finishShift() {
     var content = document.getElementById('summaryContent');
     var rows = '';
-    var ordered = rapidTeams.map(function(t) { return { id: t.name, name: t.displayName }; })
-        .concat(centerList.map(function(c) { return { id: c, name: c }; }));
+    // W-تكامل ③: الملخص بترتيب الخادم نفسه — كل الفرق من الحالة المشتقة
+    var ordered = serverTeamIds().map(function(id) { return { id: id, name: id }; });
     ordered.forEach(function(t) {
         if (!teamInCurrentRoster(t.id)) return;
         var d = rosterDataOf(t.id);
@@ -1359,6 +1646,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStaffingLog();
     loadVehiclesBoard();
     loadSavedNotes();
+    loadAvailableSupport(); // W-تكامل ③: حوض الدعم المتاح من الخادم
 
     // مرونة: إن تعذر أول جلب لحالة الفرق (شبكة/خادم) يُعاد المحاولة دوريًا حتى تصل
     setInterval(function() {

@@ -6,10 +6,13 @@
  */
 
 // ─── Helpers ───
+const TimeRiyadh = require('./public/js/time-riyadh.js');
+
+// يُرجع Date محليًا ساعته الجدارية = توقيت الرياض، مشتقًا من الطبقة المركزية
+// (مستقل عن منطقة الخادم الزمنية — بلا إزاحة يدوية +3)
 function getSaudiDateTime() {
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    return new Date(utc + (3 * 60 * 60 * 1000));
+    const p = TimeRiyadh.riyadhParts(new Date());
+    return new Date(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`);
 }
 
 function getSaudiDateString(date = getSaudiDateTime()) {
@@ -61,7 +64,7 @@ class ShiftManager {
             shiftDate: today,
             shiftTime: getSaudiTimeString(now),
             shiftType: type,
-            shiftDay: new Date().toLocaleDateString('ar-SA', { weekday: 'long' }),
+            shiftDay: TimeRiyadh.formatDayName(new Date()),
             startTime: now.toISOString()
         });
 

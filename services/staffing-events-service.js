@@ -8,6 +8,7 @@
  */
 
 const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators } = require('./operational-events-core');
+const { sortTeamsNatural } = require('./team-order'); // doc-v4 ⑫: الفرز الرقمي الطبيعي — مركزي
 
 const DOMAIN = 'staffing';
 
@@ -23,10 +24,20 @@ function canonicalTeamId(teamId) {
 }
 
 // رموز الدوام (نفس مجموعات مسار /api/shift-completion/:shiftId/:teamName حرفيًا)
-const DAY_ONLY_CODES = ['D12', 'D10', 'D11', 'D8', 'D6', 'CPD', 'CP8'];
-const NIGHT_ONLY_CODES = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
-const SHARED_CODES = ['CP24', 'M', 'ME', 'F', 'O12', 'O10', 'O6'];
-const OFF_CODES = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+// ═══ قوائم الأكواد من القاموس المركزي فقط (public/js/core/shift-type-dictionary.js) ═══
+// القاموس الرسمي: الأوفرلاب جزء من المناوبة الليلية — الاستثناء الوحيد OvD (نهاري بتعريف المالك)
+let DAY_ONLY_CODES, NIGHT_ONLY_CODES, SHARED_CODES, OFF_CODES;
+try {
+    // المدقق المركزي: فحص القواميس الثلاثة عند الإقلاع — أي خطأ = رفض التشغيل مع تقرير
+    require('../public/js/core/system-validator.js').assertValid();
+    const STD = require('../public/js/core/shift-type-dictionary.js');
+    DAY_ONLY_CODES = STD.DAY_ONLY_CODES;
+    NIGHT_ONLY_CODES = STD.NIGHT_ONLY_CODES;
+    SHARED_CODES = STD.SHARED_CODES;
+    OFF_CODES = STD.OFF_CODES;
+} catch (e) {
+    throw new Error('القاموس المركزي مفقود أو معطوب: public/js/core/ — ارفع ملفات القواميس قبل تشغيل الخادم. ' + e.message);
+}
 
 // ─── بند 15: اشتقاق سجلات التأخير (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل ───
 // يربط حدث arrival بحدث late نفسه (إغلاق دلالي)، ويطبّق آخر correction لوقت الحضور.
@@ -96,6 +107,47 @@ function deriveLateRecords(events) {
     return records;
 }
 
+// ─── بند 17: اشتقاق سجلات التغطية التشغيلية — سيرفري بالكامل ───
+// يربط support_end بأقدم دعم مفتوح (external_support/volunteer_support) لنفس الموظف.
+// نوع التغطية من payload.coverageType: volunteer/external/assignment/reserve.
+const COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط' };
+function deriveCoverageRecords(events) {
+    const sorted = (events || []).slice().sort((a, b) =>
+        String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
+    const open = {};   // entity_id -> [support events]
+    const records = [];
+    const pushRec = (s, endedAt) => {
+        const p = parsePayload(s.payload);
+        const coverageType = p.coverageType || (s.event_type === 'volunteer_support' ? 'volunteer' : 'external');
+        records.push({
+            employee: s.entity_id,
+            employeeNumber: p.employeeNumber || null,
+            fromCenter: s.center || null,
+            coverageType,
+            coverageTypeLabel: COVERAGE_TYPE_LABELS[coverageType] || coverageType,
+            teamId: s.team_id || null,
+            startedAt: s.created_at,
+            endedAt: endedAt || null,
+            durationMinutes: endedAt ? Math.max(0, Math.round((new Date(endedAt) - new Date(s.created_at)) / 60000)) : null,
+            status: endedAt ? 'ended' : 'active',
+            approvedBy: s.actor_name || null
+        });
+    };
+    for (const e of sorted) {
+        const ent = e.entity_id;
+        if (!ent) continue;
+        if (e.event_type === 'external_support' || e.event_type === 'volunteer_support') {
+            (open[ent] = open[ent] || []).push(e);
+        } else if (e.event_type === 'support_end') {
+            const q = open[ent];
+            if (q && q.length) pushRec(q.shift(), e.created_at);
+        }
+    }
+    for (const ent of Object.keys(open)) for (const s of open[ent]) pushRec(s, null);
+    records.sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
+    return records;
+}
+
 // تحويل تاريخ المناوبة (قد يحمل أرقامًا عربية أو صيغة D/M/YYYY) إلى ISO
 function toIsoDate(shiftDate) {
     if (!shiftDate || typeof shiftDate !== 'string') return shiftDate;
@@ -150,30 +202,56 @@ class StaffingEventsService {
             reason TEXT,
             updated_by TEXT,
             updated_at TEXT NOT NULL,
+            crew_key TEXT,
             UNIQUE(shift_id, team_id)
         )`);
+        // W-تكامل ④: crew_key يربط قرار الفريق الديناميكي بهوية طاقمه —
+        // جداول قائمة قبل هذه الميزة تُرحَّل دفاعيًا بلا فقدان
+        try {
+            const cols = await this.storage.all('PRAGMA table_info(shift_team_status)');
+            if (cols.length && !cols.some(c => c.name === 'crew_key')) {
+                await this._runWrite('ALTER TABLE shift_team_status ADD COLUMN crew_key TEXT');
+            }
+        } catch (_) { /* عرض القرار يبقى صالحًا بلا العمود */ }
         this._decisionTableReady = true;
     }
 
-    async _upsertDecision({ shiftId, teamId, status, reason, actor, at }) {
+    async _upsertDecision({ shiftId, teamId, status, reason, actor, at, crewKey }) {
         await this._ensureDecisionTable();
         await this._runWrite(
-            `INSERT INTO shift_team_status (shift_id, team_id, status, reason, updated_by, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)
+            `INSERT INTO shift_team_status (shift_id, team_id, status, reason, updated_by, updated_at, crew_key)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(shift_id, team_id) DO UPDATE SET
                status = excluded.status,
                reason = excluded.reason,
                updated_by = excluded.updated_by,
-               updated_at = excluded.updated_at`,
-            [shiftId, canonicalTeamId(teamId), status, reason || null, actor || null, at]
+               updated_at = excluded.updated_at,
+               crew_key = excluded.crew_key`,
+            [shiftId, canonicalTeamId(teamId), status, reason || null, actor || null, at, crewKey || null]
         );
+    }
+
+    /**
+     * W-تكامل ④: هوية الطاقم الحالي لفريق ديناميكي لحظة كتابة القرار.
+     // الفرق الثابتة ⇒ null (القرار عام كما كان). الفرق الاحتياطية
+     // (جنوب 11+) ⇒ رمز الطاقم المشتق حاليًا (O12A…) حتى لا يرث طاقمٌ
+     // جديد قرارَ طاقم سابق لنفس رقم الفريق.
+     */
+    async _decisionCrewKey(shiftId, teamId) {
+        const t = canonicalTeamId(teamId);
+        if (!/^جنوب\s+1[1-9]$/.test(t)) return null;
+        try {
+            const derived = await this.deriveTeamReadiness(shiftId);
+            const cur = derived.teams[t];
+            return (cur && cur.dynamicCrew) || null;
+        } catch (_) { return null; }
     }
 
     /** قرارات المشرف للمناوبة — المصدر الوحيد لحالة الفرق (Current State). */
     async getTeamDecisions(shiftId) {
         await this._ensureDecisionTable();
         const rows = await this.storage.all(
-            'SELECT team_id, status, reason, updated_by, updated_at FROM shift_team_status WHERE shift_id = ?',
+            'SELECT team_id, status, reason, updated_by, updated_at, crew_key FROM shift_team_status WHERE shift_id = ?',
             [shiftId]
         );
         const out = {};
@@ -235,13 +313,52 @@ class StaffingEventsService {
         return base;
     }
 
+    /**
+     * doc-v2: خريطة اسم → {jobTitle, code} من كادر المناوبة المجدول (shift_roster).
+     * تُستخدم لإثراء سجلات التأخير وصفيًا (additive) — إن لم تُطابق الاسم يُترك بلا code.
+     */
+    async _personInfoByName(shiftId) {
+        const shift = await this.storage.getShiftById(shiftId);
+        if (!shift) return {};
+        const isNight = String(shift.shift_type || '').includes('ليل');
+        const isoDate = toIsoDate(shift.shift_date);
+        const validCodes = isNight
+            ? [...NIGHT_ONLY_CODES, ...SHARED_CODES]
+            : [...DAY_ONLY_CODES, ...SHARED_CODES];
+        let rows = [];
+        try {
+            rows = await this.storage.all(
+                `SELECT sr.shift_code, e.name, e.job_title, e.employee_code
+                 FROM shift_roster sr JOIN employees e ON e.id = sr.employee_id
+                 WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
+            );
+        } catch (_) { rows = []; }
+        const map = {};
+        for (const r of rows) {
+            const code = String(r.shift_code || '').toUpperCase();
+            if (!code || OFF_CODES.includes(code) || !validCodes.includes(code)) continue;
+            if (!map[r.name]) map[r.name] = { jobTitle: r.job_title || null, code: r.employee_code || null };
+        }
+        return map;
+    }
+
     /** الخط الزمني الكامل (أو لكيان واحد) — مرتب زمنيًا، لا حذف إطلاقًا. */
     async getTimeline(shiftId, entityId = null) {
         let events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         if (entityId) events = events.filter(e => e.entity_id === entityId);
         // بند 15: سجلات التأخير المشتقة (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل
         const lateRecords = deriveLateRecords(events);
-        return { shiftId, domain: DOMAIN, entityId: entityId || null, events, lateRecords };
+        // doc-v2: إثراء وصفي — التخصص/المعرف الوظيفي بالمطابقة الاسمية (إن لم يُطابق يُترك بلا code)
+        try {
+            const info = await this._personInfoByName(shiftId);
+            for (const r of lateRecords) {
+                const p = info[r.employee];
+                if (p) { r.jobTitle = p.jobTitle; r.code = p.code; }
+            }
+        } catch (_) { /* الإثراء اختياري — لا يُسقط الخط الزمني */ }
+        // بند 17: سجلات التغطية التشغيلية المشتقة (دعم/تطوع — بدأ/انتهى/المدة/النوع) — سيرفري بالكامل
+        const coverageRecords = deriveCoverageRecords(events);
+        return { shiftId, domain: DOMAIN, entityId: entityId || null, events, lateRecords, coverageRecords };
     }
 
     /** مؤشرات القوى البشرية — تُشتق هنا فقط ولا تُحسب في مكان آخر. */
@@ -309,8 +426,10 @@ class StaffingEventsService {
 
             if (status === 'ready' || status === 'missing' || status === 'offline') {
                 // عقد الفصل: قرارات الحالة ← جدول القرار المستقل (Upsert)، لا سجل الأحداث.
+                // W-تكامل ④: يُختم بهوية الطاقم للفرق الديناميكية (لا وراثة بين الأطقم)
                 await this._upsertDecision({
-                    shiftId, teamId, status, reason: cur.reason || null, actor: actorName, at
+                    shiftId, teamId, status, reason: cur.reason || null, actor: actorName, at,
+                    crewKey: await this._decisionCrewKey(shiftId, teamId)
                 });
                 out.push({ decision: status, teamId });
             }
@@ -389,9 +508,9 @@ class StaffingEventsService {
         const actorName = (actor && (actor.name || actor.username)) || 'system';
         const at = createdAt || new Date().toISOString();
 
-        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'support_end', 'offline', 'ready', 'missing', 'correction'];
+        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'offline', 'ready', 'missing', 'correction'];
         const NEEDS_REASON = ['absence', 'late', 'offline'];
-        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'support_end', 'assignment', 'correction'];
+        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'assignment', 'correction'];
 
         // التحقق الكامل قبل أي كتابة (القرار لا يسبق البيانات)
         for (const ev of events) {
@@ -443,7 +562,8 @@ class StaffingEventsService {
             // القرار المستقل (Upsert — آخر ضغطة تحكم دائمًا، بلا شروط تخطٍّ)،
             // ولا تُلحق في سجل الأحداث إطلاقًا. السجل للأشخاص فقط.
             if (type === 'ready' || type === 'missing' || type === 'offline') {
-                await this._upsertDecision({ shiftId, teamId, status: type, reason: ev.reason || null, actor: actorName, at });
+                // W-تكامل ④: يُختم بهوية الطاقم للفرق الديناميكية (لا وراثة بين الأطقم)
+                await this._upsertDecision({ shiftId, teamId, status: type, reason: ev.reason || null, actor: actorName, at, crewKey: await this._decisionCrewKey(shiftId, teamId) });
                 out.push({ decision: type, teamId });
                 continue;
             }
@@ -453,7 +573,7 @@ class StaffingEventsService {
             if (employee) {
                 const open = openOf(employee);
                 if (['absence', 'late'].includes(type) && open.some(o => o.event_type === type)) continue;
-                if (type === 'external_support' && open.some(o => (o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === teamId)) continue;
+                if ((type === 'external_support' || type === 'volunteer_support') && open.some(o => (o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'assignment' && open.some(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'arrival' && !open.some(o => o.event_type === 'absence' || o.event_type === 'late')) continue;
                 if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support')) continue;
@@ -461,6 +581,9 @@ class StaffingEventsService {
 
             const payload = { source: 'completion-person-events' };
             if (type === 'correction') { payload.corrects = 'arrival_time'; payload.arrivalAt = ev.arrivalAt; }
+            if (ev.coverageType) payload.coverageType = ev.coverageType;
+            if (ev.jobTitle) payload.jobTitle = ev.jobTitle;
+            if (ev.employeeNumber) payload.employeeNumber = ev.employeeNumber;
             const id = await this.storage.appendOperationalEvent({
                 shiftId, shiftDate, shiftType, domain: DOMAIN,
                 entityId: employee,
@@ -468,7 +591,7 @@ class StaffingEventsService {
                 teamId, center: ev.center || null,
                 eventType: type,
                 reason: ev.reason || null,
-                readinessBasis: type === 'external_support' ? 'external_support' : null,
+                readinessBasis: (type === 'external_support' || type === 'volunteer_support') ? type : null,
                 payload,
                 actorId, actorName, createdAt: at
             });
@@ -518,22 +641,28 @@ class StaffingEventsService {
             : [...DAY_ONLY_CODES, ...SHARED_CODES];
 
         // الكادر المجدول لهذا التاريخ (رموز دوام فقط — الإجازات/الغياب المجدول ليس كادرًا)
-        const teamRows = await this.storage.all(
-            'SELECT id, name, center, team_type, requiredPersonnel FROM teams WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
-        );
+        // doc-v4 ⑫: فرز رقمي طبيعي في JS بعد الجلب (بادئة ثم رقم) — الموضع المركزي
+        // الذي تُشتق منه الفرق؛ ترتيب الإدراج هنا يسري على الحالة واللقطة والوثيقة والشاشات.
+        const teamRows = sortTeamsNatural(await this.storage.all(
+            'SELECT id, name, center, team_type, requiredPersonnel FROM teams WHERE is_active = 1'
+        ), t => t.name);
         let rosterRows = [];
         try {
             rosterRows = await this.storage.all(
-                `SELECT sr.team_id, sr.shift_code, e.name, e.job_title
+                `SELECT sr.team_id, sr.shift_code, e.name, e.job_title, e.employee_code
                  FROM shift_roster sr JOIN employees e ON e.id = sr.employee_id
                  WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
             );
         } catch (_) { rosterRows = []; }
         const crewByTeamId = {};
+        // doc-v2: خريطة اسم → {jobTitle, code} لإثراء الداعمين/المكلَّفين (مطابقة اسمية — additive فقط)
+        const personInfo = {};
         for (const r of rosterRows) {
             const code = String(r.shift_code || '').toUpperCase();
             if (!code || OFF_CODES.includes(code) || !validCodes.includes(code)) continue;
-            (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, jobTitle: r.job_title || null });
+            const info = { jobTitle: r.job_title || null, code: r.employee_code || null };
+            (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, ...info });
+            if (!personInfo[r.name]) personInfo[r.name] = info;
         }
 
         // SR-2: أُزيل جسر جدولة JSON نهائيًا — الكادر من shift_roster فقط.
@@ -598,6 +727,11 @@ class StaffingEventsService {
         for (const t of teamRows) {
             const required = t.requiredPersonnel || 2;
             const crew = crewByTeamId[t.id] || []; // SR-2: roster فقط — لا بديل
+            // مصدر الحقيقة = الفرق المطلوب تكميلها في هذا الشفت فقط:
+            // فريق بلا كادر مجدول لهذه المناوبة ليس ضمن خطتها، فلا يدخل
+            // الحالة ولا عدادات القوى (باقي X فريق/نسبة الإنجاز/شرط الاكتمال)
+            // ولا سير العمل الرسمي — حتى لو كان نشطًا في جدول الفرق.
+            if (crew.length === 0) continue;
             const crewNames = new Set(crew.map(c => c.name));
             const members = [];
             const absentees = [];
@@ -609,33 +743,43 @@ class StaffingEventsService {
                 const openAway = open.find(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) !== t.name);
                 if (openAbs) {
                     absentees.push({
-                        name: c.name, reason: openAbs.reason || null,
+                        name: c.name, jobTitle: c.jobTitle, code: c.code,
+                        reason: openAbs.reason || null,
                         since: openAbs.created_at, recordedBy: openAbs.actor_name || null,
                         type: openAbs.event_type
                     });
-                    members.push({ name: c.name, role: 'base', state: openAbs.event_type });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: openAbs.event_type });
                 } else if (openAway) {
-                    members.push({ name: c.name, role: 'base', state: 'assignment' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: 'assignment' });
                 } else {
                     activeCount++;
-                    members.push({ name: c.name, role: 'base', state: 'active' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: 'active' });
                 }
             }
 
             // الداعمون (دعم مفتوح لهذا الفريق) + المكلَّفون إلى هذا الفريق
             const supporters = [];
             const seenSupport = new Set();
+            // قراءة payload الحدث (نوع التغطية + المسمى/الرقم المُدخلان يدويًا لغير المجدولين)
+            const payloadOf = (o) => {
+                try { return o.payload ? JSON.parse(o.payload) : null; }
+                catch (e) { return null; }
+            };
             for (const f of folded) {
                 if (!f.entityId) continue;
                 for (const o of f.open) {
                     if ((o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === t.name) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
-                        supporters.push({ name: f.entityId, role: 'support', state: 'external_support', since: o.created_at, recordedBy: o.actor_name || null });
+                        const pi = personInfo[f.entityId] || {};
+                        const pl = payloadOf(o) || {};
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, role: 'support', state: 'external_support', supportType: o.event_type, coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
                     } else if (o.event_type === 'assignment' && canonicalTeamId(o.team_id) === t.name && !crewNames.has(f.entityId)) {
                         if (seenSupport.has(f.entityId)) continue;
                         seenSupport.add(f.entityId);
-                        supporters.push({ name: f.entityId, role: 'support', state: 'assignment', since: o.created_at, recordedBy: o.actor_name || null });
+                        const pi = personInfo[f.entityId] || {};
+                        const pl = payloadOf(o) || {};
+                        supporters.push({ name: f.entityId, jobTitle: pi.jobTitle || pl.jobTitle || null, code: pi.code || pl.employeeNumber || null, role: 'support', state: 'assignment', supportType: 'assignment', coverageType: pl.coverageType || null, since: o.created_at, recordedBy: o.actor_name || null, fromCenter: o.center || null });
                     }
                 }
             }
@@ -692,6 +836,18 @@ class StaffingEventsService {
             else wf.pendingTeams++;
         }
 
+        // ── الأوفرلاب: تعيين صريح من الإكسل فقط (بقرار المالك — إلغاء الانتشار التلقائي) ──
+        // أُزيل اشتقاق الفرق الديناميكية (③ب) بالكامل: لا إنشاء تلقائي لجنوب 11+
+        // ولا بوابة نقص ولا اكتمال طاقم. من يحمل رمزًا برقم سيارة صريح (O12C13)
+        // يدخل كادر الفريق المحدد عبر roster كأي عضو عادي، ومن بلا رقم صريح
+        // (O12C) يبقى ضمن «الدعم المتاح» حتى يوزّعه الإداري من الإكسل أو
+        // يُسنده المشرف بآلية الدعم من شاشة التكميل.
+
+        // ترتيب المفاتيح نهائيًا بالفرز الطبيعي المركزي — فرق الاحتياط المعيَّنة
+        // صراحة (جنوب 11+) تتخذ موضعها بعد جنوب 10 وقبل سريع، وبقية الترتيب كما هو
+        const teamsOrdered = {};
+        for (const n of sortTeamsNatural(Object.keys(teams))) teamsOrdered[n] = teams[n];
+
         // السيارات العاملة = مركبات معينة بحالة غير متعطلة/خارج الخدمة
         for (const vehId of Object.keys(vehAssignByVeh)) {
             const st = vehStatus[vehId];
@@ -700,7 +856,7 @@ class StaffingEventsService {
         const decided = wf.readyTeams + wf.missingTeams + wf.offlineTeams;
         wf.readinessRate = decided > 0 ? Math.round((wf.readyTeams / decided) * 100) : null;
 
-        return { shiftId, teams, workforce: wf };
+        return { shiftId, teams: teamsOrdered, workforce: wf };
     }
 
     /** VA: نفس الاشتقاق بصيغة موجزة للمسارات الإحصائية. */
@@ -726,7 +882,7 @@ class StaffingEventsService {
         let scheduled = [];
         try {
             scheduled = await this.storage.all(
-                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, sr.team_id, t.name AS team_name
+                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, sr.team_id, sr.shift_code, t.name AS team_name
                  FROM shift_roster sr
                  JOIN employees e ON e.id = sr.employee_id
                  LEFT JOIN teams t ON t.id = sr.team_id
@@ -761,7 +917,10 @@ class StaffingEventsService {
                 name: s.name,
                 employeeCode: s.employee_code || null,
                 jobTitle: s.job_title || null,
-                team: s.team_name || null
+                team: s.team_name || null,
+                // W-تكامل ③: رمز المناوبة (إضافي فقط) — يميّز الأوفرلاب (O12…)
+                // في عرض الحوض حين لا يكون للموظف فريق مجدول (team=null).
+                shiftCode: s.shift_code || null
             });
         }
         return { shiftId, supporters };

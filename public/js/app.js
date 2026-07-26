@@ -222,21 +222,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ============================================
 // دوال الوقت السعودي (Asia/Riyadh)
+// أغلفة رقيقة — كل التحويل مفوَّض للطبقة المركزية /js/time-riyadh.js (window.TimeRiyadh)
 // ============================================
-var saudiFormatter = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' });
-var saudiTimeFormatter = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-var saudiFullFormatter = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-var saudiDayFormatter = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' });
-var sauditMonthYearFormatter = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit' });
+var saudiFormatter = { format: function(v) { return TimeRiyadh.formatDate(v); } };
+var saudiTimeFormatter = { format: function(v) { return TimeRiyadh.formatTimeSec(v); } };
+var saudiFullFormatter = { format: function(v) { return TimeRiyadh.formatDateTimeSec(v); } };
+var saudiDayFormatter = { format: function(v) { return TimeRiyadh.formatDayName(v); } };
+var sauditMonthYearFormatter = { format: function(v) { return TimeRiyadh.formatMonthYear(v); } };
 
 function getSaudiDate() {
-    return saudiFormatter.format(new Date());
+    return TimeRiyadh.formatDate(new Date());
 }
 function getSaudiTime() {
-    return saudiTimeFormatter.format(new Date());
+    return TimeRiyadh.formatTimeSec(new Date());
 }
 function getSaudiDateTime() {
-    return saudiFullFormatter.format(new Date());
+    return TimeRiyadh.formatDateTimeSec(new Date());
 }
 function getSaudiDay() {
     return saudiDayFormatter.format(new Date());
@@ -247,34 +248,28 @@ function getSaudiMonthYear() {
 
 // ============================================
 // نظام النوبة التلقائي (Auto-Shift)
+// المنطق نفسه — مكوّنات الوقت من TimeRiyadh.riyadhParts (بلا إزاحة يدوية +3)
 // ============================================
 function getCurrentShiftType() {
-    const now = new Date();
-    // Get UTC time first, then add Saudi offset (+3)
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
-    const hour = saudiTime.getHours();
+    const p = TimeRiyadh.riyadhParts(new Date());
+    const hour = parseInt(p.hour, 10);
     // صباح: 05:00 - 17:00 | ليل: 17:00 - 05:00
     return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
 }
 
 function getCurrentShiftDate() {
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    const saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
-    const year = saudiTime.getFullYear();
-    const month = saudiTime.getMonth();
-    const day = saudiTime.getDate();
-    const hour = saudiTime.getHours();
-    
-    let shiftDate = new Date(year, month, day);
-    
+    const p = TimeRiyadh.riyadhParts(new Date());
+    const hour = parseInt(p.hour, 10);
+
+    // تاريخ محلي مؤقت لمجرد حساب «اليوم السابق» — لا يُعرض ولا يُحوَّل
+    let shiftDate = new Date(parseInt(p.year, 10), parseInt(p.month, 10) - 1, parseInt(p.day, 10));
+
     // Night shift runs from 17:00 to 05:00 next day
     // If time is between 00:00 and 05:00, we are in the night shift that started yesterday
     if (hour >= 0 && hour < 5) {
         shiftDate.setDate(shiftDate.getDate() - 1);
     }
-    
+
     const shiftYear = shiftDate.getFullYear();
     const shiftMonth = (shiftDate.getMonth() + 1).toString().padStart(2, '0');
     const shiftDay = shiftDate.getDate().toString().padStart(2, '0');
@@ -2022,7 +2017,7 @@ async function renderAdvancedDistribution() {
             '</div>' +
             '<div class="stat-card time">' +
                 '<div class="stat-card-icon">🕐</div>' +
-                '<div class="stat-card-value">' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '</div>' +
+                '<div class="stat-card-value">' + (lastTime ? TimeRiyadh.formatTime(lastTime) : '-') + '</div>' +
                 '<div class="stat-card-label">آخر بلاغ</div>' +
             '</div>';
     
@@ -2822,8 +2817,8 @@ function switchArchiveTab(tabName) {
 function renderArchiveSummaryTab(container, shift, totalReports) {
     var typeLabel = (shift.shiftType === 'صباح' || shift.shiftType === 'morning' || shift.shiftType === 'صباحية') ? 'صباحي' : 'ليلي';
     var date = shift.shiftDate || '-';
-    var createdAt = shift.createdAt ? new Date(shift.createdAt).toLocaleString('ar-SA') : '-';
-    var updatedAt = shift.updatedAt ? new Date(shift.updatedAt).toLocaleString('ar-SA') : '-';
+    var createdAt = shift.createdAt ? TimeRiyadh.formatDateTimeSec(shift.createdAt) : '-';
+    var updatedAt = shift.updatedAt ? TimeRiyadh.formatDateTimeSec(shift.updatedAt) : '-';
     
     container.innerHTML = 
         '<div class="archive-tab-content">' +
@@ -2959,7 +2954,7 @@ function renderArchiveFormsTab(container, forms) {
         rows += 
             '<tr>' +
                 '<td>' + (f.name || f.title || 'نموذج') + '</td>' +
-                '<td>' + (f.createdAt ? new Date(f.createdAt).toLocaleString('ar-SA') : '-') + '</td>' +
+                '<td>' + (f.createdAt ? TimeRiyadh.formatDateTimeSec(f.createdAt) : '-') + '</td>' +
                 '<td>' + (f.status || 'مكتمل') + '</td>' +
             '</tr>';
     }
@@ -2990,7 +2985,7 @@ function renderArchiveAuditTab(container, auditLog) {
     var rows = '';
     for (var i = 0; i < auditLog.length; i++) {
         var e = auditLog[i];
-        var time = e.timestamp ? new Date(e.timestamp).toLocaleString('ar-SA') : '-';
+        var time = e.timestamp ? TimeRiyadh.formatDateTimeSec(e.timestamp) : '-';
         rows += 
             '<tr>' +
                 '<td>' + (e.action || '-') + '</td>' +
@@ -3032,7 +3027,7 @@ function renderArchiveFilesTab(container, files) {
                 '<td><i class="fas fa-file" style="color:var(--primary-700); margin-left:6px;"></i>' + (f.name || f.fileName || '-') + '</td>' +
                 '<td>' + (f.category || 'عام') + '</td>' +
                 '<td>' + (f.size ? (f.size > 1024 ? (f.size/1024).toFixed(1) + ' KB' : f.size + ' B') : '-') + '</td>' +
-                '<td>' + (f.createdAt ? new Date(f.createdAt).toLocaleString('ar-SA') : '-') + '</td>' +
+                '<td>' + (f.createdAt ? TimeRiyadh.formatDateTimeSec(f.createdAt) : '-') + '</td>' +
             '</tr>';
     }
     
@@ -3631,12 +3626,10 @@ function canStartNewShift() {
         return { allowed: true };
     }
     
-    // Get current Saudi time
-    var now = new Date();
-    var utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    var saudiTime = new Date(utc + (3 * 60 * 60 * 1000));
-    var hour = saudiTime.getHours();
-    var minute = saudiTime.getMinutes();
+    // Get current Saudi time — من الطبقة المركزية (بلا إزاحة يدوية +3)
+    var p = TimeRiyadh.riyadhParts(new Date());
+    var hour = parseInt(p.hour, 10);
+    var minute = parseInt(p.minute, 10);
     var currentTimeDecimal = hour + (minute / 60);
     
     // Grace period: first 2 hours of each shift window
@@ -3891,7 +3884,7 @@ function generateShiftReport() {
             '<div class="shift-report-item"><span class="label">📅 التاريخ:</span><span class="value">' + shiftDate + '</span></div>' +
             '<div class="shift-report-item"><span class="label">🌙 النوع:</span><span class="value">' + shiftType + '</span></div>' +
             '<div class="shift-report-item"><span class="label">📊 إجمالي البلاغات:</span><span class="value">' + totalReports + '</span></div>' +
-            '<div class="shift-report-item"><span class="label">🕐 آخر بلاغ:</span><span class="value">' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '</span></div>' +
+            '<div class="shift-report-item"><span class="label">🕐 آخر بلاغ:</span><span class="value">' + (lastTime ? TimeRiyadh.formatTime(lastTime) : '-') + '</span></div>' +
         '</div>' +
     '</div>';
     
@@ -3976,7 +3969,7 @@ function downloadShiftReport() {
     text += '📅 التاريخ: ' + shiftDate + '\n';
     text += '🌙 النوع: ' + shiftType + '\n';
     text += '📊 إجمالي البلاغات: ' + totalReports + '\n';
-    text += '🕐 آخر بلاغ: ' + (lastTime ? lastTime.toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}) : '-') + '\n\n';
+    text += '🕐 آخر بلاغ: ' + (lastTime ? TimeRiyadh.formatTime(lastTime) : '-') + '\n\n';
     
     text += '🏷️ توزيع حسب النوع:\n';
     for (var t in REPORT_TYPE_DEFS) {
@@ -5230,7 +5223,7 @@ function sendIncidentWhatsApp() {
     if (description) msg += 'الوصف: ' + description + '\n';
     if (actions) msg += 'الإجراءات: ' + actions + '\n';
     msg += '═══════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -5244,7 +5237,7 @@ function renderIncidentPreview() {
     }
     var html = '';
     incidentRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
         html += '<strong style="color:var(--primary-700);">' + (rec.reportNumber || 'بدون رقم') + '</strong>';
@@ -5320,7 +5313,7 @@ async function loadSeniorShifts() {
 }
 
 function initForm_senior() {
-    var today = new Date().toISOString().slice(0, 10);
+    var today = TimeRiyadh.formatDate(new Date());
     var dtEls = ['senAsstDate', 'senChiefDate', 'senCmdrDate'];
     dtEls.forEach(function(id) {
         var el = document.getElementById(id);
@@ -5416,7 +5409,7 @@ function clearSeniorForm() {
         if (el) el.value = '';
     });
 
-    var today = new Date().toISOString().slice(0, 10);
+    var today = TimeRiyadh.formatDate(new Date());
     var dtIds = ['senAsstDate', 'senChiefDate', 'senCmdrDate'];
     dtIds.forEach(function(id) {
         var el = document.getElementById(id);
@@ -5460,7 +5453,7 @@ function sendSeniorWhatsApp() {
     msg += '👨‍⚕️ كبير المسعفين: ' + chiefName + '\n';
     if (cmdrName) msg += '👮 قائد المنطقة: ' + cmdrName + '\n';
     msg += '═══════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -5474,7 +5467,7 @@ function renderSeniorPreview() {
     }
     var html = '';
     seniorRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         var totalCars = (parseInt(rec.workingCars) || 0) + (parseInt(rec.reserveCars) || 0);
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
@@ -5608,7 +5601,7 @@ function sendAirWhatsApp() {
     msg += 'الفرقة: ' + unit + '\n';
     msg += 'المسعف: ' + paramedic + '\n';
     msg += '═══════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -5622,7 +5615,7 @@ function renderAirPreview() {
     }
     var html = '';
     airRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
         html += '<strong style="color:var(--primary-700);">' + (rec.reportNumber || 'بدون رقم') + '</strong>';
@@ -5697,7 +5690,7 @@ async function loadDailyRecords() {
 
 function initForm_daily() {
     var el = document.getElementById('dailyDate');
-    if (el) el.value = new Date().toISOString().split('T')[0];
+    if (el) el.value = TimeRiyadh.formatDate(new Date());
     renderDailyPreview();
     loadDailyRecords(); // حلّ محل القراءة الكسولة من localStorage
 }
@@ -5711,7 +5704,7 @@ function renderDailyPreview() {
     }
     var html = '';
     dailyRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         var paths = rec.paths && rec.paths.length ? rec.paths.join('، ') : 'لا يوجد';
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
@@ -5797,7 +5790,7 @@ function clearDailyForm() {
     });
     var el_dailyResponseTeams_v18 = document.getElementById('dailyResponseTeams'); if (el_dailyResponseTeams_v18) el_dailyResponseTeams_v18.value = 0;
     var el_dailyAir_v19 = document.getElementById('dailyAir'); if (el_dailyAir_v19) el_dailyAir_v19.value = 0;
-    var el_dailyDate_v20 = document.getElementById('dailyDate'); if (el_dailyDate_v20) el_dailyDate_v20.value = new Date().toISOString().split('T')[0];
+    var el_dailyDate_v20 = document.getElementById('dailyDate'); if (el_dailyDate_v20) el_dailyDate_v20.value = TimeRiyadh.formatDate(new Date());
     ['dailyPath1','dailyPath2','dailyPath3','dailyPath4','dailyPath5','dailyPath6','dailyPath7','dailyPath8'].forEach(function(id) {
         var cb = document.getElementById(id);
         if (cb) cb.checked = false;
@@ -5834,7 +5827,7 @@ function sendDailyWhatsApp() {
     if (formFill) msg += 'تعبئة النموذج: ' + formFill + '\n';
     if (summary) msg += 'الملخص: ' + summary + '\n';
     msg += '═══════════════════════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -5982,7 +5975,7 @@ function sendEWhatsApp() {
     if (outcome) msg += 'الحالة النهائية: ' + outcome + '\n';
     if (notes) msg += 'الملاحظات: ' + notes + '\n';
     msg += '═══════════════════════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -5996,7 +5989,7 @@ function renderEPreview() {
     }
     var html = '';
     eRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
         html += '<strong style="color:var(--primary-700);">' + (rec.reportNumber || 'بدون رقم') + '</strong>';
@@ -6165,7 +6158,7 @@ function sendEscalationWhatsApp() {
     if (agencies.length > 0) msg += 'الجهات المشاركة: ' + agencies.join('، ') + '\n';
     if (details) msg += 'التفاصيل: ' + details + '\n';
     msg += '═══════════════════════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
 
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -6179,7 +6172,7 @@ function renderEscalationPreview() {
     }
     var html = '';
     escalationRecords.forEach(function(rec, i) {
-        var date = new Date(rec.createdAt).toLocaleString('ar-SA');
+        var date = TimeRiyadh.formatDateTimeSec(rec.createdAt);
         html += '<div style="border:1px solid var(--gray-200); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--white);">';
         html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
         html += '<strong style="color:var(--primary-700);">' + (rec.reportNumber || 'بدون رقم') + '</strong>';
@@ -10240,7 +10233,7 @@ function sendPeakAlert() {
     msg += 'البداية: ' + (startTime ? startTime.replace('T',' ') : '-') + '\n';
     msg += 'النهاية: ' + (endTime ? endTime.replace('T',' ') : '-') + '\n';
     msg += '═══════════════════\n';
-    msg += 'تم الإرسال: ' + new Date().toLocaleString('ar-SA');
+    msg += 'تم الإرسال: ' + TimeRiyadh.formatDateTimeSec(new Date());
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 

@@ -289,7 +289,7 @@
             }
             container.innerHTML = this.sessions.map(s => {
                 const title = s.title || 'محادثة بدون عنوان';
-                const date = s.updated_at ? new Date(s.updated_at).toLocaleDateString('ar-SA') : '';
+                const date = s.updated_at ? TimeRiyadh.formatDate(s.updated_at) : '';
                 const isActive = this.sessionId === s.session_id ? 'active' : '';
                 return `
                     <div class="ai-session-item ${isActive}" data-id="${s.session_id}">
@@ -423,7 +423,7 @@
             this.elements.welcome.style.display = 'none';
             const el = document.createElement('div');
             el.className = 'ai-message user';
-            const time = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+            const time = TimeRiyadh.formatTime(new Date());
             el.innerHTML = `
                 <div class="ai-message-content">${this.escapeHtml(text).replace(/\n/g, '<br>')}</div>
                 <span class="ai-message-time">${time}</span>
@@ -436,7 +436,7 @@
             this.elements.welcome.style.display = 'none';
             const el = document.createElement('div');
             el.className = 'ai-message bot';
-            const time = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+            const time = TimeRiyadh.formatTime(new Date());
 
             // Format structured answer
             let formattedText = this.formatText(text);

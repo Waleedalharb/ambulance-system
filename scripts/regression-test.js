@@ -1862,6 +1862,316 @@ async function main() {
     record('SR-2 ⑥: ساكن — لا جسر في الاشتقاق، لا JSON في التكميل، الخطاف وSSE موصولان',
         rsStaticOk, `sync=${rsSyncExists} ses=${!rsSesSrc.includes('crewByTeamName')} srv=${rsSrvSrc.includes('rosterSyncService.syncFromSchedule')}`);
 
+    // ─── WF-1: سير العمل الرسمي — منظومة مستقلة (قراءة فقط من التكميل) ───
+    // ⓪ prepare يختم بالمناوبة النشطة سيرفريًا — نضمن وجودها أولًا (الأرشفة أعلاه تغلق المناوبات)
+    const wfCur = await api('GET', '/api/current-shift');
+    if (!(wfCur.data && wfCur.data.shift && wfCur.data.shift.id)) {
+        await api('POST', '/api/start-new-shift', { shiftType: 'صباح' });
+    }
+    // ① prepare ينشئ مسودة بلقطة كاملة (الأقسام الستة) — مختومة سيرفريًا بالمناوبة النشطة
+    const wfTlBefore = (((await api('GET', '/api/staffing/timeline')).data || {}).events || []).length;
+    const wfPrep = await api('POST', '/api/workflow/prepare', {});
+    const wfW = (wfPrep.data && wfPrep.data.workflow) || {};
+    const wfSnap = wfW.snapshot || {};
+    const wfSnapOk = wfSnap.snapshotSchema === 1 && !!wfSnap.takenAt && !!wfSnap.shift
+        && wfSnap.staffing && typeof wfSnap.staffing.teams === 'object'
+        && wfSnap.vehicles && wfSnap.indicators !== undefined
+        && typeof wfSnap.completionNotes === 'string' && Array.isArray(wfSnap.supervisors);
+    record('WF-1 ①: prepare ينشئ مسودة V1 بلقطة كاملة (shift+staffing+vehicles+indicators+notes+supervisors+takenAt)',
+        wfPrep.ok && wfW.status === 'draft' && wfW.versionNo === 1 && wfSnapOk,
+        `v=${wfW.versionNo} status=${wfW.status} shift=${wfSnap.shift && wfSnap.shift.id}`);
+
+    // ② idempotent: إعادة prepare ترجع نفس المسودة (مسودة واحدة مفتوحة لكل مناوبة)
+    const wfPrep2 = await api('POST', '/api/workflow/prepare', {});
+    record('WF-1 ②: إعادة prepare ترجع نفس المسودة (لا مكرر)',
+        wfPrep2.ok && wfPrep2.data.reused === true && wfPrep2.data.workflow.id === wfW.id,
+        `id=${wfPrep2.data && wfPrep2.data.workflow && wfPrep2.data.workflow.id} expected=${wfW.id}`);
+
+    // ③ حفظ حقول المشرف (قائمة بيضاء) + خانة المراجعة + توثيق التعديل في Audit
+    const wfPut = await api('PUT', `/api/workflow/version/${wfW.id}`, {
+        summary: 'ملخص regression', recommendations: 'توصية regression',
+        reviewedBy: ['مشرف العمليات', 'قائد غير موجود'], bogusField: 'يُتجاهل'
+    });
+    const wfPutW = (wfPut.data && wfPut.data.workflow) || {};
+    const wfFieldsOk = wfPutW.fields && wfPutW.fields.summary === 'ملخص regression'
+        && wfPutW.fields.recommendations === 'توصية regression'
+        && Array.isArray(wfPutW.fields.reviewedBy) && wfPutW.fields.reviewedBy.length === 1
+        && wfPutW.fields.reviewedBy[0] === 'مشرف العمليات'
+        && !('bogusField' in wfPutW.fields);
+    record('WF-1 ③: حفظ الحقول بالقائمة البيضاء (reviewedBy مفلتر + bogusField مرفوض)',
+        wfPut.ok && wfFieldsOk, `changed=${wfPut.data && wfPut.data.changed}`);
+
+    // ④ getVersion يقرأ من اللقطة المخزنة فقط + listByShift يشتق «تم إعداده»
+    const wfGet = await api('GET', `/api/workflow/version/${wfW.id}`);
+    const wfList = await api('GET', `/api/workflow/shift/${wfW.shiftId}`);
+    const wfListData = wfList.data || {};
+    record('WF-1 ④: قراءة النسخة من لقطتها + حالة المناوبة المشتقة «تم إعداده»',
+        wfGet.ok && wfGet.data.workflow.fields.summary === 'ملخص regression'
+        && wfList.ok && wfListData.shiftStatus === 'تم إعداده' && wfListData.versions.length >= 1,
+        `status=${wfListData.shiftStatus} versions=${wfListData.versions && wfListData.versions.length}`);
+
+    // ⑤ Audit Log: create + edit_fields موثقان بفاعل ووقت (Append Only)
+    const wfAudit = await api('GET', `/api/workflow/version/${wfW.id}/audit`);
+    const wfActions = ((wfAudit.data && wfAudit.data.audit) || []).map(a => a.action);
+    record('WF-1 ⑤: سجل التدقيق يوثق الإنشاء والتعديل (create + edit_fields بفاعل ووقت)',
+        wfAudit.ok && wfActions.includes('create') && wfActions.includes('edit_fields'),
+        `actions=${wfActions.join(',')}`);
+
+    // ⑥ عزل تام: صفر أحداث تشغيلية جديدة + 401 بلا توكن + 404 لنسخة وهمية
+    const wfTlAfter = (((await api('GET', '/api/staffing/timeline')).data || {}).events || []).length;
+    const wfTok = TOKEN; TOKEN = null;
+    const wfNoAuth = await api('POST', '/api/workflow/prepare', {}, 401);
+    TOKEN = wfTok;
+    const wf404 = await api('GET', '/api/workflow/version/999999', undefined, 404);
+    record('WF-1 ⑥: صفر كتابة في operational_events + 401 بلا توكن + 404 لنسخة وهمية',
+        wfTlAfter === wfTlBefore && wfNoAuth.status === 401 && wf404.status === 404,
+        `events=${wfTlBefore}→${wfTlAfter} noAuth=${wfNoAuth.status} missing=${wf404.status}`);
+
+    // ═══════════════════════════════════════════════════════════
+    // WF-3: الاعتماد الرسمي — قفل + مرجع ذرّي + بصمة + PDF + إعادة إصدار
+    // (قسم جديد بالكامل — لا تعديل على أي اختبار سابق)
+    // ═══════════════════════════════════════════════════════════
+
+    // ⓪ البوابة السيرفرية: مسودة بلقطة فيها فرق بانتظار ⇒ 409
+    const wfV1Pending = wfSnap.staffing && wfSnap.staffing.workforce
+        ? wfSnap.staffing.workforce.pendingTeams : null;
+    if (wfV1Pending > 0) {
+        const wfGate = await api('POST', `/api/workflow/version/${wfW.id}/approve`, {}, 409);
+        record('WF-3 ⓪: بوابة الاعتماد ترفض مسودة فيها فرق بانتظار (409)',
+            wfGate.status === 409 && /لم تُكمّل|بانتظار/.test((wfGate.data && wfGate.data.error) || ''),
+            `pending=${wfV1Pending} status=${wfGate.status} msg=${wfGate.data && wfGate.data.error}`);
+    } else {
+        record('WF-3 ⓪: بوابة الاعتماد — لا فرق بانتظار في لقطة هذه البيئة (تخطٍّ مشروط)', true, `pending=${wfV1Pending}`);
+    }
+
+    // تجهيز: قرارات جاهزية لكل فرق المناوبة (pendingTeams ⇒ 0) عبر حفظ التكميل
+    const wfState = await api('GET', '/api/staffing/state');
+    const wfTeamsNow = (wfState.data && (wfState.data.teams || (wfState.data.state && wfState.data.state.teams))) || {};
+    const wfDecidePayload = { shiftType: 'صباح', shiftDate: '2026-01-01', teams: {}, notes: 'wf3-gate', timestamp: new Date().toISOString() };
+    Object.keys(wfTeamsNow).forEach(n => {
+        wfDecidePayload.teams[n] = { status: 'ready', centerName: (wfTeamsNow[n] && wfTeamsNow[n].center) || '' };
+    });
+    const wfDecide = await api('POST', '/api/shift-completion', wfDecidePayload);
+    const wfState2 = await api('GET', '/api/staffing/state');
+    const wfTeams2 = (wfState2.data && (wfState2.data.teams || (wfState2.data.state && wfState2.data.state.teams))) || {};
+    const wfStillPending = Object.keys(wfTeams2).filter(n => (wfTeams2[n] || {}).status === 'pending').length;
+    record('WF-3 تجهيز: قرارات جاهزية لكل الفرق عبر التكميل (صفر فرق بانتظار)',
+        wfDecide.ok && wfStillPending === 0, `teams=${Object.keys(wfDecidePayload.teams).length} stillPending=${wfStillPending}`);
+
+    // تجهيز: تحضير طازج على النسخة المعزولة — مسح مسودات/تدقيق سير العمل فقط
+    // (مسموح به لبيئة الاختبار المعزولة عبر DB_PATH — لا يمس أي جدول قائم آخر)
+    let wfFreshOk = false;
+    if (process.env.DB_PATH) {
+        try {
+            const W3Database = require('better-sqlite3');
+            const w3db = new W3Database(process.env.DB_PATH);
+            w3db.prepare('DELETE FROM shift_workflows').run();
+            w3db.prepare('DELETE FROM workflow_audit_log').run();
+            w3db.close();
+            wfFreshOk = true;
+        } catch (e) { wfFreshOk = false; }
+    }
+    record('WF-3 تجهيز: تحضير طازج (DELETE shift_workflows + workflow_audit_log على النسخة المعزولة)',
+        wfFreshOk, `DB_PATH=${process.env.DB_PATH ? 'set' : 'unset'}`);
+
+    // ① إنشاء سير عمل جديد بلقطة نظيفة (بعد القرارات) — سيناريو المالك 1
+    const w3Prep = await api('POST', '/api/workflow/prepare', {});
+    const w3W = (w3Prep.data && w3Prep.data.workflow) || {};
+    const w3SnapPending = w3W.snapshot && w3W.snapshot.staffing && w3W.snapshot.staffing.workforce
+        ? w3W.snapshot.staffing.workforce.pendingTeams : null;
+    record('WF-3 ①: إنشاء سير عمل بلقطة نظيفة (صفر فرق بانتظار ⇒ قابلة للاعتماد)',
+        w3Prep.ok && w3W.status === 'draft' && w3SnapPending === 0,
+        `id=${w3W.id} v=${w3W.versionNo} pending=${w3SnapPending}`);
+
+    // ② تعديل قبل الاعتماد — سيناريو المالك 2
+    const w3Edit = await api('PUT', `/api/workflow/version/${w3W.id}`, {
+        summary: 'ملخص W-3 قبل الاعتماد', recommendations: '☑ لا توجد ملاحظات\n—\nتوصية W-3'
+    });
+    record('WF-3 ②: تعديل حقول المسودة قبل الاعتماد ينجح',
+        w3Edit.ok && w3Edit.data.workflow.fields.summary === 'ملخص W-3 قبل الاعتماد',
+        `changed=${w3Edit.data && w3Edit.data.changed}`);
+
+    // ③ اعتماد — سيناريو المالك 3 (قفل + مرجع + بصمة + PDF)
+    const w3Appr = await api('POST', `/api/workflow/version/${w3W.id}/approve`, {});
+    const w3A = (w3Appr.data && w3Appr.data.workflow) || {};
+    const w3RefOk = /^SRCA-SR-OPS-\d{4}-\d{6}$/.test(w3A.refNo || '');
+    record('WF-3 ③: الاعتماد ينجح — قفل + مرجع بصيغة رسمية + بصمة SHA-256 + اعتمده/وقته',
+        w3Appr.ok && w3A.status === 'approved' && w3RefOk
+        && /^[a-f0-9]{64}$/.test(w3A.contentHash || '') && !!w3A.approvedBy && !!w3A.approvedAt,
+        `ref=${w3A.refNo} hash=${(w3A.contentHash || '').slice(0, 12)}… by=${w3A.approvedBy}`);
+
+    // ④ قفل الحقول بعد الاعتماد — سيناريو المالك 4 (PUT يُرفض برمز خطأ)
+    const w3Lock = await api('PUT', `/api/workflow/version/${w3W.id}`, { summary: 'محاولة تعديل بعد الاعتماد' }, 403);
+    record('WF-3 ④: الحقول مقفلة بعد الاعتماد — PUT يُرفض (403)',
+        w3Lock.status === 403 && w3Lock.data && !!w3Lock.data.error, `status=${w3Lock.status}`);
+
+    // ⑦ إعادة الاعتماد على نسخة معتمدة ⇒ 409 — سيناريو المالك 7
+    const w3ReAppr = await api('POST', `/api/workflow/version/${w3W.id}/approve`, {}, 409);
+    record('WF-3 ⑦: إعادة اعتماد نسخة معتمدة تُرفض (409)',
+        w3ReAppr.status === 409, `status=${w3ReAppr.status} msg=${w3ReAppr.data && w3ReAppr.data.error}`);
+
+    // ⑥ PDF فعلي على القرص + GET pdf ⇒ 200 يبدأ بـ %PDF — سيناريو المالك 6
+    const w3PdfRes = await fetch(`${BASE}/api/workflow/version/${w3W.id}/pdf`, {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    const w3PdfBuf = Buffer.from(await w3PdfRes.arrayBuffer());
+    let w3PdfOnDisk = false, w3PdfSize = 0;
+    try {
+        const w3Fs = require('fs');
+        const w3Path = require('path');
+        const w3Abs = w3Path.join(__dirname, '..', w3A.pdfPath || '');
+        w3PdfOnDisk = w3Fs.existsSync(w3Abs);
+        if (w3PdfOnDisk) w3PdfSize = w3Fs.statSync(w3Abs).size;
+    } catch (_) {}
+    record('WF-3 ⑥: PDF فعلي على القرص + GET /pdf ⇒ 200 غير فارغ يبدأ بـ %PDF',
+        w3PdfRes.status === 200 && w3PdfBuf.length > 500 && w3PdfBuf.slice(0, 4).toString() === '%PDF'
+        && w3PdfOnDisk && w3PdfSize > 500,
+        `http=${w3PdfRes.status} bytes=${w3PdfBuf.length} disk=${w3PdfOnDisk} size=${w3PdfSize} path=${w3A.pdfPath}`);
+
+    // GET /pdf على مسودة ⇒ 409 (قبل إعادة الإصدار نتحقق من نسخة غير معتمدة لاحقًا)
+    // ⑤ تفرّد المرجع عبر اعتمادين — سيناريو المالك 5 (يُستكمل بعد reissue أدناه)
+
+    // ⑧ reissue — سيناريو المالك 8: V2 مسودة بلقطة جديدة + حقول منسوخة + V1 كما هي
+    const w3NoReason = await api('POST', `/api/workflow/version/${w3W.id}/reissue`, {}, 400);
+    const w3Rei = await api('POST', `/api/workflow/version/${w3W.id}/reissue`, { reason: 'تغيّر توزيع الفرق بعد الاعتماد' });
+    const w3V2 = (w3Rei.data && w3Rei.data.workflow) || {};
+    const w3V1After = await api('GET', `/api/workflow/version/${w3W.id}`);
+    const w3V1W = (w3V1After.data && w3V1After.data.workflow) || {};
+    record('WF-3 ⑧: reissue — السبب إلزامي (400) + V2 مسودة بلقطة جديدة وحقول منسوخة + V1 معتمدة بلا تغيير',
+        w3NoReason.status === 400 && w3Rei.ok
+        && w3V2.status === 'draft' && w3V2.versionNo === (w3A.versionNo + 1)
+        && w3V2.refNo == null && w3V2.reissueReason === 'تغيّر توزيع الفرق بعد الاعتماد'
+        && w3V2.fields && w3V2.fields.summary === 'ملخص W-3 قبل الاعتماد'
+        && w3V2.snapshot && w3V2.snapshot.takenAt && w3V2.snapshot.takenAt !== (w3A.snapshot && w3A.snapshot.takenAt)
+        && w3V1W.status === 'approved' && w3V1W.refNo === w3A.refNo
+        && w3V1W.fields && w3V1W.fields.summary === 'ملخص W-3 قبل الاعتماد',
+        `v2=${w3V2.versionNo} status=${w3V2.status} v1Status=${w3V1W.status} refKept=${w3V1W.refNo === w3A.refNo}`);
+
+    // GET /pdf على المسودة الجديدة ⇒ 409
+    const w3PdfDraft = await fetch(`${BASE}/api/workflow/version/${w3V2.id}/pdf`, {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    record('WF-3 ⑥ب: GET /pdf على مسودة (غير معتمدة) ⇒ 409', w3PdfDraft.status === 409, `status=${w3PdfDraft.status}`);
+
+    // ⑤ (تكملة) اعتماد V2 ⇒ مرجع ثانٍ متفرّد ومتسلسل — سيناريو المالك 5
+    const w3Appr2 = await api('POST', `/api/workflow/version/${w3V2.id}/approve`, {});
+    const w3A2 = (w3Appr2.data && w3Appr2.data.workflow) || {};
+    const w3Seq1 = parseInt(((w3A.refNo || '').match(/(\d{6})$/) || [])[1] || '0', 10);
+    const w3Seq2 = parseInt(((w3A2.refNo || '').match(/(\d{6})$/) || [])[1] || '0', 10);
+    record('WF-3 ⑤: المرجع متفرّد ومتسلسل عبر اعتمادين (صيغة + تزايد + لا تكرار)',
+        w3Appr2.ok && /^SRCA-SR-OPS-\d{4}-\d{6}$/.test(w3A2.refNo || '')
+        && w3A2.refNo !== w3A.refNo && w3Seq2 === w3Seq1 + 1,
+        `ref1=${w3A.refNo} ref2=${w3A2.refNo}`);
+
+    // ⑨ سجل التدقيق — سيناريو المالك 9: create/edit_fields/approve/pdf على V1 + reissue على V2
+    const w3Aud1 = await api('GET', `/api/workflow/version/${w3W.id}/audit`);
+    const w3Acts1 = ((w3Aud1.data && w3Aud1.data.audit) || []);
+    const w3ActNames1 = w3Acts1.map(a => a.action);
+    const w3Ordered = ['create', 'edit_fields', 'approve', 'pdf'].every((act, i, arr) => {
+        const idx = w3ActNames1.indexOf(act);
+        return idx !== -1;
+    }) && w3ActNames1.indexOf('create') < w3ActNames1.indexOf('edit_fields')
+       && w3ActNames1.indexOf('edit_fields') < w3ActNames1.indexOf('approve')
+       && w3ActNames1.indexOf('approve') < w3ActNames1.indexOf('pdf');
+    const w3AuditedOk = w3Acts1.every(a => a.actor_name && a.at);
+    const w3Aud2 = await api('GET', `/api/workflow/version/${w3V2.id}/audit`);
+    const w3Acts2 = ((w3Aud2.data && w3Aud2.data.audit) || []).map(a => a.action);
+    record('WF-3 ⑨: التدقيق موثق بالترتيب (create→edit_fields→approve→pdf على V1 + reissue على V2) بفاعل ووقت',
+        w3Aud1.ok && w3Ordered && w3AuditedOk && w3Aud2.ok && w3Acts2.includes('reissue'),
+        `v1=${w3ActNames1.join('>')} v2=${w3Acts2.join('>')}`);
+
+    // ⑩ تضارب معيار الاكتمال (إصلاح المالك) — مُحدَّث لعقد «المسودة الحية»:
+    //    المسودة لم تعد تعرض لقطتها المخزنة إطلاقًا. حقن لقطة قديمة «باقي 8»
+    //    في المخزن (محاكاة مسودة قديمة ما قبل العرض الحي) يجب أن يُتجاوز:
+    //    GET يعرض العد الحي (0) لا المخزن، والاعتماد يقفل على لقطة طازجة (0).
+    const w3Rei3 = await api('POST', `/api/workflow/version/${w3V2.id}/reissue`, { reason: 'اختبار لقطة قديمة' });
+    const w3V3 = (w3Rei3.data && w3Rei3.data.workflow) || {};
+    let w3StaleOk = false, w3StaleDetail = 'no DB_PATH';
+    if (w3Rei3.ok && w3V3.status === 'draft' && process.env.DB_PATH) {
+        try {
+            const W3DbStale = require('better-sqlite3');
+            const w3dbs = new W3DbStale(process.env.DB_PATH);
+            const staleRow = w3dbs.prepare('SELECT snapshot_json FROM shift_workflows WHERE id = ?').get(w3V3.id);
+            const staleSnap = JSON.parse(staleRow.snapshot_json || '{}');
+            staleSnap.staffing = staleSnap.staffing || {};
+            staleSnap.staffing.workforce = { pendingTeams: 8 }; // محاكاة مسودة أُعدّت قبل اكتمال التكميل
+            w3dbs.prepare('UPDATE shift_workflows SET snapshot_json = ? WHERE id = ?')
+                .run(JSON.stringify(staleSnap), w3V3.id);
+            w3dbs.close();
+            const w3StaleGet = await api('GET', `/api/workflow/version/${w3V3.id}`);
+            const w3StalePending = (((w3StaleGet.data || {}).workflow || {}).snapshot || {}).staffing;
+            const staleShown = w3StalePending && w3StalePending.workforce ? w3StalePending.workforce.pendingTeams : null;
+            const w3Appr3 = await api('POST', `/api/workflow/version/${w3V3.id}/approve`, {});
+            const w3A3 = (w3Appr3.data && w3Appr3.data.workflow) || {};
+            const lockedPending = w3A3.snapshot && w3A3.snapshot.staffing && w3A3.snapshot.staffing.workforce
+                ? w3A3.snapshot.staffing.workforce.pendingTeams : null;
+            // العرض الحي: GET يتجاوز المخزن القديم (يظهر العد الحي 0 لا 8)
+            w3StaleOk = staleShown === 0 && w3Appr3.ok && w3A3.status === 'approved'
+                && lockedPending === 0 && /^SRCA-SR-OPS-\d{4}-\d{6}$/.test(w3A3.refNo || '');
+            w3StaleDetail = `liveShown=${staleShown} (stored=8) approve=${w3Appr3.status} lockedPending=${lockedPending} ref=${w3A3.refNo}`;
+        } catch (e) { w3StaleDetail = 'err: ' + e.message; }
+    } else if (!w3Rei3.ok) { w3StaleDetail = 'reissue status=' + w3Rei3.status; }
+    record('WF-3 ⑩: بوابة الاعتماد من المصدر الحي — لقطة مخزنة «باقي 8» تُتجاوز في العرض (تظهر 0) والاعتماد يقفل على 0',
+        w3StaleOk, w3StaleDetail);
+
+    // ⑪ عقد «المسودة الحية» (Live Draft): لا تُخزن بيانات تشغيلية في المسودة،
+    //    والقراءة تعكس آخر بيانات التكميل تلقائيًا دون إعادة إعداد.
+    //    1) prepare ⇒ مسودة جديدة؛ المخزن snapshot_json = '{}'.
+    //    2) حدث غياب عبر /api/shift-completion ⇒ GET version (بلا prepare) يظهر الغائب.
+    //    3) إغلاق الغياب بحدث حضور حتى يبقى pendingTeams=0 للاختبارات اللاحقة.
+    let w3LiveOk = false, w3LiveDetail = 'no DB_PATH';
+    if (process.env.DB_PATH) {
+        try {
+            const w3PrepLive = await api('POST', '/api/workflow/prepare', {});
+            const w3LV = (w3PrepLive.data && w3PrepLive.data.workflow) || {};
+            const W3DbLive = require('better-sqlite3');
+            const w3dbl = new W3DbLive(process.env.DB_PATH);
+            const liveRow = w3dbl.prepare('SELECT snapshot_json FROM shift_workflows WHERE id = ?').get(w3LV.id);
+            w3dbl.close();
+            const storedEmpty = liveRow && String(liveRow.snapshot_json).trim() === '{}';
+
+            // اختيار عضو نشط من فريق مجدول من اللقطة الحية نفسها (بلا افتراض بيانات)
+            const liveTeams = (w3LV.snapshot && w3LV.snapshot.staffing && w3LV.snapshot.staffing.teams) || {};
+            let pickTeam = null, pickMember = null;
+            for (const tn of Object.keys(liveTeams)) {
+                const ms = (liveTeams[tn] && liveTeams[tn].members) || [];
+                const act = ms.find(m => m && m.role !== 'support' && m.state === 'active' && m.name);
+                if (act) { pickTeam = tn; pickMember = act.name; break; }
+            }
+            const absBefore = (w3LV.snapshot.staffing.workforce || {}).absentees;
+
+            const w3AbsEv = await api('POST', '/api/shift-completion', {
+                shiftType: w3LV.snapshot.shift.type, shiftDate: w3LV.snapshot.shift.date,
+                events: [{ type: 'absence', employeeName: pickMember, teamId: pickTeam, reason: 'غياب اختبار العرض الحي' }]
+            });
+            // GET مباشرة على نفس المسودة — بلا إعادة إعداد
+            const w3LiveGet = await api('GET', `/api/workflow/version/${w3LV.id}`);
+            const w3LW = (w3LiveGet.data && w3LiveGet.data.workflow) || {};
+            const lt = (w3LW.snapshot && w3LW.snapshot.staffing && w3LW.snapshot.staffing.teams) || {};
+            const absEntry = lt[pickTeam] && (lt[pickTeam].absentees || []).find(a => a && a.name === pickMember);
+            const absAfter = w3LW.snapshot && w3LW.snapshot.staffing && w3LW.snapshot.staffing.workforce
+                ? w3LW.snapshot.staffing.workforce.absentees : null;
+
+            // إغلاق الغياب (حضور) حتى تعود الحالة نظيفة
+            const w3ArrEv = await api('POST', '/api/shift-completion', {
+                shiftType: w3LV.snapshot.shift.type, shiftDate: w3LV.snapshot.shift.date,
+                events: [{ type: 'arrival', employeeName: pickMember, teamId: pickTeam }]
+            });
+            const w3CleanGet = await api('GET', `/api/workflow/version/${w3LV.id}`);
+            const pendingAfter = (((w3CleanGet.data || {}).workflow || {}).snapshot || {}).staffing;
+            const pendingNow = pendingAfter && pendingAfter.workforce ? pendingAfter.workforce.pendingTeams : null;
+
+            w3LiveOk = w3PrepLive.ok && w3LV.status === 'draft' && storedEmpty
+                && !!pickMember && w3AbsEv.ok
+                && !!absEntry && absEntry.reason === 'غياب اختبار العرض الحي'
+                && typeof absAfter === 'number' && absAfter === (absBefore || 0) + 1
+                && w3ArrEv.ok && pendingNow === 0;
+            w3LiveDetail = `stored='${liveRow ? String(liveRow.snapshot_json).slice(0, 10) : '?'}' member=${pickMember}@${pickTeam} absentees:${absBefore}→${absAfter} closed pending=${pendingNow}`;
+        } catch (e) { w3LiveDetail = 'err: ' + e.message; }
+    }
+    record('WF-3 ⑪: المسودة الحية — المخزن \'{}\' + الغياب يظهر في GET بلا إعادة إعداد + الإغلاق يعيد النظافة',
+        w3LiveOk, w3LiveDetail);
+
     // ─── 14. Logout ───
     const logout = await api('POST', '/api/auth/logout', {});
     record('تسجيل الخروج', logout.ok || logout.status === 200, `status=${logout.status}`);

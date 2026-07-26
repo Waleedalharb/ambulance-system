@@ -168,6 +168,7 @@
 
     <script src="js/core/core-auth.js"></script>
     <script src="js/core/core-toast.js"></script>
+    <script src="/js/time-riyadh.js"></script>
     <script src="js/core/core-time.js"></script>
     <script>
         var authToken = AuthCore.getToken();
@@ -310,7 +311,7 @@
             container.innerHTML = logs.slice(0, 15).map(entry => `
                 <div class="audit-item">
                     <div><strong>${entry.action}</strong> — ${entry.user}</div>
-                    <div class="audit-time">${new Date(entry.timestamp).toLocaleString('ar-SA')}</div>
+                    <div class="audit-time">${TimeRiyadh.formatDateTimeSec(entry.timestamp)}</div>
                 </div>
             `).join('');
         }
@@ -382,7 +383,7 @@
                 <div class="monitor-card ${dbClass}">
                     <h4><i class="fas fa-database"></i> قاعدة البيانات</h4>
                     <div class="monitor-value">${dbOk ? '✅ متصلة' : '❌ غير متصلة'}</div>
-                    <div class="monitor-detail">${dbMs} ملي ثانية | ${health.checkTime ? new Date(health.checkTime).toLocaleTimeString('ar-SA') : ''}</div>
+                    <div class="monitor-detail">${dbMs} ملي ثانية | ${health.checkTime ? TimeRiyadh.formatTimeSec(health.checkTime) : ''}</div>
                 </div>
                 <div class="monitor-card ${memClass}">
                     <h4><i class="fas fa-memory"></i> الذاكرة (Heap)</h4>
@@ -436,7 +437,7 @@
             container.innerHTML = alerts.map(a => `
                 <div class="alert-item ${a.level}">
                     <div class="alert-msg">[${a.level.toUpperCase()}] ${a.category} — ${a.message}</div>
-                    <div class="alert-meta">#${a.id} | ${new Date(a.createdAt).toLocaleString('ar-SA')}</div>
+                    <div class="alert-meta">#${a.id} | ${TimeRiyadh.formatDateTimeSec(a.createdAt)}</div>
                     ${a.requiresAttention ? '<span style="color:var(--coral);font-size:0.75rem;">⚠️ يتطلب اهتمام</span>' : ''}
                     <br>
                     <button class="btn-resolve" onclick="resolveAlert(${a.id})"><i class="fas fa-check"></i> حل التنبيه</button>
@@ -454,7 +455,7 @@
                 <div class="log-item">
                     <span class="log-level ${l.level}">${l.level}</span>
                     <strong>${l.category}</strong> — ${l.message}
-                    <div style="color:var(--gray-400);font-size:0.7rem;margin-top:2px;">${new Date(l.timestamp).toLocaleTimeString('ar-SA')}</div>
+                    <div style="color:var(--gray-400);font-size:0.7rem;margin-top:2px;">${TimeRiyadh.formatTimeSec(l.timestamp)}</div>
                 </div>
             `).join('');
         }
@@ -511,7 +512,7 @@
                         <span class="log-level error">${e.type}</span>
                         <strong>${e.message ? e.message.substring(0, 80) : 'Error'}</strong>
                         <div style="color:var(--gray-400);font-size:0.7rem;margin-top:2px;">
-                            ${e.page_path || ''} | ${new Date(e.timestamp).toLocaleTimeString('ar-SA')}
+                            ${e.page_path || ''} | ${TimeRiyadh.formatTimeSec(e.timestamp)}
                         </div>
                     </div>
                 `).join('');

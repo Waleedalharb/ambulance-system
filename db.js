@@ -897,6 +897,9 @@ async function runMigrations() {
   await ensureColumn('report_times', 'type', 'TEXT');
   // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
   await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
+  // W-تكامل ③ب: الرمز الأساسي للموظف من الجدولة الرسمية (O12A/O14B/D0…)
+  // مفتاح تجميع أطقم الأوفرلاب لاشتقاق الفرق الديناميكية — بيانات وصفية فقط (idempotent)
+  await ensureColumn('employees', 'symbol', 'TEXT');
 
   // F4: drop the dead daily_reports store (derived daily report replaces it)
   try {

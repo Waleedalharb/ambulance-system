@@ -1796,6 +1796,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
      ═══════════════════════════════════════════════════════════════ -->
 <script src="js/core/core-auth.js"></script>
 <script src="js/core/core-toast.js"></script>
+<script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -2793,8 +2794,8 @@ function updateClock() {
     const now = new Date();
     const timeEl = document.getElementById('clock-time');
     const dateEl = document.getElementById('clock-date');
-    if (timeEl) timeEl.textContent = now.toLocaleTimeString('ar-SA', { hour12:false }) || '--:--:--';
-    if (dateEl) dateEl.textContent = now.toLocaleDateString('ar-SA', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) || '---';
+    if (timeEl) timeEl.textContent = TimeRiyadh.formatTimeSec(now) || '--:--:--';
+    if (dateEl) dateEl.textContent = TimeRiyadh.formatFullDate(now) || '---';
   } catch (e) {
     const timeEl = document.getElementById('clock-time');
     const dateEl = document.getElementById('clock-date');

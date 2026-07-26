@@ -365,11 +365,11 @@
         
     </div>
     
+    <script src="/js/time-riyadh.js"></script>
     <script>
         // تحديث الوقت
         function updateTime() {
-            const now = new Date();
-            document.getElementById('liveTime').textContent = now.toLocaleTimeString('ar-SA');
+            document.getElementById('liveTime').textContent = TimeRiyadh.formatTimeSec(new Date());
         }
         updateTime();
         setInterval(updateTime, 1000);

@@ -1324,6 +1324,7 @@ table.data-table tr:hover td {
      ============================================ -->
 <script src="js/core/core-auth.js"></script>
 <script src="js/core/core-toast.js"></script>
+<script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
 <script>AuthCore.requireAuth('/');</script>
 <script>
@@ -1521,39 +1522,16 @@ async function saveRecords(records) {
 }
 
 function getTodayDate() {
-    var d = new Date();
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, "0");
-    var day = String(d.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + day;
+    return TimeRiyadh.formatDate(new Date());
 }
 
 // ========== الساعة الحية ==========
 function startClock() {
     function tick() {
         var now = new Date();
-        var h = String(now.getHours()).padStart(2, "0");
-        var m = String(now.getMinutes()).padStart(2, "0");
-        var s = String(now.getSeconds()).padStart(2, "0");
-        document.getElementById("liveClock").textContent = h + ":" + m + ":" + s;
-
-        var days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-        var months = ["يناير", "فبراير", "مارس", "إبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-        var dayName = days[now.getDay()];
-        var monthName = months[now.getMonth()];
-        var dateStr = dayName + "، " + now.getDate() + " " + monthName + " " + now.getFullYear() + " م";
-
-        // محاولة الحصول على التاريخ الهجري
-        try {
-            var hijri = new Intl.DateTimeFormat("ar-SA-u-ca-islamic", {
-                day: "numeric", month: "long", year: "numeric"
-            }).format(now);
-            dateStr += " - " + hijri;
-        } catch(e) {
-            // إذا لم يكن مدعوماً
-        }
-
-        document.getElementById("liveDate").textContent = dateStr;
+        document.getElementById("liveClock").textContent = TimeRiyadh.formatTimeSec(now);
+        // التاريخ الميلادي الكامل — من الطبقة المركزية فقط (المنصة ميلادية حصرًا)
+        document.getElementById("liveDate").textContent = TimeRiyadh.formatFullDate(now);
     }
     tick();
     setInterval(tick, 1000);
@@ -1684,11 +1662,7 @@ function openQuickModal(center, unit) {
     }
 
     // ملء الوقت الحالي
-    var now = new Date();
-    var h = String(now.getHours()).padStart(2, "0");
-    var m = String(now.getMinutes()).padStart(2, "0");
-    var timeStr = h + ":" + m;
-    document.getElementById("quickDispatch").value = timeStr;
+    document.getElementById("quickDispatch").value = TimeRiyadh.formatTime(new Date());
     document.getElementById("quickArrival").value = "";
 
     document.getElementById("quickModal").classList.add("active");
@@ -1707,11 +1681,7 @@ function openAdvancedModal() {
     document.getElementById("advResponseSeconds").value = "0";
     document.getElementById("advType").value = "";
 
-    var now = new Date();
-    var h = String(now.getHours()).padStart(2, "0");
-    var m = String(now.getMinutes()).padStart(2, "0");
-    var timeStr = h + ":" + m;
-    document.getElementById("advDispatch").value = timeStr;
+    document.getElementById("advDispatch").value = TimeRiyadh.formatTime(new Date());
     document.getElementById("advDate").value = getTodayDate();
 
     var chips = document.querySelectorAll("#advTypeSelector .type-chip");

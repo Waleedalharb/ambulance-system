@@ -71,8 +71,7 @@
     var dateElTopbar = document.getElementById('currentDateTopbar');
     if (dateElTopbar) {
         var now = new Date();
-        var options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        dateElTopbar.textContent = now.toLocaleDateString('ar-SA', options);
+        dateElTopbar.textContent = TimeRiyadh.formatFullDate(now);
     }
 
     // ========== Operations Room Data Loader ==========
@@ -92,9 +91,9 @@
 
     function formatDate(dateStr) {
         if (!dateStr) return '';
-        var d = new Date(dateStr);
-        if (isNaN(d)) return dateStr;
-        return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        // غلاف رقيق — التحويل والتطبيع في الطبقة المركزية /js/time-riyadh.js
+        var r = TimeRiyadh.formatDateTime(dateStr);
+        return r === '—' ? dateStr : r;
     }
 
     function renderOperationalFiles(files) {

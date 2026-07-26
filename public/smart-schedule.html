@@ -1202,6 +1202,8 @@
         .classic-shift-V { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Vacation */
         .classic-shift-VC { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Compensatory */
         .classic-shift-O12 { background: #E0F2FE !important; color: #0C4A6E; font-weight: 600; } /* Overlap */
+        .classic-shift-OvN { background: #E0E7FF !important; color: #3730A3; font-weight: 600; } /* أوفرلاب ليلي */
+        .classic-shift-OvD { background: #E0F2FE !important; color: #0C4A6E; font-weight: 600; } /* أوفرلاب نهاري */
         .classic-shift-M { background: #F3E8FF !important; color: #6B21A8; font-weight: 600; } /* Morning */
         .classic-shift-C { background: #FFEDD5 !important; color: #9A3412; font-weight: 600; } /* Training */
         .classic-shift-R { background: #F1F5F9 !important; color: #475569; font-weight: 600; } /* Rest */
@@ -1315,6 +1317,7 @@
     <link rel="stylesheet" href="/css/smart-schedule-editor.css">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <!-- Skeleton Loading Screen — نفس مكوّن index.html (P1-S4) -->
@@ -1372,6 +1375,14 @@
                 <div class="upload-progress" id="uploadProgress" style="position:absolute;bottom:0;left:0;right:0;">
                     <div class="progress-bar" style="height:3px;"><div class="progress-fill" id="progressFill"></div></div>
                 </div>
+            </div>
+            <!-- استيراد الجدول الرسمي (وحدة مستقلة — لا تمس الاستيراد الحالي) -->
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <input type="file" id="officialImportInput" accept=".xlsx,.xls" style="display:none;" onchange="oiFileChosen(this)">
+                <button class="btn btn-primary" type="button" onclick="oiOpenPicker()">
+                    <i class="fas fa-file-import"></i> استيراد الجدول الرسمي (القطاع)
+                </button>
+                <span style="font-size:12px;color:#888;">يقرأ ملف القطاع الرسمي كما هو — يقارن ويحدّث دون مسح — ويعرض تقريرًا مفصلًا قبل الحفظ</span>
             </div>
             <!-- قائمة الملفات المحفوظة -->
             <div class="saved-files-list" id="savedFilesList"></div>
@@ -1481,7 +1492,7 @@
                 عرض الجدول
             </div>
             <div class="view-buttons">
-                <button class="view-btn active" data-view="daily">
+                <button class="view-btn" data-view="daily">
                     <i class="fas fa-sun"></i> عرض يومي
                 </button>
                 <button class="view-btn" data-view="weekly">
@@ -1493,7 +1504,7 @@
                 <button class="view-btn" data-view="employee">
                     <i class="fas fa-user"></i> عرض حسب الموظف
                 </button>
-                <button class="view-btn" data-view="classic">
+                <button class="view-btn active" data-view="classic">
                     <i class="fas fa-table"></i> عرض كلاسيكي
                 </button>
             </div>
@@ -1519,8 +1530,14 @@
                     <select id="filterShift" onchange="applyFilters()">
                         <option value="">الكل</option>
                         <option value="صباحية">صباحية</option>
-                        <option value="مسائية">مسائية</option>
                         <option value="ليلية">ليلية</option>
+                        <option value="أوفرلاب">أوفرلاب</option>
+                        <option value="دوام رسمي">دوام رسمي</option>
+                        <option value="مهمة رسمية">مهمة رسمية</option>
+                        <option value="راحة">راحة</option>
+                        <option value="إجازة">إجازة</option>
+                        <option value="إجازة تعويضية">إجازة تعويضية</option>
+                        <option value="تدريب">تدريب</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -1556,7 +1573,7 @@
                 <div class="stat-card">
                     <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
                     <div class="stat-value" id="statTodayShifts">0</div>
-                    <div class="stat-label">المناوبات اليوم</div>
+                    <div class="stat-label">على رأس العمل اليوم</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon gold"><i class="fas fa-percentage"></i></div>
@@ -1564,16 +1581,32 @@
                     <div class="stat-label">نسبة التغطية</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon coral"><i class="fas fa-user-slash"></i></div>
+                    <div class="stat-icon coral"><i class="fas fa-bed"></i></div>
                     <div class="stat-value" id="statLeaves">0</div>
-                    <div class="stat-label">الإجازات / الراحات</div>
+                    <div class="stat-label">الراحة الدورية</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon purple"><i class="fas fa-hand-fist"></i></div>
+                    <div class="stat-icon purple"><i class="fas fa-umbrella-beach"></i></div>
                     <div class="stat-value" id="statWorkforce">0</div>
-                    <div class="stat-label">القوة البشرية</div>
+                    <div class="stat-label">الإجازات الفعلية</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-briefcase"></i></div>
+                    <div class="stat-value" id="statMission">0</div>
+                    <div class="stat-label">مهمة رسمية</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-layer-group"></i></div>
+                    <div class="stat-value" id="statOverlap">0</div>
+                    <div class="stat-label">أوفرلاب</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon gold"><i class="fas fa-graduation-cap"></i></div>
+                    <div class="stat-value" id="statTraining">0</div>
+                    <div class="stat-label">تدريب</div>
                 </div>
             </div>
+            <div id="statsAnchorNote" style="font-size:12px;color:#b45309;margin-top:6px;min-height:16px;"></div>
             <div class="charts-row">
                 <div class="section" style="padding:16px;">
                     <div class="section-title" style="font-size:0.95rem;">
@@ -1731,12 +1764,98 @@
         </div>
     </div>
 
+    <!-- ═══ نافذتا الاستيراد الرسمي (وحدة مستقلة) ═══ -->
+    <style>
+        .oi-input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:14px; font-family:inherit; background:#fff; }
+        .oi-report { font-size:14px; }
+        .oi-sep { text-align:center; color:#999; margin:12px 0 6px; font-size:12px; letter-spacing:1px; }
+        .oi-line { display:flex; justify-content:space-between; padding:6px 4px; border-bottom:1px dashed #eee; }
+        .oi-line b { color:#2c3e50; }
+        .oi-line.oi-warn b { color:#c0392b; }
+        .oi-detail { font-size:12px; color:#888; padding:2px 8px 8px; line-height:1.8; }
+        .classic-grid-cell.row-hit { background:#FDE68A !important; transition:background 0.6s; }
+    </style>
+    <div class="modal-overlay" id="oiMonthModal">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    شهر الجدول الرسمي
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-close" onclick="oiCloseModals()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="oiSugSource" style="font-size:13px;color:#666;margin-bottom:12px;"></div>
+                <div style="display:flex;gap:10px;">
+                    <select id="oiMonth" class="oi-input" style="flex:1;">
+                        <option value="0">— الشهر —</option>
+                        <option value="1">يناير</option>
+                        <option value="2">فبراير</option>
+                        <option value="3">مارس</option>
+                        <option value="4">أبريل</option>
+                        <option value="5">مايو</option>
+                        <option value="6">يونيو</option>
+                        <option value="7">يوليو</option>
+                        <option value="8">أغسطس</option>
+                        <option value="9">سبتمبر</option>
+                        <option value="10">أكتوبر</option>
+                        <option value="11">نوفمبر</option>
+                        <option value="12">ديسمبر</option>
+                    </select>
+                    <input type="number" id="oiYear" class="oi-input" min="2020" max="2100" style="width:110px;" placeholder="السنة">
+                </div>
+                <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                    <button class="btn" onclick="oiCloseModals()">إلغاء</button>
+                    <button class="btn btn-primary" onclick="oiConfirmMonth()"><i class="fas fa-check"></i> متابعة للتقرير</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="oiReportModal">
+        <div class="modal-content" style="max-width:620px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-clipboard-list"></i>
+                    تقرير الاستيراد الرسمي
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-close" onclick="oiCloseModals()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="oiReportBody" class="oi-report"></div>
+                <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                    <button class="btn" onclick="oiCloseModals()">إلغاء</button>
+                    <button class="btn btn-green" onclick="oiApply()"><i class="fas fa-cloud-upload-alt"></i> اعتماد وحفظ (دمج بلا مسح)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==========================================
          JavaScript
          ========================================== -->
+    <script src="js/time-riyadh.js"></script>
     <script src="js/core/core-auth.js"></script>
     <script src="js/core/core-toast.js"></script>
     <script src="js/core/core-time.js"></script>
+    <!-- القواميس المركزية: المصدر الوحيد للرموز وأنواع المناوبات وترتيب الفرق -->
+    <script src="js/core/symbol-dictionary.js"></script>
+    <script src="js/core/shift-type-dictionary.js"></script>
+    <script src="js/core/team-dictionary.js"></script>
+    <script src="js/core/system-validator.js"></script>
+    <script>
+        // فحص ذاتي غير مانع في المتصفح — يحذر في الكونسول إن كانت القواميس معطوبة
+        (function () {
+            try {
+                var r = SystemValidator.validateAll();
+                if (!r.ok) console.warn(SystemValidator.formatReport(r));
+            } catch (e) { console.warn('تعذر فحص القواميس المركزية:', e); }
+        })();
+    </script>
     <script>AuthCore.requireAuth('/');</script>
     <script>
         // ==========================================
@@ -1749,7 +1868,12 @@
         console.log('🚀 Script loaded — starting initialization...');
         function pad2(n) { n = parseInt(n); return n < 10 ? '0' + n : '' + n; }
         var employees = [];
-        var currentView = 'daily';
+        var currentView = 'classic'; // البند 1: الجدول الكلاسيكي هو الواجهة الافتراضية
+        // البند 3: أكواد الأوفرلاب — غيّر من هنا فقط مستقبلًا (بدون تعديل الأكواد في بقية الملف)
+        var OVERLAP_CODES = {
+            night: { code: 'OvN', name: 'أوفرلاب ليلي', time: '17:00-05:00' },
+            day:   { code: 'OvD', name: 'أوفرلاب نهاري', time: '05:00-17:00' }
+        };
         var savedFiles = [];
         var currentFile = null;
         var charts = {};
@@ -1776,7 +1900,11 @@
             showSkeleton();
             try { initClock(); } catch(e) { console.error('initClock failed:', e); }
             try { loadSavedFiles(); } catch(e) { console.error('loadSavedFiles failed:', e); }
-            try { loadMonthlyTableFromServer().finally(hideSkeleton); } catch(e) { console.error('loadMonthlyTableFromServer failed:', e); hideSkeleton(); }
+            // W-تكامل ② (شرط المالك): فتح الصفحة قراءة فقط — لا كتابة ولا مزامنة ولا
+            // إعادة بناء عند الفتح. أُوقف الاستدعاء التلقائي لـ loadMonthlyTableFromServer
+            // لأنه كان يعيد تحليل الملف القديم بالمحرك القديم ويكتب فوق قاعدة البيانات
+            // عند كل فتح. الدالة نفسها محفوظة أدناه (تعطيل لا حذف) ولا تُستدعى تلقائيًا.
+            try { hideSkeleton(); } catch(e) { console.error('hideSkeleton failed:', e); }
             try { setupDragAndDrop(); } catch(e) { console.error('setupDragAndDrop failed:', e); }
             try { setupFileInput(); } catch(e) { console.error('setupFileInput failed:', e); }
             try { setupDemoData(); } catch(e) { console.error('setupDemoData failed:', e); }
@@ -1808,7 +1936,11 @@
         function setupFilterListeners() {
             var shiftSelect = document.getElementById('filterShift');
             if (shiftSelect) {
-                shiftSelect.innerHTML = '<option value="">الكل</option><option value="مناوبة نهارية">مناوبة نهارية</option><option value="مناوبة ليلية">مناوبة ليلية</option><option value="دوام رسمي">دوام رسمي</option><option value="مكلف / مهمة رسمية">مكلف / مهمة رسمية</option><option value="أوفر لاب / نوبات تداخلية">أوفر لاب / نوبات تداخلية</option><option value="إجازة">إجازة</option><option value="إجازة تعويضية">إجازة تعويضية</option><option value="راحة">راحة</option><option value="تدريب">تدريب</option>';
+                // بند 7: فئات الفلتر تُبنى من القاموس المركزي فقط — إضافة مستقبلية من shift-type-dictionary.js
+                var html = '<option value="">الكل</option>';
+                var cats = ShiftTypeDictionary.FILTER_CATEGORIES;
+                for (var i = 0; i < cats.length; i++) html += '<option value="' + cats[i] + '">' + cats[i] + '</option>';
+                shiftSelect.innerHTML = html;
             }
         }
 
@@ -2097,8 +2229,8 @@
         function extractEmployees(workbook) {
             console.log('🔍 extractEmployees called, sheets:', workbook.SheetNames.length);
             var empMap = {}; // Deduplicate by employee code
-            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
-            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
+            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'OvN': 'أوفرلاب ليلي', 'OvD': 'أوفرلاب نهاري', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
+            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'OvN': '17:00-05:00', 'OvD': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
             var sheetNames = workbook.SheetNames;
             
             for (var s = 0; s < sheetNames.length; s++) {
@@ -2435,8 +2567,8 @@
             var currentEmployees = [];
             var dayNumbers = [];
             var dayNames = [];
-            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
-            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
+            var shiftMap = { 'D': 'مناوبة نهارية', 'D12': 'دوام 12 ساعة', 'N': 'مناوبة ليلية', 'N12': 'دوام ليلي 12 ساعة', 'WO': 'دوام رسمي', 'ME': 'مكلف / مهمة رسمية', 'VC': 'إجازة تعويضية', 'V': 'إجازة', 'O12': 'أوفر لاب / نوبات تداخلية', 'OvN': 'أوفرلاب ليلي', 'OvD': 'أوفرلاب نهاري', 'M': 'صباح', 'C': 'تدريب', 'R': 'راحة' };
+            var shiftTimeMap = { 'D': '05:00-17:00', 'D12': '05:00-17:00', 'N': '17:00-05:00', 'N12': '17:00-05:00', 'WO': '05:00-17:00', 'ME': '08:00-14:00', 'VC': '-', 'V': '-', 'O12': '05:00-17:00', 'OvN': '17:00-05:00', 'OvD': '05:00-17:00', 'M': '08:00-14:00', 'C': '08:00-14:00', 'R': '-' };
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
@@ -2483,7 +2615,7 @@
                     var rest = empMatch[3];
                     
                     // استخراج المناوبات من بقية السطر
-                    var shiftMatches = rest.match(/\b(D12|N12|WO|ME|VC|V|O12|M|C|R)\b/g);
+                    var shiftMatches = rest.match(/\b(D12|N12|WO|ME|VC|OvN|OvD|V|O12|M|C|R)\b/g);
                     
                     if (shiftMatches && shiftMatches.length > 3) {
                         var schedule = [];
@@ -2805,7 +2937,7 @@
             for (var i = 0; i < Math.min(savedFiles.length, 5); i++) {
                 var f = savedFiles[i];
                 var icon = f.type === 'pdf' ? 'fa-file-pdf' : 'fa-file-excel';
-                var date = new Date(f.date).toLocaleDateString('ar-SA');
+                var date = TimeRiyadh.formatDate(f.date);
                 html += '<div class="saved-file-item">' +
                     '<div class="saved-file-info">' +
                     '<i class="fas ' + icon + ' saved-file-icon"></i>' +
@@ -2925,10 +3057,30 @@
             if (!r) return;
             document.getElementById('searchResults').classList.remove('active');
             if (r.employee) {
-                setView('employee');
-                selectedEmployee = r.employee.id;
-                renderEmployeeView(selectedEmployee);
+                // بند 6: البحث يفتح الجدول الكلاسيكي مباشرة — تحديد الصف وتمييزه والانتقال إليه (مثل Excel)
+                setView('classic');
+                jumpToEmployeeInClassic(r.employee);
             }
+        }
+
+        function jumpToEmployeeInClassic(emp) {
+            setTimeout(function () {
+                var cell = document.querySelector('[data-emp-row="' + emp.id + '"]');
+                if (!cell) { // احتياط: مطابقة بالاسم
+                    var cells = document.querySelectorAll('.classic-grid-cell');
+                    for (var i = 0; i < cells.length; i++) {
+                        if (cells[i].textContent.trim() === String(emp.name || '').trim()) { cell = cells[i]; break; }
+                    }
+                }
+                if (!cell) return;
+                var row = cell.parentElement;
+                var kids = row ? row.children : [cell];
+                for (var k = 0; k < kids.length; k++) kids[k].classList.add('row-hit');
+                cell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(function () {
+                    for (var k2 = 0; k2 < kids.length; k2++) kids[k2].classList.remove('row-hit');
+                }, 3500);
+            }, 200); // بعد اكتمال رسم الكلاسيكي
         }
 
         // ==========================================
@@ -2951,6 +3103,7 @@
         }
 
         function renderCurrentView() {
+            enrichAllEntries(); // يضمن اكتمال status/shift/day لكل السجلات (قديمة وجديدة)
             var container = document.getElementById('mainViewArea');
             container.innerHTML = '';
             switch (currentView) {
@@ -2982,6 +3135,8 @@
             { code: 'O12', name: 'O12 — أوفرلاب 12' },
             { code: 'O10', name: 'O10 — أوفرلاب 10' },
             { code: 'O6', name: 'O6 — أوفرلاب 6' },
+            { code: 'OvN', name: 'OvN — أوفرلاب ليلي (افتراضي الليلية)' },
+            { code: 'OvD', name: 'OvD — أوفرلاب نهاري (افتراضي الصباحية)' },
             { code: 'M', name: 'M — مهمة' },
             { code: 'C', name: 'C — تدريب' },
             { code: 'ME', name: 'ME — مكلف' },
@@ -3075,7 +3230,7 @@
 
             // 3. Check next-day conflict: night shift followed by early morning
             var nightCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
-            var earlyCodes = ['D6', 'D8', 'D10', 'D12', 'D11', 'O6', 'O10', 'O12', 'CPD', 'CP8'];
+            var earlyCodes = ['D6', 'D8', 'D10', 'D12', 'D11', 'O6', 'O10', 'O12', 'OvD', 'CPD', 'CP8'];
             if (nightCodes.indexOf(newCode) !== -1) {
                 // Check if next day has early shift
                 var nextDate = new Date(dateStr);
@@ -3317,6 +3472,12 @@
         function renderClassicView() {
             var container = document.getElementById('mainViewArea');
             var filtered = getFilteredEmployees();
+            // بند 10: ترتيب مركزي — القيادة ← التحكم ← جنوب 1..N ← سريع ← أوفرلاب ← إدارات، ثم بالاسم
+            filtered = filtered.slice().sort(function (a, b) {
+                var ka = teamSortKey(a.team || ''), kb = teamSortKey(b.team || '');
+                if (ka !== kb) return ka < kb ? -1 : 1;
+                return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
+            });
             
             if (filtered.length === 0) {
                 container.innerHTML = '<div class="text-center" style="padding:40px; color:var(--text-muted);"><i class="fas fa-table" style="font-size:3rem; margin-bottom:16px; display:block;"></i>لا توجد بيانات لعرضها</div>';
@@ -3369,7 +3530,7 @@
             for (var i = 0; i < filtered.length; i++) {
                 var emp = filtered[i];
                 html += '<div class="classic-grid-row" style="display:contents;">';
-                html += '<div class="classic-grid-cell" title="' + emp.jobTitle + ' | ' + (emp.team || '-') + '">' + emp.name + '</div>';
+                html += '<div class="classic-grid-cell" data-emp-row="' + emp.id + '" title="' + emp.jobTitle + ' | ' + (emp.team || '-') + '">' + emp.name + '</div>';
                 
                 // Build a map of date -> schedule entry for this employee
                 var empSchedule = {};
@@ -3411,6 +3572,8 @@
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FFEDD5; border-color:#F59E0B;"></div><span>C = تدريب</span></div>' +
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#FEF3C7; border-color:#D97706;"></div><span>ME = مكلف</span></div>' +
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0F2FE; border-color:#0EA5E9;"></div><span>O12 = أوفر لاب</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0E7FF; border-color:#6366F1;"></div><span>OvN = أوفرلاب ليلي</span></div>' +
+                '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0F2FE; border-color:#0EA5E9;"></div><span>OvD = أوفرلاب نهاري</span></div>' +
                 '</div>' +
                 '<div class="classic-edit-hint"><i class="fas fa-mouse-pointer"></i> انقر على أي خلية للتعديل مباشرة</div>';
             
@@ -3712,9 +3875,14 @@
             }
             var currentVal = select.value;
             var html = '<option value="">الكل</option>';
-            var locs = Object.keys(locations).sort();
-            for (var l = 0; l < locs.length; l++) {
-                html += '<option value="' + locs[l] + '">' + locations[locs[l]] + '</option>';
+            // بند 10: الترتيب المركزي — بالاسم المعروض
+            var pairs = Object.keys(locations).map(function (k) { return [k, locations[k]]; });
+            pairs.sort(function (a, b) {
+                var ka = teamSortKey(a[1]), kb = teamSortKey(b[1]);
+                return ka < kb ? -1 : ka > kb ? 1 : 0;
+            });
+            for (var l = 0; l < pairs.length; l++) {
+                html += '<option value="' + pairs[l][0] + '">' + pairs[l][1] + '</option>';
             }
             select.innerHTML = html;
             select.value = currentVal;
@@ -3737,7 +3905,7 @@
                     if (dateFilter && s.date !== dateFilter) return false;
                     if (monthFilter && !s.date.startsWith(monthFilter)) return false;
                     if (locFilter && s.location !== locFilter && emp.team !== locFilter) return false;
-                    if (shiftFilter && s.shift !== shiftFilter) return false;
+                    if (shiftFilter && classifyEntry(s).filterCat !== shiftFilter) return false; // بند 7: التصنيف من الكود
                     if (statusFilter && s.status !== statusFilter) return false;
                     return true;
                 });
@@ -3765,33 +3933,125 @@
         // ==========================================
         // الإحصائيات - Statistics
         // ==========================================
-        function calculateStats() {
-            var today = new Date().toISOString().split('T')[0];
-            var totalEmployees = employees.length;
-            var todayShifts = 0;
-            var leaves = 0;
-            var totalSlots = 0;
+        // ═══ الترتيب المركزي للفرق (بند 10) — من القاموس js/core/team-dictionary.js فقط ═══
+        function teamSortKey(name) { return TeamDictionary.teamSortKey(name); }
+        function sortTeamNames(arr) { return TeamDictionary.sortTeamNames(arr); }
+
+        // ═══ مصنّف الأكواد — من القاموس js/core/shift-type-dictionary.js فقط ═══
+        // القاعدة: الراحة الدورية (جزء من دورة التشغيل) ≠ الإجازة (استثناء) · لا شروط على أكواد هنا
+        var DC_GROUPS = ShiftTypeDictionary.GROUPS;
+        var DC_CHART_LABELS = ShiftTypeDictionary.LABELS;
+        var DC_STATUS = ShiftTypeDictionary.STATUS;
+        var DC_FILTERCAT = ShiftTypeDictionary.FILTERCAT;
+        function dcNormalize(code) { return ShiftTypeDictionary.normalize(code); }
+        function classifyDayCode(code) { return ShiftTypeDictionary.classifyDayCode(code); }
+        function classifyEntry(sch) { return ShiftTypeDictionary.classifyEntry(sch); }
+        function isRotationEmployee(emp) { return ShiftTypeDictionary.isRotationEmployee(emp); }
+        function dcDateKey(dateStr) {
+            var p = String(dateStr || '').split('-');
+            if (p.length !== 3) return String(dateStr || '');
+            return parseInt(p[0], 10) + '-' + parseInt(p[1], 10) + '-' + parseInt(p[2], 10);
+        }
+        function dcSaudiTodayKey() { // البند 16: العرض بتوقيت السعودية
+            try {
+                var p = TimeRiyadh.riyadhParts(new Date());
+                return parseInt(p.year, 10) + '-' + parseInt(p.month, 10) + '-' + parseInt(p.day, 10);
+            } catch (e) { var n = new Date(); return n.getFullYear() + '-' + (n.getMonth() + 1) + '-' + n.getDate(); }
+        }
+        // إثراء السجلات الناقصة (status/shift/day) — الحالة تُحسب من الرمز دائمًا عند وجوده
+        function enrichAllEntries() {
             for (var i = 0; i < employees.length; i++) {
-                for (var s = 0; s < employees[i].schedule.length; s++) {
-                    var sch = employees[i].schedule[s];
-                    totalSlots++;
-                    if (sch.date === today && sch.status === 'دوام') todayShifts++;
-                    if (sch.status === 'إجازة' || sch.status === 'راحة' || sch.status === 'OFF') leaves++;
+                var sch = employees[i].schedule || [];
+                for (var s = 0; s < sch.length; s++) {
+                    var e = sch[s];
+                    var info = classifyEntry(e);
+                    if (dcNormalize(e.shiftCode || e.code)) e.status = info.status; // الرمز هو المرجع
+                    else if (!e.status) e.status = info.status;
+                    if (!e.shift) e.shift = info.shift || ''; // نص دائمًا — بحث/فلاتر لا تنكسر
+                    if (!e.day && e.date) {
+                        var p = String(e.date).split('-');
+                        if (p.length === 3) {
+                            var dt = new Date(+p[0], +p[1] - 1, +p[2]);
+                            if (!isNaN(dt)) e.day = ARABIC_DAYS[dt.getDay()];
+                        }
+                    }
                 }
             }
-            var coverage = totalSlots > 0 ? Math.round(((totalSlots - leaves) / totalSlots) * 100) : 0;
-            var workforce = totalEmployees - leaves; // القوة البشرية = إجمالي - الإجازات
-            return { totalEmployees: totalEmployees, todayShifts: todayShifts, coverage: coverage, leaves: leaves, workforce: workforce };
+        }
+        // الشهر الغالب في البيانات 'YYYY-M' (الجدول المعروض)
+        function dcDominantMonth() {
+            var counts = {};
+            for (var i = 0; i < employees.length; i++) {
+                var sch = employees[i].schedule || [];
+                for (var s = 0; s < sch.length; s++) {
+                    var p = dcDateKey(sch[s].date).split('-');
+                    if (p.length === 3) { var mk = p[0] + '-' + p[1]; counts[mk] = (counts[mk] || 0) + 1; }
+                }
+            }
+            var best = null, bn = 0;
+            for (var k in counts) if (counts[k] > bn) { bn = counts[k]; best = k; }
+            return best;
+        }
+        // اليوم المرجعي: اليوم الفعلي إن وُجدت بياناته، وإلا أول أيام الشهر الغالب
+        function getStatsAnchor() {
+            var today = dcSaudiTodayKey();
+            for (var i = 0; i < employees.length; i++) {
+                var sch = employees[i].schedule || [];
+                for (var s = 0; s < sch.length; s++) if (dcDateKey(sch[s].date) === today) return { key: today, real: true };
+            }
+            var mk = dcDominantMonth();
+            if (mk) return { key: mk + '-1', real: false };
+            return { key: today, real: true };
+        }
+
+        function calculateStats() {
+            enrichAllEntries();
+            var total = employees.length;
+            var anchor = getStatsAnchor();
+            var onDuty = 0, rest = 0, vacation = 0, off = 0, mission = 0, overlap = 0, training = 0, unscheduled = 0;
+            for (var i = 0; i < employees.length; i++) {
+                var emp = employees[i];
+                var sch = emp.schedule || [];
+                var entry = null;
+                for (var s = 0; s < sch.length; s++) {
+                    if (dcDateKey(sch[s].date) === anchor.key) { entry = sch[s]; break; }
+                }
+                // الراحة الدورية تُشتق من دورة المناوبة وليس من الفراغ: يوم بلا سجل لموظف دورة = راحة، ولغيره = غير مجدول
+                var g = entry ? classifyEntry(entry).group : (isRotationEmployee(emp) ? 'rest' : 'unscheduled');
+                if (g === 'vacation') vacation++;
+                else if (g === 'rest') rest++;
+                else if (g === 'off') off++;
+                else if (g === 'unscheduled') unscheduled++;
+                else onDuty++; // كل أكواد العمل: صباح/ليل/ليل8/أوفرلاب/دوام رسمي/مهمة/تدريب
+                if (g === 'mission') mission++;   // عدادات مستقلة (بند 9) — فرعية من على رأس العمل
+                if (g === 'overlap') overlap++;
+                if (g === 'training') training++;
+            }
+            var coverage = total > 0 ? Math.round((onDuty / total) * 100) : 0;
+            return { totalEmployees: total, onDuty: onDuty, rest: rest, vacation: vacation, off: off, unscheduled: unscheduled, mission: mission, overlap: overlap, training: training, coverage: coverage, anchor: anchor };
         }
 
         function updateStats() {
             var stats = calculateStats();
             document.getElementById('statTotalEmployees').textContent = stats.totalEmployees;
-            document.getElementById('statTodayShifts').textContent = stats.todayShifts;
+            document.getElementById('statTodayShifts').textContent = stats.onDuty;
             document.getElementById('statCoverage').textContent = stats.coverage + '%';
-            document.getElementById('statLeaves').textContent = stats.leaves;
+            document.getElementById('statLeaves').textContent = stats.rest;     // الراحة الدورية — ليست إجازة
             var elWf = document.getElementById('statWorkforce');
-            if (elWf) elWf.textContent = stats.workforce;
+            if (elWf) elWf.textContent = stats.vacation;                        // الإجازات الفعلية فقط (V/VC)
+            var elM = document.getElementById('statMission');
+            if (elM) elM.textContent = stats.mission;
+            var elO = document.getElementById('statOverlap');
+            if (elO) elO.textContent = stats.overlap;
+            var elT = document.getElementById('statTraining');
+            if (elT) elT.textContent = stats.training;
+            var note = document.getElementById('statsAnchorNote');
+            if (note) {
+                var parts = [];
+                if (!stats.anchor.real) parts.push('⚠️ اليوم المرجعي للإحصائيات: ' + stats.anchor.key + ' — لا توجد بيانات لليوم الفعلي');
+                if (stats.unscheduled > 0) parts.push('غير مجدولين في هذا اليوم (خارج دورة المناوبات): ' + stats.unscheduled);
+                note.textContent = parts.join(' · ');
+            }
             // Show/hide sync button
             var syncBtn = document.getElementById('syncBtn');
             if (syncBtn) {
@@ -3810,25 +4070,41 @@
         function renderShiftsChart() {
             var ctx = document.getElementById('shiftsChart');
             if (!ctx) return;
-            var shiftCounts = { 'صباحية': 0, 'مسائية': 0, 'ليلية': 0, 'إجازة': 0, 'راحة': 0, 'OFF': 0 };
+            enrichAllEntries();
+            // الأساس: كل موظف × كل يوم من الشهر الغالب — الراحة الدورية والإجازات فئتان مستقلتان
+            var mk = dcDominantMonth();
+            if (charts.shifts) { charts.shifts.destroy(); charts.shifts = null; }
+            if (!mk) return;
+            var mp = mk.split('-');
+            var y = parseInt(mp[0], 10), m = parseInt(mp[1], 10);
+            var daysInMonth = new Date(y, m, 0).getDate();
+            var counts = { morning: 0, night: 0, night8: 0, overlap: 0, office: 0, mission: 0, training: 0, rest: 0, vacation: 0, off: 0, unscheduled: 0 };
             for (var i = 0; i < employees.length; i++) {
-                for (var s = 0; s < employees[i].schedule.length; s++) {
-                    var sh = employees[i].schedule[s];
-                    if (sh.status !== 'دوام') {
-                        if (shiftCounts[sh.status] !== undefined) shiftCounts[sh.status]++;
-                    } else if (shiftCounts[sh.shift] !== undefined) {
-                        shiftCounts[sh.shift]++;
-                    }
+                var emp = employees[i];
+                var byDate = {};
+                var sch = emp.schedule || [];
+                for (var s = 0; s < sch.length; s++) byDate[dcDateKey(sch[s].date)] = sch[s];
+                var rotation = isRotationEmployee(emp);
+                for (var d = 1; d <= daysInMonth; d++) {
+                    var e = byDate[y + '-' + m + '-' + d];
+                    counts[e ? classifyEntry(e).group : (rotation ? 'rest' : 'unscheduled')]++; // الراحة من الدورة لا من الفراغ
                 }
             }
-            if (charts.shifts) charts.shifts.destroy();
+            var order = ShiftTypeDictionary.CHART_ORDER;
+            var colors = ShiftTypeDictionary.CHART_COLORS;
+            var labels = [], data = [], bg = [];
+            for (var o = 0; o < order.length; o++) {
+                var g = order[o];
+                if (counts[g] > 0) { labels.push(DC_CHART_LABELS[g]); data.push(counts[g]); bg.push(colors[g]); }
+            }
+            if (labels.length === 0) return;
             charts.shifts = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['صباحية', 'مسائية', 'ليلية', 'إجازة', 'راحة', 'OFF'],
+                    labels: labels,
                     datasets: [{
-                        data: [shiftCounts['صباحية'], shiftCounts['مسائية'], shiftCounts['ليلية'], shiftCounts['إجازة'], shiftCounts['راحة'], shiftCounts['OFF']],
-                        backgroundColor: ['#2563EB', '#8B5CF6', '#64748B', '#EF4444', '#F59E0B', '#94A3B8'],
+                        data: data,
+                        backgroundColor: bg,
                         borderColor: '#FFFFFF',
                         borderWidth: 2
                     }]
@@ -3853,7 +4129,7 @@
                     if (loc) locCounts[loc] = (locCounts[loc] || 0) + 1;
                 }
             }
-            var labels = Object.keys(locCounts).sort();
+            var labels = sortTeamNames(Object.keys(locCounts)); // بند 10: الترتيب المركزي
             var data = labels.map(function(l) { return locCounts[l]; });
             var colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#3B82F6', '#F97316', '#EC4899'];
             if (charts.locations) charts.locations.destroy();
@@ -4267,5 +4543,375 @@
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
 
-</body>
+
+    <!-- ═══ وحدة الاستيراد الرسمي — مستقلة بالكامل، لا تعديل على الدوال الحالية ═══ -->
+    <script>
+// ═══════════════════════════════════════════════════════════════════════════
+// نظام الاستيراد الرسمي من Excel الإدارة — وحدة إضافية مستقلة (وثيقة import-spec.md)
+// المبادئ: الملف ليس مصدر الحقيقة · لا أسماء أوراق · لا مواقع خلايا · الرقم الوظيفي
+// هو المفتاح · تطبيع قبل التحليل · استيراد ذكي بلا مسح · تقرير مفصل · تدهور رشيق
+// ═══════════════════════════════════════════════════════════════════════════
+(function () {
+'use strict';
+
+// ─── خريطة الرموز المركزية (P3) — رمز جديد مستقبلًا = سطر هنا فقط ───
+// ─── الرموز والتطبيع: من قاموس الرموز المركزي فقط (js/core/symbol-dictionary.js) ───
+// ممنوع أي خريطة رموز أو شرط على رمز هنا — أي إضافة مستقبلية في القاموس
+function oiNormalize(code) { return SymbolDictionary.normalize(code); }
+function oiResolveSymbol(rawSym, jobNature) { return SymbolDictionary.resolveSymbol(rawSym, jobNature); }
+
+// أكواد أيام العمل الميدانية — مشتقة من قاموس أنواع المناوبات (فئات العمل فقط، بلا WO/إجازات)
+var OI_WORK_DAYCODES = [].concat(
+    ShiftTypeDictionary.GROUPS.morning, ShiftTypeDictionary.GROUPS.night,
+    ShiftTypeDictionary.GROUPS.night8, ShiftTypeDictionary.GROUPS.overlap,
+    ShiftTypeDictionary.GROUPS.mission, ShiftTypeDictionary.GROUPS.training
+);
+var OI_MONTHS = { 'يناير':1, 'فبراير':2, 'مارس':3, 'أبريل':4, 'ابريل':4, 'مايو':5, 'يونيو':6, 'يوليو':7, 'أغسطس':8, 'سبتمبر':9, 'أكتوبر':10, 'نوفمبر':11, 'ديسمبر':12 };
+
+// ─── اكتشاف الورقة التشغيلية بالأعمدة فقط (P1 — بلا أسماء أوراق، بلا مواقع خلايا) ───
+function oiFindOperationalSheet(workbook) {
+    var HEADERS = ['الاسم', 'الكود', 'رمز', 'طبيعة العمل'];
+    for (var s = 0; s < workbook.SheetNames.length; s++) {
+        var sheet = workbook.Sheets[workbook.SheetNames[s]];
+        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        for (var r = 0; r < Math.min(rows.length, 20); r++) {
+            var row = rows[r] || [];
+            var colMap = {}, hits = 0, dayCols = 0;
+            for (var c = 0; c < row.length; c++) {
+                var v = String(row[c]).trim();
+                if (HEADERS.indexOf(v) !== -1 && !colMap[v]) { colMap[v] = c; hits++; }
+                var n = parseInt(v, 10);
+                if (String(n) === v && n >= 1 && n <= 31) dayCols++;
+            }
+            if (hits >= 3 && colMap['الاسم'] !== undefined && dayCols >= 10) {
+                return { sheet: sheet, rows: rows, headerRow: r, colMap: colMap };
+            }
+        }
+    }
+    return null;
+}
+
+// ─── اكتشاف ورقة دليل الموظفين (إثراء: مسمى/نوع) بالأعمدة أيضًا ───
+function oiFindDirectorySheet(workbook) {
+    for (var s = 0; s < workbook.SheetNames.length; s++) {
+        var sheet = workbook.Sheets[workbook.SheetNames[s]];
+        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        for (var r = 0; r < Math.min(rows.length, 15); r++) {
+            var row = rows[r] || [], hasName = false, hasTitle = false, codeCol = -1, nameCol = -1, titleCol = -1, typeCol = -1;
+            for (var c = 0; c < row.length; c++) {
+                var v = String(row[c]).trim();
+                if (v === 'اسم' || v === 'الاسم') { hasName = true; nameCol = c; }
+                if (v === 'مسمى الوظيفة' || v === 'المسمى الوظيفي') { hasTitle = true; titleCol = c; }
+                if (v === 'رقم الموظف' || v === 'الكود') codeCol = c;
+                if (v === 'نوع الموظف') typeCol = c;
+            }
+            if (hasName && hasTitle && codeCol >= 0) return { rows: rows, headerRow: r, codeCol: codeCol, nameCol: nameCol, titleCol: titleCol, typeCol: typeCol };
+        }
+    }
+    return null;
+}
+
+// ─── اكتشاف الشهر/السنة — اقتراح متعدد المصادر (قرار المالك: اختيار يدوي باقتراح) ───
+function oiSuggestMonthYear(workbook, fileName, fileDate) {
+    var suggestions = [];
+    // 1) نصوص أول الصفوف في كل الأوراق (عنوان مثل «مارس / 2026»)
+    for (var s = 0; s < workbook.SheetNames.length && suggestions.length < 3; s++) {
+        var rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[s]], { header: 1, defval: '' });
+        for (var r = 0; r < Math.min(rows.length, 6); r++) {
+            for (var c = 0; c < (rows[r] || []).length; c++) {
+                var cell = String(rows[r][c]);
+                for (var mn in OI_MONTHS) {
+                    if (cell.indexOf(mn) !== -1) {
+                        var ym = cell.match(/(20\d{2})/);
+                        suggestions.push({ month: OI_MONTHS[mn], year: ym ? parseInt(ym[1]) : 0, source: 'عنوان داخل الملف', conf: 3 });
+                    }
+                }
+            }
+        }
+    }
+    // 2) اسم الملف
+    for (var mn2 in OI_MONTHS) {
+        if (fileName.indexOf(mn2) !== -1) {
+            var ym2 = fileName.match(/(20\d{2})/);
+            suggestions.push({ month: OI_MONTHS[mn2], year: ym2 ? parseInt(ym2[1]) : 0, source: 'اسم الملف', conf: 2 });
+        }
+    }
+    // 3) تاريخ حفظ الملف
+    if (fileDate) suggestions.push({ month: fileDate.getMonth() + 1, year: fileDate.getFullYear(), source: 'تاريخ حفظ الملف', conf: 1 });
+    // 4) آخر استيراد
+    try {
+        var last = JSON.parse(localStorage.getItem('officialImport:lastMY') || 'null');
+        if (last && last.month) suggestions.push({ month: last.month, year: last.year, source: 'آخر استيراد', conf: 1 });
+    } catch (e) {}
+    suggestions.sort(function (a, b) { return b.conf - a.conf; });
+    var best = suggestions[0] || { month: 0, year: new Date().getFullYear(), source: '—', conf: 0 };
+    if (!best.year) best.year = new Date().getFullYear();
+    return best;
+}
+
+// ─── التحليل الكامل للملف الرسمي (تدهور رشيق: ما يُقرأ يُقرأ والباقي يُحصى) ───
+function oiParseOfficial(workbook) {
+    var out = {
+        employees: [], issues: { unknownSymbols: [], noCode: [], noSymbol: [], duplicates: [], rowErrors: 0, fieldWithoutShifts: [] },
+        counts: { teams: {}, ops: 0, admins: 0, overlap: 0, leadership: 0, restDays: 0, vacations: 0 }
+    };
+    var target = oiFindOperationalSheet(workbook);
+    if (!target) return null;
+    var cm = target.colMap;
+    var nameCol = cm['الاسم'], codeCol = cm['الكود'], symCol = cm['رمز'], jobCol = cm['طبيعة العمل'];
+    var phoneCol = -1;
+    var hRow = target.rows[target.headerRow] || [];
+    var dayCols = []; // [{col, day}]
+    for (var c = 0; c < hRow.length; c++) {
+        var v = String(hRow[c]).trim();
+        if (v === 'رقم الجوال' || v === 'الجوال') phoneCol = c;
+        var n = parseInt(v, 10);
+        if (String(n) === v && n >= 1 && n <= 31) dayCols.push({ col: c, day: n });
+    }
+    // دليل الموظفين (إثراء بالمسمى/النوع) — بالمفتاح: الرقم الوظيفي
+    var dir = {};
+    var dSheet = oiFindDirectorySheet(workbook);
+    if (dSheet) {
+        for (var dr = dSheet.headerRow + 1; dr < dSheet.rows.length; dr++) {
+            var dRow = dSheet.rows[dr] || [];
+            var dCode = String(dRow[dSheet.codeCol] || '').trim();
+            if (dCode) dir[dCode] = { jobTitle: String(dRow[dSheet.titleCol] || '').trim(), empType: dSheet.typeCol >= 0 ? String(dRow[dSheet.typeCol] || '').trim() : '' };
+        }
+    }
+    var seen = {};
+    for (var r = target.headerRow + 1; r < target.rows.length; r++) {
+        try {
+            var row = target.rows[r] || [];
+            var name = String(row[nameCol] || '').trim();
+            if (!name) continue; // صفوف فارغة/ترويسات/إحصاءات القاع
+            var empCode = String(row[codeCol] || '').trim();
+            var rawSym = row[symCol];
+            var job = jobCol >= 0 ? String(row[jobCol] || '').trim() : '';
+            var phone = phoneCol >= 0 ? String(row[phoneCol] || '').trim() : '';
+            if (!empCode) { out.issues.noCode.push(name); continue; }       // P4: لا مفتاح ← تجاهل+إحصاء
+            if (seen[empCode]) { out.issues.duplicates.push(empCode + ' — ' + name); continue; }
+            seen[empCode] = true;
+            var resolved = oiResolveSymbol(rawSym, job); // قاعدة «تنسيق الاستجابة» محسومة داخل القاموس
+            if (!resolved) {
+                var ns = oiNormalize(rawSym);
+                if (!ns) out.issues.noSymbol.push(empCode + ' — ' + name);
+                else if (out.issues.unknownSymbols.indexOf(ns) === -1) out.issues.unknownSymbols.push(ns);
+                continue;
+            }
+            var days = {}, workDays = 0;
+            for (var d = 0; d < dayCols.length; d++) {
+                var raw = row[dayCols[d].col];
+                var dc = oiNormalize(raw);
+                if (!dc) { out.counts.restDays++; continue; }
+                if (OI_WORK_DAYCODES.indexOf(dc) !== -1) { days[dayCols[d].day] = dc; workDays++; continue; } // يوم عمل — فئات العمل من القاموس
+                var dayGroup = ShiftTypeDictionary.classifyDayCode(dc).group; // التصنيف من القاموس فقط — ممنوع شرط على كود هنا
+                if (dayGroup === 'vacation') { out.counts.vacations++; days[dayCols[d].day] = dc; continue; } // إجازة فعلية (V/VC/E/EV/S) — تُستورد لتُحسب وتُعرض
+                if (dayGroup === 'rest') { days[dayCols[d].day] = dc; out.counts.restDays++; continue; } // راحة دورية صريحة
+                if (dc === 'WO' || dayGroup === 'off') continue; // مكتبي/OFF — سجل إداري منفصل (لا صف ميدان)
+                if (out.issues.unknownSymbols.indexOf('يوم:' + dc) === -1) out.issues.unknownSymbols.push('يوم:' + dc);
+            }
+            var enrich = dir[empCode] || {};
+            var teamName = resolved.team;
+            var emp = {
+                employeeNumber: empCode, id: empCode, name: name, phone: phone,
+                jobTitle: enrich.jobTitle || job || 'مسعف', jobNature: job, empType: enrich.empType || '',
+                symbol: oiNormalize(rawSym), kind: resolved.kind, team: teamName,
+                workDays: workDays, days: days
+            };
+            out.employees.push(emp);
+            // قرار المستشار: أي إسعافي/قيادة/عمليات بلا مناوبات = خطأ في الجدول يُبلَّغ عنه (ليس «غير مجدول»)
+            if (resolved.kind !== 'admin' && workDays === 0) {
+                out.issues.fieldWithoutShifts.push(empCode + ' — ' + name + ' (' + resolved.team + ')');
+            }
+            if (resolved.kind === 'ops') out.counts.ops++;
+            else if (resolved.kind === 'admin') out.counts.admins++;
+            else if (resolved.kind === 'overlap') out.counts.overlap++;
+            else if (resolved.kind === 'leadership') out.counts.leadership++;
+            else out.counts.teams[resolved.team] = (out.counts.teams[resolved.team] || 0) + 1;
+        } catch (rowErr) { out.issues.rowErrors++; }
+    }
+    // الفرق الناقصة: رمز فريق ورد لكن بلا أي يوم عمل
+    out.counts.emptyTeams = [];
+    var teamWork = {};
+    out.employees.forEach(function (e) {
+        if ((e.kind === 'center' || e.kind === 'rapid' || e.kind === 'overlap') && e.workDays > 0) teamWork[e.team] = true;
+    });
+    Object.keys(out.counts.teams).forEach(function (t) { if (!teamWork[t]) out.counts.emptyTeams.push(t); });
+    return out;
+}
+
+window.__oi = { normalize: oiNormalize, resolveSymbol: oiResolveSymbol, findSheet: oiFindOperationalSheet, suggestMY: oiSuggestMonthYear, parse: oiParseOfficial };
+})();
+</script>
+    <script>
+// ═══ الاستيراد الرسمي — الجزء 2: التدفق (شهر/سنة ← مقارنة ذكية ← تقرير ← تطبيق) ═══
+// الحفظ عبر syncToServer الحالية كما هي (لا تغيير لطريقة الحفظ) — الدمج بلا مسح إطلاقًا
+(function () {
+'use strict';
+var oiState = null; // { parsed, month, year, diff }
+
+// ─── دخول: زر مستقل بجانب شريط الاستيراد الحالي (الحالي يبقى كما هو) ───
+function oiOpenPicker() {
+    var inp = document.getElementById('officialImportInput');
+    if (inp) { inp.value = ''; inp.click(); }
+}
+window.oiOpenPicker = oiOpenPicker;
+
+async function oiFileChosen(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    try {
+        if (typeof showToast === 'function') showToast('⏳ جاري تحليل الملف الرسمي…', 'info');
+        var wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        var parsed = window.__oi.parse(wb);
+        if (!parsed) { showToast('❌ لم يُعثر على ورقة تشغيلية (أعمدة: الاسم/الكود/رمز/أيام) في أي ورقة', 'error'); return; }
+        var sug = window.__oi.suggestMY(wb, file.name, new Date(file.lastModified || Date.now()));
+        oiState = { parsed: parsed, month: sug.month, year: sug.year };
+        oiShowMonthModal(sug);
+    } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('❌ تعذّر تحليل الملف: ' + e.message, 'error');
+    }
+}
+window.oiFileChosen = oiFileChosen;
+
+// ─── نافذة الشهر/السنة مع مصدر الاقتراح ───
+function oiShowMonthModal(sug) {
+    document.getElementById('oiMonth').value = sug.month || 0;
+    document.getElementById('oiYear').value = sug.year || new Date().getFullYear();
+    document.getElementById('oiSugSource').textContent = 'الاقتراح من: ' + sug.source + ' — يمكنك تغييره قبل الاستيراد';
+    document.getElementById('oiMonthModal').classList.add('active');
+}
+function oiConfirmMonth() {
+    oiState.month = parseInt(document.getElementById('oiMonth').value, 10);
+    oiState.year = parseInt(document.getElementById('oiYear').value, 10);
+    if (!oiState.month || oiState.month < 1 || oiState.month > 12 || !oiState.year) { showToast('⚠️ حدد الشهر والسنة', 'error'); return; }
+    document.getElementById('oiMonthModal').classList.remove('active');
+    try { localStorage.setItem('officialImport:lastMY', JSON.stringify({ month: oiState.month, year: oiState.year })); } catch (e) {}
+    oiState.diff = oiComputeDiff(oiState.parsed, oiState.month, oiState.year);
+    oiShowReport();
+}
+window.oiConfirmMonth = oiConfirmMonth;
+function oiCloseModals() {
+    ['oiMonthModal', 'oiReportModal'].forEach(function (id) { document.getElementById(id).classList.remove('active'); });
+    oiState = null;
+}
+window.oiCloseModals = oiCloseModals;
+
+// ─── المقارنة الذكية (ملاحظة 4): مقارنة مع البيانات الحالية المحمّلة — بلا مسح ───
+function oiComputeDiff(parsed, month, year) {
+    var cur = {};
+    (typeof employees !== 'undefined' ? employees : []).forEach(function (e) {
+        var code = String(e.employeeNumber || e.id || '');
+        if (code) cur[code] = e;
+    });
+    var diff = { updated: 0, added: 0, deleted: 0, symbolsChanged: 0, ignored: parsed.issues.noCode.length + parsed.issues.duplicates.length + parsed.issues.rowErrors, notInFile: 0 };
+    var seenIncoming = {};
+    parsed.employees.forEach(function (e) {
+        seenIncoming[e.employeeNumber] = true;
+        var old = cur[e.employeeNumber];
+        if (!old) { diff.added++; return; }
+        var changed = false;
+        if (String(old.name || '') !== e.name || String(old.phone || '') !== e.phone) changed = true;
+        if (String(old.team || '') !== e.team) { diff.symbolsChanged++; changed = true; }
+        if (changed) diff.updated++;
+    });
+    Object.keys(cur).forEach(function (code) { if (!seenIncoming[code]) diff.notInFile++; });
+    return diff;
+}
+
+// ─── التقرير بالشكل المعتمد (ملاحظة 7) ───
+function oiShowReport() {
+    var p = oiState.parsed, d = oiState.diff, i = p.issues, c = p.counts;
+    var teamCount = Object.keys(c.teams).length;
+    function li(label, arr) {
+        if (!arr || !arr.length) return '<div class="oi-line"><span>' + label + '</span><b>0</b></div>';
+        return '<div class="oi-line oi-warn"><span>' + label + '</span><b>' + arr.length + '</b></div>' +
+            '<div class="oi-detail">' + arr.slice(0, 12).join(' · ') + (arr.length > 12 ? ' …' : '') + '</div>';
+    }
+    document.getElementById('oiReportBody').innerHTML =
+        '<div class="oi-sep">══ التحليل ══</div>' +
+        '<div class="oi-line"><span>عدد الموظفين المقروءين</span><b>' + p.employees.length + '</b></div>' +
+        '<div class="oi-line"><span>عدد الفرق</span><b>' + teamCount + '</b></div>' +
+        '<div class="oi-line"><span>عدد العمليات</span><b>' + c.ops + '</b></div>' +
+        '<div class="oi-line"><span>عدد الإداريين (سجلات منفصلة)</span><b>' + c.admins + '</b></div>' +
+        '<div class="oi-line"><span>أطقم الأوفرلاب</span><b>' + c.overlap + '</b></div>' +
+        '<div class="oi-sep">══ المقارنة مع الحالي (شهر ' + oiState.month + '/' + oiState.year + ') ══</div>' +
+        '<div class="oi-line"><span>تم تحديث</span><b>' + d.updated + '</b></div>' +
+        '<div class="oi-line"><span>تم إضافة</span><b>' + d.added + '</b></div>' +
+        '<div class="oi-line"><span>تم حذف</span><b>0</b></div>' +
+        '<div class="oi-line"><span>تم تغيير رموز</span><b>' + d.symbolsChanged + '</b></div>' +
+        '<div class="oi-line"><span>تم تجاهل (نقص بيانات)</span><b>' + d.ignored + '</b></div>' +
+        '<div class="oi-line"><span>سجلات حالية لم ترد في الملف (تُبقى)</span><b>' + d.notInFile + '</b></div>' +
+        '<div class="oi-sep">══ الأخطاء والملاحظات ══</div>' +
+        li('الرموز غير المعروفة', i.unknownSymbols) +
+        li('موظفون بدون رقم وظيفي', i.noCode) +
+        li('موظفون بدون رمز', i.noSymbol) +
+        li('صفوف مكررة (نفس الرقم الوظيفي)', i.duplicates) +
+        li('الفرق الناقصة (بلا أي تغطية في الملف)', c.emptyTeams) +
+        li('⚠️ ميدانيون/عمليات بلا مناوبات (خطأ جدولة — يجب مراجعته)', i.fieldWithoutShifts) +
+        (i.rowErrors ? '<div class="oi-line oi-warn"><span>صفوف تعذّر تحليلها</span><b>' + i.rowErrors + '</b></div>' : '');
+    document.getElementById('oiReportModal').classList.add('active');
+}
+
+// ─── التطبيق: دمج بلا مسح ← قناة الحفظ الوحيدة (/api/schedule/employees) ───
+async function oiApply() {
+    if (!oiState) return;
+    var month = oiState.month, year = oiState.year;
+    var pad2 = function (n) { n = parseInt(n, 10); return (n < 10 ? '0' : '') + n; };
+    var ym = year + '-' + pad2(month); // شهر الاستيراد — النطاق الوحيد المسموح كتابته (YYYY-MM مبطّن)
+    var byCode = {};
+    (typeof employees !== 'undefined' ? employees : []).forEach(function (e) {
+        var code = String(e.employeeNumber || e.id || '');
+        if (code) byCode[code] = e; // الحاليون يبقون (ملاحظة 4: لا مسح)
+    });
+    // W-تكامل ②: قصر الجدولة المحفوظة على شهر الاستيراد حصرًا. المزامنة المركزية
+    // (RosterSync) تحذف كل الفترات الواردة في البيانات ثم تعيد بناءها؛ بقاء مداخل
+    // شهر قديم هنا كان سيمسح روستر ذلك الشهر التاريخي ويعيد بناءه من بقايا منقوصة.
+    // JSON ملف استيراد للشهر الجاري فقط — التاريخ يبقى في قاعدة البيانات.
+    Object.keys(byCode).forEach(function (k) {
+        var e = byCode[k];
+        e.schedule = (e.schedule || []).filter(function (s) { return String(s.date || '').indexOf(ym + '-') === 0; });
+    });
+    oiState.parsed.employees.forEach(function (ne) {
+        var schedule = [];
+        Object.keys(ne.days).forEach(function (day) {
+            schedule.push({ date: ym + '-' + pad2(day), shiftCode: ne.days[day], location: ne.team }); // ISO مبطّن — الصيغة الوحيدة المعتمدة
+        });
+        var old = byCode[ne.employeeNumber];
+        if (old) { // تحديث الموجود — نفس الشكل الحالي للبيانات
+            old.name = ne.name; old.phone = ne.phone || old.phone;
+            old.jobTitle = ne.jobTitle || old.jobTitle; old.team = ne.team;
+            old.kind = ne.kind || old.kind; old.symbol = ne.symbol || old.symbol; // يُحفظ النوع — قاعدة «غير مجدول إداري حصرًا» تعتمد عليه
+            old.schedule = schedule;
+        } else { // إضافة الجديد — نفس شكل emp في النظام
+            byCode[ne.employeeNumber] = {
+                id: ne.employeeNumber, employeeNumber: ne.employeeNumber, name: ne.name,
+                phone: ne.phone, jobTitle: ne.jobTitle, team: ne.team, schedule: schedule,
+                kind: ne.kind, symbol: ne.symbol
+            };
+        }
+    });
+    employees.length = 0;
+    Object.keys(byCode).forEach(function (k) { employees.push(byCode[k]); });
+    document.getElementById('oiReportModal').classList.remove('active');
+    if (typeof showToast === 'function') showToast('⏳ جاري المزامنة مع الخادم…', 'info');
+    // W-تكامل ②: قناة الحفظ الوحيدة للاستيراد الرسمي — POST /api/schedule/employees
+    // (يكتب JSON الاستيراد + يزامن القاعدة ذريًا عبر RosterSyncService: موظفون +
+    // roster + تعيينات). لا كاتب ثانٍ — syncToServer القديمة لا تُستدعى هنا.
+    await saveToServer();
+    saveToIndexedDB();
+    saveToLocalStorage();
+    // تحديث الواجهة بالكامل بعد الدمج (نفس مسار التحديث القياسي في الصفحة)
+    try { updateStats(); } catch (e) {}
+    try { renderCharts(); } catch (e) {}
+    try { renderCurrentView(); } catch (e) {}
+    try { populateLocationFilter(); } catch (e) {}
+    if (typeof showToast === 'function') showToast('✅ اكتمل الاستيراد الرسمي — راجع التقرير أعلاه', 'success');
+    oiState = null;
+}
+window.oiApply = oiApply;
+})();
+</script>
+    </body>
 </html>

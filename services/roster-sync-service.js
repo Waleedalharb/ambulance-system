@@ -64,11 +64,12 @@ class RosterSyncService {
         const stats = {
             employeesSeen: 0, created: 0, updated: 0, reactivated: 0,
             deactivated: 0, rosterRows: 0, rosterPeriods: [],
-            skippedEmployees: 0, skippedEntries: 0
+            skippedEmployees: 0, skippedEntries: 0,
+            assignmentsCreated: 0, assignmentsEnded: 0
         };
 
         // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
-        const people = new Map(); // code → { code, name, phone, jobTitle, teamRaw, entries[] }
+        const people = new Map(); // code → { code, name, phone, jobTitle, teamRaw, symbol, entries[] }
         for (const emp of scheduleEmployees) {
             const code = String((emp && (emp.employeeNumber != null ? emp.employeeNumber : emp.id)) || '').trim();
             const name = String((emp && emp.name) || '').trim();
@@ -78,6 +79,10 @@ class RosterSyncService {
                 phone: emp.phone != null ? String(emp.phone) : null,
                 jobTitle: String(emp.jobTitle || 'مسعف').trim() || 'مسعف',
                 teamRaw: String(emp.team || '').trim(),
+                // W-تكامل ③ب: الرمز الأساسي (O12A…) — undefined إن لم يرد في
+                // هذا الاستيراد إطلاقًا حتى لا يمسح الرمز المخزن (استيراد قديم الصيغة)
+                symbol: (emp && emp.symbol != null && String(emp.symbol).trim())
+                    ? String(emp.symbol).trim() : undefined,
                 entries: Array.isArray(emp.schedule) ? emp.schedule : []
             });
         }
@@ -85,6 +90,9 @@ class RosterSyncService {
 
         const teamRows = await this.db.all('SELECT id, name FROM teams');
         const resolveTeam = this._buildTeamResolver(teamRows);
+        // W-تكامل ③ب: العمود وصفة إضافية — قواعد مصغّرة بلا symbol تُتخطى تحديثه بأمان
+        const empCols = await this.db.all('PRAGMA table_info(employees)').catch(() => []);
+        const hasSymbolCol = (empCols || []).some(c => c.name === 'symbol');
 
         await this.db.beginTransaction();
         try {
@@ -94,18 +102,32 @@ class RosterSyncService {
                 const existing = await this.db.get(
                     'SELECT id, is_active FROM employees WHERE employee_code = ?', [p.code]);
                 if (existing) {
-                    await this.db.run(
-                        'UPDATE employees SET name = ?, phone = ?, job_title = ?, is_active = 1 WHERE id = ?',
-                        [p.name, p.phone, p.jobTitle, existing.id]);
+                    if (hasSymbolCol && p.symbol !== undefined) {
+                        await this.db.run(
+                            'UPDATE employees SET name = ?, phone = ?, job_title = ?, symbol = ?, is_active = 1 WHERE id = ?',
+                            [p.name, p.phone, p.jobTitle, p.symbol, existing.id]);
+                    } else {
+                        await this.db.run(
+                            'UPDATE employees SET name = ?, phone = ?, job_title = ?, is_active = 1 WHERE id = ?',
+                            [p.name, p.phone, p.jobTitle, existing.id]);
+                    }
                     stats.updated++;
                     if (!existing.is_active) stats.reactivated++;
                     idByCode.set(p.code, existing.id);
                 } else {
-                    const ins = await this.db.run(
-                        'INSERT INTO employees (employee_code, name, phone, job_title, is_active) VALUES (?, ?, ?, ?, 1)',
-                        [p.code, p.name, p.phone, p.jobTitle]);
-                    stats.created++;
-                    idByCode.set(p.code, ins.id);
+                    if (hasSymbolCol) {
+                        const ins = await this.db.run(
+                            'INSERT INTO employees (employee_code, name, phone, job_title, symbol, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+                            [p.code, p.name, p.phone, p.jobTitle, p.symbol !== undefined ? p.symbol : null]);
+                        stats.created++;
+                        idByCode.set(p.code, ins.id);
+                    } else {
+                        const ins = await this.db.run(
+                            'INSERT INTO employees (employee_code, name, phone, job_title, is_active) VALUES (?, ?, ?, ?, 1)',
+                            [p.code, p.name, p.phone, p.jobTitle]);
+                        stats.created++;
+                        idByCode.set(p.code, ins.id);
+                    }
                 }
             }
 
@@ -119,6 +141,43 @@ class RosterSyncService {
             } else {
                 const deact = await this.db.run('UPDATE employees SET is_active = 0');
                 stats.deactivated = deact.changes || 0;
+            }
+
+            // ── 3ب) تعيينات الفرق: مطابقة العضوية مع آخر جدولة (إنهاء لا حذف) ──
+            // team_assignments يخدم مسار /api/shift-completion/:shiftId/:teamName.
+            // بما أن هذه الخدمة هي الكاتب الوحيد للجدولة (W-تكامل ②)، فهي أيضًا
+            // من يحافظ على العضوية: فريق الموظف في آخر استيراد هو عضويته النشطة،
+            // والتعيين المستبدل يُنهى بـ end_date ولا يُحذف إطلاقًا.
+            // ملاحظة حقن: قواعد مصغّرة بلا جدول التعيينات تُتخطى هذه الخطوة بأمان.
+            const hasAssignTable = !!(await this.db.get(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='team_assignments'"));
+            if (hasAssignTable) {
+                const today = new Date().toISOString().slice(0, 10);
+                const activeAssign = await this.db.all(
+                    'SELECT id, employee_id, team_id FROM team_assignments WHERE end_date IS NULL');
+                const assignByEmp = new Map();
+                for (const a of activeAssign) {
+                    if (!assignByEmp.has(a.employee_id)) assignByEmp.set(a.employee_id, []);
+                    assignByEmp.get(a.employee_id).push(a);
+                }
+                for (const p of people.values()) {
+                    const employeeId = idByCode.get(p.code);
+                    const teamId = resolveTeam(p.teamRaw);
+                    const current = assignByEmp.get(employeeId) || [];
+                    const hasMatch = teamId != null && current.some(a => a.team_id === teamId);
+                    for (const a of current) {
+                        if (a.team_id !== teamId) {
+                            await this.db.run('UPDATE team_assignments SET end_date = ? WHERE id = ?', [today, a.id]);
+                            stats.assignmentsEnded++;
+                        }
+                    }
+                    if (teamId != null && !hasMatch) {
+                        await this.db.run(
+                            'INSERT INTO team_assignments (employee_id, team_id, assigned_date, is_primary) VALUES (?, ?, ?, 1)',
+                            [employeeId, teamId, today]);
+                        stats.assignmentsCreated++;
+                    }
+                }
             }
 
             // ── 4) صفوف الـ roster من مداخل الجدولة الصالحة فقط ──

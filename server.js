@@ -15,6 +15,8 @@ const { createEngine, getEngine } = require('./ops-engine');
 // OV-S6-01: server-side shift type/date derivation (prep mode stamping)
 // (aliased: server.js already defines its own identical getCurrentShiftType)
 const { getCurrentShiftType: deriveServerShiftType, getSaudiDateString } = require('./managers');
+// الطبقة المركزية الوحيدة لتحويل وعرض الوقت (Asia/Riyadh) — نفس ملف المتصفح
+const TimeRiyadh = require('./public/js/time-riyadh.js');
 
 // ═══════════════════════════════════════════════════════════
 // Operations Engine v1.0 — The New Single Source of Truth
@@ -33,6 +35,7 @@ let indicatorService = null; // F5a: read-only operational indicators
 let staffingEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث القوى البشرية
 let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث المركبات
 let rosterSyncService = null; // SR-2: المزامنة الوحيدة الجدولة ← employees + shift_roster (SSOT)
+let workflowService = null; // WF-1: سير العمل الرسمي — منظومة مستقلة، قراءة فقط من التكميل
 
 // Set timezone to Saudi Arabia (Riyadh)
 process.env.TZ = 'Asia/Riyadh';
@@ -570,10 +573,9 @@ let lastUpdateTime = Date.now();
 // نظام النوبة التلقائي (Auto-Shift System)
 // ============================================
 function getSaudiDateTime() {
-    const now = new Date();
-    // Get UTC time first, then add Saudi offset (+3)
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    return new Date(utc + (3 * 60 * 60 * 1000));
+    // مكوّنات الرياض من الطبقة المركزية — مستقل عن منطقة الخادم الزمنية (بلا إزاحة يدوية +3)
+    const p = TimeRiyadh.riyadhParts(new Date());
+    return new Date(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`);
 }
 
 function getCurrentShiftType() {
@@ -2549,19 +2551,18 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
             targetShift = shifts[index];
         } else {
             // Create new auto-shift record
-            const now = new Date();
-            const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
-            const year = saudiTime.getFullYear();
-            const month = (saudiTime.getMonth() + 1).toString().padStart(2, '0');
-            const day = saudiTime.getDate().toString().padStart(2, '0');
-            const isoDate = `${year}-${month}-${day}`;
+            // مكوّنات الرياض من الطبقة المركزية (بلا إزاحة يدوية +3)
+            const p = TimeRiyadh.riyadhParts(new Date());
+            const isoDate = `${p.year}-${p.month}-${p.day}`;
+            // نفس الدلالة السابقة تمامًا: توقيت الرياض الجداري مُخزَّن كما هو
+            const saudiWall = new Date(Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second));
             const newShift = {
                 id: Date.now(),
                 shiftName: `${shiftData.shiftType || 'صباحية'} - ${shiftDate || isoDate}`,
                 shiftDate: shiftDate || isoDate,
-                shiftTime: saudiTime.toLocaleTimeString('ar-SA'),
+                shiftTime: TimeRiyadh.formatTimeSec(new Date()),
                 shiftType: shiftData.shiftType || 'صباحية',
-                startTime: saudiTime.toISOString(),
+                startTime: saudiWall.toISOString(),
                 savedReports: {},
                 totalReports: 0,
                 rapidLocations: shiftData.rapidLocations || {},
@@ -2569,7 +2570,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
                 vehicleData: {},
                 fuelData: {},
                 generalNotes: shiftData.generalNotes || "",
-                lastUpdate: saudiTime.toISOString(),
+                lastUpdate: saudiWall.toISOString(),
                 autoArchived: false
             };
             shifts.unshift(newShift);
@@ -4279,11 +4280,17 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
         `, [isoDate, teamName, isoDate]);
         
         
-        // Define shift code categories for proper filtering
-        const dayOnlyCodes = ['D12', 'D10', 'D11', 'D8', 'D6', 'CPD', 'CP8'];
-        const nightOnlyCodes = ['N12', 'N10', 'N11', 'N8', 'N6', 'LN8', 'LN10', 'CPN'];
-        const sharedCodes = ['CP24', 'M', 'ME', 'F', 'O12', 'O10', 'O6'];
-        const offCodes = ['V', 'VC', 'E', 'EV', 'WO', 'C'];
+        // ═══ قوائم الأكواد من القاموس المركزي فقط (public/js/core/shift-type-dictionary.js) ═══
+        // القاموس الرسمي: الأوفرلاب جزء من المناوبة الليلية — الاستثناء الوحيد OvD (نهاري بتعريف المالك)
+        if (!global.__dictValidated) { // المدقق المركزي — مرة واحدة عند أول استدعاء
+            require('./public/js/core/system-validator.js').assertValid();
+            global.__dictValidated = true;
+        }
+        const STD = require('./public/js/core/shift-type-dictionary.js');
+        const dayOnlyCodes = STD.DAY_ONLY_CODES;
+        const nightOnlyCodes = STD.NIGHT_ONLY_CODES;
+        const sharedCodes = STD.SHARED_CODES;
+        const offCodes = STD.OFF_CODES;
         
         const validCodes = isNightShift 
             ? [...nightOnlyCodes, ...sharedCodes] 
@@ -4622,6 +4629,131 @@ app.post('/api/vehicles/events', authenticate, async (req, res) => {
         if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
         console.error('[API] Error vehicle event:', error);
         res.status(500).json({ error: 'فشل في حفظ حالة المركبة' });
+    }
+});
+
+// ============================================
+// WF-1: سير العمل الرسمي (Official Shift Workflow) — منظومة مستقلة
+// قراءة فقط من التكميل/المركبات. صفر كتابة في أي جدول قائم.
+// الاعتماد/القفل/المرجع/PDF/الإرسال = مراحل لاحقة (W-3/W-4/W-5).
+// ============================================
+app.post('/api/workflow/prepare', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const result = await workflowService.prepare({ actor: req.user });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow prepare:', error);
+        res.status(500).json({ error: 'فشل في إعداد سير العمل' });
+    }
+});
+
+app.get('/api/workflow/shift/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const shiftId = parseInt(req.params.shiftId);
+        if (isNaN(shiftId)) return res.status(400).json({ error: 'shift_id غير صالح' });
+        const result = await workflowService.listByShift(shiftId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('[API] Error workflow list:', error);
+        res.status(500).json({ error: 'فشل في جلب نسخ سير العمل' });
+    }
+});
+
+app.get('/api/workflow/version/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const result = await workflowService.getVersion(id);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow get:', error);
+        res.status(500).json({ error: 'فشل في جلب نسخة سير العمل' });
+    }
+});
+
+app.put('/api/workflow/version/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const result = await workflowService.updateFields(id, req.body || {}, { actor: req.user });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow update:', error);
+        res.status(500).json({ error: 'فشل في حفظ حقول سير العمل' });
+    }
+});
+
+app.get('/api/workflow/version/:id/audit', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const audit = await workflowService.getAudit(id);
+        res.json({ success: true, audit });
+    } catch (error) {
+        console.error('[API] Error workflow audit:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
+    }
+});
+
+// ─── W-3: الاعتماد الرسمي (قفل + مرجع + بصمة + PDF) وإعادة الإصدار ───
+app.post('/api/workflow/version/:id/approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const result = await workflowService.approve(id, { actor: req.user });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow approve:', error);
+        res.status(500).json({ error: 'فشل في اعتماد سير العمل' });
+    }
+});
+
+app.post('/api/workflow/version/:id/reissue', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const reason = req.body && req.body.reason;
+        const result = await workflowService.reissue(id, reason, { actor: req.user });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow reissue:', error);
+        res.status(500).json({ error: 'فشل في إعادة إصدار سير العمل' });
+    }
+});
+
+app.get('/api/workflow/version/:id/pdf', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        const info = await workflowService.getPdfInfo(id);
+        if (info.status !== 'approved') {
+            return res.status(409).json({ error: 'PDF متاح للنسخ المعتمدة فقط' });
+        }
+        if (!info.pdfPath) {
+            return res.status(409).json({ error: 'لا يوجد ملف PDF مسجل لهذه النسخة' });
+        }
+        const abs = path.join(__dirname, info.pdfPath);
+        if (!require('fs').existsSync(abs)) {
+            return res.status(409).json({ error: 'ملف PDF مفقود من التخزين' });
+        }
+        res.sendFile(abs);
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error workflow pdf:', error);
+        res.status(500).json({ error: 'فشل في جلب ملف PDF' });
     }
 });
 
@@ -5325,7 +5457,7 @@ app.post('/api/peak-mission', authenticate, async (req, res) => {
             action: 'مهمة جديدة',
             details: unit + ' في ' + location,
             priority: priority || 'عادي',
-            time: new Date().toLocaleTimeString('ar-SA'),
+            time: TimeRiyadh.formatTimeSec(new Date()),
             date: new Date().toISOString()
         });
         if (data.logs.length > 50) data.logs.pop();
@@ -5381,7 +5513,7 @@ app.post('/api/peak-resolve', authenticate, async (req, res) => {
                 action: 'تم التنفيذ',
                 details: alert.details,
                 priority: alert.priority || 'عادي',
-                time: new Date().toLocaleTimeString('ar-SA'),
+                time: TimeRiyadh.formatTimeSec(new Date()),
                 date: new Date().toISOString()
             });
             if (data.logs.length > 50) data.logs.pop();
@@ -5415,7 +5547,7 @@ app.delete('/api/peak-mission/:id', authenticate, authorize(['admin', 'director'
             action: 'مهمة محذوفة',
             details: mission.unit + ' في ' + mission.location,
             priority: mission.priority || 'عادي',
-            time: new Date().toLocaleTimeString('ar-SA'),
+            time: TimeRiyadh.formatTimeSec(new Date()),
             date: new Date().toISOString()
         });
         if (data.logs.length > 50) data.logs.pop();
@@ -6287,7 +6419,7 @@ app.get('/api/export', authenticate, async (req, res) => {
         const safeReports = (reports && typeof reports === 'object') ? reports : {};
         let rows = [
             ["تقرير بلاغات الفرق الإسعافية - قطاع جنوب الرياض"],
-            ["تاريخ التصدير:", new Date().toLocaleString("ar-SA")],
+            ["تاريخ التصدير:", TimeRiyadh.formatDateTimeSec(new Date())],
             [],
             ["المركز", "الوحدة", "عدد البلاغات", "التواقيت"]
         ];
@@ -7864,10 +7996,20 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
             // Delete existing roster for same month/year to avoid duplicates
             await db.ShiftRoster.deleteByMonthYear(month, year);
 
+            // تطبيع التاريخ إلى ISO مبطّن (YYYY-MM-DD) — الصيغة الوحيدة المعتمدة في shift_roster.
+            // ملفات الإكسل ترسل أحيانًا بلا تبطين (2026-7-1) فتفشل قراءات التكميل/سير العمل (تستعلم بصيغة مبطّنة).
+            const normIsoDate = (d) => {
+                const m = String(d || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+                if (!m) return null;
+                return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+            };
+
             // Insert roster entries
             for (const entry of roster) {
                 const empId = employeeIdMap[entry.employee_code];
                 if (!empId) continue;
+                const isoDate = normIsoDate(entry.shift_date);
+                if (!isoDate) continue; // تاريخ مشوه — يُتخطى بدل كتابة صف لا تقرأه المنصة
                 let teamId = null;
                 if (entry.team_name && teamMap[entry.team_name]) {
                     teamId = teamMap[entry.team_name];
@@ -7875,7 +8017,7 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
                 await db.ShiftRoster.create({
                     employee_id: empId,
                     team_id: teamId,
-                    shift_date: entry.shift_date,
+                    shift_date: isoDate,
                     shift_code: entry.shift_code,
                     month: month,
                     year: year
@@ -10456,6 +10598,15 @@ server.listen(PORT, async () => {
             // W1-B: late binding — CompletionService هو نقطة الكتابة الوحيدة للأحداث
             if (completionService) completionService.staffingEventsService = staffingEventsService;
             console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');
+            // WF-1: سير العمل الرسمي — منظومة مستقلة (جداول ذاتية، قراءة فقط من
+            // staffing/vehicles/completion، صفر كتابة في أي جدول قائم)
+            const WorkflowService = require('./services/workflow-service');
+            workflowService = new WorkflowService({
+                storage: opsEngine.storage, engine: opsEngine,
+                staffingService: staffingEventsService, vehicleService: vehicleEventsService
+            });
+            await workflowService.init();
+            console.log('✅ WorkflowService wired (WF-1, isolated)');
         } catch (err) {
             console.error('⚠️ Event-driven services failed:', err.message);
             reportService = null;
@@ -10467,6 +10618,7 @@ server.listen(PORT, async () => {
             staffingEventsService = null;
             vehicleEventsService = null;
             rosterSyncService = null;
+            workflowService = null;
         }
     }
     

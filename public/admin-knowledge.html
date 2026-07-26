@@ -276,6 +276,7 @@
 
     <script src="js/core/core-auth.js"></script>
     <script src="js/core/core-toast.js"></script>
+    <script src="/js/time-riyadh.js"></script>
     <script src="js/core/core-time.js"></script>
     <script>
         var authToken = AuthCore.getToken();
@@ -349,7 +350,7 @@
             const container = document.getElementById('documentsList');
             container.innerHTML = '<div class="document-list">' + docs.map(doc => {
                 const size = doc.file_size ? formatFileSize(doc.file_size) : '-';
-                const date = doc.upload_date ? new Date(doc.upload_date).toLocaleDateString('ar-SA') : (doc.created_at ? new Date(doc.created_at).toLocaleDateString('ar-SA') : '-');
+                const date = doc.upload_date ? TimeRiyadh.formatDate(doc.upload_date) : (doc.created_at ? TimeRiyadh.formatDate(doc.created_at) : '-');
                 const category = doc.category || 'عام';
                 const docId = doc.doc_id || doc.id;
                 return `
@@ -563,7 +564,7 @@
             const rows = questions.map(q => {
                 const status = q.status || 'pending';
                 const statusLabel = status === 'pending' ? 'جديد' : status === 'reviewing' ? 'قيد المراجعة' : status === 'resolved' ? 'محلول' : status === 'dismissed' ? 'متجاهل' : status;
-                const date = q.created_at ? new Date(q.created_at).toLocaleString('ar-SA') : '-';
+                const date = q.created_at ? TimeRiyadh.formatDateTimeSec(q.created_at) : '-';
                 const user = q.user_name || q.user_id || 'غير معروف';
                 const resolution = q.resolution || '';
                 const resolvedBy = q.resolved_by || '';

@@ -59,7 +59,7 @@
     // ============================================
     function $(id) { return document.getElementById(id); }
     function escapeHtml(t) { if(!t)return'';var d=document.createElement('div');d.textContent=t;return d.innerHTML; }
-    function formatTime(d) { if(!d)return'';var n=new Date(),x=new Date(d);if(isNaN(x))return'';return x.toDateString()===n.toDateString()?x.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',hour12:false}):x.toLocaleDateString('ar-SA',{month:'short',day:'numeric'}); }
+    function formatTime(d) { if(!d)return'';var n=new Date(),x=new Date(d);if(isNaN(x))return'';return x.toDateString()===n.toDateString()?TimeRiyadh.formatTime(x):TimeRiyadh.formatDate(x); }
     function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn.bind.apply(fn,[this].concat(Array.prototype.slice.call(arguments))),ms);};}
 
     // ============================================
@@ -297,7 +297,7 @@
         if (x.toDateString() === n.toDateString()) return 'اليوم';
         var y = new Date(n); y.setDate(y.getDate()-1);
         if (x.toDateString() === y.toDateString()) return 'أمس';
-        return x.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        return TimeRiyadh.formatFullDate(x);
     }
 
     // ============================================

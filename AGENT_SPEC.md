@@ -1,7 +1,13 @@
 # Agent Shared Contract - منصة الجنوب Refactoring
 
+> **سياسة التوقيت**: جميع تنسيقات التاريخ والوقت تمر عبر `public/js/time-riyadh.js` فقط — انظر [TIME-POLICY.md](TIME-POLICY.md) وشغّل `node scripts/guard-time-riyadh.js` قبل أي commit.
+>
+> **سياسة الاختبار (قرار المالك)**: أي تعديل على أي ملف في المشروع = تشغيل الانحدار `scripts/regression-test.js` على بيئة معزولة قبل التسليم، بلا استثناء — حتى لو كان التعديل شكليًا أو تنظيفًا. الاختبار جزء من عملية التسليم وليس خيارًا. المرجع المعتمد: 202/213 (الـ11 الفاشلة مؤجلة بقرار المالك)، وأي فشل جديد يُوقف التسليم.
+
 ## المشروع
-- المسار: `C:\Users\a7bk-\Documents\kimi\workspace\ambulance-dispatch`
+- المسار: `C:\projects\Ambulance Dispatch` — **المشروع الوحيد المعتمد (Single Source of Truth)**.
+  كل الخدمات (Backend/Frontend/SSE/Workflow/Schedule/Reports) تعمل من هذا المسار فقط.
+  أي نسخة أخرى (مثل `workspace\ambulance-dispatch-live-ARCHIVE`) أرشيف للقراءة فقط ويُمنع تشغيلها أو الإشارة إليها.
 - Stack: Node.js + Express + SQLite (sqlite3) + Vanilla HTML/CSS/JS
 - اللغة: JavaScript (commonjs), CSS, HTML (Arabic/RTL)
 
@@ -416,6 +422,9 @@ CREATE TABLE password_settings (
 - `public/css/app.css` - استخراج CSS (جديد)
 - `public/js/app.js` - استخراج JS (جديد)
 - `public/forms/*.html` - تحديث لتستخدم APIs بدل localStorage
+
+## متابعات مفتوحة (أولوية منخفضة)
+- حذف الهيكل الفارغ `C:\Users\a7bk-\Documents\kimi\workspace\ambulance-dispatch-live` نهائيًا — محجوز حاليًا كـ cwd لعملية جارية؛ يُحذف بعد أول إعادة تشغيل للجهاز/التطبيق أو أول نافذة صيانة (قرار المالك 2026-07-26: متابعة فقط وليست أولوية).
 - `db/database.js` - SQLite wrapper (جديد)
 - `db/migrate.js` - Migration script (جديد)
 - `package.json` - إضافة sqlite3 dependency
