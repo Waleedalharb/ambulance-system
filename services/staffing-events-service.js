@@ -651,11 +651,26 @@ class StaffingEventsService {
      * «النشط» = عضو مجدول بلا غياب/تأخر/تكليف مفتوح، أو داعم بدعم مفتوح للفريق،
      * أو مكلَّف إلى الفريق. لا شيء يُحسب في الواجهة إطلاقًا.
      */
+    // دلالة الحقول (توثيق UAT-1 — إضافة حقول فقط، بلا حذف/إعادة تسمية):
+    //   scheduledStaff  : الكادر المجدول — كل الأفراد المجدولين في الجدول الرسمي
+    //                     (shift_roster برمز دوام صحيح) لفرق هذه المناوبة، بغض
+    //                     النظر عن الغياب/التأخير/التكليف.
+    //   totalStaff      : الكادر الحاضر فعليًا = المجدولون النشطون (بلا غياب/تأخر
+    //                     مفتوح وغير مكلَّفين خارج فرقهم) + الدعم المؤقت (دعم خارجي
+    //                     /تطوعي/تكليف وارد) + الأوفرلاب المدمج صراحة عبر roster.
+    //                     لذلك قد يتجاوز scheduledStaff عند ورود دعم إضافي من
+    //                     خارج الجدول — وهذا سلوك صحيح وليس خطأ.
+    //   requiredTeams   : الفرق المطلوبة — عدد فرق خطة هذه المناوبة (لها كادر مجدول).
+    //   operationalReadinessRate : نسبة الجاهزية التشغيلية =
+    //                     (الفرق الجاهزة ÷ الفرق المطلوبة) × 100 — مقياس فرق
+    //                     صرف لا علاقة له بعدد الأفراد. (readinessRate الأصلي
+    //                     = جاهزة ÷ مقرَّرة ويبقى كما هو للتوافق الخلفي.)
     async deriveTeamReadiness(shiftId) {
         const emptyWf = {
             totalStaff: 0, totalRequired: 0, totalCars: 0,
             readyTeams: 0, missingTeams: 0, offlineTeams: 0, pendingTeams: 0,
-            supporters: 0, absentees: 0, readinessRate: null
+            supporters: 0, absentees: 0, readinessRate: null,
+            scheduledStaff: 0, requiredTeams: 0, operationalReadinessRate: null
         };
         if (!shiftId) return { shiftId: shiftId || null, teams: {}, workforce: emptyWf };
         const shift = await this.storage.getShiftById(shiftId);
@@ -854,6 +869,8 @@ class StaffingEventsService {
             wf.totalRequired += required;
             wf.supporters += supporters.length;
             wf.absentees += absentees.length;
+            wf.scheduledStaff += crew.length; // UAT-1: الكادر المجدول (roster) لهذا الفريق
+            wf.requiredTeams++;               // UAT-1: الفرق المطلوبة (فرق خطة المناوبة)
             if (status === 'ready') wf.readyTeams++;
             else if (status === 'missing') wf.missingTeams++;
             else if (status === 'offline') wf.offlineTeams++;
@@ -879,6 +896,9 @@ class StaffingEventsService {
         }
         const decided = wf.readyTeams + wf.missingTeams + wf.offlineTeams;
         wf.readinessRate = decided > 0 ? Math.round((wf.readyTeams / decided) * 100) : null;
+        // UAT-1: نسبة الجاهزية التشغيلية = (الجاهزة ÷ المطلوبة) × 100 — مقياس فرق صرف
+        wf.operationalReadinessRate = wf.requiredTeams > 0
+            ? Math.round((wf.readyTeams / wf.requiredTeams) * 100) : null;
 
         return { shiftId, teams: teamsOrdered, workforce: wf };
     }

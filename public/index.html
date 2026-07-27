@@ -560,16 +560,35 @@ window.addEventListener('load', function() {
             </button>
         </div>
 
+        <!-- UAT-1: القسم الأول — القوى البشرية -->
+        <div class="wf-section-title">
+            <i class="fas fa-users"></i>
+            <span>القوى البشرية</span>
+            <button class="wf-info-btn" onclick="openModalById('wfInfoHumanModal')" title="شرح مؤشرات القوى البشرية">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        </div>
         <div class="workforce-grid">
-            <!-- بطاقة المسعفين -->
+            <!-- بطاقة الكادر المجدول -->
             <div class="wf-card wf-card-blue">
+                <div class="wf-card-top">
+                    <div class="wf-card-icon-wrap">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <div class="wf-card-value" id="wfScheduledStaff"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                </div>
+                <div class="wf-card-label">الكادر المجدول</div>
+            </div>
+
+            <!-- بطاقة الكادر الحاضر -->
+            <div class="wf-card wf-card-green">
                 <div class="wf-card-top">
                     <div class="wf-card-icon-wrap">
                         <i class="fas fa-user-md"></i>
                     </div>
                     <div class="wf-card-value" id="wfTotalStaff"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
-                <div class="wf-card-label">إجمالي المسعفين</div>
+                <div class="wf-card-label">الكادر الحاضر</div>
                 <div class="wf-card-progress-wrap">
                     <div class="wf-card-progress-track">
                         <div class="wf-card-progress-fill" id="wfStaffProgress" style="width:0%"></div>
@@ -579,22 +598,58 @@ window.addEventListener('load', function() {
                 <div class="wf-card-trend neutral" id="wfStaffTrend">—</div>
             </div>
 
-            <!-- بطاقة السيارات -->
+            <!-- بطاقة الغياب -->
+            <div class="wf-card wf-card-red">
+                <div class="wf-card-top">
+                    <div class="wf-card-icon-wrap">
+                        <i class="fas fa-user-times"></i>
+                    </div>
+                    <div class="wf-card-value" id="wfAbsentees"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                </div>
+                <div class="wf-card-label">الغياب</div>
+            </div>
+
+            <!-- بطاقة الدعم المؤقت -->
+            <div class="wf-card wf-card-gold">
+                <div class="wf-card-top">
+                    <div class="wf-card-icon-wrap">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <div class="wf-card-value" id="wfSupporters"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                </div>
+                <div class="wf-card-label">الدعم المؤقت</div>
+            </div>
+        </div>
+
+        <!-- UAT-1: القسم الثاني — الجاهزية التشغيلية -->
+        <div class="wf-section-title" style="margin-top:18px">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>الجاهزية التشغيلية</span>
+            <button class="wf-info-btn" onclick="openModalById('wfInfoOpsModal')" title="شرح مؤشرات الجاهزية التشغيلية">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        </div>
+        <div class="workforce-grid">
+            <!-- بطاقة الفرق المطلوبة -->
+            <div class="wf-card wf-card-blue">
+                <div class="wf-card-top">
+                    <div class="wf-card-icon-wrap">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="wf-card-value" id="wfRequiredTeams"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                </div>
+                <div class="wf-card-label">الفرق المطلوبة</div>
+            </div>
+
+            <!-- بطاقة الفرق الجاهزة -->
             <div class="wf-card wf-card-green">
                 <div class="wf-card-top">
                     <div class="wf-card-icon-wrap">
-                        <i class="fas fa-ambulance"></i>
+                        <i class="fas fa-check-circle"></i>
                     </div>
-                    <div class="wf-card-value" id="wfTotalCars"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                    <div class="wf-card-value" id="wfReadyTeams"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
-                <div class="wf-card-label">إجمالي السيارات</div>
-                <div class="wf-card-progress-wrap">
-                    <div class="wf-card-progress-track">
-                        <div class="wf-card-progress-fill" id="wfCarsProgress" style="width:0%"></div>
-                    </div>
-                    <div class="wf-card-progress-text" id="wfCarsProgressText">—</div>
-                </div>
-                <div class="wf-card-trend neutral" id="wfCarsTrend">—</div>
+                <div class="wf-card-label">الفرق الجاهزة</div>
             </div>
 
             <!-- بطاقة نسبة الجاهزية -->
@@ -615,7 +670,7 @@ window.addEventListener('load', function() {
                 <div class="wf-card-trend neutral" id="wfReadinessTrend">—</div>
             </div>
 
-            <!-- بطاقة المراكز الناقصة -->
+            <!-- بطاقة الفرق الناقصة -->
             <div class="wf-card wf-card-red">
                 <div class="wf-card-top">
                     <div class="wf-card-icon-wrap">
@@ -623,7 +678,7 @@ window.addEventListener('load', function() {
                     </div>
                     <div class="wf-card-value" id="wfMissingCenters"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
                 </div>
-                <div class="wf-card-label">مراكز ناقصة</div>
+                <div class="wf-card-label">فرق ناقصة</div>
                 <div class="wf-card-progress-wrap">
                     <div class="wf-card-progress-track">
                         <div class="wf-card-progress-fill" id="wfMissingProgress" style="width:0%"></div>
@@ -631,6 +686,24 @@ window.addEventListener('load', function() {
                     <div class="wf-card-progress-text" id="wfMissingProgressText">—</div>
                 </div>
                 <div class="wf-card-trend neutral" id="wfMissingTrend">—</div>
+            </div>
+
+            <!-- بطاقة السيارات العاملة -->
+            <div class="wf-card wf-card-green">
+                <div class="wf-card-top">
+                    <div class="wf-card-icon-wrap">
+                        <i class="fas fa-ambulance"></i>
+                    </div>
+                    <div class="wf-card-value" id="wfTotalCars"><span class="skeleton skeleton-value" style="display:inline-block; width:40px; height:1.5rem;"></span></div>
+                </div>
+                <div class="wf-card-label">السيارات العاملة</div>
+                <div class="wf-card-progress-wrap">
+                    <div class="wf-card-progress-track">
+                        <div class="wf-card-progress-fill" id="wfCarsProgress" style="width:0%"></div>
+                    </div>
+                    <div class="wf-card-progress-text" id="wfCarsProgressText">—</div>
+                </div>
+                <div class="wf-card-trend neutral" id="wfCarsTrend">—</div>
             </div>
         </div>
     </div>
@@ -844,6 +917,45 @@ window.addEventListener('load', function() {
         <div class="modal-buttons">
             <button onclick="generateShiftReport()" class="btn btn-primary"><i class="fas fa-file-alt"></i> تقرير المناوبة</button>
             <button onclick="closeModalById('distributionModal')" class="btn"><i class="fas fa-times"></i> إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== UAT-1: شرح مؤشرات القوى البشرية ===== -->
+<div id="wfInfoHumanModal" class="modal">
+    <div class="modal-content" style="max-width:640px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h2 style="margin:0; color:var(--primary-700);"><i class="fas fa-users"></i> القوى البشرية — معنى المؤشرات</h2>
+            <button onclick="closeModalById('wfInfoHumanModal')" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="font-size:0.9rem; line-height:2; color:var(--gray-700);">
+            <p><b>الكادر المجدول:</b> عدد الأفراد المجدولين في الجدول الرسمي (shift_roster) لهذه المناوبة برمز دوام صحيح — بغض النظر عن حضورهم الفعلي.</p>
+            <p><b>الكادر الحاضر:</b> الموجودون فعليًا الآن = المجدولون النشطون (بلا غياب/تأخر مفتوح) + الدعم المؤقت + الأوفرلاب المدمج. يشمل كل التصنيفات: الفرق الإسعافية، القيادة الميدانية، التحكم العملياتي، تنسيق الاستجابة، كبار المسعفين، والدعم اللوجستي. <b>لذلك قد يتجاوز الكادر المجدول عند ورود دعم إضافي من خارج الجدول — وهذا صحيح وليس خطأ.</b></p>
+            <p><b>الغياب:</b> أفراد مجدولون عليهم حدث غياب أو تأخر مفتوح.</p>
+            <p><b>الدعم المؤقت:</b> داعمون بحدث دعم مفتوح (دعم خارجي/تطوعي/تكليف وارد من فريق آخر).</p>
+        </div>
+        <div class="modal-buttons">
+            <button onclick="closeModalById('wfInfoHumanModal')" class="btn btn-primary"><i class="fas fa-check"></i> فهمت</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== UAT-1: شرح مؤشرات الجاهزية التشغيلية ===== -->
+<div id="wfInfoOpsModal" class="modal">
+    <div class="modal-content" style="max-width:640px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h2 style="margin:0; color:var(--primary-700);"><i class="fas fa-tachometer-alt"></i> الجاهزية التشغيلية — معنى المؤشرات</h2>
+            <button onclick="closeModalById('wfInfoOpsModal')" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="font-size:0.9rem; line-height:2; color:var(--gray-700);">
+            <p><b>الفرق المطلوبة:</b> عدد الفرق المخططة لهذه المناوبة (الفرق التي لها كادر مجدول في الجدول الرسمي).</p>
+            <p><b>الفرق الجاهزة:</b> الفرق التي اعتمد المشرف اكتمالها من شاشة التكميل.</p>
+            <p><b>نسبة الجاهزية = (الفرق الجاهزة ÷ الفرق المطلوبة) × 100</b> — مقياس لجاهزية الفرق فقط، لا علاقة له بعدد الأفراد أو الكادر.</p>
+            <p><b>فرق ناقصة:</b> فرق قرر المشرف أنها غير مكتملة الكادر.</p>
+            <p><b>السيارات العاملة:</b> مركبات معيّنة للفرق بحالة غير متعطلة وغير خارج الخدمة.</p>
+        </div>
+        <div class="modal-buttons">
+            <button onclick="closeModalById('wfInfoOpsModal')" class="btn btn-primary"><i class="fas fa-check"></i> فهمت</button>
         </div>
     </div>
 </div>

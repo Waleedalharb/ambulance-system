@@ -3360,23 +3360,34 @@ function refreshWorkforceFromServer(shiftId) {
 
 // SR-1: العرض من كائن workforce المشتق سيرفريًا حرفيًا — بلا أهداف مختلقة
 // (حُذفت «/30 هدف» و«/20 هدف» و«/10 مركز» ومقارنات «الأسبوع الماضي»).
-// المقام الوحيد المستخدم حقيقي: totalRequired للكادر، وعدد الفرق للجاهزية/النقص.
+// UAT-1: التقسيم الجديد — قسم «القوى البشرية» (المجدول/الحاضر/الغياب/الدعم
+// المؤقت) وقسم «الجاهزية التشغيلية» (الفرق المطلوبة/الجاهزة/نسبة الجاهزية).
+// نسبة الجاهزية = operationalReadinessRate سيرفريًا (الجاهزة ÷ المطلوبة).
 function updateWorkforceDisplay(wf) {
-    var honest = !wf || wf.readinessRate == null;
+    var honest = !wf || wf.operationalReadinessRate == null;
+    var scheduledStaff = honest ? '—' : (wf.scheduledStaff != null ? wf.scheduledStaff : '—');
     var totalStaff = honest ? '—' : wf.totalStaff;
     var totalCars = honest ? '—' : wf.totalCars;
-    var readiness = honest ? 0 : wf.readinessRate;
+    var readiness = honest ? 0 : wf.operationalReadinessRate;
     var missingTeams = honest ? '—' : (wf.missingTeams || 0);
-    var totalRequired = honest ? 0 : (wf.totalRequired || 0);
+    var requiredTeams = honest ? 0 : (wf.requiredTeams || 0);
+    var scheduledNum = (!honest && typeof wf.scheduledStaff === 'number') ? wf.scheduledStaff : 0;
     var totalTeams = honest ? 0 : ((wf.readyTeams || 0) + (wf.missingTeams || 0) + (wf.offlineTeams || 0) + (wf.pendingTeams || 0));
-    var decidedTeams = honest ? 0 : ((wf.readyTeams || 0) + (wf.missingTeams || 0) + (wf.offlineTeams || 0));
 
+    // قسم القوى البشرية
+    animateValue('wfScheduledStaff', scheduledStaff);
     animateValue('wfTotalStaff', totalStaff);
-    animateValue('wfTotalCars', totalCars);
+    animateValue('wfAbsentees', honest ? '—' : (wf.absentees || 0));
+    animateValue('wfSupporters', honest ? '—' : (wf.supporters || 0));
+
+    // قسم الجاهزية التشغيلية
+    animateValue('wfRequiredTeams', honest ? '—' : requiredTeams);
+    animateValue('wfReadyTeams', honest ? '—' : (wf.readyTeams || 0));
     var el_wfReadiness = document.getElementById('wfReadiness'); if (el_wfReadiness) el_wfReadiness.innerText = honest ? '—' : readiness + '%';
     var el_wfMissingCenters = document.getElementById('wfMissingCenters'); if (el_wfMissingCenters) el_wfMissingCenters.innerText = missingTeams;
+    animateValue('wfTotalCars', totalCars);
 
-    var staffPct = (honest || totalRequired <= 0) ? 0 : Math.min((wf.totalStaff / totalRequired) * 100, 100);
+    var staffPct = (honest || scheduledNum <= 0) ? 0 : Math.min((wf.totalStaff / scheduledNum) * 100, 100);
     var missingPct = (honest || totalTeams <= 0) ? 0 : Math.min(((wf.missingTeams || 0) / totalTeams) * 100, 100);
 
     var el_wfStaffProgress = document.getElementById('wfStaffProgress'); if (el_wfStaffProgress) el_wfStaffProgress.style.width = staffPct + '%';
@@ -3386,9 +3397,9 @@ function updateWorkforceDisplay(wf) {
     var el_wfCarsProgress = document.getElementById('wfCarsProgress');
     if (el_wfCarsProgress && el_wfCarsProgress.parentElement) el_wfCarsProgress.parentElement.style.display = 'none';
 
-    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = honest ? '—' : (totalRequired > 0 ? wf.totalStaff + ' / ' + totalRequired + ' مطلوب' : wf.totalStaff + ' مسعف');
+    var el_wfStaffProgressText = document.getElementById('wfStaffProgressText'); if (el_wfStaffProgressText) el_wfStaffProgressText.innerText = honest ? '—' : (scheduledNum > 0 ? wf.totalStaff + ' حاضر من ' + scheduledNum + ' مجدول' : wf.totalStaff + ' حاضر');
     var el_wfCarsProgressText = document.getElementById('wfCarsProgressText'); if (el_wfCarsProgressText) el_wfCarsProgressText.innerText = honest ? '—' : wf.totalCars + ' مركبة عاملة';
-    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = honest ? '—' : readiness + '% جاهز (' + (wf.readyTeams || 0) + '/' + decidedTeams + ' فرقة)';
+    var el_wfReadinessProgressText = document.getElementById('wfReadinessProgressText'); if (el_wfReadinessProgressText) el_wfReadinessProgressText.innerText = honest ? '—' : readiness + '% جاهز (' + (wf.readyTeams || 0) + '/' + requiredTeams + ' فرقة)';
     var el_wfMissingProgressText = document.getElementById('wfMissingProgressText'); if (el_wfMissingProgressText) el_wfMissingProgressText.innerText = honest ? '—' : (wf.missingTeams || 0) + ' فرقة ناقصة';
 
     // الاتجاهات: لا مقارنة حقيقية متاحة ⇒ «—» محايد دائمًا (حُذفت خطوط الأساس المختلقة)

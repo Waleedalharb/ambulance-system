@@ -14,6 +14,31 @@
 
 const SNAPSHOT_SCHEMA = 1;
 
+// ═══════════════════════════════════════════════════════════
+// UAT-3: نافذة المناوبة المخططة — تُشتق سيرفريًا من النوع والتاريخ:
+//   صباح = 05:00 → 17:00 بتوقيت الرياض
+//   ليل  = 17:00 → 05:00 (اليوم التالي) بتوقيت الرياض
+// التخزين UTC ISO كعادة المنصة؛ العرض عبر طبقة time-riyadh فقط.
+// الإزاحة تُكتب نصًا صريحًا (+03:00) — بلا أي حساب إزاحة محلي.
+// ═══════════════════════════════════════════════════════════
+function plannedShiftWindow(shiftType, shiftDate) {
+    const empty = { plannedStartAt: null, plannedEndAt: null };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(shiftDate || ''))) return empty;
+    const isNight = String(shiftType || '').includes('ليل');
+    const startLocal = shiftDate + (isNight ? 'T17:00:00+03:00' : 'T05:00:00+03:00');
+    let endDate = shiftDate;
+    if (isNight) {
+        const d = new Date(shiftDate + 'T00:00:00.000Z');
+        d.setUTCDate(d.getUTCDate() + 1); // نهاية مناوبة الليل = 05:00 صباح اليوم التالي
+        endDate = d.toISOString().slice(0, 10);
+    }
+    const endLocal = endDate + (isNight ? 'T05:00:00+03:00' : 'T17:00:00+03:00');
+    return {
+        plannedStartAt: new Date(startLocal).toISOString(),
+        plannedEndAt: new Date(endLocal).toISOString()
+    };
+}
+
 // حقول المشرف الخمسة + خانة المراجعة — قائمة بيضاء صارمة
 const FIELD_WHITELIST = ['summary', 'operationalNotes', 'keyEvents', 'issues', 'recommendations'];
 // doc-v4 ⑨: الجهات الثلاث المعتمدة في الوثيقة والشاشة — + الأسماء القديمة
@@ -110,10 +135,14 @@ class WorkflowService {
         try {
             const s = await this.engine.shifts.getShiftById(shiftId);
             if (s) {
+                // UAT-3: النافذة المخططة حقول إضافية فقط (startedAt/endedAt كما هي)
+                const win = plannedShiftWindow(s.shift_type, s.shift_date);
                 snapshot.shift = {
                     id: s.id, type: s.shift_type, date: s.shift_date,
                     status: s.status, startedAt: s.started_at || null,
-                    endedAt: s.ended_at || null
+                    endedAt: s.ended_at || null,
+                    plannedStartAt: win.plannedStartAt,
+                    plannedEndAt: win.plannedEndAt
                 };
             }
         } catch (e) { console.warn('[Workflow] snapshot.shift failed:', e.message); }
@@ -177,6 +206,32 @@ class WorkflowService {
         );
         if (existing) {
             return { workflow: await this._withLiveSnapshot(existing), reused: true };
+        }
+
+        // UAT-2: ممنوع إنشاء سير عمل ثانٍ لمناوبة لها نسخة معتمدة/مرسلة.
+        // الجذر الذي يُعالج: كان prepare يُنشئ مسودة جديدة صامتة بعد الاعتماد،
+        // فيفتح أي مستخدم آخر الصفحة على نموذج إدخال وكأن المناوبة بلا سير عمل.
+        // الاستثناء الوحيد: مناوبة دخلت دورة إعادة الإصدار (reissue سابق) —
+        // هناك يبقى prepare أداة «المسودة الحية» الموثقة لجلب/إنشاء المسودة
+        // التالية (عقد اختبار الانحدار WF-3 ⑪ — لا يُمس). المسار النظامي
+        // لإصدار جديد بعد الاعتماد هو reissue من النسخة المعتمدة.
+        const locked = await this.storage.get(
+            `SELECT id, ref_no FROM shift_workflows
+             WHERE shift_id = ? AND status IN ('approved','sent')
+             ORDER BY version_no DESC LIMIT 1`,
+            [shiftId]
+        );
+        if (locked) {
+            const hadReissue = await this.storage.get(
+                'SELECT id FROM shift_workflows WHERE shift_id = ? AND reissue_reason IS NOT NULL LIMIT 1',
+                [shiftId]
+            );
+            if (!hadReissue) {
+                const err = new Error('يوجد سير عمل معتمد لهذه المناوبة بالفعل (المرجع: ' + (locked.ref_no || '—') +
+                    ') — لا يمكن إنشاء سير عمل ثانٍ. لإصدار نسخة جديدة استخدم «إعادة إصدار» من النسخة المعتمدة.');
+                err.statusCode = 409;
+                throw err;
+            }
         }
 
         // العرض الحي: لا تُخزن أي بيانات تشغيلية في المسودة — اللقطة تُبنى

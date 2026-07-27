@@ -463,8 +463,8 @@ function generateWorkflowPdf(workflow) {
             table(
                 ['النوع', 'التاريخ', 'البداية', 'النهاية', 'رقم المناوبة', 'وقت إنشاء اللقطة'],
                 [[
-                    [shift.type || ''], [shift.date || ''], [fTime(shift.startedAt)],
-                    [fTime(shift.endedAt)], [shift.id != null ? String(shift.id) : ''], [fDateTime(snap.takenAt)]
+                    [shift.type || ''], [shift.date || ''], [fTime(shift.startedAt || shift.plannedStartAt)],
+                    [fTime(shift.endedAt || shift.plannedEndAt)], [shift.id != null ? String(shift.id) : ''], [fDateTime(snap.takenAt)]
                 ]],
                 [70, 90, 70, 70, 100, 115]
             );
@@ -527,18 +527,22 @@ function generateWorkflowPdf(workflow) {
             heading('رابعًا: ملخص القوى البشرية');
             const incomplete = (typeof wfd.missingTeams === 'number' || typeof wfd.offlineTeams === 'number')
                 ? String((wfd.missingTeams || 0) + (wfd.offlineTeams || 0)) : '';
+            // UAT-1: تسميات التقسيم الجديد (القوى البشرية ثم الجاهزية التشغيلية).
+            // اللقطات المجمدة قبل هذا التحديث تفتقد الحقول الجديدة ⇒ تُعرض فراغًا.
+            const opRate = wfd.operationalReadinessRate != null ? wfd.operationalReadinessRate : wfd.readinessRate;
             table(
-                ['الكادر المطلوب', 'الحاضرون', 'غياب', 'دعم مؤقت', 'جاهزية الفرق', 'الفرق المكتملة', 'الفرق غير المكتملة'],
+                ['الكادر المجدول', 'الكادر الحاضر', 'الغياب', 'الدعم المؤقت', 'الفرق المطلوبة', 'الفرق الجاهزة', 'الفرق غير المكتملة', 'نسبة الجاهزية'],
                 [[
-                    [String(wfd.totalRequired != null ? wfd.totalRequired : '')],
+                    [String(wfd.scheduledStaff != null ? wfd.scheduledStaff : '')],
                     [String(wfd.totalStaff != null ? wfd.totalStaff : '')],
                     [String(wfd.absentees != null ? wfd.absentees : '')],
                     [String(wfd.supporters != null ? wfd.supporters : '')],
-                    [wfd.readinessRate != null ? wfd.readinessRate + '%' : ''],
+                    [String(wfd.requiredTeams != null ? wfd.requiredTeams : '')],
                     [String(wfd.readyTeams != null ? wfd.readyTeams : '')],
-                    [incomplete]
+                    [incomplete],
+                    [opRate != null ? opRate + '%' : '']
                 ]],
-                [70, 70, 60, 70, 80, 80, 85]
+                [62, 62, 50, 62, 66, 62, 76, 75]
             );
             // doc-v5 ⑤: المسمى الرسمي — «الكادر الحاضر حسب التصنيف الوظيفي»
             para('الكادر الحاضر حسب التصنيف الوظيفي: ' + crewComposition(teams), 9, GRAY);

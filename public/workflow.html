@@ -177,6 +177,18 @@ tr:last-child td { border-bottom:none; }
 .view { display:none; } .view.active { display:block; }
 .info-banner { background:var(--yellow-light); border:1px solid #fde68a; color:#92400e; text-align:center; font-size:0.75rem; font-weight:700; padding:6px; border-radius:8px; margin-bottom:14px; }
 
+/* ─── UAT-2: شريط حالة الاعتماد (يظهر للنسخة المعتمدة) ─── */
+.approval-banner { background:var(--green-light); border:1px solid #86efac; color:#166534; font-size:0.85rem; font-weight:800; padding:10px 16px; border-radius:10px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.approval-banner .ap-ref { background:var(--green); color:#fff; padding:2px 12px; border-radius:14px; font-size:0.78rem; }
+.approval-banner .ap-meta { font-size:0.78rem; font-weight:700; color:#15803d; }
+
+/* ─── UAT-1: عناوين قسمي مؤشرات القوى + صناديق الشرح ─── */
+.dash-section-title { grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:800; color:var(--primary-dark); border-right:4px solid var(--primary); padding-right:8px; margin-top:4px; }
+.dash-section-title .info-dot { border:1px solid var(--border); background:#fff; color:var(--primary); border-radius:50%; width:20px; height:20px; font-size:0.7rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.dash-section-title .info-dot:hover { background:var(--primary); color:#fff; }
+.wf-info-box { grid-column:1/-1; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px 14px; font-size:0.75rem; line-height:1.9; color:var(--gray); }
+.wf-info-box b { color:var(--primary-dark); }
+
 /* ─── حالات فارغة / أخطاء ─── */
 .state-box { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:52px 24px; text-align:center; }
 .state-box .big { font-size:2.6rem; margin-bottom:12px; }
@@ -240,6 +252,9 @@ tr:last-child td { border-bottom:none; }
 
 <!-- ═══════════ العرض الرئيسي ═══════════ -->
 <div class="view active" id="view-main">
+
+    <!-- UAT-2: شريط حالة الاعتماد — يظهر فقط للنسخة المعتمدة -->
+    <div class="approval-banner" id="approvalBanner" style="display:none"></div>
 
     <div class="info-banner">كل البيانات أدناه من لقطة مخزنة وقت إعداد سير العمل — قراءة فقط</div>
 
@@ -513,6 +528,7 @@ function renderOperational() {
     buildVehMap();
     renderHeader();
     renderStatusTrack();
+    renderApprovalBanner();
     renderAlerts();
     renderShiftInfo();
     renderWorkforce();
@@ -525,7 +541,15 @@ function renderOperational() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// الإقلاع
+// الإقلاع — UAT-2: الاكتشاف قبل الإنشاء (الجذر المُعالج:
+// كان init يستدعي prepare فورًا فيُنشئ مسودة جديدة صامتة بعد
+// الاعتماد، فيظهر لأي مستخدم آخر نموذج إدخال وكأن المناوبة
+// بلا سير عمل). التدفق الآن:
+//   1) يوجد draft        ⇒ prepare (idempotent) يفتحها للتحرير.
+//   2) لا draft لكن توجد نسخة معتمدة/مرسلة ⇒ تُفتح هي مباشرة
+//      قراءة فقط — بلا أي استدعاء prepare (لا نسخة ثانية إطلاقًا).
+//   3) لا يوجد أي سير عمل إطلاقًا ⇒ prepare ينشئ المسودة الأولى
+//      (نموذج الإدخال يظهر في هذه الحالة فقط).
 // ═══════════════════════════════════════════════════════════
 function init() {
     if (!AuthCore.getToken()) {
@@ -533,9 +557,8 @@ function init() {
             'هذه الشاشة تعرض وثيقة رسمية وتتطلب صلاحية مشرف. سجّل الدخول من الصفحة الرئيسية للمنصة ثم أعد فتح هذه الشاشة.');
         return;
     }
-    showState('⏳', 'جارٍ تحميل سير العمل…', 'يتم التحقق من المناوبة النشطة وإعداد المسودة.');
+    showState('⏳', 'جارٍ تحميل سير العمل…', 'يتم التحقق من المناوبة النشطة وحالة سير العمل.');
 
-    var shiftId = null;
     api('/api/current-shift')
         .then(function(data) {
             if (!data || !data.success || !data.shift || !data.shift.id) {
@@ -543,27 +566,44 @@ function init() {
                     'سير العمل الرسمي يُعدّ لمناوبة نشطة فقط. بعد بدء المناوبة أعد فتح هذه الشاشة.');
                 return null;
             }
-            shiftId = data.shift.id;
-            // إعداد المسودة (idempotent — ينشئ أو يرجع المفتوحة)
-            return api('/api/workflow/prepare', { method: 'POST' });
-        })
-        .then(function(prep) {
-            if (prep === null) return null;
-            if (!prep || !prep.workflow) throw new Error('استجابة غير متوقعة من خدمة سير العمل');
-            state.workflow = prep.workflow;
-            return api('/api/workflow/shift/' + encodeURIComponent(shiftId));
+            // الاكتشاف أولًا: نسخ المناوبة القائمة قبل أي إنشاء
+            return api('/api/workflow/shift/' + encodeURIComponent(data.shift.id));
         })
         .then(function(list) {
-            if (list === null) return;
+            if (list === null) return null;
             state.versions = (list && list.versions) || [];
             state.shiftStatus = (list && list.shiftStatus) || '';
+            var draft = null, locked = null;
+            state.versions.forEach(function(v) {
+                if (!v) return;
+                if (v.status === 'draft' && (!draft || v.version_no > draft.version_no)) draft = v;
+                if ((v.status === 'approved' || v.status === 'sent') && (!locked || v.version_no > locked.version_no)) locked = v;
+            });
+            if (draft) {
+                // مسودة قائمة — prepare idempotent يرجعها بلقطة حية
+                return api('/api/workflow/prepare', { method: 'POST' });
+            }
+            if (locked) {
+                // نسخة معتمدة — تُفتح مباشرة بلقطتها المجمدة قراءة فقط
+                return api('/api/workflow/version/' + encodeURIComponent(locked.id));
+            }
+            // لا يوجد أي سير عمل للمناوبة — إنشاء المسودة الأولى
+            return api('/api/workflow/prepare', { method: 'POST' });
+        })
+        .then(function(res) {
+            if (res === null) return;
+            if (!res || !res.workflow) throw new Error('استجابة غير متوقعة من خدمة سير العمل');
+            state.workflow = res.workflow;
             renderAll();
-            initLiveSync(); // العرض الحي — تحديث تلقائي عند الأحداث التشغيلية
+            initLiveSync(); // العرض الحي — تحديث تلقائي عند الأحداث التشغيلية (للمسودات فقط)
             // الرابط العميق: workflow.html#pdf يفتح معاينة PDF مباشرة
             if (location.hash === '#pdf') setView('pdf');
         })
         .catch(function(err) {
-            if (err && err.status === 409) {
+            if (err && err.status === 409 && /معتمد/.test(err.message || '')) {
+                // سباق نادر: اعتُمدت النسخة بين الاكتشاف والإعداد — أظهر رسالة الخادم
+                showState('✅', 'يوجد سير عمل معتمد لهذه المناوبة', esc(err.message) + ' — أعد تحميل الصفحة لعرض النسخة المعتمدة.');
+            } else if (err && err.status === 409) {
                 showState('🕐', 'لا توجد مناوبة نشطة — ابدأ المناوبة من شاشة التكميل أولًا',
                     'سير العمل الرسمي يُعدّ لمناوبة نشطة فقط. بعد بدء المناوبة أعد فتح هذه الشاشة.');
             } else if (err && (err.status === 401 || err.status === 403)) {
@@ -671,6 +711,25 @@ function renderStatusTrack() {
     }
 }
 
+// ─── UAT-2: شريط حالة الاعتماد — «معتمد» + المرجع + التاريخ + المعتمد ───
+function renderApprovalBanner() {
+    var el = document.getElementById('approvalBanner');
+    var wf = state.workflow;
+    if (!el) return;
+    if (!wf || (wf.status !== 'approved' && wf.status !== 'sent')) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    el.innerHTML =
+        '<span>✅ معتمد</span>' +
+        '<span class="ap-ref">' + esc(wf.refNo || '—') + '</span>' +
+        '<span class="ap-meta">تاريخ الاعتماد: ' + esc(fDateTime(wf.approvedAt) || '—') + '</span>' +
+        '<span class="ap-meta">المعتمد: ' + esc(wf.approvedBy || '—') + '</span>' +
+        '<span class="ap-meta">قراءة فقط — التعديل يتطلب «إعادة إصدار» موثقة</span>';
+    el.style.display = 'flex';
+}
+
 // ═══════════════════════════════════════════════════════════
 // شريط التنبيهات التشغيلية (تلخيص عرض من بيانات اللقطة المعروضة)
 // ═══════════════════════════════════════════════════════════
@@ -722,8 +781,9 @@ function renderShiftInfo() {
     grid.innerHTML =
         shiftItem('التاريخ', esc(sh.date || '—')) +
         shiftItem('نوع المناوبة', esc(sh.type || '—')) +
-        shiftItem('بداية المناوبة', fTime(sh.startedAt)) +
-        shiftItem('نهاية المناوبة', fTime(sh.endedAt)) +
+        // UAT-3: بلا بدء/إنهاء فعلي ⇒ النافذة المخططة المشتقة سيرفريًا من النوع
+        shiftItem('بداية المناوبة', fTime(sh.startedAt || sh.plannedStartAt)) +
+        shiftItem('نهاية المناوبة', fTime(sh.endedAt || sh.plannedEndAt)) +
         shiftItem('رقم المناوبة', esc(sh.id != null ? String(sh.id) : '—')) +
         shiftItem('وقت إنشاء اللقطة', fTime(snap().takenAt));
 }
@@ -754,6 +814,22 @@ function crewComposition() {
     return parts.length ? parts.join(' • ') : '';
 }
 
+// UAT-1: شرح مؤشرات القوى — نص عربي واضح لمعنى كل مؤشر وطريقة احتسابه
+var WF_INFO_HUMAN =
+    '<b>الكادر المجدول:</b> عدد الأفراد المجدولين في الجدول الرسمي (shift_roster) لهذه المناوبة برمز دوام صحيح — بغض النظر عن حضورهم.<br>' +
+    '<b>الكادر الحاضر:</b> الموجودون فعليًا الآن = المجدولون النشطون (بلا غياب/تأخر مفتوح) + الدعم المؤقت + الأوفرلاب المدمج. يشمل كل التصنيفات: الفرق الإسعافية، القيادة الميدانية، التحكم العملياتي، تنسيق الاستجابة، كبار المسعفين، والدعم اللوجستي. <b>لذلك قد يتجاوز الكادر المجدول عند ورود دعم إضافي من خارج الجدول — وهذا صحيح وليس خطأ.</b><br>' +
+    '<b>الغياب:</b> أفراد مجدولون عليهم حدث غياب أو تأخر مفتوح.<br>' +
+    '<b>الدعم المؤقت:</b> داعمون بحدث دعم مفتوح (دعم خارجي/تطوعي/تكليف وارد من فريق آخر).';
+var WF_INFO_OPS =
+    '<b>الفرق المطلوبة:</b> عدد الفرق المخططة لهذه المناوبة (الفرق التي لها كادر مجدول في الجدول الرسمي).<br>' +
+    '<b>الفرق الجاهزة:</b> الفرق التي اعتمد المشرف اكتمالها من شاشة التكميل.<br>' +
+    '<b>نسبة الجاهزية = (الفرق الجاهزة ÷ الفرق المطلوبة) × 100</b> — مقياس لجاهزية الفرق فقط، لا علاقة له بعدد الأفراد أو الكادر.';
+
+function toggleWfInfo(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+
 function renderWorkforce() {
     var wf = workforce();
     var wDash = document.getElementById('workforceDash');
@@ -762,12 +838,21 @@ function renderWorkforce() {
         wDash.innerHTML = dashCard('', '—', 'ملخص القوى غير متوفر في اللقطة');
         tDash.innerHTML = '';
     } else {
+        // UAT-1: نسبة الجاهزية التشغيلية (الجاهزة ÷ المطلوبة) — مع سقوط للقطات
+        // المجمدة القديمة التي تسبق الحقول الجديدة (readinessRate الأصلي)
+        var opRate = (wf.operationalReadinessRate != null) ? wf.operationalReadinessRate : wf.readinessRate;
         wDash.innerHTML =
+            '<div class="dash-section-title">القوى البشرية <button type="button" class="info-dot" onclick="toggleWfInfo(\'wfInfoHuman\')" title="شرح المؤشرات">ⓘ</button></div>' +
+            '<div class="wf-info-box" id="wfInfoHuman" style="display:none">' + WF_INFO_HUMAN + '</div>' +
+            dashCard('', num(wf.scheduledStaff), 'الكادر المجدول') +
             dashCard('blue', num(wf.totalStaff), 'الكادر الحاضر') +
-            dashCard('', num(wf.totalRequired), 'الكادر المطلوب') +
-            dashCard('red', num(wf.absentees), 'غياب') +
-            dashCard('blue', num(wf.supporters), 'دعم مؤقت') +
-            dashCard('green', wf.readinessRate != null ? wf.readinessRate + '%' : '—', 'جاهزية الفرق');
+            dashCard('red', num(wf.absentees), 'الغياب') +
+            dashCard('blue', num(wf.supporters), 'الدعم المؤقت') +
+            '<div class="dash-section-title">الجاهزية التشغيلية <button type="button" class="info-dot" onclick="toggleWfInfo(\'wfInfoOps\')" title="شرح المؤشرات">ⓘ</button></div>' +
+            '<div class="wf-info-box" id="wfInfoOps" style="display:none">' + WF_INFO_OPS + '</div>' +
+            dashCard('', num(wf.requiredTeams), 'الفرق المطلوبة') +
+            dashCard('green', num(wf.readyTeams), 'الفرق الجاهزة') +
+            dashCard('green', opRate != null ? opRate + '%' : '—', 'نسبة الجاهزية');
         var hasIncomplete = (typeof wf.missingTeams === 'number') || (typeof wf.offlineTeams === 'number');
         var incomplete = hasIncomplete ? String((wf.missingTeams || 0) + (wf.offlineTeams || 0)) : '—';
         tDash.innerHTML =
@@ -1518,8 +1603,8 @@ function renderPdf() {
                 '<tr><th>النوع</th><th>التاريخ</th><th>البداية</th><th>النهاية</th><th>رقم المناوبة</th></tr>' +
                 '<tr><td>' + esc(sh && sh.type ? sh.type : '') + '</td>' +
                 '<td>' + esc(sh && sh.date ? sh.date : '') + '</td>' +
-                '<td>' + fTime(sh && sh.startedAt) + '</td>' +
-                '<td>' + fTime(sh && sh.endedAt) + '</td>' +
+                '<td>' + fTime(sh && (sh.startedAt || sh.plannedStartAt)) + '</td>' +
+                '<td>' + fTime(sh && (sh.endedAt || sh.plannedEndAt)) + '</td>' +
                 '<td>' + esc(sh && sh.id != null ? String(sh.id) : '') + '</td></tr>' +
             '</table>' +
             '<h4>ثانيًا: جاهزية الفرق والكادر</h4>' +
@@ -1529,14 +1614,16 @@ function renderPdf() {
             '</table>' +
             '<h4>ثالثًا: ملخص القوى</h4>' +
             '<table>' +
-                '<tr><th>الكادر المطلوب</th><th>الحاضرون</th><th>غياب</th><th>دعم مؤقت</th><th>جاهزية الفرق</th><th>الفرق المكتملة</th><th>الفرق غير المكتملة</th></tr>' +
-                '<tr><td>' + num(wfd && wfd.totalRequired) + '</td>' +
+                // UAT-1: نفس تسميات التقسيم الجديد (قوى بشرية ثم جاهزية تشغيلية)
+                '<tr><th>الكادر المجدول</th><th>الكادر الحاضر</th><th>الغياب</th><th>الدعم المؤقت</th><th>الفرق المطلوبة</th><th>الفرق الجاهزة</th><th>الفرق غير المكتملة</th><th>نسبة الجاهزية</th></tr>' +
+                '<tr><td>' + num(wfd && wfd.scheduledStaff) + '</td>' +
                 '<td>' + num(wfd && wfd.totalStaff) + '</td>' +
                 '<td>' + num(wfd && wfd.absentees) + '</td>' +
                 '<td>' + num(wfd && wfd.supporters) + '</td>' +
-                '<td>' + (wfd && wfd.readinessRate != null ? wfd.readinessRate + '%' : '') + '</td>' +
+                '<td>' + num(wfd && wfd.requiredTeams) + '</td>' +
                 '<td>' + num(wfd && wfd.readyTeams) + '</td>' +
-                '<td>' + incompleteTxt + '</td></tr>' +
+                '<td>' + incompleteTxt + '</td>' +
+                '<td>' + (function() { var r = wfd && (wfd.operationalReadinessRate != null ? wfd.operationalReadinessRate : wfd.readinessRate); return r != null ? r + '%' : ''; })() + '</td></tr>' +
             '</table>' +
             '<div class="crew-composition">الكادر الحاضر حسب التصنيف الوظيفي: ' + esc(crewComposition()) + '</div>' +
             '<h4>رابعًا: ملخص المناوبة والملاحظات</h4>' +
@@ -1601,6 +1688,7 @@ function renderAll() {
     document.getElementById('appContent').style.display = 'block';
     renderHeader();
     renderStatusTrack();
+    renderApprovalBanner();
     renderAlerts();
     renderShiftInfo();
     renderWorkforce();

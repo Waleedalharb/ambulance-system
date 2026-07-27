@@ -293,6 +293,34 @@ body {
     gap: 16px;
 }
 
+/* UAT-1: عنوان قسم داخل لوحة مؤشرات القوى + زر الشرح */
+.wf-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--primary-700);
+}
+.wf-section-title i { font-size: 1rem; }
+.wf-info-btn {
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    color: var(--primary-500, #3B82F6);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+.wf-info-btn:hover { background: #3B82F6; color: var(--white); border-color: #3B82F6; }
+
 /* Card base */
 .wf-card {
     background: var(--white);
