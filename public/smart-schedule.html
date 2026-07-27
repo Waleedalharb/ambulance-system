@@ -4703,7 +4703,10 @@ function oiParseOfficial(workbook) {
                 var raw = row[dayCols[d].col];
                 var dc = oiNormalize(raw);
                 if (!dc) { out.counts.restDays++; continue; }
-                if (OI_WORK_DAYCODES.indexOf(dc) !== -1) { days[dayCols[d].day] = dc; workDays++; continue; } // يوم عمل — فئات العمل من القاموس
+                var dcb = ShiftTypeDictionary.normalizeDayCode(dc); // التطبيع المركزي: O12C13→O12C (يُحفظ الصريح كما ورد — يحمل تعيين السيارة)
+                if (OI_WORK_DAYCODES.indexOf(dcb) !== -1) { days[dayCols[d].day] = dc; workDays++; continue; } // يوم عمل — فئات العمل من القاموس
+                var symDay = oiResolveSymbol(dc); // تعيين صريح لوحدة ميدانية (RRC1/RRB2…) — يُقبل إن كان أساسه في القوائم
+                if (symDay && (symDay.kind === 'rapid' || symDay.kind === 'center' || symDay.kind === 'overlap')) { days[dayCols[d].day] = dc; workDays++; continue; }
                 var dayGroup = ShiftTypeDictionary.classifyDayCode(dc).group; // التصنيف من القاموس فقط — ممنوع شرط على كود هنا
                 if (dayGroup === 'vacation') { out.counts.vacations++; days[dayCols[d].day] = dc; continue; } // إجازة فعلية (V/VC/E/EV/S) — تُستورد لتُحسب وتُعرض
                 if (dayGroup === 'rest') { days[dayCols[d].day] = dc; out.counts.restDays++; continue; } // راحة دورية صريحة

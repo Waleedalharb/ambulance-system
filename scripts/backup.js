@@ -31,9 +31,19 @@ const BACKUP_ITEMS = [
     'peak-data.json',
     'theme-settings.json',
     'password.json',
-    'database.db',
-    'database.db-shm',
-    'database.db-wal',
+    'ambulance.db',
+    'ambulance.db-shm',
+    'ambulance.db-wal',
+    'schedule-employees.json',
+    'schedule-files.json',
+    'shift-events.json',
+    'shift-absences.json',
+    'shift-notes.json',
+    'peak-plans.json',
+    'announcements.json',
+    'audit-log.json',
+    'archive-audit-log.json',
+    'archives',
     'uploads'
 ];
 

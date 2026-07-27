@@ -26,17 +26,42 @@ function canonicalTeamId(teamId) {
 // رموز الدوام (نفس مجموعات مسار /api/shift-completion/:shiftId/:teamName حرفيًا)
 // ═══ قوائم الأكواد من القاموس المركزي فقط (public/js/core/shift-type-dictionary.js) ═══
 // القاموس الرسمي: الأوفرلاب جزء من المناوبة الليلية — الاستثناء الوحيد OvD (نهاري بتعريف المالك)
-let DAY_ONLY_CODES, NIGHT_ONLY_CODES, SHARED_CODES, OFF_CODES;
+let DAY_ONLY_CODES, NIGHT_ONLY_CODES, SHARED_CODES, OFF_CODES, STD, SymbolDictionary;
 try {
     // المدقق المركزي: فحص القواميس الثلاثة عند الإقلاع — أي خطأ = رفض التشغيل مع تقرير
     require('../public/js/core/system-validator.js').assertValid();
-    const STD = require('../public/js/core/shift-type-dictionary.js');
+    STD = require('../public/js/core/shift-type-dictionary.js');
     DAY_ONLY_CODES = STD.DAY_ONLY_CODES;
     NIGHT_ONLY_CODES = STD.NIGHT_ONLY_CODES;
     SHARED_CODES = STD.SHARED_CODES;
     OFF_CODES = STD.OFF_CODES;
+    // قاموس الرموز (UMD نفس ملف المتصفح) — فك الأكواد الصريحة وتصنيف kind للحوض
+    SymbolDictionary = require('../public/js/core/symbol-dictionary.js');
 } catch (e) {
     throw new Error('القاموس المركزي مفقود أو معطوب: public/js/core/ — ارفع ملفات القواميس قبل تشغيل الخادم. ' + e.message);
+}
+
+// ── قبول كود يوم ك«يوم عمل» لهذه المناوبة — التطبيع المركزي الوحيد ──
+// 1) يفك الكود الصريح إلى أساسه عبر القاموس (O12C13→O12C — يبقى ليليًا فقط
+//    لأن أساسه ضمن NIGHT_ONLY_CODES، فلا يُكسر منطق الليل-فقط إطلاقًا).
+// 2) الراحة/الإجازة/OFF مرفوضة دائمًا.
+// 3) الأساس ضمن قائمة الوردية ⇒ عمل.
+// 4) أساسٌ هو كود مناوبة معروف لكنه ليس لهذه الوردية (O12C صباحًا) ⇒ مرفوض —
+//    لا فكّ رمزيًا للأكواد المعروفة حتى لا يتجاوز الفكُّ قوائمَ الوردية.
+// 5) وإلا: تعيين صريح لوحدة ميدانية عاملة (RRC1→تدخل سريع…) يُقبل إن فكّه
+//    قاموس الرموز إلى kind ميداني (rapid/center/overlap) — قرار المالك:
+//    الإداري يضبط التوزيع في الإكسل بالأكواد الصريحة، فلا يُطرد الموظف.
+function isWorkDayCode(rawCode, isNight) {
+    const base = STD.normalizeDayCode(rawCode);
+    if (!base || OFF_CODES.includes(base)) return false;
+    const validCodes = isNight
+        ? [...NIGHT_ONLY_CODES, ...SHARED_CODES]
+        : [...DAY_ONLY_CODES, ...SHARED_CODES];
+    if (validCodes.includes(base)) return true;
+    const KNOWN_SHIFT_CODES = [...NIGHT_ONLY_CODES, ...DAY_ONLY_CODES, ...SHARED_CODES];
+    if (KNOWN_SHIFT_CODES.includes(base)) return false;
+    const sym = SymbolDictionary.resolveSymbol(base);
+    return !!(sym && (sym.kind === 'rapid' || sym.kind === 'center' || sym.kind === 'overlap'));
 }
 
 // ─── بند 15: اشتقاق سجلات التأخير (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل ───
@@ -205,7 +230,7 @@ class StaffingEventsService {
             crew_key TEXT,
             UNIQUE(shift_id, team_id)
         )`);
-        // W-تكامل ④: crew_key يربط قرار الفريق الديناميكي بهوية طاقمه —
+        // W-تكامل ④: crew_key يربط قرار الفريق بهوية طاقمه الفعلية —
         // جداول قائمة قبل هذه الميزة تُرحَّل دفاعيًا بلا فقدان
         try {
             const cols = await this.storage.all('PRAGMA table_info(shift_team_status)');
@@ -232,18 +257,23 @@ class StaffingEventsService {
     }
 
     /**
-     * W-تكامل ④: هوية الطاقم الحالي لفريق ديناميكي لحظة كتابة القرار.
-     // الفرق الثابتة ⇒ null (القرار عام كما كان). الفرق الاحتياطية
-     // (جنوب 11+) ⇒ رمز الطاقم المشتق حاليًا (O12A…) حتى لا يرث طاقمٌ
-     // جديد قرارَ طاقم سابق لنفس رقم الفريق.
+     * W-تكامل ④: هوية الطاقم لحظة كتابة القرار — قرار المالك:
+     // مفتاح الطاقم يُشتق من هويات الأعضاء الفعليين للفريق (الكود الوظيفي،
+     // وإلا الاسم) مرتبةً — قرار التكميل مرتبط بهوية الطاقم لا باسم الفريق،
+     // فإذا تغيّر الأعضاء تغيّر المفتاح ولم يرث الطاقم الجديد قرار طاقم سابق.
+     // (أُزيل اعتماده على dynamicCrew الذي لم يعد يُنتَج بعد إلغاء
+     // الانتشار التلقائي للفرق الديناميكية.)
      */
     async _decisionCrewKey(shiftId, teamId) {
-        const t = canonicalTeamId(teamId);
-        if (!/^جنوب\s+1[1-9]$/.test(t)) return null;
         try {
             const derived = await this.deriveTeamReadiness(shiftId);
-            const cur = derived.teams[t];
-            return (cur && cur.dynamicCrew) || null;
+            const cur = derived.teams[canonicalTeamId(teamId)];
+            if (!cur || !Array.isArray(cur.members) || !cur.members.length) return null;
+            const ids = cur.members
+                .map(m => String(m.code || m.employeeCode || m.name || '').trim())
+                .filter(Boolean)
+                .sort();
+            return ids.length ? ids.join('|') : null;
         } catch (_) { return null; }
     }
 
@@ -322,9 +352,6 @@ class StaffingEventsService {
         if (!shift) return {};
         const isNight = String(shift.shift_type || '').includes('ليل');
         const isoDate = toIsoDate(shift.shift_date);
-        const validCodes = isNight
-            ? [...NIGHT_ONLY_CODES, ...SHARED_CODES]
-            : [...DAY_ONLY_CODES, ...SHARED_CODES];
         let rows = [];
         try {
             rows = await this.storage.all(
@@ -335,8 +362,8 @@ class StaffingEventsService {
         } catch (_) { rows = []; }
         const map = {};
         for (const r of rows) {
-            const code = String(r.shift_code || '').toUpperCase();
-            if (!code || OFF_CODES.includes(code) || !validCodes.includes(code)) continue;
+            // التطبيع المركزي: الأكواد الصريحة (O12C13/RRC1) لا تُطرد — تُفك لأساسها
+            if (!isWorkDayCode(r.shift_code, isNight)) continue;
             if (!map[r.name]) map[r.name] = { jobTitle: r.job_title || null, code: r.employee_code || null };
         }
         return map;
@@ -426,7 +453,7 @@ class StaffingEventsService {
 
             if (status === 'ready' || status === 'missing' || status === 'offline') {
                 // عقد الفصل: قرارات الحالة ← جدول القرار المستقل (Upsert)، لا سجل الأحداث.
-                // W-تكامل ④: يُختم بهوية الطاقم للفرق الديناميكية (لا وراثة بين الأطقم)
+                // W-تكامل ④: يُختم بهوية الطاقم الفعلية (لا وراثة بين الأطقم)
                 await this._upsertDecision({
                     shiftId, teamId, status, reason: cur.reason || null, actor: actorName, at,
                     crewKey: await this._decisionCrewKey(shiftId, teamId)
@@ -562,7 +589,7 @@ class StaffingEventsService {
             // القرار المستقل (Upsert — آخر ضغطة تحكم دائمًا، بلا شروط تخطٍّ)،
             // ولا تُلحق في سجل الأحداث إطلاقًا. السجل للأشخاص فقط.
             if (type === 'ready' || type === 'missing' || type === 'offline') {
-                // W-تكامل ④: يُختم بهوية الطاقم للفرق الديناميكية (لا وراثة بين الأطقم)
+                // W-تكامل ④: يُختم بهوية الطاقم الفعلية (لا وراثة بين الأطقم)
                 await this._upsertDecision({ shiftId, teamId, status: type, reason: ev.reason || null, actor: actorName, at, crewKey: await this._decisionCrewKey(shiftId, teamId) });
                 out.push({ decision: type, teamId });
                 continue;
@@ -636,9 +663,6 @@ class StaffingEventsService {
 
         const isNight = String(shift.shift_type || '').includes('ليل');
         const isoDate = toIsoDate(shift.shift_date);
-        const validCodes = isNight
-            ? [...NIGHT_ONLY_CODES, ...SHARED_CODES]
-            : [...DAY_ONLY_CODES, ...SHARED_CODES];
 
         // الكادر المجدول لهذا التاريخ (رموز دوام فقط — الإجازات/الغياب المجدول ليس كادرًا)
         // doc-v4 ⑫: فرز رقمي طبيعي في JS بعد الجلب (بادئة ثم رقم) — الموضع المركزي
@@ -658,8 +682,8 @@ class StaffingEventsService {
         // doc-v2: خريطة اسم → {jobTitle, code} لإثراء الداعمين/المكلَّفين (مطابقة اسمية — additive فقط)
         const personInfo = {};
         for (const r of rosterRows) {
-            const code = String(r.shift_code || '').toUpperCase();
-            if (!code || OFF_CODES.includes(code) || !validCodes.includes(code)) continue;
+            // التطبيع المركزي: الأكواد الصريحة (O12C13/RRC1) لا تُطرد — تُفك لأساسها
+            if (!isWorkDayCode(r.shift_code, isNight)) continue;
             const info = { jobTitle: r.job_title || null, code: r.employee_code || null };
             (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, ...info });
             if (!personInfo[r.name]) personInfo[r.name] = info;
@@ -868,6 +892,11 @@ class StaffingEventsService {
      * VA: القوى المتاحة للدعم — موظفون مجدولون (رمز دوام لهذه المناوبة)
      * ليسوا نشطين حاليًا في أي فريق مشتق، وبلا غياب/تأخر/خروج مفتوح.
      * يشمل حوض الاحتياط (external_support مفتوح بلا فريق هدف).
+     * فلتر النوع (قرار المالك): القيادة الميدانية/التحكم العملياتي/تنسيق
+     * الاستجابة فرق مستقلة — لا تدخل الحوض إطلاقًا (kind من قاموس الرموز:
+     * leadership/ops — وتنسيق الاستجابة فرع ops بحسب طبيعة العمل).
+     * كل مرشح يُوسم بمصدره (sourceUnit/kind) حتى تعرض الواجهة «المركز
+     * القادم منه» بلا لبس — حقول إضافية فقط، لا يُحذف أي حقل قائم.
      */
     async getAvailableSupport(shiftId) {
         if (!shiftId) return { shiftId: shiftId || null, supporters: [] };
@@ -875,24 +904,18 @@ class StaffingEventsService {
         if (!shift) return { shiftId, supporters: [] };
         const isNight = String(shift.shift_type || '').includes('ليل');
         const isoDate = toIsoDate(shift.shift_date);
-        const validCodes = isNight
-            ? [...NIGHT_ONLY_CODES, ...SHARED_CODES]
-            : [...DAY_ONLY_CODES, ...SHARED_CODES];
 
         let scheduled = [];
         try {
             scheduled = await this.storage.all(
-                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, sr.team_id, sr.shift_code, t.name AS team_name
+                `SELECT e.id AS employee_id, e.employee_code, e.name, e.job_title, e.symbol, sr.team_id, sr.shift_code, t.name AS team_name
                  FROM shift_roster sr
                  JOIN employees e ON e.id = sr.employee_id
                  LEFT JOIN teams t ON t.id = sr.team_id
                  WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
             );
         } catch (_) { scheduled = []; }
-        scheduled = scheduled.filter(r => {
-            const code = String(r.shift_code || '').toUpperCase();
-            return code && !OFF_CODES.includes(code) && validCodes.includes(code);
-        });
+        scheduled = scheduled.filter(r => isWorkDayCode(r.shift_code, isNight)); // التطبيع المركزي — لا مطابقة حرفية
 
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         const folded = foldEvents(events, DOMAIN);
@@ -913,6 +936,11 @@ class StaffingEventsService {
             const open = openByEntity[s.name] || [];
             if (open.some(o => o.event_type === 'absence' || o.event_type === 'late' || o.event_type === 'exit')) continue;
             if (busy.has(s.name)) continue;
+            // تصنيف المرشح عبر قاموس الرموز (رمز الموظف + طبيعة عمله —
+            // قاعدة «تنسيق الاستجابة» محسومة داخل القاموس)
+            const sym = s.symbol ? SymbolDictionary.resolveSymbol(s.symbol, s.job_title) : null;
+            const kind = sym ? sym.kind : null;
+            if (kind === 'leadership' || kind === 'ops') continue; // فرق مستقلة — ممنوع دخول الحوض
             supporters.push({
                 name: s.name,
                 employeeCode: s.employee_code || null,
@@ -920,7 +948,10 @@ class StaffingEventsService {
                 team: s.team_name || null,
                 // W-تكامل ③: رمز المناوبة (إضافي فقط) — يميّز الأوفرلاب (O12…)
                 // في عرض الحوض حين لا يكون للموظف فريق مجدول (team=null).
-                shiftCode: s.shift_code || null
+                shiftCode: s.shift_code || null,
+                // وسم المصدر (إضافي فقط): الوحدة القادم منها + نوعه من القاموس
+                sourceUnit: sym ? sym.team : (s.team_name || null),
+                kind: kind
             });
         }
         return { shiftId, supporters };

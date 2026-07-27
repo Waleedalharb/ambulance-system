@@ -5,10 +5,48 @@ const path = require('path');
 // ============================================
 // CONFIGURATION
 // ============================================
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'database.db');
-const DATA_DIR = path.join(__dirname, 'data');
+// مصدر الحقيقة الوحيد للتخزين الدائم: RENDER_DISK_PATH (قرص /data على Render)
+// أو DATA_DIR، وإلا مجلد data/ المحلي. قاعدة SQLite يجب أن تعيش تحته حتى تنجو
+// من إعادة النشر وإعادة التشغيل (الجذر الذي كان يمسح البيانات: القاعدة كانت
+// في جذر المشروع = نظام ملفات مؤقت على Render).
+const STORAGE_PATH = process.env.RENDER_DISK_PATH || process.env.DATA_DIR || path.join(__dirname, 'data');
+const LEGACY_DB_PATH = path.join(__dirname, 'database.db');
+const DB_PATH = process.env.DB_PATH || path.join(STORAGE_PATH, 'ambulance.db');
+const DATA_DIR = STORAGE_PATH;
 const OPS_UPLOAD_DIR = path.join(DATA_DIR, 'uploads', 'operational');
 const OPS_METADATA_PATH = path.join(OPS_UPLOAD_DIR, 'metadata.json');
+const fsSync = require('fs');
+
+// ترحيل لمرة واحدة: إن وُجدت القاعدة القديمة في جذر المشروع والهدف الجديد
+// غائب أو فارغ (0 بايت) تُنقل القاعدة الحية إلى موقع التخزين الدائم.
+// لا يعمل عند تعيين DB_PATH صراحة (عزل الاختبارات يبقى كما هو).
+function migrateLegacyDbIfNeeded() {
+  if (process.env.DB_PATH) return;
+  if (DB_PATH === LEGACY_DB_PATH) return;
+  try {
+    if (!fsSync.existsSync(LEGACY_DB_PATH)) return;
+    const targetMissing = !fsSync.existsSync(DB_PATH);
+    const targetEmpty = !targetMissing && fsSync.statSync(DB_PATH).size === 0;
+    if (!targetMissing && !targetEmpty) return;
+    fsSync.mkdirSync(STORAGE_PATH, { recursive: true });
+    // Checkpoint للـ WAL حتى تكون النسخة مكتملة في الملف الرئيسي
+    try {
+      const legacy = new Database(LEGACY_DB_PATH);
+      legacy.pragma('wal_checkpoint(TRUNCATE)');
+      legacy.close();
+    } catch (chkErr) {
+      logger.warn(`Legacy checkpoint skipped: ${chkErr.message}`);
+    }
+    fsSync.copyFileSync(LEGACY_DB_PATH, DB_PATH);
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+      const stale = DB_PATH + suffix;
+      if (fsSync.existsSync(stale)) fsSync.unlinkSync(stale);
+    }
+    logger.info(`Migrated legacy database ${LEGACY_DB_PATH} -> ${DB_PATH}`);
+  } catch (err) {
+    logger.error('Legacy DB migration failed (continuing with target path)', err);
+  }
+}
 
 // ============================================
 // LOGGER
@@ -27,6 +65,7 @@ let db = null;
 
 async function openDb() {
   try {
+    migrateLegacyDbIfNeeded();
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
@@ -3516,5 +3555,10 @@ module.exports = {
   ShiftChangeRequests,
 
   // Migration
-  migrateAll
+  migrateAll,
+
+  // Paths (مصدر الحقيقة للتخزين — يستخدمها server.js في /health وdestroy)
+  DB_PATH,
+  STORAGE_PATH,
+  LEGACY_DB_PATH
 };

@@ -27,14 +27,26 @@ class RosterSyncService {
         this.db = db;
     }
 
-    /** تطبيع اسم الفريق الخام من الإكسل إلى teams.id — غير المعروف ⇒ NULL. */
+    /**
+     * تطبيع اسم الفريق الخام من الإكسل إلى teams.id — غير المعروف ⇒ NULL.
+     * المطابقة بعد تطبيع الطرفين: trim + توحيد المسافات المتكررة + الأرقام
+     * العربية ← إنجليزية، و«تدخل سريع N»/«rapid_N»/«سريع N» كلها فريق واحد.
+     * (لا يغيّر نتيجة الربط الناجح الحالي — يوسّع التقاط الصيغ فقط.)
+     */
+    _normalizeTeamName(v) {
+        return String(v || '')
+            .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
     _buildTeamResolver(teamRows) {
-        const byName = new Map(teamRows.map(t => [String(t.name || '').trim(), t.id]));
+        const byName = new Map(teamRows.map(t => [this._normalizeTeamName(t.name), t.id]));
         return (rawTeam) => {
-            const t = String(rawTeam || '').trim();
+            const t = this._normalizeTeamName(rawTeam);
             if (!t) return null;
             if (byName.has(t)) return byName.get(t);
-            const m = t.match(/^(?:rapid_|تدخل\s*سريع\s*)(\d+)$/i);
+            const m = t.match(/^(?:rapid_\s*|تدخل\s*سريع\s*|سريع\s*)(\d+)$/i);
             if (m) {
                 const rapid = byName.get('سريع ' + parseInt(m[1], 10));
                 if (rapid != null) return rapid;
@@ -65,7 +77,8 @@ class RosterSyncService {
             employeesSeen: 0, created: 0, updated: 0, reactivated: 0,
             deactivated: 0, rosterRows: 0, rosterPeriods: [],
             skippedEmployees: 0, skippedEntries: 0,
-            assignmentsCreated: 0, assignmentsEnded: 0
+            assignmentsCreated: 0, assignmentsEnded: 0,
+            unmatchedTeams: []
         };
 
         // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
@@ -90,6 +103,19 @@ class RosterSyncService {
 
         const teamRows = await this.db.all('SELECT id, name FROM teams');
         const resolveTeam = this._buildTeamResolver(teamRows);
+        // ── شفافية الربط: أي فريق خام غير فارغ تعذّر ربطه يُجمع ويُرجع في
+        // النتيجة (unmatchedTeams) بدل الاختفاء الصامت في team_id=NULL —
+        // يظهر للإداري في تقرير الاستيراد (حادثة صفوف القيادة/العمليات).
+        const unmatchedMap = new Map(); // teamRaw → عدد الموظفين
+        for (const p of people.values()) {
+            if (!p.teamRaw) continue;
+            if (resolveTeam(p.teamRaw) == null) {
+                unmatchedMap.set(p.teamRaw, (unmatchedMap.get(p.teamRaw) || 0) + 1);
+            }
+        }
+        stats.unmatchedTeams = [...unmatchedMap.entries()]
+            .map(([team, employees]) => ({ team, employees }))
+            .sort((a, b) => b.employees - a.employees || a.team.localeCompare(b.team));
         // W-تكامل ③ب: العمود وصفة إضافية — قواعد مصغّرة بلا symbol تُتخطى تحديثه بأمان
         const empCols = await this.db.all('PRAGMA table_info(employees)').catch(() => []);
         const hasSymbolCol = (empCols || []).some(c => c.name === 'symbol');

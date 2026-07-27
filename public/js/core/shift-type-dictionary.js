@@ -60,9 +60,26 @@
             .toUpperCase();
     }
 
+    // ── تطبيع كود اليوم المركزي (تعريف المالك — الأكواد الصريحة في خلايا الأيام) ──
+    // O12C13 = طاقم أوفرلاب O12C معيّن صراحة لسيارة جنوب 13 → كوده الأساسي O12C
+    // (نفس نطاق قاموس الرموز: سيارة 1-19 — رقم أو رقمان، و«13» لا تُقرأ «1»+«3»).
+    // RRC1/RRB2 = تعيين صريح لسيارة تدخل سريع → يبقى كما هو هنا؛ فكّه إلى
+    // «وحدة ميدانية عاملة» يتم عبر قاموس الرموز (symbol-dictionary) في المستهلِك.
+    // أي كود آخر يعود كما هو بعد normalize — ممنوع أي شرط على كود خارج هذا الملف.
+    function normalizeDayCode(code) {
+        var c = normalize(code);
+        if (!c) return '';
+        var m = c.match(/^O(\d+)([A-Z])([1-9]|1[0-9])$/);
+        if (m) {
+            var base = 'O' + m[1] + m[2];
+            if (GROUPS.overlap.indexOf(base) !== -1) return base;
+        }
+        return c;
+    }
+
     // تصنيف كود يوم واحد ← { group, status, shift, filterCat, label }
     function classifyDayCode(code) {
-        var c = normalize(code);
+        var c = normalizeDayCode(code);
         if (!c) return { group: 'rest', status: STATUS.rest, shift: '', filterCat: FILTERCAT.rest, label: LABELS.rest };
         for (var g in GROUPS) {
             if (GROUPS[g].indexOf(c) !== -1) {
@@ -135,6 +152,9 @@
             if (NIGHT_ONLY_CODES.indexOf(DAY_ONLY_CODES[d]) !== -1) errors.push('كود نهاري وليلي معًا: ' + DAY_ONLY_CODES[d]);
         }
         if (!DAY_ONLY_CODES.length || !NIGHT_ONLY_CODES.length) errors.push('قوائم وردية الخادم فارغة');
+        // الأكواد الصريحة: O12C13 يفك إلى O12C (جنوب 13 — لا جنوب 1 + «3»)، والأساسي يبقى كما هو
+        if (normalizeDayCode('O12C13') !== 'O12C') errors.push('تطبيع الكود الصريح مكسور: O12C13');
+        if (normalizeDayCode('O12C') !== 'O12C') errors.push('تطبيع الكود الأساسي مكسور: O12C');
         return errors;
     }
 
@@ -151,6 +171,7 @@
         SHARED_CODES: SHARED_CODES,
         OFF_CODES: OFF_CODES,
         normalize: normalize,
+        normalizeDayCode: normalizeDayCode,
         classifyDayCode: classifyDayCode,
         classifyEntry: classifyEntry,
         isRotationEmployee: isRotationEmployee,

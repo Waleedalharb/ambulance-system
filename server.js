@@ -954,7 +954,25 @@ app.get('/health', (req, res) => {
             storage: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH,
             jwt: !!process.env.JWT_SECRET,
             websocket: !!wss
-        }
+        },
+        // إثبات التخزين الدائم: المسار الفعلي + اختبار كتابة حقيقي (يكشف غياب قرص Render)
+        storageProof: (() => {
+            try {
+                const fsSync = require('fs');
+                const probe = path.join(STORAGE_PATH, '.storage-write-test');
+                fsSync.mkdirSync(STORAGE_PATH, { recursive: true });
+                fsSync.writeFileSync(probe, String(Date.now()));
+                fsSync.unlinkSync(probe);
+                return {
+                    storagePath: STORAGE_PATH,
+                    dbPath: (db && db.DB_PATH) || null,
+                    writable: true,
+                    persistent: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH
+                };
+            } catch (e) {
+                return { storagePath: STORAGE_PATH, dbPath: (db && db.DB_PATH) || null, writable: false, persistent: !!process.env.DATA_DIR || !!process.env.RENDER_DISK_PATH, error: e.message };
+            }
+        })()
     };
     if (aiMonitor) {
         health.aiMonitor = {
@@ -4287,6 +4305,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             global.__dictValidated = true;
         }
         const STD = require('./public/js/core/shift-type-dictionary.js');
+        const SYMD = require('./public/js/core/symbol-dictionary.js');
         const dayOnlyCodes = STD.DAY_ONLY_CODES;
         const nightOnlyCodes = STD.NIGHT_ONLY_CODES;
         const sharedCodes = STD.SHARED_CODES;
@@ -4296,17 +4315,29 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             ? [...nightOnlyCodes, ...sharedCodes] 
             : [...dayOnlyCodes, ...sharedCodes];
         
+        // التطبيع المركزي: الأكواد الصريحة (O12C13→O12C) لا تُطرد — تُفك لأساسها
+        // عبر القاموس، والتعيين الصريح لوحدة ميدانية (RRC1…) يُقبل كيوم عمل.
+        // كود مناوبة معروف ليس لهذه الوردية (O12C صباحًا) يبقى مرفوضًا — لا فكّ رمزيًا له.
+        const baseDayCode = (c) => STD.normalizeDayCode(c);
+        const knownShiftCodes = [...dayOnlyCodes, ...nightOnlyCodes, ...sharedCodes, ...offCodes];
+        const isExplicitFieldCode = (c) => {
+            if (knownShiftCodes.includes(c)) return false;
+            const sym = SYMD.resolveSymbol(c);
+            return !!(sym && (sym.kind === 'rapid' || sym.kind === 'center' || sym.kind === 'overlap'));
+        };
+        
         // Filter paramedics: show working codes for this shift + all off codes (to show as absent)
         const filteredParamedics = paramedics.filter(p => {
             if (!p.shift_code) return false;
-            const codeUpper = p.shift_code.toUpperCase();
-            return validCodes.includes(codeUpper) || offCodes.includes(codeUpper);
+            const codeBase = baseDayCode(p.shift_code);
+            if (!codeBase) return false;
+            return validCodes.includes(codeBase) || offCodes.includes(codeBase) || isExplicitFieldCode(codeBase);
         });
         
         // Map paramedics with accurate status using database shift_status
         const paramedicsWithStatus = filteredParamedics.map(p => {
-            const codeUpper = p.shift_code ? p.shift_code.toUpperCase() : '';
-            const isOff = offCodes.includes(codeUpper);
+            const codeBase = baseDayCode(p.shift_code);
+            const isOff = offCodes.includes(codeBase);
             // Use actual shift_status from database for accurate display
             const actualStatus = p.shift_status || '';
             const displayStatus = isOff ? 'غائب' : 'حاضر';
@@ -8593,10 +8624,11 @@ app.post('/api/admin/destroy-db', authenticate, authorize(['admin']), async (req
             console.log('[DESTROY] Database connection closed');
         }
         
-        // 2. Delete database.db file
-        const dbFile = path.join(__dirname, 'database.db');
-        const dbWal = path.join(__dirname, 'database.db-shm');
-        const dbJournal = path.join(__dirname, 'database.db-wal');
+        // 2. Delete the actual DB file (مسار الحقيقة من db.js — يعمل محليًا وعلى Render)
+        const actualDbPath = (db && db.DB_PATH) || path.join(__dirname, 'database.db');
+        const dbFile = actualDbPath;
+        const dbWal = actualDbPath + '-shm';
+        const dbJournal = actualDbPath + '-wal';
         
         let deletedFiles = [];
         [dbFile, dbWal, dbJournal].forEach(f => {
@@ -8606,11 +8638,16 @@ app.post('/api/admin/destroy-db', authenticate, authorize(['admin']), async (req
             }
         });
         
-        // 3. Delete data/ directory recursively
-        const dataDir = path.join(__dirname, 'data');
+        // 3. Delete storage directory + legacy root DB (حتى لا يُعاد ترحيلها عند إعادة الإنشاء)
+        const dataDir = (db && db.STORAGE_PATH) || path.join(__dirname, 'data');
         if (fsSync.existsSync(dataDir)) {
             fsSync.rmSync(dataDir, { recursive: true, force: true });
             deletedFiles.push('data/');
+        }
+        const legacyDb = (db && db.LEGACY_DB_PATH) || path.join(__dirname, 'database.db');
+        if (legacyDb !== dbFile && fsSync.existsSync(legacyDb)) {
+            fsSync.unlinkSync(legacyDb);
+            deletedFiles.push(path.basename(legacyDb));
         }
         
         console.log('[DESTROY] Deleted:', deletedFiles);

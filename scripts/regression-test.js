@@ -1816,7 +1816,7 @@ async function main() {
     // SCHEDULE_FILE: نفس تجاوز الخادم — يبقي الاختبار على نسخة معزولة ولا يلمس ملف التشغيل المشترك
     const rsSchedPath = process.env.SCHEDULE_FILE || f4Path.join(__dirname, '..', 'data', 'schedule-employees.json');
     const rsBackup = f4Fs.readFileSync(rsSchedPath, 'utf8');
-    const rsDbPath = process.env.DB_PATH || f4Path.join(__dirname, '..', 'database.db');
+    const rsDbPath = process.env.DB_PATH || [f4Path.join(__dirname, '..', 'data', 'ambulance.db'), f4Path.join(__dirname, '..', 'database.db')].find(p => f4Fs.existsSync(p) && f4Fs.statSync(p).size > 0);
     const rsLiveDb = new BetterSqlite3(rsDbPath, { readonly: true });
     const rsBefore = rsLiveDb.prepare(`SELECT COUNT(*) c FROM shift_roster WHERE year = 2026 AND month = 7`).get().c;
     let rsApiOk = false, rsRestoredOk = false, rsDetail = '';

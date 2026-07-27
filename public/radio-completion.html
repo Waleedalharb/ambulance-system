@@ -861,10 +861,8 @@ function renderCard(teamId, name, type, d) {
 
     var centerName = getTeamCenter(teamId);
     var centerHtml = centerName ? '<div class="card-center"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
-    // W-تكامل ③ب: شارة الفريق الديناميكي — مشتق من طاقم أوفرلاب (عرض فقط من الخادم)
-    var dynHtml = (d && d.dynamicCrew)
-        ? '<div class="card-center"><i class="fas fa-bolt"></i> احتياطي تشغيلي — طاقم ' + escapeHtml(d.dynamicCrew) + '</div>'
-        : '';
+    // أُزيلت شارة «الفريق الديناميكي» (dynamicCrew) — لم يعد يُنتَج بعد إلغاء
+    // الانتشار التلقائي؛ هوية الطاقم تُختم سيرفريًا في crew_key من هويات الأعضاء.
     var typeLabel = type === 'rapid' ? '⚡ سريع' : type === 'center' ? '🏥 مركز' : '⭐ قيادة/عمليات';
 
     // الأزرار الثلاثة مباشرة على البطاقة — ضغطة واحدة = إجراء واحد
@@ -890,7 +888,6 @@ function renderCard(teamId, name, type, d) {
         '<span class="card-type ' + type + '">' + typeLabel + '</span>' +
         '<div class="card-name">' + escapeHtml(name) + '</div>' +
         centerHtml +
-        dynHtml +
         '<div class="card-status">' + (STATUS_LABELS[status] || status) + '</div>' +
         '<div class="paramedics">' + paramedicsHtml + '</div>' +
         missInfoHtml +

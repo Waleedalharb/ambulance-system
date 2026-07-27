@@ -13,7 +13,7 @@
 
 | المجال | المصدر الوحيد | الملف |
 |---|---|---|
-| البيانات (الفرق، الموظفون، المناوبات، الأحداث التشغيلية، سير العمل) | قاعدة SQLite بنمط WAL | `database.db` عبر `db.js` (`DB_PATH` افتراضيًا `__dirname/database.db`) |
+| البيانات (الفرق، الموظفون، المناوبات، الأحداث التشغيلية، سير العمل) | قاعدة SQLite بنمط WAL | `ambulance.db` عبر `db.js` — الافتراضي `STORAGE_PATH/ambulance.db` (قرص `/data` على Render عبر `RENDER_DISK_PATH`، محليًا `data/`) مع ترحيل تلقائي لمرة واحدة من `database.db` القديمة في الجذر؛ `DB_PATH` لتجاوز الاختبارات |
 | التاريخ والوقت (عرض + منطق كشف المناوبة) | طبقة TimeRiyadh (UMD: متصفح + Node) — التخزين UTC دائمًا، العرض Asia/Riyadh عبر `Intl.DateTimeFormat` فقط | `public/js/time-riyadh.js` + سياسة `TIME-POLICY.md` + حارس `scripts/guard-time-riyadh.js` |
 | الجداول (تعيين الموظفين للمناوبات) | ملف الجدولة + مزامنته إلى قاعدة البيانات | `data/schedule-employees.json` (`SCHEDULE_FILE` لتجاوز الاختبارات) + `services/roster-sync-service.js` |
 | حالة القوى البشرية (جاهزية الفرق: غياب/تأخر/دعم) | أحداث Timeline فقط — تُشتق الحالة من الأحداث ولا تُحسب محليًا أبدًا | `services/staffing-events-service.js` (`deriveTeamReadiness`) + جدول `operational_events` |
