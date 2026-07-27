@@ -1379,6 +1379,8 @@ async function runMigrations() {
   // ضمان الفرق التشغيلية المستقلة بعد اكتمال الأعمدة (يتقارب في إقلاع واحد
   // حتى للقواعد القديمة التي ينقصها عمود requiredPersonnel قبل runMigrations)
   await ensureOperationalTeams();
+  // سيارة الصيانة المتنقلة لفرقة الدعم اللوجستي (قرار المالك 2026-07-27)
+  await ensureLogisticsVehicleAssignment();
 
   logger.info('Migrations complete');
 }
@@ -1429,7 +1431,9 @@ const FLEET_OPENING_ASSIGNMENTS = {
   veh_000001: 'جنوب 1', veh_000002: 'جنوب 2', veh_000003: 'جنوب 3', veh_000004: 'جنوب 4',
   veh_000005: 'جنوب 5', veh_000006: 'جنوب 6', veh_000007: 'جنوب 7', veh_000008: 'جنوب 8',
   veh_000009: 'جنوب 9', veh_000010: 'جنوب 10',
-  veh_000014: 'سريع 1', veh_000015: 'سريع 2', veh_000016: 'سريع 3', veh_000017: 'سريع 4'
+  veh_000014: 'سريع 1', veh_000015: 'سريع 2', veh_000016: 'سريع 3', veh_000017: 'سريع 4',
+  // قرار المالك 2026-07-27: سيارة الصيانة المتنقلة هي سيارة فرقة الدعم اللوجستي
+  veh_000018: 'الدعم اللوجستي'
 };
 
 // slugs ثابتة للمراكز التسعة (المفاتيح بإملاء teams.center الرسمي)
@@ -1460,6 +1464,31 @@ const VEHICLES_DDL = `CREATE TABLE IF NOT EXISTS vehicles (
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL
 );`;
+
+// ضمان تعيين سيارة الصيانة المتنقلة (veh_000018) لفرقة الدعم اللوجستي في القواعد
+// القائمة (زرع الافتتاح V-A يعمل مرة واحدة فقط ولا يغطي القواعد المزروعة سلفًا).
+// idempotent: لا يُدرج إن وُجد أي حدث تعيين سابق للمركبة. يُستدعى من runMigrations
+// فقط (بعد وجود جدولَي vehicles وoperational_events وفريق الدعم اللوجستي).
+async function ensureLogisticsVehicleAssignment() {
+  try {
+    const team = await get(`SELECT id, center FROM teams WHERE name = 'الدعم اللوجستي'`);
+    if (!team) return;
+    const existing = await get(`SELECT COUNT(*) AS c FROM operational_events WHERE domain = 'vehicle' AND entity_id = 'veh_000018' AND event_type = 'assignment'`);
+    if (existing.c > 0) return;
+    await run(
+      `INSERT INTO operational_events
+       (shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, center,
+        event_type, status, reason, readiness_basis, corrects_event_id, payload, note,
+        actor_id, actor_name, created_at)
+       VALUES (NULL, NULL, NULL, 'vehicle', 'veh_000018', 'صيانة متنقلة', ?, ?, 'assignment',
+        NULL, 'initial_seed', NULL, NULL, NULL, 'ensure: سيارة فرقة الدعم اللوجستي (قرار المالك 2026-07-27)', 'system', 'system-migration', ?)`,
+      [String(team.id), team.center, FLEET_SEED_AT]
+    );
+    logger.info('Logistics vehicle assignment ensured: veh_000018 -> الدعم اللوجستي');
+  } catch (err) {
+    logger.error('ensureLogisticsVehicleAssignment failed', err);
+  }
+}
 
 async function migrateFleetVA() {
   // ── C7: تصحيح مركزَي سريع 3/4 للقواعد القائمة (idempotent) ──
@@ -1996,7 +2025,10 @@ const DEFAULT_TEAMS = [
   // أسقط القيادة/التحكم/التنسيق من التكميل على أي قاعدة جديدة مثل Render)
   { name: 'القيادة الميدانية', center: 'العمليات', team_type: 'قيادة', sort_order: 0, requiredPersonnel: 2 },
   { name: 'التحكم العملياتي', center: 'العمليات', team_type: 'عمليات', sort_order: 0, requiredPersonnel: 1 },
-  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', sort_order: 0, requiredPersonnel: 1 }
+  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', sort_order: 0, requiredPersonnel: 1 },
+  // قرار المالك 2026-07-27: الدعم اللوجستي فرقة تُحضَّر مثل سائر الفرق
+  // (أكواد XY/AZ-DZ يحلّها القاموس أصلًا إلى هذا الاسم — كان ينقص وجود الفريق)
+  { name: 'الدعم اللوجستي', center: 'العمليات', team_type: 'دعم', sort_order: 0, requiredPersonnel: 1 }
 ];
 
 async function seedShiftCodes() {
@@ -2040,7 +2072,8 @@ async function seedDefaultTeams() {
 const OPERATIONAL_TEAMS = [
   { name: 'القيادة الميدانية', center: 'العمليات', team_type: 'قيادة', requiredPersonnel: 2 },
   { name: 'التحكم العملياتي', center: 'العمليات', team_type: 'عمليات', requiredPersonnel: 1 },
-  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', requiredPersonnel: 1 }
+  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', requiredPersonnel: 1 },
+  { name: 'الدعم اللوجستي', center: 'العمليات', team_type: 'دعم', requiredPersonnel: 1 }
 ];
 
 async function ensureOperationalTeams() {

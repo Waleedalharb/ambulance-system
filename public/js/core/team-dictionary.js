@@ -16,10 +16,11 @@
     var ORDER = {
         leadership: 1,   // القيادة
         control: 2,      // التحكم العملياتي / تنسيق الاستجابة
-        south: 3,        // جنوب 1..N
-        rapid: 4,        // سريع 1..N
-        overlap: 5,      // الأوفرلاب
-        admin: 6         // الإدارات والبقية
+        support: 3,      // الدعم اللوجستي (قرار المالك: بجوار العمليات والقيادة)
+        south: 4,        // جنوب 1..N
+        rapid: 5,        // سريع 1..N
+        overlap: 6,      // الأوفرلاب
+        admin: 7         // الإدارات والبقية
     };
 
     function teamSortKey(name) {
@@ -28,6 +29,7 @@
         if (n === 'القائد الميداني') return '0' + ORDER.leadership + '-2';
         if (n === 'التحكم العملياتي') return '0' + ORDER.control + '-1';
         if (n === 'تنسيق الاستجابة') return '0' + ORDER.control + '-2';
+        if (n === 'الدعم اللوجستي') return '0' + ORDER.support;
         var m = n.match(/^جنوب (\d+)$/);
         if (m) return '0' + ORDER.south + '-' + String(m[1]).padStart(3, '0');
         m = n.match(/^(?:سريع|تدخل سريع) (\d+)$/);

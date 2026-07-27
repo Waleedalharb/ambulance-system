@@ -608,17 +608,19 @@ async function main() {
                 centersRows.length === 9 && !centersRows.some(c => c.name === 'الفرق الإضافية'),
                 `centers=${centersRows.length}`);
 
-            // ⑨ أحداث الافتتاح: 52 دورة حياة + 2 عطل + 2 طلب صيانة + 14 تعيين = 70
+            // ⑨ أحداث الافتتاح: 52 دورة حياة + 2 عطل + 2 طلب صيانة + 15 تعيين = 71
             //    مختومة system-migration وبلا مناوبة (قرار المالك 2) — وidempotent (لا تكرار)
+            //    15 تعيينًا: النقاط الدائمة الـ14 + veh_000018 الصيانة المتنقلة لفرقة
+            //    الدعم اللوجستي (قرار المالك 2026-07-27)
             const seedEv = vadbc.prepare(`SELECT event_type AS t, COUNT(*) AS c FROM operational_events
                 WHERE domain='vehicle' AND actor_name='system-migration' GROUP BY event_type`).all();
             const seedMap = Object.fromEntries(seedEv.map(r => [r.t, r.c]));
             const nullShift = vadbc.prepare(`SELECT COUNT(*) AS c FROM operational_events
                 WHERE domain='vehicle' AND actor_name='system-migration' AND shift_id IS NOT NULL`).get().c;
-            record('V-A ⑨: أحداث الافتتاح (26 acquired + 26 entered_service + 2 breakdown + 2 maintenance_requested + 14 assignment) بلا مناوبة',
+            record('V-A ⑨: أحداث الافتتاح (26 acquired + 26 entered_service + 2 breakdown + 2 maintenance_requested + 15 assignment) بلا مناوبة',
                 seedMap.acquired === 26 && seedMap.entered_service === 26
                 && seedMap.status_change === 2 && seedMap.maintenance_requested === 2
-                && seedMap.assignment === 14 && nullShift === 0,
+                && seedMap.assignment === 15 && nullShift === 0,
                 JSON.stringify(seedMap) + ` nullShift=${nullShift}`);
 
             // ⑩ system_metadata: schema_version=2 / fleet_schema=v9 / migration=V-A
