@@ -260,7 +260,8 @@ const TABLE_SCHEMAS = [
     center TEXT NOT NULL,
     team_type TEXT,
     sort_order INTEGER DEFAULT 0,
-    is_active INTEGER DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    requiredPersonnel INTEGER DEFAULT 2
   );`,
 
   // Shift Codes
@@ -896,6 +897,7 @@ async function initTables() {
   // Seed default data
   await seedShiftCodes();
   await seedDefaultTeams();
+  await ensureOperationalTeams();
   logger.info('All tables initialized successfully');
 }
 
@@ -1373,6 +1375,10 @@ async function runMigrations() {
   // V-A: المراكز + إعادة بناء الأسطول v9 + زرع السجل الرسمي + أحداث الافتتاح
   // + تصحيح مركزَي سريع 3/4 (C7) + system_metadata — كلها idempotent.
   await migrateFleetVA();
+
+  // ضمان الفرق التشغيلية المستقلة بعد اكتمال الأعمدة (يتقارب في إقلاع واحد
+  // حتى للقواعد القديمة التي ينقصها عمود requiredPersonnel قبل runMigrations)
+  await ensureOperationalTeams();
 
   logger.info('Migrations complete');
 }
@@ -1982,10 +1988,15 @@ const DEFAULT_TEAMS = [
   { name: 'جنوب 17', center: 'الفرق الإضافية', team_type: 'جنوب', sort_order: 17 },
   { name: 'جنوب 18', center: 'الفرق الإضافية', team_type: 'جنوب', sort_order: 18 },
   { name: 'جنوب 19', center: 'الفرق الإضافية', team_type: 'جنوب', sort_order: 19 },
-  { name: 'سريع 1', center: 'الدار البيضاء', team_type: 'سريع', sort_order: 101 },
-  { name: 'سريع 2', center: 'الشفاء', team_type: 'سريع', sort_order: 102 },
-  { name: 'سريع 3', center: 'الخالدية', team_type: 'سريع', sort_order: 103 },
-  { name: 'سريع 4', center: 'المنصورة', team_type: 'سريع', sort_order: 104 }
+  { name: 'سريع 1', center: 'الدار البيضاء', team_type: 'سريع', sort_order: 101, requiredPersonnel: 1 },
+  { name: 'سريع 2', center: 'الشفاء', team_type: 'سريع', sort_order: 102, requiredPersonnel: 1 },
+  { name: 'سريع 3', center: 'الخالدية', team_type: 'سريع', sort_order: 103, requiredPersonnel: 1 },
+  { name: 'سريع 4', center: 'المنصورة', team_type: 'سريع', sort_order: 104, requiredPersonnel: 1 },
+  // فرق العمليات المستقلة (كانت تُضاف يدويًا لقاعدة الإنتاج فقط — غيابها عن الزرع
+  // أسقط القيادة/التحكم/التنسيق من التكميل على أي قاعدة جديدة مثل Render)
+  { name: 'القيادة الميدانية', center: 'العمليات', team_type: 'قيادة', sort_order: 0, requiredPersonnel: 2 },
+  { name: 'التحكم العملياتي', center: 'العمليات', team_type: 'عمليات', sort_order: 0, requiredPersonnel: 1 },
+  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', sort_order: 0, requiredPersonnel: 1 }
 ];
 
 async function seedShiftCodes() {
@@ -2014,11 +2025,35 @@ async function seedDefaultTeams() {
     }
     logger.info('Seeding default teams...');
     for (const t of DEFAULT_TEAMS) {
-      await run('INSERT INTO teams (name, center, team_type, sort_order, is_active) VALUES (?, ?, ?, ?, ?);', [t.name, t.center, t.team_type, t.sort_order, 1]);
+      await run('INSERT INTO teams (name, center, team_type, sort_order, is_active, requiredPersonnel) VALUES (?, ?, ?, ?, ?, ?);', [t.name, t.center, t.team_type, t.sort_order, 1, t.requiredPersonnel || 2]);
     }
     logger.info(`Seeded ${DEFAULT_TEAMS.length} teams`);
   } catch (err) {
     logger.error('Teams seeding failed', err);
+  }
+}
+
+// ضمان الفرق التشغيلية المستقلة في القواعد القائمة (idempotent بالاسم):
+// seedDefaultTeams يتخطى أي قاعدة فيها فرق، لذا قواعد مثل Render (23 فريقًا)
+// بقيت بلا قيادة/تحكم/تنسيق — هذا الضمان يكملها. كما يوحّد requiredPersonnel
+// للسريع = 1 (قاعدة المالك: شخص واحد لكل سيارة تدخل سريع).
+const OPERATIONAL_TEAMS = [
+  { name: 'القيادة الميدانية', center: 'العمليات', team_type: 'قيادة', requiredPersonnel: 2 },
+  { name: 'التحكم العملياتي', center: 'العمليات', team_type: 'عمليات', requiredPersonnel: 1 },
+  { name: 'تنسيق الاستجابة', center: 'العمليات', team_type: 'عمليات', requiredPersonnel: 1 }
+];
+
+async function ensureOperationalTeams() {
+  try {
+    for (const t of OPERATIONAL_TEAMS) {
+      const existing = await all('SELECT id FROM teams WHERE name = ?', [t.name]);
+      if (existing.length > 0) continue;
+      await run('INSERT INTO teams (name, center, team_type, sort_order, is_active, requiredPersonnel) VALUES (?, ?, ?, 0, 1, ?);', [t.name, t.center, t.team_type, t.requiredPersonnel]);
+      logger.info(`Operational team ensured: ${t.name}`);
+    }
+    await run(`UPDATE teams SET requiredPersonnel = 1 WHERE team_type = 'سريع' AND requiredPersonnel <> 1`);
+  } catch (err) {
+    logger.error('ensureOperationalTeams failed', err);
   }
 }
 
