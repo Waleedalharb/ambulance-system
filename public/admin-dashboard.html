@@ -9,6 +9,69 @@
     <link rel="stylesheet" href="/css/a11y.css?v=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ═══ إعادة توكنة محلية — الهوية التنفيذية الداكنة الموحدة ═══
+           تتفوق على app.css المشترك (وراثة لاحقة) دون تعديل الملف المشترك */
+        :root {
+            --white:   rgba(255,255,255,0.035);
+            --gray-50: #0A1220;
+            --gray-100:rgba(255,255,255,0.05);
+            --gray-200:rgba(255,255,255,0.08);
+            --gray-300:rgba(255,255,255,0.10);
+            --gray-400:#7C8DA6;
+            --gray-500:#A9BACD;
+            --gray-600:#C2CFDD;
+            --gray-700:#D5DEE9;
+            --gray-800:#F1F5F9;
+            --gray-900:#F1F5F9;
+            --primary: #60A5FA;
+            --primary-700: #3B82F6;
+            --teal: #10B586;
+            --gold: #FBBF24;
+            --coral: #F87171;
+            --shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+            --shadow-exec: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+        }
+
+        /* طبقة الهوية: تدرجات + شبكة مقنّعة + توهج سفلي */
+        body {
+            background:
+                radial-gradient(1100px 620px at 85% -10%, rgba(14,164,122,0.10), transparent 60%),
+                radial-gradient(900px 540px at 8% -5%, rgba(96,165,250,0.08), transparent 55%),
+                #0A1220 !important;
+            background-attachment: fixed !important;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(1200px 500px at 50% 110%, rgba(14,164,122,0.05), transparent 65%);
+        }
+        :focus-visible {
+            outline: 2px solid rgba(14,164,122,0.50) !important;
+            outline-offset: 2px;
+        }
+        ::selection {
+            background: rgba(14,164,122,0.28);
+            color: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10) !important; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18) !important; }
+
         .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .stat-card { background: var(--white); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); border-right: 4px solid var(--primary); }
@@ -32,8 +95,8 @@
         .audit-time { color: var(--gray-400); font-size: 0.75rem; margin-top: 6px; text-align: right; display: block; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .header-bar h1 { font-size: 1.4rem; margin: 0; }
-        .btn-refresh { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
-        .btn-refresh:hover { background: var(--primary-700); }
+        .btn-refresh { background: #0EA47A; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+        .btn-refresh:hover { background: #0B8C66; }
         .loading { text-align: center; padding: 40px; color: var(--gray-400); }
         .error { text-align: center; padding: 40px; color: var(--coral); }
         @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
@@ -49,23 +112,23 @@
         .monitor-card h4 { font-size: 0.8rem; color: var(--gray-500); margin: 0 0 6px; }
         .monitor-value { font-size: 1.4rem; font-weight: 700; color: var(--gray-900); }
         .monitor-detail { font-size: 0.75rem; color: var(--gray-400); margin-top: 4px; }
-        .alert-item { padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fff8f0; border-right: 3px solid var(--gold); }
-        .alert-item.critical { background: #fef2f2; border-color: var(--coral); }
-        .alert-item.warning { background: #fffbeb; border-color: var(--gold); }
+        .alert-item { padding: 10px; border-radius: 8px; margin-bottom: 8px; background: rgba(245,158,11,0.10); border-right: 3px solid var(--gold); }
+        .alert-item.critical { background: rgba(239,68,68,0.12); border-color: var(--coral); }
+        .alert-item.warning { background: rgba(245,158,11,0.12); border-color: var(--gold); }
         .alert-item .alert-msg { font-size: 0.85rem; color: var(--gray-800); }
         .alert-item .alert-meta { font-size: 0.7rem; color: var(--gray-400); margin-top: 4px; }
         .btn-resolve { background: var(--teal); color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; margin-top: 6px; }
-        .btn-resolve:hover { background: #0d9488; }
+        .btn-resolve:hover { background: #0B8C66; }
         .log-item { padding: 6px 0; border-bottom: 1px solid var(--gray-100); font-size: 0.8rem; }
         .log-item:last-child { border-bottom: none; }
         .log-level { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 6px; }
-        .log-level.info { background: #e0f2fe; color: #0369a1; }
-        .log-level.warning { background: #fef3c7; color: #92400e; }
-        .log-level.error { background: #fee2e2; color: #991b1b; }
-        .log-level.critical { background: #fecaca; color: #7f1d1d; }
-        .log-level.heal { background: #d1fae5; color: #065f46; }
-        .btn-force-check { background: var(--primary); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
-        .btn-force-check:hover { background: var(--primary-700); }
+        .log-level.info { background: rgba(56,189,248,0.14); color: #7DD3FC; }
+        .log-level.warning { background: rgba(245,158,11,0.14); color: #FCD34D; }
+        .log-level.error { background: rgba(239,68,68,0.14); color: #FCA5A5; }
+        .log-level.critical { background: rgba(239,68,68,0.24); color: #FECACA; }
+        .log-level.heal { background: rgba(16,185,129,0.14); color: #6EE7B7; }
+        .btn-force-check { background: #0EA47A; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+        .btn-force-check:hover { background: #0B8C66; }
         .monitor-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 768px) { .monitor-panels { grid-template-columns: 1fr; } }
         /* Admin Tools */
@@ -75,8 +138,8 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
         .clear-result { margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 0.85rem; display: none; }
-        .clear-result.success { background: #d1fae5; color: #065f46; display: block; }
-        .clear-result.error { background: #fee2e2; color: #991b1b; display: block; }
+        .clear-result.success { background: rgba(16,185,129,0.14); color: #6EE7B7; display: block; }
+        .clear-result.error { background: rgba(239,68,68,0.14); color: #FCA5A5; display: block; }
     </style>
 </head>
 <body>
@@ -153,11 +216,7 @@
             <!-- Admin Tools -->
             <div class="admin-tools">
                 <h3><i class="fas fa-tools"></i> أدوات المشرف</h3>
-                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
-                    <button class="btn-refresh" onclick="location.href='admin-knowledge.html'" style="background:var(--primary);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:0.9rem;display:inline-flex;align-items:center;gap:8px;">
-                        <i class="fas fa-brain"></i> إدارة المعرفة (AI Assistant)
-                    </button>
-                </div>
+                <a href="admin-vehicles.html" class="btn-force-check" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-left:8px;" title="السجل المرجعي للأسطول + تاريخ كل مركبة"><i class="fas fa-ambulance"></i> إدارة المركبات</a>
                 <button id="clearAllBtn" class="btn-danger" onclick="clearAllScheduleData()">
                     <i class="fas fa-trash-alt"></i> مسح كل بيانات الجداول (IndexedDB + Server)
                 </button>

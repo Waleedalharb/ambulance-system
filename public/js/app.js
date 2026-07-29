@@ -711,6 +711,12 @@ function handleSSEEvent(data) {
         case 'roster_synced': // SR-2: مزامنة الجدولة ← القاعدة
             refreshWorkforceFromServer(data.shiftId);
             break;
+        case 'timeline_updated':
+        case 'announcements_updated':
+        case 'announcement_deleted':
+            // المنطقة 3: تحديث شريط الأحداث النشطة فورًا من نفس القناة
+            refreshEventsAux();
+            break;
         case 'shift_note_added':
         case 'shift_note_deleted':
             loadShiftNotes();
@@ -987,7 +993,7 @@ function renderHeatmap() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    var colors = ['#e8f5e9', '#c8e6c9', '#a5d6a7', '#81c784', '#66bb6a', '#ffb74d', '#ffa726', '#f57c00', '#e57373', '#c62828'];
+    var colors = ['rgba(255,255,255,0.04)', 'rgba(16,181,134,0.18)', 'rgba(16,181,134,0.30)', 'rgba(16,181,134,0.42)', 'rgba(16,181,134,0.55)', 'rgba(16,181,134,0.70)', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.75)', 'rgba(239,68,68,0.65)', 'rgba(239,68,68,0.85)'];
 
     // F5b: هيستوغرام ساعي حقيقي من مرآة بلاغات المناوبة الجارية (reports[key].times — نفس تجميع getPeakHour)
     var hourCounts = new Array(24).fill(0);
@@ -1352,7 +1358,7 @@ function loadNotifications() {
         .then(function(data) {
             if (data.success && Array.isArray(data.notifications)) {
                 notifications = data.notifications;
-                unreadNotificationsCount = notifications.filter(function(n) { return !n.read; }).length;
+                unreadNotificationsCount = notifications.filter(function(n) { return !(n.read || n.is_read); }).length;
                 updateNotificationBadge();
                 renderNotifications();
             }
@@ -1411,21 +1417,43 @@ function renderNotifications() {
     var list = document.getElementById('notificationList');
     if (!list) return;
     if (notifications.length === 0) {
-        list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:24px; font-size:0.85rem;">📭 لا توجد إشعارات</p>';
+        list.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><span>لا توجد إشعارات</span></div>';
         return;
     }
     var html = '';
     for (var i = 0; i < notifications.length; i++) {
         var n = notifications[i];
-        var readStyle = n.read ? 'opacity:0.7; background:var(--gray-50);' : 'background:var(--white); border-right:3px solid var(--coral);';
-        html += '<div style="padding:12px 16px; border-bottom:1px solid var(--gray-200); ' + readStyle + '">' +
-            '<div style="font-weight:700; font-size:0.85rem; color:var(--text);">' + (n.title || 'إشعار') + '</div>' +
-            '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:4px;">' + (n.message || '') + '</div>' +
-            '<div style="font-size:0.7rem; color:var(--gray-400); margin-top:4px;">' + (n.time || n.createdAt || '') + '</div>' +
+        // عرض فقط: النوع (type) يصل جاهزًا ضمن حمولة GET /api/notifications — لا تغيير منطق/بيانات
+        var typeKey = renderNotifications.TYPE_META[n.type] ? n.type : 'info';
+        var meta = renderNotifications.TYPE_META[typeKey];
+        var isRead = !!(n.read || n.is_read);
+        var timeText = n.time || n.createdAt || n.created_at || '';
+        html += '<div class="nc-item nc-' + typeKey + (isRead ? ' is-read' : '') + '">' +
+            '<div class="nc-icon"><i class="fas ' + meta.icon + '"></i></div>' +
+            '<div class="nc-body">' +
+                '<div class="nc-head">' +
+                    '<span class="nc-title">' + (n.title || 'إشعار') + '</span>' +
+                    '<span class="nc-chip">' + meta.label + '</span>' +
+                '</div>' +
+                (n.message ? '<div class="nc-message">' + n.message + '</div>' : '') +
+                '<div class="nc-time"><i class="far fa-clock"></i><span>' + timeText + '</span></div>' +
+            '</div>' +
+            (isRead ? '' : '<span class="nc-dot" title="غير مقروء"></span>') +
         '</div>';
     }
     list.innerHTML = html;
 }
+
+// خريطة عرض النوع (عرض فقط): تُرجمة عمود type المخزّن في جدول notifications
+// إلى أيقونة/لون/وسم — بلا أي تغيير في البيانات أو التدفق أو المعالجات.
+renderNotifications.TYPE_META = {
+    success: { icon: 'fa-check-circle',         label: 'نجاح'    },
+    warning: { icon: 'fa-exclamation-triangle', label: 'تنبيه'   },
+    info:    { icon: 'fa-info-circle',          label: 'معلومات' },
+    danger:  { icon: 'fa-exclamation-circle',   label: 'عاجل'    },
+    urgent:  { icon: 'fa-exclamation-circle',   label: 'عاجل'    },
+    error:   { icon: 'fa-exclamation-circle',   label: 'عاجل'    }
+};
 
 function markNotificationRead(id) {
     if (!AuthManager.isLoggedIn() || id === undefined) return;
@@ -1911,7 +1939,7 @@ function getPeakHour() {
 async function renderAdvancedDistribution() {
     var container = document.getElementById('distributionContainer');
     if (!container) return;
-    container.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--gray-500);"><i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:1rem;display:block;"></i>جاري تحميل البيانات...</div>';
+    container.innerHTML = '<div class="dm-loading"><i class="fas fa-spinner fa-spin dm-loading-icon"></i>جاري تحميل البيانات...</div>';
     
     // ─── Fetch completion data: only ready teams ───
     var readyTeams = {};
@@ -1954,10 +1982,10 @@ async function renderAdvancedDistribution() {
     
     // If no completion saved yet, show message
     if (!hasCompletion) {
-        container.innerHTML = '<div style="text-align:center; padding:3rem 1rem; color:var(--gray-500);">' +
-            '<i class="fas fa-clipboard-check" style="font-size:3rem; margin-bottom:1rem; display:block; color:var(--gray-300);"></i>' +
-            '<div style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">لم يتم تسجيل تكميل المناوبة</div>' +
-            '<div style="font-size:0.85rem;">الرجاء إكمال التكميل السريع أولاً لعرض الفرق الجاهزة.</div>' +
+        container.innerHTML = '<div class="dm-empty">' +
+            '<i class="fas fa-clipboard-check dm-empty-icon"></i>' +
+            '<div class="dm-empty-title">لم يتم تسجيل تكميل المناوبة</div>' +
+            '<div class="dm-empty-sub">الرجاء إكمال التكميل السريع أولاً لعرض الفرق الجاهزة.</div>' +
             '</div>';
         return;
     }
@@ -2065,7 +2093,7 @@ async function renderAdvancedDistribution() {
         var sectorColorClass = getSectorSmartColorClass(totalSectorReports);
         
         var headerHtml = '<div class="distribution-sector-header ' + sectorColorClass + '">' +
-            '<span class="sector-name"><i class="fas fa-map-pin" style="color:var(--primary-500);"></i> ' + center + '</span>' +
+            '<span class="sector-name"><i class="fas fa-map-pin"></i> ' + center + '</span>' +
             '<span class="sector-total">📊 ' + totalSectorReports + '</span>' +
             '</div>';
         
@@ -2095,7 +2123,7 @@ async function renderAdvancedDistribution() {
             var activityBarHtml = '';
             if (info.count > 0) {
                 activityBarHtml = '<div class="activity-bar">' +
-                    '<div class="activity-bar-fill" style="width:' + getActivityBarWidth(info.count) + '; background:' + getActivityBarColor(info.count) + ';"></div>' +
+                    '<div class="activity-bar-fill ab-' + smartColorClass.replace('smart-color-', '') + '" data-w="' + getActivityBarWidth(info.count) + '"></div>' +
                     '</div>';
             }
             
@@ -2103,7 +2131,7 @@ async function renderAdvancedDistribution() {
             var paramedics = teamParamedics[unit2] || [];
             var paramedicsHtml = '';
             if (paramedics.length > 0) {
-                paramedicsHtml = '<div style="font-size:0.65rem;color:var(--gray-500);margin-top:2px;text-align:center;">👤 ' + paramedics.join('، ') + '</div>';
+                paramedicsHtml = '<div class="unit-paramedics">👤 ' + paramedics.join('، ') + '</div>';
             }
             
             gridHtml += '<div class="distribution-unit-item ' + smartColorClass + '" id="unit-' + center.replace(/\s/g, '') + '-' + unit2.replace(/\s/g, '') + '">' +
@@ -2114,9 +2142,9 @@ async function renderAdvancedDistribution() {
                 activityBarHtml +
                 typeBreakdownHtml +
                 '<div class="unit-actions">' +
-                '<button class="btn btn-primary report-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
-                (info.count > 0 ? '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:inline-flex;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '<button class="btn btn-coral undo-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px; display:none;" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>') +
-                '<button class="btn btn-outline preview-btn" style="padding:2px 8px; font-size:0.55rem; border-radius:12px;" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
+                '<button class="btn btn-primary report-btn unit-action-btn" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-plus-circle"></i></button>' +
+                (info.count > 0 ? '<button class="btn btn-coral undo-btn unit-action-btn is-visible" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>' : '<button class="btn btn-coral undo-btn unit-action-btn is-hidden" data-center="' + center + '" data-unit="' + unit2 + '"><i class="fas fa-undo-alt"></i></button>') +
+                '<button class="btn btn-outline preview-btn unit-action-btn" data-unit="' + unit2 + '" data-location="' + location + '"><i class="fas fa-map-marker-alt"></i></button>' +
                 '</div>' +
                 '</div>';
         }
@@ -2124,6 +2152,11 @@ async function renderAdvancedDistribution() {
         
         sectorDiv.innerHTML = headerHtml + gridHtml;
         container.appendChild(sectorDiv);
+        
+        // عرض شريط النشاط يُضبط برمجيًا (data-w → style.width) ليبقى الماركب المبني بلا style مضمّن
+        sectorDiv.querySelectorAll('.activity-bar-fill[data-w]').forEach(function(el) {
+            el.style.width = el.getAttribute('data-w');
+        });
         
         // ربط الأحداث
         sectorDiv.querySelectorAll('.report-btn').forEach(function(btn) {
@@ -2188,62 +2221,49 @@ var unitLocationAddresses = {
     "سريع 4": "المنصورة، الرياض"
 };
 
-// إحداثيات الفرق حسب المركز [lat, lng]
-var unitLocations = {
-    "جاكسو": {
-        "جنوب 12": [24.6234, 46.7256]
-    },
-    "المنصورة": {
-        "جنوب 2": [24.6789, 46.7123],
-        "جنوب 16": [24.6812, 46.7198],
-        "سريع 4": [24.6756, 46.7089]
-    },
-    "الشيخ زايد": {
-        "جنوب 3": [24.7234, 46.6845],
-        "جنوب 19": [24.7289, 46.6912]
-    },
-    "حي الواحات": {
-        "جنوب 11": [24.7123, 46.7567]
-    },
-    "المناخ": {
-        "جنوب 10": [24.6987, 46.7321]
-    },
-    "المريوطية": {
-        "جنوب 8": [24.6543, 46.6789]
-    },
-    "طرة": {
-        "جنوب 7": [24.6678, 46.7234]
-    },
-    "مطرية": {
-        "جنوب 14": [24.6890, 46.7456]
-    },
-    "البساتين": {
-        "جنوب 5": [24.7345, 46.7234]
-    },
-    "الخليفة": {
-        "جنوب 13": [24.6456, 46.7123]
-    },
-    "الشفاء": {
-        "جنوب 6": [24.7456, 46.6890],
-        "جنوب 17": [24.7512, 46.6945],
-        "سريع 2": [24.7398, 46.6834],
-        "سريع 3": [24.7489, 46.6876]
-    },
-    "عكاظ": {
-        "جنوب 9": [24.6890, 46.7678]
-    },
-    "الدار البيضاء": {
-        "جنوب 4": [24.7567, 46.7123],
-        "جنوب 15": [24.7623, 46.7189]
-    },
-    "طريق الملك فهد": {
-        "جنوب 1": [24.7890, 46.6890],
-        "جنوب 18": [24.7956, 46.6956]
-    },
-    "مستشفى الملك خالد": {
-        "سريع 1": [24.7345, 46.7012]
-    }
+// ============================================================
+// الإحداثيات التشغيلية الفعلية لمراكز قطاع جنوب الرياض — مصدر التموضع
+// الوحيد (بلا أي منطق تشغيلي). كل فرقة ترث موقع مركزها التشغيلي عبر
+// teamCenterMap؛ لا إحداثيات مستقلة للفرق، ولا إحداثيات تجريبية.
+// ============================================================
+var operationalCenters = {
+    "المنصورة":      [24.614143, 46.75111],
+    "الخالدية":      [24.6199444071494, 46.7549224197865],
+    "منفوحه":        [24.6083812713623, 46.7229347229004],
+    "الدار البيضاء": [24.56692, 46.76842],
+    "الإسكان":       [24.560406, 46.84616],
+    "الشفا":         [24.5608158111572, 46.695240020752],
+    "عكاظ":          [24.5301020455377, 46.6545581817627],
+    "ديراب":         [24.44628, 46.617017],
+    "الحائر":        [24.418611, 46.842628]
 };
+
+// Mapping: رمز الفرقة ← مركزها التشغيلي الفعلي
+var teamCenterMap = {
+    "جنوب 1": "المنصورة",      "سريع 4": "المنصورة",
+    "جنوب 2": "الخالدية",      "سريع 3": "الخالدية",
+    "جنوب 3": "منفوحه",
+    "جنوب 4": "الدار البيضاء", "جنوب 5": "الدار البيضاء", "سريع 1": "الدار البيضاء",
+    "جنوب 6": "الإسكان",
+    "جنوب 7": "الحائر",
+    "جنوب 8": "الشفا",         "سريع 2": "الشفا",
+    "جنوب 9": "عكاظ",
+    "جنوب 10": "ديراب"
+};
+
+// توافق للميزات القائمة (معاينة الموقع/أقرب فرقة): يُبنى من الجدولين
+// الفعليين أعلاه — حُذفت الإحداثيات التجريبية القديمة نهائيًا.
+var unitLocations = (function () {
+    var out = {};
+    for (var team in teamCenterMap) {
+        if (!teamCenterMap.hasOwnProperty(team)) continue;
+        var c = teamCenterMap[team];
+        if (!operationalCenters[c]) continue;
+        if (!out[c]) out[c] = {};
+        out[c][team] = operationalCenters[c];
+    }
+    return out;
+})();
 
 var map = null;
 var mapMarkers = [];
@@ -2568,7 +2588,7 @@ async function loadAllData() {
             // Phase 2+3: currentShiftId is server-managed
         }
         updateShiftStatus();
-        document.getElementById("updateStatus").innerHTML = "🟢 متصل | آخر تحديث: " + getSaudiTime();
+        document.getElementById("updateStatus").innerHTML = '<i class="fas fa-circle" style="color:#34D399;font-size:7px;"></i> متصل | آخر تحديث: ' + getSaudiTime();
 
         // Hide skeleton loading screen when data is loaded
         hideSkeleton();
@@ -3265,7 +3285,7 @@ function calculateLiveReportStats() {
             typeEntries.forEach(function(item, index) {
                 var td = REPORT_TYPE_DEFS[item[0]];
                 var percentage = total > 0 ? Math.round((item[1] / total) * 100) : 0;
-                var color = td ? td.color : '#3B82F6';
+                var color = td ? td.color : '#60A5FA';
                 var div = document.createElement('div');
                 div.className = 'distribution-item';
                 div.innerHTML = '<div class="distribution-item-rank rank-other">' + (td ? td.emoji : '📦') + '</div>' +
@@ -3290,7 +3310,7 @@ function calculateLiveReportStats() {
         listContainer.innerHTML = '<div class="distribution-empty"><i class="fas fa-inbox"></i><span>لا توجد بيانات</span></div>';
         return;
     }
-    var colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#64748B', '#EC4899'];
+    var colors = ['#60A5FA', '#10B586', '#F59E0B', '#EF4444', '#C4B5FD', '#67E8F9', '#FCD34D'];
     var grandTotal = total;
     sortedUnits.forEach(function(item, index) {
         var percentage = Math.round((item[1] / grandTotal) * 100);
@@ -3332,6 +3352,10 @@ function updateWorkforceStats() {
         if (data && data.success && data.workforce) {
             workforceStateTeams = data.teams || null;
             updateWorkforceDisplay(data.workforce);
+            lastWorkforce = data.workforce;
+            renderResourcesStrip();
+            renderOperationalFocus();
+            updateOperationalMap();
         } else {
             updateWorkforceStatsFallback();
         }
@@ -3344,7 +3368,12 @@ function updateWorkforceStats() {
 
 function updateWorkforceStatsFallback() {
     // F5b/VA: لا مصدر حقيقي متاح ⇒ الحالة الصادقة «—» (لا افتراضي مختلق إطلاقًا)
+    workforceStateTeams = null;
     updateWorkforceDisplay(null);
+    lastWorkforce = null;
+    renderResourcesStrip();
+    renderOperationalFocus();
+    updateOperationalMap();
 }
 
 // VA: مُنعش موحّد من المصدر الواحد — يحل محل الحساب المحلي المحذوف نهائيًا.
@@ -3354,6 +3383,8 @@ function refreshWorkforceFromServer(shiftId) {
     if (_wfRefreshTimer) clearTimeout(_wfRefreshTimer);
     _wfRefreshTimer = setTimeout(function() {
         _wfRefreshTimer = null;
+        refreshResourcesAux(); // مرافق لتحديث القوى: يجلب الدعم المتاح ومؤشرات المركبات
+        refreshEventsAux();    // مرافق للأحداث: يجلب الخط الزمني والإعلانات
         updateWorkforceStats();
     }, 400);
 }
@@ -3412,6 +3443,237 @@ function updateWorkforceDisplay(wf) {
     var el_wfLastUpdate = document.getElementById('wfLastUpdate'); if (el_wfLastUpdate) el_wfLastUpdate.innerText = getSaudiTime();
 }
 
+// بؤرة التركيز التشغيلي — مركز قرار: تعرض حالات الفرق المشتقة سيرفريًا حرفيًا
+// من مرآة workforceStateTeams (state.teams). كل ملاحظة تجيب سؤالين:
+// «ما الذي يحدث؟» (الحالة السيرفرية) و«ما الإجراء؟» (زر فعل يقود لشاشة التكميل).
+// التصنيف اللوني عرضي بحت: أحمر=إجراء فوري، أصفر=متابعة، أخضر=طبيعي —
+// لا حساب جاهزية محلي إطلاقًا، وترتيب الفرق = ترتيب الخادم نفسه.
+function renderOperationalFocus() {
+    var listEl = document.getElementById('opsFocusList');
+    var summaryEl = document.getElementById('opsFocusSummary');
+    var summaryTxt = document.getElementById('opsFocusSummaryText');
+    var badge = document.getElementById('opsFocusBadge');
+    if (!listEl || !summaryEl || !badge) return;
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    var teams = workforceStateTeams;
+    if (!teams) {
+        // الحالة الصادقة: لا مصدر ⇒ «—» بلا افتراضي مختلق
+        listEl.innerHTML = '';
+        summaryEl.className = 'ops-focus-summary unknown';
+        if (summaryTxt) summaryTxt.textContent = '— بانتظار بيانات الحالة';
+        badge.className = 'ops-focus-badge';
+        badge.textContent = '—';
+        updateSidebarIndicators(null);
+        return;
+    }
+
+    var missing = [], offline = [], pending = [], vehicle = [];
+    for (var name in teams) {
+        if (!teams.hasOwnProperty(name)) continue;
+        var t = teams[name];
+        if (!t) continue;
+        if (t.status === 'missing') missing.push({ name: name, t: t });
+        else if (t.status === 'offline') offline.push({ name: name, t: t });
+        else if (t.status === 'pending') pending.push({ name: name, t: t });
+        if (t.vehicleOk === false) vehicle.push({ name: name, t: t });
+    }
+
+    var critical = missing.length + offline.length + vehicle.length; // إجراء فوري
+    var monitor = pending.length;                                     // متابعة
+    var total = critical + monitor;
+
+    // الملخص التنفيذي — جملة قرار واحدة بثلاث حالات
+    if (total === 0) {
+        summaryEl.className = 'ops-focus-summary green';
+        if (summaryTxt) summaryTxt.textContent = 'لا توجد ملاحظات تشغيلية';
+        badge.className = 'ops-focus-badge stable';
+        badge.textContent = 'مستقر';
+    } else if (critical > 0) {
+        summaryEl.className = 'ops-focus-summary red';
+        if (summaryTxt) {
+            var critText = critical === 1 ? 'ملاحظة حرجة واحدة تتطلب إجراءً فوريًا'
+                         : critical + ' ملاحظات حرجة تتطلب إجراءً فوريًا';
+            if (monitor > 0) critText += ' — و' + monitor + ' للمتابعة';
+            summaryTxt.textContent = critText;
+        }
+        badge.className = 'ops-focus-badge attention';
+        badge.textContent = total + ' يتطلب الانتباه';
+    } else {
+        summaryEl.className = 'ops-focus-summary yellow';
+        if (summaryTxt) summaryTxt.textContent = monitor === 1
+            ? 'عنصر تشغيلي واحد يتطلب المتابعة'
+            : monitor + ' عناصر تشغيلية تتطلب المتابعة';
+        badge.className = 'ops-focus-badge monitor';
+        badge.textContent = total + ' للمتابعة';
+    }
+
+    // مؤشرات الشريط الجانبي الذكي — من نفس تصنيف مركز القرار (لا حساب جديد)
+    updateSidebarIndicators(critical, monitor);
+
+    // كل عنصر = ما الذي يحدث + الإجراء (النقر يفتح شاشة التكميل مباشرة)
+    function group(title, cls, icon, items, actLabel) {
+        if (!items.length) return '';
+        var h = '<div class="ops-focus-group">';
+        h += '<div class="ops-focus-group-title ' + cls + '"><i class="fas ' + icon + '"></i>' + title + '<span class="ops-focus-count">' + items.length + '</span></div>';
+        h += '<div class="ops-focus-items">';
+        for (var i = 0; i < items.length; i++) {
+            h += '<div class="ops-focus-item ' + cls + '" onclick="navigateToPage(\'radio-completion.html?v=41\')" title="الانتقال إلى تكميل المراكز الإسعافية">'
+               + '<span class="ops-focus-item-name">' + esc(items[i].name) + '</span>'
+               + '<span class="ops-focus-item-detail">' + esc(items[i].detail) + '</span>'
+               + '<span class="ops-focus-item-act">' + actLabel + '<i class="fas fa-chevron-left"></i></span></div>';
+        }
+        h += '</div></div>';
+        return h;
+    }
+
+    var html = '';
+    html += group('فرق ناقصة', 'red', 'fa-exclamation-circle', missing.map(function (m) {
+        var d = [];
+        if (m.t.reason) d.push(m.t.reason);
+        if (m.t.vacant > 0) d.push('ينقصها ' + m.t.vacant);
+        return { name: m.name, detail: d.join(' — ') || 'ناقصة' };
+    }), 'التكميل والدعم');
+    html += group('خارج الخدمة', 'red', 'fa-power-off', offline.map(function (m) {
+        return { name: m.name, detail: m.t.reason || 'خارج الخدمة' };
+    }), 'مراجعة السبب');
+    html += group('بانتظار قرار التكميل', 'gold', 'fa-hourglass-half', pending.map(function (m) {
+        return { name: m.name, detail: (m.t.activeCount || 0) + '/' + (m.t.requiredPersonnel || 0) + ' حاضر' };
+    }), 'اتخاذ القرار');
+    html += group('مركبات تحتاج انتباه', 'blue', 'fa-ambulance', vehicle.map(function (m) {
+        return { name: m.name, detail: m.t.vehicleStatus ? 'المركبة: ' + m.t.vehicleStatus : 'حالة المركبة غير جاهزة' };
+    }), 'مراجعة المركبة');
+
+    listEl.innerHTML = html;
+}
+
+// ============================================================
+// الخريطة التشغيلية الذكية — امتداد مركز القرار على الجغرافيا.
+// علامات الفرق من مرآة workforceStateTeams (حالة سيرفرية حرفية)
+// وإحداثيات unitLocations الموجودة. التصنيف اللوني عرضي بحت
+// ومطابق لمركز القرار: أحمر (ناقصة/خارج الخدمة/مركبة غير جاهزة)،
+// أصفر (بانتظار التكميل)، أخضر (جاهزة). لا حساب محلي إطلاقًا.
+// ============================================================
+var opsMap = null;
+var opsMapLayer = null;
+var opsMapFitted = false;
+
+function initOperationalMap() {
+    if (opsMap) return true;
+    var el = document.getElementById('opsMap');
+    if (!el) return false;
+    if (typeof L === 'undefined') {
+        var note0 = document.getElementById('opsMapTileNote');
+        if (note0) { note0.style.display = 'block'; note0.innerHTML = '<i class="fas fa-triangle-exclamation"></i> تعذّر تحميل مكتبة الخرائط'; }
+        return false;
+    }
+    opsMap = L.map('opsMap', { scrollWheelZoom: false, attributionControl: true }).setView([24.7136, 46.6753], 12);
+    // تكبير العجلة يُفعَّل عند النقر فقط — الصفحة تُمرَّر بحرية أثناء المناوبة
+    opsMap.on('click', function () { opsMap.scrollWheelZoom.enable(); });
+    opsMap.on('mouseout', function () { opsMap.scrollWheelZoom.disable(); });
+    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+    tiles.on('tileerror', function () {
+        var note = document.getElementById('opsMapTileNote');
+        if (note) note.style.display = 'block';
+    });
+    tiles.addTo(opsMap);
+    opsMapLayer = L.layerGroup().addTo(opsMap);
+    return true;
+}
+
+function updateOperationalMap() {
+    if (!initOperationalMap() || !opsMapLayer) return;
+    opsMapLayer.clearLayers();
+
+    var teams = workforceStateTeams;
+    if (!teams) return; // الحالة الصادقة: لا بيانات ⇒ خريطة بلا علامات (مركز القرار يعرض «—»)
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // تجميع فرق المناوبة الحالية حسب مركزها التشغيلي (وراثة التموضع)
+    var byCenter = {};
+    for (var unit in teams) {
+        if (!teams.hasOwnProperty(unit)) continue;
+        var c = teamCenterMap[unit];
+        if (!c || !operationalCenters[c]) continue; // بلا مركز معروف (قيادة/تحكم/احتياط) — مغطاة في مركز القرار
+        (byCenter[c] = byCenter[c] || []).push(unit);
+    }
+
+    var bounds = [];
+    for (var center in byCenter) {
+        if (!byCenter.hasOwnProperty(center)) continue;
+        var list = byCenter[center];
+        var base = operationalCenters[center];
+        for (var i = 0; i < list.length; i++) {
+            var unit = list[i];
+            var t = teams[unit];
+            // فرق المركز الواحد تتموضع على حلقة صغيرة (~110م) حول موقع المركز
+            // حتى لا تتكدس العلامات فوق بعضها — تموضع عرضي بحت بلا منطق تشغيلي
+            var loc = base;
+            if (list.length > 1) {
+                var ang = (2 * Math.PI * i) / list.length;
+                loc = [base[0] + 0.0011 * Math.cos(ang), base[1] + 0.0011 * Math.sin(ang)];
+            }
+
+            var sev = (t.status === 'missing' || t.status === 'offline' || t.vehicleOk === false) ? 'red'
+                    : (t.status === 'pending' ? 'yellow' : 'green');
+
+            var statusText, details = [];
+            if (t.status === 'ready') {
+                statusText = 'جاهزة';
+                details.push((t.activeCount || 0) + '/' + (t.requiredPersonnel || 0) + ' حاضر');
+            } else if (t.status === 'missing') {
+                statusText = 'ناقصة';
+                if (t.reason) details.push(t.reason);
+                if (t.vacant > 0) details.push('ينقصها ' + t.vacant);
+            } else if (t.status === 'offline') {
+                statusText = 'خارج الخدمة';
+                if (t.reason) details.push(t.reason);
+            } else {
+                statusText = 'بانتظار قرار التكميل';
+                details.push((t.activeCount || 0) + '/' + (t.requiredPersonnel || 0) + ' حاضر');
+            }
+            if (t.vehicleOk === false) details.push('المركبة: ' + (t.vehicleStatus || 'غير جاهزة'));
+
+            var icon = L.divIcon({
+                className: 'ops-marker ops-marker-' + sev,
+                html: '<span class="ops-marker-dot"></span>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9],
+                popupAnchor: [0, -11]
+            });
+            var popup = '<div class="ops-popup">'
+                + '<div class="ops-popup-head"><span class="ops-popup-dot ' + sev + '"></span><b>' + esc(unit) + '</b></div>'
+                + '<div class="ops-popup-status">' + esc(statusText) + '</div>'
+                + (details.length ? '<div class="ops-popup-detail">' + esc(details.join(' — ')) + '</div>' : '')
+                + '<div class="ops-popup-center"><i class="fas fa-location-dot"></i> ' + esc(center) + '</div>'
+                + '<button class="ops-popup-action" onclick="navigateToPage(\'radio-completion.html?v=41\')">فتح الإجراء <i class="fas fa-chevron-left"></i></button>'
+                + '</div>';
+            L.marker(loc, { icon: icon }).bindPopup(popup, { closeButton: false }).addTo(opsMapLayer);
+            bounds.push(loc);
+        }
+    }
+
+    if (bounds.length && !opsMapFitted) {
+        opsMap.fitBounds(bounds, { padding: [42, 42] });
+        opsMapFitted = true;
+    }
+    setTimeout(function () { if (opsMap) opsMap.invalidateSize(); }, 250);
+}
+
 function animateValue(elementId, value) {
     var el = document.getElementById(elementId);
     if (!el) return;
@@ -3452,13 +3714,16 @@ function updateDistributionIndicator() {
         }
     }
     var el_distTotal = document.getElementById('distTotal'); if (el_distTotal) el_distTotal.innerText = total + ' بلاغ';
+    updateSidebarReportsBadge(total);
+    lastReportsTotal = total;
+    renderEventsStrip();
     var sorted = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     if (sorted.length === 0) {
         container.innerHTML = '<div class="distribution-empty"><i class="fas fa-inbox"></i><span>لا توجد بلاغات مسجلة</span></div>';
         return;
     }
     var html = '';
-    var colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#64748B', '#EC4899'];
+    var colors = ['#60A5FA', '#10B586', '#F59E0B', '#EF4444', '#C4B5FD', '#67E8F9', '#FCD34D'];
     sorted.forEach(function(item, index) {
         var percentage = Math.round((item[1] / total) * 100);
         var color = colors[index % colors.length];
@@ -4096,7 +4361,7 @@ async function viewShiftReports() {
             var el_viewingBadge_d20 = document.getElementById('viewingBadge'); if (el_viewingBadge_d20) el_viewingBadge_d20.style.display = 'inline-block';
             var el_returnToCurrentBtn_d21 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d21) el_returnToCurrentBtn_d21.style.display = 'inline-block';
             var el_viewingBadge_h5 = document.getElementById('viewingBadge'); if (el_viewingBadge_h5) el_viewingBadge_h5.innerHTML = '📂 تستعرض: ' + (result.shift.shiftType || 'مناوبة') + ' - ' + (result.shift.shiftDate || '') + ' (' + totalReports + ' بلاغ)';
-            var el_updateStatus_h6 = document.getElementById('updateStatus'); if (el_updateStatus_h6) el_updateStatus_h6.innerHTML = '🟡 تستعرض مناوبة سابقة | آخر تحديث: ' + getSaudiTime();
+            var el_updateStatus_h6 = document.getElementById('updateStatus'); if (el_updateStatus_h6) el_updateStatus_h6.innerHTML = '<i class="fas fa-circle" style="color:#FBBF24;font-size:7px;"></i> تستعرض مناوبة سابقة | آخر تحديث: ' + getSaudiTime();
             var el_shiftModal_d22 = document.getElementById('shiftModal'); if (el_shiftModal_d22) el_shiftModal_d22.style.display = 'flex';
             // Show archive summary card
             updateArchiveSummaryCard(result.shift, totalReports);
@@ -4117,7 +4382,7 @@ async function returnToCurrentShift() {
     var el_returnToCurrentBtn_d24 = document.getElementById('returnToCurrentBtn'); if (el_returnToCurrentBtn_d24) el_returnToCurrentBtn_d24.style.display = 'none';
     var el_archiveSummaryCard = document.getElementById('archiveSummaryCard'); if (el_archiveSummaryCard) el_archiveSummaryCard.style.display = 'none';
     var el_archiveSelect_v4 = document.getElementById('archiveSelect'); if (el_archiveSelect_v4) el_archiveSelect_v4.value = '';
-    var el_updateStatus_h7 = document.getElementById('updateStatus'); if (el_updateStatus_h7) el_updateStatus_h7.innerHTML = '🟢 متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
+    var el_updateStatus_h7 = document.getElementById('updateStatus'); if (el_updateStatus_h7) el_updateStatus_h7.innerHTML = '<i class="fas fa-circle" style="color:#34D399;font-size:7px;"></i> متصل | تحديث تلقائي مفعل | آخر تحديث: ' + getSaudiTime();
     var el_shiftModal_d25 = document.getElementById('shiftModal'); if (el_shiftModal_d25) el_shiftModal_d25.style.display = 'none';
 }
 
@@ -4772,7 +5037,7 @@ function displayShiftReportStats(reportsData) {
         var percentage = Math.round((item[1] / total) * 100);
         var div = document.createElement('div');
         div.className = 'distribution-bar';
-        div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#1e466e;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#1e466e;"></div></div><span class="percent">' + percentage + '%</span>';
+        div.innerHTML = '<span class="name">' + item[0] + '</span><span class="count" style="color:#F1F5F9;">' + item[1] + '</span><div class="bar-track"><div class="bar-fill" style="width:' + percentage + '%; background:#10B586;"></div></div><span class="percent">' + percentage + '%</span>';
         listContainer.appendChild(div);
     });
 }
@@ -9193,8 +9458,8 @@ function renderHourlyChart() {
             datasets: [{
                 label: 'عدد البلاغات',
                 data: data,
-                backgroundColor: 'rgba(46, 139, 122, 0.7)',
-                borderColor: '#10B981',
+                backgroundColor: 'rgba(16, 181, 134, 0.55)',
+                borderColor: '#10B586',
                 borderWidth: 1,
                 borderRadius: 4
             }]
@@ -9203,11 +9468,12 @@ function renderHourlyChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: { backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }
             },
             scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-                x: { grid: { display: false } }
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#A9BACD' } },
+                x: { grid: { display: false }, ticks: { color: '#A9BACD' } }
             }
         }
     });
@@ -9219,7 +9485,7 @@ function renderCenterChart() {
 
     var centerNames = [];
     var centerData = [];
-    var colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#2980B9', '#8E44AD', '#27AE60', '#D35400', '#16A085', '#C0392B'];
+    var colors = ['#60A5FA', '#10B586', '#F59E0B', '#EF4444', '#C4B5FD', '#67E8F9', '#93C5FD', '#4FBF9A', '#FCD34D', '#FCA5A5'];
 
     for (var center in centersData) {
         centerNames.push(center);
@@ -9242,14 +9508,15 @@ function renderCenterChart() {
                 data: centerData,
                 backgroundColor: colors,
                 borderWidth: 2,
-                borderColor: '#fff'
+                borderColor: '#101B30'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } }
+                legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12, color: '#A9BACD' } },
+                tooltip: { backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }
             }
         }
     });
@@ -9281,7 +9548,7 @@ function renderTopUnitsChart() {
             datasets: [{
                 label: 'البلاغات',
                 data: data,
-                backgroundColor: 'rgba(232, 116, 97, 0.7)',
+                backgroundColor: 'rgba(239, 68, 68, 0.50)',
                 borderColor: '#EF4444',
                 borderWidth: 1,
                 borderRadius: 4
@@ -9291,10 +9558,10 @@ function renderTopUnitsChart() {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: 'y',
-            plugins: { legend: { display: false } },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 } },
             scales: {
-                x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-                y: { grid: { display: false } }
+                x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#A9BACD' } },
+                y: { grid: { display: false }, ticks: { color: '#A9BACD' } }
             }
         }
     });
@@ -9332,7 +9599,7 @@ function renderWeeklyChart() {
                     label: 'إجمالي البلاغات',
                     data: data,
                     borderColor: '#F59E0B',
-                    backgroundColor: 'rgba(232, 200, 74, 0.1)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4,
@@ -9343,10 +9610,10 @@ function renderWeeklyChart() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { legend: { display: false }, tooltip: { backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 } },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#A9BACD' } },
+                    x: { grid: { display: false }, ticks: { color: '#A9BACD' } }
                 }
             }
         });
@@ -9378,10 +9645,10 @@ function renderChartsSummary() {
     }
     
     container.innerHTML = 
-        '<div class="charts-summary-card"><div class="icon" style="background:var(--primary-100);color:var(--primary-700);"><i class="fas fa-chart-bar"></i></div><div class="info"><div class="value">' + total + '</div><div class="label">إجمالي البلاغات</div></div></div>' +
-        '<div class="charts-summary-card"><div class="icon" style="background:var(--gold-50);color:var(--gold);"><i class="fas fa-trophy"></i></div><div class="info"><div class="value">' + topUnit + '</div><div class="label">الأكثر نشاطاً</div></div></div>' +
-        '<div class="charts-summary-card"><div class="icon" style="background:var(--teal-50);color:var(--teal);"><i class="fas fa-hashtag"></i></div><div class="info"><div class="value">' + topCount + '</div><div class="label">بلاغات ' + topUnit + '</div></div></div>' +
-        '<div class="charts-summary-card"><div class="icon" style="background:var(--coral-50);color:var(--coral);"><i class="fas fa-hospital"></i></div><div class="info"><div class="value">' + activeCenters + '</div><div class="label">مراكز نشطة</div></div></div>';
+        '<div class="charts-summary-card"><div class="icon cs-icon-blue"><i class="fas fa-chart-bar"></i></div><div class="info"><div class="value">' + total + '</div><div class="label">إجمالي البلاغات</div></div></div>' +
+        '<div class="charts-summary-card"><div class="icon cs-icon-gold"><i class="fas fa-trophy"></i></div><div class="info"><div class="value">' + topUnit + '</div><div class="label">الأكثر نشاطاً</div></div></div>' +
+        '<div class="charts-summary-card"><div class="icon cs-icon-teal"><i class="fas fa-hashtag"></i></div><div class="info"><div class="value">' + topCount + '</div><div class="label">بلاغات ' + topUnit + '</div></div></div>' +
+        '<div class="charts-summary-card"><div class="icon cs-icon-coral"><i class="fas fa-hospital"></i></div><div class="info"><div class="value">' + activeCenters + '</div><div class="label">مراكز نشطة</div></div></div>';
 }
 
 function exportChartData() {
@@ -10767,3 +11034,287 @@ AuthGate.onStart(function() { loadPeakPlans(); });
 // Update the sidebar button
 var sidebarPeak = document.getElementById('sidebarPeak');
 if (sidebarPeak) sidebarPeak.onclick = function() { toggleSidebar(); openPeakTimeModal(); };
+
+// ============================================================
+// Executive Navigation: تمييز الصفحة الحالية بمؤشر هادئ (active).
+// المطابقة من مسار الصفحة الحالية مقابل أهداف navigateToPage —
+// عرض فقط، بلا أي تغيير في الروابط أو المنطق.
+// ============================================================
+(function markActiveSidebarItem() {
+    var path = (window.location.pathname || '').toLowerCase();
+    var isHome = path.endsWith('/') || path.endsWith('index.html');
+    var items = document.querySelectorAll('.smart-sidebar .sidebar-item');
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var onclick = item.getAttribute('onclick') || '';
+        var m = onclick.match(/navigateToPage\('([^'?]+)/);
+        var target = m ? m[1].toLowerCase() : '';
+        if ((isHome && item.id === 'sidebarHomeItem') || (target && path.endsWith(target))) {
+            item.classList.add('active');
+            item.setAttribute('aria-current', 'page');
+        }
+    }
+})();
+
+
+// ============================================================
+// الشريط الجانبي الذكي — مؤشرات حالة حية على عناصر القائمة.
+// البيانات من نفس تصنيف مركز القرار (renderOperationalFocus)
+// ومن عداد البلاغات القائم — صفر حساب محلي جديد.
+// ============================================================
+function updateSidebarIndicators(critical, monitor) {
+    var sev = (critical == null) ? '' : (critical > 0 ? 'red' : (monitor > 0 ? 'yellow' : 'green'));
+    ['sbStatusCompletion', 'sbStatusOps'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.className = 'sidebar-item-status' + (sev ? ' ' + sev : '');
+    });
+}
+
+function updateSidebarReportsBadge(total) {
+    var el = document.getElementById('sbBadgeReports');
+    if (!el) return;
+    el.textContent = total;
+    el.style.display = (typeof total === 'number' && total > 0) ? '' : 'none';
+}
+
+// مرآة شارة الدردشة القائمة (#chatBadge) إلى عنصر «الرسائل» — عرض فقط
+(function mirrorChatBadge() {
+    var src = document.getElementById('chatBadge');
+    var dst = document.getElementById('sbBadgeChat');
+    if (!src || !dst || typeof MutationObserver === 'undefined') return;
+    function sync() {
+        var n = parseInt(src.textContent, 10) || 0;
+        var visible = src.style.display !== 'none' && n > 0;
+        dst.textContent = src.textContent;
+        dst.style.display = visible ? '' : 'none';
+    }
+    new MutationObserver(sync).observe(src, { childList: true, attributes: true, attributeFilter: ['style'] });
+    sync();
+})();
+
+
+// ============================================================
+// المنطقة 2: شريط الموارد المتاحة — تغطية/دعم/مركبات.
+// كل قيمة من مصدر خادم قائم: كائن workforce (مرآة staffing/state)،
+// /api/staffing/available-support، /api/vehicles/indicators.
+// صفر حساب محلي — تجميع عرض فقط لما اشتقّه الخادم.
+// ============================================================
+var lastWorkforce = null;
+var resourcesSupport = null;   // null = لا مصدر بعد ⇒ الحالة الصادقة «—»
+var resourcesVehicles = null;  // كذلك
+
+function resEsc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function refreshResourcesAux() {
+    if (!AuthManager.isLoggedIn()) {
+        resourcesSupport = null;
+        resourcesVehicles = null;
+        renderResourcesStrip();
+        return;
+    }
+    var qs = currentShiftId ? '?shift_id=' + encodeURIComponent(currentShiftId) : '';
+    AuthManager.apiRequest('/api/staffing/available-support' + qs)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { resourcesSupport = (d && d.success && Array.isArray(d.supporters)) ? d.supporters : null; })
+        .catch(function() { resourcesSupport = null; })
+        .then(function() { renderResourcesStrip(); });
+    AuthManager.apiRequest('/api/vehicles/indicators' + qs)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { resourcesVehicles = (d && d.success && d.vehiclesByStatus) ? d.vehiclesByStatus : null; })
+        .catch(function() { resourcesVehicles = null; })
+        .then(function() { renderResourcesStrip(); });
+}
+
+function renderResourcesStrip() {
+    var covEl = document.getElementById('resCoverageValue');
+    var supEl = document.getElementById('resSupportValue');
+    var vehEl = document.getElementById('resVehiclesValue');
+    if (!covEl && !supEl && !vehEl) return;
+
+    // ① التغطية — readyTeams/requiredTeams كما اشتقّها الخادم حرفيًا
+    if (covEl) {
+        if (!lastWorkforce || lastWorkforce.requiredTeams == null) {
+            covEl.textContent = '—';
+            covEl.className = 'ops-resources-value';
+        } else {
+            var ready = lastWorkforce.readyTeams || 0;
+            var req = lastWorkforce.requiredTeams || 0;
+            covEl.textContent = ready + ' من ' + req + ' جاهزة';
+            covEl.className = 'ops-resources-value' + (req > 0 ? (ready >= req ? ' ok' : ' warn') : '');
+        }
+    }
+
+    // ② الدعم المتاح — قائمة الخادم كما هي (عدّ عرض فقط)
+    if (supEl) {
+        if (!resourcesSupport) {
+            supEl.textContent = '—';
+            supEl.className = 'ops-resources-value';
+        } else {
+            supEl.textContent = resourcesSupport.length === 0 ? 'لا دعم متاح' : resourcesSupport.length + ' متاح';
+            supEl.className = 'ops-resources-value' + (resourcesSupport.length > 0 ? ' ok' : '');
+        }
+        renderResourcesSupportList();
+    }
+
+    // ③ المركبات — vehiclesByStatus المشتقة سيرفريًا من operational_events
+    if (vehEl) {
+        if (!resourcesVehicles) {
+            vehEl.textContent = '—';
+            vehEl.className = 'ops-resources-value';
+        } else {
+            var vs = resourcesVehicles;
+            var active = vs.active || 0;
+            var stopped = (vs.breakdown || 0) + (vs.out_of_service || 0);
+            var reserve = vs.reserve || 0;
+            var parts = [];
+            if (active > 0 || stopped === 0) parts.push(active + ' عاملة');
+            if (stopped > 0) parts.push(stopped + ' متوقفة');
+            if (reserve > 0) parts.push(reserve + ' احتياط');
+            if (!parts.length) parts.push('لا مركبات');
+            vehEl.textContent = parts.join(' · ');
+            vehEl.className = 'ops-resources-value' + (stopped > 0 ? ' warn' : (active > 0 ? ' ok' : ''));
+        }
+    }
+}
+
+var resourcesSupportListOpen = false;
+function toggleResourcesSupportList() {
+    resourcesSupportListOpen = !resourcesSupportListOpen;
+    renderResourcesSupportList();
+}
+
+function renderResourcesSupportList() {
+    var list = document.getElementById('resSupportList');
+    var caret = document.getElementById('resSupportCaret');
+    if (!list) return;
+    if (caret) caret.classList.toggle('open', resourcesSupportListOpen);
+    if (!resourcesSupportListOpen) { list.style.display = 'none'; return; }
+    list.style.display = '';
+    if (!resourcesSupport) {
+        list.innerHTML = '<div class="ops-resources-support-empty">— بانتظار بيانات الدعم</div>';
+        return;
+    }
+    if (resourcesSupport.length === 0) {
+        list.innerHTML = '<div class="ops-resources-support-empty">لا توجد قوى متاحة للدعم حاليًا</div>';
+        return;
+    }
+    var h = '';
+    for (var i = 0; i < resourcesSupport.length; i++) {
+        var s = resourcesSupport[i];
+        var meta = [];
+        if (s.jobTitle) meta.push(s.jobTitle);
+        if (s.employeeCode) meta.push(s.employeeCode);
+        if (s.sourceUnit) meta.push(s.sourceUnit);
+        h += '<div class="ops-resources-supporter">'
+           + '<span class="sup-name">' + resEsc(s.name) + '</span>'
+           + '<span class="sup-meta">' + resEsc(meta.join(' · ')) + '</span>'
+           + '</div>';
+    }
+    h += '<button class="ops-resources-support-cta" onclick="navigateToPage(\'radio-completion.html?v=41\')"><i class="fas fa-clipboard-list"></i> فتح التكميل لتنفيذ الدعم</button>';
+    list.innerHTML = h;
+}
+
+
+// ============================================================
+// المنطقة 3: شريط الأحداث النشطة — بلاغات/آخر حدث/إعلانات.
+// البلاغات: نفس إجمالي توزيع البلاغات (distTotal) المعتمد.
+// الخط الزمني والإعلانات: /api/timeline و/api/announcements
+// (نفس مصدرَي «غرفة العمليات الذكية»). صفر حساب محلي —
+// اختيار/عدّ عرض فقط، و«—» الصادقة عند غياب المصدر.
+// ============================================================
+var lastReportsTotal = null;
+var eventsTimeline = null;
+var eventsAnnouncements = null;
+
+function refreshEventsAux() {
+    if (!AuthManager.isLoggedIn()) {
+        eventsTimeline = null;
+        eventsAnnouncements = null;
+        renderEventsStrip();
+        return;
+    }
+    AuthManager.apiRequest('/api/timeline')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { eventsTimeline = (d && d.success && Array.isArray(d.data)) ? d.data : null; })
+        .catch(function() { eventsTimeline = null; })
+        .then(function() { renderEventsStrip(); });
+    AuthManager.apiRequest('/api/announcements')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { eventsAnnouncements = (d && d.success && Array.isArray(d.data)) ? d.data : null; })
+        .catch(function() { eventsAnnouncements = null; })
+        .then(function() { renderEventsStrip(); });
+}
+
+function latestTimelineEvent(list) {
+    // اختيار عرض فقط: الأحدث بتاريخ/وقت الخادم؛ آخر عنصر عند غياب التواريخ
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (!e || !e.title) continue;
+        if (!best) { best = e; continue; }
+        var ke = String(e.date || '') + ' ' + String(e.time || '');
+        var kb = String(best.date || '') + ' ' + String(best.time || '');
+        if (ke >= kb) best = e;
+    }
+    return best || (list.length ? list[list.length - 1] : null);
+}
+
+function renderEventsStrip() {
+    var repEl = document.getElementById('evReportsValue');
+    var tlEl = document.getElementById('evTimelineValue');
+    var anEl = document.getElementById('evAnnounceValue');
+    if (!repEl && !tlEl && !anEl) return;
+
+    // ① البلاغات — مرآة إجمالي التوزيع القائم
+    if (repEl) {
+        if (lastReportsTotal == null) {
+            repEl.textContent = '—';
+            repEl.className = 'ops-events-value';
+        } else if (lastReportsTotal === 0) {
+            repEl.textContent = 'لا بلاغات';
+            repEl.className = 'ops-events-value';
+        } else {
+            repEl.textContent = lastReportsTotal + ' بلاغ';
+            repEl.className = 'ops-events-value ok';
+        }
+    }
+
+    // ② آخر حدث — من الخط الزمني
+    if (tlEl) {
+        if (!eventsTimeline) {
+            tlEl.textContent = '—';
+            tlEl.className = 'ops-events-value ops-events-value-wide';
+        } else {
+            var ev = latestTimelineEvent(eventsTimeline);
+            if (!ev) {
+                tlEl.textContent = 'لا أحداث';
+                tlEl.className = 'ops-events-value ops-events-value-wide';
+            } else {
+                tlEl.textContent = ev.title + (ev.date ? ' · ' + ev.date : '');
+                tlEl.className = 'ops-events-value ops-events-value-wide';
+            }
+        }
+    }
+
+    // ③ الإعلانات — العدد + وسم العاجل إن وُجد
+    if (anEl) {
+        if (!eventsAnnouncements) {
+            anEl.textContent = '—';
+            anEl.className = 'ops-events-value';
+        } else if (eventsAnnouncements.length === 0) {
+            anEl.textContent = 'لا إعلانات';
+            anEl.className = 'ops-events-value';
+        } else {
+            var urgent = 0;
+            for (var i = 0; i < eventsAnnouncements.length; i++) {
+                if (eventsAnnouncements[i] && eventsAnnouncements[i].priority === 'urgent') urgent++;
+            }
+            anEl.textContent = eventsAnnouncements.length + ' إعلان' + (urgent ? ' · ' + urgent + ' عاجل' : '');
+            anEl.className = 'ops-events-value' + (urgent ? ' warn' : '');
+        }
+    }
+}

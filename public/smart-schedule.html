@@ -15,8 +15,8 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/a11y.css?v=1">
-    <!-- Google Fonts: Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Google Fonts: IBM Plex Sans Arabic + Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS for Excel -->
@@ -33,19 +33,21 @@
            CSS Variables & Base Styles
            ========================================== */
         :root {
-            --bg: #F8FAFC;
-            --bg-card: #FFFFFF;
-            --bg-glass: #F8FAFC;
-            --border: #E2E8F0;
-            --primary: #2563EB;
+            /* الهوية التنفيذية الداكنة الموحدة — نفس أسماء الرموز */
+            --bg: #0A1220;
+            --bg-card: rgba(255,255,255,0.035);
+            --bg-glass: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.08);
+            --border-soft: rgba(255,255,255,0.06);
+            --primary: #60A5FA;
             --success: #10B981;
             --warning: #F59E0B;
             --danger: #EF4444;
             --purple: #8B5CF6;
-            --text: #1E293B;
-            --text-muted: #64748B;
-            --font: 'Inter', sans-serif;
-            --shadow: 0 1px 3px rgba(148, 163, 184, 0.08), 0 4px 12px rgba(148, 163, 184, 0.12);
+            --text: #F1F5F9;
+            --text-muted: #A9BACD;
+            --font: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+            --shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
         }
 
         * {
@@ -56,17 +58,54 @@
 
         body {
             font-family: var(--font);
-            background: var(--bg);
+            background:
+                radial-gradient(1100px 620px at 85% -10%, rgba(14,164,122,0.10), transparent 60%),
+                radial-gradient(900px 540px at 8% -5%, rgba(96,165,250,0.08), transparent 55%),
+                var(--bg);
+            background-attachment: fixed;
             color: var(--text);
             min-height: 100vh;
             overflow-x: hidden;
         }
 
+        /* طبقة الهوية: شبكة مقنّعة + توهج سفلي خافت */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(1200px 500px at 50% 110%, rgba(14,164,122,0.05), transparent 65%);
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #F1F5F9; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+        /* تركيز لوحة المفاتيح + تحديد النص */
+        :focus-visible {
+            outline: 2px solid rgba(14,164,122,0.50);
+            outline-offset: 2px;
+        }
+        ::selection {
+            background: rgba(14,164,122,0.28);
+            color: #F1F5F9;
+        }
 
         /* ==========================================
            الشريط العلوي - Top Bar
@@ -75,15 +114,14 @@
             position: sticky;
             top: 0;
             z-index: 1000;
-            background: #FFFFFF;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background: rgba(11,18,32,0.82);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
             border-bottom: 1px solid var(--border);
             padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: var(--shadow);
         }
 
         .logo {
@@ -92,10 +130,10 @@
             gap: 12px;
             font-size: 1.3rem;
             font-weight: 700;
-            color: var(--primary);
+            color: var(--text);
         }
 
-        .logo i { font-size: 1.5rem; }
+        .logo i { font-size: 1.5rem; color: var(--primary); }
 
         .top-bar-center {
             display: flex;
@@ -107,11 +145,11 @@
             font-family: 'Courier New', monospace;
             font-size: 1.1rem;
             font-weight: 600;
-            color: var(--success);
-            background: #ECFDF5;
+            color: #6EE7B7;
+            background: rgba(16,185,129,0.12);
             padding: 6px 16px;
             border-radius: 8px;
-            border: 1px solid #A7F3D0;
+            border: 1px solid rgba(16,185,129,0.25);
         }
 
         .top-bar-actions {
@@ -123,7 +161,7 @@
             padding: 8px 18px;
             border-radius: 8px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: var(--bg-card);
             color: var(--text);
             font-family: var(--font);
             font-size: 0.9rem;
@@ -135,20 +173,20 @@
         }
 
         .btn:hover {
-            background: #F8FAFC;
-            border-color: var(--primary);
+            background: rgba(255,255,255,0.09);
+            border-color: rgba(255,255,255,0.16);
             transform: translateY(-1px);
         }
 
         .btn-primary {
-            background: var(--primary);
+            background: #0EA47A;
             border: none;
             color: #fff;
             font-weight: 600;
         }
 
         .btn-primary:hover {
-            background: #1D4ED8;
+            background: #0B8C66;
         }
 
         .btn-coral { background: var(--danger); border: none; color: #fff; }
@@ -183,7 +221,7 @@
         }
 
         .section:hover {
-            border-color: #CBD5E1;
+            border-color: rgba(255,255,255,0.14);
         }
 
         .section-title {
@@ -212,7 +250,7 @@
         }
         .import-bar:hover, .import-bar.dragover {
             border-color: var(--primary);
-            background: #EFF6FF;
+            background: rgba(96,165,250,0.10);
         }
         .import-bar input[type="file"] {
             position: absolute;
@@ -226,7 +264,7 @@
         .import-bar .icon { font-size: 1.4rem; color: var(--primary); flex-shrink: 0; }
         .import-bar .text { font-size: 0.9rem; color: var(--text); flex: 1; }
         .import-bar .hint { font-size: 0.75rem; color: var(--text-muted); }
-        .import-bar .btn-import { background: var(--primary); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; flex-shrink: 0; pointer-events: none; }
+        .import-bar .btn-import { background: #0EA47A; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; flex-shrink: 0; pointer-events: none; }
 
 
         /* ==========================================
@@ -247,7 +285,7 @@
         .drop-zone:hover, .drop-zone.dragover {
             border-color: var(--primary);
             transform: scale(1.01);
-            background: #EFF6FF;
+            background: rgba(96,165,250,0.10);
         }
 
         .drop-zone input[type="file"] {
@@ -286,7 +324,7 @@
 
         .progress-bar {
             height: 8px;
-            background: #E2E8F0;
+            background: rgba(255,255,255,0.10);
             border-radius: 4px;
             overflow: hidden;
             margin-top: 8px;
@@ -326,7 +364,7 @@
 
         .saved-file-item:hover {
             border-color: var(--primary);
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.06);
         }
 
         .saved-file-info {
@@ -348,7 +386,7 @@
             height: 30px;
             border-radius: 6px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: var(--bg-card);
             color: var(--text);
             cursor: pointer;
             display: inline-flex;
@@ -359,9 +397,9 @@
         }
 
         .btn-icon:hover {
-            background: var(--primary);
+            background: #0EA47A;
             color: #fff;
-            border-color: var(--primary);
+            border-color: #0EA47A;
         }
 
         .btn-icon.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
@@ -417,7 +455,7 @@
             padding: 14px 18px 14px 50px;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: rgba(255,255,255,0.04);
             color: var(--text);
             font-family: var(--font);
             font-size: 1rem;
@@ -426,8 +464,8 @@
 
         .search-bar input:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: #10B586;
+            box-shadow: 0 0 0 3px rgba(14,164,122,0.12);
         }
 
         .search-bar input::placeholder { color: var(--text-muted); }
@@ -466,7 +504,7 @@
         }
 
         .search-result-item:hover {
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.06);
         }
 
         .search-result-item:last-child { border-bottom: none; }
@@ -475,7 +513,7 @@
             width: 36px;
             height: 36px;
             border-radius: 8px;
-            background: #EFF6FF;
+            background: rgba(96,165,250,0.14);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -503,7 +541,7 @@
             padding: 10px 20px;
             border-radius: 10px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: var(--bg-card);
             color: var(--text-muted);
             font-family: var(--font);
             font-size: 0.9rem;
@@ -518,15 +556,15 @@
         }
 
         .view-btn:hover {
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.09);
             color: var(--text);
-            border-color: #CBD5E1;
+            border-color: rgba(255,255,255,0.16);
         }
 
         .view-btn.active {
-            background: var(--primary);
+            background: #0EA47A;
             color: #fff;
-            border-color: var(--primary);
+            border-color: #0EA47A;
         }
 
         /* ==========================================
@@ -538,7 +576,7 @@
             flex-wrap: wrap;
             margin-bottom: 20px;
             padding: 16px;
-            background: #F8FAFC;
+            background: var(--bg-glass);
             border-radius: 12px;
             border: 1px solid var(--border);
         }
@@ -561,7 +599,7 @@
             padding: 10px 12px;
             border-radius: 8px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: rgba(255,255,255,0.04);
             color: var(--text);
             font-family: var(--font);
             font-size: 0.85rem;
@@ -571,7 +609,13 @@
 
         .filter-group select:focus, .filter-group input:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: #10B586;
+            box-shadow: 0 0 0 3px rgba(14,164,122,0.12);
+        }
+
+        .filter-group select option {
+            background: #101B30;
+            color: #F1F5F9;
         }
 
         /* ==========================================
@@ -590,8 +634,8 @@
         }
 
         .data-table thead th {
-            background: #F8FAFC;
-            color: var(--text);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-muted);
             font-weight: 600;
             padding: 14px 16px;
             text-align: right;
@@ -603,7 +647,7 @@
 
         .data-table tbody td {
             padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-soft);
             color: var(--text);
         }
 
@@ -612,12 +656,12 @@
         }
 
         .data-table tbody tr:hover {
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
         }
 
         .data-table tbody tr:last-child td { border-bottom: none; }
 
-        /* شارات الحالة - Status Badges */
+        /* شارات الحالة - Status Badges (هوية دلالية محفوظة) */
         .badge {
             padding: 4px 12px;
             border-radius: 20px;
@@ -626,13 +670,13 @@
             display: inline-block;
         }
 
-        .badge-shift-morning { background: #DBEAFE; color: #2563EB; }
-        .badge-shift-evening { background: #E9D5FF; color: #7C3AED; }
-        .badge-shift-night { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
-        .badge-status-work { background: #D1FAE5; color: #059669; }
-        .badge-status-off { background: #FEE2E2; color: #DC2626; }
-        .badge-status-leave { background: #FEF3C7; color: #D97706; }
-        .badge-status-rest { background: #F1F5F9; color: #64748B; }
+        .badge-shift-morning { background: rgba(96,165,250,0.14); color: #93C5FD; }
+        .badge-shift-evening { background: rgba(167,139,250,0.16); color: #C4B5FD; }
+        .badge-shift-night { background: rgba(255,255,255,0.06); color: #A9BACD; border: 1px solid var(--border); }
+        .badge-status-work { background: rgba(16,185,129,0.14); color: #6EE7B7; }
+        .badge-status-off { background: rgba(239,68,68,0.14); color: #FCA5A5; }
+        .badge-status-leave { background: rgba(245,158,11,0.14); color: #FCD34D; }
+        .badge-status-rest { background: rgba(255,255,255,0.06); color: #A9BACD; }
 
         /* ==========================================
            بطاقات الإحصائيات - Stats Cards
@@ -645,7 +689,7 @@
         }
 
         .stat-card {
-            background: #FFFFFF;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 14px;
             padding: 20px;
@@ -656,9 +700,9 @@
         }
 
         .stat-card:hover {
-            border-color: #CBD5E1;
+            border-color: rgba(255,255,255,0.14);
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(148, 163, 184, 0.15);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.32);
         }
 
         .stat-icon {
@@ -672,10 +716,10 @@
             margin-bottom: 12px;
         }
 
-        .stat-icon.blue { background: #DBEAFE; color: #2563EB; }
-        .stat-icon.green { background: #D1FAE5; color: #059669; }
-        .stat-icon.gold { background: #FEF3C7; color: #D97706; }
-        .stat-icon.coral { background: #FEE2E2; color: #DC2626; }
+        .stat-icon.blue { background: rgba(96,165,250,0.14); color: #93C5FD; }
+        .stat-icon.green { background: rgba(16,185,129,0.14); color: #6EE7B7; }
+        .stat-icon.gold { background: rgba(245,158,11,0.14); color: #FCD34D; }
+        .stat-icon.coral { background: rgba(239,68,68,0.14); color: #FCA5A5; }
 
         .stat-value {
             font-size: 1.8rem;
@@ -718,14 +762,14 @@
             font-weight: 700;
             color: var(--text);
             font-size: 0.85rem;
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
             border-radius: 8px;
-            border: 1px solid #E2E8F0;
+            border: 1px solid var(--border);
         }
 
         .calendar-day {
             min-height: 90px;
-            background: #FFFFFF;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 10px;
             padding: 8px;
@@ -736,7 +780,7 @@
 
         .calendar-day:hover {
             border-color: var(--primary);
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.06);
         }
 
         .calendar-day-number {
@@ -751,7 +795,7 @@
 
         .calendar-day.today {
             border-color: var(--primary);
-            background: #EFF6FF;
+            background: rgba(96,165,250,0.10);
         }
 
         .calendar-shift-count {
@@ -773,9 +817,9 @@
             display: inline-block;
         }
 
-        .dot-morning { background: #2563EB; }
-        .dot-evening { background: #7C3AED; }
-        .dot-night { background: #64748B; }
+        .dot-morning { background: #60A5FA; }
+        .dot-evening { background: #A78BFA; }
+        .dot-night { background: #7C8DA6; }
         .dot-off { background: #EF4444; }
 
         /* ==========================================
@@ -788,14 +832,14 @@
         }
 
         .weekly-day-col {
-            background: #FFFFFF;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
         }
 
         .weekly-day-header {
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
             padding: 10px;
             text-align: center;
             font-weight: 700;
@@ -811,7 +855,8 @@
 
         .weekly-employee-item {
             padding: 6px 8px;
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-soft);
             border-radius: 6px;
             margin-bottom: 6px;
             font-size: 0.8rem;
@@ -836,7 +881,9 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(4,8,16,0.66);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 2000;
             display: flex;
             align-items: center;
@@ -853,7 +900,7 @@
         }
 
         .modal-content {
-            background: var(--bg-card);
+            background: #101B30;
             border: 1px solid var(--border);
             border-radius: 16px;
             width: 100%;
@@ -877,7 +924,7 @@
             justify-content: space-between;
             padding: 16px 20px;
             border-bottom: 1px solid var(--border);
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
         }
 
         .modal-title {
@@ -903,7 +950,7 @@
             height: 36px;
             border-radius: 8px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: var(--bg-card);
             color: var(--text);
             cursor: pointer;
             display: flex;
@@ -944,15 +991,16 @@
         .toast {
             padding: 14px 20px;
             border-radius: 10px;
-            background: #FFFFFF;
+            background: #101B30;
             border: 1px solid var(--border);
+            border-right: 3px solid var(--border);
             color: var(--text);
             font-size: 0.9rem;
             display: flex;
             align-items: center;
             gap: 10px;
             animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
-            box-shadow: var(--shadow);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.40);
         }
 
         @keyframes toastIn {
@@ -965,9 +1013,9 @@
             to { opacity: 0; transform: translateX(-20px); }
         }
 
-        .toast.success { border-color: var(--success); }
-        .toast.error { border-color: var(--danger); }
-        .toast.info { border-color: var(--primary); }
+        .toast.success { border-right-color: var(--success); }
+        .toast.error { border-right-color: var(--danger); }
+        .toast.info { border-right-color: var(--primary); }
 
         /* ==========================================
            Responsive
@@ -1029,7 +1077,7 @@
             height: 36px;
             border-radius: 8px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: var(--bg-card);
             color: var(--text);
             cursor: pointer;
             display: flex;
@@ -1039,9 +1087,9 @@
         }
 
         .month-nav-btn:hover {
-            background: var(--primary);
+            background: #0EA47A;
             color: #fff;
-            border-color: var(--primary);
+            border-color: #0EA47A;
         }
 
         .month-nav-title {
@@ -1059,7 +1107,7 @@
             overflow-x: auto;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: #FFFFFF;
+            background: #0B1424;
             max-height: 75vh;
             overflow-y: auto;
         }
@@ -1074,7 +1122,8 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: #F8FAFC;
+            background: #101B30;
+            color: var(--text-muted);
             font-weight: 700;
             font-size: 0.8rem;
             padding: 10px 6px;
@@ -1091,7 +1140,8 @@
             position: sticky;
             right: 0;
             z-index: 11;
-            background: #F8FAFC;
+            background: #101B30;
+            color: var(--text);
             border-left: 2px solid var(--border);
             min-width: 180px;
         }
@@ -1100,8 +1150,8 @@
             padding: 8px 6px;
             text-align: center;
             font-size: 0.8rem;
-            border-bottom: 1px solid var(--border);
-            border-left: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-soft);
+            border-left: 1px solid var(--border-soft);
             white-space: nowrap;
             display: flex;
             align-items: center;
@@ -1113,7 +1163,7 @@
             position: sticky;
             right: 0;
             z-index: 9;
-            background: #FFFFFF;
+            background: #101B30;
             border-left: 2px solid var(--border);
             font-weight: 600;
             text-align: right;
@@ -1123,14 +1173,14 @@
         }
 
         .classic-grid-cell:hover {
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.05);
         }
 
         .classic-grid-row:nth-child(even) .classic-grid-cell {
-            background: #FAFBFC;
+            background: rgba(255,255,255,0.02);
         }
         .classic-grid-row:nth-child(even) .classic-grid-cell:first-child {
-            background: #FAFBFC;
+            background: #172236;
         }
 
         /* Inline editing styles */
@@ -1139,12 +1189,12 @@
             position: relative;
         }
         .classic-grid-cell.editable:hover {
-            background: #E0F2FE !important;
+            background: rgba(56,189,248,0.12) !important;
             border: 2px dashed var(--primary);
         }
         .classic-grid-cell.editing {
             padding: 0 !important;
-            background: #FFFFFF !important;
+            background: #101B30 !important;
         }
         .classic-grid-cell .inline-select {
             width: 100%;
@@ -1155,17 +1205,19 @@
             padding: 4px 8px;
             font-size: 0.8rem;
             font-family: var(--font);
-            background: #FFFFFF;
+            background: #131E38;
             color: var(--text);
             outline: none;
             cursor: pointer;
         }
         .classic-grid-cell .inline-select:focus {
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            box-shadow: 0 0 0 3px rgba(96,165,250,0.18);
         }
         .classic-grid-cell .inline-select option {
             padding: 6px;
             font-size: 0.85rem;
+            background: #101B30;
+            color: #F1F5F9;
         }
         .classic-edit-hint {
             font-size: 0.8rem;
@@ -1173,7 +1225,8 @@
             margin-top: 12px;
             text-align: center;
             padding: 8px;
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-soft);
             border-radius: 8px;
         }
         .classic-edit-hint i {
@@ -1186,27 +1239,27 @@
         }
 
         /* Shift colors for classic view */
-            background: #FAFBFC;
+            background: rgba(255,255,255,0.02);
         }
         .classic-grid-row:nth-child(even) .classic-grid-cell:first-child {
-            background: #FAFBFC;
+            background: #172236;
         }
 
-        /* Shift colors for classic view */
-        .classic-shift-D { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; } /* Day shift */
-        .classic-shift-D12 { background: #DBEAFE !important; color: #1E40AF; font-weight: 600; }
-        .classic-shift-N { background: #E9D5FF !important; color: #6B21A8; font-weight: 600; } /* Night shift */
-        .classic-shift-N12 { background: #E9D5FF !important; color: #6B21A8; font-weight: 600; }
-        .classic-shift-WO { background: #D1FAE5 !important; color: #065F46; font-weight: 600; } /* Official */
-        .classic-shift-ME { background: #FEF3C7 !important; color: #92400E; font-weight: 600; } /* Mission */
-        .classic-shift-V { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Vacation */
-        .classic-shift-VC { background: #FEE2E2 !important; color: #991B1B; font-weight: 600; } /* Compensatory */
-        .classic-shift-O12 { background: #E0F2FE !important; color: #0C4A6E; font-weight: 600; } /* Overlap */
-        .classic-shift-OvN { background: #E0E7FF !important; color: #3730A3; font-weight: 600; } /* أوفرلاب ليلي */
-        .classic-shift-OvD { background: #E0F2FE !important; color: #0C4A6E; font-weight: 600; } /* أوفرلاب نهاري */
-        .classic-shift-M { background: #F3E8FF !important; color: #6B21A8; font-weight: 600; } /* Morning */
-        .classic-shift-C { background: #FFEDD5 !important; color: #9A3412; font-weight: 600; } /* Training */
-        .classic-shift-R { background: #F1F5F9 !important; color: #475569; font-weight: 600; } /* Rest */
+        /* Shift colors for classic view — هوية دلالية محفوظة على الداكن */
+        .classic-shift-D { background: rgba(96,165,250,0.16) !important; color: #93C5FD; font-weight: 600; } /* Day shift */
+        .classic-shift-D12 { background: rgba(96,165,250,0.16) !important; color: #93C5FD; font-weight: 600; }
+        .classic-shift-N { background: rgba(167,139,250,0.16) !important; color: #C4B5FD; font-weight: 600; } /* Night shift */
+        .classic-shift-N12 { background: rgba(167,139,250,0.16) !important; color: #C4B5FD; font-weight: 600; }
+        .classic-shift-WO { background: rgba(16,185,129,0.16) !important; color: #6EE7B7; font-weight: 600; } /* Official */
+        .classic-shift-ME { background: rgba(245,158,11,0.16) !important; color: #FCD34D; font-weight: 600; } /* Mission */
+        .classic-shift-V { background: rgba(239,68,68,0.16) !important; color: #FCA5A5; font-weight: 600; } /* Vacation */
+        .classic-shift-VC { background: rgba(239,68,68,0.16) !important; color: #FCA5A5; font-weight: 600; } /* Compensatory */
+        .classic-shift-O12 { background: rgba(56,189,248,0.16) !important; color: #7DD3FC; font-weight: 600; } /* Overlap */
+        .classic-shift-OvN { background: rgba(129,140,248,0.16) !important; color: #A5B4FC; font-weight: 600; } /* أوفرلاب ليلي */
+        .classic-shift-OvD { background: rgba(56,189,248,0.16) !important; color: #7DD3FC; font-weight: 600; } /* أوفرلاب نهاري */
+        .classic-shift-M { background: rgba(192,132,252,0.16) !important; color: #D8B4FE; font-weight: 600; } /* Morning */
+        .classic-shift-C { background: rgba(251,146,60,0.16) !important; color: #FDBA74; font-weight: 600; } /* Training */
+        .classic-shift-R { background: rgba(255,255,255,0.06) !important; color: #A9BACD; font-weight: 600; } /* Rest */
 
         .classic-legend {
             display: flex;
@@ -1214,7 +1267,7 @@
             gap: 12px;
             margin-top: 16px;
             padding: 12px;
-            background: #F8FAFC;
+            background: rgba(255,255,255,0.03);
             border-radius: 10px;
             border: 1px solid var(--border);
         }
@@ -1312,6 +1365,63 @@
             100% { background-position: -200% 0; }
         }
 
+        /* ==========================================
+           لوحة المؤشرات التنفيذية (وثيقة «تحسين لوحة مؤشرات نظام الجداول»)
+           بصري فقط — هرمية صفّين + شارة تغطية + بطاقة غير المجدولين
+           ========================================== */
+        .stats-grid-primary { grid-template-columns: repeat(4, 1fr); margin-bottom: 14px; }
+        .stats-grid-secondary { grid-template-columns: repeat(4, 1fr); margin-bottom: 18px; }
+
+        /* الصف الأول — المؤشرات الرئيسية: أكبر وأبرز (أيقونة جانبية + رقم ينجذب إليه النظر) */
+        .stat-card-primary { display: flex; align-items: center; gap: 16px; padding: 22px; }
+        .stat-card-primary .stat-icon { width: 52px; height: 52px; font-size: 1.5rem; margin-bottom: 0; flex-shrink: 0; }
+        .stat-card-primary .stat-body { flex: 1; min-width: 0; }
+        .stat-card-primary .stat-value { font-size: 2.3rem; line-height: 1.1; margin-bottom: 3px; }
+        .stat-card-primary .stat-label { font-size: 0.92rem; color: var(--text); font-weight: 600; }
+
+        /* الصف الثاني — المؤشرات الثانوية: أصغر وأهدأ */
+        .stat-card-secondary { padding: 14px 16px; }
+        .stat-card-secondary .stat-icon { width: 36px; height: 36px; font-size: 1rem; margin-bottom: 8px; border-radius: 10px; }
+        .stat-card-secondary .stat-value { font-size: 1.4rem; margin-bottom: 2px; }
+        .stat-card-secondary .stat-label { font-size: 0.78rem; }
+
+        .stat-desc { font-size: 0.72rem; color: var(--text-muted); opacity: 0.85; margin-top: 3px; }
+
+        /* شارة جودة التغطية — عتبات عرض موثقة (≥80 ممتازة / 60–79 متابعة / <60 منخفضة)، قابلة للضبط */
+        .stat-value-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .stat-badge { font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+        .stat-badge.good { background: rgba(16,185,129,0.14); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.35); }
+        .stat-badge.watch { background: rgba(245,158,11,0.14); color: #FCD34D; border: 1px solid rgba(245,158,11,0.35); }
+        .stat-badge.low { background: rgba(239,68,68,0.14); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.35); }
+
+        /* بطاقة تنبيه «غير المجدولين» — مؤشر تشغيلي مستقل بدل السطر الأصفر الصغير */
+        .stats-alerts { margin: -4px 0 20px; display: flex; flex-direction: column; gap: 10px; }
+        .unscheduled-card { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.30); border-radius: 14px; box-shadow: var(--shadow); }
+        .unscheduled-card.elevated { background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.38); }
+        .unscheduled-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; background: rgba(245,158,11,0.16); color: #FCD34D; flex-shrink: 0; }
+        .unscheduled-card.elevated .unscheduled-icon { background: rgba(239,68,68,0.16); color: #FCA5A5; }
+        .unscheduled-body { flex: 1; min-width: 0; }
+        .unscheduled-title { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+        .unscheduled-sub { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+        .unscheduled-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+        .unscheduled-count { font-size: 2rem; font-weight: 800; color: #FCD34D; }
+        .unscheduled-card.elevated .unscheduled-count { color: #FCA5A5; }
+        .stats-alert-chip { font-size: 0.78rem; padding: 8px 14px; border-radius: 10px; background: rgba(245,158,11,0.10); color: #FCD34D; border: 1px solid rgba(245,158,11,0.25); }
+
+        /* حاوية الرسم أعلى قليلًا لاستيعاب الخطوط الأكبر والـlegend الجانبي */
+        .chart-container { height: 320px; }
+        .chart-section { padding: 16px; }
+        .chart-title { font-size: 0.95rem; }
+
+        @media (max-width: 1200px) {
+            .stats-grid-primary, .stats-grid-secondary { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .stat-card-primary { padding: 16px; }
+            .stat-card-primary .stat-value { font-size: 1.7rem; }
+            .stat-card-primary .stat-icon { width: 44px; height: 44px; font-size: 1.2rem; }
+        }
+
     </style>
     <!-- New Interactive Editor Styles -->
     <link rel="stylesheet" href="/css/smart-schedule-editor.css">
@@ -1343,7 +1453,7 @@
             <img src="logo.png" alt="South Sector Emergency Operations Platform" style="width:36px;height:36px;border-radius:8px;object-fit:contain;margin-left:10px;">
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;">
                 <span style="font-size:1.2rem;font-weight:700;">نظام الجداول</span>
-                <span style="font-size:0.7rem;color:#64748B;">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
+                <span style="font-size:0.7rem;color:#8A9BB0;">منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</span>
             </div>
         </div>
         <div class="top-bar-center">
@@ -1382,7 +1492,7 @@
                 <button class="btn btn-primary" type="button" onclick="oiOpenPicker()">
                     <i class="fas fa-file-import"></i> استيراد الجدول الرسمي (القطاع)
                 </button>
-                <span style="font-size:12px;color:#888;">يقرأ ملف القطاع الرسمي كما هو — يقارن ويحدّث دون مسح — ويعرض تقريرًا مفصلًا قبل الحفظ</span>
+                <span style="font-size:12px;color:#8A9BB0;">يقرأ ملف القطاع الرسمي كما هو — يقارن ويحدّث دون مسح — ويعرض تقريرًا مفصلًا قبل الحفظ</span>
             </div>
             <!-- قائمة الملفات المحفوظة -->
             <div class="saved-files-list" id="savedFilesList"></div>
@@ -1564,60 +1674,90 @@
                 <i class="fas fa-chart-line"></i>
                 الإحصائيات والتحليلات
             </div>
-            <div class="stats-grid" id="statsGrid">
-                <div class="stat-card">
+            <!-- الصف الأول: المؤشرات الرئيسية (وثيقة لوحة المؤشرات التنفيذية) -->
+            <div class="stats-grid stats-grid-primary" id="statsGridPrimary">
+                <div class="stat-card stat-card-primary">
                     <div class="stat-icon blue"><i class="fas fa-users"></i></div>
-                    <div class="stat-value" id="statTotalEmployees">0</div>
-                    <div class="stat-label">إجمالي الموظفين</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="statTotalEmployees">0</div>
+                        <div class="stat-label">إجمالي الموظفين</div>
+                        <div class="stat-desc">كل المسجلين في النظام</div>
+                    </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-primary">
                     <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
-                    <div class="stat-value" id="statTodayShifts">0</div>
-                    <div class="stat-label">على رأس العمل اليوم</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="statTodayShifts">0</div>
+                        <div class="stat-label">على رأس العمل اليوم</div>
+                        <div class="stat-desc">مناوبات ودوام ومهام وتدريب</div>
+                    </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-primary">
                     <div class="stat-icon gold"><i class="fas fa-percentage"></i></div>
-                    <div class="stat-value" id="statCoverage">0%</div>
-                    <div class="stat-label">نسبة التغطية</div>
+                    <div class="stat-body">
+                        <div class="stat-value-row">
+                            <div class="stat-value" id="statCoverage">0%</div>
+                            <span class="stat-badge good hidden" id="statCoverageBadge"></span>
+                        </div>
+                        <div class="stat-label">نسبة التغطية</div>
+                        <div class="stat-desc">على رأس العمل ÷ إجمالي الموظفين</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon coral"><i class="fas fa-bed"></i></div>
-                    <div class="stat-value" id="statLeaves">0</div>
-                    <div class="stat-label">الراحة الدورية</div>
-                </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-primary">
                     <div class="stat-icon purple"><i class="fas fa-umbrella-beach"></i></div>
-                    <div class="stat-value" id="statWorkforce">0</div>
-                    <div class="stat-label">الإجازات الفعلية</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="statWorkforce">0</div>
+                        <div class="stat-label">الإجازات الفعلية</div>
+                        <div class="stat-desc">إجازة وتعويضية</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon blue"><i class="fas fa-briefcase"></i></div>
-                    <div class="stat-value" id="statMission">0</div>
-                    <div class="stat-label">مهمة رسمية</div>
-                </div>
-                <div class="stat-card">
+            </div>
+            <!-- الصف الثاني: المؤشرات الثانوية — معلومات مساندة -->
+            <div class="stats-grid stats-grid-secondary" id="statsGridSecondary">
+                <div class="stat-card stat-card-secondary">
                     <div class="stat-icon green"><i class="fas fa-layer-group"></i></div>
                     <div class="stat-value" id="statOverlap">0</div>
                     <div class="stat-label">أوفرلاب</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-secondary">
+                    <div class="stat-icon coral"><i class="fas fa-bed"></i></div>
+                    <div class="stat-value" id="statLeaves">0</div>
+                    <div class="stat-label">الراحة الدورية</div>
+                </div>
+                <div class="stat-card stat-card-secondary">
                     <div class="stat-icon gold"><i class="fas fa-graduation-cap"></i></div>
                     <div class="stat-value" id="statTraining">0</div>
                     <div class="stat-label">تدريب</div>
                 </div>
+                <div class="stat-card stat-card-secondary">
+                    <div class="stat-icon blue"><i class="fas fa-briefcase"></i></div>
+                    <div class="stat-value" id="statMission">0</div>
+                    <div class="stat-label">مهمة رسمية</div>
+                </div>
             </div>
-            <div id="statsAnchorNote" style="font-size:12px;color:#b45309;margin-top:6px;min-height:16px;"></div>
+            <!-- تنبيهات تشغيلية: بطاقة «غير المجدولين» المستقلة + شريحة اليوم المرجعي -->
+            <div class="stats-alerts" id="statsAlerts">
+                <div class="stats-alert-chip hidden" id="statsAnchorChip"></div>
+                <div class="unscheduled-card hidden" id="unscheduledCard">
+                    <div class="unscheduled-icon"><i class="fas fa-user-clock"></i></div>
+                    <div class="unscheduled-body">
+                        <div class="unscheduled-title">غير مجدولين اليوم <span class="unscheduled-sub">(خارج دورة المناوبات)</span></div>
+                        <div class="unscheduled-desc">موظفون بلا تكليف في اليوم المرجعي — يحتاجون جدولة أو إعادة توزيع</div>
+                    </div>
+                    <div class="unscheduled-count" id="statUnscheduled">0</div>
+                </div>
+            </div>
             <div class="charts-row">
-                <div class="section" style="padding:16px;">
-                    <div class="section-title" style="font-size:0.95rem;">
+                <div class="section chart-section">
+                    <div class="section-title chart-title">
                         <i class="fas fa-chart-pie"></i> توزيع المناوبات
                     </div>
                     <div class="chart-container">
                         <canvas id="shiftsChart"></canvas>
                     </div>
                 </div>
-                <div class="section" style="padding:16px;">
-                    <div class="section-title" style="font-size:0.95rem;">
+                <div class="section chart-section">
+                    <div class="section-title chart-title">
                         <i class="fas fa-chart-bar"></i> توزيع الموظفين حسب الموقع
                     </div>
                     <div class="chart-container">
@@ -1766,14 +1906,15 @@
 
     <!-- ═══ نافذتا الاستيراد الرسمي (وحدة مستقلة) ═══ -->
     <style>
-        .oi-input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:14px; font-family:inherit; background:#fff; }
+        .oi-input { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit; background:rgba(255,255,255,0.04); color:var(--text); }
+        .oi-input:focus { outline:none; border-color:#10B586; box-shadow:0 0 0 3px rgba(14,164,122,0.12); }
         .oi-report { font-size:14px; }
-        .oi-sep { text-align:center; color:#999; margin:12px 0 6px; font-size:12px; letter-spacing:1px; }
-        .oi-line { display:flex; justify-content:space-between; padding:6px 4px; border-bottom:1px dashed #eee; }
-        .oi-line b { color:#2c3e50; }
-        .oi-line.oi-warn b { color:#c0392b; }
-        .oi-detail { font-size:12px; color:#888; padding:2px 8px 8px; line-height:1.8; }
-        .classic-grid-cell.row-hit { background:#FDE68A !important; transition:background 0.6s; }
+        .oi-sep { text-align:center; color:#7C8DA6; margin:12px 0 6px; font-size:12px; letter-spacing:1px; }
+        .oi-line { display:flex; justify-content:space-between; padding:6px 4px; border-bottom:1px dashed rgba(255,255,255,0.10); }
+        .oi-line b { color:#F1F5F9; }
+        .oi-line.oi-warn b { color:#F87171; }
+        .oi-detail { font-size:12px; color:#8A9BB0; padding:2px 8px 8px; line-height:1.8; }
+        .classic-grid-cell.row-hit { background:rgba(245,158,11,0.25) !important; transition:background 0.6s; }
     </style>
     <div class="modal-overlay" id="oiMonthModal">
         <div class="modal-content" style="max-width:440px;">
@@ -1787,7 +1928,7 @@
                 </div>
             </div>
             <div class="modal-body">
-                <div id="oiSugSource" style="font-size:13px;color:#666;margin-bottom:12px;"></div>
+                <div id="oiSugSource" style="font-size:13px;color:#8A9BB0;margin-bottom:12px;"></div>
                 <div style="display:flex;gap:10px;">
                     <select id="oiMonth" class="oi-input" style="flex:1;">
                         <option value="0">— الشهر —</option>
@@ -4045,12 +4186,35 @@
             if (elO) elO.textContent = stats.overlap;
             var elT = document.getElementById('statTraining');
             if (elT) elT.textContent = stats.training;
-            var note = document.getElementById('statsAnchorNote');
+            var note = document.getElementById('statsAnchorChip');
+            // ══ ثوابت عرض موثقة (وثيقة لوحة المؤشرات) — لا تمس calculateStats إطلاقًا ══
+            // شارة جودة التغطية: 🟢 ≥80% · 🟡 60–79% · 🔴 <60% (عرض فقط — النسبة نفسها من الخادم/الحساب كما هي، قابلة للضبط)
+            var COVERAGE_DISPLAY = [
+                { min: 80, cls: 'good',  txt: '🟢 ممتازة' },
+                { min: 60, cls: 'watch', txt: '🟡 تحتاج متابعة' },
+                { min: 0,  cls: 'low',   txt: '🔴 منخفضة' }
+            ];
+            // بطاقة «غير المجدولين»: تظهر عند >0، ولكنة أعلى (elevated) عند >5 (لقطة الوثيقة: 13)
+            var UNSCHEDULED_ELEVATED_ABOVE = 5;
             if (note) {
-                var parts = [];
-                if (!stats.anchor.real) parts.push('⚠️ اليوم المرجعي للإحصائيات: ' + stats.anchor.key + ' — لا توجد بيانات لليوم الفعلي');
-                if (stats.unscheduled > 0) parts.push('غير مجدولين في هذا اليوم (خارج دورة المناوبات): ' + stats.unscheduled);
-                note.textContent = parts.join(' · ');
+                note.classList.toggle('hidden', stats.anchor.real);
+                note.textContent = stats.anchor.real ? '' : '⚠️ اليوم المرجعي للإحصائيات: ' + stats.anchor.key + ' — لا توجد بيانات لليوم الفعلي';
+            }
+            var uc = document.getElementById('unscheduledCard');
+            if (uc) {
+                uc.classList.toggle('hidden', stats.unscheduled <= 0);
+                uc.classList.toggle('elevated', stats.unscheduled > UNSCHEDULED_ELEVATED_ABOVE);
+                var ucN = document.getElementById('statUnscheduled');
+                if (ucN) ucN.textContent = stats.unscheduled;
+            }
+            var cb = document.getElementById('statCoverageBadge');
+            if (cb) {
+                var band = COVERAGE_DISPLAY[2];
+                for (var bi = 0; bi < COVERAGE_DISPLAY.length; bi++) {
+                    if (stats.coverage >= COVERAGE_DISPLAY[bi].min) { band = COVERAGE_DISPLAY[bi]; break; }
+                }
+                cb.className = 'stat-badge ' + band.cls;
+                cb.textContent = band.txt;
             }
             // Show/hide sync button
             var syncBtn = document.getElementById('syncBtn');
@@ -4092,10 +4256,13 @@
             }
             var order = ShiftTypeDictionary.CHART_ORDER;
             var colors = ShiftTypeDictionary.CHART_COLORS;
+            // ══ لوحة ألوان عرض محلية (وثيقة لوحة المؤشرات): متمايزة بوضوح على الداكن وبهوية المنصة ══
+            // القاموس المشترك (shift-type-dictionary.js) لم يُمس — هذه قيم عرض بديلة محلية لهذا الرسم فقط
+            var SS_CHART_DISPLAY_COLORS = { morning: '#FBBF24', night: '#60A5FA', night8: '#A5B4FC', overlap: '#4FBF9A', office: '#FB923C', mission: '#F87171', training: '#6EE7B7', rest: '#7C8DA6', vacation: '#C4B5FD', off: '#5E7189', unscheduled: '#EF4444' };
             var labels = [], data = [], bg = [];
             for (var o = 0; o < order.length; o++) {
                 var g = order[o];
-                if (counts[g] > 0) { labels.push(DC_CHART_LABELS[g]); data.push(counts[g]); bg.push(colors[g]); }
+                if (counts[g] > 0) { labels.push(DC_CHART_LABELS[g]); data.push(counts[g]); bg.push(SS_CHART_DISPLAY_COLORS[g] || colors[g]); }
             }
             if (labels.length === 0) return;
             charts.shifts = new Chart(ctx, {
@@ -4105,7 +4272,7 @@
                     datasets: [{
                         data: data,
                         backgroundColor: bg,
-                        borderColor: '#FFFFFF',
+                        borderColor: '#101B30',
                         borderWidth: 2
                     }]
                 },
@@ -4113,11 +4280,42 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: '#1E293B', font: { family: 'Inter' }, padding: 15 } }
+                        // الـlegend عمود جانبي رأسي يحمل العدد والنسبة (بديل معتمد: بلا مكتبات جديدة ⇒ لا نسب داخل الأجزاء)
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#A9BACD',
+                                font: { family: 'Inter', size: 13 },
+                                padding: 10,
+                                boxWidth: 14,
+                                generateLabels: function (chart) {
+                                    var dd = chart.data;
+                                    var vals = dd.datasets[0].data;
+                                    var total = 0;
+                                    for (var vi = 0; vi < vals.length; vi++) total += vals[vi];
+                                    return dd.labels.map(function (l, i) {
+                                        var pct = total > 0 ? Math.round((vals[i] / total) * 100) : 0;
+                                        return {
+                                            text: l + ' — ' + vals[i] + ' (' + pct + '%)',
+                                            fillStyle: dd.datasets[0].backgroundColor[i],
+                                            strokeStyle: dd.datasets[0].backgroundColor[i],
+                                            fontColor: '#A9BACD',
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
+                        tooltip: { backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD' }
                     }
                 }
             });
         }
+
+        // عرض فقط (وثيقة لوحة المؤشرات): اختصار أسماء المواقع الطويلة على المحور — الاسم الكامل في الـtooltip
+        var SS_LOC_LABEL_MAX = 14;
+        function ssShortLocLabel(l) { return (l && l.length > SS_LOC_LABEL_MAX) ? l.slice(0, SS_LOC_LABEL_MAX - 1) + '…' : l; }
 
         function renderLocationsChart() {
             var ctx = document.getElementById('locationsChart');
@@ -4131,28 +4329,47 @@
             }
             var labels = sortTeamNames(Object.keys(locCounts)); // بند 10: الترتيب المركزي
             var data = labels.map(function(l) { return locCounts[l]; });
-            var colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#3B82F6', '#F97316', '#EC4899'];
+            var fullLabels = labels; // الأسماء الكاملة للـtooltip
+            var shortLabels = labels.map(ssShortLocLabel); // عرض فقط
+            // لوحة هوية متمايزة (بدل التراثية #2563EB/#8B5CF6)
+            var colors = ['#60A5FA', '#10B586', '#F59E0B', '#F87171', '#C4B5FD', '#4FBF9A', '#FB923C', '#93C5FD'];
             if (charts.locations) charts.locations.destroy();
             charts.locations = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: shortLabels,
                     datasets: [{
                         label: 'عدد المناوبات',
                         data: data,
                         backgroundColor: colors.slice(0, labels.length),
-                        borderRadius: 6
+                        borderRadius: 8,
+                        maxBarThickness: 52,
+                        categoryPercentage: 0.65,
+                        barPercentage: 0.85
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#101B30', titleColor: '#F1F5F9', bodyColor: '#A9BACD',
+                            callbacks: {
+                                title: function (items) { return fullLabels[items[0].dataIndex]; } // الاسم الكامل عند المرور
+                            }
+                        }
                     },
                     scales: {
-                        x: { ticks: { color: '#64748B', font: { family: 'Inter' } }, grid: { color: '#F1F5F9' } },
-                        y: { ticks: { color: '#64748B', font: { family: 'Inter' } }, grid: { color: '#F1F5F9' } }
+                        x: {
+                            ticks: { color: '#A9BACD', font: { family: 'Inter', size: 13 }, maxRotation: 0, autoSkip: true },
+                            grid: { display: false } // شبكة أقل: بلا خطوط رأسية
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#A9BACD', font: { family: 'Inter', size: 13 }, maxTicksLimit: 6, precision: 0 },
+                            grid: { color: 'rgba(255,255,255,0.06)' }
+                        }
                     }
                 }
             });

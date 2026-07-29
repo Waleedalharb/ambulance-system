@@ -196,6 +196,44 @@ class StorageAdapter {
         return this.db.get('SELECT * FROM vehicles WHERE id = ?', [String(id)]);
     }
 
+    async getVehicleByPlate(plate) {
+        return this.db.get('SELECT * FROM vehicles WHERE plate_number = ?', [String(plate).trim()]);
+    }
+
+    // ─── Fleet Engine V1 ②: كتابة السجل المرجعي للمركبات (إضافة/تعديل) ───
+    // لا حذف ولا تعطيل هنا إطلاقًا — السجل التشغيلي append-only ولا يُمس.
+    async getCenters() {
+        return this.db.all('SELECT id, name FROM centers WHERE is_active = 1 ORDER BY sort_order ASC, id ASC');
+    }
+
+    async createVehicle(data) {
+        // المعرف مولّد ذاتيًا: veh_ + أعلى تسلسل موجود + 1 (عبر كل المركبات،
+        // بما فيها غير النشطة، حتى لا يصطدم بالمفتاح الأساسي).
+        const row = await this.db.get("SELECT MAX(CAST(SUBSTR(id, 5) AS INTEGER)) AS maxn FROM vehicles WHERE id LIKE 'veh_%'");
+        const next = (row && row.maxn ? row.maxn : 0) + 1;
+        const id = 'veh_' + String(next).padStart(6, '0');
+        await this.db.run(
+            `INSERT INTO vehicles
+             (id, plate_number, call_sign, vehicle_type, model_year, category, designation, admin_status, owner_center_id, sort_order, is_active, created_at, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+            [id, data.plateNumber, data.callSign || null, data.vehicleType, data.modelYear,
+             data.category, data.designation, data.adminStatus || 'أساسية',
+             data.ownerCenterId || null, data.sortOrder || 0, new Date().toISOString(), data.notes || null]
+        );
+        return id;
+    }
+
+    async updateVehicle(id, fields) {
+        // قائمة بيضاء صارمة — is_active والمعرف وcreated_at خارج التعديل دائمًا
+        const allowed = ['plate_number', 'call_sign', 'vehicle_type', 'model_year', 'category',
+            'designation', 'admin_status', 'owner_center_id', 'sort_order', 'notes'];
+        const cols = Object.keys(fields).filter(k => allowed.includes(k));
+        if (!cols.length) return false;
+        const sql = `UPDATE vehicles SET ${cols.map(c => c + ' = ?').join(', ')} WHERE id = ?`;
+        await this.db.run(sql, [...cols.map(c => fields[c]), String(id)]);
+        return true;
+    }
+
     async getOperationalEventsByEntity(domain, entityId, limit = 500) {
         return this.db.all(
             'SELECT * FROM operational_events WHERE domain = ? AND entity_id = ? ORDER BY created_at ASC, id ASC LIMIT ?',

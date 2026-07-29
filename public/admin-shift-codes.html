@@ -17,6 +17,75 @@
     <!-- App CSS -->
     <link rel="stylesheet" href="css/app.css?v=30">
     <style>
+        /* ═══ إعادة توكنة محلية — الهوية التنفيذية الداكنة الموحدة ═══
+           تتفوق على app.css المشترك (وراثة لاحقة) دون تعديل الملف المشترك */
+        :root {
+            --white:   rgba(255,255,255,0.035);
+            --gray-50: #0A1220;
+            --gray-100:rgba(255,255,255,0.05);
+            --gray-200:rgba(255,255,255,0.08);
+            --gray-300:rgba(255,255,255,0.10);
+            --gray-400:#7C8DA6;
+            --gray-500:#A9BACD;
+            --gray-600:#C2CFDD;
+            --gray-700:#D5DEE9;
+            --gray-800:#F1F5F9;
+            --gray-900:#F1F5F9;
+            --primary: #60A5FA;
+            --primary-700: #60A5FA;
+            --primary-800: #93C5FD;
+            --info-50: rgba(96,165,250,0.10);
+            --info-light: rgba(96,165,250,0.22);
+            --teal: #10B586;
+            --teal-50: rgba(16,181,134,0.12);
+            --gold: #FBBF24;
+            --gold-50: rgba(245,158,11,0.12);
+            --coral: #F87171;
+            --coral-50: rgba(239,68,68,0.12);
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.28);
+            --shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+        }
+
+        /* طبقة الهوية: تدرجات + شبكة مقنّعة + توهج سفلي */
+        body {
+            background:
+                radial-gradient(1100px 620px at 85% -10%, rgba(14,164,122,0.10), transparent 60%),
+                radial-gradient(900px 540px at 8% -5%, rgba(96,165,250,0.08), transparent 55%),
+                #0A1220 !important;
+            background-attachment: fixed !important;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(1200px 500px at 50% 110%, rgba(14,164,122,0.05), transparent 65%);
+        }
+        :focus-visible {
+            outline: 2px solid rgba(14,164,122,0.50) !important;
+            outline-offset: 2px;
+        }
+        ::selection {
+            background: rgba(14,164,122,0.28);
+            color: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10) !important; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18) !important; }
+
         .page-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -73,14 +142,14 @@
         }
 
         .btn-primary {
-            background: var(--primary-700);
-            border-color: var(--primary-700);
+            background: #0EA47A;
+            border-color: #0EA47A;
             color: #fff;
         }
 
         .btn-primary:hover {
-            background: var(--primary-800);
-            border-color: var(--primary-800);
+            background: #0B8C66;
+            border-color: #0B8C66;
             color: #fff;
         }
 
@@ -219,8 +288,8 @@
         .status-تكميل   { background: var(--gold-50); color: var(--gold); }
         .status-تكميل::before   { background: var(--gold); }
 
-        .status-تدريب   { background: #F3E8FF; color: #9333EA; }
-        .status-تدريب::before   { background: #9333EA; }
+        .status-تدريب   { background: rgba(167,139,250,0.14); color: #C4B5FD; }
+        .status-تدريب::before   { background: #A78BFA; }
 
         .status-إجازة   { background: var(--coral-50); color: var(--coral); }
         .status-إجازة::before   { background: var(--coral); }
@@ -284,8 +353,8 @@
 
         .filter-btn.active,
         .filter-btn:hover {
-            background: var(--primary-700);
-            border-color: var(--primary-700);
+            background: #0EA47A;
+            border-color: #0EA47A;
             color: #fff;
         }
 

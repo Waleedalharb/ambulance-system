@@ -1539,6 +1539,10 @@ async function migrateFleetVA() {
     await exec(VEHICLES_DDL);
   }
 
+  // Fleet Engine V1 ②: عمود ملاحظات السجل المرجعي — إضافي وidempotent
+  // (ensureColumn يقرأ PRAGMA table_info؛ آمن على القواعد القائمة والجديدة).
+  await ensureColumn('vehicles', 'notes', 'TEXT');
+
   // ── زرع السجل الرسمي (فقط إذا كان الجدول فارغًا) ──
   const vehiclesCount = await get('SELECT COUNT(*) AS c FROM vehicles');
   if (vehiclesCount.c === 0) {

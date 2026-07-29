@@ -8,6 +8,7 @@
  */
 
 const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators, DOMAIN_REGISTRY } = require('./operational-events-core');
+const TimeRiyadh = require('../public/js/time-riyadh.js'); // الطبقة المركزية الوحيدة للوقت (TIME-POLICY) — حقول عرض فقط
 
 const DOMAIN = 'vehicle';
 
@@ -345,6 +346,64 @@ class VehicleEventsService {
     async getIndicators(shiftId) {
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         return { shiftId, ...deriveIndicators(events, DOMAIN) };
+    }
+
+    /** Fleet Engine V1 ①: تاريخ مركبة عبر كل المناوبات (Asset Timeline كامل) —
+     *  قراءة فقط، بلا ختم مناوبة. يدمج أحداث نطاق المركبة + أحداث الدعم
+     *  (نطاق center بكيان المركبة) مرتبة زمنيًا تصاعديًا، مع الحالة الحالية
+     *  المشتقة (نفس اشتقاق getBoard حرفيًا) وأسماء الفرق وحقول عرض الرياض
+     *  (TIME-POLICY — عرض فقط، لا تُقارن ولا تُخزن). */
+    async getVehicleHistory(vehicleId) {
+        const vehicle = await this._requireVehicle(vehicleId);
+        const events = await this.storage.getOperationalEventsByEntity(DOMAIN, vehicle.id, 1000);
+        const supportEvents = await this.storage.getOperationalEventsByEntity(SUPPORT_DOMAIN, vehicle.id, 1000);
+        const merged = events.concat(supportEvents)
+            .sort((a, b) => (a.created_at === b.created_at ? a.id - b.id : (a.created_at < b.created_at ? -1 : 1)));
+        const teams = await this.storage.all('SELECT id, name FROM teams');
+        const teamNameById = new Map(teams.map(t => [String(t.id), t.name]));
+        // الحالة الحالية — اشتقاق مطابق لـ getBoard: آخر حالة + آخر تعيين مفتوح
+        const f = foldEvents(events, DOMAIN)[0] || null;
+        const openAssignment = f ? [...f.open].reverse().find(o => o.event_type === 'assignment') : null;
+        const lastStatus = f ? [...f.open].reverse().find(o => o.status) : null;
+        return {
+            vehicle: {
+                id: vehicle.id,
+                name: vehicle.call_sign || vehicle.plate_number,
+                plateNumber: vehicle.plate_number,
+                callSign: vehicle.call_sign || null,
+                vehicleType: vehicle.vehicle_type,
+                modelYear: vehicle.model_year,
+                category: vehicle.category,
+                designation: vehicle.designation,
+                adminStatus: vehicle.admin_status,
+                homeCenterId: vehicle.owner_center_id || null,
+                notes: vehicle.notes != null ? vehicle.notes : null
+            },
+            current: {
+                status: lastStatus ? lastStatus.status : null,
+                reason: lastStatus ? lastStatus.reason || null : null,
+                since: lastStatus ? lastStatus.created_at : null,
+                teamId: openAssignment && openAssignment.team_id != null ? Number(openAssignment.team_id) : null,
+                teamName: openAssignment ? (teamNameById.get(String(openAssignment.team_id)) || null) : null
+            },
+            events: merged.map(e => ({
+                id: e.id,
+                domain: e.domain,
+                eventType: e.event_type,
+                status: e.status || null,
+                reason: e.reason || null,
+                note: e.note || null,
+                teamId: e.team_id != null ? Number(e.team_id) : null,
+                teamName: e.team_id != null ? (teamNameById.get(String(e.team_id)) || null) : null,
+                center: e.center || null,
+                shiftId: e.shift_id != null ? Number(e.shift_id) : null,
+                shiftDate: e.shift_date || null,
+                shiftType: e.shift_type || null,
+                actorName: e.actor_name || null,
+                createdAt: e.created_at,
+                createdAtRiyadh: TimeRiyadh.formatDateTimeSec(e.created_at) // عرض فقط (TIME-POLICY)
+            }))
+        };
     }
 
     /**

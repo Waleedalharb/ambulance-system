@@ -1,0 +1,1899 @@
+/**
+ * executive-theme.css — المرحلة الثانية (لوحة القيادة)
+ * طبقة تحسين بصري فقط: توريث لغة شاشة الدخول المعتمدة للوحة القيادة.
+ * لا تغيّر أي وظيفة ولا أي DOM — سطوح زجاجية داكنة، ظلال أهدأ،
+ * طباعة أوضح، مسافات أوسع. الألوان من لوحة المنصة نفسها (كحلي/أبيض/رمادي/زمردي/أزرق).
+ * تُحمَّل بعد app.css لتتغلّب عليه، وتُستخدم !important فقط حيث توجد
+ * أنماط مضمّنة (inline) أو !important في الطبقة الأساسية.
+ */
+
+/* ===== الرموز التصميمية ===== */
+:root {
+    --ex-bg:          #0A1220;
+    --ex-surface:     rgba(255, 255, 255, 0.035);
+    --ex-surface-2:   rgba(255, 255, 255, 0.05);
+    --ex-border:      rgba(255, 255, 255, 0.08);
+    --ex-border-soft: rgba(255, 255, 255, 0.06);
+    --ex-text:        #F1F5F9;
+    --ex-text-2:      #A9BACD;
+    --ex-text-3:      #8A9BB0;
+    --ex-text-4:      #7C8DA6;
+    --ex-text-5:      #5E7189;
+    --ex-emerald:     #0EA47A;
+    --ex-emerald-hi:  #10B586;
+    --ex-emerald-txt: #4FBF9A;
+    --ex-blue:        #60A5FA;
+    --ex-gold:        #F59E0B;
+    --ex-red:         #EF4444;
+    --ex-radius:      20px;
+    --ex-radius-md:   14px;
+    --ex-shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    --ex-shadow-deep: inset 0 1px 0 rgba(255,255,255,0.045), 0 24px 60px rgba(0,0,0,0.40);
+}
+
+/* ===== خلفية الصفحة — نفس وصفة شاشة الدخول: تكاد تختفي ===== */
+body {
+    background: var(--ex-bg) !important;
+    color: var(--ex-text) !important;
+}
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 60% 40% at 50% -10%, rgba(126, 166, 232, 0.06), transparent 70%),
+        radial-gradient(ellipse 45% 32% at 50% 110%, rgba(14, 164, 122, 0.045), transparent 70%),
+        linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%);
+}
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+}
+
+/* ===== إيقاع عام: مسافات تنفّس أوسع ===== */
+.container {
+    padding-top: 18px !important;
+    padding-bottom: 40px !important;
+    /* شاشة قرار تنفيذية: عمود واحد مرن — الترتيب البصري بالمستويات دون نقل أي عنصر في DOM */
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 22px !important;
+}
+
+/* ===== شريط التطبيق العلوي (Smart Topbar) ===== */
+.smart-topbar {
+    background: rgba(11, 18, 32, 0.82) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.30) !important;
+    padding: 10px 18px !important;
+}
+.smart-topbar .brand span { color: var(--ex-text) !important; }
+.smart-topbar .topbar-info span { color: var(--ex-text-3) !important; }
+
+/* أزرار الإجراءات السريعة — حبوب زجاجية هادئة */
+.smart-topbar .qa-btn {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 10px !important;
+    color: var(--ex-text-2) !important;
+    box-shadow: none !important;
+    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease !important;
+}
+.smart-topbar .qa-btn:hover {
+    background: var(--ex-surface-2) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-text) !important;
+}
+.smart-topbar .notification-bell,
+.smart-topbar .chat-icon {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-2) !important;
+    box-shadow: none !important;
+}
+.smart-topbar .notification-bell:hover,
+.smart-topbar .chat-icon:hover {
+    background: var(--ex-surface-2) !important;
+    color: var(--ex-text) !important;
+}
+/* أزرار الشريط ذات التدرجات الصارخة — توحيد زجاجي (تغلّب على الأنماط المضمّنة) */
+.smart-topbar .operations-room-btn {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 10px !important;
+    color: var(--ex-text-2) !important;
+    box-shadow: none !important;
+    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease !important;
+}
+.smart-topbar .operations-room-btn:hover {
+    background: var(--ex-surface-2) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-text) !important;
+}
+.smart-topbar #logoutBtn { color: #F2899B !important; }
+.smart-topbar #logoutBtn:hover { border-color: rgba(239, 68, 68, 0.4) !important; color: #F6A5B4 !important; }
+
+/* ===== الترويسة الرئيسية — نفس الهوية، إضاءة أهدأ ===== */
+.header {
+    background: linear-gradient(160deg, #0D1626 0%, #0B1424 60%, #0A1220 100%) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    padding: 30px 34px !important;
+}
+.header::before {
+    background:
+        radial-gradient(ellipse 40% 60% at 85% 20%, rgba(14, 164, 122, 0.08), transparent 70%),
+        radial-gradient(ellipse 35% 55% at 12% 85%, rgba(96, 165, 250, 0.06), transparent 70%) !important;
+}
+.header-brand .text h1 {
+    color: var(--ex-text) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+    text-shadow: none !important;
+}
+.header-brand .text .sub { color: var(--ex-text-4) !important; }
+.header-date {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-2) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* ===== شريط التنبيهات — هدوء تحت الضغط ===== */
+#alertBar .alert-bar-content,
+.alert-bar-content {
+    background: rgba(11, 18, 32, 0.9) !important;
+    border: 1px solid rgba(245, 158, 11, 0.28) !important;
+    border-right: 3px solid var(--ex-gold) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.35) !important;
+    backdrop-filter: blur(12px) !important;
+    color: var(--ex-text) !important;
+}
+.alert-bar-text #alertTitle { color: var(--ex-text) !important; }
+.alert-bar-text #alertMessage { color: var(--ex-text-3) !important; }
+
+/* ===== شريط التحكم (Info Bar) ===== */
+.info-bar {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-card) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 16px 22px !important;
+}
+.total-box { color: var(--ex-text-3) !important; }
+.total-box span { color: var(--ex-emerald-txt) !important; background: rgba(14,164,122,0.10) !important; border-radius: 8px !important; padding: 2px 10px !important; }
+
+/* توحيد أزرار شريط التحكم — زجاج هادئ بدل قوس قزح (مع الحفاظ على زر حالة المناوبة) */
+.info-bar .toolbar .btn:not(.btn-shift-status) {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: 11px !important;
+    color: var(--ex-text-2) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease, transform 0.15s ease !important;
+}
+.info-bar .toolbar .btn:not(.btn-shift-status):hover {
+    background: rgba(255,255,255,0.08) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-text) !important;
+    transform: translateY(-1px);
+}
+.info-bar .toolbar .btn:not(.btn-shift-status):active { transform: translateY(0); }
+
+/* مؤشر حالة المناوبة وشارة العرض — قراءة واضحة على الداكن */
+.shift-status-indicator { color: var(--ex-text-2) !important; }
+.viewing-badge {
+    background: rgba(245, 158, 11, 0.14) !important;
+    color: #FCD34D !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+.archive-summary-card-top {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border) !important;
+    color: var(--ex-text-2) !important;
+    border-radius: var(--ex-radius-md) !important;
+}
+
+/* شريط حالة الاتصال — نص هادئ صغير */
+.update-status { color: var(--ex-text-5) !important; }
+
+/* ===== المستوى الأول: مؤشرات القوى العاملة ===== */
+.workforce-dashboard {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 26px 28px !important;
+}
+.workforce-header-title { color: var(--ex-text) !important; font-weight: 600 !important; }
+.workforce-header-title i { color: var(--ex-emerald-txt) !important; }
+.workforce-update-badge {
+    background: rgba(14,164,122,0.10) !important;
+    color: var(--ex-emerald-txt) !important;
+    border: 1px solid rgba(14,164,122,0.25) !important;
+}
+.workforce-refresh-btn,
+.btn-chat-share {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-3) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease !important;
+}
+.workforce-refresh-btn:hover,
+.btn-chat-share:hover {
+    color: var(--ex-emerald-txt) !important;
+    border-color: rgba(14,164,122,0.4) !important;
+    background: rgba(255,255,255,0.07) !important;
+}
+
+/* عناوين الأقسام داخل المؤشرات — هرمية أوضح */
+.wf-section-title {
+    color: var(--ex-text-2) !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.02em !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    margin-bottom: 14px !important;
+}
+.wf-section-title i { color: var(--ex-text-4) !important; }
+.wf-info-btn {
+    background: transparent !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-4) !important;
+    border-radius: 50% !important;
+}
+.wf-info-btn:hover { color: var(--ex-emerald-txt) !important; border-color: rgba(14,164,122,0.4) !important; }
+
+.workforce-grid { gap: 16px !important; }
+
+/* بطاقات المؤشرات — زجاج نظيف، أيقونة ملوّنة هادئة، رقم هو البطل */
+.wf-card {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 16px !important;
+    box-shadow: var(--ex-shadow-card) !important;
+    padding: 18px !important;
+    transition: transform 0.2s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+}
+.wf-card::before { display: none !important; } /* إلغاء الشريط الملوّن الصارخ */
+.wf-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: var(--ex-border) !important;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.38) !important;
+}
+.wf-card-icon-wrap {
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+.wf-card-blue  .wf-card-icon-wrap { background: rgba(96,165,250,0.12) !important; color: #7FB3FA !important; }
+.wf-card-green .wf-card-icon-wrap { background: rgba(16,181,134,0.12) !important; color: var(--ex-emerald-txt) !important; }
+.wf-card-gold  .wf-card-icon-wrap { background: rgba(245,158,11,0.12) !important; color: #FBBF24 !important; }
+.wf-card-red   .wf-card-icon-wrap { background: rgba(239,68,68,0.12) !important; color: #F87171 !important; }
+.wf-card-value { color: var(--ex-text) !important; font-weight: 700 !important; }
+.wf-card-label { color: var(--ex-text-3) !important; font-weight: 500 !important; }
+.wf-card-progress-track { background: rgba(255,255,255,0.07) !important; }
+.wf-card-progress-text { color: var(--ex-text-4) !important; }
+.wf-card-trend.neutral { background: rgba(255,255,255,0.05) !important; color: var(--ex-text-4) !important; border-color: transparent !important; }
+.wf-card-trend.up { background: rgba(16,181,134,0.10) !important; color: var(--ex-emerald-txt) !important; border-color: rgba(16,181,134,0.22) !important; }
+.wf-card-trend.down { background: rgba(239,68,68,0.10) !important; color: #F87171 !important; border-color: rgba(239,68,68,0.22) !important; }
+
+/* هياكل التحميل (Skeletons) على الداكن */
+.workforce-dashboard .skeleton,
+.distribution-card .skeleton,
+.live-report-card .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.05) 75%) !important;
+    background-size: 200% 100% !important;
+}
+
+/* ===== مؤشر توزيع البلاغات ===== */
+.distribution-card {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 24px 26px !important;
+}
+.distribution-card:hover { transform: none !important; }
+.distribution-icon-wrap { background: rgba(96,165,250,0.12) !important; color: #7FB3FA !important; box-shadow: none !important; }
+.distribution-header-title { color: var(--ex-text) !important; font-weight: 600 !important; }
+.distribution-header-subtitle { color: var(--ex-text-4) !important; }
+.distribution-expand-btn {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-3) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+.distribution-expand-btn:hover { color: var(--ex-emerald-txt) !important; border-color: rgba(14,164,122,0.4) !important; }
+.distribution-empty { color: var(--ex-text-4) !important; }
+.distribution-empty i { color: var(--ex-text-5) !important; }
+/* صفوف التوزيع */
+.distribution-item,
+.dist-item {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 12px !important;
+    color: var(--ex-text-2) !important;
+}
+.distribution-item:hover,
+.dist-item:hover { background: rgba(255,255,255,0.055) !important; }
+.dist-bar-track,
+.distribution-bar-track { background: rgba(255,255,255,0.07) !important; }
+
+/* ===== إحصائيات البلاغات الحية ===== */
+.live-report-card {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 24px 26px !important;
+}
+.live-report-icon-wrap { background: rgba(16,181,134,0.12) !important; color: var(--ex-emerald-txt) !important; box-shadow: none !important; }
+.live-report-header-title { color: var(--ex-text) !important; font-weight: 600 !important; }
+.live-report-badge {
+    background: rgba(96,165,250,0.12) !important;
+    color: #7FB3FA !important;
+    border: 1px solid rgba(96,165,250,0.25) !important;
+}
+.live-report-stat {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 14px !important;
+}
+.live-report-stat-value { color: var(--ex-text) !important; }
+.live-report-stat-label,
+.live-report-stat-sub { color: var(--ex-text-4) !important; }
+.live-report-stat-icon.blue { background: rgba(96,165,250,0.12) !important; color: #7FB3FA !important; }
+.live-report-stat-icon.green { background: rgba(16,181,134,0.12) !important; color: var(--ex-emerald-txt) !important; }
+.live-report-stat-icon.gold { background: rgba(245,158,11,0.12) !important; color: #FBBF24 !important; }
+
+/* ===== اللوحات المنسدلة (إشعارات/دردشة) على الداكن ===== */
+.notification-panel {
+    background: rgba(11, 18, 32, 0.96) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(16px) !important;
+    color: var(--ex-text) !important;
+}
+.notification-panel-header { border-bottom: 1px solid var(--ex-border-soft) !important; }
+.notification-panel-header h3 { color: var(--ex-text) !important; }
+.notification-empty { color: var(--ex-text-4) !important; }
+
+/* ==========================================================================
+   مركز الإشعارات — إعادة تصميم (المرجع البصري: admin-vehicles.html)
+   الجذر المُعالج: كانت renderNotifications تبني divs بأنماط inline فاتحة
+   (var(--gray-50)/var(--white)/opacity:0.7) فوق لوحة يفرض هذا الملف داكنتها
+   ⇒ مزيج فاتح/داكن «باهت». الآن JS يصدر أصناف .nc-* فقط (بلا inline)،
+   وكل الألوان هنا بقيم رموز الصفحة المرجعية نفسها.
+   هذا القسم هو المالك الوحيد لألوان مركز الإشعارات — يُعتمد نمطه للأسطح 2-4.
+   ========================================================================== */
+/* هيكل اللوحة: تحييد بقايا smart-toolbar الفاتحة (header/footer/أزرار) */
+#notificationPanel .notification-panel-header { background: rgba(255,255,255,0.03) !important; }
+#notificationPanel .notification-close { background: rgba(255,255,255,0.05) !important; color: var(--ex-text-4) !important; }
+#notificationPanel .notification-close:hover { background: rgba(248,113,113,0.15) !important; color: #F87171 !important; }
+#notificationPanel .notification-panel-body { padding: 12px !important; scrollbar-color: rgba(255,255,255,0.14) transparent !important; }
+#notificationPanel .notification-panel-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14) !important; }
+#notificationPanel .notification-panel-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22) !important; }
+#notificationPanel .notification-panel-footer { background: rgba(255,255,255,0.03) !important; border-top: 1px solid var(--ex-border-soft) !important; padding: 12px 16px !important; }
+/* «مسح الكل» — نمط التدمير الثانوي للمنصة (مثل #logoutBtn): نص مرجاني خافت يشتد عند hover */
+#notificationPanel .notification-clear-all { background: transparent !important; border: 1px solid rgba(255,255,255,0.10) !important; color: #F2899B !important; }
+#notificationPanel .notification-clear-all:hover { background: rgba(248,113,113,0.12) !important; color: #F6A5B4 !important; border-color: rgba(248,113,113,0.35) !important; }
+#notificationPanel .notification-empty { padding: 44px 20px !important; gap: 12px !important; }
+#notificationPanel .notification-empty i { color: var(--ex-text-4) !important; opacity: 0.85 !important; }
+#notificationPanel .notification-empty span { color: var(--ex-text-3) !important; font-weight: 600 !important; }
+
+/* الجرس والشارة في الشريط العلوي — إكمال توحيد السطح:
+   الشارة كانت تدرجًا ورديًا صارخًا مع نبض لا نهائي (badgePulse) فوق زجاج داكن.
+   الآن: مرجاني هادئ مصمت (سابقة badge-coral للمنصة) بنص داكن مقروء،
+   هالة داكنة تفصلها عن الزر، بلا أي حركة — «واضح لكن غير مزعج». */
+.smart-topbar .notification-bell { transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease !important; }
+.smart-topbar .notification-bell:hover { border-color: rgba(96,165,250,0.40) !important; transform: none !important; box-shadow: none !important; }
+.smart-topbar .notification-bell:hover .fa-bell { color: #60A5FA !important; }
+.smart-topbar .notification-badge {
+    background: #F87171 !important;
+    color: #0A1220 !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 0 2px #0B1424, 0 2px 8px rgba(248,113,113,0.30) !important;
+    animation: none !important;
+}
+
+/* بطاقة الإشعار — زجاج داكن: نفس قيم --white/--gray-200/--shadow في admin-vehicles */
+#notificationPanel .nc-item {
+    display: flex; align-items: flex-start; gap: 12px; position: relative;
+    padding: 12px 14px; margin-bottom: 8px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-right: 3px solid transparent;
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.045);
+    transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+#notificationPanel .nc-item:last-child { margin-bottom: 0; }
+#notificationPanel .nc-item:hover {
+    background: rgba(255,255,255,0.065);
+    border-color: rgba(255,255,255,0.14);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 30px rgba(0,0,0,0.30);
+}
+/* لكنة النوع على حافة البداية (يمين RTL) — 🟢🟡🔵🔴 */
+#notificationPanel .nc-success { border-right-color: #10B586; }
+#notificationPanel .nc-warning { border-right-color: #FBBF24; }
+#notificationPanel .nc-info    { border-right-color: #60A5FA; }
+#notificationPanel .nc-danger  { border-right-color: #F87171; }
+/* أيقونة النوع — صبغة زجاجية بنفس قيم teal-50/gold-50/info-50/coral-50 المرجعية */
+#notificationPanel .nc-icon { width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+#notificationPanel .nc-success .nc-icon { background: rgba(16,181,134,0.12); color: #10B586; }
+#notificationPanel .nc-warning .nc-icon { background: rgba(245,158,11,0.12); color: #FBBF24; }
+#notificationPanel .nc-info    .nc-icon { background: rgba(96,165,250,0.10); color: #60A5FA; }
+#notificationPanel .nc-danger  .nc-icon { background: rgba(239,68,68,0.12); color: #F87171; }
+/* جسم البطاقة: عنوان + وسم نوع + وصف + وقت — قيم gray-800/500/400 المرجعية */
+#notificationPanel .nc-body { flex: 1; min-width: 0; }
+#notificationPanel .nc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#notificationPanel .nc-title { font-size: 0.85rem; font-weight: 700; color: #F1F5F9; line-height: 1.35; }
+#notificationPanel .nc-chip { flex-shrink: 0; font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; line-height: 1.6; }
+#notificationPanel .nc-success .nc-chip { background: rgba(16,181,134,0.12); color: #34D399; }
+#notificationPanel .nc-warning .nc-chip { background: rgba(245,158,11,0.12); color: #FBBF24; }
+#notificationPanel .nc-info    .nc-chip { background: rgba(96,165,250,0.10); color: #93C5FD; }
+#notificationPanel .nc-danger  .nc-chip { background: rgba(239,68,68,0.12); color: #FCA5A5; }
+#notificationPanel .nc-message { font-size: 0.78rem; color: #A9BACD; line-height: 1.5; margin-top: 4px; }
+#notificationPanel .nc-time { display: flex; align-items: center; gap: 5px; font-size: 0.68rem; color: #7C8DA6; margin-top: 6px; }
+/* نقطة «غير مقروء» على الحافة البعيدة بلون النوع + توهج خفيف */
+#notificationPanel .nc-dot { position: absolute; top: 14px; left: 12px; width: 8px; height: 8px; border-radius: 50%; }
+#notificationPanel .nc-success .nc-dot { background: #10B586; box-shadow: 0 0 6px rgba(16,181,134,0.38); }
+#notificationPanel .nc-warning .nc-dot { background: #FBBF24; box-shadow: 0 0 6px rgba(245,158,11,0.38); }
+#notificationPanel .nc-info    .nc-dot { background: #60A5FA; box-shadow: 0 0 6px rgba(96,165,250,0.38); }
+#notificationPanel .nc-danger  .nc-dot { background: #F87171; box-shadow: 0 0 6px rgba(239,68,68,0.38); }
+/* حالة القراءة: خفوت مقصود للمقروء (يميّزه عن غير المقروء) — ليس «بهتان» الخلط القديم */
+#notificationPanel .nc-item.is-read { opacity: 0.6; border-right-color: rgba(255,255,255,0.10); }
+#notificationPanel .nc-item.is-read:hover { opacity: 0.9; }
+#chatPreviewPanel {
+    background: rgba(11, 18, 32, 0.96) !important;
+    border: 1px solid var(--ex-border) !important;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(16px) !important;
+}
+#chatPreviewPanel > div:first-child {
+    background: rgba(255,255,255,0.04) !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+}
+#chatPreviewPanel span { color: var(--ex-text) !important; }
+#chatPreviewPanel p { color: var(--ex-text-4) !important; }
+#chatPreviewPanel a {
+    background: rgba(96,165,250,0.12) !important;
+    color: #7FB3FA !important;
+}
+
+/* ===== تفاصيل نهائية: تحديد النص وشريط التمرير ===== */
+::selection { background: rgba(14, 164, 122, 0.28); color: #FFFFFF; }
+body::-webkit-scrollbar { width: 10px; }
+body::-webkit-scrollbar-track { background: #0A1220; }
+body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 6px; border: 2px solid #0A1220; }
+body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+
+/* ===== تقليل الحركة — احترام تفضيل المستخدم ===== */
+@media (prefers-reduced-motion: reduce) {
+    .wf-card, .info-bar .toolbar .btn, .smart-topbar .qa-btn { transition: none !important; }
+    .wf-card:hover { transform: none !important; }
+}
+
+/* ============================================================
+   الهرمية المعلوماتية — «شاشة قرار تنفيذية، وليست عارض خرائط»
+   المستوى 1: النبض التشغيلي (هل العمليات سليمة؟)
+   المستوى 2: القرارات التشغيلية (ما الذي يحتاج انتباهي وفعلي؟)
+   المستوى 3: الخريطة والمعلومات الداعمة (لاحقًا)
+   الترتيب بصري فقط عبر order — لا يُنقل أي عنصر في DOM.
+   ============================================================ */
+.smart-topbar          { order: 0; }
+.header                { order: 1; }
+#alertBar              { order: 2; }
+.ops-eyebrow-pulse     { order: 3; }
+.workforce-dashboard   { order: 4; }
+.ops-eyebrow-decisions { order: 5; }
+.ops-focus             { order: 6; }
+.ops-resources         { order: 7; }
+.ops-events            { order: 8; }
+.distribution-card     { order: 9; }
+.live-report-card      { order: 10; }
+.info-bar              { order: 11; }
+.update-status         { order: 15; }
+
+/* عناوين المستويات — بوصلة عين بلا تفكير */
+.ops-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 8px;
+    margin-bottom: -10px; /* التحاق أوثق بقسمه */
+    color: var(--ex-text-4);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+.ops-eyebrow i { color: var(--ex-emerald-txt); font-size: 0.72rem; }
+.ops-eyebrow::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--ex-border-soft);
+}
+
+/* الترويسة الرئيسية — شريط هوية مضغوط: الهوية تخدم القرار ولا تنافسه */
+.header { padding: 16px 26px !important; }
+.header-brand .icon { width: 44px !important; height: 44px !important; }
+.header-brand .text h1 { font-size: 1.3rem !important; font-weight: 600 !important; }
+.header-brand .text .sub { font-size: 0.76rem !important; }
+
+/* بطاقة نسبة الجاهزية — إجابة السؤال الأول «هل العمليات سليمة؟» تُبرز بلا صخب */
+.wf-card:has(#wfReadiness) {
+    border-color: rgba(14, 164, 122, 0.38) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30), 0 0 0 1px rgba(14,164,122,0.10) !important;
+}
+
+/* ============================================================
+   بؤرة التركيز التشغيلي — «ما الذي يحتاج انتباهي الآن؟»
+   تعرض حالات الفرق المشتقة سيرفريًا حرفيًا (عرض فقط — لا حساب محلي).
+   ============================================================ */
+.ops-focus {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 24px 26px !important;
+}
+.ops-focus-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.ops-focus-header-right { display: flex; align-items: center; gap: 13px; flex: 1; }
+.ops-focus-icon {
+    width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(239, 68, 68, 0.10);
+    color: #F87171;
+    border-radius: 12px;
+    font-size: 1rem;
+}
+.ops-focus-title { color: var(--ex-text); font-weight: 600; font-size: 1.02rem; }
+.ops-focus-subtitle { color: var(--ex-text-4); font-size: 0.76rem; margin-top: 2px; }
+.ops-focus-badge {
+    padding: 4px 14px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.05);
+    color: var(--ex-text-4);
+    border: 1px solid var(--ex-border-soft);
+}
+.ops-focus-badge.attention {
+    background: rgba(239, 68, 68, 0.10);
+    color: #F87171;
+    border-color: rgba(239, 68, 68, 0.25);
+}
+.ops-focus-badge.stable {
+    background: rgba(14, 164, 122, 0.10);
+    color: var(--ex-emerald-txt);
+    border-color: rgba(14, 164, 122, 0.25);
+}
+.ops-focus-action {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: 10px !important;
+    color: var(--ex-text-2) !important;
+    padding: 8px 16px !important;
+    font-size: 0.8rem !important;
+    font-family: inherit !important;
+    cursor: pointer !important;
+    transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease !important;
+}
+.ops-focus-action:hover {
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-emerald-txt) !important;
+    background: rgba(255,255,255,0.07) !important;
+}
+
+/* الملخص التنفيذي — جملة قرار واحدة: أخضر=طبيعي، أصفر=متابعة، أحمر=إجراء فوري */
+.ops-focus-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+.ops-focus-summary-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.ops-focus-summary.green {
+    background: rgba(14, 164, 122, 0.07);
+    border: 1px solid rgba(14, 164, 122, 0.22);
+    color: var(--ex-emerald-txt);
+}
+.ops-focus-summary.yellow {
+    background: rgba(245, 158, 11, 0.07);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    color: #FBBF24;
+}
+.ops-focus-summary.red {
+    background: rgba(239, 68, 68, 0.07);
+    border: 1px solid rgba(239, 68, 68, 0.22);
+    color: #F87171;
+}
+.ops-focus-summary.unknown {
+    background: transparent;
+    border: 1px dashed var(--ex-border-soft);
+    color: var(--ex-text-4);
+    font-weight: 400;
+}
+.ops-focus-badge.monitor {
+    background: rgba(245, 158, 11, 0.10);
+    color: #FBBF24;
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* الحالة المستقرة — طمأنة هادئة (عنصر قديم محفوظ للتوافق) */
+.ops-focus-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 22px;
+    border: 1px dashed rgba(14, 164, 122, 0.25);
+    border-radius: 14px;
+    color: var(--ex-emerald-txt);
+    font-size: 0.88rem;
+    background: rgba(14, 164, 122, 0.04);
+}
+.ops-focus-empty i { font-size: 1rem; }
+.ops-focus-empty.unknown {
+    border-color: var(--ex-border-soft);
+    color: var(--ex-text-4);
+    background: transparent;
+}
+
+/* مجموعات الانتباه */
+.ops-focus-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+.ops-focus-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ex-border-soft);
+}
+.ops-focus-group-title.red  { color: #F87171; }
+.ops-focus-group-title.gold { color: #FBBF24; }
+.ops-focus-group-title.blue { color: #7FB3FA; }
+.ops-focus-count {
+    margin-inline-start: auto;
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 1px 8px;
+    font-size: 0.72rem;
+    color: var(--ex-text-3);
+}
+.ops-focus-items { display: flex; flex-direction: column; gap: 8px; }
+.ops-focus-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--ex-border-soft);
+    border-radius: 11px;
+    padding: 9px 13px;
+    border-right: 3px solid transparent;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.ops-focus-item:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: var(--ex-border);
+}
+.ops-focus-item.red  { border-right-color: rgba(239, 68, 68, 0.55); }
+.ops-focus-item.gold { border-right-color: rgba(245, 158, 11, 0.5); }
+.ops-focus-item.blue { border-right-color: rgba(96, 165, 250, 0.5); }
+.ops-focus-item-name { color: var(--ex-text); font-weight: 600; font-size: 0.86rem; white-space: nowrap; }
+.ops-focus-item-detail { color: var(--ex-text-4); font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.ops-focus-item-act {
+    color: var(--ex-emerald-txt);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.ops-focus-item-act i { font-size: 0.6rem; }
+
+/* ============================================================
+   المستوى 3: الخريطة التشغيلية الذكية — امتداد مركز القرار
+   علامات هادئة بثلاث درجات (أخضر/أصفر/أحمر) من حالة الخادم.
+   ============================================================ */
+.ops-eyebrow-map { order: 13; }
+.ops-map-section { order: 14; }
+.ops-map-section {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    padding: 18px !important;
+}
+.ops-map-wrap {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--ex-border-soft);
+}
+#opsMap {
+    width: 100%;
+    height: 420px;
+    background: #0B1424;
+    font-family: inherit;
+}
+.ops-map-tile-note {
+    position: absolute;
+    bottom: 12px;
+    inset-inline-start: 12px;
+    z-index: 800;
+    background: rgba(11, 18, 32, 0.92);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #FBBF24;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    backdrop-filter: blur(8px);
+}
+.ops-map-legend {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 8px 2px;
+    font-size: 0.76rem;
+    color: var(--ex-text-3);
+}
+.ops-map-legend-item { display: flex; align-items: center; gap: 7px; }
+.ops-map-legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+.ops-map-legend-dot.green { background: #10B586; box-shadow: 0 0 0 3px rgba(16,181,134,0.14); }
+.ops-map-legend-dot.yellow { background: #F59E0B; box-shadow: 0 0 0 3px rgba(245,158,11,0.14); }
+.ops-map-legend-dot.red { background: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.14); }
+.ops-map-legend-note { margin-inline-start: auto; color: var(--ex-text-5); font-size: 0.72rem; }
+
+/* علامات الفرق — نقطة هادئة بهالة شفافة، نبض بطيء للأحمر فقط */
+.ops-marker { background: transparent !important; border: none !important; }
+.ops-marker-dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+.ops-marker-green .ops-marker-dot { background: #10B586; box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 5px rgba(16,181,134,0.18); }
+.ops-marker-yellow .ops-marker-dot { background: #F59E0B; box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 5px rgba(245,158,11,0.18); }
+.ops-marker-red .ops-marker-dot { background: #EF4444; box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 5px rgba(239,68,68,0.20); animation: opsMarkerPulse 3.2s ease-in-out infinite; }
+@keyframes opsMarkerPulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 5px rgba(239,68,68,0.20); }
+    50%      { box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 8px rgba(239,68,68,0.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ops-marker-red .ops-marker-dot { animation: none; }
+}
+
+/* نافذة القرار على الخريطة — زجاج داكن بنفس لغة مركز القرار */
+.ops-map-wrap .leaflet-popup-content-wrapper {
+    background: rgba(11, 18, 32, 0.96);
+    border: 1px solid var(--ex-border);
+    border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    color: var(--ex-text);
+}
+.ops-map-wrap .leaflet-popup-tip { background: rgba(11, 18, 32, 0.96); border: 1px solid var(--ex-border); }
+.ops-map-wrap .leaflet-popup-content {
+    direction: rtl;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+    margin: 14px 16px;
+    min-width: 190px;
+}
+.ops-popup-head { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; margin-bottom: 6px; }
+.ops-popup-head b { color: #F1F5F9; }
+.ops-popup-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.ops-popup-dot.green { background: #10B586; }
+.ops-popup-dot.yellow { background: #F59E0B; }
+.ops-popup-dot.red { background: #EF4444; }
+.ops-popup-status { font-size: 0.84rem; font-weight: 600; color: #E2E8F0; }
+.ops-popup-detail { font-size: 0.76rem; color: #8A9BB0; margin-top: 3px; line-height: 1.6; }
+.ops-popup-center { font-size: 0.7rem; color: #5E7189; margin-top: 6px; }
+.ops-popup-action {
+    margin-top: 10px;
+    width: 100%;
+    background: rgba(14, 164, 122, 0.12);
+    border: 1px solid rgba(14, 164, 122, 0.35);
+    color: #4FBF9A;
+    border-radius: 9px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.ops-popup-action:hover { background: rgba(14, 164, 122, 0.2); }
+
+/* أدوات الخريطة على الداكن */
+.ops-map-wrap .leaflet-control-zoom {
+    border: 1px solid var(--ex-border) !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.4) !important;
+}
+.ops-map-wrap .leaflet-control-zoom a {
+    background: rgba(11, 18, 32, 0.92) !important;
+    color: #A9BACD !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+}
+.ops-map-wrap .leaflet-control-zoom a:hover { background: rgba(255,255,255,0.08) !important; color: #F1F5F9 !important; }
+.ops-map-wrap .leaflet-control-attribution {
+    background: rgba(11, 18, 32, 0.7) !important;
+    color: #5E7189 !important;
+    font-size: 0.62rem !important;
+}
+.ops-map-wrap .leaflet-control-attribution a { color: #7C8DA6 !important; }
+
+/* ============================================================
+   Executive Navigation — الشريط الجانبي بهوية غرفة العمليات
+   زجاج كحلي، مؤشر صفحة حالية هادئ، أيقونات خافتة، انتقالات ناعمة.
+   ============================================================ */
+.smart-sidebar {
+    background: linear-gradient(180deg, #0D1626 0%, #0A1220 100%) !important;
+    border-left: 1px solid var(--ex-border) !important;
+    box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45) !important;
+}
+.smart-sidebar .sidebar-header {
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    padding: 22px 20px !important;
+}
+.smart-sidebar .sidebar-brand { color: var(--ex-text) !important; font-weight: 600 !important; font-size: 0.92rem !important; }
+.smart-sidebar .sidebar-close {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-3) !important;
+    box-shadow: none !important;
+}
+.smart-sidebar .sidebar-close:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    color: #F87171 !important;
+    box-shadow: none !important;
+}
+.smart-sidebar .sidebar-nav { padding: 18px 14px !important; scrollbar-color: rgba(255,255,255,0.12) transparent !important; }
+.smart-sidebar .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10) !important; }
+
+/* المجموعات — عناوين خافتة بلا صناديق */
+.smart-sidebar .sidebar-group { margin-bottom: 20px !important; }
+.smart-sidebar .sidebar-group:hover { box-shadow: none !important; }
+.smart-sidebar .sidebar-group.operations-group {
+    border-right: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.smart-sidebar .group-header {
+    color: var(--ex-text-5) !important;
+    font-size: 0.74rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em !important;
+    padding: 8px 12px 10px !important;
+}
+.smart-sidebar .group-header:hover {
+    color: var(--ex-text-3) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.smart-sidebar .group-header i:first-child { color: var(--ex-text-4) !important; font-size: 0.85rem !important; }
+.smart-sidebar .group-arrow { color: var(--ex-text-5) !important; }
+.smart-sidebar .group-items { gap: 3px !important; padding: 0 4px 4px !important; }
+
+/* العناصر — هدوء افتراضي، وميض زمردي عند التمرير */
+.smart-sidebar .sidebar-item {
+    color: var(--ex-text-2) !important;
+    font-size: 0.86rem !important;
+    padding: 11px 14px !important;
+    border-radius: 10px !important;
+    transition: background 0.22s ease, color 0.22s ease, transform 0.18s ease, box-shadow 0.22s ease !important;
+}
+.smart-sidebar .sidebar-item::before { display: none !important; }
+.smart-sidebar .sidebar-item i {
+    color: var(--ex-text-4) !important;
+    font-size: 0.85rem !important;
+    transition: color 0.22s ease !important;
+}
+.smart-sidebar .sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--ex-text) !important;
+    transform: translateX(-3px) !important;
+    box-shadow: none !important;
+}
+.smart-sidebar .sidebar-item:hover i { color: var(--ex-emerald-txt) !important; }
+
+/* الصفحة الحالية — مؤشر تنفيذي هادئ: شريط زمردي + تلوين شفاف، وليس مجرد نص */
+.smart-sidebar .sidebar-item.active {
+    background: rgba(14, 164, 122, 0.10) !important;
+    color: var(--ex-text) !important;
+    font-weight: 600 !important;
+    box-shadow: inset -3px 0 0 var(--ex-emerald) !important;
+    transform: none !important;
+    cursor: default !important;
+}
+.smart-sidebar .sidebar-item.active i { color: var(--ex-emerald-txt) !important; }
+
+/* الشريط الذكي — نقاط حالة حية وعدادات، جزء من نظام القيادة */
+.smart-sidebar .sidebar-item-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-inline-start: auto;
+    flex-shrink: 0;
+    display: none;
+}
+.smart-sidebar .sidebar-item-status.green { display: block; background: #10B586; box-shadow: 0 0 0 3px rgba(16,181,134,0.14); }
+.smart-sidebar .sidebar-item-status.yellow { display: block; background: #F59E0B; box-shadow: 0 0 0 3px rgba(245,158,11,0.14); }
+.smart-sidebar .sidebar-item-status.red { display: block; background: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.16); animation: opsMarkerPulse 3.2s ease-in-out infinite; }
+.smart-sidebar .sidebar-item-badge {
+    margin-inline-start: auto;
+    flex-shrink: 0;
+    background: rgba(245, 158, 11, 0.13) !important;
+    color: #FBBF24 !important;
+    border: 1px solid rgba(245, 158, 11, 0.28) !important;
+    border-radius: 999px !important;
+    padding: 1px 9px !important;
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    position: static !important;
+    min-width: 0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .smart-sidebar .sidebar-item-status.red { animation: none; }
+}
+
+/* التذييل */
+.smart-sidebar .sidebar-footer {
+    border-top: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-5) !important;
+    padding: 16px 20px !important;
+}
+
+/* زر القائمة في الشريط العلوي */
+.menu-toggle {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    color: var(--ex-text-2) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease !important;
+}
+.menu-toggle:hover {
+    background: var(--ex-surface-2) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-text) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .smart-sidebar .sidebar-item { transition: none !important; }
+    .smart-sidebar .sidebar-item:hover { transform: none !important; }
+}
+
+
+/* ============================================================
+   المنطقة 2: شريط الموارد المتاحة — شريط واحد مدمج هادئ.
+   يجيب على سؤال واحد: «ما الموارد المتاحة الآن؟»
+   ثلاثة مقاطع (تغطية/دعم/مركبات) — بلا بطاقات منفصلة.
+   ============================================================ */
+.ops-resources,
+.ops-events {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 10px;
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+}
+.ops-resources-seg,
+.ops-events-seg {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 0;
+    min-width: 160px;
+    padding: 7px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ex-border-soft);
+    font-size: 13px;
+    color: rgba(226, 232, 240, 0.85);
+}
+.ops-resources-seg > i:first-child,
+.ops-events-seg > i:first-child { color: rgba(96, 165, 250, 0.85); font-size: 14px; }
+.ops-resources-seg-btn,
+.ops-events-seg-btn { cursor: pointer; transition: background 0.18s ease, border-color 0.18s ease; }
+.ops-resources-seg-btn:hover,
+.ops-events-seg-btn:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--ex-border); }
+.ops-resources-label,
+.ops-events-label { color: rgba(148, 163, 184, 0.9); font-size: 12px; white-space: nowrap; }
+.ops-resources-value,
+.ops-events-value {
+    font-weight: 700;
+    font-size: 13px;
+    color: #F1F5F9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ops-resources-value.ok,
+.ops-events-value.ok     { color: rgba(52, 211, 153, 0.95); }
+.ops-resources-value.warn,
+.ops-events-value.warn   { color: rgba(251, 191, 36, 0.95); }
+.ops-resources-caret {
+    margin-inline-start: auto;
+    font-size: 10px;
+    color: rgba(148, 163, 184, 0.7);
+    transition: transform 0.2s ease;
+}
+.ops-resources-caret.open { transform: rotate(180deg); }
+.ops-resources-support-list {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px dashed var(--ex-border-soft);
+    padding-top: 10px;
+}
+.ops-resources-supporter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--ex-border-soft);
+    font-size: 12.5px;
+}
+.ops-resources-supporter .sup-name { font-weight: 600; color: #E2E8F0; }
+.ops-resources-supporter .sup-meta { color: rgba(148, 163, 184, 0.85); font-size: 11.5px; }
+.ops-resources-support-empty { color: rgba(148, 163, 184, 0.8); font-size: 12.5px; padding: 4px; }
+.ops-resources-support-cta {
+    align-self: flex-start;
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(96, 165, 250, 0.95);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px 0;
+}
+.ops-resources-support-cta:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) {
+    .ops-resources-seg-btn, .ops-resources-caret, .ops-events-seg-btn { transition: none; }
+}
+
+
+/* ============================================================
+   المنطقة 3: شريط الأحداث النشطة — الأنماط مدمجة مع شريط الموارد
+   (محددات مجمّعة أعلاه: صفر تكرار). هنا الفروق الخاصة فقط.
+   ============================================================ */
+.ops-events-value-wide { flex: 1; min-width: 0; }
+
+
+/* ============================================================
+   Executive Polish — توحيد الهوية البصرية النهائي (بصري فقط).
+   ① إزالة الخلفيات البيضاء المتبقية  ② ضغط بطاقات الإحصائيات
+   ③ تقليل الخطوط الفاصلة  ④ لغة واحدة  ⑤ توازن المسافات
+   ============================================================ */
+
+/* ① الخلفيات البيضاء المتبقية — قسم «توزيع البلاغات حسب النوع» وملحقاته */
+.live-report-distribution {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    padding: 12px 14px !important;
+}
+.live-report-distribution-title { color: var(--ex-text-2) !important; margin-bottom: 10px !important; }
+.live-report-distribution-title i { color: #7FB3FA !important; }
+.live-report-sync-header {
+    background: rgba(16, 181, 134, 0.10) !important;
+    color: var(--ex-emerald-txt) !important;
+    border: 1px solid rgba(16, 181, 134, 0.22) !important;
+    margin-top: 10px !important;
+    padding: 8px 12px !important;
+}
+/* أيقونة coral كانت بلا تغطية — تدرّج أحمر فاتح يكسر الداكن */
+.live-report-stat-icon.coral { background: rgba(239, 68, 68, 0.12) !important; color: #F87171 !important; }
+.live-report-stat:hover {
+    background: rgba(255, 255, 255, 0.055) !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: var(--ex-border) !important;
+}
+
+/* ② ضغط بطاقات «إحصائيات البلاغات الحية» — كثافة أعلى بارتفاع أقل */
+.live-report-card { padding: 16px 20px !important; }
+.live-report-stats-grid { gap: 10px !important; margin-bottom: 12px !important; }
+.live-report-stat {
+    flex-direction: row !important;
+    align-items: center !important;
+    text-align: start !important;
+    gap: 10px !important;
+    padding: 10px 14px !important;
+}
+.live-report-stat-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.85rem !important;
+    margin-bottom: 0 !important;
+    flex-shrink: 0;
+}
+.live-report-stat-value { font-size: 1.35rem !important; margin-bottom: 0 !important; }
+.live-report-stat-label { font-size: 0.7rem !important; }
+
+/* ③ تقليل الخطوط الفاصلة — مسافات وظلال بدل الخطوط */
+.distribution-header,
+.live-report-header {
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 12px !important;
+}
+
+/* ⑤ توازن المسافات العمودية — نفس إيقاع الأشرطة الجديدة (18px) */
+.distribution-card { padding: 18px 22px !important; }
+.distribution-card,
+.live-report-card { margin-bottom: 18px !important; }
+.distribution-icon-wrap,
+.live-report-icon-wrap {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 0.95rem !important;
+}
+
+/* تقليل الحركة — الامتداد الطبيعي للقواعد الجديدة */
+@media (prefers-reduced-motion: reduce) {
+    .live-report-stat { transition: none !important; }
+}
+
+
+/* ============================================================
+   Executive Quality Pack — نتائج مراجعة الجودة النهائية (بصري فقط)
+   ① إيقاع عمودي واحد  ② حالة الاتصال للذيل  ③ Toolbox مدمج
+   ============================================================ */
+
+/* ① إيقاع واحد: gap في الحاوية وحده يملك المسافات بين الأقسام —
+   تصفير هوامش الأقسام حتى لا تتضاعف الفجوات (22px موحّد) */
+.header, .workforce-dashboard, .ops-focus, .ops-resources, .ops-events,
+.distribution-card, .live-report-card, .info-bar, .ops-map-section {
+    margin-bottom: 0 !important;
+}
+
+/* ② حالة الاتصال في ذيل الصفحة (order:15 في كتلة الترتيب) — همسة بيئية */
+.update-status { text-align: center; padding-top: 2px; font-size: 0.72rem !important; }
+
+/* ③ شريط التحكم التنفيذي — Toolbox مدمج منخفض الوزن البصري.
+   يبقى في منطقته التشغيلية؛ نخفف حضوره فقط: بلا ظل، تعبئة أخف،
+   أزرار شبحية صغيرة تستعيد تعبئتها عند التحويم فقط */
+.info-bar {
+    padding: 8px 14px !important;
+    border-radius: var(--ex-radius-md) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    box-shadow: none !important;
+}
+.info-bar .toolbar { gap: 6px !important; }
+.info-bar .toolbar .btn:not(.btn-shift-status) {
+    padding: 6px 12px !important;
+    font-size: 0.76rem !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    border-color: var(--ex-border-soft) !important;
+    color: var(--ex-text-3) !important;
+}
+.info-bar .toolbar .btn:not(.btn-shift-status):hover {
+    background: var(--ex-surface-2) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-text) !important;
+    transform: none !important;
+}
+.total-box { font-size: 0.8rem !important; }
+.total-box > i { color: var(--ex-text-4); margin-inline-end: 2px; }
+
+
+/* ============================================================
+   المرحلة الرابعة: نظام النوافذ التنفيذي (Executive Modal System)
+   كل نافذة = طبقة أعمق من مركز القيادة نفسه، لا «موقع آخر».
+   بصري فقط — التغطية عبر !important فوق الأنماط المضمّنة الشرعية،
+   بلا أي تغيير في الوظائف أو التدفقات أو المنطق.
+   ============================================================ */
+
+/* الستارة — عمق أهدأ فوق اللوحة */
+.modal {
+    background: rgba(4, 8, 16, 0.62) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* جسم النافذة — زجاج كحلي يطفو بثقة */
+.modal-content, .modal-dialog {
+    background: rgba(11, 18, 32, 0.96) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    color: var(--ex-text) !important;
+    animation: exModalIn 0.22s ease-out !important;
+}
+@keyframes exModalIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+
+
+}
+/* ==========================================================================
+   تغليب الجذر المشترك — مجموعة smart-toolbar البيضاء للنوافذ الـ19
+   (smart-toolbar.css:1983-2156)
+   التشخيص بـcomputed style (Chrome headless): القواعد المجمّعة بالـID مثل
+   «#chartsModal .modal-content { background:#FFFFFF !important }» سبقتها (1,1,0)
+   أعلى من قاعدة «.modal-content» العامة هنا (0,1,0) ⇒ صدفة بيضاء ونص داكن
+   رغم تحميل هذا الملف لاحقًا. التغليب بنفس المحددات حرفيًا (نفس السبقية)
+   + هذا الملف يُحمَّل بعد smart-toolbar ⇒ القيم التنفيذية الداكنة تكسب.
+   هذا إصلاح جذري لكل النوافذ التسع عشرة المشتركة، لا لنافذة الرسوم وحدها.
+   ========================================================================== */
+#shiftModal .modal-content,
+#distributionModal .modal-content,
+#peakTimeModal .modal-content,
+#controlModal .modal-content,
+#formsModal .modal-content,
+#analyticsModal .modal-content,
+#chartsModal .modal-content,
+#auditLogModal .modal-content,
+#operationsRoomModal .modal-content,
+#passwordModal .modal-content,
+#changePasswordModal .modal-content,
+#seniorShiftModal .modal-content,
+#monthlyTableModal .modal-content,
+#airAmbulanceModal .modal-content,
+#docsPage .modal-content,
+#soundSettingsPanel .modal-content,
+#peakAlertModal .modal-content,
+#mapModal .modal-content,
+#opsPreviewModal .modal-content,
+#opsModal .modal-content {
+    background: rgba(11, 18, 32, 0.96) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius) !important;
+    box-shadow: var(--ex-shadow-deep) !important;
+    color: var(--ex-text) !important;
+}
+
+#shiftModal .modal-content h2,
+#distributionModal .modal-content h2,
+#peakTimeModal .modal-content h2,
+#controlModal .modal-content h2,
+#formsModal .modal-content h2,
+#analyticsModal .modal-content h2,
+#chartsModal .modal-content h2,
+#auditLogModal .modal-content h2,
+#operationsRoomModal .modal-content h2,
+#passwordModal .modal-content h3,
+#changePasswordModal .modal-content h3,
+#seniorShiftModal .modal-content h2,
+#monthlyTableModal .modal-content h2,
+#airAmbulanceModal .modal-content h2,
+#peakAlertModal .modal-content h2,
+#mapModal .modal-content h2,
+#opsModal .modal-content .modal-title {
+    color: var(--ex-text) !important;
+}
+
+#shiftModal .modal-content .sub-title,
+#distributionModal .modal-content .sub-title,
+#peakTimeModal .modal-content .sub-title,
+#controlModal .modal-content .sub-title,
+#formsModal .modal-content .sub-title,
+#analyticsModal .modal-content .sub-title,
+#chartsModal .modal-content .sub-title,
+#auditLogModal .modal-content .sub-title,
+#seniorShiftModal .modal-content .sub-title,
+#passwordModal .modal-content .sub-title,
+#changePasswordModal .modal-content .sub-title {
+    color: var(--ex-text-4) !important;
+}
+
+#shiftModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#distributionModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#peakTimeModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#controlModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#formsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#analyticsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#chartsModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#auditLogModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#operationsRoomModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#passwordModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#changePasswordModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#seniorShiftModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#monthlyTableModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#airAmbulanceModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#peakAlertModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#mapModal .modal-content .btn:not(.btn-primary):not(.btn-gold):not(.btn-coral):not(.btn-danger):not(.btn-teal):not(.btn-whatsapp):not(.btn-success):not(.btn-warning),
+#opsModal .modal-content .modal-close {
+    color: var(--ex-text-2) !important;
+}
+
+
+/* الترويسات — عربي واضح، بلا ظلال نصية */
+.modal-content h1, .modal-content h2, .modal-content h3, .modal-content h4 {
+    color: var(--ex-text) !important;
+    font-weight: 600 !important;
+    text-shadow: none !important;
+}
+.modal-content h2 i, .modal-content h3 i { color: var(--ex-emerald-txt) !important; }
+.modal-header { border-bottom: 1px solid var(--ex-border-soft) !important; }
+
+/* الأنماط المضمّنة: عناوين primary-700 → نص تنفيذي (والأيقونات زمردية) */
+.modal-content [style*="primary-700"] { color: var(--ex-text) !important; }
+.modal-content i[style*="primary-700"] { color: var(--ex-emerald-txt) !important; }
+.modal-content [style*="primary-100"] { background: rgba(96, 165, 250, 0.12) !important; color: #7FB3FA !important; }
+
+/* النصوص الرمادية المضمّنة → سلّم نصوص الهوية */
+.modal-content [style*="color:var(--gray-8"], .modal-content [style*="color: var(--gray-8"] { color: var(--ex-text) !important; }
+.modal-content [style*="color:var(--gray-7"], .modal-content [style*="color: var(--gray-7"] { color: var(--ex-text-2) !important; }
+.modal-content [style*="color:var(--gray-6"], .modal-content [style*="color: var(--gray-6"] { color: var(--ex-text-3) !important; }
+.modal-content [style*="color:var(--gray-5"], .modal-content [style*="color: var(--gray-5"] { color: var(--ex-text-4) !important; }
+.modal-content [style*="color:var(--gray-4"], .modal-content [style*="color: var(--gray-4"] { color: var(--ex-text-5) !important; }
+
+/* الخلفيات الفاتحة المضمّنة → سطوح زجاجية */
+.modal-content [style*="background:var(--white)"], .modal-content [style*="background: var(--white)"],
+.modal-content [style*="background:white"] { background: rgba(255, 255, 255, 0.05) !important; }
+.modal-content [style*="background:var(--gray-50)"], .modal-content [style*="background: var(--gray-50)"],
+.modal-content [style*="background:var(--gray-100)"], .modal-content [style*="background: var(--gray-100)"] { background: rgba(255, 255, 255, 0.035) !important; }
+
+/* الحدود الرمادية المضمّنة → حدود الهوية */
+.modal-content [style*="border"][style*="--gray-100"],
+.modal-content [style*="border"][style*="--gray-200"],
+.modal-content [style*="border"][style*="--gray-300"] { border-color: var(--ex-border-soft) !important; }
+
+/* الحقول والنماذج — داكنة بحدود هادئة وتركيز زمردي ناعم */
+.modal-content input, .modal-content select, .modal-content textarea {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--ex-border) !important;
+    color: var(--ex-text) !important;
+    border-radius: 9px !important;
+}
+.modal-content input:focus, .modal-content select:focus, .modal-content textarea:focus {
+    border-color: rgba(14, 164, 122, 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(14, 164, 122, 0.12) !important;
+    outline: none !important;
+}
+.modal-content input::placeholder, .modal-content textarea::placeholder { color: var(--ex-text-5) !important; }
+.modal-content select option { background: #0B1424; color: var(--ex-text); }
+.modal-content label { color: var(--ex-text-3) !important; }
+
+/* الأزرار — زجاج ثانوي، زمردي أولي، أحمر هادئ للخطر */
+.modal-content .btn {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border) !important;
+    color: var(--ex-text-2) !important;
+    box-shadow: none !important;
+    border-radius: 10px !important;
+}
+.modal-content .btn:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(14, 164, 122, 0.4) !important;
+    color: var(--ex-text) !important;
+}
+.modal-content .btn-primary {
+    background: var(--ex-emerald) !important;
+    border: 1px solid transparent !important;
+    color: #FFFFFF !important;
+    box-shadow: none !important;
+}
+.modal-content .btn-primary:hover { background: var(--ex-emerald-hi) !important; color: #FFFFFF !important; }
+.modal-content .btn-danger {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: #F87171 !important;
+}
+
+/* الجداول — صفوف تتنفس، تناوب شفاف فقط، بلا حدود قاسية */
+.modal-content table { border-collapse: collapse !important; }
+.modal-content th {
+    background: rgba(255, 255, 255, 0.03) !important;
+    color: var(--ex-text-3) !important;
+    border: none !important;
+    border-bottom: 1px solid var(--ex-border) !important;
+    padding: 10px 12px !important;
+    font-weight: 600 !important;
+}
+.modal-content td {
+    color: var(--ex-text-2) !important;
+    border: none !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    padding: 10px 12px !important;
+}
+.modal-content tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02) !important; }
+
+/* فاصل أزرار أسفل النافذة */
+.modal-buttons { border-top: 1px solid var(--ex-border-soft) !important; }
+
+/* التمرير التنفيذي — رفيع داكن */
+.modal-content::-webkit-scrollbar { width: 8px; }
+.modal-content::-webkit-scrollbar-track { background: transparent; }
+.modal-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.10); border-radius: 4px; }
+.modal-content::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+    .modal-content, .modal-dialog { animation: none !important; }
+}
+
+/* ==========================================================================
+   نافذة «الإحصائيات والرسوم البيانية» #chartsModal — توحيد السطح ②
+   (المرجع البصري: admin-vehicles.html — نفس قيم الرموز)
+   الجذور المُعالجة:
+   ١) .chart-summary كانت بلا أي تنسيق ⇒ ٤ بطاقات متراكبة بعرض كامل = فراغات.
+   ٢) app.css يقيّد .modal-content بـ max-width:900px !important ويتغلّب على
+      الـinline ⇒ نافذة ضيقة ورسوم صغيرة وسط فراغ.
+   ٣) .chart-canvas-container بارتفاع ثابت 220px ⇒ الرسم ليس البطل.
+   ٤) .charts-summary-card فاتحة بأصناف app.css (خارج طبقة الـinline-sniffing)
+      + رقائق أيقونات gold-50/teal-50/coral-50 الباستيل ⇒ «بهتان».
+   كل القيم هنا من كتلة رموز admin-vehicles: خلفية 0.035، حد 0.08،
+   ظل inset مزدوج، نص #F1F5F9، صبغات أيقونات 0.10-0.12.
+   ========================================================================== */
+/* صندوق النافذة — عرض تنفيذي يستوعب الرسوم (يتغلّب على قيد app.css) */
+#chartsModal .modal-content, #chartsModal .modal-content.charts-modal-content {
+    width: 95% !important;
+    max-width: 1400px !important;
+    max-height: 92vh !important;
+    padding: 22px 24px !important;
+}
+/* الترويسة — خط فاصل هادئ بدل الهامش العائم */
+#chartsModal .cm-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--ex-border-soft);
+}
+#chartsModal .cm-title-wrap { display: flex; align-items: center; gap: 12px; }
+#chartsModal .cm-title { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--ex-text); }
+#chartsModal .cm-subtitle { font-size: 0.72rem; color: var(--ex-text-4); }
+#chartsModal .cm-header .card-icon.gold {
+    background: rgba(245,158,11,0.12) !important; color: #FBBF24 !important;
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 1.05rem;
+}
+/* أيقونات عناوين البطاقات — دلالية حية مطابقة لألوان الرسوم المعتمدة */
+#chartsModal .chart-card h3 i.cm-ic-teal  { color: #10B586 !important; }
+#chartsModal .chart-card h3 i.cm-ic-blue  { color: #60A5FA !important; }
+#chartsModal .chart-card h3 i.cm-ic-coral { color: #F87171 !important; }
+#chartsModal .chart-card h3 i.cm-ic-gold  { color: #FBBF24 !important; }
+/* شريط الملخص — شبكة ٤ أعمدة تملأ العرض (الجذر ١: كان بلا تنسيق إطلاقًا) */
+#chartsModal .chart-summary {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 18px;
+}
+@media (max-width: 1100px) {
+    #chartsModal .chart-summary { grid-template-columns: repeat(2, 1fr); }
+}
+/* بطاقات الملخص العلوية — زجاج admin-vehicles حرفيًا */
+#chartsModal .charts-summary-card {
+    background: rgba(255,255,255,0.035) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30) !important;
+    transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+#chartsModal .charts-summary-card:hover {
+    background: rgba(255,255,255,0.065) !important;
+    border-color: rgba(255,255,255,0.14) !important;
+    transform: translateY(-1px);
+}
+#chartsModal .charts-summary-card .info .value {
+    color: #F1F5F9 !important; font-weight: 800 !important; font-size: 1.3rem !important; line-height: 1.25;
+}
+#chartsModal .charts-summary-card .info .label {
+    color: var(--ex-text-4) !important; font-size: 0.72rem !important; margin-top: 2px;
+}
+#chartsModal .charts-summary-card .icon {
+    width: 40px !important; height: 40px !important; border-radius: 10px !important; font-size: 1.05rem !important;
+}
+#chartsModal .charts-summary-card .icon.cs-icon-blue  { background: rgba(96,165,250,0.12) !important; color: #60A5FA !important; }
+#chartsModal .charts-summary-card .icon.cs-icon-gold  { background: rgba(245,158,11,0.12) !important; color: #FBBF24 !important; }
+#chartsModal .charts-summary-card .icon.cs-icon-teal  { background: rgba(16,181,134,0.12) !important; color: #10B586 !important; }
+#chartsModal .charts-summary-card .icon.cs-icon-coral { background: rgba(239,68,68,0.12) !important; color: #F87171 !important; }
+/* بطاقات الرسوم — نفس الزجاج والظل المزدوج (يتغلّب على box-shadow:none في <style> المضمّن) */
+body #chartsModal .chart-card {
+    border-radius: 14px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30) !important;
+    padding: 16px 18px !important;
+}
+body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
+/* الرسم هو البطل — ارتفاع الحاوية 220px → 300px (CSS فقط، بلا لمس منطق الرسم) */
+#chartsModal .chart-canvas-container { height: 300px !important; }
+
+/* ============================================================
+   نافذة النماذج (forms-modal) وبطاقات الإدخال (#formContent)
+   إكمال توحيد الهوية: هيكل النافذة والبطاقات على لغة الزجاج الداكن
+   ============================================================ */
+
+/* ترويسة النافذة — زجاج داكن بدل الشريط الأبيض */
+.forms-modal-wrapper .forms-modal-header {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+}
+.forms-modal-wrapper .forms-header-text h2 { color: var(--ex-text) !important; }
+.forms-modal-wrapper .forms-header-text p { color: var(--ex-text-4) !important; }
+.forms-modal-wrapper .forms-header-icon {
+    background: linear-gradient(135deg, var(--ex-emerald), var(--ex-emerald-hi)) !important;
+}
+.forms-modal-wrapper .forms-close-btn {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border) !important;
+    color: var(--ex-text-3) !important;
+}
+.forms-modal-wrapper .forms-close-btn:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: rgba(239, 68, 68, 0.35) !important;
+    color: #F87171 !important;
+}
+
+/* الشريط الجانبي — عمود داكن بعناصر زجاجية وتفعيل زمردي */
+.forms-modal-wrapper .forms-sidebar {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-left: 1px solid var(--ex-border-soft) !important;
+}
+.forms-modal-wrapper .forms-sidebar-item {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+}
+.forms-modal-wrapper .forms-sidebar-item:hover {
+    background: var(--ex-surface-2) !important;
+    border-color: rgba(14, 164, 122, 0.30) !important;
+}
+.forms-modal-wrapper .forms-sidebar-item.active {
+    background: rgba(14, 164, 122, 0.12) !important;
+    border-color: rgba(14, 164, 122, 0.45) !important;
+    color: var(--ex-emerald-txt) !important;
+}
+.forms-modal-wrapper .forms-sidebar-item .text .name { color: var(--ex-text) !important; }
+.forms-modal-wrapper .forms-sidebar-item .text .desc { color: var(--ex-text-4) !important; }
+.forms-modal-wrapper .forms-sidebar-item.active .text .name { color: var(--ex-emerald-txt) !important; }
+
+/* منطقة المحتوى — سطح داكن يوارث زجاج النافذة */
+.forms-modal-wrapper .forms-main-content { background: transparent !important; }
+.forms-modal-wrapper .forms-loading { color: var(--ex-text-4) !important; }
+
+/* بطاقات النماذج — زجاج داكن بحدود الهوية */
+#formContent .form-card {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    box-shadow: none !important;
+}
+#formContent .form-card-title {
+    color: var(--ex-text) !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+}
+
+/* شبكة مربعات الاختيار وسجلات المحفوظات — سطوح داكنة */
+#formContent .checkbox-grid {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+}
+#formContent .checkbox-grid label:hover { background: var(--ex-surface-2) !important; }
+#formContent .saved-records {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+}
+
+
+
+/* ==========================================================================
+   نافذة توزيع البلاغات #distributionModal — إعادة تصميم داكنة (السطح ④)
+   المرجع البصري: بطاقات admin-vehicles (زجاج 0.035 / حدود 0.08 /
+   ظل ex-shadow-card / نصف قطر 14px / نص ex-text بوزن 700-800).
+   التشخيص الحي (Chrome headless، computed style): بطاقات المراكز var(--white)،
+   رأس المركز باستيل sector-smart، بطاقات الفرق بتدرجات smart-color فاقعة — كلها
+   من app.css (بدون !important عدا smart-color/sector-smart) ⇒ قاعدة أعمّ بـ
+   !important وسبقية أعلى (#distributionModal) تكسب بلا نسخ محددات.
+   الألوان الدلالية 🟢🟡🟠🔴 محفوظة بنفس العتبات (<5، ≤10، ≤15، >15) —
+   الدوال في app.js لم تُمس (byte-identical)؛ تتبدّل اللكنة فقط:
+   حدّ + صبغة هادئة على زجاج داكن بدل التدرج الفاقع. كل التوقيتات 0.2s.
+   ========================================================================== */
+
+/* أبعاد الصدفة وإيقاع الترويسة (كانت style مضمّنة في index.html) */
+#distributionModal .dm-modal-content { min-width: 900px; width: 95%; max-width: 1400px; }
+#distributionModal .dm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px; }
+#distributionModal .dm-header-main { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#distributionModal .dm-title { margin: 0; color: var(--ex-text) !important; }
+#distributionModal .dm-title i { color: var(--ex-emerald-txt) !important; }
+
+/* صندوق اختيار نوع البلاغ — زجاج داكن بدل gray-50/white الفاتحين */
+#distributionModal .dm-select-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--ex-surface) !important;
+    padding: 6px 12px; border-radius: var(--ex-radius-md);
+    border: 1px solid var(--ex-border) !important;
+}
+#distributionModal .dm-label { font-size: 0.75rem; font-weight: 600; color: var(--ex-text-3) !important; margin: 0; }
+/* select: نفس سبقية smart-toolbar (1,2,1) بالضبط + هذا الملف يُحمَّل لاحقًا ⇒ يكسب */
+#distributionModal .modal-content select.dm-select {
+    padding: 4px 8px; border-radius: 8px;
+    border: 1px solid var(--ex-border) !important;
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--ex-text) !important;
+    background-color: #101B30 !important;
+    cursor: pointer; min-width: 140px; font-family: inherit;
+}
+#distributionModal select.dm-select option { background: #101B30; color: var(--ex-text); }
+#distributionModal .dm-report-btn { padding: 6px 14px !important; font-size: 0.75rem !important; }
+
+/* حالتا التحميل والفراغ (كانتا style مضمّنة في app.js) */
+#distributionModal .dm-loading { text-align: center; padding: 3rem 1rem; color: var(--ex-text-4); }
+#distributionModal .dm-loading-icon { font-size: 2rem; margin-bottom: 1rem; display: block; }
+#distributionModal .dm-empty { text-align: center; padding: 3rem 1rem; color: var(--ex-text-4); }
+#distributionModal .dm-empty-icon { font-size: 3rem; margin-bottom: 1rem; display: block; color: var(--ex-text-5); }
+#distributionModal .dm-empty-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--ex-text-2); }
+#distributionModal .dm-empty-sub { font-size: 0.85rem; }
+
+/* بطاقة المركز — زجاج داكن بقيم admin-vehicles (تغلب var(--white) المجمّعة في app.css:175) */
+#distributionModal .distribution-sector-card {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: var(--ex-shadow-card) !important;
+}
+
+/* رأس المركز — لكنة دلالية هادئة (تغلب تدرجات sector-smart الباستيل) */
+#distributionModal .distribution-sector-header {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft);
+    color: var(--ex-text) !important;
+}
+#distributionModal .distribution-sector-header .sector-name i { color: var(--ex-emerald-txt) !important; }
+#distributionModal .distribution-sector-header .sector-total { font-weight: 800; }
+#distributionModal .sector-smart-green  { background: rgba(16,181,134,0.10) !important; border-color: rgba(16,181,134,0.35) !important; color: #10B586 !important; }
+#distributionModal .sector-smart-yellow { background: rgba(245,158,11,0.10) !important; border-color: rgba(245,158,11,0.35) !important; color: #FBBF24 !important; }
+#distributionModal .sector-smart-orange { background: rgba(249,115,22,0.10) !important; border-color: rgba(249,115,22,0.40) !important; color: #FB923C !important; }
+#distributionModal .sector-smart-red    { background: rgba(239,68,68,0.12) !important; border-color: rgba(239,68,68,0.40) !important; color: #F87171 !important; }
+
+/* بطاقة الفرقة — زجاج داكن؛ الفارغة أخفت بوضوح (حدّ متقطع + سطح أبهت) من المشغولة */
+#distributionModal .distribution-unit-item {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+#distributionModal .distribution-unit-item:not(.smart-color-green):not(.smart-color-yellow):not(.smart-color-orange):not(.smart-color-red) {
+    background: rgba(255,255,255,0.02) !important;
+    border-style: dashed;
+}
+#distributionModal .distribution-unit-item:hover {
+    border-color: rgba(16,181,134,0.45) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.30) !important;
+    transform: translateY(-2px);
+}
+#distributionModal .distribution-unit-item .unit-name { color: var(--ex-text-2) !important; }
+#distributionModal .distribution-unit-item .unit-count { color: var(--ex-text) !important; }
+#distributionModal .distribution-unit-item .unit-count.zero { color: var(--ex-text-5) !important; }
+#distributionModal .unit-paramedics { font-size: 0.65rem; color: var(--ex-text-4); margin-top: 2px; text-align: center; }
+
+/* الشارة المرجانية — عدّاد البلاغات فوق بطاقة الفرقة */
+#distributionModal .distribution-unit-item .unit-badge {
+    background: linear-gradient(135deg, #EF4444, #F87171) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(239,68,68,0.35) !important;
+}
+
+/* اللكنة الدلالية للفرق المشغولة 🟢🟡🟠🔴 — حدّ + صبغة + عدّاد ملوّن (تغلب التدرجات الفاقعة) */
+#distributionModal .smart-color-green  { background: rgba(16,181,134,0.10) !important; border-color: rgba(16,181,134,0.45) !important; }
+#distributionModal .smart-color-yellow { background: rgba(245,158,11,0.10) !important; border-color: rgba(245,158,11,0.45) !important; }
+#distributionModal .smart-color-orange { background: rgba(249,115,22,0.12) !important; border-color: rgba(249,115,22,0.50) !important; }
+#distributionModal .smart-color-red    { background: rgba(239,68,68,0.14) !important; border-color: rgba(239,68,68,0.50) !important; }
+#distributionModal .smart-color-green .unit-count  { color: #10B586 !important; text-shadow: none !important; }
+#distributionModal .smart-color-yellow .unit-count { color: #FBBF24 !important; text-shadow: none !important; }
+#distributionModal .smart-color-orange .unit-count { color: #FB923C !important; text-shadow: none !important; }
+#distributionModal .smart-color-red .unit-count    { color: #F87171 !important; text-shadow: none !important; }
+#distributionModal .smart-color-green .unit-name,
+#distributionModal .smart-color-yellow .unit-name,
+#distributionModal .smart-color-orange .unit-name,
+#distributionModal .smart-color-red .unit-name { color: var(--ex-text) !important; text-shadow: none !important; }
+
+/* لوحة الإحصائيات الحية وبطاقاتها — نفس لغة بطاقات ملخص الرسوم المعتمدة */
+#distributionModal .distribution-stats-dashboard {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: var(--ex-shadow-card) !important;
+}
+#distributionModal .stats-dashboard-header { border-bottom: 1px solid var(--ex-border-soft) !important; }
+#distributionModal .stats-dashboard-header i { color: var(--ex-emerald-txt) !important; }
+#distributionModal .stats-dashboard-title { color: var(--ex-text) !important; }
+#distributionModal .stat-card {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius-md) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+#distributionModal .stat-card:hover {
+    border-color: rgba(16,181,134,0.40) !important;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.32) !important;
+}
+#distributionModal .stat-card-value { color: var(--ex-text) !important; font-weight: 800; }
+#distributionModal .stat-card-label { color: var(--ex-text-4) !important; }
+#distributionModal .stat-card.time .stat-card-value { color: var(--ex-text) !important; }
+
+/* وسوم الأنواع وشريط النشاط — مسارات داكنة وألوان دلالية صلبة */
+#distributionModal .unit-type-breakdown { border-top: 1px solid var(--ex-border-soft) !important; color: var(--ex-text-4) !important; }
+#distributionModal .unit-type-breakdown .type-tag {
+    background: var(--ex-surface-2) !important;
+    color: var(--ex-text-3) !important;
+    border: 1px solid var(--ex-border-soft);
+}
+#distributionModal .activity-bar { background: rgba(255,255,255,0.06) !important; }
+#distributionModal .activity-bar-fill.ab-green  { background: #10B586; }
+#distributionModal .activity-bar-fill.ab-yellow { background: #F59E0B; }
+#distributionModal .activity-bar-fill.ab-orange { background: #F97316; }
+#distributionModal .activity-bar-fill.ab-red    { background: #EF4444; }
+
+/* أزرار إجراءات الفرقة (كانت style مضمّنة) + إظهار/إخفاء التراجع بالأصناف —
+   بلا !important على display عمدًا: updateUnitDisplay يضبط style.display قسريًا
+   بعد كل بلاغ/تراجع، والنمط المضمّن يتغلب على القاعدة هنا فيبقى السلوك نفسه */
+#distributionModal .unit-action-btn { padding: 2px 8px !important; font-size: 0.55rem !important; border-radius: 12px !important; }
+#distributionModal .undo-btn.is-hidden { display: none; }
+#distributionModal .undo-btn.is-visible { display: inline-flex; }
+
+/* ==========================================================================
+   جولة نافذة «تقرير المناوبة» (#shiftReportModal) — الهوية التنفيذية الداكنة
+   بصري فقط (صفر منطق/بيانات/API). الجذور المشخَّصة قبل اللمس:
+   app.css (محمي): header بتدرج primary-700→primary-500 فاقع، body بـvar(--gray-50)،
+   sections بـvar(--white) وحدود var(--gray-200)، highlight بتدرج primary-50→100،
+   footer بـvar(--white)، والقيم بـvar(--primary-700) — كلها تُغلَّب هنا
+   (نفس السبقية + هذا الملف يُحمَّل أخيرًا بعد app.css).
+   التصدير: «تحميل التقرير» (downloadShiftReport في app.js) يبني مستند .txt
+   مستقلًا عبر Blob بلا أي اعتماد على أنماط الشاشة ⇒ الشاشة داكنة والمستند كما كان.
+   وتحصين @media print أدناه يبقي أي طباعة متصفح فاتحة الهوية الرسمية.
+   ========================================================================== */
+#shiftReportModal .shift-report-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    padding: 16px 22px !important;
+}
+#shiftReportModal .sr-header-main { display: flex; align-items: center; gap: 12px; }
+#shiftReportModal .shift-report-header .fa-file-medical-alt { font-size: 1.4rem; color: #60A5FA !important; }
+#shiftReportModal .shift-report-header h2 { color: var(--ex-text) !important; font-weight: 800 !important; }
+#shiftReportModal .sr-close-btn {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid var(--ex-border) !important;
+    color: var(--ex-text-2) !important;
+    width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+#shiftReportModal .sr-close-btn:hover { background: rgba(239,68,68,0.15) !important; color: #FCA5A5 !important; }
+
+#shiftReportModal .shift-report-body { background: transparent !important; }
+
+/* الأقسام — زجاج 0.035، حدود 0.08، radius 14، ظل inset مزدوج (قيم الهوية المعتمدة) */
+#shiftReportModal .shift-report-section {
+    background: var(--ex-surface) !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: var(--ex-radius-md) !important;
+    box-shadow: var(--ex-shadow-card) !important;
+}
+#shiftReportModal .shift-report-section h3 {
+    color: var(--ex-text) !important;
+    font-weight: 700 !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    padding-bottom: 8px !important;
+}
+/* صبغات دلالية مقروءة لأيقونات عناوين الأقسام (ترتيب البنّاء في app.js ثابت) */
+#shiftReportBody .shift-report-section:nth-of-type(1) h3 i { color: #60A5FA !important; }
+#shiftReportBody .shift-report-section:nth-of-type(2) h3 i { color: #FBBF24 !important; }
+#shiftReportBody .shift-report-section:nth-of-type(3) h3 i { color: #4FBF9A !important; }
+#shiftReportBody .shift-report-section:nth-of-type(4) h3 i { color: #F87171 !important; }
+#shiftReportBody .shift-report-section:nth-of-type(5) h3 i { color: #FBBF24 !important; }
+
+/* العناصر — بطاقات زجاجية والقيم بأزرق الهوية المقروء بدل primary-700 الفاقع */
+#shiftReportModal .shift-report-item {
+    background: var(--ex-surface-2) !important;
+    border: 1px solid var(--ex-border-soft) !important;
+    border-radius: 10px !important;
+}
+#shiftReportModal .shift-report-item .label { color: var(--ex-text-2) !important; }
+#shiftReportModal .shift-report-item .value { color: #60A5FA !important; font-weight: 800 !important; }
+
+/* أقسام التمييز (الملخص/أبرز الإحصائيات) — صبغة زرقاء هادئة بدل التدرج الفاتح */
+#shiftReportModal .shift-report-highlight {
+    background: rgba(96,165,250,0.07) !important;
+    border: 1px solid rgba(96,165,250,0.18) !important;
+}
+
+/* حالة الفراغ الداكنة المقروءة للأقسام بلا بيانات (المدينة/الفرق في اللقطة) —
+   CSS خالص عبر :empty (البنّاء يُخرج grid فارغًا تمامًا بلا عقد نصية) */
+#shiftReportModal .shift-report-grid:empty::before {
+    content: '📭 لا توجد بيانات مسجلة بعد';
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--ex-text-4);
+    font-size: 0.8rem;
+    padding: 14px 8px;
+    background: var(--ex-surface);
+    border: 1px dashed var(--ex-border);
+    border-radius: 10px;
+}
+
+#shiftReportModal .shift-report-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--ex-border-soft) !important;
+}
+
+/* تحصين الورق — الشاشة داكنة، وأي طباعة متصفح للنافذة تخرج فاتحة الهوية الرسمية */
+@media print {
+    #shiftReportModal .modal-content,
+    #shiftReportModal .shift-report-body,
+    #shiftReportModal .shift-report-footer {
+        background: #FFFFFF !important; color: #1F2937 !important;
+        box-shadow: none !important; border: none !important;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    }
+    #shiftReportModal .shift-report-header { background: #F8FAFC !important; border-bottom: 2px solid #1D4ED8 !important; }
+    #shiftReportModal .shift-report-header h2 { color: #1F2937 !important; }
+    #shiftReportModal .sr-close-btn { display: none !important; }
+    #shiftReportModal .shift-report-section,
+    #shiftReportModal .shift-report-highlight { background: #FFFFFF !important; border: 1px solid #E2E8F0 !important; box-shadow: none !important; }
+    #shiftReportModal .shift-report-section h3 { color: #1D4ED8 !important; border-bottom: 1px solid #E2E8F0 !important; }
+    #shiftReportModal .shift-report-item { background: #F8FAFC !important; border: 1px solid #E2E8F0 !important; }
+    #shiftReportModal .shift-report-item .label { color: #475569 !important; }
+    #shiftReportModal .shift-report-item .value { color: #1D4ED8 !important; }
+    #shiftReportModal .shift-report-grid:empty::before { color: #94A3B8 !important; background: #F8FAFC !important; border-color: #E2E8F0 !important; }
+}

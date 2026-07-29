@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>المشغل الذكي — قطاع الجنوب</title>
+<style>
+    /* ===== الرموز التصميمية — نفس لوحة النظام التنفيذي المعتمد (executive-theme.css) ===== */
+    :root {
+        --ex-bg:          #0A1220;
+        --ex-surface:     rgba(255, 255, 255, 0.035);
+        --ex-surface-2:   rgba(255, 255, 255, 0.05);
+        --ex-border:      rgba(255, 255, 255, 0.08);
+        --ex-border-soft: rgba(255, 255, 255, 0.06);
+        --ex-text:        #F1F5F9;
+        --ex-text-2:      #A9BACD;
+        --ex-text-3:      #8A9BB0;
+        --ex-text-4:      #7C8DA6;
+        --ex-text-5:      #5E7189;
+        --ex-emerald:     #0EA47A;
+        --ex-emerald-hi:  #10B586;
+        --ex-emerald-txt: #4FBF9A;
+        --ex-blue:        #60A5FA;
+        --ex-gold:        #F59E0B;
+        --ex-red:         #EF4444;
+        --ex-radius:      20px;
+        --ex-radius-md:   14px;
+        --ex-shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+        --ex-shadow-deep: inset 0 1px 0 rgba(255,255,255,0.045), 0 24px 60px rgba(0,0,0,0.40);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', Tahoma, 'Noto Kufi Arabic', Arial, sans-serif;
+        background: var(--ex-bg);
+        color: var(--ex-text);
+        min-height: 100vh;
+        padding: 22px clamp(14px, 4vw, 48px) 48px;
+        display: flex; flex-direction: column; gap: 22px;
+    }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(126, 166, 232, 0.06), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(14, 164, 122, 0.045), transparent 70%),
+            linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%);
+    }
+    body::after {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+    }
+    .glass {
+        background: var(--ex-surface);
+        border: 1px solid var(--ex-border-soft);
+        border-radius: var(--ex-radius);
+        box-shadow: var(--ex-shadow-card);
+    }
+    /* ===== ترويسة الهوية التنفيذية — لوحة نظام هادئة ===== */
+    #identity { text-align: center; padding: 14px 20px 4px; }
+    #identity::before {
+        content: ''; display: block; width: 56px; height: 3px; margin: 0 auto 16px;
+        border-radius: 2px; background: var(--ex-emerald);
+    }
+    .id-title { font-size: 26px; font-weight: 800; letter-spacing: 0.3px; }
+    .id-sub { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--ex-text-4); margin-top: 6px; font-weight: 600; }
+    .id-desc { font-size: 13.5px; color: var(--ex-text-3); margin-top: 10px; }
+    /* ===== الشريط العلوي ===== */
+    #topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 11px 22px; border-radius: var(--ex-radius-md);
+        background: rgba(11, 18, 32, 0.82);
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    #topbar .sys-label { font-size: 12px; color: var(--ex-text-4); letter-spacing: 0.2px; }
+    #conn { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ex-text-3); }
+    #conn-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ex-text-5); transition: background 0.4s ease; }
+    #conn-dot.online { background: var(--ex-emerald-hi); }
+    #conn-dot.offline { background: var(--ex-red); }
+    /* ===== ① الملخص التنفيذي ===== */
+    #zone-summary { padding: 26px 30px; text-align: center; }
+    #summary-text { font-size: clamp(17px, 2.2vw, 22px); font-weight: 600; line-height: 1.9; transition: opacity 0.5s ease; }
+    #summary-text.fading { opacity: 0.25; }
+    /* ===== ② الحالة التشغيلية ===== */
+    #zone-status { display: grid; grid-template-columns: 260px 1fr; gap: 18px; }
+    @media (max-width: 860px) { #zone-status { grid-template-columns: 1fr; } }
+    #readiness-card { padding: 24px; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+    #readiness-percent { font-size: 52px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; transition: opacity 0.5s ease; }
+    #readiness-percent.fading { opacity: 0.25; }
+    #readiness-word { font-size: 15px; font-weight: 700; }
+    .tone-stable  #readiness-percent, .tone-stable  #readiness-word { color: var(--ex-emerald-txt); }
+    .tone-attention #readiness-percent, .tone-attention #readiness-word { color: var(--ex-gold); }
+    .tone-critical #readiness-percent, .tone-critical #readiness-word { color: var(--ex-red); }
+    .tone-stable  #readiness-card { border-color: rgba(14,164,122,0.35); }
+    .tone-attention #readiness-card { border-color: rgba(245,158,11,0.35); }
+    .tone-critical #readiness-card { border-color: rgba(239,68,68,0.40); }
+    /* ===== وضع الاستعداد — طابع محايد هادئ ===== */
+    .tone-standby #readiness-percent, .tone-standby #readiness-word { color: var(--ex-text-3); }
+    #readiness-percent.standby-note { font-size: 15px; font-weight: 600; line-height: 1.9; }
+    #standby-banner {
+        padding: 12px 20px; border-radius: var(--ex-radius-md); text-align: center;
+        background: var(--ex-surface); border: 1px solid var(--ex-border-soft);
+        color: var(--ex-text-3); font-size: 13px; line-height: 1.8;
+    }
+    .risk-chip.calm { color: var(--ex-text-3); }
+    .empty-state small { display: block; margin-top: 6px; font-size: 12px; color: var(--ex-text-5); font-weight: 400; }
+    #status-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    @media (max-width: 640px) { #status-cards { grid-template-columns: 1fr; } }
+    .status-card { padding: 18px 20px; border-radius: var(--ex-radius-md); background: var(--ex-surface); border: 1px solid var(--ex-border-soft); }
+    .status-card .label { font-size: 11px; color: var(--ex-text-4); margin-bottom: 8px; }
+    .status-card .value { font-size: 17px; font-weight: 700; }
+    .status-card .sub { font-size: 12px; color: var(--ex-text-3); margin-top: 4px; }
+    /* ===== شريط المخاطر ===== */
+    #risks-strip { display: flex; flex-wrap: wrap; gap: 10px; min-height: 8px; }
+    .risk-chip {
+        font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+        border: 1px solid var(--ex-border); background: var(--ex-surface);
+    }
+    .risk-chip.sev-critical { color: var(--ex-red); border-color: rgba(239,68,68,0.45); }
+    .risk-chip.sev-warning { color: var(--ex-gold); border-color: rgba(245,158,11,0.40); }
+    .risk-chip.sev-info { color: var(--ex-blue); border-color: rgba(96,165,250,0.35); }
+    /* ===== ③ الإجراءات ذات الأولوية ===== */
+    #zone-actions { padding: 22px 26px; }
+    .zone-title { font-size: 14px; font-weight: 700; color: var(--ex-text-2); margin-bottom: 16px; }
+    #actions-list { display: flex; flex-direction: column; gap: 12px; }
+    .action-card {
+        display: grid; grid-template-columns: 44px 1fr; gap: 16px; align-items: start;
+        padding: 16px 18px; border-radius: var(--ex-radius-md);
+        background: var(--ex-surface-2); border: 1px solid var(--ex-border-soft);
+    }
+    .action-priority {
+        width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+        font-size: 16px; font-weight: 800; background: rgba(14,164,122,0.14); color: var(--ex-emerald-txt);
+        border: 1px solid rgba(14,164,122,0.30);
+    }
+    .action-card.p1 .action-priority { background: rgba(239,68,68,0.14); color: var(--ex-red); border-color: rgba(239,68,68,0.35); }
+    .action-card.p2 .action-priority { background: rgba(245,158,11,0.12); color: var(--ex-gold); border-color: rgba(245,158,11,0.30); }
+    .action-card .a-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .action-card .a-reason { font-size: 13px; color: var(--ex-text-3); margin-bottom: 8px; line-height: 1.7; }
+    .action-card .a-do { font-size: 13.5px; color: var(--ex-emerald-txt); font-weight: 600; line-height: 1.7; }
+    .empty-state { text-align: center; color: var(--ex-text-4); font-size: 14px; padding: 18px 0; }
+    /* ===== ④ الخط الزمني التشغيلي ===== */
+    #zone-timeline { padding: 22px 26px; }
+    #timeline-list { display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; padding-left: 6px; }
+    .tl-entry { display: grid; grid-template-columns: 86px 10px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--ex-border-soft); align-items: start; }
+    .tl-entry:last-child { border-bottom: none; }
+    .tl-time { font-size: 12px; color: var(--ex-text-4); font-variant-numeric: tabular-nums; padding-top: 2px; }
+    .tl-marker { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; background: var(--ex-text-5); }
+    .tl-marker.tone-stable { background: var(--ex-emerald-hi); }
+    .tl-marker.tone-attention { background: var(--ex-gold); }
+    .tl-marker.tone-critical { background: var(--ex-red); }
+    .tl-line { font-size: 13.5px; color: var(--ex-text-2); line-height: 1.8; }
+    /* ===== ⑤ الاستعلام التشغيلي — اختصارات تنفيذية + بطاقات إحاطة ===== */
+    #zone-ask { padding: 22px 26px; }
+    #ask-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .ask-shortcut {
+        padding: 13px 16px; border-radius: var(--ex-radius-md); cursor: pointer; text-align: right;
+        background: var(--ex-surface-2); border: 1px solid var(--ex-border); color: var(--ex-text-2);
+        font-size: 13.5px; font-weight: 600; font-family: inherit; line-height: 1.6;
+        transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+    }
+    .ask-shortcut:hover { color: var(--ex-emerald-txt); border-color: rgba(14,164,122,0.40); background: rgba(14,164,122,0.06); }
+    #ask-thread { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; padding-left: 6px; }
+    .brief-card {
+        padding: 14px 18px; border-radius: var(--ex-radius-md);
+        background: var(--ex-surface-2); border: 1px solid var(--ex-border-soft);
+    }
+    .brief-card .bc-title { font-size: 12.5px; font-weight: 700; color: var(--ex-text-4); margin-bottom: 6px; }
+    .brief-card .bc-body { font-size: 14px; line-height: 1.9; color: var(--ex-text); }
+    .bc-pending { display: inline-flex; align-items: center; gap: 8px; color: var(--ex-text-4); font-size: 13px; }
+    .bc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ex-emerald-hi); animation: calmPulse 1.6s ease-in-out infinite; }
+    @keyframes calmPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    /* سطر إدخال حر — ثانوي بصريًا تحت الاختصارات */
+    #ask-form { display: flex; gap: 10px; align-items: center; border-top: 1px solid var(--ex-border-soft); padding-top: 14px; }
+    #ask-input {
+        flex: 1; padding: 8px 4px; font-size: 13px; background: transparent; border: none;
+        border-bottom: 1px solid var(--ex-border-soft); color: var(--ex-text);
+        font-family: inherit; outline: none; transition: border-color 0.25s ease;
+    }
+    #ask-input::placeholder { color: var(--ex-text-5); }
+    #ask-input:focus { border-bottom-color: rgba(14,164,122,0.50); }
+    #ask-send {
+        padding: 8px 18px; border-radius: 10px; cursor: pointer; font-size: 12.5px; font-weight: 700; font-family: inherit;
+        background: transparent; border: 1px solid rgba(14,164,122,0.35); color: var(--ex-emerald-txt);
+        transition: background 0.25s ease;
+    }
+    #ask-send:hover { background: rgba(14,164,122,0.10); }
+    #ask-send:disabled { opacity: 0.45; cursor: default; }
+</style>
+</head>
+<body>
+
+<header id="identity">
+    <h1 class="id-title">المشغل الذكي</h1>
+    <div class="id-sub" dir="ltr">Smart Operator — Operational Briefing System</div>
+    <p class="id-desc">تحليل لحظي لحالة العمليات والتوصيات التنفيذية</p>
+</header>
+
+<header id="topbar">
+    <div class="sys-label">إحاطة عمليات — قطاع جنوب الرياض</div>
+    <div id="conn">
+        <span id="conn-dot"></span>
+        <span id="conn-label">جارٍ الاتصال…</span>
+    </div>
+</header>
+
+<!-- لافتة وضع الاستعداد — تظهر فقط بلا مناوبة نشطة -->
+<div id="standby-banner">المنظومة في وضع الاستعداد — تُحدَّث هذه اللوحة تلقائيًا فور بدء المناوبة القادمة</div>
+
+<!-- ① الملخص التنفيذي -->
+<section id="zone-summary" class="glass">
+    <p id="summary-text">لا توجد مناوبة نشطة حاليًا — المنظومة في وضع الاستعداد</p>
+</section>
+
+<!-- ② الحالة التشغيلية -->
+<section id="zone-status">
+    <div id="readiness-card" class="glass tone-standby">
+        <div id="readiness-percent" class="standby-note">ستُعرض الجاهزية فور بدء المناوبة</div>
+        <div id="readiness-word">وضع الاستعداد</div>
+    </div>
+    <div id="status-cards">
+        <div class="status-card">
+            <div class="label">المناوبة الحالية</div>
+            <div class="value" id="shift-info">بانتظار بدء المناوبة</div>
+            <div class="sub" id="shift-date">ستُعرض التفاصيل فور البدء</div>
+        </div>
+        <div class="status-card">
+            <div class="label">مرحلة المناوبة</div>
+            <div class="value" id="shift-phase">لم تبدأ</div>
+        </div>
+        <div class="status-card">
+            <div class="label">الدعم المتاح</div>
+            <div class="value" id="support-count">سيُحسب عند بدء المناوبة</div>
+        </div>
+    </div>
+</section>
+
+<!-- شريط المخاطر النشطة -->
+<div id="risks-strip">
+    <span class="risk-chip calm">لا مخاطر — لا توجد عمليات نشطة</span>
+</div>
+
+<!-- ③ الإجراءات ذات الأولوية -->
+<section id="zone-actions" class="glass">
+    <div class="zone-title">الإجراءات ذات الأولوية</div>
+    <div id="actions-list">
+        <div class="empty-state">لا إجراءات — ستظهر التوصيات التنفيذية هنا فور بدء المناوبة وتحليل حالة العمليات</div>
+    </div>
+</section>
+
+<!-- ④ الخط الزمني التشغيلي -->
+<section id="zone-timeline" class="glass">
+    <div class="zone-title">الخط الزمني التشغيلي</div>
+    <div id="timeline-list">
+        <div class="empty-state">لا أحداث تشغيلية مسجّلة بعد<small>سيوثّق هذا الخط كل تغيّر تشغيلي ذي معنى أثناء المناوبة</small></div>
+    </div>
+</section>
+
+<!-- ⑤ الاستعلام التشغيلي -->
+<section id="zone-ask" class="glass">
+    <div class="zone-title">استعلام تشغيلي</div>
+    <div id="ask-chips"></div>
+    <div id="ask-thread"></div>
+    <form id="ask-form">
+        <input id="ask-input" type="text" placeholder="اكتب استعلامًا تشغيليًا…" autocomplete="off">
+        <button id="ask-send" type="submit">استعلام</button>
+    </form>
+</section>
+
+<script src="/js/time-riyadh.js"></script>
+<script src="/js/smart-operator.js"></script>
+</body>
+</html>

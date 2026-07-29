@@ -5,33 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>تكميل المراكز الإسعافية | منصة الجنوب</title>
 <link rel="icon" type="image/png" href="/favicon-32x32.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="/css/a11y.css?v=1">
 <style>
 :root {
-    --bg:#F8FAFC; --card:#FFFFFF; --border:#E2E8F0; --text:#1E293B; --muted:#64748B;
-    --green:#10B981; --green-light:#ECFDF5; --yellow:#F59E0B; --yellow-light:#FFFBEB;
-    --red:#EF4444; --red-light:#FEF2F2; --blue:#3B82F6; --blue-light:#EFF6FF;
-    --gray:#94A3B8; --gray-light:#F1F5F9; --primary:#2563EB; --gold:#FFD700;
-    --shadow:0 4px 20px rgba(0,0,0,0.08);
+    /* الهوية التنفيذية الداكنة — نفس رموز executive-theme.css المعتمدة (توحيد بصري فقط) */
+    --bg:#0A1220; --card:rgba(255,255,255,0.035); --border:rgba(255,255,255,0.08); --text:#F1F5F9; --muted:#8A9BB0;
+    --green:#10B586; --green-light:rgba(16,181,134,0.10); --yellow:#F59E0B; --yellow-light:rgba(245,158,11,0.10);
+    --red:#EF4444; --red-light:rgba(239,68,68,0.10); --blue:#60A5FA; --blue-light:rgba(96,165,250,0.10);
+    --gray:#5E7189; --gray-light:rgba(255,255,255,0.05); --primary:#0EA47A; --gold:#F59E0B;
+    --shadow:inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var(--text); direction:rtl; min-height:100vh; }
 
-/* Top Bar */
-.top-bar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.5rem; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; box-shadow:var(--shadow); }
+/* Top Bar — زجاج داكن بهوية المنصة */
+.top-bar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.5rem; background:rgba(11,18,32,0.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid rgba(255,255,255,0.06); position:sticky; top:0; z-index:100; box-shadow:var(--shadow); }
 .top-bar h1 { font-size:1.1rem; font-weight:700; }
-.top-bar .badge { background:var(--gold); color:#333; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; }
+.top-bar .badge { background:var(--gold); color:#0A1220; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; }
 .top-bar .btn { padding:0.5rem 1rem; border-radius:8px; border:none; cursor:pointer; font-size:0.8rem; font-weight:600; }
 .btn-home { background:var(--primary); color:#fff; }
 .btn-print { background:var(--green); color:#fff; }
 
-/* Page Loading Overlay */
-.page-loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity 0.3s ease; }
+/* Page Loading Overlay — داكن */
+.page-loading-overlay { position:fixed; inset:0; background:rgba(10,18,32,0.96); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity 0.3s ease; }
 .page-loading-overlay.hidden { opacity:0; pointer-events:none; }
-.page-loading-overlay .spinner { width:50px; height:50px; border:4px solid #E2E8F0; border-top-color:#2563EB; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
+.page-loading-overlay .spinner { width:50px; height:50px; border:4px solid rgba(255,255,255,0.10); border-top-color:var(--primary); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
 @keyframes spin { to { transform:rotate(360deg); } }
-.page-loading-overlay .loading-text { color:#64748B; font-size:1rem; font-weight:600; }
+.page-loading-overlay .loading-text { color:#A9BACD; font-size:1rem; font-weight:600; }
 
 /* Live Dashboard — لوحة معلومات صغيرة تتحدث لحظيًا */
 .dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.75rem; padding:1rem 1.5rem 0.5rem; max-width:1400px; margin:0 auto; }
@@ -59,9 +61,9 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 
 .team-card { background:var(--card); border:2px solid var(--border); border-radius:16px; padding:1rem; transition:box-shadow 0.2s; position:relative; overflow:hidden; }
 .team-card .card-type { font-size:0.65rem; font-weight:700; padding:2px 8px; border-radius:8px; display:inline-block; }
-.team-card .card-type.rapid { background:var(--yellow-light); color:#92400E; }
-.team-card .card-type.center { background:#DBEAFE; color:#1E40AF; }
-.team-card .card-type.special { background:#F3E8FF; color:#7E22CE; }
+.team-card .card-type.rapid { background:rgba(245,158,11,0.14); color:#FBBF24; }
+.team-card .card-type.center { background:rgba(96,165,250,0.14); color:#93C5FD; }
+.team-card .card-type.special { background:rgba(167,139,250,0.14); color:#C4B5FD; }
 .team-card .card-name { font-size:1rem; font-weight:700; margin-top:0.45rem; }
 .team-card .card-center { font-size:0.65rem; color:var(--muted); margin-top:2px; }
 .team-card .card-status { font-size:0.75rem; font-weight:600; padding:4px 12px; border-radius:20px; display:inline-block; margin-top:0.5rem; }
@@ -78,7 +80,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .team-card.status-pending .card-status { background:var(--gray); color:#fff; }
 
 /* الغائب وسببه — ظاهر مباشرة على البطاقة بلا نوافذ */
-.miss-info { font-size:0.68rem; color:#92400E; margin-top:4px; font-weight:700; }
+.miss-info { font-size:0.68rem; color:#FBBF24; margin-top:4px; font-weight:700; }
 .miss-info .btn-arrive { margin-inline-start:6px; font-size:0.62rem; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-family:inherit; background:var(--green); color:#fff; }
 .miss-info .btn-arrive:hover { filter:brightness(0.92); }
 .pm { background:var(--gray-light); border-radius:8px; padding:4px 8px; margin:3px 0; text-align:right; }
@@ -87,7 +89,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .pm .pm-code { font-size:0.62rem; color:var(--muted); }
 .btn-cover { width:100%; margin-top:6px; padding:7px; border:1px dashed var(--border); border-radius:10px; background:transparent; color:var(--muted); font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
 .btn-cover:hover { border-color:var(--blue); color:var(--blue); }
-.cover-info { font-size:0.68rem; color:#065F46; margin-top:4px; font-weight:700; }
+.cover-info { font-size:0.68rem; color:#4FBF9A; margin-top:4px; font-weight:700; }
 .cover-info .btn-end-cover { margin-inline-start:6px; font-size:0.6rem; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-family:inherit; background:var(--red); color:#fff; }
 
 /* حوض الدعم المتاح (W-تكامل ③) — بطاقات الأفراد غير الموزعين من الخادم */
@@ -101,7 +103,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .support-person { background:var(--gray-light); border-radius:10px; padding:8px 10px; font-size:0.75rem; line-height:1.8; margin-bottom:4px; }
 
 /* بند 15: سجل التأخير (بدأ/حضر/المدة) — عرض فقط من اشتقاق الخادم */
-.late-rec { display:block; font-size:0.62rem; color:#92400E; line-height:1.7; background:#FFFBEB; border-radius:6px; padding:2px 6px; margin-top:2px; }
+.late-rec { display:block; font-size:0.62rem; color:#FBBF24; line-height:1.7; background:rgba(245,158,11,0.10); border-radius:6px; padding:2px 6px; margin-top:2px; }
 .late-rec .edit-time { border:none; background:none; cursor:pointer; font-size:0.62rem; padding:0 2px; }
 
 /* أزرار البطاقة الثلاثة — ضغطة واحدة = إجراء واحد */
@@ -127,7 +129,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .vehicle-card .v-team { font-size:0.68rem; color:var(--text); margin-top:4px; font-weight:700; }
 .vehicle-card .v-reason { font-size:0.62rem; color:var(--muted); margin-top:2px; }
 .vehicle-card .v-actions { display:flex; gap:4px; margin-top:6px; }
-.vehicle-card .v-actions button { flex:1; font-size:0.65rem; padding:5px 3px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); cursor:pointer; font-weight:700; font-family:inherit; transition:all 0.15s; }
+.vehicle-card .v-actions button { flex:1; font-size:0.65rem; padding:5px 3px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,0.05); color:#A9BACD; cursor:pointer; font-weight:700; font-family:inherit; transition:all 0.15s; }
 .vehicle-card .v-actions button:hover { background:var(--primary); border-color:var(--primary); color:#fff; }
 .vehicle-card .v-actions button.v-end:hover { background:var(--red); border-color:var(--red); }
 
@@ -200,7 +202,7 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .btn-finish { padding:1rem 3rem; font-size:1.1rem; font-weight:700; border-radius:16px; border:none; cursor:pointer; background:var(--primary); color:#fff; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
 .btn-finish:hover { transform:scale(1.03); }
 .btn-finish:disabled { background:var(--gray); cursor:not-allowed; transform:none; }
-.btn-workflow { padding:0.85rem 2.5rem; font-size:1.05rem; font-weight:700; border-radius:14px; border:2px solid var(--green); background:#fff; color:var(--green); cursor:pointer; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
+.btn-workflow { padding:0.85rem 2.5rem; font-size:1.05rem; font-weight:700; border-radius:14px; border:2px solid var(--green); background:transparent; color:var(--green); cursor:pointer; box-shadow:var(--shadow); transition:all 0.2s; font-family:inherit; }
 .btn-workflow:hover { background:var(--green); color:#fff; transform:scale(1.03); }
 
 /* Toast */
@@ -225,6 +227,38 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
     .dashboard { grid-template-columns:repeat(2,1fr); }
     .modal-stats { grid-template-columns:1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   طبقة الهوية التنفيذية الداكنة — توحيد بصري فقط (صفر منطق)
+   نفس وصفة الصفحات المعتمدة: خط المنصة + خلفية كحلية + زجاج
+   ═══════════════════════════════════════════════════════════ */
+body { font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif; }
+body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+        radial-gradient(ellipse 60% 40% at 50% -10%, rgba(126,166,232,0.06), transparent 70%),
+        radial-gradient(ellipse 45% 32% at 50% 110%, rgba(14,164,122,0.045), transparent 70%),
+        linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%); }
+body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+    -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%); }
+
+/* النوافذ — صندوق مُعتم فوق الغشاء (الزجاج الشفاف للبطاقات لا يصلح هنا) */
+.modal-box { background:#101B30; border-color:rgba(255,255,255,0.08); box-shadow:0 25px 50px rgba(0,0,0,0.50); }
+
+/* حلقات تركيز زمردية ناعمة — نفس لغة نماذج المنصة */
+.modal-box select:focus, .modal-box input:focus, .notes-box textarea:focus {
+    outline:none; border-color:rgba(14,164,122,0.50); box-shadow:0 0 0 3px rgba(14,164,122,0.12);
+}
+
+/* أشرطة التمرير — لغة النظام الداكنة */
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.10); border-radius:8px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.16); }
 </style>
 <base target="_blank">
 <base target="_blank">

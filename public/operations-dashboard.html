@@ -7,35 +7,37 @@
 <link rel="icon" type="image/png" href="/favicon-32x32.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="/css/a11y.css?v=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════
    مركز العمليات — Operations Command Center
    ═══════════════════════════════════════════ */
 :root {
-    --bg: #F1F5F9;
-    --card: #FFFFFF;
-    --card-hover: #F8FAFC;
-    --border: #E2E8F0;
-    --border-light: #F1F5F9;
-    --text: #0F172A;
-    --text-secondary: #475569;
-    --text-muted: #94A3B8;
-    --primary: #2563EB;
-    --primary-dark: #1D4ED8;
-    --primary-light: #DBEAFE;
+    /* الهوية التنفيذية الداكنة الموحدة — نفس أسماء الرموز */
+    --bg: #0A1220;
+    --card: rgba(255,255,255,0.035);
+    --card-hover: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.08);
+    --border-light: rgba(255,255,255,0.06);
+    --text: #F1F5F9;
+    --text-secondary: #C2CFDD;
+    --text-muted: #8A9BB0;
+    --primary: #60A5FA;
+    --primary-dark: #3B82F6;
+    --primary-light: rgba(96,165,250,0.12);
     --success: #10B981;
-    --success-light: #D1FAE5;
+    --success-light: rgba(16,185,129,0.14);
     --warning: #F59E0B;
-    --warning-light: #FEF3C7;
+    --warning-light: rgba(245,158,11,0.14);
     --danger: #EF4444;
-    --danger-light: #FEE2E2;
-    --info: #06B6D4;
-    --info-light: #CFFAFE;
-    --purple: #8B5CF6;
-    --purple-light: #EDE9FE;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-    --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    --danger-light: rgba(239,68,68,0.14);
+    --info: #22D3EE;
+    --info-light: rgba(6,182,212,0.14);
+    --purple: #A78BFA;
+    --purple-light: rgba(139,92,246,0.16);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.28);
+    --shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.38);
     --radius: 12px;
     --radius-sm: 8px;
 }
@@ -43,17 +45,62 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg);
+    font-family: 'IBM Plex Sans Arabic', 'Inter', 'Segoe UI', Tahoma, sans-serif;
+    background:
+        radial-gradient(1100px 620px at 85% -10%, rgba(14,164,122,0.10), transparent 60%),
+        radial-gradient(900px 540px at 8% -5%, rgba(96,165,250,0.08), transparent 55%),
+        var(--bg);
+    background-attachment: fixed;
     color: var(--text);
     direction: rtl;
     min-height: 100vh;
 }
 
+/* طبقة الهوية: شبكة مقنّعة + توهج سفلي خافت */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+            mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+}
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(1200px 500px at 50% 110%, rgba(14,164,122,0.05), transparent 65%);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* تركيز لوحة المفاتيح + تحديد النص */
+:focus-visible {
+    outline: 2px solid rgba(14,164,122,0.50);
+    outline-offset: 2px;
+}
+::selection {
+    background: rgba(14,164,122,0.28);
+    color: #F1F5F9;
+}
+
 /* ── Top Bar ── */
 .topbar {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
+    background: rgba(11,18,32,0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: var(--text);
     padding: 0 1.5rem;
     display: flex;
     align-items: center;
@@ -62,18 +109,18 @@ body {
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: var(--shadow-lg);
+    border-bottom: 1px solid var(--border);
 }
 
 .topbar-brand { display:flex; align-items:center; gap:0.75rem; font-size:1.1rem; font-weight:700; }
-.topbar-brand i { font-size:1.3rem; }
+.topbar-brand i { font-size:1.3rem; color: #10B586; }
 
 .topbar-actions { display:flex; align-items:center; gap:0.5rem; }
 
 .btn-topbar {
-    background: rgba(255,255,255,0.15);
-    border: none;
-    color: white;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 0.4rem 0.9rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -85,7 +132,7 @@ body {
     gap: 0.4rem;
 }
 
-.btn-topbar:hover { background: rgba(255,255,255,0.25); }
+.btn-topbar:hover { background: rgba(255,255,255,0.09); }
 
 /* ── Tab Navigation ── */
 .tab-bar {
@@ -119,12 +166,12 @@ body {
     gap: 0.5rem;
 }
 
-.tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+.tab-btn:hover { color: var(--primary); background: rgba(96,165,250,0.10); }
 
 .tab-btn.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    background: var(--primary-light);
+    color: #4FBF9A;
+    border-bottom-color: #0EA47A;
+    background: rgba(14,164,122,0.10);
 }
 
 /* ── Content Container ── */
@@ -155,7 +202,7 @@ body {
     transition: all 0.2s;
 }
 
-.stat-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.stat-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); border-color: rgba(255,255,255,0.14); }
 
 .stat-icon {
     width: 48px; height: 48px;
@@ -165,12 +212,12 @@ body {
     flex-shrink: 0;
 }
 
-.stat-icon.blue { background: var(--primary-light); color: var(--primary); }
-.stat-icon.green { background: var(--success-light); color: var(--success); }
-.stat-icon.orange { background: var(--warning-light); color: var(--warning); }
-.stat-icon.red { background: var(--danger-light); color: var(--danger); }
-.stat-icon.cyan { background: var(--info-light); color: var(--info); }
-.stat-icon.purple { background: var(--purple-light); color: var(--purple); }
+.stat-icon.blue { background: var(--primary-light); color: #93C5FD; }
+.stat-icon.green { background: var(--success-light); color: #6EE7B7; }
+.stat-icon.orange { background: var(--warning-light); color: #FCD34D; }
+.stat-icon.red { background: var(--danger-light); color: #FCA5A5; }
+.stat-icon.cyan { background: var(--info-light); color: #67E8F9; }
+.stat-icon.purple { background: var(--purple-light); color: #C4B5FD; }
 
 .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1; }
 .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
@@ -207,11 +254,11 @@ body {
 /* ── Tables ── */
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th {
-    background: var(--bg);
+    background: rgba(255,255,255,0.03);
     padding: 0.75rem 1rem;
     font-size: 0.8rem;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     text-align: right;
     border-bottom: 2px solid var(--border);
     white-space: nowrap;
@@ -222,7 +269,7 @@ body {
     border-bottom: 1px solid var(--border-light);
     vertical-align: middle;
 }
-.data-table tr:hover td { background: var(--card-hover); }
+.data-table tr:hover td { background: rgba(255,255,255,0.03); }
 
 /* ── Badges ── */
 .badge {
@@ -234,10 +281,10 @@ body {
     font-weight: 700;
 }
 
-.badge-success { background: var(--success-light); color: var(--success); }
-.badge-warning { background: var(--warning-light); color: var(--warning); }
-.badge-danger { background: var(--danger-light); color: var(--danger); }
-.badge-info { background: var(--info-light); color: var(--info); }
+.badge-success { background: var(--success-light); color: #6EE7B7; }
+.badge-warning { background: var(--warning-light); color: #FCD34D; }
+.badge-danger { background: var(--danger-light); color: #FCA5A5; }
+.badge-info { background: var(--info-light); color: #67E8F9; }
 .badge-muted { background: var(--border-light); color: var(--text-muted); }
 
 /* ── Buttons ── */
@@ -256,29 +303,29 @@ body {
     transition: all 0.2s;
 }
 
-.btn:hover { background: var(--bg); }
-.btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
-.btn-primary:hover { background: var(--primary-dark); }
+.btn:hover { background: rgba(255,255,255,0.09); }
+.btn-primary { background: #0EA47A; color: white; border-color: #0EA47A; }
+.btn-primary:hover { background: #0B8C66; }
 .btn-success { background: var(--success); color: white; border-color: var(--success); }
 .btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
 .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; }
 
 /* ── Modal Tabs ── */
-.modal-tab-btn.active { color: var(--primary) !important; border-bottom-color: var(--primary) !important; background: var(--primary-light) !important; }
-.modal-tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+.modal-tab-btn.active { color: #4FBF9A !important; border-bottom-color: #0EA47A !important; background: rgba(14,164,122,0.10) !important; }
+.modal-tab-btn:hover { color: var(--primary); background: rgba(96,165,250,0.10); }
 .modal-tab-panel { display: none; }
 .modal-tab-panel.active { display: block; animation: fadeIn 0.2s ease; }
 
 /* ── Modal ── */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-.modal-box { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(4,8,16,0.66); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: #101B30; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; }
 .modal-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-light); }
 .modal-body { padding: 1.25rem; }
 .modal-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--border-light); }
 
 /* ── Detail Grid ── */
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-.detail-item { background: var(--bg); padding: 0.75rem 1rem; border-radius: var(--radius-sm); }
+.detail-item { background: rgba(255,255,255,0.04); border: 1px solid var(--border-light); padding: 0.75rem 1rem; border-radius: var(--radius-sm); }
 .detail-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
 .detail-value { font-size: 1rem; font-weight: 700; color: var(--text); }
 
@@ -305,8 +352,18 @@ body {
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
     font-family: inherit;
-    background: var(--card);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    transition: all 0.2s;
 }
+
+.search-box input:focus {
+    outline: none;
+    border-color: #10B586;
+    box-shadow: 0 0 0 3px rgba(14,164,122,0.12);
+}
+
+.search-box input::placeholder { color: #5E7189; }
 
 .search-box i {
     position: absolute;
@@ -322,14 +379,26 @@ body {
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
     font-family: inherit;
-    background: var(--card);
+    background: rgba(255,255,255,0.04);
     color: var(--text);
     cursor: pointer;
+    transition: all 0.2s;
+}
+
+.select-box:focus {
+    outline: none;
+    border-color: #10B586;
+    box-shadow: 0 0 0 3px rgba(14,164,122,0.12);
+}
+
+.select-box option {
+    background: #101B30;
+    color: #F1F5F9;
 }
 
 /* ── Progress Bar ── */
 .progress-container {
-    background: var(--border-light);
+    background: rgba(255,255,255,0.10);
     border-radius: 9999px;
     height: 8px;
     overflow: hidden;
@@ -363,14 +432,20 @@ body {
 }
 
 .toast {
-    background: var(--text);
-    color: white;
+    background: #101B30;
+    border: 1px solid var(--border);
+    border-right: 3px solid var(--border);
+    color: var(--text);
     padding: 0.75rem 1rem;
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.40);
     animation: slideIn 0.3s ease;
 }
+
+.toast.success { border-right-color: var(--success); }
+.toast.error { border-right-color: var(--danger); }
+.toast.info { border-right-color: var(--primary); }
 
 @keyframes slideIn { from { transform:translateX(-100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
 
@@ -383,6 +458,24 @@ body {
     .data-table { font-size: 0.75rem; }
     .data-table th, .data-table td { padding: 0.5rem; }
 }
+
+/* ── شريط حالة الخدمات (ميزة مصرّح بها) ── */
+.ops-statusbar {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 1.5rem; font-size: 0.75rem; color: var(--text-muted);
+    background: rgba(11,18,32,0.60);
+    border-bottom: 1px solid var(--border-light);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    position: sticky; top: 56px; z-index: 999;
+    transition: color 0.2s ease;
+}
+.ops-status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-muted);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.ops-status-dot.ok { background: var(--success); box-shadow: 0 0 8px rgba(16,185,129,0.55); }
+.ops-status-dot.warn { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,0.55); }
 
 /* ── Loading ── */
 .loading { text-align:center; padding:2rem; color:var(--text-muted); }
@@ -410,6 +503,12 @@ body {
         <button class="btn-topbar" onclick="window.location.href='/index.html'"><i class="fas fa-home"></i> الرئيسية</button>
         <button class="btn-topbar" onclick="refreshAll()"><i class="fas fa-sync-alt"></i> تحديث</button>
     </div>
+</div>
+
+<!-- ── شريط حالة الخدمات (ميزة مصرّح بها — يتغذى من نتائج الجلب/الاتصال الفعلية، لا قيم ثابتة) ── -->
+<div class="ops-statusbar" id="opsStatusBar" role="status">
+    <span class="ops-status-dot ok" id="opsStatusDot"></span>
+    <span id="opsStatusText">جاري الاتصال بالخدمات...</span>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -669,6 +768,13 @@ function authHeaders() {
     return AuthCore.authHeaders({ 'Content-Type': 'application/json' });
 }
 
+// ─── طبقة الوقت الموحدة (Asia/Riyadh): كل عرض يمر عبر TimeRiyadh — لا توقيت متصفح ولا UTC مباشر ───
+function riyadhTodayYMD() { var p = TimeRiyadh.riyadhParts(new Date()); return p.year + '-' + p.month + '-' + p.day; }
+function fmtDT(v) { return TimeRiyadh.formatDateTime(v); }
+function fmtD(v) { return TimeRiyadh.formatDate(v); }
+function fmtT(v) { return TimeRiyadh.formatTime(v); }
+function fmtStatusDT(d) { var p = TimeRiyadh.riyadhParts(d); return p.day + '-' + p.month + '-' + p.year + ' ' + p.hour + ':' + p.minute; }
+
 // ============================================
 // TABS
 // ============================================
@@ -690,12 +796,55 @@ function showToast(msg, type) {
 }
 
 // ============================================
+// شريط حالة الخدمات — يتغذى من نتائج الجلب/الاتصال الفعلية ويحدّث وقته مع كل جلب ناجح
+// ============================================
+var opsStatus = {
+    services: {
+        live: { label: 'المؤشرات', ok: null },
+        events: { label: 'الأحداث', ok: null },
+        indicators: { label: 'الإحصائيات', ok: null },
+        sse: { label: 'البث المباشر', ok: null }
+    },
+    lastOk: null,
+    mark: function (key, ok) {
+        var s = this.services[key];
+        if (!s) return;
+        s.ok = !!ok;
+        if (ok) this.lastOk = new Date();
+        this.render();
+    },
+    render: function () {
+        var el = document.getElementById('opsStatusText');
+        if (!el) return;
+        var down = [];
+        for (var k in this.services) { if (this.services[k].ok === false) down.push(this.services[k].label); }
+        var t = this.lastOk ? fmtStatusDT(this.lastOk) : '—';
+        el.textContent = 'آخر تحديث: ' + t + ' (توقيت الرياض) • ' +
+            (down.length === 0 ? 'جميع الخدمات متصلة ✓' : 'خدمة ' + down.join('، ') + ' غير متاحة ⚠️');
+        var dot = document.getElementById('opsStatusDot');
+        if (dot) dot.className = 'ops-status-dot ' + (down.length === 0 ? 'ok' : 'warn');
+    }
+};
+
+// تحديث مجدول (debounce 700ms) — عاصفة أحداث SSE تُترجم إلى جلب واحد
+var opsRefreshTimer = null;
+function scheduleOpsRefresh() {
+    if (opsRefreshTimer) clearTimeout(opsRefreshTimer);
+    opsRefreshTimer = setTimeout(function () { opsRefreshTimer = null; refreshLiveTab(); }, 700);
+}
+function refreshLiveTab() {
+    loadLiveStats();
+    loadLiveEvents();
+}
+
+// ============================================
 // TAB 1: LIVE INDICATORS
 // ============================================
 async function loadLiveStats() {
     try {
         // Fetch current shift
         var res = await fetch('/api/current-shift', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var data = await res.json();
 
         var statsHtml = '';
@@ -714,6 +863,7 @@ async function loadLiveStats() {
 
         // Fetch shifts count
         var shiftsRes = await fetch('/api/shifts', { headers: authHeaders() });
+        if (!shiftsRes.ok) throw new Error('HTTP ' + shiftsRes.status);
         var shiftsData = await shiftsRes.json();
         var totalShifts = Array.isArray(shiftsData) ? shiftsData.length : 0;
 
@@ -724,7 +874,7 @@ async function loadLiveStats() {
             '</div>';
 
         // Fetch today's reports
-        var today = new Date().toISOString().split('T')[0];
+        var today = riyadhTodayYMD(); // Asia/Riyadh — كان new Date().toISOString() (UTC)
         var todayShifts = Array.isArray(shiftsData) ? shiftsData.filter(function(s) { return s.shiftDate === today; }).length : 0;
 
         statsHtml +=
@@ -760,10 +910,48 @@ async function loadLiveStats() {
                 '<div><strong style="color:var(--text-muted);font-size:0.8rem">البلاغات</strong><div style="font-size:1.1rem;font-weight:700">' + (shiftInfo.totalReports || 0) + '</div></div>' +
             '</div>';
         document.getElementById('currentShiftDetails').innerHTML = detailsHtml;
+        opsStatus.mark('live', true);
 
     } catch (e) {
         console.error('[LiveStats] Error:', e);
         document.getElementById('liveStats').innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-exclamation-circle"></i> فشل في تحميل المؤشرات</div>';
+        document.getElementById('currentShiftDetails').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i> تعذر تحميل بيانات المناوبة — تحقق من الاتصال</div>';
+        var statusBadgeErr = document.getElementById('shiftStatusBadge');
+        if (statusBadgeErr) { statusBadgeErr.textContent = 'غير متاح'; statusBadgeErr.className = 'badge badge-muted'; }
+        opsStatus.mark('live', false);
+    }
+}
+
+// ============================================
+// آخر الأحداث — الودجة كانت ماركبًا ميتًا بلا أي محمّل (⇒ «جاري التحميل» أبدي).
+// المصدر: /api/audit-log (مصدر الحقيقة الوحيد للأحداث) + Empty/Error states — لا تحميل دائم.
+// ============================================
+async function loadLiveEvents() {
+    var tbody = document.querySelector('#liveTimeline tbody');
+    if (!tbody) return;
+    try {
+        var res = await fetch('/api/audit-log', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        var logs = (data && Array.isArray(data.logs)) ? data.logs : [];
+        if (logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><i class="fas fa-inbox"></i> لا توجد أحداث مسجلة بعد</td></tr>';
+        } else {
+            var html = '';
+            logs.slice(0, 8).forEach(function (ev) {
+                html += '<tr>' +
+                    '<td style="white-space:nowrap;color:var(--text-muted);font-size:0.75rem">' + fmtT(ev.timestamp) + ' <span style="opacity:.7">' + fmtD(ev.timestamp) + '</span></td>' +
+                    '<td>' + (ev.details || ev.action || '-') + (ev.user ? ' <span style="color:var(--text-muted);font-size:0.7rem">— ' + ev.user + '</span>' : '') + '</td>' +
+                    '<td><span class="badge badge-info">' + (ev.category || 'عام') + '</span></td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+        opsStatus.mark('events', true);
+    } catch (e) {
+        console.error('[LiveEvents] Error:', e);
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><i class="fas fa-exclamation-circle"></i> تعذر تحميل الأحداث — تحقق من الاتصال بالخادم</td></tr>';
+        opsStatus.mark('events', false);
     }
 }
 
@@ -773,6 +961,7 @@ async function loadLiveStats() {
 async function loadArchive() {
     try {
         var res = await fetch('/api/shifts', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var data = await res.json();
         archiveData = Array.isArray(data) ? data : [];
         renderArchive(archiveData);
@@ -854,6 +1043,7 @@ async function viewShift(id) {
 
     try {
         var res = await fetch('/api/shifts/' + id, { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var data = await res.json();
 
         if (!data || data.error) {
@@ -880,8 +1070,8 @@ async function viewShift(id) {
                 '<div class="detail-item"><div class="detail-label">التكميلات</div><div class="detail-value" style="color:var(--success)">' + (data.completions ? Object.keys(data.completions).length : 0) + '</div></div>' +
                 '<div class="detail-item"><div class="detail-label">النماذج</div><div class="detail-value" style="color:var(--warning)">' + (data.forms ? data.forms.length : 0) + '</div></div>' +
                 '<div class="detail-item"><div class="detail-label">الملفات</div><div class="detail-value" style="color:var(--info)">' + (data.files ? data.files.length : 0) + '</div></div>' +
-                '<div class="detail-item"><div class="detail-label">بداية المناوبة</div><div class="detail-value">' + (s.startTime || s.start_time || '-') + '</div></div>' +
-                '<div class="detail-item"><div class="detail-label">آخر تحديث</div><div class="detail-value">' + (s.lastUpdate || s.last_update || '-') + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">بداية المناوبة</div><div class="detail-value">' + fmtDT(s.startTime || s.start_time) + '</div></div>' +
+                '<div class="detail-item"><div class="detail-label">آخر تحديث</div><div class="detail-value">' + fmtDT(s.lastUpdate || s.last_update) + '</div></div>' +
             '</div>';
 
         // Notes
@@ -906,7 +1096,7 @@ async function viewShift(id) {
                 var r = reports[key];
                 var count = typeof r === 'object' ? (r.count || 0) : (r || 0);
                 var times = typeof r === 'object' && r.times ? r.times : [];
-                var lastTime = times.length > 0 ? times[0] : '-';
+                var lastTime = times.length > 0 ? fmtDT(times[0]) : '—';
                 reportsHtml += '<tr><td>' + center + '</td><td>' + unit + '</td><td style="font-weight:700;color:var(--primary)">' + count + '</td><td style="font-size:0.75rem;color:var(--text-muted)">' + lastTime + '</td></tr>';
             });
             reportsHtml += '</tbody></table>';
@@ -940,7 +1130,7 @@ async function viewShift(id) {
         if (forms.length > 0) {
             formsHtml += '<table class="data-table"><thead><tr><th>#</th><th>النموذج</th><th>التاريخ</th><th>الإجراءات</th></tr></thead><tbody>';
             forms.forEach(function(f, i) {
-                formsHtml += '<tr><td>' + (i + 1) + '</td><td>' + (f.formName || f.form_name || f.form_id || '-') + '</td><td>' + (f.createdAt || f.created_at || '-') + '</td><td><button class="btn btn-sm btn-primary">عرض</button></td></tr>';
+                formsHtml += '<tr><td>' + (i + 1) + '</td><td>' + (f.formName || f.form_name || f.form_id || '-') + '</td><td>' + fmtDT(f.createdAt || f.created_at) + '</td><td><button class="btn btn-sm btn-primary">عرض</button></td></tr>';
             });
             formsHtml += '</tbody></table>';
         } else {
@@ -955,7 +1145,7 @@ async function viewShift(id) {
             filesHtml += '<table class="data-table"><thead><tr><th>#</th><th>الملف</th><th>الحجم</th><th>التاريخ</th><th>الإجراءات</th></tr></thead><tbody>';
             files.forEach(function(f, i) {
                 var size = f.size ? (f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? Math.round(f.size / 1024) + ' KB' : Math.round(f.size / 1048576) + ' MB') : '-';
-                filesHtml += '<tr><td>' + (i + 1) + '</td><td><i class="fas fa-file" style="color:var(--primary)"></i> ' + (f.filename || f.file_name || '-') + '</td><td>' + size + '</td><td>' + (f.uploadDate || f.upload_date || f.createdAt || '-') + '</td><td><button class="btn btn-sm btn-primary"><i class="fas fa-download"></i></button></td></tr>';
+                filesHtml += '<tr><td>' + (i + 1) + '</td><td><i class="fas fa-file" style="color:var(--primary)"></i> ' + (f.filename || f.file_name || '-') + '</td><td>' + size + '</td><td>' + fmtDT(f.uploadDate || f.upload_date || f.createdAt) + '</td><td><button class="btn btn-sm btn-primary"><i class="fas fa-download"></i></button></td></tr>';
             });
             filesHtml += '</tbody></table>';
         } else {
@@ -970,7 +1160,7 @@ async function viewShift(id) {
             auditHtml += '<table class="data-table"><thead><tr><th>الوقت</th><th>المستخدم</th><th>الإجراء</th><th>التفاصيل</th><th>النوع</th></tr></thead><tbody>';
             auditLog.forEach(function(a) {
                 var actionBadge = a.action && a.action.includes('created') ? 'badge-success' : a.action && a.action.includes('deleted') ? 'badge-danger' : a.action && a.action.includes('archive') ? 'badge-warning' : 'badge-info';
-                auditHtml += '<tr><td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (a.createdAt || a.created_at || '-') + '</td><td style="font-weight:600">' + (a.userName || a.user_name || a.userId || '-') + '</td><td><span class="badge ' + actionBadge + '">' + (a.action || '-') + '</span></td><td>' + (a.detail || '-') + '</td><td>' + (a.type || '-') + '</td></tr>';
+                auditHtml += '<tr><td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + fmtDT(a.createdAt || a.created_at) + '</td><td style="font-weight:600">' + (a.userName || a.user_name || a.userId || '-') + '</td><td><span class="badge ' + actionBadge + '">' + (a.action || '-') + '</span></td><td>' + (a.detail || '-') + '</td><td>' + (a.type || '-') + '</td></tr>';
             });
             auditHtml += '</tbody></table>';
         } else {
@@ -1058,16 +1248,23 @@ function connectDashboardSSE() {
         var sseToken = AuthCore.getToken();
         if (!sseToken) return; // بلا توكن: يبقى الاستطلاع الدوري (60ث) هو البديل
         dashSseSource = new EventSource('/api/sse?token=' + encodeURIComponent(sseToken));
+        dashSseSource.onopen = function() { opsStatus.mark('sse', true); };
         dashSseSource.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
                 if (data.type === 'shift_archived' || data.type === 'shift_started') {
                     loadArchive();
-                    loadLiveStats();
+                    scheduleOpsRefresh();
+                } else if (data.type === 'new_report' || data.type === 'report_undone') {
+                    // بلاغ/تراجع لحظي: المؤشرات والأحداث تتحدث بلا Refresh يدوي
+                    scheduleOpsRefresh();
+                } else if (data.type === 'shift_event_added' || data.type === 'shift_event_deleted' || data.type === 'shift_audit_trail_new') {
+                    loadLiveEvents();
                 }
             } catch (e) { /* ignore malformed event */ }
         };
         dashSseSource.onerror = function() {
+            opsStatus.mark('sse', false);
             // EventSource يعيد الاتصال تلقائياً؛ عند رفض نهائي (401/403) نغلق بلا عاصفة
             if (dashSseSource && dashSseSource.readyState === EventSource.CLOSED) {
                 try { dashSseSource.close(); } catch (e) {}
@@ -1093,6 +1290,7 @@ window.addEventListener('pagehide', closeDashboardSSE);
 async function loadReports() {
     try {
         var res = await fetch('/api/indicators/dashboard', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var bundle = await res.json();
         var st = bundle.shiftStats || {};
 
@@ -1113,9 +1311,12 @@ async function loadReports() {
         });
         html += '</div>';
         document.getElementById('dailyReportContent').innerHTML = html;
+        opsStatus.mark('indicators', true);
 
     } catch (e) {
         console.error('[Reports] Error:', e);
+        document.getElementById('dailyReportContent').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i> تعذر تحميل التقارير — تحقق من الاتصال</div>';
+        opsStatus.mark('indicators', false);
     }
 }
 
@@ -1130,6 +1331,7 @@ function generateDailyReport() {
 async function loadAnalytics() {
     try {
         var res = await fetch('/api/indicators/dashboard', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var bundle = await res.json();
         var st = bundle.shiftStats || {};
 
@@ -1148,9 +1350,12 @@ async function loadAnalytics() {
             tbody += '<tr><td>أسبوع ' + w.weekStart + '</td><td>' + w.shiftCount + '</td><td>' + w.reports + '</td><td>' + w.avg + '</td><td>' + w.max + '</td><td>' + w.min + '</td></tr>';
         });
         document.getElementById('analyticsTbody').innerHTML = tbody || '<tr><td colspan="6" class="empty-state">لا توجد بيانات كافية</td></tr>';
+        opsStatus.mark('indicators', true);
 
     } catch (e) {
         console.error('[Analytics] Error:', e);
+        document.getElementById('analyticsTbody').innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-exclamation-circle"></i> تعذر تحميل الإحصائيات — تحقق من الاتصال</td></tr>';
+        opsStatus.mark('indicators', false);
     }
 }
 
@@ -1160,6 +1365,7 @@ async function loadAnalytics() {
 async function loadCompareOptions() {
     try {
         var res = await fetch('/api/shifts', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var shifts = await res.json();
         shifts = Array.isArray(shifts) ? shifts : [];
 
@@ -1171,6 +1377,9 @@ async function loadCompareOptions() {
         document.getElementById('compareShift2').innerHTML = options;
     } catch (e) {
         console.error('[Compare] Error:', e);
+        var errOpt = '<option value="">تعذر تحميل القائمة — تحقق من الاتصال</option>';
+        document.getElementById('compareShift1').innerHTML = errOpt;
+        document.getElementById('compareShift2').innerHTML = errOpt;
     }
 }
 
@@ -1182,8 +1391,10 @@ async function compareShifts() {
 
     try {
         var res1 = await fetch('/api/shifts/' + id1, { headers: authHeaders() });
+        if (!res1.ok) throw new Error('HTTP ' + res1.status);
         var s1 = await res1.json();
         var res2 = await fetch('/api/shifts/' + id2, { headers: authHeaders() });
+        if (!res2.ok) throw new Error('HTTP ' + res2.status);
         var s2 = await res2.json();
 
         var html =
@@ -1208,16 +1419,28 @@ async function compareShifts() {
 // ============================================
 function loadCharts() {
     fetch('/api/indicators/dashboard', { headers: authHeaders() })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function(bundle) {
             renderCharts(bundle || {});
+            opsStatus.mark('indicators', true);
         })
-        .catch(function(e) { console.error('[Charts] Error:', e); });
+        .catch(function(e) {
+            console.error('[Charts] Error:', e);
+            showToast('تعذر تحميل الرسوم البيانية — تحقق من الاتصال', 'error');
+            opsStatus.mark('indicators', false);
+        });
 }
 
 function renderCharts(bundle) {
     // Destroy old charts first to prevent "Canvas already in use"
     destroyCharts();
+
+    // هوية الرسوم الداكنة — نفس قيم الرسوم المعتمدة في لوحة القيادة (خط/شبكة/تلميح)
+    Chart.defaults.color = '#A9BACD';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+    Chart.defaults.plugins.tooltip.backgroundColor = '#101B30';
+    Chart.defaults.plugins.tooltip.titleColor = '#F1F5F9';
+    Chart.defaults.plugins.tooltip.bodyColor = '#A9BACD';
 
     // Daily reports line chart
     var ds = bundle.dailySeries || { labels: [], values: [] };
@@ -1232,8 +1455,8 @@ function renderCharts(bundle) {
             datasets: [{
                 label: 'البلاغات',
                 data: values,
-                borderColor: '#2563EB',
-                backgroundColor: 'rgba(37,99,235,0.1)',
+                borderColor: '#60A5FA',
+                backgroundColor: 'rgba(96,165,250,0.12)',
                 fill: true,
                 tension: 0.3
             }]
@@ -1249,7 +1472,7 @@ function renderCharts(bundle) {
         type: 'doughnut',
         data: {
             labels: ['صباحية', 'ليلية'],
-            datasets: [{ data: [typeCounts['صباحية'] || 0, typeCounts['ليلية'] || 0], backgroundColor: ['#F59E0B', '#2563EB'] }]
+            datasets: [{ data: [typeCounts['صباحية'] || 0, typeCounts['ليلية'] || 0], backgroundColor: ['#F59E0B', '#60A5FA'] }]
         },
         options: { responsive: true }
     });
@@ -1261,7 +1484,7 @@ function renderCharts(bundle) {
         type: 'bar',
         data: {
             labels: centers.map(function(c) { return c.center; }),
-            datasets: [{ label: 'البلاغات', data: centers.map(function(c) { return c.count; }), backgroundColor: '#10B981' }]
+            datasets: [{ label: 'البلاغات', data: centers.map(function(c) { return c.count; }), backgroundColor: '#10B586' }]
         },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
@@ -1271,13 +1494,13 @@ function renderCharts(bundle) {
 // GLOBAL
 // ============================================
 function refreshAll() {
-    loadLiveStats();
+    refreshLiveTab();
     showToast('تم التحديث', 'success');
 }
 
 // Init
-loadLiveStats();
-setInterval(loadLiveStats, 60000); // Refresh every minute
+refreshLiveTab();
+setInterval(refreshLiveTab, 60000); // Refresh every minute
 connectDashboardSSE(); // OV-S5: تحديث لحظي عند أرشفة/بدء المناوبات
 </script>
 

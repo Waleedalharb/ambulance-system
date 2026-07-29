@@ -50,19 +50,20 @@
    CSS Variables - متغيرات التصميم الرئيسية
    ────────────────────────────────────────────────────────────── */
 :root {
-  /* الألوان الرئيسية */
-  --bg: #F8FAFC;
-  --bg-card: #FFFFFF;
-  --bg-glass: rgba(241, 245, 249, 0.8);
-  --border: #E2E8F0;
-  --neon: #2563EB;
+  /* الألوان الرئيسية — الهوية التنفيذية الداكنة (Phase 5): المعيار الافتراضي.
+     القيم الفاتحة التراثية محفوظة في body.light-mode أسفل الملف. */
+  --bg: #0A1220;
+  --bg-card: rgba(255, 255, 255, 0.035);
+  --bg-glass: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.08);
+  --neon: #60A5FA;
   --neon-green: #10B981;
   --gold: #F59E0B;
   --coral: #EF4444;
   --purple: #8B5CF6;
   --orange: #F97316;
-  --text: #1E293B;
-  --text-muted: #64748B;
+  --text: #F1F5F9;
+  --text-muted: #8A9BB0;
   /* أبعاد التخطيط */
   --sidebar-width: 260px;
   --header-height: 70px;
@@ -100,8 +101,8 @@ input, select, textarea { font-family:inherit; }
    ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width:6px; height:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:rgba(37,99,235,0.2); border-radius:10px; }
-::-webkit-scrollbar-thumb:hover { background:rgba(37,99,235,0.4); }
+::-webkit-scrollbar-thumb { background:rgba(96,165,250,0.2); border-radius:10px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(96,165,250,0.4); }
 ::-webkit-scrollbar-corner { background:transparent; }
 
 /* ──────────────────────────────────────────────────────────────
@@ -133,48 +134,14 @@ input, select, textarea { font-family:inherit; }
   from { opacity:0; transform:translateY(25px); }
   to   { opacity:1; transform:translateY(0); }
 }
-/* نبضة إضاءة */
-@keyframes pulseGlow {
-  0%,100% { box-shadow:0 0 8px rgba(0,212,255,0.12); }
-  50%     { box-shadow:0 0 28px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.08); }
-}
-/* نبضة خضراء */
-@keyframes pulseGlowGreen {
-  0%,100% { box-shadow:0 0 8px rgba(6,214,160,0.12); }
-  50%     { box-shadow:0 0 28px rgba(6,214,160,0.35); }
-}
-/* نبضة حمراء */
-@keyframes pulseGlowRed {
-  0%,100% { box-shadow:0 0 8px rgba(239,71,111,0.12); }
-  50%     { box-shadow:0 0 28px rgba(239,71,111,0.4); }
-}
 /* شريط متحرك */
 @keyframes marquee {
   0%   { transform:translateX(0%); }
   100% { transform:translateX(-50%); }
 }
-/* طفو */
-@keyframes float {
-  0%,100% { transform:translateY(0); }
-  50%     { transform:translateY(-8px); }
-}
-/* تألق */
-@keyframes shimmer {
-  0% { background-position:-200% 0; }
-  100% { background-position:200% 0; }
-}
 /* دوران */
 @keyframes spin {
   to { transform:rotate(360deg); }
-}
-/* كتابة نص */
-@keyframes typing {
-  from { width:0; }
-  to   { width:100%; }
-}
-/* وميض المؤشر */
-@keyframes blink {
-  50% { border-color:transparent; }
 }
 /* عدّاد صاعد */
 @keyframes countUp {
@@ -192,12 +159,6 @@ input, select, textarea { font-family:inherit; }
   60%  { transform:rotate(-6deg); }
   100% { transform:rotate(0); }
 }
-/* تدرج متحرك للخلفية */
-@keyframes gradientShift {
-  0%   { background-position:0% 50%; }
-  50%  { background-position:100% 50%; }
-  100% { background-position:0% 50%; }
-}
 /* دخول بطاقة */
 @keyframes cardEnter {
   from { opacity:0; transform:translateY(20px) scale(0.96); }
@@ -207,11 +168,6 @@ input, select, textarea { font-family:inherit; }
 @keyframes alertFlash {
   0%,100% { opacity:1; }
   50%     { opacity:0.5; }
-}
-/* تموج دائري */
-@keyframes ripple {
-  0%   { transform:scale(1); opacity:0.6; }
-  100% { transform:scale(2.5); opacity:0; }
 }
 /* ظهور تدريجي */
 @keyframes staggerFade {
@@ -251,8 +207,8 @@ input, select, textarea { font-family:inherit; }
   position:relative;
 }
 .logo-text { display:flex; flex-direction:column; }
-.logo-title { font-size:19px; font-weight:800; color:var(--text); letter-spacing:0.5px; }
-.logo-sub  { font-size:11px; color:var(--text-muted); letter-spacing:0.8px; }
+.logo-title { font-size:19px; font-weight:800; color:var(--text); }
+.logo-sub  { font-size:11px; color:var(--text-muted); }
 
 /* ── شريط الإشعارات المتحرك (Marquee) ── */
 .marquee-wrapper {
@@ -289,7 +245,7 @@ input, select, textarea { font-family:inherit; }
   border-radius:var(--radius-sm); padding:7px 16px;
   transition:border-color 0.3s ease;
 }
-.time-display:hover { border-color:rgba(37,99,235,0.2); }
+.time-display:hover { border-color:rgba(96,165,250,0.2); }
 .time-display i { color:var(--neon); font-size:13px; }
 #clock-time { font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:1.5px; }
 #clock-date { font-size:11.5px; color:var(--text-muted); font-weight:500; }
@@ -306,13 +262,13 @@ input, select, textarea { font-family:inherit; }
 }
 .btn-icon::before {
   content:''; position:absolute; inset:0;
-  background:rgba(37,99,235,0.06);
+  background:rgba(96,165,250,0.06);
   opacity:0; transition:opacity 0.3s ease;
 }
 .btn-icon:hover {
-  background:rgba(37,99,235,0.06); border-color:rgba(37,99,235,0.25);
+  background:rgba(96,165,250,0.06); border-color:rgba(96,165,250,0.25);
   color:var(--neon); transform:translateY(-2px);
-  box-shadow:0 4px 12px rgba(37,99,235,0.08);
+  box-shadow:0 4px 12px rgba(96,165,250,0.08);
 }
 .btn-icon:hover::before { opacity:1; }
 .btn-icon:active { transform:translateY(0) scale(0.96); }
@@ -320,8 +276,8 @@ input, select, textarea { font-family:inherit; }
 .btn-back {
   display:flex; align-items:center; gap:8px;
   padding:9px 18px;
-  background:rgba(37,99,235,0.06);
-  border:1px solid rgba(37,99,235,0.18);
+  background:rgba(96,165,250,0.06);
+  border:1px solid rgba(96,165,250,0.18);
   border-radius:var(--radius-sm); color:var(--neon);
   font-size:12.5px; font-weight:600;
   transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
@@ -329,12 +285,12 @@ input, select, textarea { font-family:inherit; }
 }
 .btn-back::after {
   content:''; position:absolute; inset:0;
-  background:rgba(37,99,235,0.08);
+  background:rgba(96,165,250,0.08);
   opacity:0; transition:opacity 0.3s ease;
 }
 .btn-back:hover {
-  border-color:rgba(37,99,235,0.4);
-  box-shadow:0 4px 12px rgba(37,99,235,0.08);
+  border-color:rgba(96,165,250,0.4);
+  box-shadow:0 4px 12px rgba(96,165,250,0.08);
   transform:translateY(-1px);
 }
 .btn-back:hover::after { opacity:1; }
@@ -365,7 +321,7 @@ input, select, textarea { font-family:inherit; }
 .sidebar-nav .nav-label {
   font-size:10px; font-weight:700;
   color:var(--text-muted); text-transform:uppercase;
-  letter-spacing:1.5px; padding:0 10px 12px;
+  letter-spacing:0.05em; padding:0 10px 12px;
   display:flex; align-items:center; gap:8px;
 }
 .sidebar-nav .nav-label::after {
@@ -389,7 +345,7 @@ input, select, textarea { font-family:inherit; }
 }
 .nav-item::after {
   content:''; position:absolute; inset:0;
-  background:rgba(37,99,235,0.03);
+  background:rgba(96,165,250,0.03);
   opacity:0; transition:opacity 0.3s ease;
 }
 .nav-item:hover {
@@ -399,7 +355,7 @@ input, select, textarea { font-family:inherit; }
 .nav-item:hover::before { height:60%; }
 .nav-item:hover::after { opacity:1; }
 .nav-item.active {
-  background:rgba(0,212,255,0.06);
+  background:rgba(96,165,250,0.06);
   color:var(--neon); font-weight:600;
 }
 .nav-item.active::before { height:70%; }
@@ -417,6 +373,19 @@ input, select, textarea { font-family:inherit; }
   z-index:2;
 }
 
+/* روابط تنقل خارجية بنفس مظهر عناصر القائمة */
+a.nav-item { text-decoration: none; }
+
+/* شارة «تجريبي» — قرص هادئ بصبغة زرقاء ناعمة (نص ثابت، بلا عداد) */
+.nav-beta-pill {
+  margin-inline-start: auto; flex-shrink: 0;
+  padding: 1px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 600;
+  color: #93C5FD; background: rgba(96, 165, 250, 0.10);
+  border: 1px solid rgba(96, 165, 250, 0.26);
+  position: relative; z-index: 1;
+}
+
 /* ── شريط البحث الموحد في السايدبار ── */
 .sidebar-search {
   padding:14px 12px 18px;
@@ -431,9 +400,9 @@ input, select, textarea { font-family:inherit; }
   transition:all 0.3s ease;
 }
 .sidebar-search input:focus {
-  outline:none; border-color:rgba(37,99,235,0.3);
-  box-shadow:0 0 14px rgba(37,99,235,0.06);
-  background:rgba(37,99,235,0.02);
+  outline:none; border-color:rgba(96,165,250,0.3);
+  box-shadow:0 0 14px rgba(96,165,250,0.06);
+  background:rgba(96,165,250,0.02);
 }
 .sidebar-search input::placeholder { color:var(--text-muted); opacity:0.6; }
 .sidebar-search i {
@@ -476,7 +445,7 @@ input, select, textarea { font-family:inherit; }
   padding:4px 12px; border-radius:20px;
   font-size:11px; font-weight:600;
 }
-.badge-primary { background:rgba(37,99,235,0.1); color:var(--neon); }
+.badge-primary { background:rgba(96,165,250,0.1); color:var(--neon); }
 .badge-warning { background:rgba(245,158,11,0.12); color:var(--gold); }
 .badge-danger  { background:rgba(239,68,68,0.12); color:var(--coral); }
 .badge-success { background:rgba(16,185,129,0.12); color:var(--neon-green); }
@@ -511,13 +480,13 @@ input, select, textarea { font-family:inherit; }
 .stat-card:hover {
   transform:translateY(-4px);
   box-shadow:var(--shadow);
-  border-color:rgba(37,99,235,0.15);
+  border-color:rgba(96,165,250,0.15);
 }
 
 /* ألوان البطاقات */
 .stat-card.coral   { --card-color:var(--coral);   --card-glow:rgba(239,71,111,0.3); }
-.stat-card.neon-g  { --card-color:var(--neon-green);--card-glow:rgba(6,214,160,0.3); }
-.stat-card.neon    { --card-color:var(--neon);     --card-glow:rgba(0,212,255,0.3); }
+.stat-card.neon-g  { --card-color:var(--neon-green);--card-glow:rgba(16,185,129,0.3); }
+.stat-card.neon    { --card-color:var(--neon);     --card-glow:rgba(96,165,250,0.3); }
 .stat-card.gold    { --card-color:var(--gold);     --card-glow:rgba(255,209,102,0.3); }
 
 .stat-icon {
@@ -530,8 +499,8 @@ input, select, textarea { font-family:inherit; }
 }
 .stat-card:hover .stat-icon { transform:scale(1.08); }
 .stat-card.coral   .stat-icon { background:rgba(239,71,111,0.1); }
-.stat-card.neon-g  .stat-icon { background:rgba(6,214,160,0.1); }
-.stat-card.neon    .stat-icon { background:rgba(0,212,255,0.1); }
+.stat-card.neon-g  .stat-icon { background:rgba(16,185,129,0.1); }
+.stat-card.neon    .stat-icon { background:rgba(96,165,250,0.1); }
 .stat-card.gold    .stat-icon { background:rgba(255,209,102,0.1); }
 
 .stat-value {
@@ -546,7 +515,7 @@ input, select, textarea { font-family:inherit; }
   font-size:11.5px; margin-top:10px; padding:3px 10px;
   border-radius:20px; font-weight:600;
 }
-.stat-change.up   { color:var(--neon-green); background:rgba(6,214,160,0.1); }
+.stat-change.up   { color:var(--neon-green); background:rgba(16,185,129,0.1); }
 .stat-change.down { color:var(--coral);      background:rgba(239,71,111,0.1); }
 
 /* زر إجراء داخل البطاقة */
@@ -566,15 +535,15 @@ input, select, textarea { font-family:inherit; }
 }
 .btn-coral:hover { background:rgba(239,71,111,0.2); transform:translateY(-1px); }
 .btn-neon {
-  background:rgba(0,212,255,0.08); color:var(--neon);
-  border:1px solid rgba(0,212,255,0.18);
+  background:rgba(96,165,250,0.08); color:var(--neon);
+  border:1px solid rgba(96,165,250,0.18);
 }
-.btn-neon:hover { background:rgba(0,212,255,0.16); transform:translateY(-1px); }
+.btn-neon:hover { background:rgba(96,165,250,0.16); transform:translateY(-1px); }
 .btn-green {
-  background:rgba(6,214,160,0.1); color:var(--neon-green);
-  border:1px solid rgba(6,214,160,0.18);
+  background:rgba(16,185,129,0.1); color:var(--neon-green);
+  border:1px solid rgba(16,185,129,0.18);
 }
-.btn-green:hover { background:rgba(6,214,160,0.2); transform:translateY(-1px); }
+.btn-green:hover { background:rgba(16,185,129,0.2); transform:translateY(-1px); }
 
 /* ═══════════════════════════════════════════════════════════════
        شبكة المحتوى (Content Grid System)
@@ -598,10 +567,10 @@ input, select, textarea { font-family:inherit; }
 }
 .glass-card::before {
   content:''; position:absolute; top:0; right:0; width:120px; height:120px;
-  background:radial-gradient(circle, rgba(37,99,235,0.03), transparent 70%);
+  background:radial-gradient(circle, rgba(96,165,250,0.03), transparent 70%);
   pointer-events:none;
 }
-.glass-card:hover { border-color:rgba(37,99,235,0.08); }
+.glass-card:hover { border-color:rgba(96,165,250,0.08); }
 .glass-card-header {
   display:flex; align-items:center; justify-content:space-between;
   margin-bottom:18px; position:relative; z-index:1;
@@ -627,7 +596,7 @@ input, select, textarea { font-family:inherit; }
 .directive-item:nth-child(4) { animation-delay:0.18s; }
 .directive-item:nth-child(5) { animation-delay:0.24s; }
 .directive-item:last-child { border-bottom:none; }
-.directive-item:hover { padding-right:8px; background:rgba(37,99,235,0.03); }
+.directive-item:hover { padding-right:8px; background:rgba(96,165,250,0.03); }
 .directive-pin {
   width:32px; height:32px; flex-shrink:0;
   background:var(--bg-glass); border:1px solid var(--border);
@@ -684,7 +653,7 @@ input, select, textarea { font-family:inherit; }
 .alert-badge { font-size:9px; padding:2px 8px; border-radius:10px; margin-right:8px; font-weight:600; }
 .alert-item.high   .alert-badge { background:rgba(239,71,111,0.12); color:var(--coral); }
 .alert-item.medium .alert-badge { background:rgba(255,209,102,0.12); color:var(--gold); }
-.alert-item.low    .alert-badge { background:rgba(6,214,160,0.12); color:var(--neon-green); }
+.alert-item.low    .alert-badge { background:rgba(16,185,129,0.12); color:var(--neon-green); }
 
 /* ═══════════════════════════════════════════════════════════════
        Progress Bars الدائرية (Circular Progress Indicators)
@@ -720,8 +689,8 @@ input, select, textarea { font-family:inherit; }
   min-width:160px; transition:all 0.3s ease;
 }
 .filter-bar select:focus, .filter-bar input:focus {
-  outline:none; border-color:rgba(37,99,235,0.3);
-  box-shadow:0 0 12px rgba(37,99,235,0.06);
+  outline:none; border-color:rgba(96,165,250,0.3);
+  box-shadow:0 0 12px rgba(96,165,250,0.06);
 }
 .filter-bar select option { background:var(--bg); color:var(--text); }
 .filter-bar input::placeholder { color:var(--text-muted); opacity:0.6; }
@@ -747,7 +716,7 @@ input, select, textarea { font-family:inherit; }
 .ref-card:nth-child(8) { animation-delay:0.49s; }
 .ref-card:hover {
   transform:translateY(-4px);
-  border-color:rgba(37,99,235,0.15);
+  border-color:rgba(96,165,250,0.15);
   box-shadow:var(--shadow);
 }
 .ref-card:hover .ref-icon { transform:scale(1.1) rotate(-5deg); }
@@ -759,9 +728,9 @@ input, select, textarea { font-family:inherit; }
   transition:transform 0.3s ease;
 }
 .ref-icon.protocol { background:rgba(239,71,111,0.1);  color:var(--coral); }
-.ref-icon.guide    { background:rgba(0,212,255,0.1);   color:var(--neon); }
+.ref-icon.guide    { background:rgba(96,165,250,0.1);   color:var(--neon); }
 .ref-icon.form     { background:rgba(255,209,102,0.1); color:var(--gold); }
-.ref-icon.sop      { background:rgba(6,214,160,0.1);   color:var(--neon-green); }
+.ref-icon.sop      { background:rgba(16,185,129,0.1);   color:var(--neon-green); }
 .ref-title { font-size:13.5px; font-weight:700; color:var(--text); margin-bottom:4px; }
 .ref-desc { font-size:12px; color:var(--text-muted); margin-bottom:12px; line-height:1.7; }
 .ref-meta { display:flex; align-items:center; gap:14px; font-size:11px; color:var(--text-muted); }
@@ -792,7 +761,7 @@ input, select, textarea { font-family:inherit; }
 .hosp-card:nth-child(12) { animation-delay:0.55s; }
 .hosp-card:hover {
   transform:translateY(-4px);
-  border-color:rgba(37,99,235,0.12);
+  border-color:rgba(96,165,250,0.12);
   box-shadow:var(--shadow);
 }
 .hosp-header {
@@ -820,7 +789,7 @@ input, select, textarea { font-family:inherit; }
        مركز الملفات (File Center)
    ═══════════════════════════════════════════════════════════════ */
 .drop-zone {
-  border:2px dashed rgba(37,99,235,0.15);
+  border:2px dashed rgba(96,165,250,0.15);
   border-radius:var(--radius); padding:44px 24px;
   text-align:center; cursor:pointer;
   transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
@@ -830,12 +799,12 @@ input, select, textarea { font-family:inherit; }
 }
 .drop-zone::before {
   content:''; position:absolute; inset:0;
-  background:radial-gradient(circle at 50% 50%, rgba(37,99,235,0.04), transparent 70%);
+  background:radial-gradient(circle at 50% 50%, rgba(96,165,250,0.04), transparent 70%);
   opacity:0; transition:opacity 0.4s ease;
 }
 .drop-zone:hover, .drop-zone.dragover {
   border-color:var(--neon);
-  background:rgba(37,99,235,0.04);
+  background:rgba(96,165,250,0.04);
   transform:scale(1.005);
 }
 .drop-zone:hover::before { opacity:1; }
@@ -856,12 +825,12 @@ input, select, textarea { font-family:inherit; }
   transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
   animation:staggerFade 0.35s ease both;
 }
-.file-list-item:hover { border-color:rgba(37,99,235,0.15); background:rgba(37,99,235,0.02); transform:translateX(-4px); }
+.file-list-item:hover { border-color:rgba(96,165,250,0.15); background:rgba(96,165,250,0.02); transform:translateX(-4px); }
 .file-icon { width:44px; height:44px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; transition:transform 0.3s ease; }
 .file-list-item:hover .file-icon { transform:scale(1.08); }
 .file-icon.pdf  { background:rgba(239,71,111,0.1);  color:var(--coral); }
-.file-icon.word { background:rgba(0,212,255,0.1);   color:var(--neon); }
-.file-icon.excel{ background:rgba(6,214,160,0.1);   color:var(--neon-green); }
+.file-icon.word { background:rgba(96,165,250,0.1);   color:var(--neon); }
+.file-icon.excel{ background:rgba(16,185,129,0.1);   color:var(--neon-green); }
 .file-icon.ppt  { background:rgba(255,209,102,0.1); color:var(--gold); }
 .file-icon.img  { background:rgba(168,85,247,0.1);  color:var(--purple); }
 .file-info { flex:1; }
@@ -918,6 +887,8 @@ input, select, textarea { font-family:inherit; }
        الخط الزمني (Timeline Component)
    ═══════════════════════════════════════════════════════════════ */
 .timeline { position:relative; padding:24px 0; }
+.timeline.empty { padding:0; }
+.timeline.empty::before { display:none; }
 .timeline::before {
   content:''; position:absolute; right:26px; top:0; bottom:0;
   width:2px;
@@ -943,7 +914,7 @@ input, select, textarea { font-family:inherit; }
   transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
   animation:fadeInRight 0.45s ease both;
 }
-.timeline-card:hover { border-color:rgba(37,99,235,0.15); transform:translateX(-4px); }
+.timeline-card:hover { border-color:rgba(96,165,250,0.15); transform:translateX(-4px); }
 .timeline-title { font-size:13.5px; font-weight:700; color:var(--text); margin-bottom:5px; }
 .timeline-desc  { font-size:12px; color:var(--text-muted); margin-bottom:8px; line-height:1.6; }
 .timeline-meta  { font-size:11.5px; color:var(--text-muted); display:flex; gap:16px; }
@@ -968,7 +939,7 @@ input, select, textarea { font-family:inherit; }
   border-right:4px solid transparent;
   animation:cardEnter 0.45s ease both;
 }
-.announce-card:hover { border-color:rgba(37,99,235,0.1); transform:translateY(-3px); box-shadow:var(--shadow); }
+.announce-card:hover { border-color:rgba(96,165,250,0.1); transform:translateY(-3px); box-shadow:var(--shadow); }
 .announce-card.pinned { border-right-color:var(--gold); background:rgba(255,209,102,0.025); }
 .announce-card.urgent { border-right-color:var(--coral); }
 .announce-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
@@ -998,101 +969,6 @@ input, select, textarea { font-family:inherit; }
 }
 .legend-item { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); }
 .legend-dot { width:12px; height:12px; border-radius:50%; }
-
-/* ═══════════════════════════════════════════════════════════════
-       المساعد الذكي (AI Chat Assistant)
-   ═══════════════════════════════════════════════════════════════ */
-.chat-fab {
-  position:fixed; bottom:28px; left:28px; z-index:2000;
-  width:58px; height:58px;
-  background:var(--neon);
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  color:#fff; font-size:23px;
-  box-shadow:0 4px 16px rgba(37,99,235,0.25);
-  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
-  animation:float 3.5s ease infinite;
-  cursor:pointer; border:none;
-}
-.chat-fab::after {
-  content:''; position:absolute; inset:-4px; border-radius:50%;
-  border:2px solid rgba(37,99,235,0.15);
-  animation:ripple 2.5s ease infinite;
-}
-.chat-fab:hover { transform:scale(1.1); box-shadow:0 6px 24px rgba(37,99,235,0.35); }
-.chat-fab:active { transform:scale(0.95); }
-.chat-box {
-  position:fixed; bottom:100px; left:28px; z-index:2000;
-  width:380px; max-height:500px;
-  background:var(--bg-card); border:1px solid var(--border);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  display:none !important; flex-direction:column;
-  overflow:hidden;
-  animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1);
-}
-.chat-box.active { display:flex !important; }
-.chat-header {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:14px 18px;
-  background:var(--bg-glass);
-  border-bottom:1px solid var(--border);
-}
-.chat-header h4 { font-size:13.5px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
-.chat-header h4 i { color:var(--neon); font-size:15px; }
-.chat-status { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--neon-green); }
-.chat-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--neon-green); }
-.chat-close { color:var(--text-muted); font-size:13px; cursor:pointer; transition:color 0.2s; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); }
-.chat-close:hover { color:var(--coral); background:rgba(239,71,111,0.1); }
-.chat-messages {
-  flex:1; overflow-y:auto; padding:16px;
-  display:flex; flex-direction:column; gap:12px;
-  max-height:340px;
-}
-.chat-msg { max-width:88%; padding:11px 16px; border-radius:16px; font-size:12.5px; line-height:1.7; animation:fadeIn 0.3s ease; }
-.chat-msg.bot { align-self:flex-start; background:var(--bg-glass); color:var(--text); border:1px solid var(--border); border-bottom-right-radius:4px; }
-.chat-msg.user { align-self:flex-end; background:var(--neon); color:#fff; border-bottom-left-radius:4px; }
-.chat-msg.bot.welcome { background:rgba(37,99,235,0.04); border-color:rgba(37,99,235,0.12); }
-.chat-input-row {
-  display:flex; gap:8px; padding:10px 14px;
-  border-top:1px solid var(--border); background:var(--bg-glass);
-}
-.chat-input-row input {
-  flex:1; padding:9px 14px; background:var(--bg-glass);
-  border:1px solid var(--border); border-radius:22px;
-  color:var(--text); font-family:inherit; font-size:12px;
-  transition:all 0.3s ease;
-}
-.chat-input-row input:focus { outline:none; border-color:rgba(37,99,235,0.3); box-shadow:0 0 12px rgba(37,99,235,0.06); }
-.chat-input-row input::placeholder { color:rgba(138,155,176,0.45); }
-.chat-send {
-  width:36px; height:36px; border-radius:50%;
-  background:var(--neon);
-  color:#fff; display:flex; align-items:center; justify-content:center;
-  transition:all 0.25s ease; cursor:pointer; border:none;
-}
-.chat-send:hover { transform:scale(1.12); box-shadow:0 4px 14px rgba(37,99,235,0.25); }
-.chat-send:active { transform:scale(0.95); }
-
-/* أسئلة سريعة */
-.quick-questions { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
-.quick-q {
-  padding:6px 12px; border-radius:14px;
-  background:rgba(37,99,235,0.05); border:1px solid rgba(37,99,235,0.1);
-  color:var(--neon); font-size:11.5px; cursor:pointer;
-  transition:all 0.25s ease;
-}
-.quick-q:hover { background:rgba(37,99,235,0.12); transform:translateY(-1px); }
-
-/* مؤشر الكتابة */
-.typing-indicator { display:flex; gap:4px; padding:10px 14px; }
-.typing-indicator span { width:7px; height:7px; border-radius:50%; background:var(--neon); animation:typingBounce 1s ease infinite; }
-.typing-indicator span:nth-child(2) { animation-delay:0.15s; }
-.typing-indicator span:nth-child(3) { animation-delay:0.3s; }
-@keyframes typingBounce {
-  0%,60%,100% { transform:translateY(0); }
-  30%        { transform:translateY(-6px); }
-}
 
 /* ═══════════════════════════════════════════════════════════════
        Toast Notifications - إشعارات منبثقة
@@ -1130,7 +1006,7 @@ input, select, textarea { font-family:inherit; }
    ═══════════════════════════════════════════════════════════════ */
 .spinner {
   width:40px; height:40px; border-radius:50%;
-  border:3px solid rgba(37,99,235,0.1);
+  border:3px solid rgba(96,165,250,0.1);
   border-top-color:var(--neon);
   animation:spin 0.8s linear infinite;
   margin:30px auto;
@@ -1156,6 +1032,50 @@ input, select, textarea { font-family:inherit; }
 .shortcut-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
 .shortcut-row:last-child { border-bottom:none; }
 .shortcut-key { background:var(--bg-glass); border:1px solid var(--border); border-radius:6px; padding:3px 10px; font-size:11px; font-weight:600; color:var(--neon); font-family:monospace; }
+
+/* ═══════════════════════════════════════════════════════════════
+       نافذة إضافة إعلان (Announcement Modal)
+       أنماط كانت مفقودة — تُعرض النافذة عبر inline display:flex
+   ═══════════════════════════════════════════════════════════════ */
+.modal {
+  position:fixed; inset:0; z-index:5600;
+  background:rgba(10,18,32,0.6); backdrop-filter:blur(8px);
+  display:none; align-items:center; justify-content:center;
+  animation:fadeIn 0.3s ease;
+}
+.modal-content {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; width:100%;
+  animation:slideDown 0.35s cubic-bezier(0.16,1,0.3,1);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+}
+.modal-content h3 { font-size:15px; font-weight:700; color:var(--text); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.modal-content h3 i { color:var(--neon-green); }
+.form-row { margin-bottom:14px; }
+.form-row label { display:block; font-size:12.5px; font-weight:600; color:var(--text-muted); margin-bottom:6px; }
+.form-row input[type="text"], .form-row textarea {
+  width:100%; padding:10px 14px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text); font-size:13px;
+  transition:border-color 0.25s ease; resize:vertical;
+}
+.form-row input[type="text"]:focus, .form-row textarea:focus {
+  outline:none; border-color:rgba(16,185,129,0.4);
+}
+.form-row label:has(input[type="checkbox"]) { display:inline-flex; align-items:center; gap:6px; color:var(--text); font-weight:500; margin-bottom:0; }
+.modal-buttons { display:flex; gap:10px; justify-content:flex-start; margin-top:18px; }
+.btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 20px; border-radius:var(--radius-sm);
+  background:var(--bg-glass); border:1px solid var(--border);
+  color:var(--text-muted); font-size:13px; font-weight:600;
+  transition:all 0.25s ease;
+}
+.btn:hover { color:var(--text); border-color:rgba(255,255,255,0.16); }
+.btn-teal { background:rgba(14,164,122,0.12); color:#4FBF9A; border-color:rgba(14,164,122,0.28); }
+.btn-teal:hover { background:rgba(14,164,122,0.20); color:#4FBF9A; }
+body:not(.light-mode) .modal-content { box-shadow:inset 0 1px 0 rgba(255,255,255,0.045), 0 24px 60px rgba(0,0,0,0.40); }
+body.light-mode .modal { background:rgba(30,41,59,0.45); }
 
 /* ═══════════════════════════════════════════════════════════════
        Status Indicator Dots
@@ -1209,7 +1129,6 @@ input, select, textarea { font-family:inherit; }
   .main-content { margin-right:0; padding:18px 14px 30px; }
   .stats-grid { grid-template-columns:1fr; }
   .marquee-wrapper { display:none; }
-  .chat-box { width:calc(100vw - 32px); left:16px; }
   .section-header { flex-direction:column; align-items:flex-start; gap:10px; }
   .map-container { height:380px; }
   .topbar { padding:0 14px; }
@@ -1221,24 +1140,198 @@ input, select, textarea { font-family:inherit; }
   .topbar-actions .btn-back span { display:none; }
   .topbar-actions .btn-back { padding:9px 12px; }
   .doc-viewer-box { width:96%; height:90vh; }
-  .chat-box { width:calc(100vw - 24px); left:12px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-       Dark Mode Overrides - تبديل الوضع الفاتح
+       الهوية التنفيذية (Phase 5) — الداكن التنفيذي هو المعيار
+       الافتراضي: كحلي/زجاج/زمردي (نفس شاشة الدخول واللوحة التنفيذية).
+       body.light-mode يعيد المظهر الفاتح التراثي كخيار محفوظ.
+       (تحل محل كتلة body.dark-mode القديمة — لم يعد أحد يضيفها)
    ═══════════════════════════════════════════════════════════════ */
-body.dark-mode {
-  --bg: #0F172A;
-  --bg-card: rgba(30,41,59,0.95);
-  --bg-glass: rgba(255,255,255,0.03);
-  --border: rgba(255,255,255,0.08);
-  --text: #E2E8F0;
-  --text-muted: #94A3B8;
+body:not(.light-mode) {
+  background:linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%);
+  background-attachment:fixed;
+  scrollbar-color:rgba(255,255,255,0.12) transparent;
+  /* الظل الفاتح الافتراضي يختفي على الداكن — بديل عميق؛ القيمة الأصلية تبقى للفاتح */
+  --shadow:0 10px 30px rgba(0,0,0,0.30);
 }
-body.dark-mode .topbar { background:rgba(15,23,42,0.95); border-bottom-color:rgba(255,255,255,0.08); }
-body.dark-mode .sidebar { background:rgba(30,41,59,0.95); }
-body.dark-mode .drop-zone { background:rgba(255,255,255,0.02); }
-body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
+/* خلفية حيّة تكاد تختفي — نفس وصفة اللوحة التنفيذية (إضاءة محيطية + شبكة خافتة) */
+body:not(.light-mode)::before {
+  content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -10%, rgba(126,166,232,0.06), transparent 70%),
+    radial-gradient(ellipse 45% 32% at 50% 110%, rgba(14,164,122,0.045), transparent 70%),
+    linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%);
+}
+body:not(.light-mode)::after {
+  content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+}
+/* شريط تمرير تنفيذي */
+body:not(.light-mode)::-webkit-scrollbar-track { background:#0A1220; }
+body:not(.light-mode)::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.10); border:2px solid #0A1220; }
+body:not(.light-mode)::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.16); }
+
+/* الشريط العلوي — زجاج كحلي عميق بنفس وصفة smart-topbar */
+body:not(.light-mode) .topbar {
+  background:rgba(11,18,32,0.82); border-bottom-color:rgba(255,255,255,0.06);
+  box-shadow:0 10px 30px rgba(0,0,0,0.30);
+}
+/* الشريط الجانبي — تدرج عمودي عميق بظل غرفة عمليات */
+body:not(.light-mode) .sidebar {
+  background:linear-gradient(180deg, #0D1626 0%, #0A1220 100%);
+  box-shadow:-24px 0 60px rgba(0,0,0,0.45);
+}
+body:not(.light-mode) .marquee-wrapper::before { background:linear-gradient(to left, rgba(11,18,32,0.95), transparent); }
+body:not(.light-mode) .marquee-wrapper::after  { background:linear-gradient(to right, rgba(11,18,32,0.95), transparent); }
+body:not(.light-mode) .drop-zone { background:rgba(255,255,255,0.02); }
+body:not(.light-mode) .circle-bg { stroke:rgba(255,255,255,0.06); }
+body:not(.light-mode) .alert-item:hover { background:rgba(255,255,255,0.06); }
+body:not(.light-mode) .filter-bar select option { background:#0D1626; }
+
+/* البطاقات — سطح زجاجي بعمق تنفيذي (ظل داخلي خفيف + ظل سقوط عميق) */
+body:not(.light-mode) .glass-card,
+body:not(.light-mode) .oc-resources,
+body:not(.light-mode) .doc-viewer-box,
+body:not(.light-mode) .shortcuts-box {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.045), 0 24px 60px rgba(0,0,0,0.40);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+}
+body:not(.light-mode) .stat-card,
+body:not(.light-mode) .ref-card,
+body:not(.light-mode) .toast {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+}
+
+/* التنقل الجانبي — هدوء افتراضي ولمسة زمردية، والصفحة الحالية بشريط زمردي */
+body:not(.light-mode) .nav-item { color:#A9BACD; }
+body:not(.light-mode) .nav-item::before { background:#0EA47A; }
+body:not(.light-mode) .nav-item:hover { background:rgba(255,255,255,0.05); color:#F1F5F9; }
+body:not(.light-mode) .nav-item:hover i { color:#4FBF9A; }
+body:not(.light-mode) .nav-item.active {
+  background:rgba(14,164,122,0.10); color:#F1F5F9; font-weight:600;
+}
+body:not(.light-mode) .nav-item.active i { color:#4FBF9A; }
+
+/* الأزرار — زجاج هادئ بحدود زمردية عند التمرير، والإجراء الرئيسي زمردي */
+body:not(.light-mode) .btn-icon:hover {
+  background:rgba(255,255,255,0.06); border-color:rgba(14,164,122,0.45); color:#4FBF9A;
+}
+body:not(.light-mode) .btn-back {
+  background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.08); color:#A9BACD;
+}
+body:not(.light-mode) .btn-back:hover { border-color:rgba(14,164,122,0.45); color:#F1F5F9; }
+body:not(.light-mode) .btn-neon {
+  background:rgba(14,164,122,0.12); color:#4FBF9A; border-color:rgba(14,164,122,0.28);
+}
+body:not(.light-mode) .btn-neon:hover { background:rgba(14,164,122,0.20); }
+
+/* أيقونات العناوين — زمردية هادئة موحدة */
+body:not(.light-mode) .section-header h2 i,
+body:not(.light-mode) .glass-card-header h3 i { color:#4FBF9A; }
+
+/* الوضع الفاتح التراثي — خيار محفوظ عبر زر تبديل المظهر */
+body.light-mode {
+  --bg: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-glass: rgba(241, 245, 249, 0.8);
+  --border: #E2E8F0;
+  --text: #1E293B;
+  --text-muted: #64748B;
+}
+body.light-mode .topbar { background:rgba(255,255,255,0.95); }
+body.light-mode .sidebar { background:#FFFFFF; }
+body.light-mode .marquee-wrapper::before { background:linear-gradient(to left, rgba(248,250,252,0.95), transparent); }
+body.light-mode .marquee-wrapper::after  { background:linear-gradient(to right, rgba(248,250,252,0.95), transparent); }
+
+/* ── عناوين المناطق التنفيذية (بوصلة عين بلا تفكير) ── */
+.oc-eyebrow {
+  display:flex; align-items:center; gap:12px;
+  padding:0 8px; margin:20px 0 12px;
+  color:var(--text-muted);
+  font-size:0.78rem; font-weight:600; letter-spacing:0.06em;
+}
+.oc-eyebrow i { color:var(--neon-green); font-size:0.72rem; }
+.oc-eyebrow::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── المنطقة 1: بطاقة المناوبة الحالية ── */
+.oc-shift-card { margin-bottom:6px; }
+.oc-shift-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:14px 20px;
+}
+.oc-shift-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.oc-shift-label { font-size:11px; color:var(--text-muted); font-weight:600; letter-spacing:0.04em; }
+.oc-shift-value { font-size:15px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oc-shift-value.oc-shift-name { font-size:17px; }
+.oc-shift-status { display:inline-flex; align-items:center; gap:7px; }
+
+/* ── المنطقة 3: شريط الموارد التشغيلية (شريط واحد مدمج هادئ) ── */
+.oc-resources {
+  display:flex; flex-wrap:wrap; align-items:stretch; gap:10px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:12px 16px; margin-bottom:16px;
+}
+.oc-resources-seg {
+  display:flex; align-items:center; gap:8px;
+  flex:1 1 0; min-width:170px;
+  padding:7px 14px; border-radius:10px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  font-size:13px; color:var(--text);
+}
+.oc-resources-seg > i:first-child { color:var(--neon); font-size:14px; }
+.oc-resources-seg-btn { cursor:pointer; transition:background 0.18s ease, border-color 0.18s ease; }
+.oc-resources-seg-btn:hover { border-color:rgba(96,165,250,0.3); }
+.oc-resources-label { color:var(--text-muted); font-size:12px; white-space:nowrap; }
+.oc-resources-value { font-weight:700; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oc-resources-value.ok { color:var(--neon-green); }
+.oc-resources-value.warn { color:var(--gold); }
+.oc-resources-caret { margin-inline-start:auto; font-size:10px; color:var(--text-muted); transition:transform 0.2s ease; }
+.oc-resources-caret.open { transform:rotate(180deg); }
+.oc-resources-support-list {
+  flex-basis:100%; display:flex; flex-direction:column; gap:6px;
+  border-top:1px dashed var(--border); padding-top:10px;
+}
+.oc-resources-supporter {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:7px 12px; border-radius:8px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  font-size:12.5px;
+}
+.oc-resources-supporter .sup-name { font-weight:600; color:var(--text); }
+.oc-resources-supporter .sup-meta { color:var(--text-muted); font-size:11.5px; }
+.oc-resources-support-empty { color:var(--text-muted); font-size:12.5px; padding:4px; }
+.oc-resources-support-cta {
+  align-self:flex-start; margin-top:4px;
+  font-size:12px; color:var(--neon); cursor:pointer;
+  background:none; border:none; padding:2px 0;
+}
+.oc-resources-support-cta:hover { text-decoration:underline; }
+
+/* ── المنطقة 4: الإجراءات التنفيذية ── */
+.oc-actions { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
+.oc-action-btn {
+  display:flex; align-items:center; gap:12px;
+  flex:1 1 0; min-width:220px;
+  padding:14px 18px;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text);
+  font-size:13.5px; font-weight:700; text-align:right;
+  transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+}
+.oc-action-btn i { font-size:16px; color:var(--neon-green); transition:transform 0.3s ease; }
+.oc-action-btn small { display:block; font-size:11px; font-weight:500; color:var(--text-muted); margin-top:2px; }
+.oc-action-btn:hover { border-color:rgba(16,185,129,0.35); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.18); }
+.oc-action-btn:hover i { transform:scale(1.12); }
+@media (prefers-reduced-motion: reduce) {
+  .oc-action-btn, .oc-action-btn i, .oc-resources-seg-btn, .oc-resources-caret { transition:none; }
+  .oc-action-btn:hover, .oc-action-btn:hover i { transform:none; }
+}
 
 /* ═══════════════════════════════════════════════════════════════
        Utility Classes - فصول مساعدة
@@ -1268,7 +1361,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
     position: fixed;
     inset: 0;
     z-index: 9998;
-    background: #0F172A;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     padding: 20px;
@@ -1329,8 +1422,6 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 }
 </style>
 <base target="_blank">
-<base target="_blank">
-<base target="_blank">
 </head>
 <body>
 
@@ -1367,16 +1458,9 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
       </div>
     </div>
 
-    <!-- شريط الإشعارات المتحرك (Marquee) -->
-    <div class="marquee-wrapper">
-      <div class="marquee-track" id="marqueeTrack">
-        <span><i class="fas fa-exclamation-triangle"></i> تنبيه: تمركز فوري للفرق - حادث مروري على طريق الملك فهد</span>
-        <span><i class="fas fa-info-circle"></i> تعميم جديد: تحديث بروتوكول الاستجابة السريعة رقم 45 لسنة 2025</span>
-        <span><i class="fas fa-bell"></i> إعلان: ورشة تدريبية في إدارة الأزمات يوم الأحد القادم الساعة 9 ص</span>
-        <span><i class="fas fa-exclamation-triangle"></i> تنبيه: تمركز فوري للفرق - حادث مروري على طريق الملك فهد</span>
-        <span><i class="fas fa-info-circle"></i> تعميم جديد: تحديث بروتوكول الاستجابة السريعة رقم 45 لسنة 2025</span>
-        <span><i class="fas fa-bell"></i> إعلان: ورشة تدريبية في إدارة الأزمات يوم الأحد القادم الساعة 9 ص</span>
-      </div>
+    <!-- شريط الإشعارات المتحرك (Marquee) — يُملأ من /api/announcements عبر renderMarquee؛ مخفي عند غياب البيانات -->
+    <div class="marquee-wrapper" style="display:none;">
+      <div class="marquee-track" id="marqueeTrack"></div>
     </div>
   </div>
 
@@ -1396,7 +1480,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
       <span>الرجوع للرئيسية</span>
     </button>
     <button class="btn-icon" id="darkModeToggle" data-tooltip="تبديل الوضع الداكن/الفاتح">
-      <i class="fas fa-moon"></i>
+      <i class="fas fa-sun"></i>
     </button>
     <button class="btn-icon" id="kbdShortcuts" data-tooltip="اختصارات لوحة المفاتيح (؟)">
       <i class="fas fa-keyboard"></i>
@@ -1422,6 +1506,11 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
       <span>لوحة القيادة</span>
       <span class="nav-badge" style="display:none;">0</span>
     </div>
+    <a class="nav-item" href="smart-operator.html" target="_self">
+      <i class="fas fa-brain"></i>
+      <span>المشغل الذكي</span>
+      <span class="nav-beta-pill">تجريبي</span>
+    </a>
     <div class="nav-item" data-section="references" onclick="switchSection('references')">
       <i class="fas fa-book"></i>
       <span>المرجعيات التشغيلية</span>
@@ -1433,7 +1522,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
     <div class="nav-item" data-section="files" onclick="switchSection('files')">
       <i class="fas fa-folder-open"></i>
       <span>مركز الملفات</span>
-      <span class="nav-badge">3</span>
+      <span class="nav-badge" id="navFilesBadge" style="display:none;">0</span>
     </div>
     <div class="nav-item" data-section="timeline" onclick="switchSection('timeline')">
       <i class="fas fa-stream"></i>
@@ -1442,7 +1531,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
     <div class="nav-item" data-section="announcements" onclick="switchSection('announcements')">
       <i class="fas fa-bullhorn"></i>
       <span>الإعلانات العاجلة</span>
-      <span class="nav-badge" style="background:var(--gold); color:#1E293B;">2</span>
+      <span class="nav-badge" id="navAnnounceBadge" style="display:none;">0</span>
     </div>
     <div class="nav-item" data-section="map" onclick="switchSection('map')">
       <i class="fas fa-map-marked-alt"></i>
@@ -1474,13 +1563,46 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
         <h2><i class="fas fa-tachometer-alt"></i> لوحة القيادة</h2>
         <p>نظرة شاملة على العمليات والإحصائيات اللحظية والمؤشرات التشغيلية</p>
       </div>
-      <span class="badge badge-primary"><span class="status-dot online" style="margin-left:4px;"></span> النظام متصل</span>
+      <span class="badge badge-primary" id="connStatusBadge"><span class="status-dot online" style="margin-left:4px;"></span><span class="conn-label"> النظام متصل</span></span>
     </div>
 
-    <!-- بطاقات الإحصائيات -->
-    <div class="stats-grid" id="dashboardStats"></div>
+    <!-- المنطقة 1: المناوبة الحالية — من /api/current-shift (مصدر خادم قائم، «—» عند غيابه) -->
+    <div class="oc-eyebrow"><i class="fas fa-clock"></i> المناوبة الحالية</div>
+    <div class="glass-card oc-shift-card" id="shiftOverviewCard">
+      <div class="oc-shift-grid">
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">المناوبة</span>
+          <span class="oc-shift-value oc-shift-name" id="ocShiftName">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">النوع</span>
+          <span class="oc-shift-value" id="ocShiftType">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">التاريخ</span>
+          <span class="oc-shift-value" id="ocShiftDate">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">الحالة</span>
+          <span class="oc-shift-value oc-shift-status" id="ocShiftStatus">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">وقت البدء</span>
+          <span class="oc-shift-value" id="ocShiftStart">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">البلاغات المسجلة</span>
+          <span class="oc-shift-value" id="ocShiftReports">—</span>
+        </div>
+        <div class="oc-shift-field">
+          <span class="oc-shift-label">المشرف</span>
+          <span class="oc-shift-value" id="ocShiftSupervisor">—</span>
+        </div>
+      </div>
+    </div>
 
-    <!-- شبكة محتوى: التوجيهات + التنبيهات -->
+    <!-- المنطقة 2: السجل التشغيلي — التوجيهات والتنبيهات وآخر النشاطات (محتوى قائم كما هو) -->
+    <div class="oc-eyebrow"><i class="fas fa-stream"></i> السجل التشغيلي</div>
     <div class="content-grid">
       <!-- التوجيهات الجديدة -->
       <div class="glass-card">
@@ -1501,22 +1623,66 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
       </div>
     </div>
 
-    <!-- مؤشرات التشغيل الدائرية -->
-    <div class="glass-card" style="margin-top:16px;">
-      <div class="glass-card-header">
-        <h3><i class="fas fa-chart-pie"></i> مؤشرات التشغيل اللحظية</h3>
-        <span class="badge badge-success">محدث للتو</span>
-      </div>
-      <div class="circular-progress-wrapper" id="opIndicators"></div>
-    </div>
-
     <!-- جدول آخر النشاطات -->
     <div class="glass-card" style="margin-top:16px;">
       <div class="glass-card-header">
         <h3><i class="fas fa-history"></i> آخر النشاطات</h3>
-        <span class="badge badge-info">15 نشاط</span>
+        <span class="badge badge-info" id="actCount">0 نشاط</span>
       </div>
       <div id="activityList"></div>
+    </div>
+
+    <!-- المنطقة 3: الموارد التشغيلية — شريط مدمج ثم الإحصائيات والمؤشرات القائمة -->
+    <div class="oc-eyebrow"><i class="fas fa-layer-group"></i> الموارد التشغيلية</div>
+
+    <!-- شريط الموارد: تغطية/دعم/مركبات — كل قيمة من مصدر خادم قائم، صفر حساب محلي -->
+    <div class="oc-resources" id="ocResourcesStrip">
+      <div class="oc-resources-seg">
+        <i class="fas fa-users"></i>
+        <span class="oc-resources-label">تغطية الفرق</span>
+        <span class="oc-resources-value" id="ocResCoverage">—</span>
+      </div>
+      <div class="oc-resources-seg oc-resources-seg-btn" id="ocResSupportBtn" onclick="toggleOcResSupport()" data-tooltip="القوى المتاحة للدعم">
+        <i class="fas fa-hand-holding-medical"></i>
+        <span class="oc-resources-label">الدعم المتاح</span>
+        <span class="oc-resources-value" id="ocResSupport">—</span>
+        <i class="fas fa-chevron-down oc-resources-caret" id="ocResSupportCaret"></i>
+      </div>
+      <div class="oc-resources-seg">
+        <i class="fas fa-truck-medical"></i>
+        <span class="oc-resources-label">المركبات</span>
+        <span class="oc-resources-value" id="ocResVehicles">—</span>
+      </div>
+      <div class="oc-resources-support-list" id="ocResSupportList" style="display:none;"></div>
+    </div>
+
+    <!-- بطاقات الإحصائيات -->
+    <div class="stats-grid" id="dashboardStats"></div>
+
+    <!-- مؤشرات التشغيل الدائرية -->
+    <div class="glass-card" style="margin-top:16px;">
+      <div class="glass-card-header">
+        <h3><i class="fas fa-chart-pie"></i> مؤشرات التشغيل اللحظية</h3>
+        <span class="badge badge-success" id="opIndicatorsUpdated">—</span>
+      </div>
+      <div class="circular-progress-wrapper" id="opIndicators"></div>
+    </div>
+
+    <!-- المنطقة 4: إجراءات تنفيذية — ما يحتاجه ضابط العمليات فقط -->
+    <div class="oc-eyebrow"><i class="fas fa-bolt"></i> إجراءات تنفيذية</div>
+    <div class="oc-actions">
+      <button class="oc-action-btn" onclick="window.location.href='radio-completion.html?v=41'">
+        <i class="fas fa-clipboard-check"></i>
+        <span>تكميل المراكز<small>تحديث جاهزية الفرق وأسباب النقص</small></span>
+      </button>
+      <button class="oc-action-btn" onclick="window.location.href='workflow.html'">
+        <i class="fas fa-diagram-project"></i>
+        <span>سير العمل<small>اعتماد مسار المناوبة والتسليم</small></span>
+      </button>
+      <button class="oc-action-btn" onclick="window.location.href='index.html'">
+        <i class="fas fa-gauge-high"></i>
+        <span>اللوحة التنفيذية<small>العودة إلى مركز القرار الرئيسي</small></span>
+      </button>
     </div>
   </section>
 
@@ -1673,7 +1839,7 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
   <!-- نافذة إضافة إعلان -->
   <div id="announcementModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width:500px;">
-      <h3><i class="fas fa-bullhorn icon-primary"></i> إضافة إعلان جديد</h3>
+      <h3><i class="fas fa-bullhorn"></i> إضافة إعلان جديد</h3>
       <div class="form-row"><label>العنوان:</label><input type="text" id="announceTitle" placeholder="عنوان الإعلان"></div>
       <div class="form-row"><label>النص:</label><textarea id="announceBody" rows="4" placeholder="محتوى الإعلان..."></textarea></div>
       <div class="form-row">
@@ -1739,30 +1905,6 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     ═══════════════════════════════════════════════════════════════
-         المساعد الذكي (AI Chat Assistant FAB)
-         زر عائم مع نافذة محادثة
-     ═══════════════════════════════════════════════════════════════
-     ═══════════════════════════════════════════════════════════════ -->
-<button class="chat-fab" id="chatFab" onclick="toggleChat()" data-tooltip="المساعد الذكي">
-  <i class="fas fa-robot"></i>
-</button>
-<div class="chat-box" id="chatBox">
-  <div class="chat-header">
-    <h4><i class="fas fa-robot"></i> اسأل غرفة العمليات</h4>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <span class="chat-status">متصل</span>
-      <span class="chat-close" onclick="toggleChat()"><i class="fas fa-times"></i></span>
-    </div>
-  </div>
-  <div class="chat-messages" id="chatMessages"></div>
-  <div class="chat-input-row">
-    <input type="text" id="chatInput" placeholder="اكتب سؤالك هنا..." onkeypress="if(event.key==='Enter')sendChatMessage()">
-    <button class="chat-send" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════
      Toast Notifications Container
      ═══════════════════════════════════════════════════════════════ -->
 <div class="toast-container" id="toastContainer"></div>
@@ -1780,9 +1922,8 @@ body.dark-mode .circle-bg { stroke:rgba(255,255,255,0.06); }
     <div class="shortcut-row"><span>الخط الزمني</span><span class="shortcut-key">5</span></div>
     <div class="shortcut-row"><span>الإعلانات العاجلة</span><span class="shortcut-key">6</span></div>
     <div class="shortcut-row"><span>الخريطة التفاعلية</span><span class="shortcut-key">7</span></div>
-    <div class="shortcut-row"><span>المساعد الذكي</span><span class="shortcut-key">Q</span></div>
     <div class="shortcut-row"><span>البحث الموحد</span><span class="shortcut-key">/</span></div>
-    <div class="shortcut-row"><span>وضع الظلام</span><span class="shortcut-key">D</span></div>
+    <div class="shortcut-row"><span>تبديل المظهر (داكن/فاتح)</span><span class="shortcut-key">D</span></div>
     <div class="shortcut-row"><span>هذه النافذة</span><span class="shortcut-key">?</span></div>
     <div class="shortcut-row" style="margin-top:8px;"><button class="btn-sm btn-neon" onclick="toggleShortcutsModal()" style="width:100%;justify-content:center;"><i class="fas fa-check"></i> فهمت</button></div>
   </div>
@@ -1833,6 +1974,8 @@ function apiFetch(url, options) {
 
 /** بيانات لوحة القيادة الرئيسية **/
 let dashboardData = { stats: [], directives: [], alerts: [], indicators: [], activities: [] };
+/** ختم آخر تحميل ناجح — «—» قبل أول نجاح، ولا يُمسح عند فشل تحديث لاحق **/
+let lastDashboardUpdate = null;
 
 async function loadDashboardData() {
   try {
@@ -1842,6 +1985,11 @@ async function loadDashboardData() {
       const payload = (raw && (raw.data || raw.dashboard)) || (Array.isArray(raw) ? {} : raw);
       if (payload && payload.stats) {
         dashboardData = payload;
+        lastDashboardUpdate = new Date();
+        const updEl = document.getElementById('opIndicatorsUpdated');
+        if (updEl && window.TimeRiyadh) {
+          updEl.textContent = 'آخر تحديث ' + TimeRiyadh.formatTime(lastDashboardUpdate);
+        }
       } else {
         showToast('warning', 'بيانات ناقصة', 'رد السيرفر لا يحتوي على إحصائيات');
       }
@@ -1852,34 +2000,8 @@ async function loadDashboardData() {
     }
   } catch (e) { 
     console.error('Failed to load dashboard:', e); 
-    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر - عرض بيانات افتراضية');
-    // Offline fallback demo data
-    if (!dashboardData || !dashboardData.stats || dashboardData.stats.length === 0) {
-      dashboardData = {
-        stats: [
-          { label: 'المتاح', value: 18 },
-          { label: 'البلاغات', value: 7 },
-          { label: 'المشغولين', value: 12 },
-          { label: 'الوارد', value: 4 }
-        ],
-        directives: [
-          { id: 'd1', title: 'تفعيل خطة الطوارئ', status: 'urgent', date: '2026-07-12', from: 'المدير العام', pinned: true },
-          { id: 'd2', title: 'زيادة التمركز في أحياء الجنوب', status: 'normal', date: '2026-07-11', from: 'قسم العمليات', pinned: false }
-        ],
-        alerts: [
-          { level: 'high', message: 'توقع أمطار غزيرة على جنوب الرياض من الساعة 4 عصراً' },
-          { level: 'medium', message: 'صيانة دورية لطريق الخرج من الساعة 10 مساءً' }
-        ],
-        indicators: [
-          { label: 'معدل الاستجابة', value: 92, unit: '%', trend: 'up' },
-          { label: 'متوسط وقت الوصول', value: 8.5, unit: 'د', trend: 'down' }
-        ],
-        activities: [
-          { time: '11:30', action: 'بلاغ جديد - حادث مروري', actor: 'المنسق أحمد', type: 'new' },
-          { time: '11:15', action: 'وصول فرقة 12 إلى المستشفى', actor: 'السائق خالد', type: 'arrival' }
-        ]
-      };
-    }
+    showToast('error', 'خطأ في الاتصال', 'فشل الاتصال بالسيرفر');
+    // لا بيانات افتراضية: الفلسفة الصادقة — تُعرض العدّادات صفراً والقوائم فارغة عند غياب المصدر
   }
   renderDashboard();
 }
@@ -1895,6 +2017,11 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+/** حالة فارغة موحدة — نفس مكوّن .empty-state القائم في قسم الملفات (أيقونة هادئة + سطر عربي صادق) **/
+function emptyStateHtml(icon, text, extraStyle) {
+  return `<div class="empty-state"${extraStyle ? ` style="${extraStyle}"` : ''}><i class="fas ${icon}"></i><h4>${text}</h4></div>`;
+}
+
 /** بيانات المرجعيات التشغيلية **/
 let referencesData = [];
 
@@ -1908,10 +2035,7 @@ async function loadReferencesData() {
   } catch (e) { 
     console.error('Failed to load references:', e); 
     showToast('error', 'فشل تحميل المرجعيات', 'وضع عدم الاتصال');
-    referencesData = [
-      { id: 'r1', title: 'بروتوكول إدارة الكوارث', category: 'بروتوكولات', status: 'active', priority: 'high', updatedAt: '2026-07-10' },
-      { id: 'r2', title: 'دليل التواصل مع المستشفيات', category: 'توجيهات', status: 'active', priority: 'medium', updatedAt: '2026-07-08' }
-    ];
+    referencesData = [];
   }
   renderReferences();
 }
@@ -1929,10 +2053,7 @@ async function loadHospitalsData() {
   } catch (e) { 
     console.error('Failed to load hospitals:', e); 
     showToast('error', 'فشل تحميل المستشفيات', 'وضع عدم الاتصال');
-    hospitalsData = [
-      { id: 'h1', name: 'مستشفى الملك فهد', type: 'حكومي', beds: 450, emergency: true, specialty: 'عام', phone: '011-461-2000', address: 'الرياض - العليا' },
-      { id: 'h2', name: 'مستشفى سليمان الحبيب', type: 'خاص', beds: 200, emergency: true, specialty: 'قلب', phone: '011-525-0000', address: 'الرياض - الورود' }
-    ];
+    hospitalsData = [];
   }
   renderHospitals();
 }
@@ -1967,11 +2088,7 @@ async function loadTimelineData() {
   } catch (e) { 
     console.error('Failed to load timeline:', e); 
     showToast('error', 'فشل تحميل الخط الزمني', 'وضع عدم الاتصال');
-    timelineData = [
-      { id: 't1', date: '2026-07-12', title: 'تفعيل خطة الطوارئ', type: 'directive', icon: 'fa-bullhorn' },
-      { id: 't2', date: '2026-07-11', title: 'صيانة طريق الخرج', type: 'alert', icon: 'fa-exclamation-triangle' },
-      { id: 't3', date: '2026-07-10', title: 'تدريب فرق الإسعاف', type: 'training', icon: 'fa-users' }
-    ];
+    timelineData = [];
   }
   renderTimeline();
 }
@@ -1989,24 +2106,11 @@ async function loadAnnouncementsData() {
   } catch (e) { 
     console.error('Failed to load announcements:', e); 
     showToast('error', 'فشل تحميل الإعلانات', 'وضع عدم الاتصال');
-    announcementsData = [
-      { id: 'a1', title: 'تعميم عاجل: تفعيل خطة الأمطار', content: 'تفعيل خطة الطوارئ للأمطار الغزيرة المتوقعة', priority: 'urgent', date: '2026-07-12', author: 'مدير العمليات' },
-      { id: 'a2', title: 'تعليمات جديدة للتمركز', content: 'الرجاء الالتزام بمناطق التمركز المحددة', priority: 'normal', date: '2026-07-11', author: 'قسم التخطيط' }
-    ];
+    announcementsData = [];
   }
   renderAnnouncements();
+  renderMarquee();
 }
-
-/** بيانات المساعد الذكي - الأسئلة والأجوبة **/
-const chatResponses = [
-  { q:'كيف أدخل بلاغ جديد',         a:'يمكنك الدخول إلى صفحة "إدخال البلاغات" من خلال الضغط على زر "إدخال بلاغات" في بطاقة البلاغات في لوحة القيادة، أو الانتقال مباشرة لصفحة report-entry.html' },
-  { q:'ما هي البلاغات المسجلة اليوم', a:'عدد البلاغات المسجلة اليوم هو 127 بلاغاً، بزيادة 12% عن يوم أمس. يمكنك الاطلاع على التفاصيل الكاملة من لوحة القيادة.' },
-  { q:'كيف أتواصل مع المستشفيات',    a:'يمكنك الانتقال لقسم "دليل المستشفيات" من القائمة الجانبية. يحتوي على أرقام الطوارئ والتواصل لجميع المستشفيات الشريكة مع خيار الاتصال المباشر أو نسخ الرقم.' },
-  { q:'أين أجد البروتوكولات',        a:'جميع البروتوكولات والأدلة التشغيلية متاحة في قسم "المرجعيات التشغيلية" من القائمة الجانبية. يمكنك البحث أو الفلترة حسب القسم أو النوع أو الحالة.' },
-  { q:'ما هي أوقات المناوبات',       a:'تعمل غرفة العمليات على مدار 24 ساعة. المناوبات الحالية: 18 مناوبة نشطة. يمكنك الاطلاع على جدول المناوبات من مركز الملفات.' },
-  { q:'ما هي المستشفيات المتاحة',    a:'يوجد 12 مستشفى شريك متاح: 4 مستشفيات عامة، 3 مجمعات طبية، 2 مراكز متخصصة، و3 مراكز طوارئ. تجدهم جميعاً في دليل المستشفيات.' },
-  { q:'كيف أرفع ملف',                a:'انتقل لمركز الملفات ثم اسحب الملفات لمنطقة الرفع أو انقر عليها لاختيار الملفات. ندعم PDF, Word, Excel, PowerPoint, والصور.' },
-];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  الدوال الرئيسية (Core Functions)
@@ -2027,6 +2131,8 @@ function switchSection(sectionName) {
   });
   // تهيئة الخريطة عند أول زيارة للقسم
   if (sectionName === 'map') { setTimeout(initMap, 150); }
+  // المرحلة 5: تحديث المنطقتين التنفيذيتين عند العودة للوحة القيادة
+  if (sectionName === 'dashboard') { loadShiftOverview(); loadOpsResources(); }
   // إغلاق السايدبار في وضع الجوال
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
@@ -2058,7 +2164,7 @@ function renderDashboard() {
   // ── 2. قائمة التوجيهات والتعاميم ──
   const dirEl = document.getElementById('directivesList');
   document.getElementById('dirCount').textContent = dashboardData.directives.length;
-  dirEl.innerHTML = dashboardData.directives.map(d => `
+  dirEl.innerHTML = !dashboardData.directives.length ? emptyStateHtml('fa-thumbtack', 'لا توجد توجيهات حالية') : dashboardData.directives.map(d => `
     <div class="directive-item">
       <div class="directive-pin ${d.pinned ? 'pinned' : ''}" data-id="${escapeHtml(d.id)}" title="${d.pinned ? 'إلغاء التثبيت' : 'تثبيت'}">
         <i class="fas fa-thumbtack ${d.pinned ? '' : 'fa-rotate-45'}"></i>
@@ -2077,7 +2183,7 @@ function renderDashboard() {
   // ── 3. قائمة التنبيهات الفورية ──
   const alertEl = document.getElementById('alertsList');
   document.getElementById('alertCount').textContent = dashboardData.alerts.length;
-  alertEl.innerHTML = dashboardData.alerts.map(a => `
+  alertEl.innerHTML = !dashboardData.alerts.length ? emptyStateHtml('fa-bell', 'لا توجد تنبيهات') : dashboardData.alerts.map(a => `
     <div class="alert-item ${escapeHtml(a.level)}">
       <div class="alert-icon"><i class="fas ${a.level === 'high' ? 'fa-exclamation-triangle' : a.level === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i></div>
       <div class="alert-body">
@@ -2119,9 +2225,10 @@ function renderDashboard() {
 
   // ── 5. قائمة آخر النشاطات ──
   const actEl = document.getElementById('activityList');
-  actEl.innerHTML = dashboardData.activities.map(a => `
+  document.getElementById('actCount').textContent = dashboardData.activities.length + ' نشاط';
+  actEl.innerHTML = !dashboardData.activities.length ? emptyStateHtml('fa-history', 'لا توجد نشاطات مسجلة') : dashboardData.activities.map(a => `
     <div class="directive-item" style="animation-delay:${a.id * 0.06}s">
-      <div class="directive-pin" style="color:${escapeHtml(a.color)}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(0,212,255,0.1)' : 'rgba(6,214,160,0.1)'};">
+      <div class="directive-pin" style="color:${escapeHtml(a.color)}; background:${a.color.replace(')','').replace('var(','').trim() === '--coral' ? 'rgba(239,71,111,0.1)' : a.color === 'var(--neon)' ? 'rgba(96,165,250,0.1)' : 'rgba(16,185,129,0.1)'};">
         <i class="fas ${escapeHtml(a.icon)}"></i>
       </div>
       <div class="directive-body">
@@ -2160,7 +2267,7 @@ function renderReferences() {
   });
 
   document.getElementById('refTotalCount').textContent = filtered.length + ' مرجعية';
-  document.getElementById('referencesGrid').innerHTML = filtered.map(r => `
+  document.getElementById('referencesGrid').innerHTML = !filtered.length ? emptyStateHtml('fa-book', 'لا توجد مراجع متاحة', 'grid-column:1/-1;') : filtered.map(r => `
     <div class="ref-card" data-title="${escapeHtml(r.title)}">
       <div class="ref-header">
         <div class="ref-icon ${escapeHtml(r.type)}"><i class="fas ${escapeHtml(typeIcons[r.type] || 'fa-file')}"></i></div>
@@ -2206,7 +2313,7 @@ function renderHospitals() {
 
   document.getElementById('hospTotalCount').textContent = filtered.length + ' مستشفى';
   const grid = document.getElementById('hospitalsGrid');
-  grid.innerHTML = filtered.map(h => `
+  grid.innerHTML = !filtered.length ? emptyStateHtml('fa-hospital', 'لا توجد مستشفيات مسجلة', 'grid-column:1/-1;') : filtered.map(h => `
     <div class="hosp-card">
       <div class="hosp-header">
         <div class="hosp-icon"><i class="fas fa-hospital"></i></div>
@@ -2257,6 +2364,12 @@ function renderFiles() {
   if (!Array.isArray(filesData)) filesData = [];
   const iconMap = { pdf:'fa-file-pdf', word:'fa-file-word', excel:'fa-file-excel', ppt:'fa-file-powerpoint', img:'fa-file-image' };
   document.getElementById('fileCount').textContent = filesData.length + ' ملف';
+  // شارة السايدبار: عدد حقيقي من المصدر، وتُخفى عند الصفر
+  const navFilesBadge = document.getElementById('navFilesBadge');
+  if (navFilesBadge) {
+    navFilesBadge.textContent = filesData.length;
+    navFilesBadge.style.display = filesData.length > 0 ? '' : 'none';
+  }
   if (!filesData.length) {
     document.getElementById('filesList').innerHTML = `
       <div class="empty-state">
@@ -2335,7 +2448,7 @@ async function deleteFile(id) {
  */
 function openDocViewer(title, url, type) {
   document.getElementById('docViewerOverlay').classList.add('active');
-  document.getElementById('docViewerTitle').innerHTML = `<i class="fas fa-file-alt" style="margin-left:8px;"></i> ${title}`;
+  document.getElementById('docViewerTitle').innerHTML = `<i class="fas fa-file-alt" style="margin-left:8px;"></i> ${escapeHtml(title)}`;
   const frame = document.getElementById('docViewerFrame');
   const placeholder = document.getElementById('docViewerPlaceholder');
   window.currentDocUrl = url;
@@ -2366,7 +2479,7 @@ function openDocViewer(title, url, type) {
   } else {
     frame.style.display = 'none';
     placeholder.style.display = 'flex';
-    placeholder.innerHTML = `<i class="fas fa-file-alt"></i><p>معاينة الملف "${title}"</p><span style="font-size:11px;">سيتم فتح الملف في التطبيق المناسب</span>`;
+    placeholder.innerHTML = `<i class="fas fa-file-alt"></i><p>معاينة الملف "${escapeHtml(title)}"</p><span style="font-size:11px;">سيتم فتح الملف في التطبيق المناسب</span>`;
   }
 }
 function closeDocViewer() {
@@ -2561,7 +2674,10 @@ function renderTimeline() {
   let filtered = timelineData;
   if (filter) filtered = timelineData.filter(t => t.type === filter);
 
-  document.getElementById('timelineContainer').innerHTML = filtered.map(t => `
+  const tlc = document.getElementById('timelineContainer');
+  // عند الفراغ: إخفاء خط المحور وعرض الحالة الفارغة الصادقة
+  tlc.classList.toggle('empty', filtered.length === 0);
+  tlc.innerHTML = !filtered.length ? emptyStateHtml('fa-stream', 'لا توجد أحداث في الجدول الزمني') : filtered.map(t => `
     <div class="timeline-item">
       <div class="timeline-dot ${escapeHtml(t.type)}"></div>
       <div class="timeline-card">
@@ -2583,6 +2699,12 @@ function renderTimeline() {
 function renderAnnouncements() {
   if (!Array.isArray(announcementsData)) announcementsData = [];
   const container = document.getElementById('announcementsContainer');
+  // شارة السايدبار: عدد حقيقي من المصدر، وتُخفى عند الصفر
+  const navAnnounceBadge = document.getElementById('navAnnounceBadge');
+  if (navAnnounceBadge) {
+    navAnnounceBadge.textContent = announcementsData.length;
+    navAnnounceBadge.style.display = announcementsData.length > 0 ? '' : 'none';
+  }
   const pinned = announcementsData.filter(a => a.pinned);
   const normal = announcementsData.filter(a => !a.pinned);
 
@@ -2596,7 +2718,29 @@ function renderAnnouncements() {
     html += `<div class="announce-normal-title"><i class="fas fa-list"></i> إعلانات سابقة</div>`;
     normal.forEach((a, i) => { html += renderAnnounceCard(a, i * 0.1); });
   }
-  container.innerHTML = html;
+  container.innerHTML = html || emptyStateHtml('fa-bullhorn', 'لا توجد إعلانات منشورة');
+}
+
+/**
+ * renderMarquee() - شريط الإشعارات المتحرك في التوبار
+ * يُملأ من announcementsData (نفس مصدر قسم الإعلانات) — يُكرَّر المحتوى للحلقة المستمرة،
+ * ويُخفى الشريط كاملاً عند غياب البيانات (الحالة الصادقة).
+ */
+function renderMarquee() {
+  const wrapper = document.querySelector('.marquee-wrapper');
+  const track = document.getElementById('marqueeTrack');
+  if (!wrapper || !track) return;
+  if (!Array.isArray(announcementsData) || announcementsData.length === 0) {
+    track.innerHTML = '';
+    wrapper.style.display = 'none';
+    return;
+  }
+  const items = announcementsData.map(a => {
+    const icon = a.urgent ? 'fa-exclamation-triangle' : (a.pinned ? 'fa-thumbtack' : 'fa-bullhorn');
+    return `<span><i class="fas ${icon}"></i> ${escapeHtml(a.title)}</span>`;
+  }).join('');
+  track.innerHTML = items + items;
+  wrapper.style.display = '';
 }
 function renderAnnounceCard(a, delay) {
   return `
@@ -2630,123 +2774,59 @@ function closeAnnouncementModal() {
 
 /**
  * initMap() - تهيئة الخريطة التفاعلية بـ Leaflet.js
- * تعرض مواقع المستشفيات في مدينة الرياض
+ * تعرض مواقع المستشفيات في مدينة الرياض — المواقع من GET /api/map-locations (مصدر خادم).
+ * عند فشل الجلب: تُعرض الخريطة (طبقات + مركز) بلا علامات مع تحذير — لا بيانات احتياطية مزيفة.
  */
 let mapInstance = null;
-function initMap() {
-  if (mapInstance) return;
+let mapInitStarted = false;
+let mapLocationsCache = null; // ذاكرة مؤقتة — لا إعادة جلب عند تكرار التهيئة
+async function initMap() {
+  if (mapInstance || mapInitStarted) return;
+  mapInitStarted = true;
   const map = L.map('operationsMap').setView([24.7136, 46.6753], 12);
-  // استخدام خريطة داكنة من CARTO
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  // خريطة داكنة من CARTO — نفس وصفة اللوحة التنفيذية (app.js: dark_all)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution:'&copy; <a href="https://carto.com/">CARTO</a>',
     subdomains:'abcd', maxZoom:19
   }).addTo(map);
 
-  // إحداثيات المستشفيات
-  const hospCoords = [
-    { name:'مستشفى الملك فهد',      lat:24.7136, lng:46.6753, type:'عام' },
-    { name:'مستشفى الملك فيصل',     lat:24.6892, lng:46.7028, type:'متخصص' },
-    { name:'مستشفى الصحة الوطنية',  lat:24.7682, lng:46.6013, type:'عام' },
-    { name:'م. د. سليمان الحبيب',   lat:24.6383, lng:46.7675, type:'مجمع' },
-    { name:'مستشفى الإيمان',        lat:24.7345, lng:46.6987, type:'عام' },
-    { name:'مركز طوارئ الغدير',     lat:24.7923, lng:46.7123, type:'طوارئ' },
-    { name:'مستشفى المواساة',       lat:24.7521, lng:46.6534, type:'مجمع' },
-    { name:'مستشفى الحرس الوطني',   lat:24.7111, lng:46.7245, type:'عام' },
-    { name:'مستشفى عين التخصصي',    lat:24.6998, lng:46.6856, type:'متخصص' },
-    { name:'مستشفى الأندلسية',      lat:24.7234, lng:46.6456, type:'مجمع' },
-    { name:'م. السعودي الألماني',   lat:24.7656, lng:46.6234, type:'عام' },
-    { name:'مركز طب الأسرة',        lat:24.7098, lng:46.6689, type:'طوارئ' },
-  ];
+  // إحداثيات المواقع من الخادم — المصدر الوحيد للحقيقة
+  let locations = mapLocationsCache;
+  if (!locations) {
+    try {
+      const res = await apiFetch('/api/map-locations');
+      if (res.ok) {
+        const raw = await res.json();
+        locations = (raw && (raw.data || raw.locations)) || (Array.isArray(raw) ? raw : []);
+      } else {
+        locations = [];
+      }
+    } catch (e) {
+      console.warn('[Map] تعذر جلب مواقع الخريطة:', e);
+      locations = [];
+    }
+    mapLocationsCache = locations;
+  }
+  if (!locations.length) {
+    console.warn('[Map] لا توجد مواقع من الخادم — تُعرض الخريطة بلا علامات');
+  }
   const colorMap = { 'عام':'#EF476F', 'متخصص':'#00D4FF', 'مجمع':'#06D6A0', 'طوارئ':'#FFD166' };
 
   // إضافة علامات للمستشفيات
-  hospCoords.forEach(h => {
+  locations.forEach(h => {
     const marker = L.circleMarker([h.lat, h.lng], {
       radius:11, fillColor:colorMap[h.type] || '#00D4FF',
       color:'#fff', weight:2.5, opacity:0.9, fillOpacity:0.75
     }).addTo(map);
-    marker.bindPopup(`<div style="text-align:center;font-family:'IBM Plex Sans Arabic',Inter,sans-serif;"><b style="font-size:13px;">${h.name}</b><br/><span style="font-size:11px;color:#666;">${h.type}</span></div>`);
+    marker.bindPopup(`<div style="text-align:center;font-family:'IBM Plex Sans Arabic',Inter,sans-serif;"><b style="font-size:13px;">${escapeHtml(h.name)}</b><br/><span style="font-size:11px;color:#666;">${escapeHtml(h.type)}</span></div>`);
   });
 
   // دوائر حرارية حول المناطق المزدحمة
-  hospCoords.forEach(h => {
+  locations.forEach(h => {
     L.circle([h.lat, h.lng], { radius:600, color:colorMap[h.type], weight:1, fillOpacity:0.04 }).addTo(map);
   });
 
   mapInstance = map;
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  المساعد الذكي (Chat Assistant)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-let chatOpen = false;
-function toggleChat() {
-  chatOpen = !chatOpen;
-  document.getElementById('chatBox').classList.toggle('active', chatOpen);
-  if (chatOpen && !document.getElementById('chatMessages').children.length) {
-    addBotMsg('welcome', 'مرحباً بك! أنا مساعد غرفة العمليات الذكي. كيف يمكنني مساعدتك اليوم؟', true);
-    // عرض الأسئلة السريعة
-    const qDiv = document.createElement('div');
-    qDiv.className = 'quick-questions';
-    qDiv.innerHTML = chatResponses.slice(0, 5).map(r => `<span class="quick-q" onclick="sendQuick('${r.q}')">${r.q}؟</span>`).join('');
-    document.getElementById('chatMessages').appendChild(qDiv);
-    // التركيز على حقل الإدخال
-    setTimeout(() => document.getElementById('chatInput').focus(), 300);
-  }
-}
-function addBotMsg(cls, text, isWelcome) {
-  const msg = document.createElement('div');
-  msg.className = 'chat-msg bot' + (isWelcome ? ' welcome' : '');
-  msg.textContent = text;
-  document.getElementById('chatMessages').appendChild(msg);
-  scrollChat();
-}
-function addUserMsg(text) {
-  const msg = document.createElement('div');
-  msg.className = 'chat-msg user';
-  msg.textContent = text;
-  document.getElementById('chatMessages').appendChild(msg);
-  scrollChat();
-}
-function scrollChat() {
-  const c = document.getElementById('chatMessages');
-  c.scrollTop = c.scrollHeight;
-}
-function sendQuick(q) {
-  addUserMsg(q + '؟');
-  // مؤشر كتابة
-  showTyping();
-  setTimeout(() => { hideTyping(); respond(q); }, 800);
-}
-function sendChatMessage() {
-  const input = document.getElementById('chatInput');
-  const text = input.value.trim();
-  if (!text) return;
-  addUserMsg(text);
-  input.value = '';
-  showTyping();
-  setTimeout(() => { hideTyping(); respond(text); }, 800);
-}
-function showTyping() {
-  const div = document.createElement('div');
-  div.className = 'chat-msg bot typing-msg';
-  div.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-  div.id = 'typingIndicator';
-  document.getElementById('chatMessages').appendChild(div);
-  scrollChat();
-}
-function hideTyping() {
-  const el = document.getElementById('typingIndicator');
-  if (el) el.remove();
-}
-function respond(text) {
-  const q = text.toLowerCase().replace(/[؟?]/g, '').trim();
-  const match = chatResponses.find(r => {
-    const rq = r.q.toLowerCase().replace(/[؟?]/g, '').trim();
-    return q.includes(rq.substring(0, 8)) || rq.includes(q.substring(0, 8));
-  });
-  addBotMsg('', match ? match.a : 'شكراً لسؤالك! سأقوم بتحويل استفسارك للفريق المختص. يمكنك التواصل المباشر مع غرفة العمليات على الرقم الداخلي 911 أو مراجعة قسم المرجعيات التشغيلية.');
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2774,14 +2854,12 @@ document.addEventListener('keydown', e => {
   const key = e.key;
   const map = { '1':'dashboard', '2':'references', '3':'hospitals', '4':'files', '5':'timeline', '6':'announcements', '7':'map' };
   if (map[key]) { e.preventDefault(); switchSection(map[key]); }
-  else if (key === 'q' || key === 'Q') { e.preventDefault(); toggleChat(); }
   else if (key === '/') { e.preventDefault(); document.getElementById('globalSearch').focus(); }
   else if (key === 'd' || key === 'D') { e.preventDefault(); document.getElementById('darkModeToggle').click(); }
   else if (key === '?' || key === '؟') { e.preventDefault(); toggleShortcutsModal(); }
   else if (key === 'Escape') {
     closeDocViewer();
     document.getElementById('shortcutsModal').classList.remove('active');
-    if (chatOpen) toggleChat();
   }
 });
 
@@ -2847,30 +2925,38 @@ document.addEventListener('DOMContentLoaded', () => {
     ]).then(hideSkeleton);
   });
 
+  // المرحلة 5: المنطقتان التنفيذيتان — جلب مستقل لا يؤخر إخفاء الـ Skeleton
+  loadShiftOverview();
+  loadOpsResources();
+
   // Toast ترحيبي
   setTimeout(() => {
     showToast('success', 'مرحباً بك في EOCC', 'غرفة العمليات الذكية جاهزة للعمل');
   }, 800);
 
-  // ── Dark Mode Toggle ──
+  // ── تبديل المظهر: الداكن التنفيذي (افتراضي) ⇄ الفاتح التراثي ──
   const darkModeToggle = document.getElementById('darkModeToggle');
   if (darkModeToggle) {
+    // الداكن التنفيذي هو المعيار الافتراضي للجميع؛ المفتاح القديم eocc_darkMode
+    // كان يصف النظام السابق ولا يُرحَّل — الفاتح يُحفظ فقط باختيار صريح جديد.
     darkModeToggle.addEventListener('click', function() {
-      document.body.classList.toggle('dark-mode');
+      document.body.classList.toggle('light-mode');
       const icon = this.querySelector('i');
-      const isDark = document.body.classList.contains('dark-mode');
-      icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+      const isLight = document.body.classList.contains('light-mode');
+      icon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
       // Save preference
-      localStorage.setItem('eocc_darkMode', isDark ? '1' : '0');
+      localStorage.setItem('eocc_lightMode', isLight ? '1' : '0');
       // Re-initialize map if visible
       if (mapInstance && document.getElementById('section-map')?.classList.contains('active')) {
         setTimeout(() => mapInstance.invalidateSize(), 300);
       }
     });
-    // Load saved preference
-    if (localStorage.getItem('eocc_darkMode') === '1') {
-      document.body.classList.add('dark-mode');
-      const icon = darkModeToggle.querySelector('i');
+    // Load saved preference — الداكن التنفيذي هو الافتراضي، والفاتح خيار محفوظ
+    const icon = darkModeToggle.querySelector('i');
+    if (localStorage.getItem('eocc_lightMode') === '1') {
+      document.body.classList.add('light-mode');
+      if (icon) icon.className = 'fas fa-moon';
+    } else {
       if (icon) icon.className = 'fas fa-sun';
     }
   }
@@ -2924,6 +3010,161 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ============================================================
+// المرحلة 5 — المناطق التنفيذية لغرفة العمليات
+// المنطقة 1: المناوبة الحالية ← GET /api/current-shift
+// المنطقة 3: شريط الموارد ← /api/staffing/state + /api/staffing/available-support
+//            + /api/vehicles/indicators (نفس مصادر اللوحة التنفيذية)
+// مصادر خادم قائمة فقط؛ «—» الصادقة عند غياب المصدر؛ صفر حساب محلي.
+// ============================================================
+
+/** المنطقة 1: بطاقة المناوبة الحالية **/
+async function loadShiftOverview() {
+  if (!document.getElementById('shiftOverviewCard')) return;
+  try {
+    const res = await apiFetch('/api/current-shift');
+    const data = res.ok ? await res.json() : null;
+    renderShiftOverview((data && data.success && data.shift) ? data.shift : null);
+  } catch (e) {
+    console.warn('[ShiftOverview] fetch failed:', e);
+    renderShiftOverview(null);
+  }
+}
+
+function renderShiftOverview(shift) {
+  const has = !!(shift && shift.id != null && shift.status && shift.status !== 'none');
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('ocShiftName', has ? (shift.name || '—') : 'لا توجد مناوبة نشطة');
+  setTxt('ocShiftType', has ? (shift.type || '—') : '—');
+  setTxt('ocShiftDate', has ? (shift.date || '—') : '—');
+  // العرض عبر الطبقة المركزية الوحيدة للوقت (TimeRiyadh) — ISO خام لا يُعرض أبدًا
+  setTxt('ocShiftStart', has ? (window.TimeRiyadh ? TimeRiyadh.formatTime(shift.startTime) : (shift.startTime || '—')) : '—');
+  setTxt('ocShiftReports', has ? String(shift.totalReports != null ? shift.totalReports : '—') : '—');
+  // لا يوجد عمود مشرف في مصدر المناوبات (جدول shifts) — الحالة الصادقة دائمًا
+  setTxt('ocShiftSupervisor', '—');
+  const stEl = document.getElementById('ocShiftStatus');
+  if (stEl) {
+    if (has && shift.status === 'active') {
+      stEl.innerHTML = '<span class="status-dot online"></span> نشطة';
+    } else {
+      stEl.textContent = '—';
+    }
+  }
+}
+
+/** المنطقة 3: شريط الموارد التشغيلية **/
+let ocResWorkforce = null;  // null = لا مصدر بعد ⇒ الحالة الصادقة «—»
+let ocResSupport = null;    // كذلك
+let ocResVehicles = null;   // كذلك
+let ocResSupportOpen = false;
+
+async function loadOpsResources() {
+  if (!document.getElementById('ocResourcesStrip')) return;
+  // كل مصدر مستقل الفشل — فشل مصدر لا يُسقط البقية (جلب متوازٍ ثم عرض واحد)
+  const [w, s, v] = await Promise.allSettled([
+    apiFetch('/api/staffing/state'),
+    apiFetch('/api/staffing/available-support'),
+    apiFetch('/api/vehicles/indicators')
+  ]);
+  try {
+    const d = (w.status === 'fulfilled' && w.value.ok) ? await w.value.json() : null;
+    ocResWorkforce = (d && d.success && d.workforce) ? d.workforce : null;
+  } catch (e) { ocResWorkforce = null; }
+  try {
+    const d = (s.status === 'fulfilled' && s.value.ok) ? await s.value.json() : null;
+    ocResSupport = (d && d.success && Array.isArray(d.supporters)) ? d.supporters : null;
+  } catch (e) { ocResSupport = null; }
+  try {
+    const d = (v.status === 'fulfilled' && v.value.ok) ? await v.value.json() : null;
+    ocResVehicles = (d && d.success && d.vehiclesByStatus) ? d.vehiclesByStatus : null;
+  } catch (e) { ocResVehicles = null; }
+  renderOpsResources();
+  renderOcResSupportList();
+}
+
+function renderOpsResources() {
+  // ① تغطية الفرق — readyTeams/requiredTeams كما اشتقّها الخادم حرفيًا
+  const covEl = document.getElementById('ocResCoverage');
+  if (covEl) {
+    if (!ocResWorkforce || ocResWorkforce.requiredTeams == null) {
+      covEl.textContent = '—';
+      covEl.className = 'oc-resources-value';
+    } else {
+      const ready = ocResWorkforce.readyTeams || 0;
+      const req = ocResWorkforce.requiredTeams || 0;
+      covEl.textContent = ready + ' من ' + req + ' جاهزة';
+      covEl.className = 'oc-resources-value' + (req > 0 ? (ready >= req ? ' ok' : ' warn') : '');
+    }
+  }
+  // ② الدعم المتاح — قائمة الخادم كما هي (عدّ عرض فقط)
+  const supEl = document.getElementById('ocResSupport');
+  if (supEl) {
+    if (!ocResSupport) {
+      supEl.textContent = '—';
+      supEl.className = 'oc-resources-value';
+    } else {
+      supEl.textContent = ocResSupport.length === 0 ? 'لا دعم متاح' : ocResSupport.length + ' متاح';
+      supEl.className = 'oc-resources-value' + (ocResSupport.length > 0 ? ' ok' : '');
+    }
+  }
+  // ③ المركبات — vehiclesByStatus المشتقة سيرفريًا من operational_events
+  const vehEl = document.getElementById('ocResVehicles');
+  if (vehEl) {
+    if (!ocResVehicles) {
+      vehEl.textContent = '—';
+      vehEl.className = 'oc-resources-value';
+    } else {
+      const vs = ocResVehicles;
+      const active = vs.active || 0;
+      const stopped = (vs.breakdown || 0) + (vs.out_of_service || 0);
+      const reserve = vs.reserve || 0;
+      const parts = [];
+      if (active > 0 || stopped === 0) parts.push(active + ' عاملة');
+      if (stopped > 0) parts.push(stopped + ' متوقفة');
+      if (reserve > 0) parts.push(reserve + ' احتياط');
+      if (!parts.length) parts.push('لا مركبات');
+      vehEl.textContent = parts.join(' · ');
+      vehEl.className = 'oc-resources-value' + (stopped > 0 ? ' warn' : (active > 0 ? ' ok' : ''));
+    }
+  }
+}
+
+function toggleOcResSupport() {
+  ocResSupportOpen = !ocResSupportOpen;
+  renderOcResSupportList();
+}
+
+function renderOcResSupportList() {
+  const list = document.getElementById('ocResSupportList');
+  const caret = document.getElementById('ocResSupportCaret');
+  if (!list) return;
+  if (caret) caret.classList.toggle('open', ocResSupportOpen);
+  if (!ocResSupportOpen) { list.style.display = 'none'; return; }
+  list.style.display = '';
+  if (!ocResSupport) {
+    list.innerHTML = '<div class="oc-resources-support-empty">— بانتظار بيانات الدعم</div>';
+    return;
+  }
+  if (ocResSupport.length === 0) {
+    list.innerHTML = '<div class="oc-resources-support-empty">لا توجد قوى متاحة للدعم حاليًا</div>';
+    return;
+  }
+  let h = '';
+  for (let i = 0; i < ocResSupport.length; i++) {
+    const s = ocResSupport[i];
+    const meta = [];
+    if (s.jobTitle) meta.push(s.jobTitle);
+    if (s.employeeCode) meta.push(s.employeeCode);
+    if (s.sourceUnit) meta.push(s.sourceUnit);
+    h += '<div class="oc-resources-supporter">'
+       + '<span class="sup-name">' + escapeHtml(s.name) + '</span>'
+       + '<span class="sup-meta">' + escapeHtml(meta.join(' · ')) + '</span>'
+       + '</div>';
+  }
+  h += '<button class="oc-resources-support-cta" onclick="window.location.href=\'radio-completion.html?v=41\'"><i class="fas fa-clipboard-list"></i> فتح التكميل لتنفيذ الدعم</button>';
+  list.innerHTML = h;
+}
+
 // ==========================================
 // syncUpdate — لـ websocket-sync.js
 // ==========================================
@@ -2935,6 +3176,22 @@ window.syncUpdate = function() {
   loadFilesData();
   loadTimelineData();
   loadAnnouncementsData();
+  // المرحلة 5: المنطقتان التنفيذيتان على نفس قناة التحديث القائمة
+  loadShiftOverview();
+  loadOpsResources();
+};
+
+// ==========================================
+// updateConnectionStatusUI — خطاف websocket-sync.js (SSE)
+// يُستدعى true عند فتح القناة وfalse عند انقطاعها — شارة «النظام متصل» تعكس الحالة الفعلية
+// ==========================================
+window.updateConnectionStatusUI = function(connected) {
+  const badge = document.getElementById('connStatusBadge');
+  if (!badge) return;
+  const dot = badge.querySelector('.status-dot');
+  const label = badge.querySelector('.conn-label');
+  if (dot) dot.className = 'status-dot ' + (connected ? 'online' : 'offline');
+  if (label) label.textContent = connected ? ' النظام متصل' : ' الاتصال منقطع';
 };
 </script>
 
@@ -2943,83 +3200,6 @@ window.syncUpdate = function() {
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
-
-<!-- Simple Help Button -->
-<style>
-  .help-fab {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--neon), #1d4ed8);
-    color: #fff;
-    border: none;
-    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
-    cursor: pointer;
-    font-size: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  .help-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(37,99,235,0.45); }
-  .help-fab:active { transform: scale(0.95); }
-  .help-tooltip {
-    position: fixed;
-    bottom: 90px;
-    left: 24px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    width: 280px;
-    box-shadow: var(--shadow);
-    z-index: 9998;
-    display: none;
-    font-size: 13px;
-    line-height: 1.7;
-  }
-  .help-tooltip.show { display: block; animation: slideUp 0.3s ease; }
-  .help-tooltip h4 { margin: 0 0 8px; color: var(--neon); font-size: 14px; }
-  .help-tooltip ul { margin: 0; padding-right: 16px; }
-  .help-tooltip li { margin-bottom: 4px; }
-  @keyframes slideUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
-</style>
-
-<button class="help-fab" id="helpFab" onclick="toggleHelp()" title="مساعدة">
-  <i class="fas fa-question"></i>
-</button>
-
-<div class="help-tooltip" id="helpTooltip">
-  <h4><i class="fas fa-lightbulb" style="color:var(--gold);"></i> دليل الاستخدام</h4>
-  <ul>
-    <li><strong>لوحة القيادة:</strong> إحصائيات وبلاغات ومؤشرات لحظية</li>
-    <li><strong>البلاغات:</strong> إدخال وتوزيع ومراقبة حالة البلاغات</li>
-    <li><strong>المرفقات:</strong> رفع وتحميل الملفات التشغيلية</li>
-    <li><strong>الإعلانات:</strong> نشر تعاميم وإعلانات عاجلة</li>
-    <li><strong>الخريطة:</strong> مواقع المستشفيات والمراكز</li>
-    <li><strong>الاختصارات:</strong> Ctrl+1 لوحة القيادة، Ctrl+2 بلاغات، Ctrl+3 مرفقات</li>
-  </ul>
-  <p style="margin-top:8px; color:var(--text-muted); font-size:11px;">اضغط <kbd>?</kbd> لعرض جميع الاختصارات</p>
-</div>
-
-<script>
-  function toggleHelp() {
-    var tooltip = document.getElementById('helpTooltip');
-    tooltip.classList.toggle('show');
-  }
-  // Close help when clicking outside
-  document.addEventListener('click', function(e) {
-    var fab = document.getElementById('helpFab');
-    var tooltip = document.getElementById('helpTooltip');
-    if (tooltip.classList.contains('show') && !fab.contains(e.target) && !tooltip.contains(e.target)) {
-      tooltip.classList.remove('show');
-    }
-  });
-</script>
 
 </body>
 </html>

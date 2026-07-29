@@ -50,6 +50,8 @@
 
     <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
     <link rel="stylesheet" href="css/app.css?v=41">
+    <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
+    <link rel="stylesheet" href="css/executive-theme.css?v=1">
 <script src="js/shift-codes-config.js"></script>
 <script>
 // Session check - skip login if token exists
@@ -323,29 +325,288 @@ window.addEventListener('load', function() {
     <div class="loading-text">جاري تحميل البيانات...</div>
 </div>
 <!-- ===== شاشة تسجيل الدخول ===== -->
-<div id="loginScreen" style="position:fixed; inset:0; z-index:9999; background:linear-gradient(135deg, #0F172A, #1E3A5F); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; font-family:Inter, sans-serif;">
-    <div style="text-align:center; margin-bottom:20px;">
-        <img src="logo.png" style="width:90px; height:90px; border-radius:12px; margin-bottom:15px; object-fit:contain;">
-        <h1 style="color:#FFFFFF; font-size:1.8rem; margin:0;">منصة إدارة العمليات الإسعافية</h1>
-        <p style="color:#94A3B8; font-size:0.9rem; margin:5px 0 0;">قطاع جنوب الرياض – South Sector Emergency Operations Platform</p>
-    </div>
-    <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(232,200,74,0.2); border-radius:16px; padding:30px; width:90%; max-width:360px; backdrop-filter:blur(10px);">
-        <h2 style="color:#fff; font-size:1.1rem; margin:0 0 20px; text-align:center;">تسجيل الدخول</h2>
-        <div style="margin-bottom:15px;">
-            <label style="display:block; color:#8A9BB0; font-size:0.8rem; margin-bottom:6px;">اسم المستخدم</label>
-            <input type="text" id="loginUsername" placeholder="admin" style="width:100%; padding:12px 14px; border:1px solid rgba(255,255,255,0.15); border-radius:10px; background:rgba(255,255,255,0.08); color:#fff; font-size:0.95rem; font-family:inherit; box-sizing:border-box;">
+<style id="loginScreenStyles">
+    /* Executive Minimalism — مصممة لغرف عمليات تعمل 12 ساعة: هدوء، وضوح، ثقة */
+    #loginScreen {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column;
+        font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+        background: #0A1220;
+        overflow: hidden;
+    }
+    /* خلفية تكاد تختفي: تدرّج خافت جدًا + إضاءة محيطية ناعمة + نقش رقمي بالكاد مرئي */
+    #loginScreen .ls-bg {
+        position: absolute; inset: 0; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 45% at 50% -8%, rgba(126, 166, 232, 0.07), transparent 70%),
+            radial-gradient(ellipse 45% 35% at 50% 108%, rgba(14, 164, 122, 0.05), transparent 70%),
+            linear-gradient(180deg, #0B1424 0%, #0A1220 55%, #091020 100%);
+    }
+    /* نقش جغرافي عملياتي — خطوط كونتور خافتة جدًا عند الأطراف، المركز نظيف تمامًا */
+    #loginScreen .ls-bg::before {
+        content: ''; position: absolute; inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1440' height='900' viewBox='0 0 1440 900'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='1'%3E%3Cpath d='M262 118c68-10 138 26 160 94 24 72-6 152-80 190-78 40-168 20-212-52-45-74-18-172 58-210 26-13 50-20 74-22z'/%3E%3Cpath d='M272 164c50-7 100 19 116 68 17 52-4 110-58 138-56 29-122 14-154-38-33-54-13-125 42-152 19-9 36-14 54-16z'/%3E%3Cpath d='M282 210c33-5 66 13 77 45 11 34-3 72-38 90-37 19-80 10-101-25-21-35-8-82 28-99 12-6 23-10 34-11z'/%3E%3Cpath d='M292 252c18-3 36 7 42 24 6 19-2 39-21 49-20 10-43 5-54-14-11-19-4-44 15-53 6-3 12-5 18-6z'/%3E%3Cpath d='M1178 596c72-9 142 27 165 96 24 74-7 156-82 194-80 41-172 20-217-53-46-76-18-176 59-214 26-13 50-21 75-23z'/%3E%3Cpath d='M1188 644c48-6 96 18 112 65 16 50-5 106-56 133-54 28-117 14-148-36-31-51-12-119 40-145 18-9 35-14 52-17z'/%3E%3Cpath d='M1198 690c30-4 60 11 70 40 10 31-3 66-35 82-34 17-73 9-92-22-19-32-7-74 25-90 11-6 22-9 32-10z'/%3E%3C/g%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: cover;
+    }
+    #loginScreen .ls-bg::after {
+        content: ''; position: absolute; inset: 0;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, rgba(0,0,0,0.9), transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, rgba(0,0,0,0.9), transparent 100%);
+    }
+    /* شريط الحالة العلوي — الحد الأدنى فقط */
+    #loginScreen .ls-statusbar {
+        position: relative; z-index: 2;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 20px 36px;
+        font-size: 0.78rem; color: #7C8DA6;
+        direction: rtl;
+    }
+    #loginScreen .ls-status-group { display: flex; align-items: center; gap: 18px; }
+    #loginScreen .ls-status-item { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    #loginScreen .ls-status-item i { font-size: 0.72rem; color: #5E7189; }
+    #loginScreen .ls-time { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: #A9BACD; }
+    #loginScreen .ls-divider { width: 1px; height: 13px; background: rgba(255,255,255,0.09); }
+    #loginScreen .ls-online-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #0EA47A;
+        box-shadow: 0 0 0 3px rgba(14, 164, 122, 0.14);
+    }
+    #loginScreen .ls-online-text { color: #4FBF9A; letter-spacing: 0.09em; font-size: 0.72rem; font-weight: 500; }
+    /* المركز */
+    #loginScreen .ls-center {
+        position: relative; z-index: 2;
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 24px; gap: 0;
+    }
+    #loginScreen .ls-brand { text-align: center; margin-bottom: 44px; }
+    #loginScreen .ls-logo {
+        width: 128px; height: 128px; object-fit: contain;
+        border-radius: 28px;
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(255,255,255,0.06);
+        margin-bottom: 28px;
+    }
+    #loginScreen .ls-title {
+        color: #F1F5F9; font-size: 1.9rem; font-weight: 600;
+        margin: 0; letter-spacing: 0.015em;
+    }
+    #loginScreen .ls-subtitle {
+        color: #7C8DA6; font-size: 0.82rem; font-weight: 400;
+        margin: 8px 0 0; font-family: 'Inter', sans-serif;
+        letter-spacing: 0.06em;
+    }
+    /* بطاقة الدخول — زجاج ناعم جدًا، حد رفيع، ظل هادئ */
+    #loginScreen .ls-card {
+        width: 100%; max-width: 392px;
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        padding: 38px 36px 32px;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.045),
+            0 30px 70px rgba(0, 0, 0, 0.42);
+        box-sizing: border-box;
+    }
+    #loginScreen .ls-card-title {
+        color: #E2E8F0; font-size: 1.05rem; font-weight: 500;
+        margin: 0 0 26px; text-align: center;
+    }
+    #loginScreen .ls-field { margin-bottom: 16px; }
+    #loginScreen .ls-label {
+        display: block; color: #8A9BB0; font-size: 0.78rem;
+        margin-bottom: 8px; font-weight: 400;
+    }
+    #loginScreen .ls-input-wrap { position: relative; }
+    #loginScreen .ls-input-wrap i {
+        position: absolute; inset-inline-start: 14px; top: 50%;
+        transform: translateY(-50%);
+        color: #54657C; font-size: 0.8rem; pointer-events: none;
+        transition: color 0.25s ease;
+    }
+    #loginScreen .ls-input {
+        width: 100%; box-sizing: border-box;
+        padding: 13px 40px 13px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.045);
+        color: #EDF2F7; font-size: 0.95rem; font-family: inherit;
+        outline: none;
+        transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+    }
+    #loginScreen .ls-input::placeholder { color: #4A5B70; }
+    #loginScreen .ls-input:focus {
+        border-color: rgba(14, 164, 122, 0.55);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 0 3px rgba(14, 164, 122, 0.12);
+    }
+    #loginScreen .ls-input:focus + i,
+    #loginScreen .ls-input-wrap:focus-within i { color: #4FBF9A; }
+    /* زر الدخول — زمردي واثق بلا وهج */
+    #loginScreen .ls-btn {
+        width: 100%; padding: 13px; margin-top: 8px;
+        border: none; border-radius: 12px;
+        background: #0EA47A;
+        color: #FFFFFF; font-size: 1rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; letter-spacing: 0.02em;
+        box-shadow: 0 8px 22px rgba(14, 164, 122, 0.22);
+        transition: background 0.25s ease, transform 0.15s ease, box-shadow 0.25s ease;
+    }
+    #loginScreen .ls-btn:hover { background: #10B586; box-shadow: 0 10px 26px rgba(14, 164, 122, 0.28); }
+    #loginScreen .ls-btn:active { transform: translateY(1px); }
+    #loginScreen .ls-error {
+        color: #F2899B; font-size: 0.8rem; margin: 14px 0 0;
+        text-align: center; display: none;
+    }
+    #loginScreen .ls-footer { text-align: center; margin-top: 18px; position: relative; z-index: 2; }
+    #loginScreen .ls-footer p { color: #4E5F75; font-size: 0.72rem; margin: 0; }
+    /* الشعار الرسمي — عنصر حيّ هادئ: تنفّس بطيء جدًا، توهّج بالكاد يُدرك */
+    #loginScreen .ls-slogan {
+        margin: 28px 0 0;
+        font-size: 1.3rem; font-weight: 500;
+        color: #A8DCC5;
+        letter-spacing: 0.02em;
+        display: flex; justify-content: center; gap: 12px;
+        opacity: 0;
+        animation: lsSloganIn 2.6s ease 1.4s forwards;
+    }
+    #loginScreen .ls-slogan .ls-word {
+        display: inline-block;
+        animation: lsSloganBreath 7.5s ease-in-out 3.2s infinite;
+        will-change: transform;
+    }
+    #loginScreen .ls-slogan .ls-word:last-child { animation-delay: 4.6s; }
+    @keyframes lsSloganIn { to { opacity: 1; } }
+    @keyframes lsSloganBreath {
+        0%, 100% { transform: translateY(0); text-shadow: 0 0 14px rgba(79, 191, 154, 0.10); }
+        50%      { transform: translateY(-1.6px); text-shadow: 0 0 22px rgba(79, 191, 154, 0.20); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        #loginScreen .ls-slogan { animation: none; opacity: 1; }
+        #loginScreen .ls-slogan .ls-word { animation: none; }
+    }
+    @media (max-width: 560px) {
+        #loginScreen .ls-statusbar { padding: 16px 20px; font-size: 0.72rem; }
+        #loginScreen .ls-status-group { gap: 12px; }
+        #loginScreen .ls-hide-mobile { display: none; }
+        #loginScreen .ls-title { font-size: 1.35rem; }
+        #loginScreen .ls-card { padding: 28px 22px 24px; }
+    }
+</style>
+<div id="loginScreen">
+    <div class="ls-bg"></div>
+
+    <!-- شريط الحالة -->
+    <div class="ls-statusbar">
+        <div class="ls-status-group">
+            <span class="ls-status-item"><i class="far fa-clock"></i><span class="ls-time" id="lsClock">--:--</span></span>
+            <span class="ls-divider"></span>
+            <span class="ls-status-item"><i class="far fa-calendar"></i><span id="lsDate">—</span></span>
         </div>
-        <div style="margin-bottom:20px;">
-            <label style="display:block; color:#8A9BB0; font-size:0.8rem; margin-bottom:6px;">كلمة المرور</label>
-            <input type="password" id="loginPassword" placeholder="••••••" style="width:100%; padding:12px 14px; border:1px solid rgba(255,255,255,0.15); border-radius:10px; background:rgba(255,255,255,0.08); color:#fff; font-size:0.95rem; font-family:inherit; box-sizing:border-box;">
+        <div class="ls-status-group">
+            <span class="ls-status-item" id="lsWeather" style="display:none;"><i class="fas fa-cloud-sun"></i><span id="lsWeatherText"></span></span>
+            <span class="ls-divider" id="lsWeatherDivider" style="display:none;"></span>
+            <span class="ls-status-item"><span class="ls-online-dot"></span><span class="ls-online-text">ONLINE</span></span>
+            <span class="ls-divider ls-hide-mobile"></span>
+            <span class="ls-status-item ls-hide-mobile"><i class="fas fa-lock"></i><span>اتصال آمن</span></span>
         </div>
-        <button id="loginBtn" style="width:100%; padding:12px; border:none; border-radius:10px; background:linear-gradient(135deg, #06D6A0, #0B9F7D); color:#fff; font-size:1rem; font-weight:700; cursor:pointer; transition:all 0.3s; box-shadow:0 0 20px rgba(6,214,160,0.3);">دخول</button>
-        <p id="loginError" style="color:#EF476F; font-size:0.8rem; margin:10px 0 0; text-align:center; display:none;"></p>
     </div>
-    <div style="text-align:center; margin-top:10px;">
-        <p style="color:#5A6B7E; font-size:0.7rem; margin:0;">الوصول للمديرين والمستخدمين المصرح لهم فقط</p>
+
+    <!-- المحتوى -->
+    <div class="ls-center">
+        <div class="ls-brand">
+            <img src="logo.png" class="ls-logo" alt="شعار منصة إدارة العمليات الإسعافية">
+            <h1 class="ls-title">منصة إدارة العمليات الإسعافية</h1>
+            <p class="ls-subtitle">South Sector Emergency Operations Platform</p>
+        </div>
+        <div class="ls-card">
+            <h2 class="ls-card-title">تسجيل الدخول</h2>
+            <div class="ls-field">
+                <label class="ls-label" for="loginUsername">اسم المستخدم</label>
+                <div class="ls-input-wrap">
+                    <input type="text" id="loginUsername" class="ls-input" placeholder="الرقم الوظيفي" autocomplete="username">
+                    <i class="far fa-user"></i>
+                </div>
+            </div>
+            <div class="ls-field">
+                <label class="ls-label" for="loginPassword">كلمة المرور</label>
+                <div class="ls-input-wrap">
+                    <input type="password" id="loginPassword" class="ls-input" placeholder="••••••••" autocomplete="current-password">
+                    <i class="fas fa-lock"></i>
+                </div>
+            </div>
+            <button id="loginBtn" class="ls-btn">دخول</button>
+            <p id="loginError" class="ls-error"></p>
+        </div>
+        <p class="ls-slogan" aria-label="نسعى لنحييها"><span class="ls-word">نسعى</span><span class="ls-word">لنحييها</span></p>
+        <div class="ls-footer">
+            <p>الوصول للمديرين والمستخدمين المصرح لهم فقط</p>
+        </div>
     </div>
 </div>
+<script>
+/* شريط حالة شاشة الدخول: الوقت والتاريخ عبر TimeRiyadh (المصدر الوحيد للتوقيت)،
+   والطقس من Open-Meteo (بدون مفتاح) — يُخفى بهدوء عند تعذّر الجلب */
+(function () {
+    function startClock() {
+        if (!window.TimeRiyadh) return;
+        var clockEl = document.getElementById('lsClock');
+        var dateEl = document.getElementById('lsDate');
+        function tick() {
+            var now = new Date();
+            clockEl.textContent = window.TimeRiyadh.formatTimeSec(now);
+            dateEl.textContent = window.TimeRiyadh.formatFullDate(now);
+        }
+        tick();
+        setInterval(tick, 1000);
+    }
+    function startWeather() {
+        var box = document.getElementById('lsWeather');
+        var text = document.getElementById('lsWeatherText');
+        var divider = document.getElementById('lsWeatherDivider');
+        var codes = [
+            [[0], 'صافٍ', 'fa-sun'],
+            [[1, 2], 'غائم جزئيًا', 'fa-cloud-sun'],
+            [[3], 'غائم', 'fa-cloud'],
+            [[45, 48], 'ضباب', 'fa-smog'],
+            [[51, 53, 55, 56, 57], 'رذاذ', 'fa-cloud-rain'],
+            [[61, 63, 65, 66, 67, 80, 81, 82], 'مطر', 'fa-cloud-showers-heavy'],
+            [[71, 73, 75, 77, 85, 86], 'ثلج', 'fa-snowflake'],
+            [[95, 96, 99], 'عاصفة رعدية', 'fa-cloud-bolt']
+        ];
+        var ctrl = new AbortController();
+        setTimeout(function () { ctrl.abort(); }, 6000);
+        fetch('https://api.open-meteo.com/v1/forecast?latitude=24.7136&longitude=46.6753&current=temperature_2m,weather_code&timezone=Asia%2FRiyadh', { signal: ctrl.signal })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .then(function (data) {
+                if (!data || !data.current) return;
+                var t = Math.round(data.current.temperature_2m);
+                var code = data.current.weather_code;
+                var label = '', icon = 'fa-cloud-sun';
+                for (var i = 0; i < codes.length; i++) {
+                    if (codes[i][0].indexOf(code) !== -1) { label = codes[i][1]; icon = codes[i][2]; break; }
+                }
+                box.querySelector('i').className = 'fas ' + icon;
+                text.textContent = t + '° ' + (label ? label + ' — ' : '') + 'الرياض';
+                box.style.display = 'flex';
+                divider.style.display = 'block';
+            })
+            .catch(function () { /* يبقى مخفيًا — لا مصدر بيانات بديل */ });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { startClock(); startWeather(); });
+    } else {
+        startClock(); startWeather();
+    }
+})();
+</script>
 <div class="container">
     <!-- ===== Smart Top Bar (demo-v3c) ===== -->
     <header class="smart-topbar" id="smartTopbar">
@@ -390,9 +651,6 @@ window.addEventListener('load', function() {
             </div>
         </div>
         <div class="topbar-right">
-            <button class="ai-topbar-btn" id="aiAssistantBtn" onclick="toggleAIChatPanel()" title="المساعد التشغيلي الذكي" style="display:none">
-                <img src="/images/ai-assistant-avatar.webp" alt="المساعد التشغيلي">
-            </button>
             <button class="notification-bell" id="notificationBell" onclick="toggleNotificationPanel(event)" title="الإشعارات">
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge" id="notificationBadge">0</span>
@@ -491,9 +749,9 @@ window.addEventListener('load', function() {
     <!-- ===== شريط التحكم ===== -->
     <div class="info-bar">
         <div>
-            <div class="total-box">📊 إجمالي البلاغات: <span id="grandTotal">0</span></div>
+            <div class="total-box"><i class="fas fa-chart-bar"></i> إجمالي البلاغات: <span id="grandTotal">0</span></div>
             <span id="viewingBadge" class="viewing-badge" style="display:none;"></span>
-            <button id="returnToCurrentBtn" class="btn" style="display:none;">↩️ العودة للحالية</button>
+            <button id="returnToCurrentBtn" class="btn" style="display:none;"><i class="fas fa-arrow-rotate-left"></i> العودة للحالية</button>
             <!-- Archive Summary Card (shown when viewing past shift) -->
             <div id="archiveSummaryCard" class="archive-summary-card-top" style="display:none;"></div>
             <!-- مؤشر حالة المناوبة -->
@@ -539,7 +797,27 @@ window.addEventListener('load', function() {
             </button>
         </div>
     </div>
-    <div class="update-status" id="updateStatus">🟢 متصل | تحديث تلقائي مفعل</div>
+    <div class="update-status" id="updateStatus"><i class="fas fa-circle" style="color:#34D399;font-size:7px;"></i> متصل | تحديث تلقائي مفعل</div>
+
+    <!-- المستوى 3: الخريطة التشغيلية الذكية — امتداد مركز القرار -->
+    <div class="ops-eyebrow ops-eyebrow-map"><i class="fas fa-map-marked-alt"></i><span>الخريطة التشغيلية — صورة القطاع لحظيًا من حالة الخادم</span></div>
+    <div class="ops-map-section" id="opsMapSection">
+        <div class="ops-map-wrap">
+            <div id="opsMap"></div>
+            <div class="ops-map-tile-note" id="opsMapTileNote" style="display:none;">
+                <i class="fas fa-triangle-exclamation"></i> تعذّر تحميل خلفية الخريطة — العلامات تعمل من بيانات الخادم
+            </div>
+        </div>
+        <div class="ops-map-legend">
+            <span class="ops-map-legend-item"><span class="ops-map-legend-dot green"></span>جاهزة</span>
+            <span class="ops-map-legend-item"><span class="ops-map-legend-dot yellow"></span>متابعة</span>
+            <span class="ops-map-legend-item"><span class="ops-map-legend-dot red"></span>إجراء فوري</span>
+            <span class="ops-map-legend-note">النقر على أي علامة يعرض القرار والإجراء</span>
+        </div>
+    </div>
+
+    <!-- المستوى 1: النبض التشغيلي -->
+    <div class="ops-eyebrow ops-eyebrow-pulse"><i class="fas fa-heartbeat"></i><span>النبض التشغيلي</span></div>
 
     <!-- ===== مؤشرات القوى العاملة (احترافية) ===== -->
     <div class="workforce-dashboard" id="workforceDashboard">
@@ -705,6 +983,69 @@ window.addEventListener('load', function() {
                 </div>
                 <div class="wf-card-trend neutral" id="wfCarsTrend">—</div>
             </div>
+        </div>
+    </div>
+
+    <!-- المستوى 2: القرارات التشغيلية -->
+    <div class="ops-eyebrow ops-eyebrow-decisions"><i class="fas fa-compass"></i><span>قرارات تشغيلية — ما يحتاج انتباهك وفعلك</span></div>
+
+    <!-- بؤرة التركيز التشغيلي — تعرض حالات الفرق المشتقة سيرفريًا (تُملأ عبر renderOperationalFocus) -->
+    <div class="ops-focus" id="opsFocus">
+        <div class="ops-focus-header">
+            <div class="ops-focus-header-right">
+                <div class="ops-focus-icon"><i class="fas fa-crosshairs"></i></div>
+                <div>
+                    <div class="ops-focus-title">بؤرة التركيز التشغيلي</div>
+                    <div class="ops-focus-subtitle">ما يحتاج انتباهك الآن — من حالة الخادم مباشرة</div>
+                </div>
+            </div>
+            <span class="ops-focus-badge" id="opsFocusBadge">—</span>
+            <button class="ops-focus-action" onclick="navigateToPage('radio-completion.html?v=41')"><i class="fas fa-clipboard-list"></i> فتح التكميل</button>
+        </div>
+        <div class="ops-focus-summary unknown" id="opsFocusSummary">
+            <span class="ops-focus-summary-dot"></span>
+            <span id="opsFocusSummaryText">— بانتظار بيانات الحالة</span>
+        </div>
+        <div class="ops-focus-groups" id="opsFocusList"></div>
+    </div>
+
+    <!-- ===== المنطقة 2: شريط الموارد المتاحة — من مصادر الخادم مباشرة، صفر حساب محلي ===== -->
+    <div class="ops-resources" id="opsResources">
+        <div class="ops-resources-seg" title="جاهزية الفرق من حالة الخادم">
+            <i class="fas fa-users"></i>
+            <span class="ops-resources-label">التغطية</span>
+            <span class="ops-resources-value" id="resCoverageValue">—</span>
+        </div>
+        <div class="ops-resources-seg ops-resources-seg-btn" id="resSupportSeg" onclick="toggleResourcesSupportList()" title="القوى المتاحة للدعم — انقر للعرض">
+            <i class="fas fa-user-plus"></i>
+            <span class="ops-resources-label">الدعم المتاح</span>
+            <span class="ops-resources-value" id="resSupportValue">—</span>
+            <i class="fas fa-chevron-down ops-resources-caret" id="resSupportCaret"></i>
+        </div>
+        <div class="ops-resources-seg" title="حالة المركبات من مؤشرات الخادم">
+            <i class="fas fa-ambulance"></i>
+            <span class="ops-resources-label">المركبات</span>
+            <span class="ops-resources-value" id="resVehiclesValue">—</span>
+        </div>
+        <div class="ops-resources-support-list" id="resSupportList" style="display:none;"></div>
+    </div>
+
+    <!-- ===== المنطقة 3: شريط الأحداث النشطة — بلاغات/آخر حدث/إعلانات، من مصادر قائمة ===== -->
+    <div class="ops-events" id="opsEvents">
+        <div class="ops-events-seg ops-events-seg-btn" onclick="openModalById('distributionModal'); renderAdvancedDistribution();" title="توزيع البلاغات على الفرق">
+            <i class="fas fa-ambulance"></i>
+            <span class="ops-events-label">البلاغات</span>
+            <span class="ops-events-value" id="evReportsValue">—</span>
+        </div>
+        <div class="ops-events-seg ops-events-seg-btn" onclick="navigateToPage('operations-command.html?v=41')" title="آخر الأحداث — غرفة العمليات الذكية">
+            <i class="fas fa-clock-rotate-left"></i>
+            <span class="ops-events-label">آخر حدث</span>
+            <span class="ops-events-value ops-events-value-wide" id="evTimelineValue">—</span>
+        </div>
+        <div class="ops-events-seg ops-events-seg-btn" onclick="navigateToPage('operations-command.html?v=41')" title="الإعلانات — غرفة العمليات الذكية">
+            <i class="fas fa-bullhorn"></i>
+            <span class="ops-events-label">الإعلانات</span>
+            <span class="ops-events-value" id="evAnnounceValue">—</span>
         </div>
     </div>
 
@@ -889,13 +1230,13 @@ window.addEventListener('load', function() {
 
 <!-- ===== نافذة توزيع البلاغات المتطورة ===== -->
 <div id="distributionModal" class="modal">
-    <div class="modal-content" style="min-width:900px; width:95%; max-width:1400px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:12px;">
-            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                <h2 style="margin:0; color:var(--primary-700);"><i class="fas fa-ambulance"></i> توزيع البلاغات</h2>
-                <div class="report-type-selector" id="reportTypeSelector" style="display:flex; align-items:center; gap:8px; background:var(--gray-50); padding:6px 12px; border-radius:var(--radius-md); border:1px solid var(--gray-200);">
-                    <label style="font-size:0.75rem; font-weight:600; color:var(--gray-600); margin:0;">نوع البلاغ:</label>
-                    <select id="reportTypeSelect" onchange="selectedReportType=this.value;" style="padding:4px 8px; border-radius:var(--radius-sm); border:1px solid var(--gray-200); font-size:0.8rem; font-weight:600; color:var(--gray-800); background:var(--white); cursor:pointer; min-width:140px; font-family:inherit;">
+    <div class="modal-content dm-modal-content">
+        <div class="dm-header">
+            <div class="dm-header-main">
+                <h2 class="dm-title"><i class="fas fa-ambulance"></i> توزيع البلاغات</h2>
+                <div class="report-type-selector dm-select-box" id="reportTypeSelector">
+                    <label class="dm-label">نوع البلاغ:</label>
+                    <select id="reportTypeSelect" class="dm-select" onchange="selectedReportType=this.value;">
                         <option value="traffic">🚗 حوادث مرورية</option>
                         <option value="medical" selected>🤒 حالات مرضية</option>
                         <option value="injury">🚨 إصابات</option>
@@ -907,7 +1248,7 @@ window.addEventListener('load', function() {
                         <option value="other">📦 حالات أخرى</option>
                     </select>
                 </div>
-                <button onclick="generateShiftReport()" class="btn btn-primary" style="padding:6px 14px; font-size:0.75rem;" title="تقرير المناوبة">
+                <button onclick="generateShiftReport()" class="btn btn-primary dm-report-btn" title="تقرير المناوبة">
                     <i class="fas fa-file-alt"></i> تقرير المناوبة
                 </button>
             </div>
@@ -964,11 +1305,11 @@ window.addEventListener('load', function() {
 <div id="shiftReportModal" class="modal shift-report-modal">
     <div class="modal-content">
         <div class="shift-report-header">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <i class="fas fa-file-medical-alt" style="font-size:1.4rem;"></i>
+            <div class="sr-header-main">
+                <i class="fas fa-file-medical-alt"></i>
                 <h2>📋 تقرير المناوبة</h2>
             </div>
-            <button onclick="closeModalById('shiftReportModal')" style="background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+            <button onclick="closeModalById('shiftReportModal')" class="sr-close-btn">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1394,6 +1735,70 @@ window.addEventListener('load', function() {
 
 <style>
 #opsPreviewModal.active { display: flex; }
+
+/* شارة «تجريبي» — قرص هادئ بصبغة زرقاء ناعمة ضمن الشريط الذكي (بلا عدادات) */
+.smart-sidebar .sidebar-item .nav-beta-pill {
+    margin-inline-start: auto;
+    flex-shrink: 0;
+    background: rgba(96, 165, 250, 0.10) !important;
+    color: #93C5FD !important;
+    border: 1px solid rgba(96, 165, 250, 0.26) !important;
+    border-radius: 999px !important;
+    padding: 1px 9px !important;
+    font-size: 0.68rem !important;
+    font-weight: 600 !important;
+}
+</style>
+
+<style>
+/* ===== توحيد المؤشرات وتوزيع البلاغات — إكمال الهوية التنفيذية الداكنة (بصري فقط) ===== */
+
+/* نصوص عناصر التوزيع المبنية ديناميكيًا — كانت رمادية داكنة غير مقروءة على الزجاج */
+.distribution-item-name { color: var(--ex-text, #F1F5F9) !important; }
+.distribution-item-count { color: var(--ex-text, #F1F5F9) !important; }
+.distribution-item-percent { color: var(--ex-text-4, #7C8DA6) !important; }
+.distribution-item-bar-track { background: rgba(255,255,255,0.07) !important; }
+.distribution-item-rank.rank-other { background: rgba(255,255,255,0.08) !important; color: var(--ex-text-3, #8A9BB0) !important; }
+
+/* أشرطة التوزيع الكلاسيكية داخل بطاقة «مؤشر توزيع البلاغات» */
+.distribution-bar { border-bottom: 1px solid var(--ex-border-soft, rgba(255,255,255,0.06)) !important; }
+.distribution-bar .name { color: var(--ex-text-2, #A9BACD) !important; }
+.distribution-bar .percent { color: var(--ex-text-4, #7C8DA6) !important; }
+.distribution-bar .bar-track { background: rgba(255,255,255,0.07) !important; }
+
+/* أشرطة تقدم بطاقات «مؤشرات القوى العاملة» — تدرجات الهوية الناعمة */
+.wf-card-blue  .wf-card-progress-fill { background: linear-gradient(90deg, #60A5FA, #93C5FD) !important; }
+.wf-card-green .wf-card-progress-fill { background: linear-gradient(90deg, #10B586, #4FBF9A) !important; }
+.wf-card-gold  .wf-card-progress-fill { background: linear-gradient(90deg, #F59E0B, #FCD34D) !important; }
+.wf-card-red   .wf-card-progress-fill { background: linear-gradient(90deg, #EF4444, #FCA5A5) !important; }
+
+/* بطاقات مؤشرات نافذة التحليلات — زجاج داكن بدل الأبيض الفاقع */
+#analyticsModal .kpi-card {
+    background: rgba(255,255,255,0.035) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+}
+#analyticsModal .kpi-card .kpi-value { color: var(--ex-text, #F1F5F9) !important; }
+#analyticsModal .kpi-card .kpi-label { color: var(--ex-text-4, #7C8DA6) !important; }
+#analyticsModal .kpi-card .kpi-trend { color: var(--ex-text-3, #8A9BB0) !important; }
+
+/* الخريطة الحرارية — تسميات وليجند على الهوية */
+#analyticsModal .heatmap-cell::after, .heatmap-cell::after { color: var(--ex-text-4, #7C8DA6) !important; }
+#analyticsModal .heatmap-legend, .heatmap-legend { color: var(--ex-text-3, #8A9BB0) !important; }
+#analyticsModal .heatmap-gradient, .heatmap-gradient {
+    background: linear-gradient(to right, rgba(255,255,255,0.04), rgba(16,181,134,0.18), rgba(16,181,134,0.30), rgba(16,181,134,0.42), rgba(16,181,134,0.55), rgba(16,181,134,0.70), rgba(245,158,11,0.55), rgba(245,158,11,0.75), rgba(239,68,68,0.65), rgba(239,68,68,0.85)) !important;
+}
+
+/* بطاقات الرسوم داخل نافذة «الإحصائيات والرسوم البيانية» — زجاج داكن */
+#chartsModal .chart-card {
+    background: rgba(255,255,255,0.035) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+}
+#chartsModal .chart-card h3 {
+    color: var(--ex-text, #F1F5F9) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
 </style>
 
 <!-- ===== نافذة معاينة الملف ===== -->
@@ -1610,13 +2015,13 @@ window.addEventListener('load', function() {
 
 <!-- ===== نافذة الإحصائيات والرسوم البيانية ===== -->
 <div id="chartsModal" class="modal">
-    <div class="modal-content" style="max-width:95%; max-height:95vh; overflow-y:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="display:flex; align-items:center; gap:12px;">
+    <div class="modal-content charts-modal-content">
+        <div class="cm-header">
+            <div class="cm-title-wrap">
                 <span class="card-icon gold"><i class="fas fa-chart-line"></i></span>
                 <div>
-                    <h2 style="margin:0; font-size:1.2rem;">&#x1F4CA; الإحصائيات والرسوم البيانية</h2>
-                    <span style="font-size:0.7rem; color:var(--gray-400);">تحليل بيانات البلاغات والفرق</span>
+                    <h2 class="cm-title">&#x1F4CA; الإحصائيات والرسوم البيانية</h2>
+                    <span class="cm-subtitle">تحليل بيانات البلاغات والفرق</span>
                 </div>
             </div>
             <button onclick="closeModalById('chartsModal')" class="btn">
@@ -1630,25 +2035,25 @@ window.addEventListener('load', function() {
         
         <div class="charts-grid">
             <div class="chart-card">
-                <h3><i class="fas fa-clock" style="color:var(--teal);"></i> توزيع البلاغات الساعي</h3>
+                <h3><i class="fas fa-clock cm-ic-teal"></i> توزيع البلاغات الساعي</h3>
                 <div class="chart-canvas-container">
                     <canvas id="hourlyChart"></canvas>
                 </div>
             </div>
             <div class="chart-card">
-                <h3><i class="fas fa-hospital" style="color:var(--primary-700);"></i> البلاغات حسب المركز</h3>
+                <h3><i class="fas fa-hospital cm-ic-blue"></i> البلاغات حسب المركز</h3>
                 <div class="chart-canvas-container">
                     <canvas id="centerChart"></canvas>
                 </div>
             </div>
             <div class="chart-card">
-                <h3><i class="fas fa-ambulance" style="color:var(--coral);"></i> أكثر 10 فرق نشاطاً</h3>
+                <h3><i class="fas fa-ambulance cm-ic-coral"></i> أكثر 10 فرق نشاطاً</h3>
                 <div class="chart-canvas-container">
                     <canvas id="topUnitsChart"></canvas>
                 </div>
             </div>
             <div class="chart-card">
-                <h3><i class="fas fa-calendar-week" style="color:var(--gold);"></i> البلاغات الأسبوعية</h3>
+                <h3><i class="fas fa-calendar-week cm-ic-gold"></i> البلاغات الأسبوعية</h3>
                 <div class="chart-canvas-container">
                     <canvas id="weeklyChart"></canvas>
                 </div>
@@ -1724,20 +2129,21 @@ window.addEventListener('load', function() {
                 <i class="fas fa-chevron-down group-arrow"></i>
             </div>
             <div class="group-items">
-                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=41');"><i class="fas fa-clipboard-list"></i> تكميل المراكز الإسعافية</button>
+                <button class="sidebar-item" id="sidebarHomeItem" onclick="toggleSidebar();"><i class="fas fa-gauge-high"></i> لوحة القيادة الرئيسية</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('smart-operator.html');"><i class="fas fa-brain"></i> المشغل الذكي <span class="nav-beta-pill">تجريبي</span></button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('radio-completion.html?v=41');"><i class="fas fa-clipboard-list"></i> تكميل المراكز الإسعافية <span class="sidebar-item-status" id="sbStatusCompletion"></span></button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('workflow.html');"><i class="fas fa-file-signature"></i> سير العمل الرسمي</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('distributionModal'); renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); openModalById('distributionModal'); renderAdvancedDistribution();"><i class="fas fa-ambulance"></i> توزيع البلاغات <span class="sidebar-item-badge" id="sbBadgeReports" style="display:none;">0</span></button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-chart-pie"></i> الإحصائيات والتقارير</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('controlModal'); loadVacations().then(function() { renderControlList(false); });"><i class="fas fa-sliders-h"></i> تنسيق الإجازة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('formsModal'); loadFormsList(); if(!currentFormId && FORM_DEFINITIONS.length>0) loadForm(FORM_DEFINITIONS[0].id);"><i class="fas fa-file-alt"></i> النماذج</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openPeakTimeModal();"><i class="fas fa-clock"></i> وقت الذروة</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('chartsModal'); renderAllCharts();"><i class="fas fa-chart-line"></i> إحصائيات</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openModalById('analyticsModal'); renderAnalyticsDashboard();"><i class="fas fa-tachometer-alt"></i> لوحة التحكم</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-command-center"></i> مركز العمليات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('operations-dashboard.html?v=1');"><i class="fas fa-command-center"></i> مركز العمليات <span class="sidebar-item-status" id="sbStatusOps"></span></button>
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-dashboard.html?v=41');"><i class="fas fa-chart-line"></i> لوحة المشرف</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); openAuditLogModal();"><i class="fas fa-history"></i> سجل العمليات</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); toggleAIChatPanel();"><i class="fas fa-robot"></i> المساعد التشغيلي</button>
-                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('admin-knowledge.html?v=41');"><i class="fas fa-book"></i> قاعدة المعرفة</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('chat.html');"><i class="fas fa-comments"></i> الرسائل <span class="sidebar-item-badge" id="sbBadgeChat" style="display:none;">0</span></button>
             </div>
         </div>
         <!-- الإعدادات -->

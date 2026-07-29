@@ -15,6 +15,14 @@ const { createEngine, getEngine } = require('./ops-engine');
 // OV-S6-01: server-side shift type/date derivation (prep mode stamping)
 // (aliased: server.js already defines its own identical getCurrentShiftType)
 const { getCurrentShiftType: deriveServerShiftType, getSaudiDateString } = require('./managers');
+// 6-أ: Decision Engine — طبقة تحليل صرفة (قراءة/تفسير فقط، بلا إعادة حساب)
+const decisionEngine = require('./decision-engine');
+// 6-ب: Decision Memory — ذاكرة القرار التشغيلي (إلحاق فقط؛ صفر تعديل/حذف)
+const DecisionMemoryService = require('./services/decision-memory-service');
+// 6-ج: Smart Awareness — الجهاز العصبي (بصمة الذاكرة = الزناد الوحيد للبث)
+const SmartAwarenessService = require('./services/smart-awareness-service');
+// 6-د: Smart Ask — طبقة إجابة حتمية (بلا LLM؛ تجميع من حقول التقييم فقط)
+const smartAsk = require('./services/smart-ask-service');
 // الطبقة المركزية الوحيدة لتحويل وعرض الوقت (Asia/Riyadh) — نفس ملف المتصفح
 const TimeRiyadh = require('./public/js/time-riyadh.js');
 
@@ -416,6 +424,10 @@ function initWebSocket(server) {
 // (toast مزدوج + جلب مزدوج — OV-S4-01 / D-14).
 function broadcast(data) {
     broadcastSSE(data);
+    // 6-ج: إيقاظ الوعي بأنواع SSE التشغيلية القديمة المؤثرة التي لا تعبر ناقل
+    // المحرك (vehicles_updated / shift_roster_updated). الإيقاظ رخيص (debounce)
+    // وبصمة الذاكرة تكفل الصمت ما لم يتغيّر المعنى — والوعي لا يكسر البث إطلاقًا.
+    try { smartAwarenessService.notifyLegacyBroadcast(data); } catch (_) { /* صمت */ }
 }
 
 // Helper: broadcast to conversation PARTICIPANTS only (DB-backed).
@@ -556,8 +568,23 @@ const DASHBOARD_PATH = path.join(STORAGE_PATH, 'dashboard.json');
 const HOSPITALS_PATH = path.join(STORAGE_PATH, 'hospitals.json');
 const REFERENCES_PATH = path.join(STORAGE_PATH, 'references.json');
 const TIMELINE_PATH = path.join(STORAGE_PATH, 'timeline.json');
+const MAP_LOCATIONS_PATH = path.join(STORAGE_PATH, 'map-locations.json');
 const UNIT_LOCATION_ADDRESSES_PATH = path.join(STORAGE_PATH, 'unit-location-addresses.json');
 const UNIT_LOCATIONS_PATH = path.join(STORAGE_PATH, 'unit-locations.json');
+
+// 6-ب: Decision Memory — ملف JSON ضمن STORAGE_PATH بنفس نمط timeline.json
+// (read-modify-write)؛ لا يعتمد على المحرك فيُنشأ هنا مباشرة.
+const decisionMemoryService = new DecisionMemoryService({ storagePath: STORAGE_PATH });
+
+// 6-ج: Smart Awareness — buildSnapshot و broadcast تُحقنان كمرجع دالة
+// (declarations محمولة hoist؛ لا تُستدعى إلا بعد إقلاع المحرك)، والاشتراك
+// في ناقل المحرك يتم عند التوصيل (opsEngine.wireEvents).
+const smartAwarenessService = new SmartAwarenessService({
+    engine: decisionEngine,
+    memory: decisionMemoryService,
+    buildSnapshot: buildAssessmentSnapshot,
+    broadcast
+});
 
 // ============================================
 // Shift Archive Engine v2.0 — Atomic Archive System
@@ -1955,6 +1982,16 @@ async function readTimeline() {
 
 async function writeTimeline(data) {
     await fs.writeFile(TIMELINE_PATH, JSON.stringify(data, null, 2));
+}
+
+async function readMapLocations() {
+    try {
+        const data = await fs.readFile(MAP_LOCATIONS_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        return [];
+    }
 }
 
 async function readAnnouncements() {
@@ -4615,6 +4652,127 @@ app.get('/api/vehicles/indicators', authenticate, async (req, res) => {
 });
 
 // ============================================
+// 6-أ/6-ج: Smart Operator — التقييم التشغيلي اللحظي + الوعي
+// تجميعة اللقطة واحدة فقط (buildAssessmentSnapshot) — يستخدمها مسار HTTP
+// ودورات الوعي معًا: لا توجد طريقتان لرؤية العالم. صفر إعادة حساب،
+// صفر SQL جديد؛ المحرك يفسّر ما تشتقه المنصة أصلًا.
+// ============================================
+async function buildAssessmentSnapshot() {
+    const activeShift = await opsEngine.shifts.getActiveShift();
+    const shiftId = activeShift ? activeShift.id : null;
+
+    // WF-1: مسودات سير العمل بانتظار الاعتماد — قراءة من الخدمة القائمة نفسها
+    let pendingApprovals = [];
+    if (shiftId && workflowService) {
+        try {
+            const wf = await workflowService.listByShift(shiftId);
+            pendingApprovals = (wf && Array.isArray(wf.versions) ? wf.versions : [])
+                .filter(v => v.status === 'draft')
+                .map(v => ({ id: v.id, versionNo: v.version_no, createdByName: v.created_by_name || null, createdAt: v.created_at || null }));
+        } catch (_) { pendingApprovals = []; }
+    }
+
+    return {
+        now: new Date().toISOString(),
+        shift: activeShift ? {
+            id: activeShift.id,
+            type: activeShift.shift_type || null,
+            date: activeShift.shift_date || null,
+            status: activeShift.status || null,
+            startedAt: activeShift.started_at || null
+        } : null,
+        staffing: await staffingEventsService.deriveTeamReadiness(shiftId),
+        support: await staffingEventsService.getAvailableSupport(shiftId),
+        vehicles: await vehicleEventsService.getBoard(shiftId),
+        workflow: { pendingApprovals }
+    };
+}
+
+app.get('/api/smart-operator/assessment', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const snapshot = await buildAssessmentSnapshot();
+        const assessment = decisionEngine.assess(snapshot);
+
+        // 6-ب/6-ج: استيعاب عبر المسار الواحد (ذاكرة ← بصمة ← بث عند تغيّر المعنى فقط).
+        // فشل الذاكرة/الوعي لا يكسر التقييم إطلاقًا — يُسجَّل في السجل فقط.
+        try {
+            await smartAwarenessService.ingest(assessment, { shiftId: snapshot.shift ? snapshot.shift.id : null });
+        } catch (memErr) {
+            console.error('[SmartAwareness] ingest failed (ignored):', memErr.message);
+        }
+
+        // 6-د: إثراء إضافي — عدد الداعمين المتاحين من اللقطة نفسها (getAvailableSupport
+        // مُستدعاة أصلًا في التجميع). يُلحق بجانب مخرجات المحرك دون تعديلها — المحرك مقفل.
+        const supporters = (snapshot.support && Array.isArray(snapshot.support.supporters)) ? snapshot.support.supporters : [];
+        res.json({ success: true, data: Object.assign({}, assessment, { supportCount: supporters.length }) });
+    } catch (error) {
+        console.error('[API] Error smart-operator assessment:', error);
+        res.status(500).json({ error: 'فشل في توليد التقييم التشغيلي' });
+    }
+});
+
+// 6-ب: قراءات ذاكرة القرار — سجلات المناوبة (زمنيًا) وملخص الأنماط
+app.get('/api/smart-operator/memory', authenticate, async (req, res) => {
+    try {
+        const raw = req.query.shiftId || req.query.shift_id;
+        if (raw === undefined || raw === null || raw === '') return res.status(400).json({ error: 'shift_id مطلوب' });
+        const shiftId = parseInt(raw);
+        if (isNaN(shiftId)) return res.status(400).json({ error: 'shift_id غير صالح' });
+        let limit = parseInt(req.query.limit) || 50;
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+        const records = await decisionMemoryService.listByShift(shiftId, limit);
+        res.json({ success: true, shiftId, records });
+    } catch (error) {
+        console.error('[API] Error smart-operator memory:', error);
+        res.status(500).json({ error: 'فشل في جلب ذاكرة القرار' });
+    }
+});
+
+app.get('/api/smart-operator/memory/patterns', authenticate, async (req, res) => {
+    try {
+        const scope = {};
+        const raw = req.query.shiftId || req.query.shift_id;
+        if (raw !== undefined && raw !== null && raw !== '') {
+            const shiftId = parseInt(raw);
+            if (isNaN(shiftId)) return res.status(400).json({ error: 'shift_id غير صالح' });
+            scope.shiftId = shiftId;
+        }
+        if (req.query.from) scope.from = req.query.from;
+        if (req.query.to) scope.to = req.query.to;
+        const patterns = await decisionMemoryService.patternSummary(scope);
+        res.json({ success: true, ...patterns });
+    } catch (error) {
+        console.error('[API] Error smart-operator memory patterns:', error);
+        res.status(500).json({ error: 'فشل في تحليل أنماط القرار' });
+    }
+});
+
+// 6-د: اسأل المشغل الذكي — إجابة حتمية من التقييم الحالي + أنماط الذاكرة.
+// قراءة فقط: السؤال لا يُسجَّل في الذاكرة (ليس تغيّرًا تشغيليًا) ولا يُبثّ.
+app.post('/api/smart-operator/ask', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const question = ((req.body && req.body.question) || '').trim();
+        if (!question) return res.status(400).json({ error: 'السؤال مطلوب' });
+        const snapshot = await buildAssessmentSnapshot();
+        const assessment = decisionEngine.assess(snapshot);
+        const shiftId = snapshot.shift ? snapshot.shift.id : null;
+        let patterns = null;
+        if (shiftId != null) {
+            try { patterns = await decisionMemoryService.patternSummary({ shiftId }); }
+            catch (_) { patterns = null; } // الأنماط إثراء اختياري — فشلها لا يمنع الإجابة
+        }
+        const result = smartAsk.answer(question, { assessment, patterns });
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error('[API] Error smart-operator ask:', error);
+        res.status(500).json({ error: 'فشل في معالجة السؤال' });
+    }
+});
+
+// ============================================
 // W1-D: لوحة المركبات — السجل المرجعي (معرف ثابت) + الحالة المشتقة + كتابة الأحداث
 // الكتابة عبر VehicleEventsService فقط (ختم سيرفري)؛ لا جدول حالات إطلاقًا.
 // ============================================
@@ -4626,6 +4784,131 @@ app.get('/api/vehicles/registry', authenticate, async (req, res) => {
     } catch (error) {
         console.error('[API] Error vehicles registry:', error);
         res.status(500).json({ error: 'فشل في جلب سجل المركبات' });
+    }
+});
+
+// ============================================
+// Fleet Engine V1: توسعة محرك الأسطول (قراءة التاريخ + كتابة السجل)
+// ① GET /:id/history — تاريخ المركبة عبر كل المناوبات عبر VehicleEventsService
+//    (قراءة — نفس مستوى بقية قراءات المركبات: authenticate فقط).
+// ② POST/PUT /registry — كتابة السجل المرجعي عبر StorageAdapter (معمارية
+//    البوابة الواحدة) — صلاحية مشرف فقط (سابقة /api/users وedit-shift).
+//    لا DELETE ولا تعطيل إطلاقًا: قانون append-only يمنع الحذف، والأحداث
+//    التشغيلية لا تمسها هذه النقاط. عمود notes يصل عبر هجرة db.js الإضافية.
+// ============================================
+app.get('/api/vehicles/centers', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const centers = await opsEngine.storage.getCenters();
+        res.json({ success: true, centers });
+    } catch (error) {
+        console.error('[API] Error vehicle centers:', error);
+        res.status(500).json({ error: 'فشل في جلب المراكز' });
+    }
+});
+
+app.get('/api/vehicles/:id/history', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const history = await vehicleEventsService.getVehicleHistory(req.params.id);
+        res.json({ success: true, ...history });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error vehicle history:', error);
+        res.status(500).json({ error: 'فشل في جلب تاريخ المركبة' });
+    }
+});
+
+app.post('/api/vehicles/registry', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const b = req.body || {};
+        const plate = String(b.plate_number || '').trim();
+        const vehicleType = String(b.vehicle_type || '').trim();
+        const category = String(b.category || '').trim();
+        const designation = String(b.designation || '').trim();
+        const year = parseInt(b.model_year, 10);
+        if (!plate || !vehicleType || !category || !designation) {
+            return res.status(400).json({ error: 'بيانات ناقصة: اللوحة والنوع والفئة والتعيين إلزامية' });
+        }
+        if (isNaN(year) || year < 1950 || year > 2100) {
+            return res.status(400).json({ error: 'سنة الموديل غير صالحة' });
+        }
+        if (await opsEngine.storage.getVehicleByPlate(plate)) {
+            return res.status(400).json({ error: 'رقم اللوحة مسجل لمركبة أخرى' });
+        }
+        let ownerCenterId = b.owner_center_id ? String(b.owner_center_id) : null;
+        if (ownerCenterId) {
+            const center = await opsEngine.storage.get('SELECT id FROM centers WHERE id = ? AND is_active = 1', [ownerCenterId]);
+            if (!center) return res.status(400).json({ error: 'المركز الرئيسي غير موجود' });
+        }
+        const sortOrder = parseInt(b.sort_order, 10);
+        const id = await opsEngine.storage.createVehicle({
+            plateNumber: plate,
+            callSign: b.call_sign ? String(b.call_sign).trim() : null,
+            vehicleType,
+            modelYear: year,
+            category,
+            designation,
+            adminStatus: b.admin_status ? String(b.admin_status).trim() : 'أساسية',
+            ownerCenterId,
+            sortOrder: isNaN(sortOrder) ? 0 : sortOrder,
+            notes: b.notes ? String(b.notes).trim() : null
+        });
+        const vehicle = await opsEngine.storage.getVehicleById(id);
+        res.json({ success: true, vehicle });
+    } catch (error) {
+        console.error('[API] Error vehicle registry create:', error);
+        res.status(500).json({ error: 'فشل في إضافة المركبة' });
+    }
+});
+
+app.put('/api/vehicles/registry/:id', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const existing = await opsEngine.storage.getVehicleById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'مركبة غير موجودة في السجل' });
+        const b = req.body || {};
+        const fields = {};
+        const strCols = ['plate_number', 'call_sign', 'vehicle_type', 'category', 'designation', 'admin_status', 'notes'];
+        for (const col of strCols) {
+            if (b[col] === undefined) continue;
+            const v = b[col] === null ? null : String(b[col]).trim();
+            if (['plate_number', 'vehicle_type', 'category', 'designation'].includes(col) && !v) {
+                return res.status(400).json({ error: 'حقل إلزامي لا يقبل قيمة فارغة: ' + col });
+            }
+            fields[col] = v;
+        }
+        if (b.model_year !== undefined) {
+            const year = parseInt(b.model_year, 10);
+            if (isNaN(year) || year < 1950 || year > 2100) return res.status(400).json({ error: 'سنة الموديل غير صالحة' });
+            fields.model_year = year;
+        }
+        if (b.sort_order !== undefined) {
+            const so = parseInt(b.sort_order, 10);
+            if (isNaN(so)) return res.status(400).json({ error: 'الترتيب غير صالح' });
+            fields.sort_order = so;
+        }
+        if (b.owner_center_id !== undefined) {
+            if (b.owner_center_id === null || b.owner_center_id === '') {
+                fields.owner_center_id = null;
+            } else {
+                const center = await opsEngine.storage.get('SELECT id FROM centers WHERE id = ? AND is_active = 1', [String(b.owner_center_id)]);
+                if (!center) return res.status(400).json({ error: 'المركز الرئيسي غير موجود' });
+                fields.owner_center_id = String(b.owner_center_id);
+            }
+        }
+        if (fields.plate_number && fields.plate_number !== existing.plate_number) {
+            const dup = await opsEngine.storage.getVehicleByPlate(fields.plate_number);
+            if (dup && dup.id !== existing.id) return res.status(400).json({ error: 'رقم اللوحة مسجل لمركبة أخرى' });
+        }
+        if (Object.keys(fields).length === 0) return res.status(400).json({ error: 'لا توجد حقول للتحديث' });
+        await opsEngine.storage.updateVehicle(existing.id, fields);
+        const vehicle = await opsEngine.storage.getVehicleById(existing.id);
+        res.json({ success: true, vehicle });
+    } catch (error) {
+        console.error('[API] Error vehicle registry update:', error);
+        res.status(500).json({ error: 'فشل في تعديل المركبة' });
     }
 });
 
@@ -5760,6 +6043,16 @@ app.post('/api/hospitals', authenticate, authorize(['admin']), async (req, res) 
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ المستشفيات' });
+    }
+});
+
+// Map Locations — مواقع خريطة غرفة العمليات (مصدر البذرة: ما كان مضمّناً في الصفحة)
+app.get('/api/map-locations', authenticate, async (req, res) => {
+    try {
+        const data = await readMapLocations();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ error: 'فشل في جلب مواقع الخريطة' });
     }
 });
 
@@ -10584,6 +10877,8 @@ server.listen(PORT, async () => {
             const ReportService = require('./services/report-service');
             const CompletionService = require('./services/completion-service');
             opsEngine.wireEvents({ broadcast });
+            // 6-ج: اشتراك الوعي في نبض المنصة (نفس الناقل — صمت ما لم تتغيّر البصمة)
+            smartAwarenessService.subscribe(opsEngine.bus);
             reportService = new ReportService({ engine: opsEngine, bus: opsEngine.bus });
             completionService = new CompletionService({ engine: opsEngine, bus: opsEngine.bus });
             console.log('✅ Event-driven services wired (ReportService, CompletionService)');

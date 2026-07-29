@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="description" content="إدارة المركبات — منصة إدارة العمليات الإسعافية">
+    <title>إدارة المركبات | منصة الجنوب</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#1E3A5F">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/a11y.css?v=1">
+    <!-- App CSS -->
+    <link rel="stylesheet" href="css/app.css?v=30">
+    <style>
+        /* ═══ إعادة توكنة محلية — الهوية التنفيذية الداكنة الموحدة ═══
+           تتفوق على app.css المشترك (وراثة لاحقة) دون تعديل الملف المشترك */
+        :root {
+            --white:   rgba(255,255,255,0.035);
+            --gray-50: #0A1220;
+            --gray-100:rgba(255,255,255,0.05);
+            --gray-200:rgba(255,255,255,0.08);
+            --gray-300:rgba(255,255,255,0.10);
+            --gray-400:#7C8DA6;
+            --gray-500:#A9BACD;
+            --gray-600:#C2CFDD;
+            --gray-700:#D5DEE9;
+            --gray-800:#F1F5F9;
+            --gray-900:#F1F5F9;
+            --primary: #60A5FA;
+            --primary-700: #60A5FA;
+            --primary-800: #93C5FD;
+            --info-50: rgba(96,165,250,0.10);
+            --info-light: rgba(96,165,250,0.22);
+            --teal: #10B586;
+            --teal-50: rgba(16,181,134,0.12);
+            --gold: #FBBF24;
+            --gold-50: rgba(245,158,11,0.12);
+            --coral: #F87171;
+            --coral-50: rgba(239,68,68,0.12);
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.28);
+            --shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+        }
+
+        /* طبقة الهوية: تدرجات + شبكة مقنّعة + توهج سفلي */
+        body {
+            background:
+                radial-gradient(1100px 620px at 85% -10%, rgba(14,164,122,0.10), transparent 60%),
+                radial-gradient(900px 540px at 8% -5%, rgba(96,165,250,0.08), transparent 55%),
+                #0A1220 !important;
+            background-attachment: fixed !important;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(1200px 500px at 50% 110%, rgba(14,164,122,0.05), transparent 65%);
+        }
+        :focus-visible {
+            outline: 2px solid rgba(14,164,122,0.50) !important;
+            outline-offset: 2px;
+        }
+        ::selection { background: rgba(14,164,122,0.28); color: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10) !important; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18) !important; }
+
+        .page-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        .header-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+        }
+        .header-bar h1 {
+            font-size: 1.4rem; font-weight: 700; color: var(--gray-900);
+            margin: 0; display: flex; align-items: center; gap: 10px;
+        }
+        .header-bar h1 i { color: var(--primary-700); }
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn {
+            padding: 8px 16px; border-radius: var(--radius-md);
+            border: 1px solid var(--gray-200); background: var(--white);
+            color: var(--gray-700); font-family: var(--font-main);
+            font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;
+            display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+        }
+        .btn:hover { background: var(--gray-50); border-color: var(--primary-700); color: var(--primary-700); }
+        .btn-primary { background: #0EA47A; border-color: #0EA47A; color: #fff; }
+        .btn-primary:hover { background: #0B8C66; border-color: #0B8C66; color: #fff; }
+
+        .info-banner {
+            background: var(--info-50); border: 1px solid var(--info-light);
+            border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 12px; color: var(--primary-800);
+        }
+        .info-banner i { font-size: 1.2rem; color: var(--primary-700); }
+
+        .stats-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--white); border-radius: var(--radius-lg);
+            padding: 16px 20px; box-shadow: var(--shadow-sm);
+            border-right: 4px solid var(--primary-700); text-align: center;
+        }
+        .stat-card .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--gray-900); }
+        .stat-card .stat-label { font-size: 0.8rem; color: var(--gray-500); margin-top: 4px; }
+
+        .table-container {
+            background: var(--white); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 24px;
+        }
+        .table-container .section-title {
+            padding: 16px 20px; font-size: 1rem; font-weight: 700; color: var(--gray-900);
+            border-bottom: 1px solid var(--gray-200);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .vehicles-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        .vehicles-table thead { background: var(--gray-100); }
+        .vehicles-table th {
+            padding: 12px 14px; text-align: right; font-weight: 600; color: var(--gray-600);
+            font-size: 0.78rem; border-bottom: 1px solid var(--gray-200);
+        }
+        .vehicles-table td {
+            padding: 11px 14px; border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-800); vertical-align: middle;
+        }
+        .vehicles-table tbody tr:hover { background: var(--gray-50); }
+        .vehicles-table tbody tr:last-child td { border-bottom: none; }
+
+        .plate-cell { font-family: var(--font-mono); font-weight: 700; direction: ltr; text-align: right; }
+        .notes-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-500); font-size: 0.8rem; }
+
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: var(--radius-full);
+            font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+        }
+        .st-active   { background: var(--teal-50); color: var(--teal); }
+        .st-reserve  { background: var(--info-50); color: var(--primary-700); }
+        .st-breakdown{ background: var(--gold-50); color: var(--gold); }
+        .st-out_of_service { background: var(--coral-50); color: var(--coral); }
+        .st-unset    { background: var(--gray-100); color: var(--gray-400); }
+        .workshop-mark { color: var(--gold); font-size: 0.75rem; margin-right: 4px; }
+
+        .row-actions { display: flex; gap: 6px; }
+        .row-actions button {
+            padding: 5px 10px; border-radius: 8px; border: 1px solid var(--gray-200);
+            background: var(--white); color: var(--gray-600); font-size: 0.75rem;
+            cursor: pointer; font-family: inherit; font-weight: 700; transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .row-actions button:hover { background: var(--primary-700); border-color: var(--primary-700); color: #fff; }
+
+        .loading { text-align: center; padding: 40px; color: var(--gray-400); }
+        .error-box {
+            text-align: center; padding: 40px; color: var(--coral);
+            background: var(--coral-50); border-radius: var(--radius-lg);
+        }
+        .empty-state { text-align: center; padding: 40px; color: var(--gray-400); }
+        .empty-state i { font-size: 2rem; display: block; margin-bottom: 10px; opacity: 0.5; }
+
+        /* النوافذ — إضافة/تعديل + التاريخ */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(4,10,20,0.72);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 16px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-card {
+            background: #0E1A2E; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow);
+            width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto;
+            padding: 22px;
+        }
+        .modal-card.wide { max-width: 720px; }
+        .modal-card h3 {
+            margin: 0 0 16px; font-size: 1.05rem; color: var(--gray-900);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .modal-card h3 i { color: var(--primary-700); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-grid .full { grid-column: 1 / -1; }
+        .form-field label {
+            display: block; font-size: 0.78rem; font-weight: 700;
+            color: var(--gray-500); margin-bottom: 5px;
+        }
+        .form-field label .req { color: var(--coral); }
+        /* ═══ UAT-2: تباين المدخلات على الهوية الداكنة — قيم صريحة بلا وراثة ═══ */
+        .form-field input, .form-field select, .form-field textarea {
+            width: 100%; padding: 9px 12px; border-radius: var(--radius-md);
+            border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04);
+            color: #F1F5F9; font-family: var(--font-main); font-size: 0.88rem;
+            box-sizing: border-box;
+        }
+        .form-field input::placeholder, .form-field textarea::placeholder { color: #5E7189; opacity: 1; }
+        .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+            outline: none; border-color: rgba(14,164,122,0.55);
+            box-shadow: 0 0 0 2px rgba(14,164,122,0.18);
+        }
+        /* قوائم الخيارات المنبثقة — كانت تُرسم بيضاء بنص فاتح (غير مقروءة) */
+        select option, datalist option {
+            background: #101B30; color: #F1F5F9;
+        }
+        select option:checked { background: #1B2B47; color: #FFFFFF; }
+        .form-field textarea { resize: vertical; min-height: 64px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-start; }
+
+        .history-summary {
+            background: var(--gray-100); border-radius: var(--radius-md);
+            padding: 12px 16px; margin-bottom: 16px; font-size: 0.85rem;
+            color: var(--gray-600); display: flex; flex-wrap: wrap; gap: 14px;
+        }
+        .history-summary b { color: var(--gray-900); }
+        .timeline { display: flex; flex-direction: column; gap: 0; }
+        .timeline-item {
+            display: flex; gap: 12px; padding: 10px 4px;
+            border-right: 2px solid var(--gray-200); margin-right: 6px;
+            position: relative;
+        }
+        .timeline-item::before {
+            content: ''; position: absolute; right: -6px; top: 16px;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--primary-700);
+        }
+        .timeline-item .t-body { flex: 1; }
+        .timeline-item .t-title { font-size: 0.86rem; font-weight: 700; color: var(--gray-800); }
+        .timeline-item .t-meta { font-size: 0.72rem; color: var(--gray-400); margin-top: 3px; direction: ltr; text-align: right; }
+        .timeline-item .t-detail { font-size: 0.76rem; color: var(--gray-500); margin-top: 3px; }
+
+        .version-stamp {
+            font-size: 0.62rem; font-weight: 700; color: var(--gray-400);
+            border: 1px solid var(--gray-200); border-radius: var(--radius-full);
+            padding: 2px 9px; margin-right: 6px; letter-spacing: 0.4px;
+        }
+
+        @media (max-width: 768px) {
+            .page-container { padding: 16px; }
+            .vehicles-table th, .vehicles-table td { padding: 9px 10px; font-size: 0.78rem; }
+            .header-bar h1 { font-size: 1.1rem; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Header -->
+        <div class="header-bar">
+            <h1><i class="fas fa-ambulance"></i> إدارة المركبات <span class="version-stamp">v1.1</span></h1>
+            <div class="header-actions">
+                <button class="btn" onclick="loadAll()">
+                    <i class="fas fa-sync-alt"></i> تحديث
+                </button>
+                <button class="btn btn-primary" id="addVehicleBtn" onclick="openVehicleModal(null)" style="display:none">
+                    <i class="fas fa-plus"></i> إضافة مركبة
+                </button>
+                <a href="admin-dashboard.html" class="btn">
+                    <i class="fas fa-arrow-right"></i> العودة للوحة المشرف
+                </a>
+            </div>
+        </div>
+
+        <!-- Info Banner -->
+        <div class="info-banner">
+            <i class="fas fa-info-circle"></i>
+            <div>
+                <strong>السجل المرجعي للأسطول</strong> — الإضافة والتعديل للمشرفين فقط.
+                حالة كل مركبة تُشتق تلقائيًا من سجل الحركة (append-only) ولا تُعدَّل يدويًا،
+                وتاريخها الكامل متاح عبر زر «التاريخ».
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row" id="statsRow">
+            <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">إجمالي المركبات</div></div>
+            <div class="stat-card" style="border-right-color: var(--teal);"><div class="stat-value" id="statAssigned">—</div><div class="stat-label">معيّنة الآن</div></div>
+            <div class="stat-card" style="border-right-color: var(--primary-700);"><div class="stat-value" id="statUnassigned">—</div><div class="stat-label">غير معيّنة</div></div>
+            <div class="stat-card" style="border-right-color: var(--coral);"><div class="stat-value" id="statOut">—</div><div class="stat-label">خارج الخدمة</div></div>
+        </div>
+
+        <!-- Registry Table -->
+        <div class="table-container">
+            <div class="section-title"><i class="fas fa-list"></i> سجل المركبات</div>
+            <div id="tableContent">
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري تحميل السجل...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إضافة/تعديل مركبة -->
+    <div class="modal-overlay" id="vehicleModal">
+        <div class="modal-card">
+            <h3 id="vehicleModalTitle"><i class="fas fa-plus"></i> إضافة مركبة</h3>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>رقم اللوحة <span class="req">*</span></label>
+                    <input id="fPlate" placeholder="مثال: 8572 س ح ص">
+                </div>
+                <div class="form-field">
+                    <label>النداء (الاسم التشغيلي)</label>
+                    <input id="fCallSign" placeholder="مثال: جنوب 11">
+                </div>
+                <div class="form-field">
+                    <label>النوع <span class="req">*</span></label>
+                    <input id="fType" list="typeList" placeholder="مثال: فورد">
+                    <datalist id="typeList">
+                        <option value="فورد"></option>
+                        <option value="تاهو"></option>
+                        <option value="سفانا"></option>
+                        <option value="سكوبيا"></option>
+                        <option value="فورتشنر"></option>
+                        <option value="مرسيدس"></option>
+                    </datalist>
+                </div>
+                <div class="form-field">
+                    <label>سنة الموديل <span class="req">*</span></label>
+                    <input id="fYear" type="number" min="1950" max="2100" placeholder="2024">
+                </div>
+                <div class="form-field">
+                    <label>الفئة <span class="req">*</span></label>
+                    <select id="fCategory">
+                        <option value="إسعاف">إسعاف</option>
+                        <option value="تدخل سريع">تدخل سريع</option>
+                        <option value="سيارة خدمة">سيارة خدمة</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>التعيين <span class="req">*</span></label>
+                    <select id="fDesignation">
+                        <option value="نقطة دائمة">نقطة دائمة</option>
+                        <option value="نقطة مؤقتة">نقطة مؤقتة</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>الحالة الإدارية</label>
+                    <select id="fAdminStatus">
+                        <option value="أساسية">أساسية</option>
+                        <option value="احتياط">احتياط</option>
+                        <option value="خدمة">خدمة</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>المركز الرئيسي</label>
+                    <select id="fCenter"></select>
+                    <div id="centerLoadWarn" style="display:none;color:var(--coral);font-size:0.75rem;margin-top:5px">⚠️ تعذر تحميل المراكز — حاول التحديث</div>
+                </div>
+                <div class="form-field full">
+                    <label>ملاحظات (اختياري)</label>
+                    <textarea id="fNotes" placeholder="ملاحظات إدارية عن المركبة..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="saveVehicleBtn" onclick="saveVehicle()">
+                    <i class="fas fa-save"></i> حفظ
+                </button>
+                <button class="btn" onclick="closeVehicleModal()"><i class="fas fa-times"></i> إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تاريخ المركبة -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal-card wide">
+            <h3><i class="fas fa-clock-rotate-left"></i> <span id="historyTitle">تاريخ المركبة</span></h3>
+            <div class="history-summary" id="historySummary"></div>
+            <div id="historyContent">
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري تحميل التاريخ...</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeHistoryModal()"><i class="fas fa-times"></i> إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/core/core-auth.js"></script>
+    <script src="js/core/core-toast.js"></script>
+    <script src="/js/time-riyadh.js"></script>
+    <script>
+        // ═══ إدارة المركبات — Fleet Engine V1 ② ═══
+        // قراءات: authenticate (سابقة قراءات المركبات القائمة) · كتابة السجل: admin فقط
+        // (يفرضها الخادم — تُخفى أزرار الكتابة هنا لغير المشرف تحسينًا للتجربة فقط).
+        var authToken = AuthCore.getToken();
+        var isAdmin = false;
+        var registry = [];
+        var centers = [];
+        var centersLoadError = null; // صدق الفشل: لا منتقي ميت بلا رسالة
+        var teamsById = {};
+        var centersById = {};
+        var boardById = {};   // vehicleId → { status, teamId, supportingTeamId, inWorkshop }
+        var editingId = null;
+
+        var STATUS_LABELS = {
+            active: '🟢 جاهزة', reserve: '🔵 احتياط',
+            breakdown: '🟠 عطل', out_of_service: '🔴 خارج الخدمة'
+        };
+        var EVENT_LABELS = {
+            assignment: '📍 تعيين', assignment_end: '⛔ إنهاء تعيين',
+            status_change: '🔄 تغيير حالة', workshop_in: '🔧 دخول الورشة', workshop_out: '🔧 خروج من الورشة',
+            note: '📝 ملاحظة', correction: '✏️ تصحيح',
+            supported: '🤝 دعم فريق', support_lifted: '🤝 إنهاء الدعم'
+        };
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function decodeRole(token) {
+            try {
+                var payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(atob(payload)).role || null;
+            } catch (e) { return null; }
+        }
+
+        function headers(json) {
+            return AuthCore.authHeaders(json ? { 'Content-Type': 'application/json' } : {});
+        }
+
+        function showFatal(msg) {
+            document.getElementById('tableContent').innerHTML =
+                '<div class="error-box">❌ ' + escapeHtml(msg) +
+                '<br><br><a href="index.html?v=30" style="color:var(--primary);text-decoration:underline;">العودة للصفحة الرئيسية</a></div>';
+        }
+
+        async function loadAll() {
+            document.getElementById('tableContent').innerHTML =
+                '<div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري تحميل السجل...</div>';
+            if (!authToken) { showFatal('يجب تسجيل الدخول أولاً'); return; }
+            try {
+                var h = headers(false);
+                var responses = await Promise.all([
+                    fetch('/api/vehicles/registry', { headers: h }),
+                    fetch('/api/vehicles/board', { headers: h }),
+                    fetch('/api/vehicles/centers', { headers: h }),
+                    fetch('/api/teams', { headers: h })
+                ]);
+                for (var i = 0; i < responses.length; i++) {
+                    if (responses[i].status === 401 || responses[i].status === 403) {
+                        showFatal('يجب تسجيل الدخول للوصول إلى سجل المركبات');
+                        return;
+                    }
+                }
+                registry = (await responses[0].json()).vehicles || [];
+                var board = await responses[1].json();
+                // المراكز: فشل الصمت ممنوع — رسالة صادقة بدل منتقي ميت
+                var centersJson = await responses[2].json().catch(function() { return null; });
+                if (!responses[2].ok || !centersJson || !centersJson.success) {
+                    centersLoadError = (centersJson && centersJson.error) || ('HTTP ' + responses[2].status);
+                    centers = [];
+                } else {
+                    centersLoadError = null;
+                    centers = centersJson.centers || [];
+                }
+                var teams = (await responses[3].json()).teams || [];
+
+                teamsById = {};
+                teams.forEach(function(t) { teamsById[String(t.id)] = t.name; });
+                centersById = {};
+                centers.forEach(function(c) { centersById[String(c.id)] = c.name; });
+
+                boardById = {};
+                (board.vehicles || []).forEach(function(v) {
+                    boardById[String(v.id)] = { status: v.status, teamId: v.teamId, supportingTeamId: v.supportingTeamId, inWorkshop: !!v.inWorkshop };
+                });
+                (board.unassigned || []).forEach(function(v) {
+                    boardById[String(v.id)] = { status: v.status, teamId: null, supportingTeamId: null, inWorkshop: !!v.inWorkshop };
+                });
+
+                renderStats();
+                renderTable();
+                if (centersLoadError) showToast('⚠️ تعذر تحميل المراكز — حاول التحديث', 'error');
+            } catch (e) {
+                showFatal('فشل الاتصال بالخادم');
+            }
+        }
+
+        function renderStats() {
+            var assigned = 0, out = 0;
+            registry.forEach(function(v) {
+                var b = boardById[String(v.id)];
+                if (b && b.teamId != null) assigned++;
+                if (b && (b.status === 'out_of_service' || b.status === 'breakdown')) out++;
+            });
+            document.getElementById('statTotal').textContent = registry.length;
+            document.getElementById('statAssigned').textContent = assigned;
+            document.getElementById('statUnassigned').textContent = registry.length - assigned;
+            document.getElementById('statOut').textContent = out;
+        }
+
+        function statusBadge(v) {
+            var b = boardById[String(v.id)];
+            var st = b && b.status ? b.status : null;
+            var label = st ? (STATUS_LABELS[st] || st) : '— لم تُسجّل';
+            var cls = st ? ('st-' + st) : 'st-unset';
+            var workshop = b && b.inWorkshop ? '<span class="workshop-mark" title="في الورشة">🔧</span>' : '';
+            return '<span class="status-badge ' + cls + '">' + workshop + label + '</span>';
+        }
+
+        function renderTable() {
+            if (!registry.length) {
+                document.getElementById('tableContent').innerHTML =
+                    '<div class="empty-state"><i class="fas fa-ambulance"></i>لا توجد مركبات مسجلة</div>';
+                return;
+            }
+            var html = '<table class="vehicles-table"><thead><tr>' +
+                '<th>اللوحة</th><th>النداء</th><th>النوع</th><th>الفئة</th><th>المركز الرئيسي</th>' +
+                '<th>الحالة الحالية</th><th>الفريق الحالي</th><th>ملاحظات</th><th>إجراءات</th>' +
+                '</tr></thead><tbody>';
+            registry.forEach(function(v) {
+                var b = boardById[String(v.id)] || {};
+                var teamName = b.teamId != null ? (teamsById[String(b.teamId)] || ('#' + b.teamId)) : '—';
+                var support = b.supportingTeamId != null
+                    ? '<div style="font-size:0.7rem;color:var(--gold)">🤝 تدعم: ' + escapeHtml(teamsById[String(b.supportingTeamId)] || ('#' + b.supportingTeamId)) + '</div>' : '';
+                var centerName = v.owner_center_id ? (centersById[String(v.owner_center_id)] || v.owner_center_id) : '—';
+                html += '<tr>' +
+                    '<td class="plate-cell">' + escapeHtml(v.plate_number) + '</td>' +
+                    '<td>' + escapeHtml(v.call_sign || '—') + '</td>' +
+                    '<td>' + escapeHtml(v.vehicle_type) + ' ' + escapeHtml(v.model_year) + '</td>' +
+                    '<td>' + escapeHtml(v.category) + ' · ' + escapeHtml(v.designation) + '</td>' +
+                    '<td>' + escapeHtml(centerName) + '</td>' +
+                    '<td>' + statusBadge(v) + '</td>' +
+                    '<td>' + escapeHtml(teamName) + support + '</td>' +
+                    '<td class="notes-cell" title="' + escapeHtml(v.notes || '') + '">' + escapeHtml(v.notes || '—') + '</td>' +
+                    '<td><div class="row-actions">' +
+                        '<button onclick="openHistory(\'' + escapeHtml(v.id) + '\')"><i class="fas fa-clock-rotate-left"></i> التاريخ</button>' +
+                        (isAdmin ? '<button onclick="openVehicleModal(\'' + escapeHtml(v.id) + '\')"><i class="fas fa-pen"></i> تعديل</button>' : '') +
+                    '</div></td>' +
+                '</tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById('tableContent').innerHTML = html;
+        }
+
+        // ─── نافذة الإضافة/التعديل ───
+        function fillCenterSelect(selectedId) {
+            var sel = document.getElementById('fCenter');
+            var html = '<option value="">— بلا مركز —</option>';
+            centers.forEach(function(c) {
+                html += '<option value="' + escapeHtml(c.id) + '"' + (c.id === selectedId ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>';
+            });
+            sel.innerHTML = html;
+            document.getElementById('centerLoadWarn').style.display = centersLoadError ? '' : 'none';
+        }
+
+        function openVehicleModal(id) {
+            editingId = id || null;
+            var v = id ? registry.find(function(x) { return x.id === id; }) : null;
+            document.getElementById('vehicleModalTitle').innerHTML = v
+                ? '<i class="fas fa-pen"></i> تعديل مركبة — ' + escapeHtml(v.call_sign || v.plate_number)
+                : '<i class="fas fa-plus"></i> إضافة مركبة';
+            document.getElementById('fPlate').value = v ? (v.plate_number || '') : '';
+            document.getElementById('fCallSign').value = v ? (v.call_sign || '') : '';
+            document.getElementById('fType').value = v ? (v.vehicle_type || '') : '';
+            document.getElementById('fYear').value = v ? (v.model_year || '') : '';
+            document.getElementById('fCategory').value = v ? (v.category || 'إسعاف') : 'إسعاف';
+            document.getElementById('fDesignation').value = v ? (v.designation || 'نقطة دائمة') : 'نقطة دائمة';
+            document.getElementById('fAdminStatus').value = v ? (v.admin_status || 'أساسية') : 'أساسية';
+            fillCenterSelect(v ? v.owner_center_id : null);
+            document.getElementById('fNotes').value = v ? (v.notes || '') : '';
+            document.getElementById('vehicleModal').classList.add('active');
+        }
+
+        function closeVehicleModal() {
+            document.getElementById('vehicleModal').classList.remove('active');
+            editingId = null;
+        }
+
+        async function saveVehicle() {
+            var body = {
+                plate_number: document.getElementById('fPlate').value.trim(),
+                call_sign: document.getElementById('fCallSign').value.trim() || null,
+                vehicle_type: document.getElementById('fType').value.trim(),
+                model_year: parseInt(document.getElementById('fYear').value, 10),
+                category: document.getElementById('fCategory').value,
+                designation: document.getElementById('fDesignation').value,
+                admin_status: document.getElementById('fAdminStatus').value,
+                owner_center_id: document.getElementById('fCenter').value || null,
+                notes: document.getElementById('fNotes').value.trim() || null
+            };
+            var btn = document.getElementById('saveVehicleBtn');
+            btn.disabled = true;
+            try {
+                var res = await fetch(editingId ? '/api/vehicles/registry/' + encodeURIComponent(editingId) : '/api/vehicles/registry', {
+                    method: editingId ? 'PUT' : 'POST',
+                    headers: headers(true),
+                    body: JSON.stringify(body)
+                });
+                var data = await res.json().catch(function() { return {}; });
+                if (res.status === 403) { showToast('⚠️ ليس لديك صلاحية التعديل — مشرف فقط', 'error'); return; }
+                if (!res.ok || !data.success) { showToast('⚠️ ' + (data.error || 'فشل الحفظ'), 'error'); return; }
+                showToast(editingId ? '✅ تم تعديل المركبة' : '✅ تمت إضافة المركبة', 'success');
+                closeVehicleModal();
+                loadAll();
+            } catch (e) {
+                showToast('⚠️ فشل الاتصال بالخادم', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ─── نافذة التاريخ ───
+        function eventLine(ev) {
+            var label = EVENT_LABELS[ev.eventType] || ev.eventType;
+            if (ev.eventType === 'status_change' && ev.status) {
+                label += ': ' + (STATUS_LABELS[ev.status] || ev.status);
+            }
+            var detail = [];
+            if (ev.teamName) detail.push('الفريق: ' + ev.teamName);
+            if (ev.center) detail.push('المركز: ' + ev.center);
+            if (ev.reason) detail.push('السبب: ' + ev.reason);
+            if (ev.note) detail.push(ev.note);
+            var shift = [];
+            if (ev.shiftDate) shift.push(ev.shiftDate);
+            if (ev.shiftType) shift.push(ev.shiftType);
+            var meta = ev.createdAtRiyadh + (ev.actorName ? ' · ' + ev.actorName : '') + (shift.length ? ' · مناوبة ' + shift.join(' ') : '');
+            return '<div class="timeline-item"><div class="t-body">' +
+                '<div class="t-title">' + escapeHtml(label) + '</div>' +
+                (detail.length ? '<div class="t-detail">' + escapeHtml(detail.join(' · ')) + '</div>' : '') +
+                '<div class="t-meta">' + escapeHtml(meta) + '</div>' +
+            '</div></div>';
+        }
+
+        async function openHistory(id) {
+            var v = registry.find(function(x) { return x.id === id; });
+            document.getElementById('historyTitle').textContent =
+                'تاريخ المركبة — ' + (v ? (v.call_sign || v.plate_number) : id);
+            document.getElementById('historySummary').innerHTML = '';
+            document.getElementById('historyContent').innerHTML =
+                '<div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري تحميل التاريخ...</div>';
+            document.getElementById('historyModal').classList.add('active');
+            try {
+                var res = await fetch('/api/vehicles/' + encodeURIComponent(id) + '/history', { headers: headers(false) });
+                var data = await res.json().catch(function() { return {}; });
+                if (!res.ok || !data.success) {
+                    document.getElementById('historyContent').innerHTML =
+                        '<div class="error-box">❌ ' + escapeHtml(data.error || 'فشل جلب التاريخ') + '</div>';
+                    return;
+                }
+                var cur = data.current || {};
+                var summary = '<span>الحالة الحالية: <b>' + escapeHtml(cur.status ? (STATUS_LABELS[cur.status] || cur.status) : '— لم تُسجّل') + '</b></span>';
+                if (cur.teamName) summary += '<span>الفريق الحالي: <b>' + escapeHtml(cur.teamName) + '</b></span>';
+                if (data.vehicle && data.vehicle.homeCenterId) {
+                    summary += '<span>المركز الرئيسي: <b>' + escapeHtml(centersById[String(data.vehicle.homeCenterId)] || data.vehicle.homeCenterId) + '</b></span>';
+                }
+                document.getElementById('historySummary').innerHTML = summary;
+                var events = data.events || [];
+                if (!events.length) {
+                    document.getElementById('historyContent').innerHTML =
+                        '<div class="empty-state"><i class="fas fa-clock-rotate-left"></i>لا توجد حركات مسجلة لهذه المركبة</div>';
+                    return;
+                }
+                // الأحدث أولًا للعرض (الخادم يعيدها زمنيًا تصاعديًا)
+                var html = '<div class="timeline">';
+                events.slice().reverse().forEach(function(ev) { html += eventLine(ev); });
+                html += '</div>';
+                document.getElementById('historyContent').innerHTML = html;
+            } catch (e) {
+                document.getElementById('historyContent').innerHTML =
+                    '<div class="error-box">❌ فشل الاتصال بالخادم</div>';
+            }
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').classList.remove('active');
+        }
+
+        // Expose to window for onclick handlers
+        window.loadAll = loadAll;
+        window.openVehicleModal = openVehicleModal;
+        window.closeVehicleModal = closeVehicleModal;
+        window.saveVehicle = saveVehicle;
+        window.openHistory = openHistory;
+        window.closeHistoryModal = closeHistoryModal;
+
+        // Init
+        isAdmin = authToken ? decodeRole(authToken) === 'admin' : false;
+        if (isAdmin) document.getElementById('addVehicleBtn').style.display = '';
+        loadAll();
+    </script>
+</body>
+</html>
