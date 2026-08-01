@@ -1406,6 +1406,24 @@
         .unscheduled-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
         .unscheduled-count { font-size: 2rem; font-weight: 800; color: #FCD34D; }
         .unscheduled-card.elevated .unscheduled-count { color: #FCA5A5; }
+
+        /* ── UAT Operational Polish Phase 1 — البند ①: دريل-داون «غير المجدولين» (عرض بحت — صفر مساس بالحساب) ── */
+        .unscheduled-card.clickable { cursor: pointer; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+        .unscheduled-card.clickable:hover { transform: translateY(-1px); border-color: rgba(245,158,11,0.55); }
+        .unscheduled-card.clickable.elevated:hover { border-color: rgba(239,68,68,0.60); }
+        .unscheduled-hint { font-size: 0.72rem; color: #FCD34D; margin-top: 4px; font-weight: 600; }
+        .unscheduled-card.elevated .unscheduled-hint { color: #FCA5A5; }
+        .um-count-badge { background: rgba(245,158,11,0.16); color: #FCD34D; border-radius: 999px; padding: 2px 12px; font-size: 0.8rem; font-weight: 700; }
+        .um-anchor { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
+        .um-search { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-family: inherit; font-size: 14px; margin-bottom: 12px; box-sizing: border-box; }
+        .um-search:focus { outline: none; border-color: #10B586; box-shadow: 0 0 0 3px rgba(14,164,122,0.12); }
+        .um-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+        .um-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,0.03); flex-wrap: wrap; }
+        .um-name { font-weight: 700; color: var(--text); flex: 1; min-width: 140px; }
+        .um-code { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+        .um-kind { font-size: 0.72rem; color: #7C8DA6; }
+        .um-reason { font-size: 0.72rem; color: #FCD34D; flex-basis: 100%; }
+        .um-empty { text-align: center; color: var(--text-muted); padding: 24px; }
         .stats-alert-chip { font-size: 0.78rem; padding: 8px 14px; border-radius: 10px; background: rgba(245,158,11,0.10); color: #FCD34D; border: 1px solid rgba(245,158,11,0.25); }
 
         /* حاوية الرسم أعلى قليلًا لاستيعاب الخطوط الأكبر والـlegend الجانبي */
@@ -1738,11 +1756,12 @@
             <!-- تنبيهات تشغيلية: بطاقة «غير المجدولين» المستقلة + شريحة اليوم المرجعي -->
             <div class="stats-alerts" id="statsAlerts">
                 <div class="stats-alert-chip hidden" id="statsAnchorChip"></div>
-                <div class="unscheduled-card hidden" id="unscheduledCard">
+                <div class="unscheduled-card hidden clickable" id="unscheduledCard" onclick="openUnscheduledModal()" role="button" tabindex="0" title="اضغط لعرض الأسماء" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openUnscheduledModal();}">
                     <div class="unscheduled-icon"><i class="fas fa-user-clock"></i></div>
                     <div class="unscheduled-body">
                         <div class="unscheduled-title">غير مجدولين اليوم <span class="unscheduled-sub">(خارج دورة المناوبات)</span></div>
                         <div class="unscheduled-desc">موظفون بلا تكليف في اليوم المرجعي — يحتاجون جدولة أو إعادة توزيع</div>
+                        <div class="unscheduled-hint"><i class="fas fa-hand-pointer"></i> اضغط لعرض الأسماء والتفاصيل</div>
                     </div>
                     <div class="unscheduled-count" id="statUnscheduled">0</div>
                 </div>
@@ -1900,6 +1919,27 @@
             </div>
             <div class="modal-body" id="validationModalBody">
                 <div class="text-center mt-3">جاري التحقق...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ UAT Operational Polish Phase 1 — البند ①: نافذة تفاصيل «غير المجدولين» (عرض بحت — لا حساب جديد) ═══ -->
+    <div class="modal-overlay" id="unscheduledModal">
+        <div class="modal-content" style="max-width:720px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-clock"></i>
+                    غير مجدولين اليوم
+                    <span class="um-count-badge" id="umCount">0</span>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-close" onclick="closeUnscheduledModal()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="um-anchor" id="umAnchor"></div>
+                <input type="text" class="um-search" id="umSearch" placeholder="🔍 بحث بالاسم أو الرقم الوظيفي..." oninput="renderUnscheduledList()">
+                <div class="um-list" id="umList"></div>
             </div>
         </div>
     </div>
@@ -4744,6 +4784,68 @@
         window.renderClassicView = renderClassicView;
         window.changeClassicMonth = changeClassicMonth;
         console.log('✅ جميع الدوال متاحة في window');
+
+        // ══════════════════════════════════════════════════════════
+        // UAT Operational Polish Phase 1 — البند ① (Operational Feedback):
+        // دريل-داون «غير المجدولين» — عرض بحت (Drill-down) بلا أي مساس بالحساب:
+        // نفس معيار calculateStats يُعاد استخدامه للعرض فقط (مرآة قراءة)،
+        // ولا تُعدَّل calculateStats/classifyEntry/isRotationEmployee إطلاقًا.
+        // ══════════════════════════════════════════════════════════
+        function umEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        // سبب عرضي مشتق من القرار الموثق: «غير مجدول» حصرًا لغير موظفي الدورة (إداريون غالبًا)
+        function umReason(emp) {
+            if (emp.kind === 'admin') return 'إداري — خارج دورة المناوبات (لا يُجدَّل ميدانيًا)';
+            return 'بلا تكليف في اليوم المرجعي — خارج دورة المناوبات';
+        }
+        function getUnscheduledEmployees() { // مرآة قراءة فقط — نفس تصنيف calculateStats دون إعادة حساب
+            var anchor = getStatsAnchor();
+            var list = [];
+            for (var i = 0; i < employees.length; i++) {
+                var emp = employees[i];
+                var sch = emp.schedule || [];
+                var entry = null;
+                for (var s = 0; s < sch.length; s++) { if (dcDateKey(sch[s].date) === anchor.key) { entry = sch[s]; break; } }
+                var g = entry ? classifyEntry(entry).group : (isRotationEmployee(emp) ? 'rest' : 'unscheduled');
+                if (g === 'unscheduled') list.push(emp);
+            }
+            return { list: list, anchor: anchor };
+        }
+        function openUnscheduledModal() {
+            var data = getUnscheduledEmployees();
+            document.getElementById('umCount').textContent = data.list.length;
+            document.getElementById('umAnchor').textContent = data.anchor.real
+                ? 'اليوم المرجعي للإحصائيات: ' + data.anchor.key
+                : '⚠️ اليوم المرجعي للإحصائيات: ' + data.anchor.key + ' — لا توجد بيانات لليوم الفعلي';
+            var umSearchEl = document.getElementById('umSearch');
+            if (umSearchEl) umSearchEl.value = '';
+            renderUnscheduledList();
+            document.getElementById('unscheduledModal').classList.add('active');
+        }
+        function closeUnscheduledModal() {
+            document.getElementById('unscheduledModal').classList.remove('active');
+        }
+        function renderUnscheduledList() {
+            var data = getUnscheduledEmployees();
+            var q = (document.getElementById('umSearch').value || '').trim();
+            var rows = data.list.filter(function (emp) {
+                if (!q) return true;
+                var hay = ((emp.name || '') + ' ' + (emp.employeeNumber || emp.id || '')).toLowerCase();
+                return hay.indexOf(q.toLowerCase()) !== -1;
+            });
+            var el = document.getElementById('umList');
+            if (!rows.length) { el.innerHTML = '<div class="um-empty">لا توجد نتائج مطابقة</div>'; return; }
+            el.innerHTML = rows.map(function (emp) {
+                return '<div class="um-row">' +
+                    '<span class="um-name">' + umEsc(emp.name || '—') + '</span>' +
+                    '<span class="um-code">' + umEsc(emp.employeeNumber || emp.id || '—') + '</span>' +
+                    '<span class="um-kind">' + umEsc(emp.jobTitle || emp.jobNature || '—') + '</span>' +
+                    '<span class="um-reason">' + umEsc(umReason(emp)) + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+        window.openUnscheduledModal = openUnscheduledModal;
+        window.closeUnscheduledModal = closeUnscheduledModal;
+        window.renderUnscheduledList = renderUnscheduledList;
     </script>
 
     <!-- New Interactive Shift Management Scripts -->

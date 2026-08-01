@@ -259,7 +259,8 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
     </div>
 </div>
 
-<!-- شريط حالة سير العمل -->
+<!-- شريط حالة سير العمل — خمس خطوات (تعديل «الآن فهمت قصدك 100%»: أُلغيت
+     خطوة «تسجيل خروج جميع الفرق» — التسجيل سجل اختياري لا مرحلة من سير العمل) -->
 <div class="status-track" id="statusTrack">
     <div class="step" data-step="0"><div class="dot">1</div><div class="lbl">بانتظار إعداد سير العمل</div></div>
     <div class="step" data-step="1"><div class="line"></div><div class="dot">2</div><div class="lbl">تم إعداده</div></div>
@@ -313,6 +314,18 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
     <div class="card">
         <h2>ملاحظات التكميل (كما سجّلها المشرف)</h2>
         <div id="completionNotes" style="background:var(--bg);border-radius:10px;padding:12px 16px;font-size:0.85rem;line-height:1.8;white-space:pre-wrap">—</div>
+    </div>
+
+    <!-- تسجيلات الخروج — تعديل «الآن فهمت قصدك 100%»④: قسم قراءة توثيقي بحت
+         في سير العمل الرسمي (الفرقة | أفراد الفرقة | وقت التسجيل | بواسطة) لما
+         سُجّل أثناء المناوبة. التسجيل اختياري حسب الحاجة: إن لم يُسجَّل شيء
+         يُخفى القسم بهدوء — لا تحذير ولا «نقص» ولا شارة حالة. -->
+    <div class="card" id="signoutsCard" style="display:none">
+        <h2>تسجيلات الخروج <span id="signoutsCount" style="color:var(--muted);font-size:0.75rem;font-weight:600"></span></h2>
+        <table>
+            <thead><tr><th>الفرقة</th><th>أفراد الفرقة</th><th>وقت التسجيل</th><th>بواسطة</th></tr></thead>
+            <tbody id="signoutsBody"></tbody>
+        </table>
     </div>
 
     <!-- حقول المشرف -->
@@ -429,6 +442,7 @@ var state = {
     shiftStatus: '',       // حالة سير العمل المشتقة من الخادم
     readOnly: false,       // ليست مسودة → قراءة فقط
     vehMap: {},            // vehicleId → بيانات المركبة من اللقطة
+    signouts: [],          // تعديل «الآن فهمت قصدك 100%»: سجل تسجيلات الخروج (قراءة توثيقية — اختياري، لا حالة تغطية)
     saveTimer: null,
     saveInFlight: false
 };
@@ -518,6 +532,8 @@ function initLiveSync() {
                 data.type === 'team_status_changed' || data.type === 'vehicles_updated' ||
                 data.type === 'roster_synced' || data.type === 'shift_updated') {
                 refreshLiveDraft();
+            } else if (data.type === 'shift_signout_recorded') {
+                loadSignouts(); // تسجيلات الخروج (توثيقية اختيارية) تتحدث لحظيًا مع أحداث التسجيل
             }
         } catch (e) { /* إطار غير JSON — يُتجاهل */ }
     };
@@ -624,6 +640,7 @@ function init() {
             state.workflow = res.workflow;
             renderAll();
             initLiveSync(); // العرض الحي — تحديث تلقائي عند الأحداث التشغيلية (للمسودات فقط)
+            loadSignouts(); // تسجيلات الخروج — قسم قراءة توثيقي (يُخفى بهدوء إن لم يُسجَّل شيء)
             // الرابط العميق: workflow.html#pdf يفتح معاينة PDF مباشرة
             if (location.hash === '#pdf') setView('pdf');
         })
@@ -703,7 +720,8 @@ function lateNote(name) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// الرأس + شريط الحالة الخماسي
+// الرأس + شريط الحالة الخماسي (تعديل «الآن فهمت قصدك 100%»①:
+// أُلغيت خطوة «تسجيل خروج جميع الفرق» — التسجيل سجل اختياري لا مرحلة)
 // ═══════════════════════════════════════════════════════════
 function statusStep(s) {
     if (s === 'تم استلامه') return 4;
@@ -737,6 +755,41 @@ function renderStatusTrack() {
         if (i < current) steps[i].classList.add('done');
         else if (i === current) steps[i].classList.add('current');
     }
+}
+
+// ═══════════════════════════════════════════════════════════
+// تعديل «الآن فهمت قصدك 100%»④: قسم «تسجيلات الخروج» — قراءة توثيقية بحتة
+// من سجل أحداث TEAM_CHECKOUT (GET /api/signouts?shift_id= — أحدث حدث لكل
+// فرقة). التسجيل اختياري حسب الحاجة: إن لم يُسجَّل شيء يُخفى القسم بهدوء —
+// لا تحذير ولا «نقص» ولا شارة حالة ولا مقام/نسبة. يتحدث لحظيًا عبر SSE.
+// ═══════════════════════════════════════════════════════════
+function loadSignouts() {
+    var shiftId = state.workflow && (state.workflow.shiftId || state.workflow.shift_id);
+    if (!shiftId) { state.signouts = []; renderSignouts(); return; }
+    api('/api/signouts?shift_id=' + encodeURIComponent(shiftId))
+        .then(function(d) {
+            state.signouts = (d && Array.isArray(d.signouts)) ? d.signouts : [];
+            renderSignouts();
+        })
+        .catch(function() { /* عرض فقط — فشل الجلب لا يعطّل الصفحة */ });
+}
+
+function renderSignouts() {
+    var card = document.getElementById('signoutsCard');
+    if (!card) return;
+    var list = Array.isArray(state.signouts) ? state.signouts : [];
+    // لا تسجيلات ⇒ القسم يُخفى بهدوء (الميزة توثيقية حسب الحاجة — لا ضجيج)
+    if (!list.length) { card.style.display = 'none'; return; }
+    document.getElementById('signoutsCount').textContent = '(' + list.length + (list.length === 1 ? ' فرقة' : ' فرق') + ')';
+    document.getElementById('signoutsBody').innerHTML = list.map(function(so) {
+        return '<tr>' +
+            '<td><strong>' + esc(so.team || '—') + '</strong></td>' +
+            '<td>' + (Array.isArray(so.members) && so.members.length ? so.members.map(function(n) { return esc(n); }).join(' – ') : '—') + '</td>' +
+            '<td>' + esc(fDateTime(so.createdAt) || '—') + '</td>' +
+            '<td>' + esc(so.recordedByName || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+    card.style.display = '';
 }
 
 // ─── UAT-2: شريط حالة الاعتماد — «معتمد» + المرجع + التاريخ + المعتمد ───
@@ -1333,12 +1386,17 @@ function renderActions() {
 }
 
 // ─── الاعتماد الرسمي (لا رجعة فيه — تأكيد أولًا) ───
+// تعديل «الآن فهمت قصدك 100%»②: أُزيلت البوابة الناعمة بالكامل — الاعتماد
+// لا يشترط أي تسجيل خروج (لا رفض 409 ولا حقول تأكيد واعٍ ولا تعداد فرق).
 function approveWorkflow() {
     if (!state.workflow || state.workflow.status !== 'draft') return;
     if (!confirm('الاعتماد يقفل النسخة نهائيًا ويمنحها رقمًا مرجعيًا ويولّد PDF رسميًا.\nهل تريد المتابعة؟')) return;
     var btn = document.getElementById('btnApprove');
     btn.disabled = true;
-    api('/api/workflow/version/' + encodeURIComponent(state.workflow.id) + '/approve', { method: 'POST' })
+    api('/api/workflow/version/' + encodeURIComponent(state.workflow.id) + '/approve', {
+        method: 'POST',
+        body: JSON.stringify({})
+    })
         .then(function(data) {
             if (data && data.workflow) state.workflow = data.workflow;
             return refreshList();
@@ -1717,6 +1775,7 @@ function renderAll() {
     renderHeader();
     renderStatusTrack();
     renderApprovalBanner();
+    renderSignouts(); // قسم تسجيلات الخروج التوثيقي يعكس آخر حالة خادمية عند كل عرض
     renderAlerts();
     renderShiftInfo();
     renderWorkforce();

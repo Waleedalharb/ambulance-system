@@ -492,6 +492,142 @@ body::after {
     color: #7FB3FA !important;
 }
 
+/* ==========================================================================
+   حيوية الشريط العلوي — جولة «إعادة تصميم نظام الإشعارات والرسائل»
+   (وثيقة المستخدم «أنا معك 100%.txt» — 2026-08، نسخة في workspace)
+   الرؤية الحاكمة: حيوية هادئة تناسب غرفة عمليات — بلا نبض مستمر ولا أصوات
+   ولا نوافذ منبثقة (البند خامسًا من الوثيقة).
+   ② البطاقة الوافدة: انزلاق+fade مرة واحدة (.nc-new) + وميض جرس مرة واحدة
+     (.nc-flash — iteration-count:1) — يضيفهما مراقب DOM في قسم «حيوية الشريط
+     العلوي» داخل js/chat-integration.js (app.js وindex.html مقفولان بحراس
+     الجولات السابقة — صفر لمس لهما في هذه الجولة).
+   ③ بطاقات معاينة الدردشة msg-* بلا أنماط مضمّنة — نفس وصفة nc-item الداكنة
+     (الهوية ⑥): زجاج داكن، شريط جانبي، hover خفيف. !important هنا إلزامي
+     لأن كتلة #chatPreviewPanel أعلاه تفرض ألوانًا بـ!important على a/span/p.
+   ⑤ سطر «آخر نشاط» .nc-activity — شريط رفيع يُحقن JS بين الرأس والجسم.
+   موضع هذا القسم (بعد كتلة #chatPreviewPanel) خارج شريحة حارس
+   check_notifications_center ⑦⑩ المتعمَّد (تنتهي عند أول #chatPreviewPanel).
+   ========================================================================== */
+/* ② وصول بطاقة جديدة — انزلاق خفيف + fade، مرة واحدة فقط (iteration:1) */
+#notificationPanel .nc-item.nc-new { animation: ncCardIn 0.25s ease 1 both; }
+@keyframes ncCardIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+/* ② وميض الجرس — حلقة زرقاء واحدة خافتة تتوسع وتتلاشى (بلا نبض مستمر) */
+.smart-topbar .notification-bell.nc-flash { animation: ncBellFlash 0.6s ease 1; }
+@keyframes ncBellFlash {
+    0%   { box-shadow: 0 0 0 0 rgba(96,165,250,0.45); border-color: rgba(96,165,250,0.50); }
+    100% { box-shadow: 0 0 0 12px rgba(96,165,250,0); }
+}
+/* ⑤ سطر «آخر نشاط» — شريط رفيع هادئ بين رأس اللوحة وقائمتها (يُحقن JS) */
+#notificationPanel .nc-activity {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px 14px;
+    background: rgba(255,255,255,0.02) !important;
+    border-bottom: 1px solid var(--ex-border-soft) !important;
+    font-size: 0.68rem; color: var(--ex-text-4) !important;
+}
+#notificationPanel .nc-activity i { color: var(--ex-blue) !important; font-size: 0.62rem; }
+#notificationPanel .nc-activity .nc-activity-new { color: var(--ex-text-3) !important; font-weight: 700; }
+#notificationPanel .nc-activity .nc-activity-sep { color: var(--ex-text-5) !important; }
+
+/* ③ معاينة الدردشة — بطاقات رسائل بأسلوب حديث بهوية تنفيذية داكنة */
+#chatPreviewPanel .msg-card {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 14px;
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-right: 3px solid transparent;
+    text-decoration: none; color: var(--ex-text-2) !important;
+    transition: background .18s ease, border-color .18s ease;
+}
+#chatPreviewPanel .msg-card:hover { background: rgba(255,255,255,0.06) !important; }
+#chatPreviewPanel .msg-card.msg-unread { background: rgba(96,165,250,0.07) !important; border-right-color: #60A5FA; }
+#chatPreviewPanel .msg-card.msg-unread:hover { background: rgba(96,165,250,0.12) !important; }
+/* الأفتار — أحرف أولى بلوحة ألوان ثابتة (صفر style=): 6 درجات من لوحة المنصة */
+#chatPreviewPanel .msg-avatar,
+.msg-toast .msg-avatar {
+    position: relative; width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff !important; font-weight: 700; font-size: 0.78rem;
+}
+.msg-av-0 { background: #0D9488 !important; }
+.msg-av-1 { background: #3B82F6 !important; }
+.msg-av-2 { background: #8B5CF6 !important; }
+.msg-av-3 { background: #EC4899 !important; }
+.msg-av-4 { background: #F59E0B !important; }
+.msg-av-5 { background: #10B981 !important; }
+#chatPreviewPanel .msg-avatar-group, .msg-toast .msg-avatar-group { background: linear-gradient(135deg, #3B82F6, #60A5FA) !important; }
+/* نقطة «غير مقروء» الصغيرة الملونة — على زاوية الأفتار */
+#chatPreviewPanel .msg-dot {
+    position: absolute; top: -2px; left: -2px; width: 9px; height: 9px; border-radius: 50%;
+    background: #60A5FA; box-shadow: 0 0 6px rgba(96,165,250,0.45), 0 0 0 2px #0B1424;
+}
+#chatPreviewPanel .msg-body { flex: 1; min-width: 0; }
+#chatPreviewPanel .msg-top { display: flex; align-items: center; gap: 6px; }
+#chatPreviewPanel .msg-name { flex: 1; min-width: 0; font-size: 0.8rem; font-weight: 600; color: #E2E8F0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chatPreviewPanel .msg-time { font-size: 0.62rem; color: var(--ex-text-5) !important; flex-shrink: 0; }
+#chatPreviewPanel .msg-preview { font-size: 0.72rem; color: var(--ex-text-4) !important; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chatPreviewPanel .msg-preview strong { color: var(--ex-text-3) !important; font-weight: 600; }
+/* غير المقروء: خط أثخن + خلفية مختلفة قليلًا + نقطة (الوثيقة ثالثًا حرفيًا) */
+#chatPreviewPanel .msg-unread .msg-name { color: #FFFFFF !important; font-weight: 700; }
+#chatPreviewPanel .msg-unread .msg-preview { color: var(--ex-text-2) !important; font-weight: 600; }
+#chatPreviewPanel .msg-count {
+    min-width: 17px; height: 17px; border-radius: 999px; padding: 0 5px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #F87171 !important; color: #0A1220 !important; font-size: 0.6rem; font-weight: 800;
+}
+/* حالات التحميل/الفراغ/تسجيل الدخول — صنف بدل الأنماط المضمّنة */
+#chatPreviewPanel .msg-state { text-align: center; color: var(--ex-text-4) !important; padding: 20px 16px; font-size: 0.82rem; }
+
+/* Toast الرسائل الواردة — زجاج اللوحة الداكن نفسه بدل البطاقة البيضاء */
+.msg-toast {
+    display: flex; align-items: flex-start; gap: 10px;
+    min-width: 280px; max-width: 340px; padding: 12px 14px; margin-bottom: 6px;
+    background: rgba(11, 18, 32, 0.96);
+    border: 1px solid var(--ex-border);
+    border-right: 3px solid var(--ex-blue);
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    cursor: pointer; pointer-events: all; direction: rtl;
+    opacity: 0; transform: translateX(-100px);
+    transition: opacity .25s ease, transform .25s ease;
+}
+.msg-toast.msg-toast-in { opacity: 1; transform: translateX(0); }
+.msg-toast.msg-b-0 { border-right-color: #0D9488; }
+.msg-toast.msg-b-1 { border-right-color: #3B82F6; }
+.msg-toast.msg-b-2 { border-right-color: #8B5CF6; }
+.msg-toast.msg-b-3 { border-right-color: #EC4899; }
+.msg-toast.msg-b-4 { border-right-color: #F59E0B; }
+.msg-toast.msg-b-5 { border-right-color: #10B981; }
+.msg-toast .msg-avatar { width: 38px; height: 38px; font-size: 0.8rem; }
+.msg-toast-body { flex: 1; min-width: 0; }
+.msg-toast-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.msg-toast-name { font-weight: 700; font-size: 0.82rem; color: #F1F5F9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.msg-toast-time { font-size: 0.65rem; color: #7C8DA6; flex-shrink: 0; }
+.msg-toast-preview { font-size: 0.78rem; color: #A9BACD; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-toast-close { background: none; border: none; color: #7C8DA6; cursor: pointer; font-size: 1.1rem; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; flex-shrink: 0; }
+.msg-toast-close:hover { color: #F87171; }
+
+/* ⑥ شارة الدردشة في الشريط العلوي — نفس وصفة شارة الجرس الهادئة (مرجاني مصمت) */
+.smart-topbar .chat-badge {
+    background: #F87171 !important;
+    color: #0A1220 !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 0 2px #0B1424, 0 2px 8px rgba(248,113,113,0.30) !important;
+}
+.smart-topbar .chat-icon { transition: background 0.2s ease, color 0.2s ease !important; }
+.smart-topbar .chat-icon:hover { background: rgba(255,255,255,0.05) !important; }
+.smart-topbar .chat-icon:hover .fa-comments { color: #60A5FA !important; }
+
+/* احترام تفضيل تقليل الحركة — كل حركات هذه الجولة تُلغى عند الطلب */
+@media (prefers-reduced-motion: reduce) {
+    #notificationPanel .nc-item.nc-new, .smart-topbar .notification-bell.nc-flash { animation: none !important; }
+    .msg-toast { transition: none !important; opacity: 1; transform: none; }
+}
+
 /* ===== تفاصيل نهائية: تحديد النص وشريط التمرير ===== */
 ::selection { background: rgba(14, 164, 122, 0.28); color: #FFFFFF; }
 body::-webkit-scrollbar { width: 10px; }
@@ -1897,3 +2033,157 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
     #shiftReportModal .shift-report-item .value { color: #1D4ED8 !important; }
     #shiftReportModal .shift-report-grid:empty::before { color: #94A3B8 !important; background: #F8FAFC !important; border-color: #E2E8F0 !important; }
 }
+
+
+/* ==========================================================================
+   جولة «Operational Polish – Phase 1» (UAT بعد 3 أيام استخدام فعلي — 2026-07-29)
+   البندان ② و⑤ من وثيقة الملاحظات: توحيد مكوّن «وقت الذروة» بصريًا أينما ظهر —
+   نافذة الإحصائيات (بطاقات KPI + الخريطة الحرارية + توقع الذروة)،
+   نافذة إدارة وقت الذروة (#peakTimeModal)، نافذة تنبيه الذروة (#peakAlertModal).
+   بصري فقط: صفر منطق، صفر تعديل على app.css (محمي) و app.js و index.html
+   (سلسلة الأقفال المعتمدة تمنع إعادة الهيكلة — التوحيد يُفرض من هذه الطبقة).
+   الجذر: app.css يصمّم أصناف peak-*/analytics-* بخلفيات var(--white)/var(--gray-50)
+   وتغليبات الطبقة السابقة كانت تلتقط الأنماط المضمّنة فقط ([style*=]) لا الأصناف.
+   ========================================================================== */
+
+/* ── نافذة الإحصائيات: صناديق الأقسام البيضاء (الخريطة الحرارية + توقع الذروة) ──
+   ملاحظة توثيقية: بطاقات KPI ووسيلة إيضاح الخريطة وتسميات الخلايا غطّاها قسم
+   «توحيد المؤشرات» المضمّن في index.html (جولة سابقة) — لا تُكرَّر هنا. */
+#analyticsModal .analytics-section { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#analyticsModal .analytics-section h3 { color: var(--ex-text) !important; }
+#analyticsModal .analytics-footer { background: transparent !important; border-top: 1px solid var(--ex-border-soft) !important; }
+
+/* ── توقع الذروة: حاوية زجاجية صريحة (التغليب العام [style*=gray-50] قائم — هذا توثيق وتحصين) ── */
+#analyticsModal #peakPrediction { background: transparent !important; padding: 4px !important; }
+
+/* ── نافذة إدارة وقت الذروة: الترويسة والتبويبات ── */
+#peakTimeModal .peak-header { background: rgba(255, 255, 255, 0.03) !important; border-bottom: 1px solid var(--ex-border-soft) !important; }
+#peakTimeModal .peak-header-text h2 { color: var(--ex-text) !important; }
+#peakTimeModal .peak-header-text p { color: var(--ex-text-4) !important; }
+#peakTimeModal .peak-close-btn { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; color: var(--ex-text-3) !important; }
+#peakTimeModal .peak-close-btn:hover { background: rgba(239, 68, 68, 0.15) !important; color: #FCA5A5 !important; border-color: rgba(239, 68, 68, 0.35) !important; }
+#peakTimeModal .peak-tabs { background: transparent !important; border-bottom: 1px solid var(--ex-border-soft) !important; }
+#peakTimeModal .peak-tab { color: var(--ex-text-3) !important; }
+#peakTimeModal .peak-tab:hover { background: var(--ex-surface-2) !important; }
+#peakTimeModal .peak-tab.active { background: var(--ex-surface-2) !important; color: var(--ex-text) !important; border: 1px solid var(--ex-border) !important; border-bottom-color: transparent !important; }
+
+/* ── نافذة إدارة وقت الذروة: بطاقات KPI والأقسام والنموذج ── */
+#peakTimeModal .peak-kpi-card { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#peakTimeModal .peak-kpi-card .info .value { color: var(--ex-text) !important; }
+#peakTimeModal .peak-kpi-card .info .label { color: var(--ex-text-4) !important; }
+#peakTimeModal .peak-section, #peakTimeModal .peak-form-card { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#peakTimeModal .peak-section h3, #peakTimeModal .peak-form-card h3 { color: var(--ex-text) !important; border-bottom-color: var(--ex-border-soft) !important; }
+
+/* ── نافذة إدارة وقت الذروة: خيارات تصنيف الفرقة والتمركزات والأرشيف ── */
+#peakTimeModal .peak-team-type-option { border-color: var(--ex-border) !important; color: var(--ex-text-2) !important; }
+#peakTimeModal .peak-team-type-option:hover { background: var(--ex-surface-2) !important; }
+#peakTimeModal .peak-team-type-option:has(input:checked) { background: rgba(14, 164, 122, 0.12) !important; border-color: rgba(14, 164, 122, 0.45) !important; color: var(--ex-emerald-txt) !important; }
+#peakTimeModal .peak-deployment-item, #peakTimeModal .peak-archive-item { background: var(--ex-surface) !important; border-color: var(--ex-border) !important; }
+
+/* ── نافذة إدارة وقت الذروة: العدّ التنازلي والشارات بصبغات الهوية الشفافة ── */
+#peakTimeModal .peak-countdown { background: var(--ex-surface-2) !important; color: var(--ex-text) !important; }
+#peakTimeModal .peak-countdown.urgent { background: rgba(239, 68, 68, 0.14) !important; color: #F87171 !important; }
+#peakTimeModal .peak-countdown.warning { background: rgba(245, 158, 11, 0.14) !important; color: #FBBF24 !important; }
+#peakTimeModal .peak-countdown.safe { background: rgba(16, 181, 134, 0.14) !important; color: #4FBF9A !important; }
+#peakTimeModal .peak-badge-type-peak, #peakTimeModal .peak-badge-priority-high, #peakTimeModal .peak-status-late { background: rgba(239, 68, 68, 0.14) !important; color: #F87171 !important; }
+#peakTimeModal .peak-badge-type-event, #peakTimeModal .peak-badge-priority-low, #peakTimeModal .peak-status-arrived { background: rgba(16, 181, 134, 0.14) !important; color: #4FBF9A !important; }
+#peakTimeModal .peak-badge-type-temporary, #peakTimeModal .peak-badge-priority-medium, #peakTimeModal .peak-status-active { background: rgba(245, 158, 11, 0.14) !important; color: #FBBF24 !important; }
+#peakTimeModal .peak-badge-type-incident { background: rgba(96, 165, 250, 0.14) !important; color: #7FB3FA !important; }
+#peakTimeModal .peak-badge-type-emergency { background: rgba(239, 68, 68, 0.20) !important; color: #FCA5A5 !important; }
+#peakTimeModal .peak-status-departed { background: rgba(255, 255, 255, 0.06) !important; color: var(--ex-text-3) !important; }
+#peakTimeModal .peak-footer { background: rgba(255, 255, 255, 0.03) !important; border-top: 1px solid var(--ex-border-soft) !important; }
+
+/* ── نافذة إدارة وقت الذروة: الخلفيات الملونة المضمّنة (gold-50/teal-50/coral-50/primary-50) ── */
+#peakTimeModal [style*="gold-50"] { background: rgba(245, 158, 11, 0.12) !important; }
+#peakTimeModal [style*="teal-50"] { background: rgba(16, 181, 134, 0.12) !important; }
+#peakTimeModal [style*="coral-50"] { background: rgba(239, 68, 68, 0.12) !important; }
+#peakTimeModal [style*="primary-50"] { background: rgba(96, 165, 250, 0.12) !important; }
+
+/* ── نافذة تنبيه الذروة: بطاقات المعلومات والملاحظات وشارة الأولوية ── */
+#peakAlertModal .peak-alert-info-card, #peakAlertModal .peak-alert-notes { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#peakAlertModal .peak-alert-info-card:hover { border-color: rgba(14, 164, 122, 0.35) !important; box-shadow: none !important; }
+#peakAlertModal .peak-alert-info-label { color: var(--ex-text-4) !important; }
+#peakAlertModal .peak-alert-info-value:not([style]) { color: var(--ex-text) !important; }
+#peakAlertModal .peak-alert-countdown-label { color: var(--ex-text-3) !important; }
+#peakAlertModal .priority-badge { display: inline-block; padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; }
+#peakAlertModal .priority-badge.priority-high { background: rgba(239, 68, 68, 0.16); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.35); }
+#peakAlertModal .priority-badge.priority-medium { background: rgba(245, 158, 11, 0.16); color: #FCD34D; border: 1px solid rgba(245, 158, 11, 0.35); }
+#peakAlertModal .priority-badge.priority-low { background: rgba(96, 165, 250, 0.16); color: #93C5FD; border: 1px solid rgba(96, 165, 250, 0.35); }
+
+/* ==========================================================================
+   جولة متابعة UAT — «نصوص وقت الذروة الغامقة» (بعد Phase 1 — 2026-08-01)
+   طلب المستخدم: «بخصوص وقت الذروة، الكتابات بلون غامق غير واضح في الصفحات —
+   عدّلها مثل الملاحظات التي في التكميل».
+   التشخيص الحي (Chrome headless، computed style + تباين WCAG — probe_peak_dark_text.js):
+     ١) حقول نوافذ الذروة كلها: color=rgb(30,41,59)‏ على زجاج داكن ⇒ تباين 1.04.
+        الجذر: smart-toolbar.css:2180-2234 «5. Inputs inside modals» — قاعدة
+        جماعية بالـID بسبقية (1,2,1) تضبط color:#1E293B !important فتكسب على
+        «.modal-content input» العامة هنا (0,1,1) رغم تحميل هذا الملف لاحقًا —
+        نفس جذر الصدفة البيضاء الموثق أعلاه (تغليب الجذر المشترك).
+        التغليب هنا بنفس المحددات حرفيًا (نفس السبقية) + ملفنا يُحمَّل بعده ⇒ نكسب.
+     ٢) #operationsRoomModal يعيد استخدام أصناف peak-* نفسها ولم تكن قواعد
+        Phase 1 (#peakTimeModal …) تغطيه ⇒ ترويسة/أقسام بيضاء مع عناوين
+        بيضاء (h2/h3 تباين 1.10) وزر «إغلاق» باهت (1.98) وحقول داكنة (١).
+     ٣) قسم التقييم في تنبيه الذروة: تدرج فاتح مضمّن لا تلتقطه تغليبات
+        الخلفيات ⇒ العنوان أبيض-على-فاتح (1.05) والأزرار الثلاثة فقدت
+        دلالتها اللونية بفعل قاعدة «.modal-content .btn» الزجاجية (1.73).
+   القيد: بصري فقط — صفر لمس لـapp.css/smart-toolbar.css/app.js/index.html،
+   والدلالة اللونية للحالات (زمردي/ذهبي/أحمر) محفوظة أو مستعادة.
+   ========================================================================== */
+
+/* ── ١) حقول نوافذ الذروة الثلاث: نص فاتح + مؤشر زمردي + مخطط داكن أصلي ── */
+/*    (نفس سبقية smart-toolbar (1,2,1) حرفيًا؛ هذا الملف يُحمَّل بعده ⇒ يكسب) */
+#peakTimeModal .modal-content input, #peakTimeModal .modal-content select, #peakTimeModal .modal-content textarea,
+#peakAlertModal .modal-content input, #peakAlertModal .modal-content select, #peakAlertModal .modal-content textarea,
+#operationsRoomModal .modal-content input, #operationsRoomModal .modal-content select, #operationsRoomModal .modal-content textarea {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--ex-text) !important;
+    caret-color: #10B586 !important;
+    border: 1px solid var(--ex-border) !important;
+    border-radius: 9px !important;
+    color-scheme: dark;
+}
+#peakTimeModal .modal-content input:focus, #peakTimeModal .modal-content select:focus, #peakTimeModal .modal-content textarea:focus,
+#peakAlertModal .modal-content input:focus, #peakAlertModal .modal-content select:focus, #peakAlertModal .modal-content textarea:focus,
+#operationsRoomModal .modal-content input:focus, #operationsRoomModal .modal-content select:focus, #operationsRoomModal .modal-content textarea:focus {
+    border-color: rgba(14, 164, 122, 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(14, 164, 122, 0.12) !important;
+    outline: none !important;
+}
+#peakTimeModal .modal-content input::placeholder, #peakTimeModal .modal-content textarea::placeholder,
+#peakAlertModal .modal-content input::placeholder, #peakAlertModal .modal-content textarea::placeholder,
+#operationsRoomModal .modal-content input::placeholder, #operationsRoomModal .modal-content textarea::placeholder {
+    color: var(--ex-text-4) !important;
+}
+
+/* ── ٢) نافذة غرفة العمليات: امتداد معالجة Phase 1 لأصناف peak-* المشتركة ── */
+#operationsRoomModal .peak-header { background: rgba(255, 255, 255, 0.03) !important; border-bottom: 1px solid var(--ex-border-soft) !important; }
+#operationsRoomModal .peak-header-text h2 { color: var(--ex-text) !important; }
+#operationsRoomModal .peak-header-text p { color: var(--ex-text-4) !important; }
+#operationsRoomModal .peak-close-btn { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; color: var(--ex-text-3) !important; }
+#operationsRoomModal .peak-close-btn:hover { background: rgba(239, 68, 68, 0.15) !important; color: #FCA5A5 !important; border-color: rgba(239, 68, 68, 0.35) !important; }
+#operationsRoomModal .peak-tabs { background: transparent !important; border-bottom: 1px solid var(--ex-border-soft) !important; }
+#operationsRoomModal .peak-tab { color: var(--ex-text-3) !important; }
+#operationsRoomModal .peak-tab:hover { background: var(--ex-surface-2) !important; }
+#operationsRoomModal .peak-tab.active { background: var(--ex-surface-2) !important; color: var(--ex-text) !important; border: 1px solid var(--ex-border) !important; border-bottom-color: transparent !important; }
+#operationsRoomModal .peak-kpi-card { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#operationsRoomModal .peak-kpi-card .info .value { color: var(--ex-text) !important; }
+#operationsRoomModal .peak-kpi-card .info .label { color: var(--ex-text-4) !important; }
+#operationsRoomModal .peak-section { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#operationsRoomModal .peak-section h3 { color: var(--ex-text) !important; border-bottom-color: var(--ex-border-soft) !important; }
+#operationsRoomModal .peak-footer { background: rgba(255, 255, 255, 0.03) !important; border-top: 1px solid var(--ex-border-soft) !important; }
+#operationsRoomModal [style*="gold-50"] { background: rgba(245, 158, 11, 0.12) !important; }
+#operationsRoomModal [style*="teal-50"] { background: rgba(16, 181, 134, 0.12) !important; }
+#operationsRoomModal [style*="coral-50"] { background: rgba(239, 68, 68, 0.12) !important; }
+#operationsRoomModal [style*="primary-50"] { background: rgba(96, 165, 250, 0.12) !important; }
+/* حالات الفراغ داخل نوافذ الذروة: رمادي الهوية الأفتح (ex-text-5 كان باهتًا على الداكن) */
+#peakTimeModal .modal-content [style*="color:var(--gray-4"], #peakTimeModal .modal-content [style*="color: var(--gray-4"],
+#operationsRoomModal .modal-content [style*="color:var(--gray-4"], #operationsRoomModal .modal-content [style*="color: var(--gray-4"] {
+    color: var(--ex-text-4) !important;
+}
+
+/* ── ٣) قسم التقييم في تنبيه الذروة: سطح داكن + استعادة الدلالة الثلاثية ── */
+#peakAlertModal #peakRatingSection { background: var(--ex-surface) !important; border: 1px solid var(--ex-border) !important; box-shadow: none !important; }
+#peakAlertModal #peakRatingSection .btn[onclick*="ratePeakResponse(5)"] { background: rgba(16, 181, 134, 0.16) !important; color: #4FBF9A !important; border: 1px solid rgba(16, 181, 134, 0.35) !important; }
+#peakAlertModal #peakRatingSection .btn[onclick*="ratePeakResponse(3)"] { background: rgba(245, 158, 11, 0.16) !important; color: #FCD34D !important; border: 1px solid rgba(245, 158, 11, 0.35) !important; }
+#peakAlertModal #peakRatingSection .btn[onclick*="ratePeakResponse(1)"] { background: rgba(239, 68, 68, 0.16) !important; color: #FCA5A5 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important; }

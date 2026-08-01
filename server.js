@@ -23,6 +23,8 @@ const DecisionMemoryService = require('./services/decision-memory-service');
 const SmartAwarenessService = require('./services/smart-awareness-service');
 // 6-د: Smart Ask — طبقة إجابة حتمية (بلا LLM؛ تجميع من حقول التقييم فقط)
 const smartAsk = require('./services/smart-ask-service');
+// جولة ربط الإشعارات: الطبقة المركزية الوحيدة لإنشاء الإشعارات (خريطة الحدث ← النوع)
+const notificationService = require('./services/notification-service');
 // الطبقة المركزية الوحيدة لتحويل وعرض الوقت (Asia/Riyadh) — نفس ملف المتصفح
 const TimeRiyadh = require('./public/js/time-riyadh.js');
 
@@ -37,6 +39,7 @@ let opsEngine = null;
 let reportService = null;
 let completionService = null;
 let positioningService = null; // Slice 4: single owner of peak_plans writes
+let signoutService = null; // المرحلة ب: single owner of shift_signouts writes/suggest
 let notesService = null; // Slice 5: single owner of shift_notes writes
 let formsService = null; // Slice 6: single owner of all form writes (form_type)
 let indicatorService = null; // F5a: read-only operational indicators
@@ -551,6 +554,8 @@ const PASSWORD_PATH = path.join(STORAGE_PATH, 'password.json');
 const PEAK_DATA_PATH = path.join(STORAGE_PATH, 'peak-data.json');
 const THEME_SETTINGS_PATH = path.join(STORAGE_PATH, 'theme-settings.json');
 const USERS_PATH = path.join(STORAGE_PATH, 'users.json');
+// جولة ربط الإشعارات: حقن الاعتماديات في الخدمة المركزية (مسار المستخدمين + db + البث الموجَّه)
+notificationService.init({ usersPath: USERS_PATH, getDb: () => db, broadcastToUsers });
 const SHIFT_EVENTS_PATH = path.join(STORAGE_PATH, 'shift-events.json');
 const SHIFT_ABSENCES_PATH = path.join(STORAGE_PATH, 'shift-absences.json');
 const SHIFT_NOTES_PATH = path.join(STORAGE_PATH, 'shift-notes.json');
@@ -2265,7 +2270,10 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
             forms: [],
             audit_log: [],
             files: [],
-            timeline: []
+            timeline: [],
+            positioning: [],
+            positioning_events: [],
+            signouts: []
         };
 
         // ── 1. Query related data from SQLite (new data) ──
@@ -2352,6 +2360,50 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                     const dbTimeline = await db.Timeline.getByShift(shiftId);
                     if (Array.isArray(dbTimeline) && dbTimeline.length > 0) response.timeline = dbTimeline;
                 }
+                // ── جولة Operational Workflow Completion (المرحلة أ): التمركزات ──
+                // دورة حياة التمركز جزء من سجل المناوبة. المؤرشفة تقرأ من آخر
+                // لقطة مختومة (تاريخ ثابت لا يتأثر بالحالة الحالية)؛ النشطة/بلا
+                // لقطة تقرأ من الجداول الحية بنفس shift_id.
+                try {
+                    let sealed = null;
+                    if (normalizedShift.status === 'archived') {
+                        const snapRow = await db.get('SELECT snapshot_data FROM shift_snapshots WHERE shift_id = ? ORDER BY id DESC LIMIT 1', [shiftId]);
+                        if (snapRow) { try { sealed = JSON.parse(snapRow.snapshot_data); } catch (e) { sealed = null; } }
+                    }
+                    if (sealed) {
+                        response.positioning = Array.isArray(sealed.positioning) ? sealed.positioning : [];
+                        response.positioning_events = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
+                        // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
+                        response.signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
+                    } else {
+                        const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
+                        response.positioning = (Array.isArray(planRows) ? planRows : []).map(r => {
+                            let d = {};
+                            try { d = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
+                            return { ...d, id: r.id, shiftId: r.shift_id };
+                        });
+                        const evRows = await db.all('SELECT * FROM positioning_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
+                        response.positioning_events = (Array.isArray(evRows) ? evRows : []).map(r => {
+                            let payload = {}, changed = null;
+                            try { payload = r.payload ? JSON.parse(r.payload) : {}; } catch (e) {}
+                            try { changed = r.changed_fields ? JSON.parse(r.changed_fields) : null; } catch (e) {}
+                            return { id: r.id, planId: r.plan_id, eventType: r.event_type, changedFields: changed, payload, actorId: r.actor_id, actorName: r.actor_name, createdAt: r.created_at };
+                        });
+                        // المرحلة ب: سجل تسجيلات الخروج الحي (المناوبة النشطة/بلا لقطة)
+                        // = أحدث حدث TEAM_CHECKOUT لكل فرقة (عرض مشتق من سجل الأحداث)
+                        const soRows = await db.all(
+                            `SELECT s.* FROM shift_signout_events s
+                             JOIN (SELECT team, MAX(id) AS mid FROM shift_signout_events WHERE shift_id = ? GROUP BY team) t
+                               ON t.team = s.team AND t.mid = s.id ORDER BY s.id ASC`, [shiftId]);
+                        response.signouts = (Array.isArray(soRows) ? soRows : []).map(r => {
+                            let members = [];
+                            try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
+                            return { id: r.id, team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
+                        });
+                    }
+                } catch (posErr) {
+                    console.warn('[ShiftDetail] positioning read failed:', posErr.message);
+                }
             }
         } catch (dbErr) {
             console.warn('[DB] Failed to load related shift data:', dbErr.message);
@@ -2411,6 +2463,149 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// جولة Operational Workflow Completion (المرحلة أ)
+// GET /api/shifts/:id/export — تصدير سجل المناوبة نصيًا من السجل
+// ============================================
+// مصدر الحقيقة: نفس قراءة /api/shifts/:id (اللقطة المختومة للمؤرشفة، الجداول
+// الحية للنشطة) + قسم كامل لدورة حياة التمركزات (الخطط + سجل الأحداث). يُبنى
+// خادميًا ويُحمَّل كملف .txt (Content-Disposition) — لا اعتماد على حالة المتصفح.
+function _fmtRiyadh(v) {
+    if (!v) return '—';
+    try {
+        const d = new Date(v);
+        if (isNaN(d)) return String(v);
+        return d.toLocaleString('en-GB', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch (e) { return String(v); }
+}
+
+app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
+    try {
+        const shiftId = parseInt(req.params.id);
+        let shift = null;
+        if (opsService && opsService.getShiftById) shift = await opsService.getShiftById(shiftId);
+        if (!shift && db.Shifts && db.Shifts.getById) shift = await db.Shifts.getById(shiftId);
+        if (!shift) return res.status(404).json({ error: 'المناوبة غير موجودة' });
+
+        const sName = shift.shift_name || shift.shiftName || ('مناوبة #' + shiftId);
+        const sDate = shift.shift_date || shift.shiftDate || '—';
+        const sType = shift.shift_type || shift.shiftType || '—';
+        const sStatus = shift.status === 'active' ? 'نشطة' : shift.status === 'pending_handover' ? 'بانتظار التسليم' : shift.status === 'archived' ? 'مؤرشفة' : (shift.status || '—');
+
+        // ── نفس منطق التفاصيل: اللقطة المختومة للمؤرشفة، الحيّة لغيرها ──
+        let positioning = [], positioningEvents = [], signouts = [];
+        try {
+            let sealed = null;
+            if (shift.status === 'archived') {
+                const snapRow = await db.get('SELECT snapshot_data FROM shift_snapshots WHERE shift_id = ? ORDER BY id DESC LIMIT 1', [shiftId]);
+                if (snapRow) { try { sealed = JSON.parse(snapRow.snapshot_data); } catch (e) { sealed = null; } }
+            }
+            if (sealed) {
+                positioning = Array.isArray(sealed.positioning) ? sealed.positioning : [];
+                positioningEvents = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
+                // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
+                signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
+            } else {
+                const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
+                positioning = (Array.isArray(planRows) ? planRows : []).map(r => {
+                    let d = {}; try { d = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
+                    return { ...d, id: r.id, shiftId: r.shift_id };
+                });
+                const evRows = await db.all('SELECT * FROM positioning_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
+                positioningEvents = (Array.isArray(evRows) ? evRows : []).map(r => {
+                    let payload = {}, changed = null;
+                    try { payload = r.payload ? JSON.parse(r.payload) : {}; } catch (e) {}
+                    try { changed = r.changed_fields ? JSON.parse(r.changed_fields) : null; } catch (e) {}
+                    return { planId: r.plan_id, eventType: r.event_type, changedFields: changed, payload, actorName: r.actor_name, createdAt: r.created_at };
+                });
+                // المرحلة ب: سجل تسجيلات الخروج الحي (أحدث حدث لكل فرقة — مشتق من السجل)
+                const soRows = await db.all(
+                    `SELECT s.* FROM shift_signout_events s
+                     JOIN (SELECT team, MAX(id) AS mid FROM shift_signout_events WHERE shift_id = ? GROUP BY team) t
+                       ON t.team = s.team AND t.mid = s.id ORDER BY s.id ASC`, [shiftId]);
+                signouts = (Array.isArray(soRows) ? soRows : []).map(r => {
+                    let members = [];
+                    try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
+                    return { team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
+                });
+            }
+        } catch (e) { /* قسم التمركزات يُصدَّر فارغًا عند الفشل — بقية السجل تكتمل */ }
+
+        // ملخص البلاغات من نفس مصدر التفاصيل
+        let reportsSummary = [];
+        try {
+            if (db.Reports && db.Reports.getByShift) {
+                const dbReports = await db.Reports.getByShift(shiftId);
+                reportsSummary = (Array.isArray(dbReports) ? dbReports : []).map(r => ({ center: r.center, unit: r.unit, count: r.count || 0 }));
+            }
+        } catch (e) { /* اختياري */ }
+
+        const EV_LABELS = { created: 'إنشاء', updated: 'تعديل', swept: 'انتهاء تلقائي (كنس)', ended: 'إنهاء/حذف' };
+        const L = [];
+        L.push('════════════════════════════════════════════');
+        L.push('  سجل المناوبة — منصة القطاع الجنوبي للإسعاف');
+        L.push('════════════════════════════════════════════');
+        L.push('رقم المناوبة: ' + shiftId);
+        L.push('الاسم: ' + sName);
+        L.push('التاريخ: ' + sDate + '    النوع: ' + sType + '    الحالة: ' + sStatus);
+        L.push('بداية المناوبة: ' + _fmtRiyadh(shift.start_time || shift.startTime));
+        L.push('آخر تحديث: ' + _fmtRiyadh(shift.last_update || shift.lastUpdate));
+        L.push('تاريخ تصدير السجل: ' + _fmtRiyadh(new Date().toISOString()) + ' (توقيت الرياض)');
+        L.push('');
+        L.push('── البلاغات (' + reportsSummary.reduce((a, r) => a + r.count, 0) + ') ──');
+        if (reportsSummary.length) {
+            reportsSummary.forEach(r => L.push('  • ' + (r.center || '—') + ' / ' + (r.unit || '—') + ': ' + r.count));
+        } else L.push('  لا توجد بلاغات مسجلة.');
+        L.push('');
+        L.push('── التمركزات (' + positioning.length + ') ──');
+        if (positioning.length) {
+            positioning.forEach((p, i) => {
+                L.push('  ' + (i + 1) + '. ' + (p.title || '—') + ' [' + (p.status === 'active' ? 'نشطة' : p.status === 'completed' ? 'مكتملة' : (p.status || '—')) + ']');
+                L.push('     الفرقة: ' + (p.unit || '—') + '    الموقع: ' + (p.location || '—') + '    الأولوية: ' + (p.priority || '—'));
+                L.push('     البداية: ' + _fmtRiyadh(p.startTime) + '    النهاية: ' + _fmtRiyadh(p.endTime));
+                if (p.arrivalTime) L.push('     الوصول الفعلي: ' + _fmtRiyadh(p.arrivalTime));
+                if (p.notes) L.push('     ملاحظات: ' + p.notes);
+                L.push('     أُنشئت بواسطة: ' + (p.createdBy || '—') + ' في ' + _fmtRiyadh(p.createdAt));
+            });
+        } else L.push('  لا توجد تمركزات مسجلة لهذه المناوبة.');
+        L.push('');
+        L.push('── سجل أحداث التمركزات (' + positioningEvents.length + ') ──');
+        if (positioningEvents.length) {
+            positioningEvents.forEach(ev => {
+                const title = ev.payload && ev.payload.title ? ' — ' + ev.payload.title : '';
+                L.push('  [' + _fmtRiyadh(ev.createdAt) + '] ' + (EV_LABELS[ev.eventType] || ev.eventType) + title + ' (بواسطة: ' + (ev.actorName || 'system') + ')');
+                if (ev.changedFields) {
+                    Object.keys(ev.changedFields).forEach(k => {
+                        const pair = ev.changedFields[k];
+                        L.push('      - ' + k + ': ' + (pair[0] == null ? '—' : pair[0]) + ' ← ' + (pair[1] == null ? '—' : pair[1]));
+                    });
+                }
+            });
+        } else L.push('  لا توجد أحداث مسجلة.');
+        L.push('');
+        // المرحلة ب: سجل تسجيلات الخروج — من أنهى المناوبة ومتى ومن كانوا أفراد كل فرقة
+        L.push('── سجل تسجيلات الخروج (' + signouts.length + ') ──');
+        if (signouts.length) {
+            signouts.forEach(so => {
+                L.push('  • ' + (so.team || '—') + ': ' + (Array.isArray(so.members) && so.members.length ? so.members.join(' – ') : '—'));
+                L.push('    وقت الخروج: ' + _fmtRiyadh(so.createdAt) + '    بواسطة: ' + (so.recordedByName || '—'));
+                if (so.notes) L.push('    ملاحظات: ' + so.notes);
+            });
+        } else L.push('  لا توجد تسجيلات خروج لهذه المناوبة.');
+        L.push('');
+        L.push('════════════════════════════════════════════');
+        L.push('  نهاية السجل — وُلّد خادميًا من السجل الموحد');
+
+        const body = '\uFEFF' + L.join('\r\n');
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="shift-record-' + shiftId + '.txt"');
+        res.send(body);
+    } catch (error) {
+        console.error('[ShiftExport] Error:', error);
+        res.status(500).json({ error: 'فشل في تصدير السجل' });
+    }
+});
+
 app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
     // Operations Engine → ShiftManager → SQLite
     try {
@@ -2465,6 +2660,15 @@ app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'd
             return res.status(500).json({ error: archiveResult.error || 'فشل في اعتماد التسليم' });
         }
 
+        // جولة توصيل الأحداث: اكتمال أرشفة المناوبة ← 🟢 (مرة واحدة لكل مناوبة)
+        try {
+            if (dbAvailable() && db.Notifications) {
+                await notificationService.notifyOperational({ eventKey: 'archive.completed', title: 'أرشفة المناوبة', message: 'اكتملت أرشفة المناوبة #' + shiftId + ' وختمها' });
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
+
         res.json({ success: true, message: 'تم اعتماد التسليم وأرشفة المناوبة', snapshotHash: archiveResult.snapshotHash });
     } catch (error) {
         console.error('[HandoverApprove] Error:', error);
@@ -2485,6 +2689,16 @@ app.post('/api/shift/:id/archive', authenticate, authorize(['admin']), async (re
             source: 'direct',
             reason: req.body.reason || 'أرشفة مباشرة'
         });
+        // جولة توصيل الأحداث: اكتمال أرشفة المناوبة ← 🟢 (مرة واحدة لكل مناوبة)
+        if (result && result.success) {
+            try {
+                if (dbAvailable() && db.Notifications) {
+                    await notificationService.notifyOperational({ eventKey: 'archive.completed', title: 'أرشفة المناوبة', message: 'اكتملت أرشفة المناوبة #' + shiftId + ' وختمها' });
+                }
+            } catch (notifErr) {
+                console.error('Notification creation error:', notifErr);
+            }
+        }
         res.json(result);
     } catch (error) {
         console.error('[Shift] Error archiving shift:', error);
@@ -2691,16 +2905,8 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'تحديث المناوبة',
-                        message: 'تم تحديث بيانات المناوبة',
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (shift.updated ← 🟡 warning «تغيير جدول»)
+                await notificationService.notifyOperational({ eventKey: 'shift.updated', title: 'تحديث المناوبة', message: 'تم تحديث بيانات المناوبة' });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -2758,6 +2964,14 @@ app.post('/api/shift-archive', authenticate, authorize(['admin', 'director']), a
         });
 
         if (result.success) {
+            // جولة توصيل الأحداث: اكتمال أرشفة المناوبة ← 🟢 (مرة واحدة لكل مناوبة)
+            try {
+                if (dbAvailable() && db.Notifications) {
+                    await notificationService.notifyOperational({ eventKey: 'archive.completed', title: 'أرشفة المناوبة', message: 'اكتملت أرشفة المناوبة #' + shiftId + ' وختمها' });
+                }
+            } catch (notifErr) {
+                console.error('Notification creation error:', notifErr);
+            }
             await addAuditLogEntry(
                 'shift_archived_manual',
                 'تمت أرشفة المناوبة يدوياً، Hash: ' + result.snapshotHash,
@@ -4938,6 +5152,18 @@ app.post('/api/vehicles/events', authenticate, async (req, res) => {
         }, req.user);
         // بث إضافي (لا يكسر العملاء الحاليين) لتحديث لوحات المركبات لحظيًا
         broadcast({ type: 'vehicles_updated', shiftId: result.shiftId });
+        // جولة توصيل الأحداث: مركبة خارج الخدمة ← 🔴 (الأعلى أولوية — يؤثر مباشرة
+        // على جاهزية القطاع). breakdown وحدها لا تُوصَّل (نطاق المستخدم الحرفي —
+        // موثق كفجوة مؤجلة). تكرار نفس المركبة داخل النافذة = تحديث وقت لا صف جديد.
+        if (status === 'out_of_service') {
+            try {
+                if (dbAvailable() && db.Notifications) {
+                    await notificationService.notifyOperational({ eventKey: 'vehicle.out_of_service', title: 'مركبة خارج الخدمة', message: 'تم تسجيل مركبة خارج الخدمة: ' + (vehicle.name || vehicle.call_sign || vehicle.plate_number || vehicleId) + (reason ? ' — ' + reason : '') });
+                }
+            } catch (notifErr) {
+                console.error('Notification creation error:', notifErr);
+            }
+        }
         res.json({ success: true, ...result });
     } catch (error) {
         if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
@@ -5023,7 +5249,18 @@ app.post('/api/workflow/version/:id/approve', authenticate, authorize(['admin', 
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'معرف غير صالح' });
+        // تعديل «الآن فهمت قصدك 100%»: تسجيل الخروج سجل تشغيلي اختياري حسب
+        // الحاجة — أُزيلت البوابة الناعمة بالكامل (رفض 409 وحقول التأكيد الواعي
+        // وتعداد الفرق)؛ الاعتماد لا يشترط أي تسجيل خروج لأي فرقة.
         const result = await workflowService.approve(id, { actor: req.user });
+        // جولة توصيل الأحداث: اعتماد سير العمل ← 🟢 (حدث قليل التكرار — نجاح تشغيلي)
+        try {
+            if (dbAvailable() && db.Notifications) {
+                await notificationService.notifyOperational({ eventKey: 'workflow.approved', title: 'اعتماد سير العمل', message: 'تم اعتماد سير العمل — نسخة #' + id });
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
         res.json({ success: true, ...result });
     } catch (error) {
         if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
@@ -5204,16 +5441,8 @@ app.post('/api/upload-doc', authenticate, async (req, res) => {
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'مستند جديد',
-                        message: 'تم رفع مستند جديد: ' + newDoc.filename,
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (doc.uploaded ← 🔵 info «إشعار عام»)
+                await notificationService.notifyOperational({ eventKey: 'doc.uploaded', title: 'مستند جديد', message: 'تم رفع مستند جديد: ' + newDoc.filename });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -5292,16 +5521,8 @@ app.post('/api/upload-identity', authenticate, async (req, res) => {
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'تحديث هوية القطاع',
-                        message: 'تم تحديث هوية القطاع',
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (identity.updated ← 🔵 info «إشعار عام»)
+                await notificationService.notifyOperational({ eventKey: 'identity.updated', title: 'تحديث هوية القطاع', message: 'تم تحديث هوية القطاع' });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -6874,16 +7095,8 @@ app.post('/api/upload-operational', authenticate, opsUpload.array('files'), hand
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'ملفات تشغيلية جديدة',
-                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (ops_files.uploaded ← 🔵 info «إشعار عام»)
+                await notificationService.notifyOperational({ eventKey: 'ops_files.uploaded', title: 'ملفات تشغيلية جديدة', message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة' });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -7002,16 +7215,8 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'ملفات تشغيلية جديدة',
-                        message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة',
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (ops_files.uploaded ← 🔵 info «إشعار عام»)
+                await notificationService.notifyOperational({ eventKey: 'ops_files.uploaded', title: 'ملفات تشغيلية جديدة', message: 'تم رفع ' + results.length + ' ملف/ملفات تشغيلية جديدة' });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -7635,6 +7840,14 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
         // Slice 4: PositioningService owns build + shift stamp + insert;
         // PositioningStarted fires after the write (engine broadcasts peak_plan_added)
         const plan = await positioningService.create(req.body, req.user);
+        // جولة توصيل الأحداث: تمركز جديد ← 🟡 (نفس مفتاح منع التكرار مع التعديل — إنشاء ثم تعديل داخل النافذة = صف واحد)
+        try {
+            if (dbAvailable() && db.Notifications && plan) {
+                await notificationService.notifyOperational({ eventKey: 'positioning.changed', title: 'تغيير تمركز', message: 'تم تغيير تمركز: ' + (plan.title || title) });
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
         res.json({ success: true, plan });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ خطة الذروة' });
@@ -7645,9 +7858,18 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         // Slice 4: merge + save via PositioningService.
-        const plan = await positioningService.update(id, req.body);
+        // المرحلة أ: req.user يُمرر لختم حدث التعديل بالفاعل في سجل المناوبة
+        const plan = await positioningService.update(id, req.body, req.user);
         if (!plan) return res.status(404).json({ error: 'الخطة غير موجودة' });
         // PositioningUpdated (Catalog D-4) fires inside the service → engine broadcasts 'peak_plan_updated'
+        // جولة توصيل الأحداث: تغيير تمركز ← 🟡 (مثال المستخدم حرفيًا: «تم تغيير تمركز جنوب 8»)
+        try {
+            if (dbAvailable() && db.Notifications) {
+                await notificationService.notifyOperational({ eventKey: 'positioning.changed', title: 'تغيير تمركز', message: 'تم تغيير تمركز: ' + (plan.title || 'خطة #' + id) });
+            }
+        } catch (notifErr) {
+            console.error('Notification creation error:', notifErr);
+        }
         res.json({ success: true, plan });
     } catch (error) {
         res.status(500).json({ error: 'فشل في تحديث خطة الذروة' });
@@ -7658,10 +7880,63 @@ app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
     try {
         // Slice 4: delete via PositioningService; PositioningEnded fires after
         // the write when a row existed (engine broadcasts peak_plan_deleted)
-        await positioningService.remove(req.params.id);
+        // المرحلة أ: req.user يُمرر لختم حدث الإنهاء بالفاعل في سجل المناوبة
+        await positioningService.remove(req.params.id, req.user);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف خطة الذروة' });
+    }
+});
+
+// ============================================
+// جولة Operational Workflow Completion (المرحلة ب)
+// API: تسجيل خروج المناوبة (shift_signout_events — سجل TEAM_CHECKOUT append-only،
+// مصدر الحقيقة الواحد؛ كل الصفحات تقرأ منه، والحالة الحالية عرض مشتق منه)
+// ============================================
+// الاقتراح التلقائي: آخر تسجيل خروج للفرقة ← طاقم المناوبة الحالية الفعلي
+// ← آخر مناوبة فعلية (سلسلة موثقة في SignoutService — لا جدول شهري ولا HR)
+app.get('/api/signouts/suggest', authenticate, async (req, res) => {
+    try {
+        if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
+        const team = String(req.query.team || '').trim();
+        if (!team) return res.status(400).json({ error: 'الفرقة مطلوبة' });
+        const shiftId = await getActiveShiftId();
+        const suggestion = await signoutService.suggest(team, shiftId);
+        res.json({ success: true, ...suggestion });
+    } catch (error) {
+        console.error('[Signouts] suggest error:', error);
+        res.status(500).json({ error: 'فشل في جلب الاقتراح' });
+    }
+});
+
+// التسجيل: الخادم يختم المناوبة النشطة ونوعها وتاريخها والمستخدم والوقت —
+// الواجهة ترسل الفرقة والأسماء والملاحظات فقط. append-only: إعادة التسجيل
+// لنفس الفرقة = حدث TEAM_CHECKOUT جديد (تصحيح يبقي الأثر — لا UPDATE).
+app.post('/api/signouts', authenticate, async (req, res) => {
+    try {
+        if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
+        const { team, members, notes } = req.body || {};
+        const result = await signoutService.record(String(team || '').trim(), members, notes, req.user);
+        if (!result.success) return res.status(400).json(result);
+        res.json(result);
+    } catch (error) {
+        console.error('[Signouts] record error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل الخروج' });
+    }
+});
+
+// سجل تسجيلات مناوبة (الافتراضي: النشطة) = أحدث حدث لكل فرقة (عرض مشتق من
+// سجل الأحداث — لا جدول حالة موازٍ) — لصفحة التكميل ولوحة العمليات
+app.get('/api/signouts', authenticate, async (req, res) => {
+    try {
+        if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
+        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : await getActiveShiftId();
+        if (shiftId == null || isNaN(shiftId)) return res.json({ success: true, signouts: [] });
+        const signouts = await signoutService.listByShift(shiftId);
+        res.json({ success: true, signouts });
+    } catch (error) {
+        console.error('[Signouts] list error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التسجيلات' });
     }
 });
 
@@ -7793,12 +8068,15 @@ app.post('/api/notifications', authenticate, async (req, res) => {
             }
         }
         let notificationId = null;
+        // جولة ربط الإشعارات: النوع الصريح يُطبَّع عبر الخدمة المركزية — الأنواع
+        // الأربعة + الأسماء المستعارة فقط، والسقوط الآمن info (ممنوع نوع خامس)
+        const notifType = notificationService.normalizeType(type);
         if (dbAvailable() && db.Notifications) {
             notificationId = await db.Notifications.create({
                 user_id: targetUserId,
                 title,
                 message: message || '',
-                type: type || 'info'
+                type: notifType
             });
         }
         // D-21: إشعار موجه لمستخدم محدد — يُرسل للمستهدف فقط عبر broadcastToUsers
@@ -7806,7 +8084,7 @@ app.post('/api/notifications', authenticate, async (req, res) => {
         broadcastToUsers([targetUserId], {
             type: 'notification_created',
             message: 'تم إنشاء إشعار جديد',
-            notification: { id: notificationId, user_id: targetUserId, title, message, type }
+            notification: { id: notificationId, user_id: targetUserId, title, message, type: notifType }
         });
         res.json({ success: true, id: notificationId });
     } catch (error) {
@@ -7912,16 +8190,8 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
         // Create notifications for admin/director
         try {
             if (dbAvailable() && db.Notifications) {
-                const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
-                const admins = users.filter(u => (u.role === 'admin' || u.role === 'director') && u.isActive);
-                for (const admin of admins) {
-                    await db.Notifications.create({
-                        user_id: admin.id.toString(),
-                        title: 'بلاغ جديد',
-                        message: 'تم تسجيل بلاغ جديد في النظام',
-                        type: 'info'
-                    });
-                }
+                // جولة ربط الإشعارات: النوع من خريطة الأحداث المركزية (report.entry_added ← 🔴 danger «بلاغ جديد عاجل»)
+                await notificationService.notifyOperational({ eventKey: 'report.entry_added', title: 'بلاغ جديد', message: 'تم تسجيل بلاغ جديد في النظام' });
             }
         } catch (notifErr) {
             console.error('Notification creation error:', notifErr);
@@ -10554,7 +10824,8 @@ app.put('/api/chat/messages/:id/read', authenticate, async (req, res) => {
         // Broadcast read receipt to conversation participants only (fail-closed)
         await broadcastToConversation(message.conversation_id, { type: 'chat_read', messageId: messageId, userId: userId, readAt: new Date().toISOString() });
         // Broadcast read receipt to conversation participants
-        res.json({ success: true, message: 'تم الت标记 كمقروء' });
+        // جولة ربط الإشعارات — إصلاح تلف نصي: كانت هنا محارف صينية متسربة موضع «التعليم»
+        res.json({ success: true, message: 'تم التعليم كمقروء' });
     } catch (err) {
         console.error('Mark read error:', err);
         res.status(500).json({ error: 'فشل في تحديث حالة القراءة' });
@@ -10879,6 +11150,21 @@ server.listen(PORT, async () => {
             opsEngine.wireEvents({ broadcast });
             // 6-ج: اشتراك الوعي في نبض المنصة (نفس الناقل — صمت ما لم تتغيّر البصمة)
             smartAwarenessService.subscribe(opsEngine.bus);
+            // جولة توصيل الأحداث: تغيير حالة فرقة ← 🟡. الكاشف القائم الوحيد المستخدم:
+            // CenterStatusChanged من CompletionService — يُطلق عند انتقال جاهزية فعلي
+            // لفريق قائم في تكميل سابق (الحفظ الأول ليس «تغييرًا» — منع ضجيج مدمج).
+            // لا كاشف جديد أُنشئ، ولا إشعارات للحفظ الروتيني («عند الشك لا تُرسل»).
+            opsEngine.bus.on('CenterStatusChanged', (payload) => {
+                (async () => {
+                    if (!dbAvailable() || !db.Notifications || !payload || !payload.team) return;
+                    const toTxt = payload.to === 'ناقص' ? 'أصبحت ناقصة' : 'عادت مكتملة';
+                    await notificationService.notifyOperational({
+                        eventKey: 'staffing.changed',
+                        title: 'تغيير حالة فرقة',
+                        message: 'فرقة ' + payload.team + ' ' + toTxt
+                    });
+                })().catch(e => console.error('Notification creation error (staffing.changed):', e.message));
+            });
             reportService = new ReportService({ engine: opsEngine, bus: opsEngine.bus });
             completionService = new CompletionService({ engine: opsEngine, bus: opsEngine.bus });
             console.log('✅ Event-driven services wired (ReportService, CompletionService)');
@@ -10922,6 +11208,18 @@ server.listen(PORT, async () => {
             const VehicleEventsService = require('./services/vehicle-events-service');
             staffingEventsService = new StaffingEventsService({ storage: opsEngine.storage, engine: opsEngine });
             vehicleEventsService = new VehicleEventsService({ storage: opsEngine.storage, engine: opsEngine });
+
+            // جولة Operational Workflow Completion (المرحلة ب): SignoutService —
+            // المالك الوحيد لأحداث TEAM_CHECKOUT (shift_signout_events، append-only)
+            // + الاقتراح التلقائي. تعديل «الآن فهمت قصدك 100%»: التسجيل اختياري
+            // حسب الحاجة — أُزيل منطق حالة التغطية بالكامل (دالة status ومقام
+            // الفرق المحَقون: نسبة/فرق ناقصة/حالات)؛ لا إلزام ولا تحذير نقص.
+            // يُجمَّع بعد StaffingEventsService مباشرة.
+            const SignoutService = require('./services/signout-service');
+            signoutService = new SignoutService({
+                db, bus: opsEngine.bus, getActiveShiftId, staffingService: staffingEventsService, storage: opsEngine.storage
+            });
+            console.log('✅ SignoutService wired (المرحلة ب)');
             // SR-2: RosterSyncService — القناة الوحيدة لكتابة employees/shift_roster
             // من الجدولة. بعدها لا قراءة تشغيلية من JSON إطلاقًا.
             const RosterSyncService = require('./services/roster-sync-service');

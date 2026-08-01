@@ -1155,6 +1155,65 @@ async function runMigrations() {
     }
   }
 
+  // ── جولة Operational Workflow Completion (المرحلة أ): سجل أحداث التمركزات ──
+  // Append-only: كل إنشاء/تعديل/إنهاء/كنس لخطة تمركز (peak_plans) يُختم هنا
+  // مربوطًا بالمناوبة، فتصبح دورة حياة التمركز جزءًا من سجل المناوبة
+  // (تفاصيل/أرشيف/إحصائيات/تصدير). جدول مستقل لأن operational_events مقيّد
+  // بـ CHECK(domain) لا يقبل التوسعة الإضافية. shift_id بلا REFERENCES عمدًا
+  // (نفس نمط جداول المحتوى: بقاء السجل بعد حذف المناوبة الأم — أمان تدقيقي).
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS positioning_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER,
+      plan_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      changed_fields TEXT,
+      payload TEXT NOT NULL DEFAULT '{}',
+      actor_id TEXT,
+      actor_name TEXT,
+      created_at TEXT
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_positioning_events_shift ON positioning_events(shift_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_positioning_events_plan ON positioning_events(plan_id)`);
+  } catch (err) {
+    logger.warn('positioning_events table creation: ' + err.message);
+  }
+
+  // ── جولة Operational Workflow Completion (المرحلة ب): تسجيل خروج المناوبة ──
+  // TEAM_CHECKOUT حدث تشغيلي في دورة حياة الفرقة (بدء ← تكميل ← تمركز ← دعم ←
+  // مركبات ← تسجيل خروج ← اعتماد ← أرشفة): يُختم بـ Shift ID + Team ID +
+  // الطوابع الزمنية + User ID + الحمولة (الأسماء/الملاحظات)، وكل صفحة تحتاج
+  // المعلومة تقرأ من هذا السجل — لا نموذج مستقل ولا مصدر موازٍ.
+  // جدول مستقل append-only بنمط positioning_events نفسه لأن operational_events
+  // مقيّد بـ CHECK(domain IN (...)) لا يقبل التوسعة الإضافية في SQLite إلا
+  // بإعادة بناء الجدول (غير إضافية — مرفوضة). shift_id بلا REFERENCES عمدًا
+  // (نفس نمط جداول المحتوى: بقاء السجل بعد حذف المناوبة الأم — أمان تدقيقي).
+  // كل ضغطة «تسجيل خروج» = حدث يُلحق ولا يُعدَّل ولا يُحذف؛ الحالة الحالية
+  // للفرقة = أحدث حدث لها (عرض مشتق من السجل — لا جدول حالة موازٍ)، والتصحيح
+  // حدث جديد يبقي الأثر التدقيقي كاملًا. التخزين ISO (UTC) والعرض Asia/Riyadh
+  // عبر الطبقة المركزية — نمط المنصة نفسه. (هذا التصميم يلغي الجدول الوسيط
+  // shift_signouts/UPSERT من التكرار الأول للمرحلة ب قبل أي نشر له؛ إن وُجد
+  // في قاعدة تطوير فهو يتيم غير مقروء — الإبقاء عليه أرخص من DROP غير الإضافي.)
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS shift_signout_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER NOT NULL,
+      shift_date TEXT,
+      shift_type TEXT,
+      event_type TEXT NOT NULL DEFAULT 'TEAM_CHECKOUT',
+      team TEXT NOT NULL,
+      members TEXT NOT NULL DEFAULT '[]',
+      notes TEXT,
+      actor_id TEXT,
+      actor_name TEXT,
+      created_at TEXT
+    )`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_signout_events_shift ON shift_signout_events(shift_id)`);
+    await exec(`CREATE INDEX IF NOT EXISTS idx_shift_signout_events_team ON shift_signout_events(team)`);
+  } catch (err) {
+    logger.warn('shift_signout_events table creation: ' + err.message);
+  }
+
   // Archive slice: seal blobs. The table predates this slice in real
   // databases (REFERENCES shifts + CHECK on snapshot_type) but nothing ever
   // wrote to it — the engine now inserts one row per seal and the
@@ -2376,6 +2435,16 @@ const Notifications = {
   async create(data) {
     const result = await run('INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, ?);', [data.user_id, data.title, data.message || '', data.type || 'info', data.is_read ? 1 : 0]);
     return result.id;
+  },
+  // جولة توصيل الأحداث — منع التكرار (إضافي صرف، صفر تعديل على الدوال القائمة):
+  // findRecentMatch يبحث عن إشعار مطابق (نفس المستخدم/العنوان/الرسالة = نفس
+  // الحدث على نفس الكيان) داخل النافذة الزمنية، وtouch يحدّث وقته بدل إنشاء
+  // صف مكرر. created_at بصيغة CURRENT_TIMESTAMP لذا المقارنة بـdatetime('now').
+  async findRecentMatch(userId, title, message, windowMinutes) {
+    return get("SELECT id FROM notifications WHERE user_id = ? AND title = ? AND message = ? AND created_at >= datetime('now', '-' || ? || ' minutes') ORDER BY created_at DESC LIMIT 1", [userId, title, message || '', windowMinutes]);
+  },
+  async touch(id) {
+    return run("UPDATE notifications SET created_at = datetime('now') WHERE id = ?", [id]);
   },
   async markAsRead(id) {
     return run('UPDATE notifications SET is_read = 1 WHERE id = ?', [id]);

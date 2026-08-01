@@ -11,6 +11,9 @@
 <style>
 :root {
     /* الهوية التنفيذية الداكنة — نفس رموز executive-theme.css المعتمدة (توحيد بصري فقط) */
+    /* تعديل «الآن فهمت قصدك 100%»③: color-scheme: dark — عناصر النماذج الأصيلة
+       (قائمة select المنسدلة وأشرطة التمرير) ترث الهوية الداكنة بدل الأبيض الافتراضي */
+    color-scheme: dark;
     --bg:#0A1220; --card:rgba(255,255,255,0.035); --border:rgba(255,255,255,0.08); --text:#F1F5F9; --muted:#8A9BB0;
     --green:#10B586; --green-light:rgba(16,181,134,0.10); --yellow:#F59E0B; --yellow-light:rgba(245,158,11,0.10);
     --red:#EF4444; --red-light:rgba(239,68,68,0.10); --blue:#60A5FA; --blue-light:rgba(96,165,250,0.10);
@@ -194,8 +197,9 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .notes-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.25rem; box-shadow:var(--shadow); }
 .notes-box h3 { font-size:1rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
 .notes-box h3 i { color:var(--primary); }
-.notes-box textarea { width:100%; min-height:90px; padding:0.75rem; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:0.9rem; resize:vertical; background:var(--bg); }
-.notes-box textarea:focus { outline:none; border-color:var(--primary); }
+.notes-box textarea { width:100%; min-height:90px; padding:0.75rem; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:0.9rem; resize:vertical; background:var(--bg); color:var(--text); caret-color:var(--primary); }
+.notes-box textarea::placeholder { color:var(--muted); opacity:1; }
+.notes-box textarea:focus { outline:none; border-color:var(--primary); color:var(--text); }
 
 /* Finish */
 .finish-bar { display:flex; flex-direction:column; align-items:center; padding:1rem 2rem 2rem; gap:0.5rem; }
@@ -259,6 +263,33 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.10); border-radius:8px; }
 ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.16); }
+
+/* ═══ جولة Operational Workflow Completion (المرحلة ب): قسم «تسجيل خروج المناوبة» ═══
+   لوحة زجاجية بهوية الصفحة نفسها — اقتراح قابل للتعديل الاسمي الفردي + سجل المناوبة */
+.signout-panel { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1rem; display:flex; flex-direction:column; gap:0.85rem; }
+.signout-form { display:flex; flex-direction:column; gap:0.6rem; max-width:560px; }
+.signout-form select, .signout-form input { background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); caret-color:var(--primary); padding:0.55rem 0.8rem; font-size:0.85rem; font-family:inherit; }
+.signout-form select:focus, .signout-form input:focus, .signout-member input:focus { outline:none; border-color:rgba(14,164,122,0.50); box-shadow:0 0 0 3px rgba(14,164,122,0.12); }
+/* «الآن فهمت قصدك 100%»③: الهوية الداكنة كاملة — خيارات القائمة المنسدلة داكنة
+   صراحة (بعض المتصفحات ترسمها بيضاء رغم color-scheme)، وplaceholder واضح */
+.signout-form select option { background:#0A1220; color:#F1F5F9; }
+.signout-form input::placeholder, .signout-member input::placeholder { color:var(--muted); opacity:1; }
+.signout-source { font-size:0.72rem; color:var(--muted); }
+.signout-source i { color:var(--gold); margin-left:4px; }
+.signout-members { display:flex; flex-wrap:wrap; gap:0.5rem; }
+.signout-member { display:flex; align-items:center; gap:4px; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:3px 6px; }
+.signout-member i { color:var(--primary); font-size:0.7rem; }
+.signout-member input { background:transparent; border:none; color:var(--text); caret-color:var(--primary); font-size:0.85rem; font-family:inherit; width:130px; padding:3px 4px; }
+.signout-save { align-self:flex-start; background:var(--primary); color:#fff; border:none; border-radius:12px; padding:0.6rem 1.4rem; font-size:0.9rem; font-weight:700; font-family:inherit; cursor:pointer; transition:filter 0.2s; }
+.signout-save:hover { filter:brightness(1.12); }
+.signout-save:disabled { opacity:0.55; cursor:not-allowed; }
+.signout-log { display:flex; flex-direction:column; gap:0.4rem; }
+.signout-log-row { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem 1rem; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:0.5rem 0.8rem; font-size:0.8rem; }
+.signout-log-row .so-team { font-weight:700; }
+.signout-log-row .so-members { color:var(--text); }
+.signout-log-row .so-meta { color:var(--muted); font-size:0.72rem; margin-inline-start:auto; }
+.signout-log-row .so-notes { color:var(--muted); font-size:0.72rem; width:100%; }
+.signout-log-empty { color:var(--muted); font-size:0.8rem; padding:0.25rem 0; }
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -360,6 +391,29 @@ function navigateToPage(url) {
         <div class="cards-grid" id="unassignedVehicleCards"></div>
     </div>
     <div class="section-empty" id="vehiclesEmpty" style="display:none">لا توجد مركبات مسجلة في هذه المناوبة.</div>
+</div>
+
+<!-- ═══ جولة Operational Workflow Completion (المرحلة ب): تسجيل خروج المناوبة ═══
+     القسم الرسمي لخروج الفرق (بديل كتابة الأسماء في خانة الملاحظات):
+     اختيار الفرقة ← اقتراح تلقائي من الخادم (آخر تسجيل خروج أو آخر مناوبة فعلية —
+     لا الجدول الشهري ولا HR) ← تعديل اسم واحد عند الحاجة ← ضغطة «تسجيل خروج».
+     الحفظ سيرفري كحدث TEAM_CHECKOUT في سجل الأحداث (shift_signout_events —
+     مصدر حقيقة واحد append-only).
+     تعديل «الآن فهمت قصدك 100%» (تفويض المستخدم): التسجيل سجل تشغيلي اختياري
+     حسب الحاجة — تُسجَّل بعض الفرق فقط. أُزيل شريط «فرق لم تسجل خروجها» بالكامل:
+     لا تحذير ولا عدّاد نقص ولا إلزام. -->
+<div class="section" id="signoutSection">
+    <div class="section-title"><i class="fas fa-door-open"></i> تسجيل خروج المناوبة <span class="support-count" id="signoutCount"></span></div>
+    <div class="signout-panel">
+        <div class="signout-form">
+            <select id="signoutTeam" onchange="onSignoutTeamChange()"><option value="">— اختر الفرقة —</option></select>
+            <div class="signout-source" id="signoutSource" style="display:none"></div>
+            <div class="signout-members" id="signoutMembers"></div>
+            <input id="signoutNotes" placeholder="ملاحظات (اختيارية) — مثال: تبديل بسبب دعم أو غياب" style="display:none">
+            <button class="signout-save" id="signoutSaveBtn" style="display:none" onclick="recordSignout()"><i class="fas fa-check"></i> تسجيل خروج</button>
+        </div>
+        <div class="signout-log" id="signoutLog"></div>
+    </div>
 </div>
 
 <!-- نموذج النقص — النافذة الوحيدة للفرق: موظف + سبب ثم حفظ -->
@@ -688,6 +742,7 @@ function initLiveSync() {
             if (data.type === 'vehicles_updated') { loadVehiclesBoard(); loadStaffingState(); }
             else if (data.type === 'staffing_events_updated' || data.type === 'completion_updated' || data.type === 'team_status_changed') { loadStaffingState(); loadStaffingLog(); loadAvailableSupport(); }
             else if (data.type === 'roster_synced') { loadStaffingState(); loadAvailableSupport(); }
+            else if (data.type === 'shift_signout_recorded') { loadSignoutLog(); } // المرحلة ب: تحديث لحظي لسجل التسجيلات (اختياري — لا تحذير نقص بعد تعديل «الآن فهمت قصدك 100%»)
         } catch (e) { /* إطار غير JSON — يُتجاهل */ }
     };
     sseSync.onerror = function() {
@@ -1672,12 +1727,170 @@ document.addEventListener('DOMContentLoaded', function() {
     loadVehiclesBoard();
     loadSavedNotes();
     loadAvailableSupport(); // W-تكامل ③: حوض الدعم المتاح من الخادم
+    loadSignoutLog(); // المرحلة ب: سجل تسجيلات الخروج + قائمة الفرق للقسم الجديد (اختياري بالكامل — لا تحذير)
 
     // مرونة: إن تعذر أول جلب لحالة الفرق (شبكة/خادم) يُعاد المحاولة دوريًا حتى تصل
     setInterval(function() {
         if (!serverTeamsState) loadStaffingState();
     }, 15000);
 });
+
+// ------------------------------------
+// جولة Operational Workflow Completion (المرحلة ب)
+// تسجيل خروج المناوبة — عرض فقط فوق عقد الخادم (SSOT):
+//   GET  /api/signouts/suggest?team=   (الاقتراح: آخر تسجيل أو آخر مناوبة فعلية — لا جدول/لا HR)
+//   GET  /api/signouts?shift_id=       (الحالة الحالية: أحدث حدث TEAM_CHECKOUT لكل فرقة)
+//   POST /api/signouts {team,members,notes}  (إلحاق حدث سيرفري مختوم بالمناوبة والمستخدم والوقت)
+// لا أسماء ثابتة ولا اشتقاق محلي — الأسماء المقترحة تأتي من الخادم جاهزة،
+// والمستخدم يعدّل اسمًا فرديًا عند الحاجة ثم يضغط «تسجيل خروج» مرة واحدة.
+// تعديل «الآن فهمت قصدك 100%»: التسجيل اختياري حسب الحاجة — أُزيل مسار
+// /api/signouts/status ومنطق التغطية (مقام/نسبة/فرق ناقصة) وتحذيره بالكامل.
+// ------------------------------------
+var signoutLogCache = [];      // سجل المناوبة الحالية (من الخادم)
+var signoutSuggestCache = null; // آخر اقتراح معروض (للحفظ بضغطة واحدة)
+
+function refreshSignoutTeams() {
+    var sel = document.getElementById('signoutTeam');
+    if (!sel) return;
+    var current = sel.value;
+    var teams = serverTeamIds().filter(function(id) { return isOperationalTeam(id); });
+    var html = '<option value="">— اختر الفرقة —</option>';
+    teams.forEach(function(id) {
+        var done = signoutLogCache.some(function(so) { return so.team === id; });
+        html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(id) + (done ? ' ✓' : '') + '</option>';
+    });
+    sel.innerHTML = html;
+    if (current && teams.indexOf(current) >= 0) sel.value = current;
+}
+
+function loadSignoutLog() {
+    var h = authHeaders();
+    if (!h) return;
+    fetchCurrentShiftId().then(function(sid) {
+        var url = '/api/signouts' + (sid ? '?shift_id=' + encodeURIComponent(sid) : '');
+        return fetch(url, { headers: h });
+    }).then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+        if (!d || !d.success) return;
+        signoutLogCache = d.signouts || [];
+        renderSignoutLog();
+        refreshSignoutTeams();
+    }).catch(function() { /* عرض فقط — الفشل صامت */ });
+}
+
+function renderSignoutLog() {
+    var el = document.getElementById('signoutLog');
+    var cnt = document.getElementById('signoutCount');
+    if (cnt) cnt.textContent = signoutLogCache.length ? '(' + signoutLogCache.length + ')' : '';
+    if (!el) return;
+    if (!signoutLogCache.length) {
+        el.innerHTML = '<div class="signout-log-empty"><i class="fas fa-info-circle"></i> لا توجد تسجيلات خروج بعد لهذه المناوبة.</div>';
+        return;
+    }
+    el.innerHTML = signoutLogCache.map(function(so) {
+        return '<div class="signout-log-row">' +
+            '<span class="so-team"><i class="fas fa-users"></i> ' + escapeHtml(so.team) + '</span>' +
+            '<span class="so-members">' + (so.members || []).map(function(n) { return escapeHtml(n); }).join(' – ') + '</span>' +
+            '<span class="so-meta"><i class="fas fa-clock"></i> ' + fmtSoTime(so.createdAt) + ' • بواسطة: ' + escapeHtml(so.recordedByName || '—') + '</span>' +
+            (so.notes ? '<span class="so-notes"><i class="fas fa-sticky-note"></i> ' + escapeHtml(so.notes) + '</span>' : '') +
+        '</div>';
+    }).join('');
+}
+
+function fmtSoTime(v) {
+    if (!v) return '—';
+    try {
+        var p = TimeRiyadh.riyadhParts(new Date(v));
+        return p.hour + ':' + p.minute + ' • ' + p.day + '/' + p.month + '/' + p.year;
+    } catch (e) { return String(v); }
+}
+
+function onSignoutTeamChange() {
+    var team = document.getElementById('signoutTeam').value;
+    var mem = document.getElementById('signoutMembers');
+    var notes = document.getElementById('signoutNotes');
+    var btn = document.getElementById('signoutSaveBtn');
+    signoutSuggestCache = null;
+    if (!team) {
+        document.getElementById('signoutSource').style.display = 'none';
+        mem.innerHTML = ''; notes.style.display = 'none'; btn.style.display = 'none';
+        return;
+    }
+    // فرقة مسجلة هذه المناوبة؟ ← إعادة الحفظ تصحيح: يُملأ من سجلها الحالي مباشرة
+    var existing = signoutLogCache.find(function(so) { return so.team === team; });
+    if (existing) {
+        signoutSuggestCache = { members: existing.members.slice(), sourceLabel: 'مسجلة في هذه المناوبة — الحفظ الآن يصحّح السجل' };
+        notes.value = existing.notes || '';
+        renderSignoutSuggestion();
+        return;
+    }
+    notes.value = '';
+    mem.innerHTML = '<span style="color:var(--muted);font-size:0.8rem"><i class="fas fa-circle-notch fa-spin"></i> جارٍ جلب الاقتراح من الخادم…</span>';
+    fetch('/api/signouts/suggest?team=' + encodeURIComponent(team), { headers: authHeaders() })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            if (document.getElementById('signoutTeam').value !== team) return; // تغيّر الاختيار أثناء الجلب
+            if (!d || !d.success) { mem.innerHTML = '<span style="color:var(--red);font-size:0.8rem">تعذر جلب الاقتراح — تحقق من الاتصال</span>'; return; }
+            signoutSuggestCache = d;
+            renderSignoutSuggestion();
+        }).catch(function() { mem.innerHTML = '<span style="color:var(--red);font-size:0.8rem">تعذر جلب الاقتراح — تحقق من الاتصال</span>'; });
+}
+
+function renderSignoutSuggestion() {
+    var src = document.getElementById('signoutSource');
+    var mem = document.getElementById('signoutMembers');
+    var d = signoutSuggestCache || { members: [] };
+    src.innerHTML = d.sourceLabel
+        ? '<i class="fas fa-magic"></i> الاقتراح من: ' + escapeHtml(d.sourceLabel)
+        : '<i class="fas fa-info-circle"></i> لا يوجد سجل سابق لهذه الفرقة — أدخل الأسماء';
+    src.style.display = '';
+    var members = (d.members && d.members.length) ? d.members : ['', '']; // حقلان فارغان كبداية
+    mem.innerHTML = members.map(function(n, i) {
+        return '<span class="signout-member"><i class="fas fa-user"></i><input data-so-idx="' + i + '" value="' + escapeHtml(n).replace(/"/g, '&quot;') + '" placeholder="اسم الفرد ' + (i + 1) + '"></span>';
+    }).join('') + '<button type="button" class="signout-member" style="cursor:pointer;color:var(--primary);font-size:0.78rem" onclick="addSignoutMemberField()"><i class="fas fa-plus"></i> إضافة فرد</button>';
+    document.getElementById('signoutNotes').style.display = '';
+    document.getElementById('signoutSaveBtn').style.display = '';
+}
+
+function addSignoutMemberField() {
+    var mem = document.getElementById('signoutMembers');
+    var inputs = mem.querySelectorAll('input[data-so-idx]');
+    var span = document.createElement('span');
+    span.className = 'signout-member';
+    span.innerHTML = '<i class="fas fa-user"></i><input data-so-idx="' + inputs.length + '" value="" placeholder="اسم الفرد ' + (inputs.length + 1) + '">';
+    mem.insertBefore(span, mem.lastElementChild);
+    span.querySelector('input').focus();
+}
+
+function recordSignout() {
+    var team = document.getElementById('signoutTeam').value;
+    if (!team) return;
+    var names = Array.from(document.querySelectorAll('#signoutMembers input[data-so-idx]'))
+        .map(function(inp) { return inp.value.trim(); }).filter(Boolean);
+    if (!names.length) { showToast('⚠️ أدخل اسمًا واحدًا على الأقل', 'error'); return; }
+    var btn = document.getElementById('signoutSaveBtn');
+    btn.disabled = true;
+    fetch('/api/signouts', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+        body: JSON.stringify({ team: team, members: names, notes: document.getElementById('signoutNotes').value.trim() })
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        btn.disabled = false;
+        if (!d || !d.success) { showToast('❌ ' + ((d && d.error) || 'فشل تسجيل الخروج'), 'error'); return; }
+        showToast('✅ تم تسجيل خروج ' + team, 'success');
+        document.getElementById('signoutTeam').value = '';
+        onSignoutTeamChange();
+        loadSignoutLog();
+    }).catch(function() { btn.disabled = false; showToast('❌ خطأ في الاتصال بالخادم', 'error'); });
+}
+
+// ربط القسم بدورة عرض الصفحة: قائمة الفرق تُحدَّث مع كل حالة خادم جديدة (تغليف بلا مساس)
+var _renderAllCore = renderAll;
+renderAll = function() {
+    _renderAllCore();
+    refreshSignoutTeams();
+};
 </script>
 
 <!-- RAG AI Assistant -->

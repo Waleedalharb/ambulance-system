@@ -20,6 +20,7 @@
  *     weekly:            [{ weekStart, shiftCount, reports, avg, max, min }]  // newest first
  *     centerDistribution:[{ center, count }]                             // desc
  *     hourlyProfile:     { '00': int, ..., '23': int }                   // from report_times
+ *     positioning:       { total: int, byShift: [{ shiftId, count }] }   // المرحلة أ — من peak_plans
  *   }
  */
 
@@ -143,7 +144,20 @@ class IndicatorService {
             if (r.h !== null && r.h !== undefined) hourlyProfile[r.h] = r.c;
         }
 
-        return { shiftStats, recentShifts, dailySeries, shiftTypes, weekly, centerDistribution, hourlyProfile };
+        // ── جولة Operational Workflow Completion (المرحلة أ): التمركزات ──
+        // سجل لا حالة: إجمالي خطط التمركز + توزيعها على المناوبات (peak_plans —
+        // نفس مصدر اللقطة والتفاصيل). الخطط اليتيمة (shift_id NULL) تُحسب في
+        // الإجمالي وتظهر تحت مفتاح null في byShift (قابلة للتصفية في العرض).
+        let positioning = { total: 0, byShift: [] };
+        try {
+            const posRows = await this.engine.storage.all(
+                'SELECT shift_id, COUNT(*) AS c FROM peak_plans GROUP BY shift_id ORDER BY c DESC'
+            );
+            const byShift = (Array.isArray(posRows) ? posRows : []).map(r => ({ shiftId: r.shift_id, count: r.c }));
+            positioning = { total: byShift.reduce((a, r) => a + r.count, 0), byShift };
+        } catch (e) { /* جدول قد لا يسبق التهيئة في بيئات الاختبار — الإجمالي صفر آمن */ }
+
+        return { shiftStats, recentShifts, dailySeries, shiftTypes, weekly, centerDistribution, hourlyProfile, positioning };
     }
 }
 

@@ -289,12 +289,10 @@ i, i.fas, i.far, i.fal, .fas, .far, .fal, [class^="fa-"], [class*=" fa-"] {
     justify-content: center;
     padding: 0 6px;
     flex-shrink: 0;
-    animation: unreadPulse 2s infinite;
-}
-
-@keyframes unreadPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+    /* جولة «إعادة تصميم الإشعارات والرسائل» (وثيقة «أنا معك 100%.txt» — خامسًا:
+       «لا أريد نبضات مستمرة»): كان unreadPulse 2s infinite نبضًا دائمًا في
+       سطح الرسائل. الشارة الآن مصمتة هادئة وحدَثية المعنى (العدد نفسه). */
+    animation: none;
 }
 
 .conversation-unread:empty,
@@ -303,13 +301,27 @@ i, i.fas, i.far, i.fal, .fas, .far, .fal, [class^="fa-"], [class*=" fa-"] {
     display: none;
 }
 
+/* جولة «إعادة تصميم الإشعارات والرسائل» (وثيقة «أنا معك 100%.txt» — ثالثًا):
+   صنف unread كان ميتًا (قواعد بلا طرف JS يضيفها) — chat.js أصبح يضيفه عند
+   unread_count>0. غير المقروء الآن: خلفية مختلفة قليلًا + اسم أثخن + معاينة
+   أوضح + شارة العدد المصمتة (النقطة الملونة). تُزال الحالة فور الفتح فيعاد
+   الطبيعي («إذا قُرئت: تعود للون الطبيعي»). */
+.conversation-item.unread {
+    background: rgba(96, 165, 250, 0.08);
+}
+
+.conversation-item.unread:hover {
+    background: rgba(96, 165, 250, 0.13);
+}
+
 .conversation-item.unread .conversation-name {
     color: #fff;
+    font-weight: 700;
 }
 
 .conversation-item.unread .conversation-preview {
     color: var(--chat-sidebar-text-light);
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .sidebar-empty {

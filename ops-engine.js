@@ -218,6 +218,16 @@ class OperationsEngine {
             safeBroadcast({ type: 'peak_plan_updated', message: 'تم تحديث خطة الذروة', plan: e.plan });
         });
 
+        // المرحلة ب: ShiftSignoutRecorded → 'shift_signout_recorded' — تحديث لحظي
+        // لصفحة التكميل المفتوحة ولوحة مركز العمليات عند تسجيل/تصحيح خروج فرقة
+        this.bus.on('ShiftSignoutRecorded', (e) => {
+            safeBroadcast({
+                type: 'shift_signout_recorded',
+                message: 'تم تسجيل خروج الفرقة: ' + e.team,
+                shiftId: e.shift_id,
+                signout: e.signout
+            });
+        });
         // ShiftNoteDeleted (Catalog D-5) → existing 'shift_note_deleted' message
         this.bus.on('ShiftNoteDeleted', (e) => {
             safeBroadcast({ type: 'shift_note_deleted', message: 'تم حذف ملاحظة من المناوبة', shiftId: e.shift_id, noteId: e.note_id });

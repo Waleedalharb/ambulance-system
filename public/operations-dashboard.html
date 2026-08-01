@@ -719,11 +719,17 @@ body::after {
             <button class="modal-tab-btn" data-mtab="forms" onclick="switchModalTab('forms')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-file-alt"></i> النماذج</button>
             <button class="modal-tab-btn" data-mtab="files" onclick="switchModalTab('files')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-folder-open"></i> الملفات</button>
             <button class="modal-tab-btn" data-mtab="audit" onclick="switchModalTab('audit')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-history"></i> سجل العمليات</button>
+            <!-- جولة Operational Workflow Completion (المرحلة أ): تبويب التمركزات السابع — محتواه يُبنى من سجل المناوبة عبر renderPositioningTab -->
+            <button class="modal-tab-btn" data-mtab="positioning" onclick="switchModalTab('positioning')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-map-marker-alt"></i> التمركزات</button>
+            <!-- المرحلة ب: تبويب «تسجيلات الخروج» الثامن — سجل رسمي: الفرقة/أفرادها/وقت الخروج/بواسطة (renderSignoutsTab) -->
+            <button class="modal-tab-btn" data-mtab="signouts" onclick="switchModalTab('signouts')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-door-open"></i> تسجيلات الخروج</button>
         </div>
         <div class="modal-body" id="shiftDetailBody" style="flex:1;overflow-y:auto">
             <div class="loading"><div class="spinner"></div> جاري التحميل...</div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem;text-align:left;flex-shrink:0">
+            <!-- المرحلة أ: تصدير سجل المناوبة (مع دورة حياة التمركزات) من الخادم — بجانب زر الإغلاق -->
+            <button class="btn btn-primary" onclick="exportShiftRecord()"><i class="fas fa-file-export"></i> تصدير السجل</button>
             <button class="btn" onclick="closeShiftModal()">إغلاق</button>
         </div>
     </div>
@@ -1497,6 +1503,139 @@ function refreshAll() {
     refreshLiveTab();
     showToast('تم التحديث', 'success');
 }
+
+// ============================================
+// جولة Operational Workflow Completion (المرحلة أ)
+// دورة حياة التمركزات داخل سجل المناوبة
+// ============================================
+// التبويب السابع «التمركزات»: يُبنى من نفس استجابة /api/shifts/:id
+// (positioning + positioning_events — لقطة مختومة للمؤرشفة، حيّة للنشطة).
+// التغليف يحفظ viewShift الأصلية حرفيًا ويضيف التبويب بعد نجاحها فقط.
+function renderPositioningTab(data) {
+    var body = document.getElementById('shiftDetailBody');
+    if (!body || !data || !(data.shift || data).id) return;
+    var old = document.getElementById('mtab-positioning');
+    if (old) old.remove();
+    var plans = Array.isArray(data.positioning) ? data.positioning : [];
+    var events = Array.isArray(data.positioning_events) ? data.positioning_events : [];
+    var html = '<div id="mtab-positioning" class="modal-tab-panel">';
+    if (plans.length > 0) {
+        html += '<table class="data-table"><thead><tr><th>التمركز</th><th>الفرقة</th><th>الموقع</th><th>البداية</th><th>النهاية</th><th>الوصول الفعلي</th><th>الحالة</th><th>الأولوية</th></tr></thead><tbody>';
+        plans.forEach(function (p) {
+            var stBadge = p.status === 'active' ? 'badge-success' : p.status === 'completed' ? 'badge-muted' : 'badge-info';
+            var stText = p.status === 'active' ? 'نشطة' : p.status === 'completed' ? 'مكتملة' : (p.status || '-');
+            html += '<tr><td style="font-weight:600">' + (p.title || '-') + '</td><td>' + (p.unit || '-') + '</td><td>' + (p.location || '-') + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + fmtDT(p.startTime) + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + fmtDT(p.endTime) + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + (p.arrivalTime ? fmtDT(p.arrivalTime) : '—') + '</td>' +
+                '<td><span class="badge ' + stBadge + '">' + stText + '</span></td><td>' + (p.priority || '-') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    } else {
+        html += '<div class="empty-state"><i class="fas fa-map-marker-alt"></i> لا توجد تمركزات مسجلة لهذه المناوبة</div>';
+    }
+    html += '<div style="margin-top:1rem"><strong style="color:var(--text-muted);font-size:0.8rem"><i class="fas fa-history"></i> سجل أحداث التمركزات (' + events.length + ')</strong></div>';
+    if (events.length > 0) {
+        var evLabels = { created: 'إنشاء', updated: 'تعديل', swept: 'انتهاء تلقائي', ended: 'إنهاء/حذف' };
+        html += '<table class="data-table" style="margin-top:0.4rem"><thead><tr><th>الوقت</th><th>الحدث</th><th>التمركز</th><th>المستخدم</th><th>ما تغيّر</th></tr></thead><tbody>';
+        events.forEach(function (ev) {
+            var evBadge = ev.eventType === 'created' ? 'badge-success' : ev.eventType === 'updated' ? 'badge-info' : ev.eventType === 'swept' ? 'badge-warning' : 'badge-danger';
+            var changes = '—';
+            if (ev.changedFields) {
+                changes = Object.keys(ev.changedFields).map(function (k) {
+                    var pair = ev.changedFields[k];
+                    return k + ': ' + (pair[0] == null ? '—' : pair[0]) + ' ← ' + (pair[1] == null ? '—' : pair[1]);
+                }).join(' · ');
+            }
+            html += '<tr><td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + fmtDT(ev.createdAt) + '</td>' +
+                '<td><span class="badge ' + evBadge + '">' + (evLabels[ev.eventType] || ev.eventType) + '</span></td>' +
+                '<td>' + ((ev.payload && ev.payload.title) || ev.planId || '-') + '</td>' +
+                '<td style="font-weight:600">' + (ev.actorName || 'system') + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted)">' + changes + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+    html += '</div>';
+    body.insertAdjacentHTML('beforeend', html);
+}
+
+var _viewShiftCore = viewShift;
+viewShift = async function (id) {
+    await _viewShiftCore(id);
+    // بعد نجاح الجلب فقط (currentShiftDetail يُحدَّث داخل الأصلية) — عند الفشل لا تبويب
+    if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderPositioningTab(currentShiftDetail);
+};
+
+// تصدير سجل المناوبة نصيًا من الخادم (Blob بمصادقة الجلسة — لا رابط مكشوف)
+async function exportShiftRecord() {
+    var sid = currentShiftDetail && (currentShiftDetail.shift || {}).id;
+    if (!sid) { showToast('لا توجد مناوبة معروضة للتصدير', 'warning'); return; }
+    try {
+        var res = await fetch('/api/shifts/' + sid + '/export', { headers: authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var blob = await res.blob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'shift-record-' + sid + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+        showToast('تم تصدير سجل المناوبة', 'success');
+    } catch (e) {
+        console.error('[ShiftExport] Error:', e);
+        showToast('تعذر تصدير السجل — تحقق من الاتصال', 'error');
+    }
+}
+
+// بطاقة «التمركزات» في تبويب الإحصائيات — تُلحق بعد نجاح loadAnalytics الأصلية
+var _loadAnalyticsCore = loadAnalytics;
+loadAnalytics = async function () {
+    await _loadAnalyticsCore();
+    try {
+        var res = await fetch('/api/indicators/dashboard', { headers: authHeaders() });
+        if (!res.ok) return;
+        var bundle = await res.json();
+        var pos = bundle.positioning || { total: 0 };
+        var el = document.getElementById('analyticsStats');
+        if (el) el.innerHTML += '<div class="stat-card"><div class="stat-icon purple"><i class="fas fa-map-marker-alt"></i></div><div><div class="stat-value">' + (pos.total || 0) + '</div><div class="stat-label">التمركزات</div></div></div>';
+    } catch (e) { /* بطاقة ملحقة — فشلها لا يكسر الإحصائيات الأصلية */ }
+};
+
+// ============================================
+// المرحلة ب: تبويب «تسجيلات الخروج» — سجل رسمي من /api/shifts/:id
+// (signouts — مختومة في اللقطة للمؤرشفة، حية للنشطة). تغليف إضافي فوق
+// تغليف المرحلة أ: renderSignoutsTab يُستدعى بعد اكتمال السلسلة كلها.
+// ============================================
+function renderSignoutsTab(data) {
+    var body = document.getElementById('shiftDetailBody');
+    if (!body || !data || !(data.shift || data).id) return;
+    var old = document.getElementById('mtab-signouts');
+    if (old) old.remove();
+    var signouts = Array.isArray(data.signouts) ? data.signouts : [];
+    var html = '<div id="mtab-signouts" class="modal-tab-panel">';
+    if (signouts.length > 0) {
+        html += '<table class="data-table"><thead><tr><th>الفرقة</th><th>أفراد الفرقة</th><th>وقت الخروج</th><th>بواسطة</th><th>ملاحظات</th></tr></thead><tbody>';
+        signouts.forEach(function (so) {
+            html += '<tr><td style="font-weight:600"><i class="fas fa-users" style="color:var(--primary)"></i> ' + (so.team || '-') + '</td>' +
+                '<td>' + (Array.isArray(so.members) && so.members.length ? so.members.join(' – ') : '—') + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap">' + fmtDT(so.createdAt) + '</td>' +
+                '<td style="font-weight:600">' + (so.recordedByName || '—') + '</td>' +
+                '<td style="font-size:0.75rem;color:var(--text-muted)">' + (so.notes || '—') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    } else {
+        html += '<div class="empty-state"><i class="fas fa-door-open"></i> لا توجد تسجيلات خروج لهذه المناوبة</div>';
+    }
+    html += '</div>';
+    body.insertAdjacentHTML('beforeend', html);
+}
+
+var _viewShiftCoreSignouts = viewShift;
+viewShift = async function (id) {
+    await _viewShiftCoreSignouts(id);
+    if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderSignoutsTab(currentShiftDetail);
+};
 
 // Init
 refreshLiveTab();

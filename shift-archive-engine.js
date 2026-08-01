@@ -413,6 +413,16 @@ class ShiftArchiveSnapshot {
         // 13-15. Archive slice: تفاصيل البلاغات + التمركزات + المحادثات (D-6)
         snapshot.reportEntries = await this._getReportEntries(shiftId);
         snapshot.positioning = await this._getPositioning(shiftId);
+        // 16. جولة Operational Workflow Completion (المرحلة أ): سجل أحداث التمركزات
+        // (append-only) يُختم داخل اللقطة — دورة الحياة كاملة (إنشاء/تعديل/كنس/إنهاء)
+        // تصبح جزءًا من الأرشيف التاريخي للمناوبة لا مجرد حالتها الأخيرة.
+        snapshot.positioningEvents = await this._getPositioningEvents(shiftId);
+        // 17. المرحلة ب: تسجيلات خروج الفرق — الحالة الحالية (أحدث حدث لكل فرقة)
+        // + سجل أحداث TEAM_CHECKOUT الكامل (append-only) مختومَين في اللقطة:
+        // من أنهى المناوبة ومتى ومن كانوا أفراد كل فرقة، مع أثر التصحيحات كاملًا
+        // (مصدر الحقيقة: shift_signout_events — لا جدول حالة موازٍ).
+        snapshot.signouts = await this._getSignouts(shiftId);
+        snapshot.signoutEvents = await this._getSignoutEvents(shiftId);
         snapshot.conversations = await this._getConversations(shiftId);
 
         // Calculate integrity hash
@@ -602,6 +612,93 @@ class ShiftArchiveSnapshot {
 
     async _getPositioning(shiftId) {
         return this._getContentRows('peak_plans', shiftId);
+    }
+
+    // المرحلة أ: أحداث التمركزات بترتيب وقوعها — الحقول JSON تُفك للعرض المباشر
+    async _getPositioningEvents(shiftId) {
+        try {
+            if (!this.db || !this.db.all) return [];
+            const rows = await this.db.all(
+                'SELECT * FROM positioning_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC',
+                [shiftId]
+            );
+            return (Array.isArray(rows) ? rows : []).map(r => {
+                let payload = {}, changed = null;
+                try { payload = r.payload ? JSON.parse(r.payload) : {}; } catch (e) {}
+                try { changed = r.changed_fields ? JSON.parse(r.changed_fields) : null; } catch (e) {}
+                return {
+                    id: r.id,
+                    planId: r.plan_id,
+                    eventType: r.event_type,
+                    changedFields: changed,
+                    payload,
+                    actorId: r.actor_id,
+                    actorName: r.actor_name,
+                    createdAt: r.created_at
+                };
+            });
+        } catch (err) {
+            console.error('[Snapshot] Error getting positioning events:', err.message);
+            return [];
+        }
+    }
+
+    // المرحلة ب: تسجيلات خروج الفرق — الحالة الحالية = أحدث حدث TEAM_CHECKOUT
+    // لكل فرقة (عرض مشتق من سجل shift_signout_events — members تُفك)
+    async _getSignouts(shiftId) {
+        try {
+            if (!this.db || !this.db.all) return [];
+            const rows = await this.db.all(
+                `SELECT s.* FROM shift_signout_events s
+                 JOIN (SELECT team, MAX(id) AS mid FROM shift_signout_events WHERE shift_id = ? GROUP BY team) t
+                   ON t.team = s.team AND t.mid = s.id ORDER BY s.id ASC`,
+                [shiftId]
+            );
+            return (Array.isArray(rows) ? rows : []).map(r => {
+                let members = [];
+                try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
+                return {
+                    id: r.id,
+                    team: r.team,
+                    members,
+                    notes: r.notes || '',
+                    recordedById: r.actor_id,
+                    recordedByName: r.actor_name,
+                    createdAt: r.created_at
+                };
+            });
+        } catch (err) {
+            console.error('[Snapshot] Error getting signouts:', err.message);
+            return [];
+        }
+    }
+
+    // المرحلة ب: سجل أحداث TEAM_CHECKOUT الكامل (append-only — يشمل التصحيحات)
+    async _getSignoutEvents(shiftId) {
+        try {
+            if (!this.db || !this.db.all) return [];
+            const rows = await this.db.all(
+                'SELECT * FROM shift_signout_events WHERE shift_id = ? ORDER BY id ASC',
+                [shiftId]
+            );
+            return (Array.isArray(rows) ? rows : []).map(r => {
+                let members = [];
+                try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
+                return {
+                    id: r.id,
+                    eventType: r.event_type || 'TEAM_CHECKOUT',
+                    team: r.team,
+                    members,
+                    notes: r.notes || '',
+                    actorId: r.actor_id,
+                    actorName: r.actor_name,
+                    createdAt: r.created_at
+                };
+            });
+        } catch (err) {
+            console.error('[Snapshot] Error getting signout events:', err.message);
+            return [];
+        }
     }
 
     // Archive Contract §5: conversations explicitly linked via shift_id

@@ -197,6 +197,10 @@ const ChatIntegration = {
 
     /**
      * Show Toast notification (bottom-right popup) — ONE PER MESSAGE
+     * جولة «إعادة تصميم الإشعارات والرسائل» (وثيقة «أنا معك 100%.txt»):
+     * البطاقة البيضاء بـcssText المضمّن استُبدلت بأصناف msg-toast الداكنة
+     * (نفس زجاج اللوحة — executive-theme.css قسم «حيوية الشريط العلوي»).
+     * الأنماط المضمّنة الباقية هنا وظيفية فقط (موضع الحاوية/إظهار)، صفر ألوان.
      */
     showToastNotification(message, conversationId) {
         // Ensure container exists
@@ -210,30 +214,28 @@ const ChatIntegration = {
         }
 
         var senderName = message.sender_name || 'مستخدم';
-        var initials = senderName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2);
-        var colors = ['#0D9488','#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981'];
-        var color = colors[senderName.charCodeAt(0) % colors.length];
+        var avIdx = this.avatarPaletteIndex(senderName);
+        var initials = this.avatarInitials(senderName);
         var time = this.formatTime(message.created_at);
         var preview = this.escapeHtml(message.content || '').substring(0, 55);
         if ((message.content || '').length > 55) preview += '...';
 
         var toast = document.createElement('div');
-        toast.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04);cursor:pointer;pointer-events:all;min-width:280px;max-width:340px;opacity:0;transform:translateX(-100px);transition:all 0.3s ease;border-right:3px solid ' + color + ';direction:rtl;margin-bottom:6px;';
+        toast.className = 'msg-toast msg-b-' + avIdx;
 
-        toast.innerHTML = '<div style="width:38px;height:38px;border-radius:50%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">' + initials + '</div>' +
-            '<div style="flex:1;min-width:0;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">' +
-                    '<span style="font-weight:600;font-size:0.82rem;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">' + this.escapeHtml(senderName) + '</span>' +
-                    '<span style="font-size:0.65rem;color:#94A3B8;flex-shrink:0;">' + time + '</span>' +
+        toast.innerHTML = '<span class="msg-avatar msg-av-' + avIdx + '">' + this.escapeHtml(initials) + '</span>' +
+            '<div class="msg-toast-body">' +
+                '<div class="msg-toast-top">' +
+                    '<span class="msg-toast-name">' + this.escapeHtml(senderName) + '</span>' +
+                    '<span class="msg-toast-time">' + time + '</span>' +
                 '</div>' +
-                '<div style="font-size:0.78rem;color:#64748B;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + preview + '</div>' +
+                '<div class="msg-toast-preview">' + preview + '</div>' +
             '</div>' +
-            '<button style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:1.1rem;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;" onclick="event.stopPropagation();this.parentElement.remove();">&times;</button>';
+            '<button class="msg-toast-close" onclick="event.stopPropagation();this.parentElement.remove();">&times;</button>';
 
         container.appendChild(toast);
         requestAnimationFrame(function() {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateX(0)';
+            toast.classList.add('msg-toast-in');
         });
 
         // Click to open conversation
@@ -244,8 +246,7 @@ const ChatIntegration = {
 
         // Auto remove after 6 seconds
         setTimeout(function() {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-100px)';
+            toast.classList.remove('msg-toast-in');
             setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
         }, 6000);
     },
@@ -337,6 +338,27 @@ const ChatIntegration = {
     },
 
     /**
+     * لوحة الأفتار الثابتة (جولة الإشعارات والرسائل): 6 درجات من لوحة المنصة،
+     * تُقابل أصناف .msg-av-0..5 في executive-theme.css — صفر style= للألوان.
+     * التجزئة على كامل الاسم (لا الحرف الأول فقط) لتوزيع أعدل بين المرسلين.
+     */
+    avatarPaletteIndex(name) {
+        var s = String(name || 'م');
+        var h = 0;
+        for (var i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) >>> 0;
+        return h % 6;
+    },
+
+    /**
+     * الأحرف الأولى للأفتار — أول حرفين من كلمات الاسم (بلا صور مخزنة في المنصة)
+     */
+    avatarInitials(name) {
+        var parts = String(name || '؟').trim().split(/\s+/).filter(Boolean);
+        var initials = parts.map(function(w) { return w[0]; }).join('').substring(0, 2);
+        return initials || '؟';
+    },
+
+    /**
      * Get current user ID
      */
     getCurrentUserId() {
@@ -398,12 +420,16 @@ const ChatIntegration = {
         const list = document.getElementById('chatPreviewList');
         if (!list) return;
 
-        list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</p>';
+        // جولة «إعادة تصميم الإشعارات والرسائل» (وثيقة «أنا معك 100%.txt» — ثالثًا):
+        // الصفوف الفاتحة بـstyle= المضمّن استُبدلت ببطاقات msg-* الداكنة بلا أي
+        // نمط مضمّن: أفتار أحرف ملوّن + اسم + وقت نسبي + معاينة أول سطر +
+        // حالة قراءة (غير المقروء: أثخن + نقطة على الأفتار + خلفية مختلفة).
+        list.innerHTML = '<p class="msg-state"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</p>';
 
         try {
             const token = this.getToken();
             if (!token) {
-                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">يرجى تسجيل الدخول</p>';
+                list.innerHTML = '<p class="msg-state">يرجى تسجيل الدخول</p>';
                 return;
             }
 
@@ -412,7 +438,7 @@ const ChatIntegration = {
             });
 
             if (!res.ok) {
-                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">لا توجد رسائل حديثة</p>';
+                list.innerHTML = '<p class="msg-state">لا توجد رسائل حديثة</p>';
                 return;
             }
 
@@ -420,7 +446,7 @@ const ChatIntegration = {
             const conversations = data.conversations || data || [];
 
             if (!conversations || conversations.length === 0) {
-                list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">لا توجد رسائل حديثة</p>';
+                list.innerHTML = '<p class="msg-state">لا توجد رسائل حديثة</p>';
                 return;
             }
 
@@ -430,26 +456,40 @@ const ChatIntegration = {
                 .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
                 .slice(0, 5);
 
+            if (!sortedConvs.length) {
+                list.innerHTML = '<p class="msg-state">لا توجد رسائل حديثة</p>';
+                return;
+            }
+
             list.innerHTML = sortedConvs.map(conv => {
                 const lastMsg = conv.last_message;
                 const unread = conv.unread_count || conv.unreadCount || 0;
                 const time = lastMsg ? this.formatTime(lastMsg.created_at) : '';
-                const snippet = lastMsg ? (lastMsg.content || '').substring(0, 60) : 'لا توجد رسائل';
-                const sender = lastMsg ? (lastMsg.sender_name || 'مستخدم') : '';
+                // معاينة أول سطر فقط (الوثيقة: «معاينة لأول سطر»)
+                const firstLine = lastMsg ? String(lastMsg.content || '').split('\n')[0] : '';
+                const snippet = firstLine.substring(0, 60) + (firstLine.length > 60 ? '...' : '');
+                const title = conv.title || 'محادثة';
+                const isGroup = conv.type === 'group';
+                // بادئة «المرسل:» للمجموعات فقط — في الخاص الاسم هو العنوان نفسه
+                const sender = (isGroup && lastMsg && lastMsg.sender_name) ? lastMsg.sender_name : '';
+                const avatar = isGroup
+                    ? '<span class="msg-avatar msg-avatar-group"><i class="fas fa-users"></i>'
+                    : '<span class="msg-avatar msg-av-' + this.avatarPaletteIndex(title) + '">' + this.escapeHtml(this.avatarInitials(title));
 
-                return `<a href="chat.html?conv=${conv.id}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--gray-200); text-decoration:none; color:inherit; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">` +
-                    `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">` +
-                        `<span style="font-weight:600; font-size:0.8rem; color:var(--text);">${this.escapeHtml(conv.title || 'محادثة')}</span>` +
-                        (unread > 0 ? `<span style="background:#EF4444; color:white; font-size:0.6rem; font-weight:700; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 4px;">${unread}</span>` : '') +
-                    `</div>` +
-                    `<div style="font-size:0.75rem; color:var(--gray-500); direction:rtl; text-align:right;">` +
-                        (sender ? `<strong>${this.escapeHtml(sender)}:</strong> ` : '') + this.escapeHtml(snippet) + (lastMsg && lastMsg.content && lastMsg.content.length > 60 ? '...' : '') +
-                    `</div>` +
-                    (time ? `<div style="font-size:0.65rem; color:var(--gray-400); margin-top:3px; text-align:left;">${time}</div>` : '') +
-                `</a>`;
+                return '<a class="msg-card' + (unread > 0 ? ' msg-unread' : '') + '" href="chat.html?conv=' + conv.id + '">' +
+                    avatar + (unread > 0 ? '<span class="msg-dot" title="غير مقروء"></span>' : '') + '</span>' +
+                    '<div class="msg-body">' +
+                        '<div class="msg-top">' +
+                            '<span class="msg-name">' + this.escapeHtml(title) + '</span>' +
+                            (unread > 0 ? '<span class="msg-count">' + (unread > 99 ? '99+' : unread) + '</span>' : '') +
+                            '<span class="msg-time">' + time + '</span>' +
+                        '</div>' +
+                        '<div class="msg-preview">' + (sender ? '<strong>' + this.escapeHtml(sender) + ':</strong> ' : '') + this.escapeHtml(snippet || 'لا توجد رسائل') + '</div>' +
+                    '</div>' +
+                '</a>';
             }).join('');
         } catch (err) {
-            list.innerHTML = '<p style="text-align:center; color:var(--gray-400); padding:16px; font-size:0.85rem;">لا توجد رسائل حديثة</p>';
+            list.innerHTML = '<p class="msg-state">لا توجد رسائل حديثة</p>';
         }
     },
 
@@ -465,6 +505,181 @@ const ChatIntegration = {
     }
 };
 
+/* ============================================================================
+   حيوية الشريط العلوي — جولة «إعادة تصميم نظام الإشعارات والرسائل»
+   (وثيقة المستخدم «أنا معك 100%.txt» — 2026-08، نسخة في workspace)
+   ───────────────────────────────────────────────────────────────────────────
+   لماذا يعيش هذا القسم هنا وليس في app.js؟ app.js وindex.html مختومان بحراس
+   الجولات السابقة (check_charts_modal / check_distribution_modal /
+   check_shift_signout / check_uat_polish_phase1 — بصمات وdiff-locks)، بينما
+   هذا الملف محمَّل على index.html (سطر 2177) ومفتوح التعديل — فكان بيت
+   التنفيذ الوحيد بصفر لمس للمقفل.
+   ما يضيفه (عرض فقط — لا تغيير بيانات ولا تدفق ولا معالجات):
+   ② مراقب MutationObserver على #notificationList: البطاقة الوافدة فقط تأخذ
+     .nc-new (انزلاق+fade مرة واحدة) + وميض الجرس .nc-flash مرة واحدة لكل دفعة.
+     التفعيل الأول صامت (ما هو معروض عند فتح الصفحة ليس «جديدًا»).
+   ⑤ سطر «آخر نشاط قبل X» / «N أحداث جديدة منذ آخر زيارة» — شريط .nc-activity
+     يُحقن بين رأس اللوحة وجسمها (حقن DOM، صفر ماركب). «آخر زيارة» تُختم في
+     localStorage[nc_last_visit] عند فتح اللوحة — تفضيل عرض محلي صِرف أقرّته
+     الوثيقة («localStorage مقبول صراحة» لتفضيلات العرض).
+   ④ العداد ± والظهور الفوري قائمان أصلًا عبر SSE في app.js (notification_created/
+     notification_new ← loadNotifications) — هذا القسم لا يعيد بناءهما.
+   window.__ncLiveness: عدّادات تشخيصية للأجنحة الآلية (fresh/flashed) —
+   لا تؤثر في السلوك.
+   ============================================================================ */
+const TopbarLiveness = {
+    VISIT_KEY: 'nc_last_visit',
+    panel: null,
+    list: null,
+    activityEl: null,
+    knownKeys: new Set(),
+    primed: false,
+    stats: { fresh: 0, flashed: 0 },
+
+    init() {
+        const panel = document.getElementById('notificationPanel');
+        const list = document.getElementById('notificationList');
+        if (!panel || !list) return; // صفحات بلا مركز إشعارات — لا شيء يُفعَّل
+        this.panel = panel;
+        this.list = list;
+
+        // ⑤ شريط «آخر نشاط» بين الرأس والجسم
+        this.activityEl = document.createElement('div');
+        this.activityEl.className = 'nc-activity';
+        this.activityEl.style.display = 'none';
+        panel.insertBefore(this.activityEl, list);
+
+        const self = this;
+        // ② وصول البطاقات
+        new MutationObserver(function() { self.onListChange(); })
+            .observe(list, { childList: true });
+        // ⑤ فتح اللوحة = «زيارة» — يُحتسب N مقابل الختم السابق ثم يُختم الآن
+        new MutationObserver(function() {
+            if (panel.style.display === 'block') self.onPanelOpen();
+        }).observe(panel, { attributes: true, attributeFilter: ['style'] });
+
+        this.onListChange(); // التقاط الحالة الابتدائية (تفعيل صامت)
+    },
+
+    // مفتاح هوية البطاقة: عنوان+وقت+بادئة الرسالة — مستقر عبر إعادات الرسم
+    cardKey(card) {
+        const t = card.querySelector('.nc-title');
+        const tm = card.querySelector('.nc-time span');
+        const m = card.querySelector('.nc-message');
+        return (t ? t.textContent : '') + '|' + (tm ? tm.textContent : '') + '|' + (m ? m.textContent.slice(0, 24) : '');
+    },
+
+    onListChange() {
+        const cards = this.list.querySelectorAll('.nc-item');
+        const nowKeys = new Set();
+        const fresh = [];
+        cards.forEach(card => {
+            const key = this.cardKey(card);
+            nowKeys.add(key);
+            if (this.primed && !this.knownKeys.has(key)) fresh.push(card);
+        });
+        this.knownKeys = nowKeys;
+        if (!this.primed) {
+            // أول دفعة مرئية بعد فتح الصفحة ليست «جديدة» — تُسجَّل بصمت
+            if (cards.length) this.primed = true;
+        } else if (fresh.length) {
+            this.stats.fresh += fresh.length;
+            fresh.forEach(card => {
+                card.classList.add('nc-new');
+                card.addEventListener('animationend', function h() {
+                    card.classList.remove('nc-new');
+                    card.removeEventListener('animationend', h);
+                });
+            });
+            this.flashBell();
+        }
+        this.updateActivity();
+    },
+
+    // ② وميض الجرس مرة واحدة لكل دفعة وصول — يُزال الصنف على animationend
+    flashBell() {
+        const bell = document.getElementById('notificationBell');
+        if (!bell || bell.classList.contains('nc-flash')) return;
+        this.stats.flashed++;
+        bell.classList.add('nc-flash');
+        const h = () => { bell.classList.remove('nc-flash'); bell.removeEventListener('animationend', h); };
+        bell.addEventListener('animationend', h);
+        setTimeout(() => bell.classList.remove('nc-flash'), 900); // احتياط إن غاب animationend
+    },
+
+    onPanelOpen() {
+        this.updateActivity(); // يقرأ الختم السابق قبل استبداله
+        try { localStorage.setItem(this.VISIT_KEY, new Date().toISOString()); } catch (e) {}
+    },
+
+    // ⑤ نص الشريط: «آخر نشاط قبل X» + «N أحداث جديدة منذ آخر زيارة»
+    updateActivity() {
+        if (!this.activityEl) return;
+        const cards = Array.from(this.list.querySelectorAll('.nc-item'));
+        if (!cards.length) { this.activityEl.style.display = 'none'; return; }
+        const times = cards
+            .map(c => this.parseTs((c.querySelector('.nc-time span') || {}).textContent))
+            .filter(Boolean);
+        if (!times.length) { this.activityEl.style.display = 'none'; return; }
+        const latest = new Date(Math.max.apply(null, times.map(d => d.getTime())));
+
+        let since = 0, hasVisit = false;
+        try {
+            const raw = localStorage.getItem(this.VISIT_KEY);
+            if (raw) {
+                const lv = new Date(raw);
+                if (!isNaN(lv)) { hasVisit = true; since = times.filter(d => d > lv).length; }
+            }
+        } catch (e) {}
+
+        let html = '<i class="fas fa-history"></i><span>آخر نشاط ' + this.relTime(latest) + '</span>';
+        if (hasVisit && since > 0) {
+            html += '<span class="nc-activity-sep">•</span><span class="nc-activity-new">' + this.newEventsText(since) + ' منذ آخر زيارة</span>';
+        }
+        this.activityEl.innerHTML = html;
+        this.activityEl.style.display = 'flex';
+    },
+
+    newEventsText(n) {
+        if (n === 1) return 'حدث جديد';
+        if (n === 2) return 'حدثان جديدان';
+        if (n <= 10) return n + ' أحداث جديدة';
+        return n + ' حدثًا جديدًا';
+    },
+
+    // صيغة عربية سليمة للتناسب (دقيقة/دقيقتين/دقائق، ساعة/ساعتين/ساعات، يوم/يومين/أيام)
+    relTime(d) {
+        const diff = Math.max(0, Date.now() - d.getTime());
+        const m = Math.floor(diff / 60000);
+        if (m < 1) return 'قبل لحظات';
+        if (m === 1) return 'قبل دقيقة';
+        if (m === 2) return 'قبل دقيقتين';
+        if (m <= 10) return 'قبل ' + m + ' دقائق';
+        if (m < 60) return 'قبل ' + m + ' دقيقة';
+        const h = Math.floor(m / 60);
+        if (h === 1) return 'قبل ساعة';
+        if (h === 2) return 'قبل ساعتين';
+        if (h <= 10) return 'قبل ' + h + ' ساعات';
+        if (h < 24) return 'قبل ' + h + ' ساعة';
+        const days = Math.floor(h / 24);
+        if (days === 1) return 'قبل يوم';
+        if (days === 2) return 'قبل يومين';
+        if (days <= 10) return 'قبل ' + days + ' أيام';
+        return 'قبل ' + days + ' يومًا';
+    },
+
+    // نفس قاعدة TimeRiyadh.normalize للطوابع naive: «YYYY-MM-DD HH:MM[:SS]» ← UTC
+    parseTs(s) {
+        if (!s) return null;
+        s = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+        else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) s += 'Z';
+        const d = new Date(s);
+        return isNaN(d) ? null : d;
+    }
+};
+window.__ncLiveness = TopbarLiveness; // عدّادات تشخيصية للأجنحة الآلية فقط
+
 // Global helper for backward compatibility
 function updateChatBadge() {
     if (typeof ChatIntegration !== 'undefined' && ChatIntegration.updateBadge) {
@@ -475,6 +690,7 @@ function updateChatBadge() {
 // Auto-init when DOM is ready — AuthGate: عبر البوابة على index.html (يُحمَّل هذا الملف قبل auth-manager.js،
 // لذا يُحسم وجود البوابة عند DOMContentLoaded)؛ الصفحات بلا بوابة تحافظ على السلوك السابق.
 document.addEventListener('DOMContentLoaded', () => {
+    TopbarLiveness.init(); // مراقبا DOM فقط — لا يتطلبان مصادقة ولا يمسّان الصفحات الأخرى
     if (typeof AuthGate !== 'undefined') {
         AuthGate.onStart(() => ChatIntegration.init());
         AuthGate.onStop(() => ChatIntegration.destroy());

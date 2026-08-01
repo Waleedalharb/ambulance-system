@@ -224,6 +224,28 @@ tbody tr:hover { background: var(--g100); }
     .report-card, .stat-card { box-shadow: none; border: 1px solid #ddd; }
     body { background: #fff; color: #000; }
     .container { max-width: 100%; padding: 10px; }
+    /* ── تحصين الورق (UAT — Operational Polish Phase 1، البند ④): الوضع الداكن كان يُبقي
+       النصوص الفاتحة (#E2E8F0) والبطاقات الداكنة كما هي، ومع إسقاط المتصفح للخلفيات عند
+       الطباعة كانت البيانات تختفي من الورق — هنا يُفرض الوضع الفاتح قسريًا على الطباعة ── */
+    body.dark-mode { background: #fff !important; color: #000 !important; }
+    body.dark-mode .topbar { background: #1E3A5F !important; }
+    body.dark-mode .stat-card, body.dark-mode .report-card, body.dark-mode .table-wrap { background: #fff !important; border-color: #ddd !important; }
+    body.dark-mode .stat-value, body.dark-mode .card-title, body.dark-mode table th, body.dark-mode table td { color: #000 !important; }
+    body.dark-mode .stat-card .stat-label { color: #475569 !important; }
+    body.dark-mode .stat-card .stat-sub { color: #94A3B8 !important; }
+    body.dark-mode table th { background: #F1F5F9 !important; }
+    body.dark-mode table tbody tr:nth-child(even) { background: #fff !important; }
+    body.dark-mode table tbody tr:hover { background: #fff !important; }
+    body.dark-mode .comparison-up { color: #047857 !important; }
+    body.dark-mode .comparison-down { color: #DC2626 !important; }
+    body.dark-mode .comparison-neutral { color: #475569 !important; }
+    body.dark-mode .section-badge { background: #F1F5F9 !important; color: #475569 !important; }
+    body.dark-mode .empty-state { color: #64748B !important; }
+    body.dark-mode select { background: #fff !important; color: #000 !important; }
+    body.dark-mode .rank-other { background: #E2E8F0 !important; color: #475569 !important; }
+    body.dark-mode #recContent { background: #FFFBEB !important; color: #374151 !important; }
+    /* شريطا التقدّم وميداليات الترتيب تُطبع بألوانها (بلاها تفقد الجداول معناها البصري) */
+    .progress-fill, .rank-medal { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* Responsive */
@@ -687,7 +709,15 @@ function renderReport(data) {
 
     // Header
     document.getElementById('headerTitle').textContent = 'تقرير العمليات اليومي — ' + (shift.type || 'نوبة');
-    document.getElementById('headerDate').textContent = shift.date || '—';
+    // UAT ④: تاريخ الترويسة عبر التوقيت الموحد (الرياض) مع بقاء القيمة الخام احتياطًا
+    var headerDateTxt = shift.date || '—';
+    try {
+        if (window.TimeRiyadh && shift.date && shift.date !== '—') {
+            var fd = TimeRiyadh.formatDate(shift.date);
+            if (fd && fd !== '—') headerDateTxt = fd;
+        }
+    } catch (e) { /* القيمة الخام تبقى */ }
+    document.getElementById('headerDate').textContent = headerDateTxt;
     document.getElementById('headerShift').textContent = shift.name || '—';
     document.getElementById('headerId').textContent = '#' + shift.id;
 
@@ -805,15 +835,40 @@ function printReport() {
 
 // ===== Export PDF =====
 function exportPDF() {
-    const element = document.getElementById('reportContent');
-    const opt = {
+    // UAT ④ (Operational Polish Phase 1): تحصين التصدير —
+    // 1) بيئة مغلقة بلا CDN (html2pdf غير محمَّلة) ← الطباعة المحصّنة بديل كامل الأقسام.
+    if (typeof html2pdf === 'undefined') {
+        window.print();
+        return;
+    }
+    var element = document.getElementById('reportContent');
+    if (!element) return;
+    // 2) الورق فاتح دائمًا: يُنزع الوضع الداكن مؤقتًا أثناء الالتقاط ثم يُعاد —
+    //    بلا ذلك يخرج الـPDF ببطاقات داكنة ونصوص فاتحة (أو نص يختفي عند إسقاط الخلفيات).
+    // 3) منتقي النوبة وشريط الأزرار عنصران تفاعليان للشاشة فقط — يُخفيان من الملف المصدّر.
+    var wasDark = document.body.classList.contains('dark-mode');
+    var hiddenEls = [];
+    var uiOnly = element.querySelectorAll('.shift-selector, .actions-bar');
+    function restore() {
+        if (wasDark) document.body.classList.add('dark-mode');
+        hiddenEls.forEach(function (el) { el.style.display = ''; });
+    }
+    if (wasDark) document.body.classList.remove('dark-mode');
+    uiOnly.forEach(function (el) { hiddenEls.push(el); el.style.display = 'none'; });
+    // 4) تاريخ اسم الملف بتوقيت الرياض (كان toISOString بتوقيت UTC — يسبق/يتأخر يومًا)
+    var riyadhDate;
+    try { riyadhDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' }); }
+    catch (e) { riyadhDate = new Date().toISOString().split('T')[0]; }
+    var opt = {
         margin: 10,
-        filename: 'تقرير_يومي_' + (new Date().toISOString().split('T')[0]) + '.pdf',
+        filename: 'تقرير_يومي_' + riyadhDate + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    html2pdf().set(opt).from(element).save();
+    html2pdf().set(opt).from(element).save()
+        .then(restore)
+        .catch(function (e) { console.error('exportPDF error:', e); restore(); });
 }
 
 // ===== Init =====

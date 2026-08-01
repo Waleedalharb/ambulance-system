@@ -49,6 +49,45 @@ class PositioningService {
         return { ...data, id: row.id, shiftId: row.shift_id };
     }
 
+    // ── جولة Operational Workflow Completion (المرحلة أ): سجل أحداث append-only ──
+    // كل تغيير واقٍع على خطة تمركز يُختم في positioning_events مربوطًا بالمناوبة
+    // (الختم يتم بعد نجاح الكتابة — الحدث حقيقة لا نية). فشل التسجيل لا يكسر
+    // العملية الأصلية: يُسجَّل تحذيرًا فقط (السجل تدقيقي معزول عن المسار التشغيلي).
+    async _recordEvent(planId, shiftId, eventType, changedFields, payload, user) {
+        try {
+            await this.db.run(
+                'INSERT INTO positioning_events (shift_id, plan_id, event_type, changed_fields, payload, actor_id, actor_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    shiftId != null ? shiftId : null,
+                    String(planId),
+                    eventType,
+                    changedFields ? JSON.stringify(changedFields) : null,
+                    JSON.stringify(payload || {}),
+                    user && user.id != null ? String(user.id) : null,
+                    (user && (user.name || user.username)) || 'system',
+                    new Date().toISOString()
+                ]
+            );
+        } catch (err) {
+            console.warn('[Positioning] event log failed (' + eventType + '):', err.message);
+        }
+    }
+
+    /** مقارنة حقول الخطة قبل/بعد — يعيد {field: [from, to]} للحقول المتغيرة فقط */
+    _diffFields(before, after) {
+        const changed = {};
+        const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+        for (const k of keys) {
+            if (k === 'id' || k === 'shiftId') continue;
+            const a = before ? before[k] : undefined;
+            const b = after ? after[k] : undefined;
+            if (JSON.stringify(a === undefined ? null : a) !== JSON.stringify(b === undefined ? null : b)) {
+                changed[k] = [a === undefined ? null : a, b === undefined ? null : b];
+            }
+        }
+        return Object.keys(changed).length ? changed : null;
+    }
+
     /**
      * قائمة خطط التمركز (نفس ترتيب المسار القديم).
      * قبل القراءة: كنس الخطط المنتهية — نسخة حرفية من cleanupPeakPlans في الواجهة:
@@ -62,10 +101,13 @@ class PositioningService {
         for (const row of candidates) {
             const plan = this._rowToJson(row);
             if (plan.status === 'active' && plan.endTime && new Date(plan.endTime) < now) {
+                const before = { ...plan };
                 plan.status = 'completed';
                 await this.db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), row.id]);
                 // الحدث حقيقة واقعة — يُطلق بعد نجاح التحديث، وكل خطة تُكنس مرة واحدة فقط
                 this.bus.emit('PositioningUpdated', { plan_id: row.id, shift_id: row.shift_id, plan });
+                // المرحلة أ: الكنس حدث موثق أيضًا (الفاعل system — بلا مستخدم بشري)
+                await this._recordEvent(row.id, row.shift_id, 'swept', this._diffFields(before, plan), plan, null);
             }
         }
         const rows = await this.db.all('SELECT * FROM peak_plans ORDER BY created_at DESC, id DESC');
@@ -85,25 +127,43 @@ class PositioningService {
         await this.db.run('INSERT INTO peak_plans (id, shift_id, data) VALUES (?, ?, ?)',
             [plan.id, shiftId != null ? shiftId : null, JSON.stringify(plan)]);
         this.bus.emit('PositioningStarted', { plan_id: plan.id, shift_id: shiftId, title: plan.title, plan });
+        // المرحلة أ: ختم حدث الإنشاء في سجل المناوبة
+        await this._recordEvent(plan.id, shiftId, 'created', null, plan, user);
         return plan;
     }
 
     /** تعديل خطة → PositioningUpdated (Catalog D-4 — مُفعَّل) */
-    async update(id, updates) {
+    async update(id, updates, user) {
         const row = await this.db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
         if (!row) return null;
-        const plan = { ...this._rowToJson(row), ...updates, id: row.id };
+        const before = this._rowToJson(row);
+        const plan = { ...before, ...updates, id: row.id };
+        // المرحلة أ: ختم shift_id على الخطط اليتيمة (shift_id=null أُنشئت بلا مناوبة
+        // نشطة) عند أول تعديل أثناء مناوبة نشطة — وإلا ضاعت من سجل المناوبة ولقطتها.
+        let shiftId = row.shift_id;
+        if (shiftId == null && typeof this.getActiveShiftId === 'function') {
+            const activeId = await this.getActiveShiftId();
+            if (activeId != null) {
+                shiftId = activeId;
+                plan.shiftId = activeId;
+                await this.db.run('UPDATE peak_plans SET shift_id = ? WHERE id = ?', [activeId, id]);
+            }
+        }
         await this.db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), id]);
-        this.bus.emit('PositioningUpdated', { plan_id: row.id, shift_id: row.shift_id, plan });
+        this.bus.emit('PositioningUpdated', { plan_id: row.id, shift_id: shiftId, plan });
+        // المرحلة أ: ختم حدث التعديل مع ما تغيّر فعلًا (before/after لكل حقل)
+        await this._recordEvent(row.id, shiftId, 'updated', this._diffFields(before, plan), plan, user || null);
         return plan;
     }
 
     /** إنهاء/حذف تمركز → PositioningEnded فقط إذا وُجدت الخطة فعلاً */
-    async remove(id) {
-        const row = await this.db.get('SELECT id, shift_id FROM peak_plans WHERE id = ?', [id]);
+    async remove(id, user) {
+        const row = await this.db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
         await this.db.run('DELETE FROM peak_plans WHERE id = ?', [id]);
         if (row) {
             this.bus.emit('PositioningEnded', { plan_id: id, shift_id: row.shift_id });
+            // المرحلة أ: الحذف إنهاء موثق — الحمولة الأخيرة تُحفظ في السجل قبل فقدها
+            await this._recordEvent(id, row.shift_id, 'ended', null, this._rowToJson(row), user || null);
         }
         return true;
     }

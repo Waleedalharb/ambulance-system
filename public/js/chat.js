@@ -725,6 +725,20 @@
         WS.subscribe(convId);
         await loadMessages(convId, 1);
         if (conv.unread_count > 0) { conv.unread_count = 0; renderConversationList(State.conversations); }
+        // جولة «إعادة تصميم الإشعارات والرسائل» (وثيقة «أنا معك 100%.txt» — رابعًا:
+        // «إذا فُتحت الرسالة ينقص العداد مباشرة»): الفتح كان يصفّر العدد محليًا فقط
+        // ويبقي غير المقروء سيرفريًا فيعود العداد عند أول تحديث خارجي. الآن رسائل
+        // الطرف الآخر غير المقروءة تُعلَّم مقروءة فعليًا عبر المسار القائم نفسه
+        // (PUT /api/chat/messages/:id/read) فيبث الخادم chat_read فتنقص العدادات
+        // في كل الصفحات فورًا (chat-integration.updateBadge) وتظهر ✓✓ للمرسل.
+        if (State.currentUser) {
+            State.messages.forEach(function(m) {
+                var alreadyMine = (m.read_by || []).some(function(r){ return String(r.user_id) === String(State.currentUser.id); });
+                if (String(m.sender_id) !== String(State.currentUser.id) && !alreadyMine) {
+                    API.markRead(m.id).catch(function(e){});
+                }
+            });
+        }
         if (window.innerWidth <= 768) { $('chatSidebar').classList.remove('open'); $('sidebarOverlay').style.display = 'none'; }
         Scroll.toBottom();
     };
@@ -772,7 +786,9 @@
                 if (other) otherOnline = State.onlineUsers.includes(other.user_id);
             }
 
-            html += '<div class="conversation-item ' + (isActive?'active ':'') + pinnedClass + ' ' + mutedClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
+            // جولة «إعادة تصميم الإشعارات والرسائل»: تفعيل صنف unread الميت —
+            // قواعد .conversation-item.unread كانت موجودة في chat.css بلا طرف يضيفها
+            html += '<div class="conversation-item ' + (isActive?'active ':'') + (unread>0?'unread ':'') + pinnedClass + ' ' + mutedClass + '" data-id="' + conv.id + '" onclick="openConversation(' + conv.id + ')">' +
                 '<div class="conversation-avatar ' + (conv.type==='group'?'group':'') + '"><i class="fas ' + avatarIcon + '"></i>' + (conv.type==='private' ? '<span class="avatar-status ' + (otherOnline?'online':'offline') + '"></span>' : '') + '</div>' +
                 '<div class="conversation-info"><div class="conversation-top"><span class="conversation-name">' + escapeHtml(conv.title) + '</span><span class="conversation-time">' + time + '</span></div>' +
                 '<div class="conversation-bottom"><span class="conversation-preview">' + escapeHtml(preview) + '</span>' + (unread>0?'<span class="conversation-unread">' + unread + '</span>':'') + '</div></div>' +
