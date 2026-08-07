@@ -19,6 +19,10 @@
 // فيُختبر على قاعدة مؤقتة ويُستخدم إنتاجيًا عبر db.js نفسه.
 // ============================================
 
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+// «اليوم» (تواريخ بدء/إنهاء التعيينات) = تاريخ الرياض الجداري، لا UTC الخادم.
+const TimeRiyadh = require('../public/js/time-riyadh.js');
+
 class RosterSyncService {
     constructor({ db }) {
         if (!db || typeof db.run !== 'function' || typeof db.get !== 'function' || typeof db.all !== 'function') {
@@ -178,7 +182,7 @@ class RosterSyncService {
             const hasAssignTable = !!(await this.db.get(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='team_assignments'"));
             if (hasAssignTable) {
-                const today = new Date().toISOString().slice(0, 10);
+                const today = TimeRiyadh.formatDate(new Date()); // تاريخ الرياض الجداري (كان UTC)
                 const activeAssign = await this.db.all(
                     'SELECT id, employee_id, team_id FROM team_assignments WHERE end_date IS NULL');
                 const assignByEmp = new Map();

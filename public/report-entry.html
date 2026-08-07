@@ -1472,13 +1472,18 @@ async function getRecords() {
             } else {
                 serverRecordsCache = [];
             }
-            return serverRecordsCache;
+            // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): تُعاد نسخة —
+            // serverRecordsCache هو «آخر قائمة محمّلة من الخادم» التي يقيس عليها
+            // saveRecords مرشحي الحذف (محذوف = كان فيها ولم يعد محليًا). إعادة
+            // المرجع نفسه تسمح للمستدعي (undoLastReport عبر splice) بإفساد أساس
+            // المقارنة. القائمة أصلًا محدودة بالمناوبة النشطة من الخادم.
+            return serverRecordsCache.slice();
         }
     } catch(e) {
         console.error('Failed to fetch records:', e);
     }
     serverRecordsCache = [];
-    return serverRecordsCache;
+    return serverRecordsCache.slice();
 }
 
 // OV-S5: جلب معرّف المناوبة النشطة من الخادم (مصدر الحقيقة الوحيد).
@@ -1555,7 +1560,10 @@ async function saveRecords(records) {
         }
     }
 
-    // DELETE removed records
+    // DELETE removed records — مرشح الحذف = سجل كان في آخر قائمة محمّلة من
+    // الخادم (serverRecordsCache، محدودة بالمناوبة النشطة بعد إصلاح نطاق القراءة)
+    // ولم يعد موجودًا في القائمة المحلية الحالية. لا مقارنة بأي مجموعة أوسع —
+    // سجلات المناوبات السابقة ليست مرشحة للحذف إطلاقًا (الخادم يرفضها 403).
     var recordIds = {};
     for (var i = 0; i < records.length; i++) {
         recordIds[records[i].id] = true;

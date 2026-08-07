@@ -1812,6 +1812,18 @@
                     <i class="fas fa-trash-alt"></i> مسح كل البيانات
                 </button>
             </div>
+            <!-- تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): تصدير PDF سيرفري لجدول مركز واحد (تذكرة البند ⑤) -->
+            <div class="flex flex-wrap gap-2 items-center" style="margin-top:10px;">
+                <div class="filter-group" style="min-width:230px;">
+                    <label><i class="fas fa-hospital-alt"></i> المركز</label>
+                    <select id="pdfCenterSelect">
+                        <option value="">— اختر المركز —</option>
+                    </select>
+                </div>
+                <button class="btn btn-coral" onclick="exportCenterPdf()">
+                    <i class="fas fa-file-pdf"></i> تصدير PDF للمركز (طباعة/إرسال)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -4067,6 +4079,8 @@
             }
             select.innerHTML = html;
             select.value = currentVal;
+            // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): منتقي مركز تصدير PDF يتبع نفس القائمة
+            populatePdfCenterSelect();
         }
 
         function applyFilters() {
@@ -4500,6 +4514,59 @@
         }
 
         // ==========================================
+        // تصدير PDF سيرفري لجدول مركز — تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08)
+        // تذكرة البند ⑤: اختيار المركز ← GET /api/schedule/pdf?center=…&month=… ←
+        // ملف A4 (RTL، ترويسة حكومية) يُفتح للطباعة المباشرة ويُحفظ كنسخة قابلة للإرسال للفرق.
+        // ==========================================
+        function populatePdfCenterSelect() {
+            var dst = document.getElementById('pdfCenterSelect');
+            var src = document.getElementById('filterLocation');
+            if (!dst || !src) return;
+            var cur = dst.value;
+            var html = '<option value="">— اختر المركز —</option>';
+            for (var i = 1; i < src.options.length; i++) {
+                html += '<option value="' + src.options[i].value + '">' + src.options[i].text + '</option>';
+            }
+            dst.innerHTML = html;
+            dst.value = cur;
+        }
+
+        async function exportCenterPdf() {
+            var sel = document.getElementById('pdfCenterSelect');
+            var center = sel ? sel.value : '';
+            if (!center) { showToast('اختر المركز أولاً', 'warning'); return; }
+            var token = AuthCore.getToken();
+            if (!token) { showToast('يجب تسجيل الدخول أولاً', 'error'); return; }
+            var month = document.getElementById('filterMonth').value || '';
+            var url = '/api/schedule/pdf?center=' + encodeURIComponent(center) + (month ? '&month=' + encodeURIComponent(month) : '');
+            try {
+                showToast('جاري توليد PDF للمركز...', 'info');
+                var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    showToast(errData.error || 'تعذر توليد PDF', 'error');
+                    return;
+                }
+                var blob = await resp.blob();
+                var objUrl = URL.createObjectURL(blob);
+                // الطباعة مباشرة: التبويب الجديد فيه طباعة وحفظ؛ وإن حُجب المنبثق يُنزَّل الملف تلقائيًا
+                var w = window.open(objUrl, '_blank');
+                if (!w) {
+                    var a = document.createElement('a');
+                    a.href = objUrl;
+                    a.download = 'جدول-' + center + (month ? '-' + month : '') + '.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }
+                setTimeout(function() { URL.revokeObjectURL(objUrl); }, 60000);
+                showToast(w ? 'تم توليد PDF — يُطبع أو يُحفظ من التبويب الجديد' : 'تم تنزيل PDF الجدول', 'success');
+            } catch (e) {
+                showToast('خطأ في الاتصال: ' + e.message, 'error');
+            }
+        }
+
+        // ==========================================
         // مزامنة مع السيرفر - Sync with Server
         // ==========================================
         async function syncToServer() {
@@ -4783,6 +4850,8 @@
         window.renderEmployeeTable = renderEmployeeTable;
         window.renderClassicView = renderClassicView;
         window.changeClassicMonth = changeClassicMonth;
+        window.populatePdfCenterSelect = populatePdfCenterSelect;
+        window.exportCenterPdf = exportCenterPdf;
         console.log('✅ جميع الدوال متاحة في window');
 
         // ══════════════════════════════════════════════════════════

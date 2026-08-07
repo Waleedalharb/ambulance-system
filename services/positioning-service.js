@@ -30,6 +30,43 @@
  *    silent on no-op deletes remains the correct, side-effect-free choice.
  */
 
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — السيرفر
+// (Asia/Riyadh) مرجع وحيد. startTime/endTime القادمان من حقول datetime-local
+// أوقات جدارية بتوقيت الرياض (naive بلا إزاحة)؛ تفسيرها بمنطقة الخادم المحلية
+// (new Date مباشرة) يزيح الكنس ٣ ساعات على خادم UTC. الإزاحة تُكتب نصًا صريحًا
+// +03:00 (الرياض بلا توقيت صيفي). القيم الحاملة لإزاحة/Z تُحترم كما هي.
+function parseRiyadhWall(v) {
+    if (!v) return null;
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (m) {
+        const d = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4] || '00'}+03:00`);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد مصدر وقت التمركزات +
+// تسجيل الخروج من التشكيلة النهائية الفعلية — الجذر: startTime/endTime كانا يُخزَّنان
+// نصيين naive كما يصلان من datetime-local (جدارية الرياض)، بينما كل عرض يمر عبر
+// TimeRiyadh الذي يفسر الـnaive كـUTC — فظهرت «البداية/النهاية» مزاحة +٣ ساعات عن
+// الوصول الفعلي وسجل الأحداث (المختومين UTC ISO). التوحيد: الصيغة القانونية المخزنة
+// = UTC ISO (سياسة المنصة: التخزين UTC والعرض Asia/Riyadh). التطبيع idempotent:
+// القيم الحاملة Z/إزاحة تُحوَّل للصيغة القانونية نفسها، والصفوف القديمة الـnaive
+// تُفسَّر عند القراءة جداريةَ الرياض (نفس قاعدة parseRiyadhWall) — فتتطابق البيانات
+// القديمة والجديدة في كل الأسطح بلا ترحيل بيانات.
+function normalizePlanTimes(plan) {
+    if (!plan || typeof plan !== 'object') return plan;
+    for (const k of ['startTime', 'endTime']) {
+        if (plan[k]) {
+            const d = parseRiyadhWall(plan[k]);
+            if (d) plan[k] = d.toISOString();
+        }
+    }
+    return plan;
+}
+
 class PositioningService {
     /**
      * @param {Object} deps
@@ -41,12 +78,13 @@ class PositioningService {
         this.db = db;
         this.bus = bus;
         this.getActiveShiftId = getActiveShiftId;
-    }
-
-    _rowToJson(row) {
+    }    _rowToJson(row) {
         let data = {};
         try { data = row.data ? JSON.parse(row.data) : {}; } catch (e) {}
-        return { ...data, id: row.id, shiftId: row.shift_id };
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): القراءة تطبّع
+        // startTime/endTime — الصفوف القديمة الـnaive تُفسَّر جدارية الرياض
+        // (+03:00) وتُعاد UTC ISO، والجديدة تبقى كما هي (idempotent).
+        return normalizePlanTimes({ ...data, id: row.id, shiftId: row.shift_id });
     }
 
     // ── جولة Operational Workflow Completion (المرحلة أ): سجل أحداث append-only ──
@@ -92,15 +130,17 @@ class PositioningService {
      * قائمة خطط التمركز (نفس ترتيب المسار القديم).
      * قبل القراءة: كنس الخطط المنتهية — نسخة حرفية من cleanupPeakPlans في الواجهة:
      *   if (p.status === 'active' && p.endTime && new Date(p.endTime) < now) p.status = 'completed';
-     * (endTime بصيغة YYYY-MM-DDTHH:MM — new Date في Node يفسّرها بالتوقيت المحلي
-     * للخادم مثل المتصفح سابقاً على نفس المنطقة الزمنية)
+     * مع تصحيح المرجع الزمني (تفويض 2026-08): endTime الجداري naive يُفسَّر بتوقيت
+     * الرياض (+03:00 صريح عبر parseRiyadhWall) لا بمنطقة الخادم المحلية، و«الآن»
+     * لحظة الخادم — المقارنة لحظات مطلقة فلا تتأثر بمنطقة الجهاز.
      */
     async list() {
         const now = new Date();
         const candidates = await this.db.all('SELECT * FROM peak_plans');
         for (const row of candidates) {
             const plan = this._rowToJson(row);
-            if (plan.status === 'active' && plan.endTime && new Date(plan.endTime) < now) {
+            const endAt = parseRiyadhWall(plan.endTime);
+            if (plan.status === 'active' && endAt && endAt < now) {
                 const before = { ...plan };
                 plan.status = 'completed';
                 await this.db.run('UPDATE peak_plans SET data = ? WHERE id = ?', [JSON.stringify(plan), row.id]);
@@ -123,6 +163,10 @@ class PositioningService {
             createdAt: new Date().toISOString(),
             createdBy: (user && user.username) || 'unknown'
         };
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد المصدر عند
+        // الكتابة — البداية/النهاية الجداريتان (naive من datetime-local) تُخزَّنان
+        // UTC ISO قانونية فتقرؤهما كل الأسطح عبر TimeRiyadh بلا إزاحة وهمية.
+        normalizePlanTimes(plan);
         const shiftId = typeof this.getActiveShiftId === 'function' ? await this.getActiveShiftId() : null;
         await this.db.run('INSERT INTO peak_plans (id, shift_id, data) VALUES (?, ?, ?)',
             [plan.id, shiftId != null ? shiftId : null, JSON.stringify(plan)]);
@@ -137,7 +181,22 @@ class PositioningService {
         const row = await this.db.get('SELECT * FROM peak_plans WHERE id = ?', [id]);
         if (!row) return null;
         const before = this._rowToJson(row);
-        const plan = { ...before, ...updates, id: row.id };
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+        // arrivalTime/departureTime دلالتهما «الآن» (ضغطة وصول/مغادرة/إنهاء)،
+        // فتُختم من ساعة الخادم حصرًا ولا يُوثق بأي طابع قادم من جهاز العميل.
+        // إعادة إرسال القيمة المخزنة نفسها (echo) لا تُعاد ختمًا — تبقى كما هي.
+        const serverNowIso = new Date().toISOString();
+        const stamped = { ...(updates || {}) };
+        for (const k of ['arrivalTime', 'departureTime']) {
+            if (Object.prototype.hasOwnProperty.call(stamped, k) && stamped[k] && stamped[k] !== before[k]) {
+                stamped[k] = serverNowIso;
+            }
+        }
+        const plan = { ...before, ...stamped, id: row.id };
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): نفس توحيد الكتابة —
+        // قيم startTime/endTime الجديدة (naive) تُخزَّن UTC ISO، والقيم القديمة
+        // المخزنة تُشفى ذاتيًا عند أول تعديل (idempotent — بلا ترحيل منفصل).
+        normalizePlanTimes(plan);
         // المرحلة أ: ختم shift_id على الخطط اليتيمة (shift_id=null أُنشئت بلا مناوبة
         // نشطة) عند أول تعديل أثناء مناوبة نشطة — وإلا ضاعت من سجل المناوبة ولقطتها.
         let shiftId = row.shift_id;
@@ -170,3 +229,8 @@ class PositioningService {
 }
 
 module.exports = PositioningService;
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): المطبِّع يُصدَّر ليقرأه
+// كل مستهلك خام لـ peak_plans (تفاصيل/تصدير server.js ولقطة shift-archive-engine)
+// — نقطة تطبيع واحدة لا منطق مكرر.
+PositioningService.normalizePlanTimes = normalizePlanTimes;
+PositioningService.parseRiyadhWall = parseRiyadhWall;

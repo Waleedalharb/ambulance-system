@@ -239,6 +239,13 @@ function getSaudiTime() {
 function getSaudiDateTime() {
     return TimeRiyadh.formatDateTimeSec(new Date());
 }
+// قيمة حقول datetime-local بالتوقيت الجداري للرياض (YYYY-MM-DDTHH:MM) —
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت؛ كانت
+// toISOString().slice(0,16) (جدارية UTC — ٣ ساعات فرق) تُخزَّن كأنها توقيت الرياض.
+function getRiyadhLocalInputValue(d) {
+    var p = TimeRiyadh.riyadhParts(d || new Date());
+    return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+}
 function getSaudiDay() {
     return saudiDayFormatter.format(new Date());
 }
@@ -1002,7 +1009,9 @@ function renderHeatmap() {
         var r = reports[key];
         if (r && r.times) {
             for (var i = 0; i < r.times.length; i++) {
-                var h = new Date(r.times[i]).getHours();
+                // ساعة الرياض (كانت getHours بمنطقة الجهاز — تزيح الحقول خارج السعودية)
+                var hp = TimeRiyadh.riyadhParts(r.times[i]);
+                var h = hp ? parseInt(hp.hour, 10) : NaN;
                 if (!isNaN(h)) {
                     hourCounts[h]++;
                     if (hourCounts[h] > maxCount) maxCount = hourCounts[h];
@@ -1030,7 +1039,8 @@ function renderPeakPrediction() {
     if (!container) return;
     
     var now = new Date();
-    var hour = now.getHours();
+    // ساعة الرياض الجدارية (كانت getHours بمنطقة الجهاز — توقّع ذروة خاطئ خارج السعودية)
+    var hour = parseInt(TimeRiyadh.riyadhParts(now).hour, 10);
     var predictedPeak = (hour >= 16 && hour <= 22) ? 'الآن (وقت الذروة!)' : 
                         (hour >= 10 && hour < 16) ? 'متوقع: 4 مساءً' : 'متوقع: 8 مساءً';
     
@@ -1205,7 +1215,7 @@ function exportAuditLog() {
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'سجل_العمليات_' + new Date().toISOString().slice(0, 10) + '.csv';
+    link.download = 'سجل_العمليات_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.csv';
     link.click();
 
     showNotification('تم التصدير', 'تم تصدير سجل العمليات بنجاح', 'success', 3000);
@@ -1917,7 +1927,10 @@ function getPeakHour() {
         var r = reports[key];
         if (r && r.times) {
             for (var i = 0; i < r.times.length; i++) {
-                var h = new Date(r.times[i]).getHours();
+                // ساعة الرياض (كانت getHours بمنطقة الجهاز)
+                var hp = TimeRiyadh.riyadhParts(r.times[i]);
+                var h = hp ? parseInt(hp.hour, 10) : NaN;
+                if (isNaN(h)) continue;
                 hourCounts[h] = (hourCounts[h] || 0) + 1;
             }
         }
@@ -1951,8 +1964,8 @@ async function renderAdvancedDistribution() {
         var shiftType = '';
         try {
             if (typeof getCurrentShiftDate === 'function') shiftDate = getCurrentShiftDate();
-            else shiftDate = new Date().toISOString().split('T')[0];
-        } catch(e) { shiftDate = new Date().toISOString().split('T')[0]; }
+            else shiftDate = getSaudiDate(); // تاريخ الرياض (كان toISOString UTC)
+        } catch(e) { shiftDate = getSaudiDate(); }
         try {
             if (typeof getCurrentShiftType === 'function') shiftType = getCurrentShiftType();
             else shiftType = 'صباح';
@@ -5394,8 +5407,7 @@ async function loadIncidentRecords() {
 }
 
 function initForm_incident() {
-    var now = new Date();
-    var dt = now.toISOString().slice(0, 16);
+    var dt = getRiyadhLocalInputValue(); // جدارية الرياض (كانت toISOString UTC)
     var el = document.getElementById('incDateTime');
     if (el) el.value = dt;
     renderIncidentPreview();
@@ -5466,7 +5478,7 @@ function clearIncidentForm() {
     var genderEl = document.getElementById('incGender');
     if (genderEl) genderEl.selectedIndex = 0;
     var dtEl = document.getElementById('incDateTime');
-    if (dtEl) dtEl.value = new Date().toISOString().slice(0, 16);
+    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
 }
 
 function sendIncidentWhatsApp() {
@@ -5781,7 +5793,7 @@ var airRecords = [];
 
 function initForm_air() {
     var el = document.getElementById('airDateTime');
-    if (el) el.value = new Date().toISOString().slice(0, 16);
+    if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
     renderAirPreview();
     loadAirRecords();
 }
@@ -5845,7 +5857,7 @@ function clearAirForm() {
     var unitEl = document.getElementById('airUnit');
     if (unitEl) unitEl.value = '';
     var dtEl = document.getElementById('airDateTime');
-    if (dtEl) dtEl.value = new Date().toISOString().slice(0, 16);
+    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
 }
 
 function sendAirWhatsApp() {
@@ -6155,7 +6167,7 @@ async function loadERecords() {
 
 function initForm_e() {
     var el = document.getElementById('eDateTime');
-    if (el) el.value = new Date().toISOString().slice(0, 16);
+    if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
     renderEPreview();
     loadERecords();
 }
@@ -6218,7 +6230,7 @@ function clearEForm() {
         if (el) el.value = '';
     });
     var dtEl = document.getElementById('eDateTime');
-    if (dtEl) dtEl.value = new Date().toISOString().slice(0, 16);
+    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
 }
 
 function sendEWhatsApp() {
@@ -6341,7 +6353,7 @@ async function loadEscalationRecords() {
 
 function initForm_escalation() {
     var el = document.getElementById('escDateTime');
-    if (el) el.value = new Date().toISOString().slice(0, 16);
+    if (el) el.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
     renderEscalationPreview();
     loadEscalationRecords();
 }
@@ -6402,7 +6414,7 @@ function clearEscalationForm() {
     if (typeEl) typeEl.value = '';
     document.querySelectorAll('.esc-agency').forEach(function(cb) { cb.checked = false; });
     var dtEl = document.getElementById('escDateTime');
-    if (dtEl) dtEl.value = new Date().toISOString().slice(0, 16);
+    if (dtEl) dtEl.value = getRiyadhLocalInputValue(); // جدارية الرياض (كانت UTC)
 }
 
 function sendEscalationWhatsApp() {
@@ -6736,7 +6748,7 @@ function exportTableToPDF() {
     clone.querySelectorAll('th').forEach(function(c) { c.style.background = '#2563EB'; c.style.color = 'white'; });
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
-    html2pdf().set({ margin: 10, filename: 'جدول_شهري_' + new Date().toISOString().slice(0,10) + '.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }).from(wrapper).save().then(function() { document.body.removeChild(wrapper); showNotification('تم', 'تم تصدير PDF بنجاح', 'success', 3000); });
+    html2pdf().set({ margin: 10, filename: 'جدول_شهري_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }).from(wrapper).save().then(function() { document.body.removeChild(wrapper); showNotification('تم', 'تم تصدير PDF بنجاح', 'success', 3000); });
 }
 
 // تصدير CSV
@@ -6747,7 +6759,7 @@ function exportTableToCSV() {
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = workbookData.SheetNames[currentSheetIndex] + '_' + new Date().toISOString().slice(0,10) + '.csv';
+    link.download = workbookData.SheetNames[currentSheetIndex] + '_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.csv';
     link.click();
     showNotification('تم', 'تم تصدير CSV بنجاح', 'success', 3000);
 }
@@ -6760,7 +6772,7 @@ function exportTableToImage() {
     html2canvas(container, { scale: 2, useCORS: true }).then(function(canvas) {
         var link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
-        link.download = 'جدول_' + new Date().toISOString().slice(0,10) + '.png';
+        link.download = 'جدول_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.png';
         link.click();
         showNotification('تم', 'تم تصدير الصورة بنجاح', 'success', 3000);
     }).catch(function() { showNotification('خطأ', 'فشل في تصدير الصورة', 'error', 3000); });
@@ -8531,7 +8543,7 @@ function exportAllShiftsPDF() {
 
     var opt = {
         margin: 10,
-        filename: 'جميع_التقارير_' + new Date().toISOString().slice(0, 10) + '.pdf',
+        filename: 'جميع_التقارير_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -9439,7 +9451,9 @@ function renderHourlyChart() {
         var r = reports[key];
         if (r && r.times) {
             for (var j = 0; j < r.times.length; j++) {
-                var hh = new Date(r.times[j]).getHours();
+                // ساعة الرياض (كانت getHours بمنطقة الجهاز)
+                var hp = TimeRiyadh.riyadhParts(r.times[j]);
+                var hh = hp ? parseInt(hp.hour, 10) : NaN;
                 if (!isNaN(hh)) hourCounts[hh] = (hourCounts[hh] || 0) + 1;
             }
         }
@@ -9584,9 +9598,11 @@ function renderWeeklyChart() {
         var labels = series.labels || [];
         var values = series.values || [];
         for (var i = 0; i < labels.length; i++) {
-            var d = new Date(labels[i]);
+            // labels نصوص YYYY-MM-DD (تواريخ الرياض من الخادم) — اليوم-من-الأسبوع
+            // بحساب UTC صريح (كان getDay بمنطقة الجهاز فيزيح التجميع يومًا كاملًا)
+            var d = new Date(labels[i] + 'T00:00:00Z');
             if (isNaN(d)) continue;
-            data[d.getDay()] += values[i] || 0;
+            data[d.getUTCDay()] += values[i] || 0;
         }
 
         if (chartInstances.weekly) chartInstances.weekly.destroy();
@@ -9666,7 +9682,7 @@ function exportChartData() {
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'بلاغات_' + new Date().toISOString().slice(0, 10) + '.csv';
+    link.download = 'بلاغات_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.csv';
     link.click();
     
     showNotification('تم التصدير', 'تم تصدير بيانات البلاغات بنجاح', 'success', 3000);
@@ -10392,17 +10408,12 @@ function switchPeakTab(tabName) {
 
 // ----- Form Defaults -----
 function initPeakFormDefaults() {
-    var now = new Date();
-    var yr = now.getFullYear();
-    var mo = String(now.getMonth()+1).padStart(2,'0');
-    var da = String(now.getDate()).padStart(2,'0');
-    var hr = String(now.getHours()).padStart(2,'0');
-    var mi = String(now.getMinutes()).padStart(2,'0');
-    var startStr = yr + '-' + mo + '-' + da + 'T' + hr + ':' + mi;
-    var end = new Date(now.getTime() + 2*60*60*1000);
-    var ehr = String(end.getHours()).padStart(2,'0');
-    var emi = String(end.getMinutes()).padStart(2,'0');
-    var endStr = yr + '-' + mo + '-' + da + 'T' + ehr + ':' + emi;
+    // القيم الافتراضية بالتوقيت الجداري للرياض عبر الطبقة المركزية
+    // (كانت مكوّنات منطقة الجهاز — تظهر أوقاتًا غير سعودية على الأجهزة الأجنبية)
+    var p = TimeRiyadh.riyadhParts(new Date());
+    var startStr = p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+    var pe = TimeRiyadh.riyadhParts(new Date(Date.now() + 2*60*60*1000));
+    var endStr = pe.year + '-' + pe.month + '-' + pe.day + 'T' + pe.hour + ':' + pe.minute;
     var elStart = document.getElementById('peakStartTime');
     if (elStart) elStart.value = startStr;
     var elEnd = document.getElementById('peakEndTime');
@@ -10623,7 +10634,9 @@ function buildPeakDeploymentRow(plan, compact) {
         html += '<div style="font-size:0.8rem; color:var(--gray-600); margin-top:4px;">';
         html += '🚑 ' + plan.unit + ' | ' + teamLabel + ' | 📍 ' + (plan.location || '-') + '</div>';
         html += '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px;">';
-        html += '⏰ ' + (plan.startTime ? plan.startTime.replace('T',' ') : '-') + ' → ' + (plan.endTime ? plan.endTime.replace('T',' ') : '-') + '</div>';
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): البداية/النهاية
+        // تُعرضان عبر الطبقة المركزية TimeRiyadh (التخزين UTC ISO قانوني) — لا نص خام.
+        html += '⏰ ' + (plan.startTime ? TimeRiyadh.formatDateTime(plan.startTime) : '-') + ' → ' + (plan.endTime ? TimeRiyadh.formatDateTime(plan.endTime) : '-') + '</div>';
         if (plan.notes) html += '<div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px;">📝 ' + plan.notes + '</div>';
         html += '</div>';
         html += '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">';
@@ -11001,7 +11014,7 @@ function renderPeakArchive() {
         html += '<div class="peak-archive-item">';
         html += '<div><div style="font-weight:600; font-size:0.85rem;">' + pt.icon + ' ' + plan.title + '</div>';
         html += '<div style="font-size:0.75rem; color:var(--gray-500);">🚑 ' + plan.unit + ' | ' + (plan.location || '-') + '</div>';
-        html += '<div style="font-size:0.75rem; color:var(--gray-500);">⏰ ' + (plan.startTime ? plan.startTime.replace('T',' ') : '-') + '</div></div>';
+        html += '<div style="font-size:0.75rem; color:var(--gray-500);">⏰ ' + (plan.startTime ? TimeRiyadh.formatDateTime(plan.startTime) : '-') + '</div></div>';
         html += '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">' + statusBadge;
         html += '<span class="peak-badge peak-badge-type-' + plan.planType + '">' + pt.label + '</span></div>';
         html += '</div>';
@@ -11016,12 +11029,12 @@ function exportPeakArchive() {
     var csv = 'العنوان,النوع,الفرقة,التصنيف,الموقع,البداية,النهاية,الحالة\n';
     peakPlans.forEach(function(p) {
         var pt = PEAK_PLAN_TYPES[p.planType] || PEAK_PLAN_TYPES.peak;
-        csv += (p.title || '') + ',' + pt.label + ',' + (p.unit || '') + ',' + (PEAK_TEAM_TYPES[p.teamType] || '') + ',' + (p.location || '') + ',' + (p.startTime || '') + ',' + (p.endTime || '') + ',' + (p.status === 'active' ? 'نشط' : 'منتهي') + '\n';
+        csv += (p.title || '') + ',' + pt.label + ',' + (p.unit || '') + ',' + (PEAK_TEAM_TYPES[p.teamType] || '') + ',' + (p.location || '') + ',' + (p.startTime ? TimeRiyadh.formatDateTime(p.startTime) : '') + ',' + (p.endTime ? TimeRiyadh.formatDateTime(p.endTime) : '') + ',' + (p.status === 'active' ? 'نشط' : 'منتهي') + '\n';
     });
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'تمركزات_' + new Date().toISOString().slice(0,10) + '.csv';
+    link.download = 'تمركزات_' + getSaudiDate() /* تاريخ الرياض لاسم الملف (كان UTC) */ + '.csv';
     link.click();
     showToast('✅ تم التصدير', 'success');
 }

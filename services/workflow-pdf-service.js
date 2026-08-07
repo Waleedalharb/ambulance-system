@@ -226,6 +226,32 @@ const FIELD_LABELS = [
 ];
 
 // ═══════════════════════════════════════════════════════════
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08) — بند ④:
+// بيانات «تسجيلات خروج الفرق» للـPDF تُبنى من حقول اللقطة نفسها
+// (snapshot.signouts — المالك الوحيد SignoutService، المصدر المشترك مع عرض
+// سير العمل الرسمي وصفحة التكميل والتفاصيل والأرشيف). لا استعلام مستقل ولا
+// إعادة اشتقاق من roster المجدول: الأعضاء هم من سجّل خروجهم فعلًا، بأكوادهم
+// ومسمياتهم (memberDetails)، مع وقت الخروج والمستخدم المسجِّل.
+// ═══════════════════════════════════════════════════════════
+function buildPdfSignouts(snapshot) {
+    const list = (snapshot && Array.isArray(snapshot.signouts)) ? snapshot.signouts : [];
+    return list.map(so => {
+        const details = (Array.isArray(so.memberDetails) && so.memberDetails.length)
+            ? so.memberDetails
+            : (Array.isArray(so.members) ? so.members : []).map(n => ({ name: n, code: null, jobTitle: null }));
+        return {
+            team: so.team || '',
+            members: details.filter(m => m && m.name).map(m => ({
+                name: m.name || '', code: m.code || null, jobTitle: m.jobTitle || null
+            })),
+            signoutTime: so.createdAt || null,
+            recordedBy: so.recordedByName || '',
+            notes: so.notes || ''
+        };
+    }).filter(r => r.team);
+}
+
+// ═══════════════════════════════════════════════════════════
 // التوليد — يرفض Promise عند أي فشل (لا اعتماد بلا PDF)
 // ═══════════════════════════════════════════════════════════
 function generateWorkflowPdf(workflow) {
@@ -574,6 +600,25 @@ function generateWorkflowPdf(workflow) {
             const reviewers = ['قائد المنطقة', 'كبير المسعفين', 'الإداري المناوب'];
             para('تمت مراجعة واعتماد الوثيقة من قبل: ' + reviewers.map(r => (reviewed.indexOf(r) !== -1 ? '(√) ' : '( ) ') + r).join('   '), 8.5, GRAY);
 
+            // ═══ سادسًا: تسجيلات خروج الفرق — من حقول اللقطة نفسها (بند ④) ═══
+            // نفس سجل عرض سير العمل الرسمي: الفرقة | الأفراد (مسمى|اسم|كود) |
+            // وقت الخروج | المسجِّل. بلا تسجيلات يُخفى القسم بهدوء (اللقطات
+            // القديمة بلا signouts تبقى وثائقها كما اعتُمدت حرفيًا).
+            const signoutRows = buildPdfSignouts(snap);
+            if (signoutRows.length) {
+                heading('سادسًا: تسجيلات خروج الفرق');
+                table(
+                    ['الفرقة', 'أفراد الفرقة', 'وقت الخروج', 'سُجِّل بواسطة'],
+                    signoutRows.map(r => [
+                        [r.team],
+                        personsCell(r.members),
+                        [fDateTime(r.signoutTime)],
+                        [r.recordedBy]
+                    ]),
+                    [90, PERSON_COL_W, 110, CW - 90 - PERSON_COL_W - 110]
+                );
+            }
+
             // ═══ قسم الختم ═══
             // doc-v5 ④: بنية أسطر صريحة في عمودين (إعداد يمينًا / اعتماد يسارًا) —
             // تبقى واضحة عندما يختلف المُعِد عن المُعتمد. QR التحقق يسار الصندوق.
@@ -623,4 +668,4 @@ function generateWorkflowPdf(workflow) {
     })();
 }
 
-module.exports = { generateWorkflowPdf, STORAGE_DIR };
+module.exports = { generateWorkflowPdf, buildPdfSignouts, STORAGE_DIR };

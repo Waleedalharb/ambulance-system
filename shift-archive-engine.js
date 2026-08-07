@@ -611,7 +611,13 @@ class ShiftArchiveSnapshot {
     }
 
     async _getPositioning(shiftId) {
-        return this._getContentRows('peak_plans', shiftId);
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد مصدر وقت
+        // التمركزات — اللقطة تختم startTime/endTime بالصيغة القانونية (UTC ISO)
+        // عبر مطبِّع المالك الوحيد (PositioningService.normalizePlanTimes):
+        // naive جدارية الرياض تُفسَّر +03:00، والقيم المطبَّعة تبقى كما هي.
+        const PositioningService = require('./services/positioning-service');
+        const rows = await this._getContentRows('peak_plans', shiftId);
+        return (Array.isArray(rows) ? rows : []).map(r => PositioningService.normalizePlanTimes(r));
     }
 
     // المرحلة أ: أحداث التمركزات بترتيب وقوعها — الحقول JSON تُفك للعرض المباشر
@@ -646,6 +652,19 @@ class ShiftArchiveSnapshot {
     // المرحلة ب: تسجيلات خروج الفرق — الحالة الحالية = أحدث حدث TEAM_CHECKOUT
     // لكل فرقة (عرض مشتق من سجل shift_signout_events — members تُفك)
     async _getSignouts(shiftId) {
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): الأرشيف يقرأ من
+        // المالك الوحيد (SignoutService.listByShift — late binding من server.js)
+        // فتتطابق اللقطة المختومة مع صفحة التكميل وسير العمل والتفاصيل والـPDF
+        // حرفيًا (نفس الأعضاء بأكوادهم/مسمياتهم + الوقت + المسجِّل). الاستعلام
+        // الخام أدناه سقوط فقط لبيئات بلا تجميع للخدمة.
+        try {
+            if (this.signoutService && typeof this.signoutService.listByShift === 'function') {
+                const list = await this.signoutService.listByShift(shiftId);
+                if (Array.isArray(list)) return list;
+            }
+        } catch (err) {
+            console.error('[Snapshot] signoutService read failed:', err.message);
+        }
         try {
             if (!this.db || !this.db.all) return [];
             const rows = await this.db.all(
@@ -1396,10 +1415,14 @@ class ShiftArchiveEngine {
     }
 
     _getWeekStart(dateStr) {
-        const d = new Date(dateStr);
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        const start = new Date(d.setDate(diff));
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+        // dateStr نص YYYY-MM-DD (تاريخ الرياض)؛ حساب بداية الأسبوع بـ UTC الصريح
+        // حتى لا تنزاح النتيجة مع منطقة الخادم الزمنية (كانت getDay/setDate محلية).
+        const d = new Date(dateStr + 'T00:00:00.000Z');
+        const day = d.getUTCDay();
+        const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+        const start = new Date(d.getTime());
+        start.setUTCDate(diff);
         return start.toISOString().split('T')[0];
     }
 

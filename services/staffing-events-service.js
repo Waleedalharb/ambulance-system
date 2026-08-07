@@ -65,34 +65,77 @@ function isWorkDayCode(rawCode, isNight) {
 }
 
 // ─── بند 15: اشتقاق سجلات التأخير (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل ───
-// يربط حدث arrival بحدث late نفسه (إغلاق دلالي)، ويطبّق آخر correction لوقت الحضور.
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): المرجع الوحيد لحساب
+// التأخير = بداية المناوبة (صباحية 05:00 / ليلية 17:00 بتوقيت الرياض) — لا وقت
+// الإدخال ولا وقت التعديل ولا وقت الحفظ. والغائب الذي يحضر لاحقًا = «حاضر متأخر»:
+// arrival يُغلق أقدم late مفتوح ثم أقدم absence مفتوح (نفس قاعدة foldEvents)،
+// وsourceEventType يوثّق مصدر الفتح. يطبّق آخر correction لوقت الحضور والمدة
+// تُعاد من بداية المناوبة (لا من وقت التصحيح). السقوط على طابع حدث الفتح فقط
+// عند تعذر حلّ نوع/تاريخ المناوبة (مع تحذير مسجل).
 // لا يمس حالة الفرقة إطلاقًا — معلومات Timeline فقط.
 function parsePayload(p) {
     if (!p) return {};
     if (typeof p === 'object') return p;
     try { return JSON.parse(p); } catch (_) { return {}; }
 }
-function deriveLateRecords(events) {
+// بداية المناوبة بتوقيت الرياض (الإزاحة نص صريح +03:00 — بلا حساب إزاحة محلي):
+// صباحية = dateT05:00:00+03:00 ، ليلية = dateT17:00:00+03:00 — تُعاد UTC ISO.
+function shiftStartIso(shiftType, shiftDate) {
+    const iso = toIsoDate(shiftDate);
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso) || !shiftType) return null;
+    const isNight = String(shiftType).includes('ليل');
+    const d = new Date(iso + (isNight ? 'T17:00:00+03:00' : 'T05:00:00+03:00'));
+    return isNaN(d.getTime()) ? null : d.toISOString();
+}
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — وقت الحضور
+// المصحَّح (correction.arrivalAt) وقت جداري بتوقيت الرياض. القيمة naive (بلا إزاحة)
+// كانت تُفسَّر بمنطقة الخادم المحلية عند new Date فيزيح حساب التأخير على خادم UTC؛
+// تُطبَّع هنا إلى UTC ISO بإزاحة +03:00 صريحة. القيم الحاملة لإزاحة/Z تُحترم كما هي.
+function normalizeRiyadhWallIso(v) {
+    const s = String(v || '').trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (m) {
+        const d = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4] || '00'}+03:00`);
+        return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function deriveLateRecords(events, shiftType, shiftDate) {
     const sorted = (events || []).slice().sort((a, b) =>
         String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
-    const openLate = {};   // entity_id -> [late events]
-    const pairs = [];      // { entity, teamId, startedAt, arrivedAt, arrivalEventId }
-    const corrections = {}; // entity_id -> [{ at, createdAt }]
+    const shiftStartAt = shiftStartIso(shiftType, shiftDate);
+    const openLate = {};     // entity_id -> [late events]
+    const openAbsence = {};  // entity_id -> [absence events]
+    const pairs = [];        // { entity, teamId, startedAt, arrivedAt, arrivalEventId, sourceEventType }
+    const corrections = {};  // entity_id -> [{ at, createdAt }]
+    let personOpenEvents = 0;
     for (const e of sorted) {
         const ent = e.entity_id;
         if (!ent) continue;
         if (e.event_type === 'late') {
+            personOpenEvents++;
             (openLate[ent] = openLate[ent] || []).push(e);
+        } else if (e.event_type === 'absence') {
+            personOpenEvents++;
+            (openAbsence[ent] = openAbsence[ent] || []).push(e);
         } else if (e.event_type === 'arrival') {
-            const q = openLate[ent];
-            if (q && q.length) {
-                const late = q.shift(); // يُغلق أقدم تأخير مفتوح (نفس قاعدة foldEvents)
+            // يُغلق أقدم تأخير مفتوح أولًا، وإلا أقدم غياب مفتوح (الغائب الحاضر = حاضر متأخر)
+            let opened = null, sourceEventType = null;
+            const ql = openLate[ent];
+            if (ql && ql.length) { opened = ql.shift(); sourceEventType = 'late'; }
+            else {
+                const qa = openAbsence[ent];
+                if (qa && qa.length) { opened = qa.shift(); sourceEventType = 'absence'; }
+            }
+            if (opened) {
                 pairs.push({
                     employee: ent,
-                    teamId: late.team_id || e.team_id || null,
-                    startedAt: late.created_at,
+                    teamId: opened.team_id || e.team_id || null,
+                    startedAt: shiftStartAt || opened.created_at, // المرجع: بداية المناوبة
                     arrivedAt: e.created_at,
-                    arrivalEventId: e.id || null
+                    arrivalEventId: e.id || null,
+                    sourceEventType
                 });
             }
         } else if (e.event_type === 'correction') {
@@ -102,6 +145,9 @@ function deriveLateRecords(events) {
                 (corrections[ent] = corrections[ent] || []).push({ at: correctedAt, createdAt: e.created_at });
             }
         }
+    }
+    if (!shiftStartAt && personOpenEvents) {
+        console.warn('[StaffingEventsService] تعذّر حلّ نوع/تاريخ المناوبة — التأخير يُحسب من طابع حدث الفتح (سلوك احتياطي فقط)');
     }
     // التصحيح يطبَّق على أحدث زوج وصول لنفس الموظف (الأحداث append-only — التصحيح حدث تدقيق)
     for (const ent of Object.keys(corrections)) {
@@ -115,17 +161,21 @@ function deriveLateRecords(events) {
         return {
             employee: p.employee, teamId: p.teamId,
             startedAt: p.startedAt, arrivedAt: p.arrivedAt,
-            durationMinutes: mins, status: 'arrived'
+            durationMinutes: mins, status: 'arrived',
+            sourceEventType: p.sourceEventType
         };
     });
-    // تأخير بلا وصول — «لم يحضر»
-    for (const ent of Object.keys(openLate)) {
-        for (const late of openLate[ent]) {
-            records.push({
-                employee: ent, teamId: late.team_id || null,
-                startedAt: late.created_at, arrivedAt: null,
-                durationMinutes: null, status: 'not_arrived'
-            });
+    // تأخير/غياب بلا وصول — «لم يحضر»
+    for (const [queue, sourceEventType] of [[openLate, 'late'], [openAbsence, 'absence']]) {
+        for (const ent of Object.keys(queue)) {
+            for (const ev of queue[ent]) {
+                records.push({
+                    employee: ent, teamId: ev.team_id || null,
+                    startedAt: shiftStartAt || ev.created_at, arrivedAt: null,
+                    durationMinutes: null, status: 'not_arrived',
+                    sourceEventType
+                });
+            }
         }
     }
     records.sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
@@ -373,8 +423,16 @@ class StaffingEventsService {
     async getTimeline(shiftId, entityId = null) {
         let events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         if (entityId) events = events.filter(e => e.entity_id === entityId);
-        // بند 15: سجلات التأخير المشتقة (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل
-        const lateRecords = deriveLateRecords(events);
+        // بند 15: سجلات التأخير المشتقة (بدأ/حضر/المدة/لم يحضر) — سيرفري بالكامل.
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): نوع/تاريخ المناوبة
+        // يُحلّان سيرفريًا من سجل المناوبة (لا من المتصفح إطلاقًا) — بداية المناوبة
+        // (05:00/17:00 الرياض) هي المرجع الوحيد لحساب مدة التأخير في كل الأسطح.
+        let shiftType = null, shiftDate = null;
+        try {
+            const shift = await this.storage.getShiftById(shiftId);
+            if (shift) { shiftType = shift.shift_type || null; shiftDate = shift.shift_date || null; }
+        } catch (_) { /* deriveLateRecords يسقط على طابع حدث الفتح مع تحذير */ }
+        const lateRecords = deriveLateRecords(events, shiftType, shiftDate);
         // doc-v2: إثراء وصفي — التخصص/المعرف الوظيفي بالمطابقة الاسمية (إن لم يُطابق يُترك بلا code)
         try {
             const info = await this._personInfoByName(shiftId);
@@ -559,7 +617,8 @@ class StaffingEventsService {
                 throw err;
             }
             // بند 15: تصحيح وقت الحضور — وقت صالح إلزامي (صلاحية المشرف على المسار)
-            if (type === 'correction' && (!ev.arrivalAt || isNaN(new Date(ev.arrivalAt).getTime()))) {
+            // (تفويض 2026-08: naive يُقبل ثم يُطبَّع كتوقيت الرياض عند الختم أدناه)
+            if (type === 'correction' && (!ev.arrivalAt || !normalizeRiyadhWallIso(ev.arrivalAt))) {
                 const err = new Error('وقت الحضور المصحَّح غير صالح');
                 err.statusCode = 400;
                 throw err;
@@ -607,7 +666,7 @@ class StaffingEventsService {
             }
 
             const payload = { source: 'completion-person-events' };
-            if (type === 'correction') { payload.corrects = 'arrival_time'; payload.arrivalAt = ev.arrivalAt; }
+            if (type === 'correction') { payload.corrects = 'arrival_time'; payload.arrivalAt = normalizeRiyadhWallIso(ev.arrivalAt); }
             if (ev.coverageType) payload.coverageType = ev.coverageType;
             if (ev.jobTitle) payload.jobTitle = ev.jobTitle;
             if (ev.employeeNumber) payload.employeeNumber = ev.employeeNumber;
@@ -825,6 +884,15 @@ class StaffingEventsService {
             activeCount += supporters.length;
             members.push(...supporters);
 
+            // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): التشكيلة
+            // النهائية الفعلية — من يُنهي المناوبة مع الفريق فعلًا بعد طيّ كل
+            // الأحداث (الغياب/التأخير/الدعم/الاستبدال/التطوع): القاعدة النشطة
+            // (بلا غياب/تأخير مفتوح وغير مكلَّفة خارج الفريق) + الدعم الوارد
+            // (خارجي/تطوعي/تكليف داخل). حقل مشتق هنا فقط (نفس دلالة activeCount
+            // تمامًا — مصدر واحد بلا طيّ مكرر) وتسجيل الخروج يقرأه فلا يظهر
+            // الغائب ويظهر البديل/المتطوع. additive: members يبقى كما هو.
+            const effectiveRoster = members.filter(m => m && (m.state === 'active' || m.role === 'support'));
+
             const vehId = vehByTeamId[String(t.id)] || null;
             const vehSt = vehId ? (vehStatus[vehId] || null) : null;
             const ownVehicleOk = !vehSt || (vehSt !== 'breakdown' && vehSt !== 'out_of_service');
@@ -852,6 +920,7 @@ class StaffingEventsService {
                 requiredPersonnel: required,
                 center: t.center || null,
                 members,
+                effectiveRoster, // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): التشكيلة النهائية الفعلية
                 absentees,
                 vacant: Math.max(0, required - activeCount),
                 vehicleId: vehId,

@@ -54,9 +54,11 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { generateWorkflowPdf } = require('./workflow-pdf-service');
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — الطبقة المركزية
+const TimeRiyadh = require('../public/js/time-riyadh.js');
 
 class WorkflowService {
-    constructor({ storage, engine, staffingService, vehicleService }) {
+    constructor({ storage, engine, staffingService, vehicleService, signoutService }) {
         if (!storage) throw new Error('WorkflowService requires a StorageAdapter');
         if (!engine) throw new Error('WorkflowService requires an OperationsEngine');
         if (!staffingService) throw new Error('WorkflowService requires StaffingEventsService');
@@ -65,6 +67,9 @@ class WorkflowService {
         this.engine = engine;
         this.staffing = staffingService;
         this.vehicles = vehicleService;
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): المالك الوحيد
+        // لتسجيلات الخروج — اللقطة تختمها منه (اختياري: بيئات بلا تجميع تبقى null)
+        this.signouts = signoutService || null;
     }
 
     // ─── الجداول الثلاثة — ذاتية الإنشاء، لا مساس بأي جدول قائم ───
@@ -128,7 +133,8 @@ class WorkflowService {
             vehicles: null,      // التعيينات + الحالات + الأرقام + غير المعيّنة
             completionNotes: '', // ملاحظات التكميل العامة
             supervisors: [],     // المشرفون المتفاعلون (فاعلو الأحداث)
-            lateRecords: null    // سجلات التأخير (وصول/عدم وصول + المدة) — قد تغيب في اللقطات القديمة
+            lateRecords: null,   // سجلات التأخير (وصول/عدم وصول + المدة) — قد تغيب في اللقطات القديمة
+            signouts: null       // تسجيلات خروج الفرق (المالك الوحيد — مثراة بالكود/المسمى) — قد تغيب في اللقطات القديمة
         };
 
         // 1) هوية المناوبة (ختم سيرفري)
@@ -182,6 +188,15 @@ class WorkflowService {
             const tl2 = await this.staffing.getTimeline(shiftId);
             snapshot.lateRecords = (tl2 && tl2.lateRecords) || null;
         } catch (e) { console.warn('[Workflow] snapshot.lateRecords failed:', e.message); }
+
+        // 8) تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): تسجيلات خروج
+        //    الفرق تُختم في اللقطة من المالك الوحيد (SignoutService.listByShift —
+        //    أحدث حدث TEAM_CHECKOUT لكل فرقة، مثراة بالكود/المسمى من دليل
+        //    الموظفين). سير العمل والتفاصيل والأرشيف والـPDF كلها تعرض السجل
+        //    نفسه — لا اشتقاق من roster المجدول ولا مصدر موازٍ.
+        try {
+            snapshot.signouts = this.signouts ? await this.signouts.listByShift(shiftId) : null;
+        } catch (e) { console.warn('[Workflow] snapshot.signouts failed:', e.message); }
 
         return snapshot;
     }
@@ -386,9 +401,11 @@ class WorkflowService {
         }
 
         const now = new Date().toISOString();
-        // سنة المرجع من تاريخ المناوبة (الختم السيرفري)، مع سقوط للسنة الحالية
+        // سنة المرجع من تاريخ المناوبة (الختم السيرفري)، مع سقوط لسنة الرياض الحالية
+        // (تفويض 2026-08 — توحيد التوقيت: كانت سنة منطقة الخادم المحلية)
         const shiftDate = snapshot && snapshot.shift && snapshot.shift.date;
-        const year = /^\d{4}/.test(shiftDate || '') ? parseInt(shiftDate.slice(0, 4), 10) : new Date().getFullYear();
+        const year = /^\d{4}/.test(shiftDate || '') ? parseInt(shiftDate.slice(0, 4), 10)
+            : parseInt(TimeRiyadh.riyadhParts(new Date()).year, 10);
 
         // الرقم المرجعي الذرّي — يُستهلك ولا يتكرر أبدًا حتى عند فشل لاحق
         await this.storage.run('INSERT OR IGNORE INTO workflow_counters (year, next_seq) VALUES (?, 1)', [year]);

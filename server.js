@@ -25,6 +25,9 @@ const SmartAwarenessService = require('./services/smart-awareness-service');
 const smartAsk = require('./services/smart-ask-service');
 // جولة ربط الإشعارات: الطبقة المركزية الوحيدة لإنشاء الإشعارات (خريطة الحدث ← النوع)
 const notificationService = require('./services/notification-service');
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): تصدير PDF سيرفري للجداول لكل مركز
+// (تذكرة البند ⑤) — نفس بنية PDF سير العمل (pdfkit + Amiri + أنبوب العربية المحسوم)
+const schedulePdfService = require('./services/schedule-pdf-service');
 // الطبقة المركزية الوحيدة لتحويل وعرض الوقت (Asia/Riyadh) — نفس ملف المتصفح
 const TimeRiyadh = require('./public/js/time-riyadh.js');
 
@@ -2148,7 +2151,17 @@ app.get('/api/current-shift', authenticate, async (req, res) => {
     try {
         if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
         const session = await opsEngine.shifts.getCurrentSession();
-        res.json({ success: true, shift: session.currentShift || { id: null, status: 'none' } });
+        const current = session.currentShift || { id: null, status: 'none' };
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+        // السيرفر (Asia/Riyadh) مرجع وحيد. serverNow ختم لحظة الرد، وprepShift
+        // هوية المناوبة القادمة مشتقة سيرفريًا في وضع التحضير (بلا مناوبة نشطة)
+        // حتى لا تعرض الواجهات أي قيمة من ساعة الجهاز.
+        res.json({
+            success: true,
+            shift: current,
+            serverNow: new Date().toISOString(),
+            prepShift: current && current.id ? null : { type: deriveServerShiftType(), date: getSaudiDateString() }
+        });
     } catch (error) {
         console.error('[CurrentShift] Error:', error);
         res.status(500).json({ error: 'فشل في جلب النوبة الحالية' });
@@ -2371,16 +2384,23 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         if (snapRow) { try { sealed = JSON.parse(snapRow.snapshot_data); } catch (e) { sealed = null; } }
                     }
                     if (sealed) {
-                        response.positioning = Array.isArray(sealed.positioning) ? sealed.positioning : [];
+                        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد
+                        // مصدر وقت التمركزات — اللقطات المختومة قبل التوحيد تحمل
+                        // startTime/endTime نصيين naive (جدارية الرياض)؛ تُفسَّر عند
+                        // القراءة عبر مطبِّع المالك الوحيد (+03:00 ← UTC ISO) فتتطابق
+                        // المؤرشفات القديمة مع الجديدة في كل الأسطح بلا ترحيل.
+                        const PositioningService = require('./services/positioning-service');
+                        response.positioning = (Array.isArray(sealed.positioning) ? sealed.positioning : []).map(p => PositioningService.normalizePlanTimes(p));
                         response.positioning_events = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
                         // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
                         response.signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
                     } else {
+                        const PositioningService = require('./services/positioning-service');
                         const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
                         response.positioning = (Array.isArray(planRows) ? planRows : []).map(r => {
                             let d = {};
                             try { d = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
-                            return { ...d, id: r.id, shiftId: r.shift_id };
+                            return PositioningService.normalizePlanTimes({ ...d, id: r.id, shiftId: r.shift_id });
                         });
                         const evRows = await db.all('SELECT * FROM positioning_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
                         response.positioning_events = (Array.isArray(evRows) ? evRows : []).map(r => {
@@ -2390,7 +2410,13 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                             return { id: r.id, planId: r.plan_id, eventType: r.event_type, changedFields: changed, payload, actorId: r.actor_id, actorName: r.actor_name, createdAt: r.created_at };
                         });
                         // المرحلة ب: سجل تسجيلات الخروج الحي (المناوبة النشطة/بلا لقطة)
-                        // = أحدث حدث TEAM_CHECKOUT لكل فرقة (عرض مشتق من سجل الأحداث)
+                        // = أحدث حدث TEAM_CHECKOUT لكل فرقة (عرض مشتق من سجل الأحداث).
+                        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): القراءة
+                        // من المالك الوحيد (SignoutService.listByShift — نفس عرض التكميل
+                        // وسير العمل، مثرًى بـ memberDetails)؛ الاستعلام الخام سقوط فقط.
+                        if (signoutService) {
+                            response.signouts = await signoutService.listByShift(shiftId);
+                        } else {
                         const soRows = await db.all(
                             `SELECT s.* FROM shift_signout_events s
                              JOIN (SELECT team, MAX(id) AS mid FROM shift_signout_events WHERE shift_id = ? GROUP BY team) t
@@ -2400,6 +2426,7 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                             try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
                             return { id: r.id, team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
                         });
+                        }
                     }
                 } catch (posErr) {
                     console.warn('[ShiftDetail] positioning read failed:', posErr.message);
@@ -2501,15 +2528,20 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                 if (snapRow) { try { sealed = JSON.parse(snapRow.snapshot_data); } catch (e) { sealed = null; } }
             }
             if (sealed) {
-                positioning = Array.isArray(sealed.positioning) ? sealed.positioning : [];
+                // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد مصدر
+                // وقت التمركزات — نفس تفسير القراءة في التفاصيل (مطبِّع المالك
+                // الوحيد: naive جدارية الرياض ← UTC ISO) حتى يطابق التصدير الشاشة.
+                const PositioningService = require('./services/positioning-service');
+                positioning = (Array.isArray(sealed.positioning) ? sealed.positioning : []).map(p => PositioningService.normalizePlanTimes(p));
                 positioningEvents = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
                 // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
                 signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
             } else {
+                const PositioningService = require('./services/positioning-service');
                 const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
                 positioning = (Array.isArray(planRows) ? planRows : []).map(r => {
                     let d = {}; try { d = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
-                    return { ...d, id: r.id, shiftId: r.shift_id };
+                    return PositioningService.normalizePlanTimes({ ...d, id: r.id, shiftId: r.shift_id });
                 });
                 const evRows = await db.all('SELECT * FROM positioning_events WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
                 positioningEvents = (Array.isArray(evRows) ? evRows : []).map(r => {
@@ -2518,7 +2550,12 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                     try { changed = r.changed_fields ? JSON.parse(r.changed_fields) : null; } catch (e) {}
                     return { planId: r.plan_id, eventType: r.event_type, changedFields: changed, payload, actorName: r.actor_name, createdAt: r.created_at };
                 });
-                // المرحلة ب: سجل تسجيلات الخروج الحي (أحدث حدث لكل فرقة — مشتق من السجل)
+                // المرحلة ب: سجل تسجيلات الخروج الحي (أحدث حدث لكل فرقة — مشتق من السجل).
+                // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): من المالك الوحيد
+                // (SignoutService.listByShift) عند توفره؛ الاستعلام الخام سقوط فقط.
+                if (signoutService) {
+                    signouts = await signoutService.listByShift(shiftId);
+                } else {
                 const soRows = await db.all(
                     `SELECT s.* FROM shift_signout_events s
                      JOIN (SELECT team, MAX(id) AS mid FROM shift_signout_events WHERE shift_id = ? GROUP BY team) t
@@ -2528,6 +2565,7 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                     try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
                     return { team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
                 });
+                }
             }
         } catch (e) { /* قسم التمركزات يُصدَّر فارغًا عند الفشل — بقية السجل تكتمل */ }
 
@@ -3372,7 +3410,8 @@ app.get('/api/shifts/:id/health-score', authenticate, async (req, res) => {
 // GET /api/shifts/daily-dashboard - daily KPIs
 app.get('/api/shifts/daily-dashboard', authenticate, async (req, res) => {
     try {
-        const date = req.query.date || new Date().toISOString().split('T')[0];
+        // «اليوم» = تاريخ الرياض الجداري (كان toISOString UTC — يسبق يومًا بعد 21:00)
+        const date = req.query.date || getSaudiDateString();
         if (!dbAvailable()) {
             return res.json({ success: true, date, total_shifts: 0, total_reports: 0, completed_reports: 0, open_reports: 0, suspended_reports: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, completion_rate: 0, avg_response_time: 0, avg_closure_time: 0, top_center: null, top_report_type: null });
         }
@@ -3497,8 +3536,10 @@ app.get('/api/shifts/weekly-dashboard', authenticate, async (req, res) => {
 // GET /api/shifts/monthly-dashboard - monthly KPIs
 app.get('/api/shifts/monthly-dashboard', authenticate, async (req, res) => {
     try {
-        const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
-        const year = parseInt(req.query.year) || new Date().getFullYear();
+        // الشهر/السنة الافتراضيان من مكوّنات الرياض (كانتا من منطقة الخادم المحلية)
+        const _mp = TimeRiyadh.riyadhParts(new Date());
+        const month = parseInt(req.query.month) || parseInt(_mp.month, 10);
+        const year = parseInt(req.query.year) || parseInt(_mp.year, 10);
         if (!dbAvailable()) {
             return res.json({ success: true, month, year, total_shifts: 0, total_reports: 0, total_operating_hours: 0, total_staff: 0, total_teams: 0, total_vehicles: 0, morning_shifts: 0, night_shifts: 0, completion_rate: 0, avg_performance: 0, comparison_last_month: 0, comparison_chart_data: null });
         }
@@ -3556,9 +3597,11 @@ app.get('/api/shifts/executive-dashboard', authenticate, async (req, res) => {
         // OV-S9-02: نفس مصدر daily-dashboard حرفاً (SQLite عبر readShiftsFromDb)
         // حتى يتطابق الرقمان على نفس القاعدة — لا JSON.
         const shifts = await readShiftsFromDb();
-        const today = new Date().toISOString().split('T')[0];
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // النوافذ الزمنية من تاريخ الرياض الجداري (كانت UTC — تزيح «اليوم» بعد 21:00)
+        const today = getSaudiDateString();
+        const _todayUtc = new Date(today + 'T00:00:00.000Z');
+        const weekAgo = new Date(_todayUtc.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const monthAgo = new Date(_todayUtc.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         const todayShifts = shifts.filter(s => s.shiftDate === today);
         const weekShifts = shifts.filter(s => s.shiftDate >= weekAgo);
@@ -3916,7 +3959,7 @@ app.post('/api/shifts/export', authenticate, async (req, res) => {
             data = shift || {};
             filename = `shift-detail-${shiftId}`;
         } else if (type === 'daily') {
-            const date = req.body.date || new Date().toISOString().split('T')[0];
+            const date = req.body.date || getSaudiDateString(); // تاريخ الرياض (كان UTC)
             data = { date, shifts: shifts.filter(s => s.shiftDate === date) };
             filename = `daily-report-${date}`;
         } else if (type === 'weekly') {
@@ -3929,8 +3972,9 @@ app.post('/api/shifts/export', authenticate, async (req, res) => {
             const year = req.body.year;
             data = { month, year, shifts: shifts.filter(s => {
                 if (!s.shiftDate) return false;
-                const d = new Date(s.shiftDate);
-                return d.getMonth() + 1 === month && d.getFullYear() === year;
+                // shiftDate نص YYYY-MM-DD بتوقيت الرياض — مقارنة نصية بلا Date محلي
+                const parts = String(s.shiftDate).split('-');
+                return parseInt(parts[1], 10) === month && parseInt(parts[0], 10) === year;
             }) };
             filename = `monthly-report-${year}-${month}`;
         }
@@ -3962,7 +4006,7 @@ app.post('/api/shifts/reports/generate', authenticate, authorize(['admin', 'dire
         let filename = '';
 
         if (type === 'daily') {
-            const date = date_from || new Date().toISOString().split('T')[0];
+            const date = date_from || getSaudiDateString(); // تاريخ الرياض (كان UTC)
             reportData = { date, shifts: shifts.filter(s => s.shiftDate === date) };
             filename = `daily-report-${date}.pdf`;
         } else if (type === 'weekly') {
@@ -4776,9 +4820,24 @@ async function resolveEventsShiftId(req) {
 app.get('/api/staffing/state', authenticate, async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
-        const resolved = await resolveEventsShiftId(req);
-        if (resolved.error) return res.status(400).json({ error: resolved.error });
-        const state = await staffingEventsService.getState(resolved.shiftId);
+        let shiftId;
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): وضع تحرير الأرشيف
+        // في صفحة التكميل يرسل date/type — تُحلّ المناوبة منهما (الحلال الجاهز
+        // ShiftManager.resolveShiftId أولًا، ثم بحث مباشر يشمل المؤرشفة لأن الحلال
+        // يقيد status='active' ووضع الأرشيف يستهدف مناوبة مؤرشفة). استعلام صريح لا
+        // يسقط للمناوبة النشطة إطلاقًا؛ غياب المعاملين ⇒ السلوك القائم (النشطة).
+        if (req.query.date && req.query.type) {
+            shiftId = await opsEngine.shifts.resolveShiftId(null, req.query.date, req.query.type);
+            if (shiftId == null) {
+                const row = await db.get('SELECT id FROM shifts WHERE shift_date = ? AND shift_type = ? ORDER BY id DESC LIMIT 1', [req.query.date, req.query.type]);
+                shiftId = row ? row.id : null;
+            }
+        } else {
+            const resolved = await resolveEventsShiftId(req);
+            if (resolved.error) return res.status(400).json({ error: resolved.error });
+            shiftId = resolved.shiftId;
+        }
+        const state = await staffingEventsService.getState(shiftId);
         res.json({ success: true, ...state });
     } catch (error) {
         console.error('[API] Error staffing state:', error);
@@ -6419,7 +6478,7 @@ app.post('/api/announcements/add', authenticate, authorize(['admin']), validateB
             id: Date.now().toString(),
             title,
             body,
-            date: date || new Date().toISOString().split('T')[0],
+            date: date || getSaudiDateString(), // تاريخ الرياض الجداري (كان UTC)
             pinned: !!pinned,
             urgent: !!urgent
         };
@@ -6563,16 +6622,12 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), async (req, res)
             centerStats[center] = centerReports;
         }
         
-        // Last 7 days stats
+        // Last 7 days stats — الأساس تاريخ الرياض الجداري (كانت مكوّنات منطقة الخادم)
         const last7Days = [];
-        const now = new Date();
+        const _baseDay = new Date(getSaudiDateString() + 'T00:00:00.000Z');
         for (let i = 6; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const year = d.getFullYear();
-            const month = (d.getMonth() + 1).toString().padStart(2, '0');
-            const day = d.getDate().toString().padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
+            const d = new Date(_baseDay.getTime() - i * 24 * 60 * 60 * 1000);
+            const dateStr = d.toISOString().slice(0, 10);
             const dayShifts = safeShifts.filter(s => s && s.shiftDate === dateStr);
             const dayReports = dayShifts.reduce((sum, s) => sum + (s && s.totalReports ? s.totalReports : 0), 0);
             last7Days.push({ date: dateStr, reports: dayReports });
@@ -6979,7 +7034,7 @@ app.get('/api/export', authenticate, async (req, res) => {
         let total = Object.values(safeReports).reduce((sum, r) => sum + (r.count || 0), 0);
         rows.push([], ["الإجمالي الكلي", "", total, ""]);
         let csv = rows.map(row => row.map(cell => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-        const fileName = `بلاغات_${new Date().toISOString().slice(0,10)}.csv`;
+        const fileName = `بلاغات_${getSaudiDateString()}.csv`; // تاريخ الرياض (كان UTC)
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
         res.status(200).send("\uFEFF" + csv);
@@ -7400,6 +7455,37 @@ app.post('/api/schedule/files', authenticate, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'فشل في حفظ الملفات' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08) — تذكرة البند ⑤:
+// تصدير PDF سيرفري لجدول مركز واحد (A4 أفقي، RTL، ترويسة حكومية، ختم الرياض).
+// «المركز» = نفس دلالة فلتر «الموقع» في smart-schedule.html (team أو location).
+// month اختياري (YYYY-MM)؛ غيابه = اشتقاق الفترة من البيانات نفسها.
+// الوثيقة تصدير عند الطلب (Buffer مباشر — لا تُخزَّن؛ ليست وثيقة مقفلة كسير العمل).
+// ═══════════════════════════════════════════════════════════
+app.get('/api/schedule/pdf', authenticate, async (req, res) => {
+    try {
+        const center = String(req.query.center || '').trim();
+        if (!center) return res.status(400).json({ error: 'المركز مطلوب' });
+        const month = String(req.query.month || '').trim();
+        if (month && !/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({ error: 'صيغة الشهر غير صالحة (YYYY-MM)' });
+        }
+        const employees = await readScheduleEmployees();
+        const data = schedulePdfService.buildSchedulePdfData(employees, { center, month: month || undefined });
+        if (!data.employees.length) {
+            return res.status(404).json({ error: 'لا توجد بيانات جدول لهذا المركز' });
+        }
+        const buf = await schedulePdfService.generateSchedulePdf(data);
+        const fname = 'جدول-' + data.center + '-' + (data.month || '') + '.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', "attachment; filename=\"schedule.pdf\"; filename*=UTF-8''" + encodeURIComponent(fname));
+        res.send(buf);
+    } catch (error) {
+        console.error('Schedule PDF error:', error);
+        res.status(500).json({ error: 'فشل في توليد PDF الجدول' });
     }
 });
 
@@ -7893,8 +7979,11 @@ app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
 // API: تسجيل خروج المناوبة (shift_signout_events — سجل TEAM_CHECKOUT append-only،
 // مصدر الحقيقة الواحد؛ كل الصفحات تقرأ منه، والحالة الحالية عرض مشتق منه)
 // ============================================
-// الاقتراح التلقائي: آخر تسجيل خروج للفرقة ← طاقم المناوبة الحالية الفعلي
-// ← آخر مناوبة فعلية (سلسلة موثقة في SignoutService — لا جدول شهري ولا HR)
+// الاقتراح التلقائي: آخر Final Team Snapshot معتمد (تسليم المناوبة السابقة)
+// ← احتياطي فقط: طاقم المناوبة الحالية الفعلي ← آخر مناوبة فعلية
+// (سلسلة موثقة في SignoutService — لا جدول شهري ولا HR)
+// (تفويض المالك 2026-08-08: الاقتراح يقرأ من آخر Final Team Snapshot معتمد
+//  — effectiveRoster احتياطي فقط عند غياب أي Snapshot سابق)
 app.get('/api/signouts/suggest', authenticate, async (req, res) => {
     try {
         if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
@@ -7915,8 +8004,11 @@ app.get('/api/signouts/suggest', authenticate, async (req, res) => {
 app.post('/api/signouts', authenticate, async (req, res) => {
     try {
         if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
-        const { team, members, notes } = req.body || {};
-        const result = await signoutService.record(String(team || '').trim(), members, notes, req.user);
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): createdAt اختياري
+        // (وقت يدوي = تاريخ المناوبة + وقت الرياض المدخل، UTC) — يُمرَّر للمالك
+        // الوحيد ويُحفظ كما هو إن صحّ؛ وإلا الختم الآلي داخل الخدمة.
+        const { team, members, notes, createdAt } = req.body || {};
+        const result = await signoutService.record(String(team || '').trim(), members, notes, req.user, createdAt);
         if (!result.success) return res.status(400).json(result);
         res.json(result);
     } catch (error) {
@@ -7930,7 +8022,18 @@ app.post('/api/signouts', authenticate, async (req, res) => {
 app.get('/api/signouts', authenticate, async (req, res) => {
     try {
         if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
-        const shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : await getActiveShiftId();
+        let shiftId;
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): وضع تحرير الأرشيف
+        // يرسل date/type — نفس حلّ /api/staffing/state أعلاه (بلا سقوط للنشطة).
+        if (req.query.date && req.query.type) {
+            shiftId = opsEngine ? await opsEngine.shifts.resolveShiftId(null, req.query.date, req.query.type) : null;
+            if (shiftId == null) {
+                const row = await db.get('SELECT id FROM shifts WHERE shift_date = ? AND shift_type = ? ORDER BY id DESC LIMIT 1', [req.query.date, req.query.type]);
+                shiftId = row ? row.id : null;
+            }
+        } else {
+            shiftId = req.query.shift_id ? parseInt(req.query.shift_id) : await getActiveShiftId();
+        }
         if (shiftId == null || isNaN(shiftId)) return res.json({ success: true, signouts: [] });
         const signouts = await signoutService.listByShift(shiftId);
         res.json({ success: true, signouts });
@@ -8138,7 +8241,12 @@ app.post('/api/notifications/:id/read', authenticate, async (req, res) => {
 // ============================================
 app.get('/api/report-entry', authenticate, async (req, res) => {
     try {
-        const records = await contentList('report_entries');
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): القراءة بنفس نطاق
+        // الكتابة/الحذف — بلاغات المناوبة النشطة فقط (نفس حلّ getActiveShift في
+        // POST/DELETE أدناه). بلا مناوبة نشطة ⇒ قائمة فارغة (نمط GET /api/signouts).
+        const activeShift = opsEngine ? await opsEngine.shifts.getActiveShift() : null;
+        if (!activeShift) return res.json({ success: true, records: [] });
+        const records = await contentListByShift('report_entries', activeShift.id);
         res.json({ success: true, records });
     } catch (error) {
         res.status(500).json({ error: 'فشل في جلب البلاغات' });
@@ -8171,10 +8279,16 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
 
         const records = await contentList('report_entries');
         // id/createdAt/shiftId سيرفرية فوق جسم الطلب — لا يقبل أي ختم من العميل
+        // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+        // السيرفر (Asia/Riyadh) مرجع وحيد. timestamp/date كانا يُؤخذان من ساعة
+        // جهاز العميل فيقيّدان الفلاتر والإحصاءات؛ الآن يُختمان سيرفريًا فوق أي
+        // قيمة قادمة (date = تاريخ الرياض الجداري، timestamp = epoch الخادم).
         const newRecord = {
             ...record,
             id: Date.now().toString(),
             createdAt: new Date().toISOString(),
+            timestamp: Date.now(),
+            date: getSaudiDateString(),
             shiftId: activeShift.id,
             shift_id: activeShift.id
         };
@@ -8579,7 +8693,7 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
                         await db.TeamAssignments.create({
                             employee_id: empId,
                             team_id: teamMap[emp.team_name],
-                            assigned_date: new Date().toISOString().split('T')[0],
+                            assigned_date: getSaudiDateString(), // تاريخ الرياض (كان UTC)
                             is_primary: 1
                         });
                         assignmentCount++;
@@ -9702,7 +9816,7 @@ app.post('/api/shift-schedule/update', authenticate, authorize(['admin', 'direct
 app.get('/api/staffing-levels', authenticate, async (req, res) => {
     try {
         const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const targetDate = date || getSaudiDateString(); // تاريخ الرياض الجداري (كان UTC)
         
         const schedule = await db.ShiftScheduleAuto.getByDate(targetDate);
         const employees = await db.Employees.getActive();
@@ -9918,9 +10032,10 @@ app.get('/api/staffing-alerts', authenticate, async (req, res) => {
 app.get('/api/staffing-recommendations', authenticate, async (req, res) => {
     try {
         const { month, year } = req.query;
-        const now = new Date();
-        const m = month ? parseInt(month) : now.getMonth() + 1;
-        const y = year ? parseInt(year) : now.getFullYear();
+        // الشهر/السنة الافتراضيان من مكوّنات الرياض (كانا من منطقة الخادم المحلية)
+        const _rp = TimeRiyadh.riyadhParts(new Date());
+        const m = month ? parseInt(month) : parseInt(_rp.month, 10);
+        const y = year ? parseInt(year) : parseInt(_rp.year, 10);
         
         const recommendations = await generateRecommendations(y, m);
         res.json({ success: true, recommendations });
@@ -11220,6 +11335,14 @@ server.listen(PORT, async () => {
                 db, bus: opsEngine.bus, getActiveShiftId, staffingService: staffingEventsService, storage: opsEngine.storage
             });
             console.log('✅ SignoutService wired (المرحلة ب)');
+            // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): الأرشيف يقرأ
+            // تسجيلات الخروج من المالك الوحيد نفسه (late binding — المحرك يُبنى
+            // قبل الخدمات؛ جامع اللقطة هو archiveEngine.snapshot) حتى تتطابق
+            // الأسطح الخمسة على السجل الواحد.
+            if (typeof archiveEngine !== 'undefined' && archiveEngine) {
+                archiveEngine.signoutService = signoutService;
+                if (archiveEngine.snapshot) archiveEngine.snapshot.signoutService = signoutService;
+            }
             // SR-2: RosterSyncService — القناة الوحيدة لكتابة employees/shift_roster
             // من الجدولة. بعدها لا قراءة تشغيلية من JSON إطلاقًا.
             const RosterSyncService = require('./services/roster-sync-service');
@@ -11233,7 +11356,11 @@ server.listen(PORT, async () => {
             const WorkflowService = require('./services/workflow-service');
             workflowService = new WorkflowService({
                 storage: opsEngine.storage, engine: opsEngine,
-                staffingService: staffingEventsService, vehicleService: vehicleEventsService
+                staffingService: staffingEventsService, vehicleService: vehicleEventsService,
+                // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): لقطة سير
+                // العمل تختم تسجيلات الخروج من المالك الوحيد (SignoutService) —
+                // الـPDF يستهلك حقول اللقطة نفسها، بلا اشتقاق مستقل.
+                signoutService
             });
             await workflowService.init();
             console.log('✅ WorkflowService wired (WF-1, isolated)');

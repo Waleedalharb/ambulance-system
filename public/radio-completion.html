@@ -409,6 +409,10 @@ function navigateToPage(url) {
             <select id="signoutTeam" onchange="onSignoutTeamChange()"><option value="">— اختر الفرقة —</option></select>
             <div class="signout-source" id="signoutSource" style="display:none"></div>
             <div class="signout-members" id="signoutMembers"></div>
+            <!-- تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): وقت الخروج يدوي —
+                 يُملأ تلقائيًا بوقت الرياض الحالي ويعدّل المستخدم الوقت فقط (لا التاريخ:
+                 التاريخ يُركَّب عند الحفظ من تاريخ المناوبة النشطة سيرفريًا — لا من جهاز العميل) -->
+            <input id="signoutTime" type="time" step="60" title="وقت الخروج بتوقيت الرياض — قابل للتعديل (التاريخ ثابت على تاريخ المناوبة)" style="display:none">
             <input id="signoutNotes" placeholder="ملاحظات (اختيارية) — مثال: تبديل بسبب دعم أو غياب" style="display:none">
             <button class="signout-save" id="signoutSaveBtn" style="display:none" onclick="recordSignout()"><i class="fas fa-check"></i> تسجيل خروج</button>
         </div>
@@ -645,38 +649,23 @@ function serverTeamKey(teamId) {
 
 // ------------------------------------
 // SHIFT DETECTION (Saudi Time - Asia/Riyadh)
-// المنطق لم يتغير — مكوّنات الوقت تأتي الآن من TimeRiyadh.riyadhParts
-// حتى لا يبقى أي تنسيق أو تحويل وقت خارج الطبقة (TIME-POLICY.md)
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — السيرفر
+// (Asia/Riyadh) مرجع وحيد. لا اشتقاق من ساعة الجهاز إطلاقًا: المصادر الوحيدة هي
+// overrideShiftDate/Type (وضع الأرشيف من URL) ثم activeShiftContext (ختم الخادم
+// للمناوبة النشطة) ثم prepShiftContext (هوية المناوبة القادمة من /api/current-shift
+// في وضع التحضير). بلا أي ختم خادم ⇒ '' (تُخفى القيمة بدل عرض توقيت جهاز).
 // ------------------------------------
-function getSaudiTime() {
-    var p = TimeRiyadh.riyadhParts(new Date());
-    return new Date(p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute + ':' + p.second);
-}
 function getShiftType() {
     if (window.overrideShiftType) return window.overrideShiftType;
     if (window.activeShiftContext && window.activeShiftContext.type) return window.activeShiftContext.type;
-    var hour = getSaudiTime().getHours();
-    return (hour >= 5 && hour < 17) ? 'صباح' : 'ليل';
+    if (window.prepShiftContext && window.prepShiftContext.type) return window.prepShiftContext.type;
+    return '';
 }
 function getShiftDate() {
     if (window.overrideShiftDate) return window.overrideShiftDate;
     if (window.activeShiftContext && window.activeShiftContext.date) return window.activeShiftContext.date;
-    var st = getSaudiTime();
-    var y = st.getFullYear(), m = st.getMonth(), d = st.getDate(), hour = st.getHours();
-    if (hour < 5) {
-        d = d - 1;
-        if (d < 1) {
-            m = m - 1;
-            if (m < 0) { m = 11; y = y - 1; }
-            var daysInMonth = [31, (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            d = daysInMonth[m];
-        }
-    }
-    return y + '-' + (m + 1).toString().padStart(2, '0') + '-' + d.toString().padStart(2, '0');
-}
-function getShiftTimeStr() {
-    var st = getSaudiTime();
-    return st.getHours().toString().padStart(2, '0') + ':' + st.getMinutes().toString().padStart(2, '0');
+    if (window.prepShiftContext && window.prepShiftContext.date) return window.prepShiftContext.date;
+    return '';
 }
 
 // ------------------------------------
@@ -700,13 +689,27 @@ function fetchCurrentShiftId() {
             if (data.success && data.shift && data.shift.id) {
                 _cachedShiftId = data.shift.id;
                 localStorage.setItem('currentShiftId', String(data.shift.id));
+                window.prepShiftContext = null; // مناوبة نشطة — لا سياق تحضير
                 applyActiveShiftContext(data.shift);
                 return data.shift.id;
             }
             if (data.success) {
                 _cachedShiftId = null;
                 window.activeShiftContext = null;
+                // تفويض 2026-08 (توحيد التوقيت): وضع التحضير — هوية المناوبة القادمة
+                // من ختم الخادم (prepShift)، بلا أي اشتقاق من ساعة الجهاز.
+                var prep = (data && data.prepShift) || null;
+                window.prepShiftContext = prep ? {
+                    type: String(prep.type || '').replace('ية', ''),
+                    date: prep.date || ''
+                } : null;
                 try { localStorage.removeItem('currentShiftId'); } catch (e) {}
+                var prepBadge = document.getElementById('shiftBadge');
+                if (prepBadge && !window.overrideShiftDate) {
+                    prepBadge.textContent = (window.prepShiftContext && window.prepShiftContext.type && window.prepShiftContext.date)
+                        ? window.prepShiftContext.type + ' — ' + window.prepShiftContext.date + ' (تحضير — ختم الخادم)'
+                        : '—';
+                }
             }
             return getCurrentShiftId();
         })
@@ -773,7 +776,14 @@ function loadStaffingState() {
     var h = authHeaders();
     if (!h) return Promise.resolve();
     return fetchCurrentShiftId().then(function(sid) {
-        var url = '/api/staffing/state' + (sid ? '?shift_id=' + encodeURIComponent(sid) : '');
+        // وضع تحرير الأرشيف (?date=&type=): الحلّ سيرفريًا من date/type — لا من
+        // المناوبة النشطة (تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» 2026-08).
+        var url = '/api/staffing/state';
+        if (window.overrideShiftDate) {
+            url += '?date=' + encodeURIComponent(window.overrideShiftDate) + '&type=' + encodeURIComponent(window.overrideShiftType || getShiftType());
+        } else if (sid) {
+            url += '?shift_id=' + encodeURIComponent(sid);
+        }
         return fetch(url, { headers: h });
     }).then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
@@ -822,8 +832,10 @@ function loadTeams() {
 function loadSavedNotes() {
     var h = authHeaders();
     if (!h) return;
-    var shiftType = getShiftType(), shiftDate = getShiftDate();
+    // تفويض 2026-08 (توحيد التوقيت): النوع/التاريخ يُحسبان بعد اكتمال جلب السياق
+    // من الخادم (activeShiftContext/prepShiftContext) — لا قيمة من ساعة الجهاز
     fetchCurrentShiftId().then(function(shiftId) {
+        var shiftType = getShiftType(), shiftDate = getShiftDate();
         var url = '/api/completion/latest?shiftDate=' + encodeURIComponent(shiftDate) + '&shiftType=' + encodeURIComponent(shiftType);
         if (shiftId) url += '&shift_id=' + shiftId;
         return fetch(url, { headers: h });
@@ -1002,9 +1014,11 @@ function renderMiniLogs() {
         var lateHtml = lateRecords.filter(function(r) { return r.teamId === key; }).map(function(r) {
             var nm = String(r.employee).replace(/'/g, "\\'");
             var start = TimeRiyadh.formatTime(r.startedAt);
+            // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): الغائب/المتأخر الذي
+            // يحضر تُعرض حالته «حاضر متأخر» — والمدة محسوبة سيرفريًا من بداية المناوبة.
             if (r.status === 'arrived') {
                 var arr = TimeRiyadh.formatTime(r.arrivedAt);
-                return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — تأخر<br>' +
+                return '<span class="late-rec">⏰ ' + escapeHtml(r.employee) + ' — حاضر متأخر<br>' +
                     'بدأ: ' + start + ' · حضر: ' + arr + ' · مدة التأخير: ' + r.durationMinutes + ' دقيقة' +
                     ' <button class="edit-time" title="تعديل وقت الحضور" onclick="editArrivalTime(\'' + teamId + '\', \'' + nm + '\', \'' + arr + '\')">✏️</button></span>';
             }
@@ -1149,7 +1163,13 @@ function editArrivalTime(teamId, employee, currentHHMM) {
     if (!input) return;
     var m = String(input).trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
     if (!m) { showToast('⚠️ صيغة الوقت غير صحيحة — استخدم HH:MM', 'error'); return; }
-    var iso = getShiftDate() + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00';
+    // تفويض 2026-08 (توحيد التوقيت): التاريخ من ختم الخادم فقط (سياق المناوبة)،
+    // والتركيب بإزاحة +03:00 صريحة ثم UTC ISO — كان naive يُفسَّر بمنطقة الخادم.
+    var shiftDateForCorr = getShiftDate();
+    if (!shiftDateForCorr) { showToast('⚠️ تعذّر حلّ تاريخ المناوبة من الخادم — أعد المحاولة', 'error'); return; }
+    var composedCorr = new Date(shiftDateForCorr + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00+03:00');
+    if (isNaN(composedCorr.getTime())) { showToast('⚠️ الوقت غير صالح', 'error'); return; }
+    var iso = composedCorr.toISOString();
     postPersonEvents([{ type: 'correction', employeeName: employee, teamId: teamId, arrivalAt: iso }]).then(function(d) {
         if (!d) return;
         showToast('✅ تم تصحيح وقت حضور ' + employee, 'success');
@@ -1696,8 +1716,8 @@ function finishShift() {
         html += '<div class="modal-notes"><div class="title"><i class="fas fa-sticky-note"></i> ملاحظات التكميل</div>' +
             '<div class="content">' + escapeHtml(notes) + '</div></div>';
     }
-    html += '<div class="modal-info"><i class="fas fa-calendar-alt"></i> ' + getShiftDate() +
-        ' &nbsp;|&nbsp; <i class="fas fa-clock"></i> ' + getShiftType() +
+    html += '<div class="modal-info"><i class="fas fa-calendar-alt"></i> ' + (getShiftDate() || '—') +
+        ' &nbsp;|&nbsp; <i class="fas fa-clock"></i> ' + (getShiftType() || '—') +
         ' &nbsp;|&nbsp; <i class="fas fa-check-circle"></i> ' + (ready + missing + offline) + ' / ' + (ready + missing + offline + pending) + ' فرقة</div>';
 
     content.innerHTML = html;
@@ -1708,7 +1728,10 @@ function finishShift() {
 // INIT
 // ------------------------------------
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('shiftBadge').textContent = getShiftType() + ' — ' + getShiftDate() + ' (' + getShiftTimeStr() + ' KSA)';
+    // الشارة تُختم من الخادم فقط (fetchCurrentShiftId ← /api/current-shift) —
+    // لا عرض لأي قيمة مشتقة من ساعة الجهاز (تفويض 2026-08: توحيد التوقيت)
+    var _t0 = getShiftType(), _d0 = getShiftDate();
+    document.getElementById('shiftBadge').textContent = (_t0 && _d0) ? _t0 + ' — ' + _d0 : '—';
 
     // وضع تحرير الأرشيف (من صفحة الأرشيف): ?date=YYYY-MM-DD&type=...
     var urlParams = new URLSearchParams(window.location.search);
@@ -1748,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ------------------------------------
 var signoutLogCache = [];      // سجل المناوبة الحالية (من الخادم)
 var signoutSuggestCache = null; // آخر اقتراح معروض (للحفظ بضغطة واحدة)
+var signoutTimePrefill = null;  // القيمة التلقائية لحقل الوقت — الاختلاف عنها = تعديل يدوي يُحفظ كما هو
 
 function refreshSignoutTeams() {
     var sel = document.getElementById('signoutTeam');
@@ -1767,7 +1791,14 @@ function loadSignoutLog() {
     var h = authHeaders();
     if (!h) return;
     fetchCurrentShiftId().then(function(sid) {
-        var url = '/api/signouts' + (sid ? '?shift_id=' + encodeURIComponent(sid) : '');
+        // وضع تحرير الأرشيف (?date=&type=): الحلّ سيرفريًا من date/type — لا من
+        // المناوبة النشطة (تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» 2026-08).
+        var url = '/api/signouts';
+        if (window.overrideShiftDate) {
+            url += '?date=' + encodeURIComponent(window.overrideShiftDate) + '&type=' + encodeURIComponent(window.overrideShiftType || getShiftType());
+        } else if (sid) {
+            url += '?shift_id=' + encodeURIComponent(sid);
+        }
         return fetch(url, { headers: h });
     }).then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
@@ -1810,10 +1841,13 @@ function onSignoutTeamChange() {
     var mem = document.getElementById('signoutMembers');
     var notes = document.getElementById('signoutNotes');
     var btn = document.getElementById('signoutSaveBtn');
+    var timeEl = document.getElementById('signoutTime');
     signoutSuggestCache = null;
+    signoutTimePrefill = null;
     if (!team) {
         document.getElementById('signoutSource').style.display = 'none';
         mem.innerHTML = ''; notes.style.display = 'none'; btn.style.display = 'none';
+        if (timeEl) timeEl.style.display = 'none';
         return;
     }
     // فرقة مسجلة هذه المناوبة؟ ← إعادة الحفظ تصحيح: يُملأ من سجلها الحالي مباشرة
@@ -1850,6 +1884,18 @@ function renderSignoutSuggestion() {
     }).join('') + '<button type="button" class="signout-member" style="cursor:pointer;color:var(--primary);font-size:0.78rem" onclick="addSignoutMemberField()"><i class="fas fa-plus"></i> إضافة فرد</button>';
     document.getElementById('signoutNotes').style.display = '';
     document.getElementById('signoutSaveBtn').style.display = '';
+    // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): حقل الوقت يُملأ بوقت
+    // الرياض الحالي عند كل عرض للنموذج؛ القيمة التلقائية تُحفظ مرجعًا — إن بقيت
+    // كما هي لا يُرسل createdAt (الختم الآلي سيرفري)، وإن عدّلها المستخدم تُحفظ كما هي.
+    var timeEl = document.getElementById('signoutTime');
+    if (timeEl) {
+        try {
+            var p = TimeRiyadh.riyadhParts(new Date());
+            timeEl.value = p.hour + ':' + p.minute;
+            signoutTimePrefill = timeEl.value;
+        } catch (e) { signoutTimePrefill = null; }
+        timeEl.style.display = '';
+    }
 }
 
 function addSignoutMemberField() {
@@ -1870,10 +1916,30 @@ function recordSignout() {
     if (!names.length) { showToast('⚠️ أدخل اسمًا واحدًا على الأقل', 'error'); return; }
     var btn = document.getElementById('signoutSaveBtn');
     btn.disabled = true;
-    fetch('/api/signouts', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-        body: JSON.stringify({ team: team, members: names, notes: document.getElementById('signoutNotes').value.trim() })
+    // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): الوقت اليدوي —
+    // fetchCurrentShiftId أولًا لضمان سياق المناوبة من الخادم (activeShiftContext)،
+    // ثم: إن عدّل المستخدم الوقت عن القيمة التلقائية يُركَّب «تاريخ المناوبة النشطة
+    // + الوقت المدخل» كتوقيت الرياض (+03:00) ويُرسل UTC في createdAt ليُحفظ كما هو.
+    // التاريخ لا يُؤخذ من جهاز العميل إطلاقًا — overrideShiftDate (وضع الأرشيف) أو
+    // activeShiftContext.date (ختم الخادم) هما المصدران الوحيدان.
+    fetchCurrentShiftId().then(function() {
+        var payload = { team: team, members: names, notes: document.getElementById('signoutNotes').value.trim() };
+        var timeEl = document.getElementById('signoutTime');
+        var tv = timeEl && timeEl.value ? timeEl.value.trim() : '';
+        if (tv && tv !== signoutTimePrefill && /^\d{1,2}:\d{2}$/.test(tv)) {
+            var tp = tv.split(':');
+            var shiftDate = window.overrideShiftDate ||
+                (window.activeShiftContext && window.activeShiftContext.date) || null;
+            if (shiftDate) {
+                var composed = new Date(shiftDate + 'T' + tp[0].padStart(2, '0') + ':' + tp[1] + ':00+03:00');
+                if (!isNaN(composed.getTime())) payload.createdAt = composed.toISOString();
+            }
+        }
+        return fetch('/api/signouts', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify(payload)
+        });
     }).then(function(r) { return r.json(); })
     .then(function(d) {
         btn.disabled = false;

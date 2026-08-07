@@ -24,6 +24,10 @@
  *   }
  */
 
+// تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت —
+// «اليوم» وأُسس الأسابيع تُشتق من توقيت الرياض/UTC الصريح، لا من منطقة الخادم.
+const TimeRiyadh = require('../public/js/time-riyadh.js');
+
 class IndicatorService {
     /**
      * @param {Object} deps
@@ -50,7 +54,7 @@ class IndicatorService {
         // ── Shift statistics (loadReports / loadAnalytics cards) ──
         const totalShifts = shifts.length;
         const totalReports = shifts.reduce((sum, s) => sum + (s.total_reports || 0), 0);
-        const today = new Date().toISOString().split('T')[0];
+        const today = TimeRiyadh.formatDate(new Date()); // تاريخ الرياض الجداري (كان UTC)
         const todayShifts = shifts.filter(s => s.shift_date === today).length;
         let maxReports = 0, minReports = Infinity;
         for (const s of shifts) {
@@ -95,10 +99,12 @@ class IndicatorService {
         const weeks = {};
         for (const s of shifts) {
             if (!s.shift_date) continue;
-            const d = new Date(s.shift_date);
+            // shift_date نص YYYY-MM-DD (تاريخ الرياض) — حساب الأسبوع بـ UTC الصريح
+            // حتى لا تتأثر الحقول بمنطقة الخادم الزمنية (كان getDay/setDate محليين)
+            const d = new Date(s.shift_date + 'T00:00:00.000Z');
             if (isNaN(d)) continue;
-            const weekStart = new Date(d);
-            weekStart.setDate(d.getDate() - d.getDay());
+            const weekStart = new Date(d.getTime());
+            weekStart.setUTCDate(d.getUTCDate() - d.getUTCDay());
             const key = weekStart.toISOString().split('T')[0];
             if (!weeks[key]) weeks[key] = { shiftCount: 0, reports: 0, max: 0, min: Infinity };
             const c = s.total_reports || 0;
