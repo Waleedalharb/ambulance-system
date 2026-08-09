@@ -1512,6 +1512,13 @@
                 </button>
                 <span style="font-size:12px;color:#8A9BB0;">يقرأ ملف القطاع الرسمي كما هو — يقارن ويحدّث دون مسح — ويعرض تقريرًا مفصلًا قبل الحفظ</span>
             </div>
+            <!-- استيراد أرقام الجوالات (أدمن/مدير عمليات — يظهر عبر JS) -->
+            <div id="phonesImportRow" style="margin-top:10px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-primary" type="button" onclick="openPhonesImportModal()">
+                    <i class="fas fa-address-book"></i> استيراد أرقام الجوالات
+                </button>
+                <span style="font-size:12px;color:#8A9BB0;">Excel/CSV بعمودَي «الكود الوظيفي» و«الجوال» — معاينة كاملة قبل الحفظ — لا يستبدل رقمًا موجودًا برقم فارغ</span>
+            </div>
             <!-- قائمة الملفات المحفوظة -->
             <div class="saved-files-list" id="savedFilesList"></div>
         </div>
@@ -1802,7 +1809,7 @@
                 <button class="btn btn-purple" onclick="printSchedule()">
                     <i class="fas fa-print"></i> طباعة
                 </button>
-                <button class="btn btn-primary" onclick="syncToServer()" id="syncBtn" style="display:none;">
+                <button class="btn btn-primary" onclick="saveToServer()" id="syncBtn" style="display:none;">
                     <i class="fas fa-cloud-upload-alt"></i> مزامنة مع السيرفر
                 </button>
                 <button class="btn btn-info" onclick="loadFromServerManual()" id="loadServerBtn">
@@ -2994,6 +3001,91 @@
             }
         }
 
+        // SSOT (القرار المعماري 2026-08-10 — الجدول الكلاسيكي مصدر الحقيقة الوحيد):
+        // جالب صامت من قاعدة البيانات — /api/employees + /api/teams + /api/team-assignments + /api/shift-roster.
+        // هذا هو مصدر القراءة الفعلي للجدول. يعيد null فقط عند: غياب توكن / فشل شبكة / قاعدة فارغة
+        // (حينها يسقط المتصل للمصادر القديمة كوضع مُنحط بلا أي سلطة عرض عند توفر القاعدة).
+        async function fetchEmployeesFromDBSilent() {
+            try {
+                var token = AuthCore.getToken();
+                if (!token) return null;
+                var h = { 'Authorization': 'Bearer ' + token };
+
+                var empRes = await fetch('/api/employees', { headers: h });
+                if (!empRes.ok) return null;
+                var empData = await empRes.json();
+                if (!empData.success || !Array.isArray(empData.employees) || !empData.employees.length) return null;
+
+                var teamsMap = {}, empTeamMap = {};
+                try {
+                    var teamData = await (await fetch('/api/teams', { headers: h })).json();
+                    if (teamData.success && teamData.teams) {
+                        teamData.teams.forEach(function (t) { teamsMap[t.id] = t.name; });
+                    }
+                    var assignData = await (await fetch('/api/team-assignments', { headers: h })).json();
+                    if (assignData.success && assignData.assignments) {
+                        assignData.assignments.forEach(function (a) {
+                            if (!empTeamMap[a.employee_id]) {
+                                empTeamMap[a.employee_id] = teamsMap[a.team_id] || a.team_name || '';
+                            }
+                        });
+                    }
+                } catch (e) { console.warn('[SSOT] تعذر جلب الفرق/التعيينات:', e); }
+
+                var empMap = {};
+                empData.employees.forEach(function (e) {
+                    if (e.is_active === 0) return;
+                    var code = String(e.employee_code || e.id);
+                    var resolved = null;
+                    try { resolved = SymbolDictionary.resolveSymbol(e.symbol || '', e.job_title || ''); } catch (err) { /* تجاهل */ }
+                    empMap[e.id] = {
+                        id: code,                       // الكود الوظيفي — تستخدمه البطاقة والبحث والتعديل
+                        employeeDbId: e.id,             // المعرّف الداخلي — تستخدمه كتابات roster
+                        employeeNumber: code,
+                        name: e.name || '',
+                        jobTitle: e.job_title || '',
+                        phone: e.phone || '',
+                        symbol: e.symbol || '',
+                        kind: resolved ? resolved.kind : null,
+                        team: empTeamMap[e.id] || '',
+                        schedule: []
+                    };
+                });
+
+                var rosterRes = await fetch('/api/shift-roster', { headers: h });
+                if (!rosterRes.ok) return null;
+                var rosterData = await rosterRes.json();
+                if (rosterData.success && Array.isArray(rosterData.roster)) {
+                    rosterData.roster.forEach(function (r) {
+                        var emp = empMap[r.employee_id];
+                        if (!emp) return;
+                        var c = r.shift_code;
+                        var status = 'دوام';
+                        if (c === 'V' || c === 'VC' || c === 'E' || c === 'EV') status = 'إجازة';
+                        else if (c === 'WO') status = 'راحة';
+                        else if (c === 'C') status = 'تدريب';
+                        else if (c === 'ME' || c === 'F' || (c && c.indexOf('CP') === 0)) status = 'تكميل';
+                        emp.schedule.push({
+                            rosterId: r.id,
+                            day: r.day_name || '',
+                            date: r.shift_date,
+                            shift: c,
+                            shiftCode: c,
+                            time: '',
+                            location: r.team_name || emp.team || '',
+                            status: status
+                        });
+                    });
+                }
+
+                var out = Object.values(empMap);
+                return out.length ? out : null;
+            } catch (e) {
+                console.warn('[SSOT] تعذر الجلب من قاعدة البيانات:', e);
+                return null;
+            }
+        }
+
         // F6: اعتماد بيانات الخادم + كتابة الكاشين (write-through) + العرض — منطق مشترك واحد
         function adoptServerEmployees(serverEmployees) {
             employees = serverEmployees;
@@ -3005,8 +3097,8 @@
             populateLocationFilter();
         }
 
-        // Phase 2 Final Cleanup: إصلاح زر «تحميل من السيرفر» — كان يستدعي المسار العلائقي الفارغ (مكسور إنتاجياً: «لا توجد موظفين» دائماً)
-        // فيُربط بالمصدر الرسمي المؤقت نفسه (JSON) مع نفس نمط التغذية الراجعة — إجراء يدوي فالتوست مقصود هنا (الصمت للتهيئة فقط)
+        // SSOT (2026-08-10): زر «تحميل من السيرفر» يقرأ من قاعدة البيانات أولاً؛
+        // يسقط لملف JSON فقط عند تعذّر القاعدة — إجراء يدوي فالتوست مقصود هنا (الصمت للتهيئة فقط)
         async function loadFromServerManual() {
             var token = AuthCore.getToken();
             if (!token) {
@@ -3014,10 +3106,16 @@
                 return;
             }
             showToast('جاري تحميل البيانات من النظام...', 'info');
+            var dbEmployees = await fetchEmployeesFromDBSilent();
+            if (dbEmployees) {
+                adoptServerEmployees(dbEmployees);
+                showToast('✅ تم تحميل ' + dbEmployees.length + ' موظف من قاعدة البيانات', 'success');
+                return;
+            }
             var serverEmployees = await fetchEmployeesFromServerSilent();
             if (serverEmployees) {
                 adoptServerEmployees(serverEmployees);
-                showToast('✅ تم تحميل ' + serverEmployees.length + ' موظف من النظام', 'success');
+                showToast('⚠️ تعذّرت القاعدة — تم التحميل من الكاش الخادمي (وضع مُنحط)', 'info');
             } else {
                 showToast('لا توجد موظفين في النظام', 'info');
             }
@@ -3050,7 +3148,10 @@
             return null;
         }
 
-        async function saveToServer() {
+        // ترجع 'ok' | 'conflict' | 'error' — 'conflict' يعني أن مودال التعارض ظهر
+        // وبانتظار قرار المستخدم (إلغاء أو إعادة إرسال مع confirmOverwriteManual)
+        async function saveToServer(opts) {
+            opts = opts || {};
             try {
                 var token = AuthCore.getToken();
                 // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
@@ -3061,6 +3162,9 @@
                 if (shiftId) {
                     payload.shift_id = parseInt(shiftId);
                 }
+                if (opts.confirmOverwriteManual === true) {
+                    payload.confirmOverwriteManual = true; // تأكيد صريح بعد موافقة المستخدم من مودال التعارض
+                }
                 var response = await fetch('/api/schedule/employees', {
                     method: 'POST',
                     headers: {
@@ -3069,14 +3173,31 @@
                     },
                     body: JSON.stringify(payload)
                 });
+                // 409: تعارض مع تعديلات يدوية — مودال عربي واضح بزرّي إلغاء/كتابة فوق
+                if (response.status === 409) {
+                    var conflict = await response.json().catch(function () { return {}; });
+                    if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
+                        window.showImportConflictModal(conflict.conflicts, function () {
+                            toast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
+                            saveToServer({ confirmOverwriteManual: true });
+                        });
+                    } else {
+                        showToast('⚠️ ' + (conflict.error || 'يوجد تعارض مع تعديلات يدوية'), 'error');
+                    }
+                    return 'conflict';
+                }
                 var result = await response.json();
                 if (result.success) {
                     showToast('تم حفظ البيانات في السيرفر بنجاح', 'success');
+                    return 'ok';
                 } else {
                     console.warn('فشل حفظ البيانات في السيرفر:', result.error);
+                    showToast('❌ ' + (result.error || 'فشل حفظ البيانات في السيرفر'), 'error');
+                    return 'error';
                 }
             } catch (error) {
                 console.error('خطأ في حفظ البيانات في السيرفر:', error);
+                return 'error';
             }
         }
 
@@ -3155,11 +3276,19 @@
         // ==========================================
         async function setupDemoData() {
             if (employees.length > 0) return;
-            // F6: Server-First — الخادم هو المصدر الأول دائماً (قاعدة الحافة المعتمدة: غير فارغ فقط يُعتمد)
+            // SSOT (القرار المعماري 2026-08-10): قاعدة البيانات هي مصدر القراءة الفعلي للجدول.
+            // JSON / IndexedDB / localStorage = سقوط مُنحط فقط عند تعذّر القاعدة — بلا سلطة عرض عليها.
+            var dbEmployees = await fetchEmployeesFromDBSilent();
+            if (dbEmployees) {
+                adoptServerEmployees(dbEmployees);
+                console.log('[setupDemoData] Loaded', employees.length, 'from DB (SSOT)');
+                return;
+            }
+            // سقوط مُنحط 1: ملف JSON الخادمي (كاش سابق — لا يُعتمد إلا بتعذّر القاعدة)
             var serverEmployees = await fetchEmployeesFromServerSilent();
             if (serverEmployees) {
                 adoptServerEmployees(serverEmployees);
-                console.log('[setupDemoData] Loaded', employees.length, 'from server (F6 server-first)');
+                console.warn('[setupDemoData] DEGRADED: DB unavailable — loaded', employees.length, 'from JSON cache');
                 return;
             }
             // 1. Try IndexedDB (fallback فقط عند فشل/فراغ الخادم)
@@ -3197,6 +3326,10 @@
         // ==========================================
         // البحث الفوري - Instant Search
         // ==========================================
+        // SSOT (2026-08-10): نتائج «الموظف» تأتي من /api/employees/search (قاعدة البيانات مباشرة).
+        // نتائج «المناوبة» تبقى من الذاكرة المحمّلة من القاعدة (نفس مصدر الجدول الكلاسيكي).
+        // عند تعذّر الخادم: سقوط مُنحط للمطابقة المحلية (الذاكرة محمّلة من القاعدة في الوضع الطبيعي).
+        var _searchSeq = 0;
         function handleSearch(query) {
             var resultsDiv = document.getElementById('searchResults');
             if (!query || query.trim().length === 0) {
@@ -3204,41 +3337,80 @@
                 return;
             }
             query = query.toLowerCase().trim();
-            var results = searchEmployees(query);
-            if (results.length === 0) {
-                resultsDiv.innerHTML = '<div class="search-result-item"><div class="search-result-details"><div class="search-result-name">لا توجد نتائج</div></div></div>';
-            } else {
-                var html = '';
-                for (var i = 0; i < Math.min(results.length, 10); i++) {
-                    var r = results[i];
-                    var icon = r.type === 'employee' ? 'fa-user' : r.type === 'shift' ? 'fa-clock' : 'fa-calendar';
-                    var badge = '';
-                    if (r.shift) badge = '<span class="badge badge-shift-' + (r.shift === 'صباحية' ? 'morning' : r.shift === 'مسائية' ? 'evening' : 'night') + '">' + r.shift + '</span>';
-                    else if (r.status) badge = '<span class="badge badge-status-' + (r.status === 'دوام' ? 'work' : r.status === 'إجازة' ? 'off' : 'rest') + '">' + r.status + '</span>';
-                    html += '<div class="search-result-item" onclick="selectSearchResult(' + i + ')">' +
-                        '<div class="search-result-icon"><i class="fas ' + icon + '"></i></div>' +
-                        '<div class="search-result-details">' +
-                        '<div class="search-result-name">' + r.name + '</div>' +
-                        '<div class="search-result-meta">' + (r.day || '') + ' ' + (r.date || '') + ' ' + (r.location || '') + '</div></div>' +
-                        '<div>' + badge + '</div></div>';
+            var seq = ++_searchSeq;
+            searchEmployees(query).then(function (results) {
+                if (seq !== _searchSeq) return; // تجاهل رد قديم سبقه إدخال أحدث
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="search-result-item"><div class="search-result-details"><div class="search-result-name">لا توجد نتائج</div></div></div>';
+                } else {
+                    var html = '';
+                    for (var i = 0; i < Math.min(results.length, 10); i++) {
+                        var r = results[i];
+                        var icon = r.type === 'employee' ? 'fa-user' : r.type === 'shift' ? 'fa-clock' : 'fa-calendar';
+                        var badge = '';
+                        if (r.shift) badge = '<span class="badge badge-shift-' + (r.shift === 'صباحية' ? 'morning' : r.shift === 'مسائية' ? 'evening' : 'night') + '">' + r.shift + '</span>';
+                        else if (r.status) badge = '<span class="badge badge-status-' + (r.status === 'دوام' ? 'work' : r.status === 'إجازة' ? 'off' : 'rest') + '">' + r.status + '</span>';
+                        html += '<div class="search-result-item" onclick="selectSearchResult(' + i + ')">' +
+                            '<div class="search-result-icon"><i class="fas ' + icon + '"></i></div>' +
+                            '<div class="search-result-details">' +
+                            '<div class="search-result-name">' + r.name + '</div>' +
+                            '<div class="search-result-meta">' + (r.day || '') + ' ' + (r.date || '') + ' ' + (r.location || '') + '</div></div>' +
+                            '<div>' + badge + '</div></div>';
+                    }
+                    resultsDiv.innerHTML = html;
                 }
-                resultsDiv.innerHTML = html;
-            }
-            resultsDiv.classList.add('active');
-            window._searchResults = results;
+                resultsDiv.classList.add('active');
+                window._searchResults = results;
+            });
         }
 
-        function searchEmployees(query) {
+        async function searchEmployees(query) {
             var results = [];
-            for (var i = 0; i < employees.length; i++) {
-                var emp = employees[i];
-                if (emp.name.toLowerCase().indexOf(query) !== -1 || emp.id.toLowerCase().indexOf(query) !== -1 || emp.jobTitle.toLowerCase().indexOf(query) !== -1) {
-                    results.push({ type: 'employee', name: emp.name, id: emp.id, employee: emp });
+            var employeeHit = false;
+            // 1) هوية الموظف — من قاعدة البيانات مباشرة (الاسم أو الكود الوظيفي)
+            try {
+                var token = AuthCore.getToken();
+                if (token) {
+                    var res = await fetch('/api/employees/search?q=' + encodeURIComponent(query), {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var data = await res.json();
+                    if (data.success && Array.isArray(data.results)) {
+                        employeeHit = true;
+                        data.results.forEach(function (e) {
+                            var code = String(e.employee_code);
+                            var local = null;
+                            for (var i = 0; i < employees.length; i++) {
+                                if (String(employees[i].id) === code) { local = employees[i]; break; }
+                            }
+                            results.push({
+                                type: 'employee',
+                                name: e.name,
+                                id: code,
+                                employee: local || { id: code, name: e.name, jobTitle: e.job_title || '', phone: e.phone || '', schedule: [] }
+                            });
+                        });
+                    }
                 }
-                for (var s = 0; s < emp.schedule.length; s++) {
-                    var sch = emp.schedule[s];
-                    if (sch.day.indexOf(query) !== -1 || sch.date.indexOf(query) !== -1 || sch.shift.toLowerCase().indexOf(query) !== -1 || sch.location.toLowerCase().indexOf(query) !== -1 || sch.status.indexOf(query) !== -1) {
-                        results.push({ type: 'shift', name: emp.name, day: sch.day, date: sch.date, shift: sch.shift, location: sch.location, status: sch.status, employee: emp });
+            } catch (e) { console.warn('[SSOT] بحث الخادم تعذّر — سقوط للمطابقة المحلية:', e); }
+
+            // سقوط مُنحط: تعذّر الخادم ⇒ مطابقة محلية من الذاكرة المحمّلة من القاعدة
+            if (!employeeHit) {
+                for (var i = 0; i < employees.length; i++) {
+                    var emp = employees[i];
+                    if (emp.name.toLowerCase().indexOf(query) !== -1 || String(emp.id).toLowerCase().indexOf(query) !== -1 || (emp.jobTitle || '').toLowerCase().indexOf(query) !== -1) {
+                        results.push({ type: 'employee', name: emp.name, id: emp.id, employee: emp });
+                    }
+                }
+            }
+
+            // 2) نتائج المناوبات — من الذاكرة المحمّلة من القاعدة (مصدر الجدول الكلاسيكي نفسه)
+            for (var j = 0; j < employees.length; j++) {
+                var emp2 = employees[j];
+                for (var s = 0; s < emp2.schedule.length; s++) {
+                    var sch = emp2.schedule[s];
+                    if ((sch.day || '').indexOf(query) !== -1 || (sch.date || '').indexOf(query) !== -1 || String(sch.shift || '').toLowerCase().indexOf(query) !== -1 || (sch.location || '').toLowerCase().indexOf(query) !== -1 || (sch.status || '').indexOf(query) !== -1) {
+                        results.push({ type: 'shift', name: emp2.name, day: sch.day, date: sch.date, shift: sch.shift, location: sch.location, status: sch.status, employee: emp2 });
                     }
                 }
             }
@@ -3723,7 +3895,7 @@
             for (var i = 0; i < filtered.length; i++) {
                 var emp = filtered[i];
                 html += '<div class="classic-grid-row" style="display:contents;">';
-                html += '<div class="classic-grid-cell" data-emp-row="' + emp.id + '" title="' + emp.jobTitle + ' | ' + (emp.team || '-') + '">' + emp.name + '</div>';
+                html += '<div class="classic-grid-cell emp-name-cell" data-emp-row="' + emp.id + '" title="' + emp.jobTitle + ' | ' + (emp.team || '-') + '" style="cursor:pointer;" onclick="openEmployeeCard(\'' + String(emp.id).replace(/'/g, '') + '\')">' + emp.name + '</div>';
                 
                 // Build a map of date -> schedule entry for this employee
                 var empSchedule = {};
@@ -4569,96 +4741,10 @@
         // ==========================================
         // مزامنة مع السيرفر - Sync with Server
         // ==========================================
-        async function syncToServer() {
-            if (!employees || employees.length === 0) {
-                showToast('لا توجد بيانات للمزامنة', 'warning');
-                return;
-            }
-            var token = AuthCore.getToken();
-            if (!token) {
-                showToast('يجب تسجيل الدخول أولاً', 'error');
-                return;
-            }
-            // Build employees and roster arrays
-            var employeesList = [];
-            var roster = [];
-            var month = 0;
-            var year = 0;
-            for (var i = 0; i < employees.length; i++) {
-                var emp = employees[i];
-                var teamName = emp.team || '';
-                // Use first schedule entry to get month/year
-                if (emp.schedule && emp.schedule.length > 0) {
-                    if (month === 0) {
-                        var parts = emp.schedule[0].date.split('-');
-                        if (parts.length === 3) {
-                            year = parseInt(parts[0]);
-                            month = parseInt(parts[1]);
-                        }
-                    }
-                }
-                employeesList.push({
-                    employee_code: emp.employeeNumber || emp.id || '',
-                    name: emp.name || '',
-                    phone: emp.phone || '',
-                    job_title: emp.jobTitle || 'مسعف',
-                    team_name: teamName
-                });
-                // Build roster entries
-                if (emp.schedule && emp.schedule.length > 0) {
-                    for (var s = 0; s < emp.schedule.length; s++) {
-                        var entry = emp.schedule[s];
-                        if (entry.date && entry.shiftCode) {
-                            roster.push({
-                                employee_code: emp.employeeNumber || emp.id || '',
-                                team_name: entry.location || teamName,
-                                shift_date: entry.date,
-                                shift_code: entry.shiftCode,
-                                month: month,
-                                year: year
-                            });
-                        }
-                    }
-                }
-            }
-            if (month === 0 || year === 0) {
-                showToast('لم يتم التعرف على الشهر/السنة من البيانات', 'error');
-                return;
-            }
-            showToast('جاري المزامنة مع السيرفر...', 'info');
-            try {
-                // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
-                // لا يُستخدم معرّف مخزّن قبل تأكيده من /api/current-shift؛ عند رد «لا مناوبة»
-                // أو اختلاف المعرّف يُمسح المخزن ويُعامل كعدم وجود مناوبة (لا كتابة بمعرّف بائت).
-                var shiftId = await fetchVerifiedShiftId();
-                var payload = {
-                    employees: employeesList,
-                    roster: roster,
-                    month: month,
-                    year: year
-                };
-                if (shiftId) {
-                    payload.shift_id = parseInt(shiftId);
-                }
-                var response = await fetch('/api/shift-roster/import', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify(payload)
-                });
-                var data = await response.json();
-                if (data.success) {
-                    showToast('✅ تم المزامنة بنجاح! ' + (data.rosterCount || roster.length) + ' سجل محفوظ', 'success');
-                } else {
-                    showToast('❌ فشل في المزامنة: ' + (data.error || 'خطأ غير معروف'), 'error');
-                }
-            } catch (err) {
-                console.error('Sync error:', err);
-                showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
-            }
-        }
+        // W-توحيد (البند ④ 2026-08-10): أُزيلت syncToServer القديمة (قناة
+        // /api/shift-roster/import بلا حماية تعارض). زر «مزامنة مع السيرفر»
+        // يستدعي الآن saveToServer — قناة الحفظ الرسمية الوحيدة
+        // (POST /api/schedule/employees مع كشف التعارض والمزامنة الذرية).
 
         async function clearServerRoster() {
             if (!confirm('⚠️ تحذير: هذا سيمسح جميع بيانات الجدول من السيرفر ومن المتصفح!\n\nهل أنت متأكد؟')) return;
@@ -4714,106 +4800,21 @@
         // ==========================================
         // تحميل من السيرفر - Load from Server
         // ==========================================
+        // SSOT (2026-08-10): موحَّدة مع الجالب الصامت نفسه — لا بانيَين متباينين للحقيقة.
         async function loadFromServer() {
             var token = AuthCore.getToken();
             if (!token) {
                 showToast('يجب تسجيل الدخول أولاً', 'error');
                 return;
             }
-            try {
-                showToast('جاري تحميل البيانات من النظام...', 'info');
-
-                // 1. Load employees
-                var empResponse = await fetch('/api/employees', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                var empData = await empResponse.json();
-                if (!empData.success || !empData.employees || empData.employees.length === 0) {
-                    showToast('لا توجد موظفين في النظام', 'info');
-                    return;
-                }
-
-                // 2. Load teams
-                var teamResponse = await fetch('/api/teams', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                var teamData = await teamResponse.json();
-                var teamsMap = {};
-                if (teamData.success && teamData.teams) {
-                    teamData.teams.forEach(function(t) { teamsMap[t.id] = t.name; });
-                }
-
-                // 3. Load team assignments
-                var assignResponse = await fetch('/api/team-assignments', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                var assignData = await assignResponse.json();
-                var empTeamMap = {};
-                if (assignData.success && assignData.assignments) {
-                    assignData.assignments.forEach(function(a) {
-                        empTeamMap[a.employee_id] = teamsMap[a.team_id] || a.team_name || '';
-                    });
-                }
-
-                // 4. Build employees array
-                var empMap = {};
-                empData.employees.forEach(function(e) {
-                    var empId = e.id || e.employee_id || e.employee_code;
-                    empMap[empId] = {
-                        id: empId,
-                        employeeDbId: e.id,
-                        name: e.name || '',
-                        jobTitle: e.job_title || e.jobTitle || '',
-                        phone: e.phone || '',
-                        team: empTeamMap[e.id] || e.team || '',
-                        schedule: []
-                    };
-                });
-
-                // 5. Load shift roster
-                try {
-                    var rosterResponse = await fetch('/api/shift-roster', {
-                        headers: { 'Authorization': 'Bearer ' + token }
-                    });
-                    var rosterData = await rosterResponse.json();
-                    if (rosterData.success && rosterData.roster && rosterData.roster.length > 0) {
-                        rosterData.roster.forEach(function(r) {
-                            var empId = r.employee_id;
-                            var emp = empMap[empId];
-                            if (!emp) return;
-                            var status = 'دوام';
-                            if (r.shift_code === 'V' || r.shift_code === 'VC' || r.shift_code === 'E' || r.shift_code === 'EV') status = 'إجازة';
-                            else if (r.shift_code === 'WO') status = 'راحة';
-                            else if (r.shift_code === 'C') status = 'تدريب';
-                            else if (r.shift_code === 'ME' || r.shift_code === 'F' || (r.shift_code && r.shift_code.indexOf('CP') === 0)) status = 'تكميل';
-                            emp.schedule.push({
-                                rosterId: r.id,
-                                day: r.day_name || '',
-                                date: r.shift_date,
-                                shift: r.shift_code,
-                                shiftCode: r.shift_code,
-                                time: '',
-                                location: r.team_name || emp.team || '',
-                                status: status
-                            });
-                        });
-                    }
-                } catch (rosterErr) {
-                    console.warn('Could not load shift roster:', rosterErr);
-                }
-
-                employees = Object.values(empMap);
-                saveToIndexedDB();
-                saveToLocalStorage();
-                updateStats();
-                renderCharts();
-                renderCurrentView();
-                populateLocationFilter();
-                showToast('✅ تم تحميل ' + employees.length + ' موظف من النظام', 'success');
-            } catch (err) {
-                console.error('Load from server error:', err);
-                showToast('❌ خطأ في الاتصال بالسيرفر', 'error');
+            showToast('جاري تحميل البيانات من النظام...', 'info');
+            var dbEmployees = await fetchEmployeesFromDBSilent();
+            if (!dbEmployees) {
+                showToast('❌ تعذّر التحميل من قاعدة البيانات', 'error');
+                return;
             }
+            adoptServerEmployees(dbEmployees);
+            showToast('✅ تم تحميل ' + dbEmployees.length + ' موظف من قاعدة البيانات', 'success');
         }
 
         // ==========================================
@@ -4836,7 +4837,6 @@
         window.exportToExcel = exportToExcel;
         window.exportToPDF = exportToPDF;
         window.printSchedule = printSchedule;
-        window.syncToServer = syncToServer;
         window.loadFromServer = loadFromServer;
         window.clearServerRoster = clearServerRoster;
         window.closeDocumentViewer = closeDocumentViewer;
@@ -4924,7 +4924,8 @@
     <script src="/js/smart-schedule-audit.js"></script>
     <script src="/js/smart-schedule-notifications.js"></script>
     <script src="/js/smart-schedule-bulk.js"></script>
-    <script src="/js/smart-schedule-search.js"></script>
+    <script src="/js/smart-schedule-search.js?v=2"></script>
+    <script src="/js/smart-schedule-cell-editor.js?v=3"></script>
 
 <!-- RAG AI Assistant -->
 <!-- AI Assistant -->
@@ -5290,7 +5291,7 @@ async function oiApply() {
     // W-تكامل ②: قناة الحفظ الوحيدة للاستيراد الرسمي — POST /api/schedule/employees
     // (يكتب JSON الاستيراد + يزامن القاعدة ذريًا عبر RosterSyncService: موظفون +
     // roster + تعيينات). لا كاتب ثانٍ — syncToServer القديمة لا تُستدعى هنا.
-    await saveToServer();
+    var saveResult = await saveToServer();
     saveToIndexedDB();
     saveToLocalStorage();
     // تحديث الواجهة بالكامل بعد الدمج (نفس مسار التحديث القياسي في الصفحة)
@@ -5298,6 +5299,17 @@ async function oiApply() {
     try { renderCharts(); } catch (e) {}
     try { renderCurrentView(); } catch (e) {}
     try { populateLocationFilter(); } catch (e) {}
+    if (saveResult === 'conflict') {
+        // ظهر مودال التعارض — القرار النهائي (إلغاء/كتابة فوق) بيد المستخدم
+        if (typeof showToast === 'function') showToast('⚠️ الاستيراد متوقف بسبب تعارض مع تعديلات يدوية — حدّد قرارك من النافذة', 'info');
+        oiState = null;
+        return;
+    }
+    if (saveResult !== 'ok') {
+        if (typeof showToast === 'function') showToast('❌ فشل الاستيراد — لم تُحفظ البيانات في الخادم', 'error');
+        oiState = null;
+        return;
+    }
     if (typeof showToast === 'function') showToast('✅ اكتمل الاستيراد الرسمي — راجع التقرير أعلاه', 'success');
     oiState = null;
 }

@@ -90,6 +90,11 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .pm .pm-job { font-size:0.66rem; font-weight:800; color:var(--text); }
 .pm .pm-name { font-size:0.72rem; font-weight:700; color:var(--muted); }
 .pm .pm-code { font-size:0.62rem; color:var(--muted); }
+.pm .pm-phone { font-size:0.64rem; color:var(--muted); direction:ltr; text-align:right; }
+.pm .pm-phone a { color:var(--blue); text-decoration:none; font-weight:700; }
+.pm .pm-phone a:hover { text-decoration:underline; }
+.pm .pm-phone i { font-size:0.58rem; margin-inline-end:2px; }
+.cover-phone { color:var(--blue); text-decoration:none; font-weight:700; direction:ltr; unicode-bidi:embed; }
 .btn-cover { width:100%; margin-top:6px; padding:7px; border:1px dashed var(--border); border-radius:10px; background:transparent; color:var(--muted); font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
 .btn-cover:hover { border-color:var(--blue); color:var(--blue); }
 .cover-info { font-size:0.68rem; color:#4FBF9A; margin-top:4px; font-weight:700; }
@@ -922,12 +927,14 @@ function renderCard(teamId, name, type, d) {
             if (m.role === 'support') return '<div class="pm">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
                 '<div class="pm-name">🤝 ' + escapeHtml(m.name) + '</div>' +
+                '<div class="pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '—') + '</div>' +
                 ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
                 (m.fromCenter ? '<div class="pm-code">قادم من: ' + escapeHtml(m.fromCenter) + '</div>' : '') +
                 '<div class="pm-code">نوع الدعم: ' + escapeHtml(supportTypeLabel(m)) + '</div></div>';
             return '<div class="pm">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
                 '<div class="pm-name">' + escapeHtml(m.name) + '</div>' +
+                '<div class="pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '—') + '</div>' +
                 ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
             '</div>';
         }).join('')
@@ -956,6 +963,7 @@ function renderCard(teamId, name, type, d) {
                 ((s.code || s.employeeCode) ? ' (' + escapeHtml(String(s.code || s.employeeCode)) + ')' : '') +
                 (s.fromCenter ? ' — قادم من: ' + escapeHtml(s.fromCenter) : '') +
                 ' — ' + escapeHtml(supportTypeLabel(s)) +
+                (s.phone ? ' <a class="cover-phone" href="tel:' + escapeHtml(s.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(s.phone) + '</a>' : '') +
                 ' <button class="btn-end-cover" onclick="endCoverage(\'' + teamId + '\', \'' + nm + '\')">⛔ إنهاء التغطية</button></div>';
         }).join('');
     }

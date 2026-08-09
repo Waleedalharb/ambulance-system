@@ -69,23 +69,10 @@ class RosterSyncService {
     }
 
     /**
-     * المزامنة الكاملة في معاملة واحدة ذرية.
-     * @param {Array} scheduleEmployees مصفوفة الجدولة (بنية ملف الاستيراد).
-     * @returns {Promise<object>} إحصاءات المزامنة.
+     * تطبيع مدخل الجدولة وإزالة التكرار بالرمز (الأخير يغلب).
+     * مستخرجة حتى تتشاركها المزامنة وكشف التعارض مع التعديلات اليدوية.
      */
-    async syncFromSchedule(scheduleEmployees) {
-        if (!Array.isArray(scheduleEmployees)) {
-            throw new Error('RosterSyncService: مصفوفة الجدولة مطلوبة');
-        }
-        const stats = {
-            employeesSeen: 0, created: 0, updated: 0, reactivated: 0,
-            deactivated: 0, rosterRows: 0, rosterPeriods: [],
-            skippedEmployees: 0, skippedEntries: 0,
-            assignmentsCreated: 0, assignmentsEnded: 0,
-            unmatchedTeams: []
-        };
-
-        // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
+    _collectPeople(scheduleEmployees, stats) {
         const people = new Map(); // code → { code, name, phone, jobTitle, teamRaw, symbol, entries[] }
         for (const emp of scheduleEmployees) {
             const code = String((emp && (emp.employeeNumber != null ? emp.employeeNumber : emp.id)) || '').trim();
@@ -104,6 +91,86 @@ class RosterSyncService {
             });
         }
         stats.employeesSeen = people.size;
+        return people;
+    }
+
+    /**
+     * كشف تعارض الاستيراد مع التعيينات اليدوية (source='manual') قبل أي كتابة.
+     * التعارض = موظف له تعيين يدوي نشط لفرقة، والاستيراد يضعه في فرقة مختلفة.
+     * لا يكتب شيئًا — قراءة فقط. الموظف غير الموجود في القاعدة لا تعارض له.
+     * @returns {Promise<Array>} [{employeeCode, name, manualTeam, importTeam, assignedDate}]
+     */
+    async detectManualConflicts(scheduleEmployees) {
+        if (!Array.isArray(scheduleEmployees)) return [];
+        const stats = { skippedEmployees: 0, employeesSeen: 0 };
+        const people = this._collectPeople(scheduleEmployees, stats);
+        if (people.size === 0) return [];
+
+        const teamRows = await this.db.all('SELECT id, name FROM teams');
+        const resolveTeam = this._buildTeamResolver(teamRows);
+        const teamNameById = new Map(teamRows.map(t => [t.id, t.name]));
+
+        const hasAssignTable = !!(await this.db.get(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='team_assignments'"));
+        if (!hasAssignTable) return [];
+        const cols = await this.db.all('PRAGMA table_info(team_assignments)').catch(() => []);
+        const hasSourceCol = (cols || []).some(c => c.name === 'source');
+        if (!hasSourceCol) return []; // قاعدة قديمة بلا عمود المصدر — لا حماية ممكنة
+
+        const manualActive = await this.db.all(
+            `SELECT ta.id, ta.employee_id, ta.team_id, ta.assigned_date, e.employee_code, e.name AS employee_name
+             FROM team_assignments ta JOIN employees e ON e.id = ta.employee_id
+             WHERE ta.end_date IS NULL AND ta.source = 'manual'`);
+        const manualByCode = new Map();
+        for (const a of manualActive) {
+            if (!manualByCode.has(a.employee_code)) manualByCode.set(a.employee_code, []);
+            manualByCode.get(a.employee_code).push(a);
+        }
+
+        const conflicts = [];
+        for (const p of people.values()) {
+            const manual = manualByCode.get(p.code);
+            if (!manual || !manual.length) continue;
+            const importTeamId = resolveTeam(p.teamRaw);
+            for (const a of manual) {
+                if (importTeamId == null || a.team_id !== importTeamId) {
+                    conflicts.push({
+                        employeeCode: p.code,
+                        name: p.name,
+                        manualTeam: teamNameById.get(a.team_id) || String(a.team_id),
+                        importTeam: importTeamId != null ? (teamNameById.get(importTeamId) || p.teamRaw) : (p.teamRaw || 'بدون فريق'),
+                        assignedDate: a.assigned_date || null
+                    });
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    /**
+     * المزامنة الكاملة في معاملة واحدة ذرية.
+     * @param {Array} scheduleEmployees مصفوفة الجدولة (بنية ملف الاستيراد).
+     * @param {object} [options] { overwriteManual: true } يسمح باستبدال
+     *   التعيينات اليدوية المتعارضة (يتطلب confirm صريحًا من واجهة الاستيراد).
+     *   الافتراضي: التعيين اليدوي المتعارض يُحمى ولا يُمس.
+     * @returns {Promise<object>} إحصاءات المزامنة.
+     */
+    async syncFromSchedule(scheduleEmployees, options = {}) {
+        const overwriteManual = options && options.overwriteManual === true;
+        if (!Array.isArray(scheduleEmployees)) {
+            throw new Error('RosterSyncService: مصفوفة الجدولة مطلوبة');
+        }
+        const stats = {
+            employeesSeen: 0, created: 0, updated: 0, reactivated: 0,
+            deactivated: 0, rosterRows: 0, rosterPeriods: [],
+            skippedEmployees: 0, skippedEntries: 0,
+            assignmentsCreated: 0, assignmentsEnded: 0,
+            manualConflictsProtected: [], manualOverwritten: 0,
+            unmatchedTeams: []
+        };
+
+        // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
+        const people = this._collectPeople(scheduleEmployees, stats);
 
         const teamRows = await this.db.all('SELECT id, name FROM teams');
         const resolveTeam = this._buildTeamResolver(teamRows);
@@ -132,13 +199,15 @@ class RosterSyncService {
                 const existing = await this.db.get(
                     'SELECT id, is_active FROM employees WHERE employee_code = ?', [p.code]);
                 if (existing) {
+                    // حماية الجوال (البند ④ 2026-08-10): الاستيراد بلا عمود جوال
+                    // لا يمسح رقمًا مخزنًا — يُستبدل فقط بقيمة غير فارغة.
                     if (hasSymbolCol && p.symbol !== undefined) {
                         await this.db.run(
-                            'UPDATE employees SET name = ?, phone = ?, job_title = ?, symbol = ?, is_active = 1 WHERE id = ?',
+                            "UPDATE employees SET name = ?, phone = COALESCE(NULLIF(?, ''), phone), job_title = ?, symbol = ?, is_active = 1 WHERE id = ?",
                             [p.name, p.phone, p.jobTitle, p.symbol, existing.id]);
                     } else {
                         await this.db.run(
-                            'UPDATE employees SET name = ?, phone = ?, job_title = ?, is_active = 1 WHERE id = ?',
+                            "UPDATE employees SET name = ?, phone = COALESCE(NULLIF(?, ''), phone), job_title = ?, is_active = 1 WHERE id = ?",
                             [p.name, p.phone, p.jobTitle, existing.id]);
                     }
                     stats.updated++;
@@ -183,8 +252,13 @@ class RosterSyncService {
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='team_assignments'"));
             if (hasAssignTable) {
                 const today = TimeRiyadh.formatDate(new Date()); // تاريخ الرياض الجداري (كان UTC)
+                const assignCols = await this.db.all('PRAGMA table_info(team_assignments)').catch(() => []);
+                const hasSourceCol = (assignCols || []).some(c => c.name === 'source');
                 const activeAssign = await this.db.all(
-                    'SELECT id, employee_id, team_id FROM team_assignments WHERE end_date IS NULL');
+                    hasSourceCol
+                        ? 'SELECT id, employee_id, team_id, assigned_date, source FROM team_assignments WHERE end_date IS NULL'
+                        : 'SELECT id, employee_id, team_id, assigned_date, NULL AS source FROM team_assignments WHERE end_date IS NULL');
+                const teamNameById = new Map(teamRows.map(t => [t.id, t.name]));
                 const assignByEmp = new Map();
                 for (const a of activeAssign) {
                     if (!assignByEmp.has(a.employee_id)) assignByEmp.set(a.employee_id, []);
@@ -195,13 +269,29 @@ class RosterSyncService {
                     const teamId = resolveTeam(p.teamRaw);
                     const current = assignByEmp.get(employeeId) || [];
                     const hasMatch = teamId != null && current.some(a => a.team_id === teamId);
+                    // حماية التعديل اليدوي: تعيين source='manual' متعارض مع الاستيراد
+                    // (فرقة مختلفة) لا يُنهى ولا يُستبدل إلا بتأكيد صريح
+                    // (overwriteManual=true عبر confirmOverwriteManual في endpoint الاستيراد).
+                    let manualProtected = false;
                     for (const a of current) {
                         if (a.team_id !== teamId) {
+                            if (a.source === 'manual' && !overwriteManual) {
+                                manualProtected = true;
+                                stats.manualConflictsProtected.push({
+                                    employeeCode: p.code,
+                                    name: p.name,
+                                    manualTeam: teamNameById.get(a.team_id) || String(a.team_id),
+                                    importTeam: teamId != null ? (teamNameById.get(teamId) || p.teamRaw) : (p.teamRaw || 'بدون فريق'),
+                                    assignedDate: a.assigned_date || null
+                                });
+                                continue;
+                            }
+                            if (a.source === 'manual' && overwriteManual) stats.manualOverwritten++;
                             await this.db.run('UPDATE team_assignments SET end_date = ? WHERE id = ?', [today, a.id]);
                             stats.assignmentsEnded++;
                         }
                     }
-                    if (teamId != null && !hasMatch) {
+                    if (teamId != null && !hasMatch && !manualProtected) {
                         await this.db.run(
                             'INSERT INTO team_assignments (employee_id, team_id, assigned_date, is_primary) VALUES (?, ?, ?, 1)',
                             [employeeId, teamId, today]);

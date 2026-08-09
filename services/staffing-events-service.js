@@ -747,7 +747,7 @@ class StaffingEventsService {
         let rosterRows = [];
         try {
             rosterRows = await this.storage.all(
-                `SELECT sr.team_id, sr.shift_code, e.name, e.job_title, e.employee_code
+                `SELECT sr.team_id, sr.shift_code, e.name, e.job_title, e.employee_code, e.phone
                  FROM shift_roster sr JOIN employees e ON e.id = sr.employee_id
                  WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
             );
@@ -758,7 +758,7 @@ class StaffingEventsService {
         for (const r of rosterRows) {
             // التطبيع المركزي: الأكواد الصريحة (O12C13/RRC1) لا تُطرد — تُفك لأساسها
             if (!isWorkDayCode(r.shift_code, isNight)) continue;
-            const info = { jobTitle: r.job_title || null, code: r.employee_code || null };
+            const info = { jobTitle: r.job_title || null, code: r.employee_code || null, phone: r.phone || null };
             (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, ...info });
             if (!personInfo[r.name]) personInfo[r.name] = info;
         }
@@ -841,17 +841,17 @@ class StaffingEventsService {
                 const openAway = open.find(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) !== t.name);
                 if (openAbs) {
                     absentees.push({
-                        name: c.name, jobTitle: c.jobTitle, code: c.code,
+                        name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone,
                         reason: openAbs.reason || null,
                         since: openAbs.created_at, recordedBy: openAbs.actor_name || null,
                         type: openAbs.event_type
                     });
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: openAbs.event_type });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: openAbs.event_type });
                 } else if (openAway) {
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: 'assignment' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: 'assignment' });
                 } else {
                     activeCount++;
-                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, role: 'base', state: 'active' });
+                    members.push({ name: c.name, jobTitle: c.jobTitle, code: c.code, phone: c.phone, role: 'base', state: 'active' });
                 }
             }
 

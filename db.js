@@ -276,6 +276,17 @@ const TABLE_SCHEMAS = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
 
+  // Shift Patterns (A/B/C/D) — بنية تقنية فقط: لا دورة مفترضة ولا تحويل تلقائي
+  // لأي رمز موجود؛ cycle_json يبقى NULL حتى يُهيَّأ لاحقًا من الإعدادات.
+  `CREATE TABLE IF NOT EXISTS shift_patterns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT,
+    cycle_json TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
   // Shift Roster
   `CREATE TABLE IF NOT EXISTS shift_roster (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -898,6 +909,7 @@ async function initTables() {
   await seedShiftCodes();
   await seedDefaultTeams();
   await ensureOperationalTeams();
+  await seedShiftPatterns();
   logger.info('All tables initialized successfully');
 }
 
@@ -941,6 +953,14 @@ async function runMigrations() {
   // W-تكامل ③ب: الرمز الأساسي للموظف من الجدولة الرسمية (O12A/O14B/D0…)
   // مفتاح تجميع أطقم الأوفرلاب لاشتقاق الفرق الديناميكية — بيانات وصفية فقط (idempotent)
   await ensureColumn('employees', 'symbol', 'TEXT');
+
+  // أنماط المناوبة A/B/C/D (بنية فقط): نمط الموظف لا يتغير تلقائيًا أبدًا —
+  // لا يُشتق من symbol ولا من أي استيراد؛ يُضبط يدويًا فقط عبر
+  // PUT /api/employees/:employeeCode/pattern (idempotent)
+  await ensureColumn('employees', 'pattern_code', 'TEXT');
+  // مصدر تعيين الفرقة: 'import' (مزامنة الجدولة) أو 'manual' (نقل يدوي) —
+  // التعيينات اليدوية محمية من الاستبدال الصامت عند الاستيراد (idempotent)
+  await ensureColumn('team_assignments', 'source', "TEXT DEFAULT 'import'");
 
   // F4: drop the dead daily_reports store (derived daily report replaces it)
   try {
@@ -2111,6 +2131,26 @@ async function seedShiftCodes() {
   }
 }
 
+// بذر أنماط المناوبة A/B/C/D — بنية تقنية فقط (cycle_json = NULL، بلا دورة
+// مفترضة). INSERT OR IGNORE: idempotent ولا يمس أي تهيئة لاحقة من الإعدادات.
+const DEFAULT_SHIFT_PATTERNS = [
+  { code: 'A', name: 'نمط A' },
+  { code: 'B', name: 'نمط B' },
+  { code: 'C', name: 'نمط C' },
+  { code: 'D', name: 'نمط D' }
+];
+
+async function seedShiftPatterns() {
+  try {
+    for (const p of DEFAULT_SHIFT_PATTERNS) {
+      await run('INSERT OR IGNORE INTO shift_patterns (code, name, cycle_json, is_active) VALUES (?, ?, NULL, 1);', [p.code, p.name]);
+    }
+    logger.info('Shift patterns A/B/C/D ensured (structure only, no cycle)');
+  } catch (err) {
+    logger.error('Shift patterns seeding failed', err);
+  }
+}
+
 async function seedDefaultTeams() {
   try {
     const existing = await all('SELECT COUNT(*) as count FROM teams');
@@ -2165,6 +2205,9 @@ const Employees = {
   },
   async getByCode(code) {
     return get('SELECT * FROM employees WHERE employee_code = ?', [code]);
+  },
+  async updatePhone(code, phone) {
+    return run('UPDATE employees SET phone = ? WHERE employee_code = ?;', [phone, code]);
   },
   async getActive() {
     return all('SELECT * FROM employees WHERE is_active = 1 ORDER BY name');
@@ -2303,7 +2346,9 @@ const TeamAssignments = {
     return all('SELECT ta.*, e.name as employee_name, e.employee_code, e.phone, e.job_title FROM team_assignments ta JOIN employees e ON ta.employee_id = e.id WHERE ta.team_id = ? AND (ta.end_date IS NULL OR ta.end_date >= date(\'now\')) ORDER BY e.name', [team_id]);
   },
   async create(data) {
-    const result = await run('INSERT INTO team_assignments (employee_id, team_id, assigned_date, end_date, is_primary) VALUES (?, ?, ?, ?, ?);', [data.employee_id, data.team_id, data.assigned_date || null, data.end_date || null, data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : 1]);
+    // source: 'import' (مزامنة الجدولة — الافتراضي) أو 'manual' (نقل يدوي محمي
+    // من الاستبدال الصامت عند الاستيراد). العمود يُضاف عبر runMigrations.
+    const result = await run('INSERT INTO team_assignments (employee_id, team_id, assigned_date, end_date, is_primary, source) VALUES (?, ?, ?, ?, ?, ?);', [data.employee_id, data.team_id, data.assigned_date || null, data.end_date || null, data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : 1, data.source || 'import']);
     return result.id;
   },
   async update(id, data) {
@@ -2314,6 +2359,23 @@ const TeamAssignments = {
   },
   async deleteAll() {
     return run('DELETE FROM team_assignments');
+  }
+};
+
+// ============================================
+// CRUD: SHIFT PATTERNS (A/B/C/D — بنية تقنية فقط)
+// ============================================
+// لا دورة مفترضة ولا تحويل تلقائي لأي رمز مناوبة؛ الجدول قابل للتهيئة
+// لاحقًا من الإعدادات (cycle_json)، وربط الموظف بالنمط يدوي صريح فقط.
+const ShiftPatterns = {
+  async getAll() {
+    return all('SELECT * FROM shift_patterns ORDER BY code');
+  },
+  async getByCode(code) {
+    return get('SELECT * FROM shift_patterns WHERE code = ?', [code]);
+  },
+  async update(code, data) {
+    return run('UPDATE shift_patterns SET name = ?, cycle_json = ?, is_active = ? WHERE code = ?;', [data.name !== undefined ? data.name : null, data.cycle_json !== undefined ? data.cycle_json : null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, code]);
   }
 };
 
@@ -3652,6 +3714,7 @@ module.exports = {
   ShiftCodes,
   ShiftRoster,
   TeamAssignments,
+  ShiftPatterns,
   LeaveRequests,
   ShiftScheduleAuto,
   StaffingAlerts,

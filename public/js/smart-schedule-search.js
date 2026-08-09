@@ -301,10 +301,11 @@
             fetch('/api/shift-roster/employee-schedule/' + encodeURIComponent(employeeId) + '?month=' + month + '&year=' + year, {
                 headers: { 'Authorization': 'Bearer ' + token }
             }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.success && data.schedule) {
+                if (data.success && Array.isArray(data.schedule)) {
+                    // SSOT (2026-08-10): نجاح الخادم = الحقيقة حتى لو فارغًا — لا سقوط للكاش عند الفراغ
                     renderEmployeeScheduleGrid(data.schedule, employeeId);
                 } else {
-                    // Fallback to local data
+                    // فشل الاستجابة نفسها فقط ⇒ سقوط مُنحط للذاكرة المحمّلة من القاعدة
                     renderLocalEmployeeSchedule(employeeId, monthYear);
                 }
             }).catch(function() {

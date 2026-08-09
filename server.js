@@ -7395,20 +7395,34 @@ app.post('/api/schedule/employees', authenticate, async (req, res) => {
         if (!employees || !Array.isArray(employees)) {
             return res.status(400).json({ error: 'بيانات ناقصة' });
         }
+        // حماية التعديل اليدوي: الاستيراد ممنوع أن يستبدل تعيينًا يدويًا
+        // (source='manual') بصمت. عند وجود تعارض وبدون تأكيد صريح
+        // (confirmOverwriteManual===true) تُوقف العملية كلها قبل أي كتابة
+        // (JSON + القاعدة) حتى لا يبقى النظام في حالة نصف-مستوردة.
+        const confirmOverwriteManual = !Array.isArray(req.body) && req.body.confirmOverwriteManual === true;
+        if (rosterSyncService && !confirmOverwriteManual) {
+            const conflicts = await rosterSyncService.detectManualConflicts(employees);
+            if (conflicts.length > 0) {
+                return res.status(409).json({ error: 'يوجد تعارض مع تعديلات يدوية', conflicts });
+            }
+        } else if (!rosterSyncService) {
+            return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
+        }
         await writeScheduleEmployees(employees);
         // SR-2: JSON ملف استيراد فقط — الحفظ يُزامن فورًا إلى القاعدة
         // (employees upsert بالرمز + إعادة بناء shift_roster) في معاملة ذرية.
         // فشل المزامنة = فشل الحفظ كله حتى لا تبقى القاعدة بلا كادر محدث.
         let syncStats = null;
-        if (rosterSyncService) {
-            try {
-                syncStats = await rosterSyncService.syncFromSchedule(employees);
-            } catch (syncErr) {
-                console.error('[RosterSync] فشل المزامنة بعد حفظ الجدولة:', syncErr);
-                return res.status(500).json({ error: 'فشل في مزامنة الكادر مع قاعدة البيانات' });
-            }
-        } else {
-            return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
+        try {
+            syncStats = await rosterSyncService.syncFromSchedule(employees, { overwriteManual: confirmOverwriteManual });
+        } catch (syncErr) {
+            console.error('[RosterSync] فشل المزامنة بعد حفظ الجدولة:', syncErr);
+            return res.status(500).json({ error: 'فشل في مزامنة الكادر مع قاعدة البيانات' });
+        }
+        if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
+            await addAuditLogEntry('import_overwrite_manual',
+                `استيراد الجدولة مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,
+                'schedule', req.user.name, req.user.role, req.user.id);
         }
         broadcast({
             type: 'schedule_employees_updated',
@@ -7465,6 +7479,67 @@ app.post('/api/schedule/files', authenticate, async (req, res) => {
 // month اختياري (YYYY-MM)؛ غيابه = اشتقاق الفترة من البيانات نفسها.
 // الوثيقة تصدير عند الطلب (Buffer مباشر — لا تُخزَّن؛ ليست وثيقة مقفلة كسير العمل).
 // ═══════════════════════════════════════════════════════════
+// SSOT (2026-08-10 — البند ③): بناء نموذج موظفي الجدول من قاعدة البيانات
+// بنفس اشتقاق الواجهة fetchEmployeesFromDBSilent حرفيًا (الحالة من الرمز،
+// والموقع من team_name لسطر roster ثم تعيين الفرقة). الناتج يطابق النموذج
+// الذي يتوقعه schedulePdfService.buildSchedulePdfData — الخدمة لا تُمس.
+async function readScheduleEmployeesFromDB(month) {
+    const employees = await db.Employees.getAll();
+    const teams = await db.Teams.getAll();
+    const assignments = await db.TeamAssignments.getAll();
+    const teamsMap = {};
+    teams.forEach(t => { teamsMap[t.id] = t.name; });
+    const empTeamMap = {};
+    assignments.forEach(a => {   // getAll مرتَّب id DESC — الأولوية للأحدث كما في الواجهة
+        if (!empTeamMap[a.employee_id]) {
+            empTeamMap[a.employee_id] = teamsMap[a.team_id] || '';
+        }
+    });
+    const empMap = {};
+    employees.forEach(e => {
+        if (e.is_active === 0) return;
+        const code = String(e.employee_code || e.id);
+        empMap[e.id] = {
+            id: code,
+            employeeNumber: code,
+            name: e.name || '',
+            jobTitle: e.job_title || '',
+            team: empTeamMap[e.id] || '',
+            schedule: []
+        };
+    });
+    let rows;
+    if (month) {
+        const y = parseInt(month.split('-')[0], 10);
+        const m = parseInt(month.split('-')[1], 10);
+        rows = await db.all(
+            `SELECT sr.employee_id, sr.shift_date, sr.shift_code, sr.team_id, t.name AS team_name
+             FROM shift_roster sr LEFT JOIN teams t ON t.id = sr.team_id
+             WHERE sr.month = ? AND sr.year = ? ORDER BY sr.shift_date`, [m, y]);
+    } else {
+        rows = await db.all(
+            `SELECT sr.employee_id, sr.shift_date, sr.shift_code, sr.team_id, t.name AS team_name
+             FROM shift_roster sr LEFT JOIN teams t ON t.id = sr.team_id ORDER BY sr.shift_date`);
+    }
+    rows.forEach(r => {
+        const emp = empMap[r.employee_id];
+        if (!emp) return;
+        const c = r.shift_code;
+        let status = 'دوام';
+        if (c === 'V' || c === 'VC' || c === 'E' || c === 'EV') status = 'إجازة';
+        else if (c === 'WO') status = 'راحة';
+        else if (c === 'C') status = 'تدريب';
+        else if (c === 'ME' || c === 'F' || (c && c.indexOf('CP') === 0)) status = 'تكميل';
+        emp.schedule.push({
+            date: r.shift_date,
+            shiftCode: c,
+            location: r.team_name || emp.team || '',
+            status: status
+        });
+    });
+    return Object.values(empMap);
+}
+
 app.get('/api/schedule/pdf', authenticate, async (req, res) => {
     try {
         const center = String(req.query.center || '').trim();
@@ -7473,7 +7548,18 @@ app.get('/api/schedule/pdf', authenticate, async (req, res) => {
         if (month && !/^\d{4}-\d{2}$/.test(month)) {
             return res.status(400).json({ error: 'صيغة الشهر غير صالحة (YYYY-MM)' });
         }
-        const employees = await readScheduleEmployees();
+        // SSOT: قاعدة البيانات هي المصدر؛ JSON سقوط مُنحط فقط عند تعذّر القاعدة
+        let employees;
+        if (dbAvailable()) {
+            try {
+                employees = await readScheduleEmployeesFromDB(month || null);
+            } catch (dbErr) {
+                console.warn('[SchedulePDF] تعذّرت القراءة من القاعدة — سقوط لملف JSON:', dbErr.message);
+                employees = await readScheduleEmployees();
+            }
+        } else {
+            employees = await readScheduleEmployees();
+        }
         const data = schedulePdfService.buildSchedulePdfData(employees, { center, month: month || undefined });
         if (!data.employees.length) {
             return res.status(404).json({ error: 'لا توجد بيانات جدول لهذا المركز' });
@@ -8384,6 +8470,27 @@ app.get('/api/employees', authenticate, async (req, res) => {
     }
 });
 
+// بحث الموظفين بالاسم أو الكود الوظيفي — SSOT: قاعدة البيانات فقط (قرار 2026-08-10).
+// مُسجَّل قبل /api/employees/:id حتى لا تُبتلع كلمة «search» بالمعرّف الديناميكي.
+app.get('/api/employees/search', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const q = String(req.query.q || '').trim();
+        if (!q) return res.json({ success: true, results: [] });
+        if (q.length > 100) return res.status(400).json({ error: 'استعلام طويل' });
+        const like = '%' + q + '%';
+        const results = await db.all(
+            `SELECT e.id, e.employee_code, e.name, e.phone, e.job_title, e.symbol, e.pattern_code
+             FROM employees e
+             WHERE e.is_active = 1 AND (e.name LIKE ? OR e.employee_code LIKE ?)
+             ORDER BY e.name LIMIT 15`, [like, like]);
+        res.json({ success: true, results });
+    } catch (error) {
+        console.error('Employees search error:', error);
+        res.status(500).json({ error: 'فشل في البحث عن الموظفين' });
+    }
+});
+
 app.get('/api/employees/:id', authenticate, async (req, res) => {
     try {
         const employee = await db.Employees.getById(req.params.id);
@@ -8568,6 +8675,87 @@ app.get('/api/shift-roster', authenticate, async (req, res) => {
 // تسجيله هنا كان يظلّلها جميعاً فيطابق «audit-log» كأنه id.
 // انظر التعليق عند إعادة تسجيله أسفل مسار /stats.
 
+// ============================================
+// API: تعديل خلية مناوبة ليوم واحد (PUT /api/shift-roster/cell)
+// ============================================
+// يخدم تعديل الجدول الكلاسيكي: يحدّث shift_code لموظف+يوم واحد فقط
+// (أو ينشئ السطر مع team_id التعيين النشط في ذلك التاريخ إن لم يوجد).
+// لا يمس بقية الأيام ولا team_assignments ولا pattern_code إطلاقًا.
+// مُسجَّل قبل PUT /api/shift-roster/:id حتى لا يُطابق «cell» كأنه id.
+function _isValidIsoDateStr(d) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return false;
+    const [y, m, day] = String(d).split('-').map(Number);
+    if (m < 1 || m > 12 || day < 1 || day > 31) return false;
+    const dt = new Date(Date.UTC(y, m - 1, day));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+}
+
+app.put('/api/shift-roster/cell', authenticate, authorize(['admin', 'director']), validateBody({
+    employeeCode: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    date: { required: true, type: 'string', minLength: 10, maxLength: 10 },
+    shiftCode: { required: true, type: 'string', minLength: 1, maxLength: 20 }
+}), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employeeCode = String(req.body.employeeCode).trim();
+        const date = String(req.body.date).trim();
+        const shiftCode = String(req.body.shiftCode).trim();
+
+        if (!_isValidIsoDateStr(date)) {
+            return res.status(400).json({ error: 'صيغة التاريخ غير صالحة — المطلوب YYYY-MM-DD' });
+        }
+        const employee = await db.Employees.getByCode(employeeCode);
+        if (!employee) return res.status(404).json({ error: 'الموظف غير موجود' });
+        // الرمز يجب أن يكون من shift_codes الموجودة فعلًا — ممنوع اختراع رموز
+        const codeRow = await db.ShiftCodes.getByCode(shiftCode);
+        if (!codeRow) {
+            return res.status(404).json({ error: `رمز المناوبة "${shiftCode}" غير موجود في قائمة الرموز المعتمدة` });
+        }
+
+        const year = Number(date.slice(0, 4));
+        const month = Number(date.slice(5, 7));
+        const existing = await db.ShiftRoster.getByEmployeeAndDate(employee.id, date);
+        let row; let changeType;
+        if (existing) {
+            // تحديث رمز اليوم فقط — team_id والأيام الأخرى كما هي
+            await db.run('UPDATE shift_roster SET shift_code = ? WHERE id = ?', [codeRow.code, existing.id]);
+            row = await db.ShiftRoster.getById(existing.id);
+            changeType = 'edit';
+        } else {
+            // إنشاء السطر مع فرقة التعيين النشط في ذلك التاريخ (قراءة فقط من
+            // team_assignments — لا تعديل عليها ولا على pattern_code)
+            const activeAssign = await db.get(
+                `SELECT team_id FROM team_assignments
+                 WHERE employee_id = ? AND (assigned_date IS NULL OR assigned_date <= ?)
+                   AND (end_date IS NULL OR end_date >= ?)
+                 ORDER BY id DESC LIMIT 1`, [employee.id, date, date]);
+            const teamId = activeAssign ? activeAssign.team_id : null;
+            const newId = await db.ShiftRoster.create({
+                employee_id: employee.id, team_id: teamId,
+                shift_date: date, shift_code: codeRow.code, month, year
+            });
+            row = await db.ShiftRoster.getById(newId);
+            changeType = 'add';
+        }
+
+        await addShiftAuditLog({
+            roster_id: row.id, employee_id: employee.id, team_id: row.team_id,
+            shift_date: date, old_shift_code: existing ? existing.shift_code : null, new_shift_code: codeRow.code,
+            old_team_id: existing ? existing.team_id : null, new_team_id: row.team_id,
+            changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+            change_type: changeType, reason: 'تعديل خلية مناوبة ليوم واحد'
+        });
+        await addAuditLogEntry('shift_cell_update',
+            `تعديل مناوبة ${employee.name} (${employeeCode}) يوم ${date}: ${existing ? existing.shift_code : '—'} ← ${codeRow.code}`,
+            'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: row.id, change_type: changeType }], by_user: req.user.name || req.user.username } });
+        res.json({ success: true, entry: row });
+    } catch (error) {
+        console.error('ShiftRoster cell PUT error:', error);
+        res.status(500).json({ error: 'فشل في تعديل خلية المناوبة' });
+    }
+});
+
 app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
     employee_id: { required: true, type: 'number' },
     shift_date: { required: true, type: 'string', minLength: 1 },
@@ -8640,105 +8828,98 @@ app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (r
 // ============================================
 app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (req, res) => {
     try {
-        const { employees, roster, month, year } = req.body;
-        console.log('[IMPORT DEBUG] Request body keys:', Object.keys(req.body || {}));
-        console.log('[IMPORT DEBUG] employees type:', typeof employees, 'isArray:', Array.isArray(employees), 'length:', employees ? employees.length : 'null');
-        console.log('[IMPORT DEBUG] roster type:', typeof roster, 'isArray:', Array.isArray(roster), 'length:', roster ? roster.length : 'null');
-        console.log('[IMPORT DEBUG] month:', month, 'year:', year);
+        const { employees, roster } = req.body;
         if (!employees || !Array.isArray(employees) || !roster || !Array.isArray(roster)) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'بيانات الاستيراد غير صالحة',
                 details: {
                     hasEmployees: !!employees,
                     employeesIsArray: Array.isArray(employees),
                     hasRoster: !!roster,
-                    rosterIsArray: Array.isArray(roster),
-                    month: month,
-                    year: year
+                    rosterIsArray: Array.isArray(roster)
                 }
             });
         }
+        if (!rosterSyncService) return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
 
-        await db.beginTransaction();
-        let empCount = 0;
-        let rosterCount = 0;
-        let teamCount = 0;
-        let assignmentCount = 0;
-
-        try {
-            // Ensure teams exist (insert if not present, using existing logic)
-            const allTeams = await db.Teams.getAll();
-            const teamMap = {};
-            for (const t of allTeams) { teamMap[t.name] = t.id; }
-
-            // Process employees: create or update
-            const employeeIdMap = {};
-            for (const emp of employees) {
-                const existing = await db.Employees.getByCode(emp.employee_code);
-                let empId;
-                if (existing) {
-                    await db.Employees.update(existing.id, emp);
-                    empId = existing.id;
-                } else {
-                    empId = await db.Employees.create(emp);
-                    empCount++;
-                }
-                employeeIdMap[emp.employee_code] = empId;
-
-                // Create team assignments if team provided
-                if (emp.team_name && teamMap[emp.team_name]) {
-                    const existingAssignments = await db.TeamAssignments.getByEmployee(empId);
-                    const alreadyAssigned = existingAssignments.find(a => a.team_id === teamMap[emp.team_name]);
-                    if (!alreadyAssigned) {
-                        await db.TeamAssignments.create({
-                            employee_id: empId,
-                            team_id: teamMap[emp.team_name],
-                            assigned_date: getSaudiDateString(), // تاريخ الرياض (كان UTC)
-                            is_primary: 1
-                        });
-                        assignmentCount++;
-                    }
-                }
-            }
-
-            // Delete existing roster for same month/year to avoid duplicates
-            await db.ShiftRoster.deleteByMonthYear(month, year);
-
-            // تطبيع التاريخ إلى ISO مبطّن (YYYY-MM-DD) — الصيغة الوحيدة المعتمدة في shift_roster.
-            // ملفات الإكسل ترسل أحيانًا بلا تبطين (2026-7-1) فتفشل قراءات التكميل/سير العمل (تستعلم بصيغة مبطّنة).
-            const normIsoDate = (d) => {
-                const m = String(d || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-                if (!m) return null;
-                return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
-            };
-
-            // Insert roster entries
-            for (const entry of roster) {
-                const empId = employeeIdMap[entry.employee_code];
-                if (!empId) continue;
-                const isoDate = normIsoDate(entry.shift_date);
-                if (!isoDate) continue; // تاريخ مشوه — يُتخطى بدل كتابة صف لا تقرأه المنصة
-                let teamId = null;
-                if (entry.team_name && teamMap[entry.team_name]) {
-                    teamId = teamMap[entry.team_name];
-                }
-                await db.ShiftRoster.create({
-                    employee_id: empId,
-                    team_id: teamId,
-                    shift_date: isoDate,
-                    shift_code: entry.shift_code,
-                    month: month,
-                    year: year
-                });
-                rosterCount++;
-            }
-
-            await db.commitTransaction();
-            res.json({ success: true, empCount, rosterCount, assignmentCount, teamCount });
-        } catch (err) {
-            await db.rollbackTransaction();
-            throw err;
+        // W-توحيد (القرار المعماري 2026-08-10 — البند ④ «قناة كتابة واحدة»):
+        // لا كاتب ثانٍ للجدولة. الصيغة القديمة {employees, roster, month, year}
+        // تُحوَّل إلى نموذج الجدولة الكلاسيكي وتُفوَّض بالكامل إلى
+        // rosterSyncService — نفس كاتب POST /api/schedule/employees: نفس كشف
+        // تعارض التعيينات اليدوية (409 بلا confirm)، نفس المعاملة الذرية، نفس
+        // إعادة بناء roster لكل فترة، ونفس شفافية unmatchedTeams.
+        // الفترات تُشتق من التواريخ نفسها (أدق من month/year الممرَّرة).
+        const normIsoDate = (d) => {
+            const m = String(d || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (!m) return null;
+            return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+        };
+        const byCode = new Map();
+        for (const emp of employees) {
+            const code = String((emp && emp.employee_code) || '').trim();
+            if (!code) continue;
+            byCode.set(code, {
+                id: code,
+                employeeNumber: code,
+                name: String(emp.name || '').trim(),
+                phone: emp.phone != null ? String(emp.phone) : '',
+                jobTitle: String(emp.job_title || 'مسعف').trim() || 'مسعف',
+                team: String(emp.team_name || '').trim(),
+                schedule: []
+            });
         }
+        let skippedDates = 0;
+        for (const entry of roster) {
+            const code = String((entry && entry.employee_code) || '').trim();
+            const emp = byCode.get(code);
+            if (!emp) continue;
+            const isoDate = normIsoDate(entry.shift_date);
+            if (!isoDate) { skippedDates++; continue; } // تاريخ مشوه — يُتخطى بدل كتابة صف لا تقرأه المنصة
+            emp.schedule.push({
+                date: isoDate,
+                shiftCode: entry.shift_code,
+                location: entry.team_name || emp.team
+            });
+        }
+        const scheduleModel = [...byCode.values()];
+
+        // حماية التعديل اليدوي: نفس عقد القناة الرسمية — 409 بلا كتابة عند
+        // التعارض، والاستبدال فقط بتأكيد صريح confirmOverwriteManual=true.
+        const confirmOverwriteManual = req.body.confirmOverwriteManual === true;
+        if (!confirmOverwriteManual) {
+            const conflicts = await rosterSyncService.detectManualConflicts(scheduleModel);
+            if (conflicts.length > 0) {
+                return res.status(409).json({ error: 'يوجد تعارض مع تعديلات يدوية', conflicts });
+            }
+        }
+        const syncStats = await rosterSyncService.syncFromSchedule(scheduleModel, { overwriteManual: confirmOverwriteManual });
+        if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
+            await addAuditLogEntry('import_overwrite_manual',
+                `استيراد roster مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,
+                'schedule', req.user.name, req.user.role, req.user.id);
+        }
+        broadcast({ type: 'schedule_employees_updated', message: 'تم تحديث بيانات الموظفين' });
+        broadcast({
+            type: 'roster_synced',
+            message: 'تمت مزامنة كادر المناوبات مع قاعدة البيانات',
+            stats: {
+                employeesSeen: syncStats.employeesSeen,
+                created: syncStats.created,
+                updated: syncStats.updated,
+                deactivated: syncStats.deactivated,
+                rosterRows: syncStats.rosterRows
+            }
+        });
+        // توافقية الرد مع العميل القديم (syncToServer): نفس أسماء الحقول
+        res.json({
+            success: true,
+            empCount: syncStats.created + syncStats.updated,
+            rosterCount: syncStats.rosterRows,
+            assignmentCount: syncStats.assignmentsCreated,
+            teamCount: 0,
+            skippedDates,
+            rosterSync: syncStats
+        });
     } catch (error) {
         console.error('ShiftRoster import error:', error);
         res.status(500).json({ error: 'فشل في استيراد جدول المناوبات' });
@@ -8751,6 +8932,17 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
 app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), async (req, res) => {
     try {
         await db.ShiftRoster.deleteAll();
+        // W-توحيد (البند ④ 2026-08-10): مسح القاعدة يجب ألّا يترك نسخة بديلة —
+        // يُحيَّد ملف JSON حتى لا يبعث البيانات الممسوحة عبر أي سقوط أو بث لاحق.
+        try {
+            await writeScheduleEmployees([]);
+        } catch (jsonErr) {
+            console.warn('[clear-all] تعذّر تحييد ملف JSON (القاعدة مُسحت):', jsonErr.message);
+        }
+        await addAuditLogEntry('roster_clear_all',
+            'مسح جميع بيانات جدول المناوبات (shift_roster) مع تحييد ملف JSON',
+            'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'schedule_employees_updated', message: 'تم مسح بيانات الجدول' });
         res.json({ success: true, message: 'تم حذف جميع بيانات الجدول بنجاح' });
     } catch (error) {
         console.error('ShiftRoster clear-all error:', error);
@@ -9410,6 +9602,313 @@ app.delete('/api/team-assignments/:id', authenticate, authorize(['admin']), asyn
     } catch (error) {
         console.error('TeamAssignments DELETE error:', error);
         res.status(500).json({ error: 'فشل في حذف التعيين' });
+    }
+});
+
+// ============================================
+// API: Shift Patterns (A/B/C/D — بنية تقنية فقط)
+// ============================================
+// قرار المالك: الأنماط بنية قابلة للتهيئة لاحقًا من الإعدادات. لا دورة
+// مفترضة، لا تغيير للدورة الحالية، ولا تحويل تلقائي لأي symbol إلى نمط.
+app.get('/api/shift-patterns', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const patterns = await db.ShiftPatterns.getAll();
+        res.json({ success: true, patterns });
+    } catch (error) {
+        console.error('ShiftPatterns GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب أنماط المناوبة' });
+    }
+});
+
+app.put('/api/shift-patterns/:code', authenticate, authorize(['admin']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const code = String(req.params.code || '').trim();
+        const pattern = await db.ShiftPatterns.getByCode(code);
+        if (!pattern) return res.status(404).json({ error: 'النمط غير موجود' });
+        const { name, cycle_json, is_active } = req.body || {};
+        // cycle_json نص JSON صالح أو null — لا تفسير له هنا (تهيئة مستقبلية)
+        if (cycle_json !== undefined && cycle_json !== null && typeof cycle_json === 'string') {
+            try { JSON.parse(cycle_json); } catch (_) {
+                return res.status(400).json({ error: 'cycle_json يجب أن يكون نص JSON صالحًا' });
+            }
+        }
+        await db.ShiftPatterns.update(code, {
+            name: name !== undefined ? name : pattern.name,
+            cycle_json: cycle_json !== undefined ? cycle_json : pattern.cycle_json,
+            is_active: is_active !== undefined ? is_active : pattern.is_active
+        });
+        const updated = await db.ShiftPatterns.getByCode(code);
+        await addAuditLogEntry('shift_pattern_update', `تحديث نمط المناوبة ${code}`, 'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'shift_patterns_updated', payload: { code }, by_user: req.user.name || req.user.username });
+        res.json({ success: true, pattern: updated });
+    } catch (error) {
+        console.error('ShiftPatterns PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث نمط المناوبة' });
+    }
+});
+
+// ربط موظف بنمط (أو فكه بـ null) — يغيّر pattern_code فقط؛ لا يمس الرموز
+// ولا الجدول ولا التعيينات، ولا يتغير تلقائيًا من أي مسار آخر.
+app.put('/api/employees/:employeeCode/pattern', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employee = await db.Employees.getByCode(String(req.params.employeeCode || '').trim());
+        if (!employee) return res.status(404).json({ error: 'الموظف غير موجود' });
+        const patternCode = req.body && req.body.patternCode != null && String(req.body.patternCode).trim() !== ''
+            ? String(req.body.patternCode).trim() : null;
+        if (patternCode !== null) {
+            const pattern = await db.ShiftPatterns.getByCode(patternCode);
+            if (!pattern) return res.status(404).json({ error: `النمط "${patternCode}" غير موجود في أنماط المناوبة` });
+        }
+        await db.run('UPDATE employees SET pattern_code = ? WHERE id = ?', [patternCode, employee.id]);
+        await addAuditLogEntry('employee_pattern_update',
+            `تعيين نمط الموظف ${employee.name} (${employee.employee_code}): ${employee.pattern_code || '—'} ← ${patternCode || 'بدون نمط'}`,
+            'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'employee_pattern_updated', payload: { employeeCode: employee.employee_code, patternCode }, by_user: req.user.name || req.user.username });
+        res.json({ success: true, employeeCode: employee.employee_code, patternCode });
+    } catch (error) {
+        console.error('Employee pattern PUT error:', error);
+        res.status(500).json({ error: 'فشل في تعيين نمط الموظف' });
+    }
+});
+
+// ============================================
+// API: ملف الموظف (SSOT — كل الحقول من قاعدة البيانات فقط)
+// ============================================
+app.get('/api/employees/:employeeCode/profile', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employee = await db.Employees.getByCode(String(req.params.employeeCode || '').trim());
+        if (!employee) return res.status(404).json({ error: 'الموظف غير موجود' });
+
+        const today = TimeRiyadh.formatDate(new Date());
+        // التعيين النشط (تاريخ الرياض الجداري) + بيانات الفرقة
+        const team = await db.get(
+            `SELECT t.id, t.name, t.center, ta.assigned_date, ta.source
+             FROM team_assignments ta JOIN teams t ON t.id = ta.team_id
+             WHERE ta.employee_id = ? AND (ta.assigned_date IS NULL OR ta.assigned_date <= ?)
+               AND (ta.end_date IS NULL OR ta.end_date >= ?)
+             ORDER BY ta.id DESC LIMIT 1`, [employee.id, today, today]);
+
+        // مناوبات الشهر الحالي مع أسماء الرموز والفرق
+        const rp = TimeRiyadh.riyadhParts(new Date());
+        const roster = await db.all(
+            `SELECT sr.shift_date, sr.shift_code, sc.name AS shift_name, sr.team_id, t.name AS team_name
+             FROM shift_roster sr
+             LEFT JOIN shift_codes sc ON sc.code = sr.shift_code
+             LEFT JOIN teams t ON t.id = sr.team_id
+             WHERE sr.employee_id = ? AND sr.month = ? AND sr.year = ?
+             ORDER BY sr.shift_date`, [employee.id, Number(rp.month), Number(rp.year)]);
+
+        const leaves = await db.LeaveRequests.getByEmployee(employee.id);
+
+        res.json({
+            success: true,
+            employee: {
+                id: employee.id,
+                code: employee.employee_code,
+                name: employee.name,
+                phone: employee.phone || null,
+                jobTitle: employee.job_title || null,
+                symbol: employee.symbol || null,
+                patternCode: employee.pattern_code || null
+            },
+            team: team ? { id: team.id, name: team.name, center: team.center } : null,
+            roster,
+            leaves
+        });
+    } catch (error) {
+        console.error('Employee profile GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب ملف الموظف' });
+    }
+});
+
+// ============================================
+// API: أرقام الجوالات — employees.phone هو مصدر الحقيقة الوحيد
+// ============================================
+// تطبيع الرقم: إزالة الفراغات والشرطات؛ الصيغة المقبولة: +؟ ثم 9-15 رقمًا.
+function normalizePhone(raw) {
+    if (raw === null || raw === undefined) return '';
+    let p = String(raw).trim().replace(/[\s\-()]/g, '');
+    if (p.endsWith('.0')) p = p.slice(0, -2); // قراءة رقمية من Excel
+    if (p.startsWith('00')) p = '+' + p.slice(2);
+    if (/^5[0-9]{8}$/.test(p)) p = '0' + p; // جوال سعودي فقد الصفر الأول في Excel
+    return p;
+}
+function isValidPhone(p) {
+    return /^\+?[0-9]{9,15}$/.test(p);
+}
+
+// تعديل يدوي لرقم موظف واحد (أدمن/مدير عمليات) — يقبل مسح الرقم بقيمة فارغة صريحة
+app.put('/api/employees/:employeeCode/phone', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const code = String(req.params.employeeCode || '').trim();
+        const employee = await db.Employees.getByCode(code);
+        if (!employee) return res.status(404).json({ error: 'الموظف غير موجود' });
+
+        const phone = normalizePhone(req.body && req.body.phone);
+        if (phone && !isValidPhone(phone)) {
+            return res.status(400).json({ error: 'رقم جوال غير صالح — أرقام فقط (9 إلى 15 رقمًا)' });
+        }
+        await db.Employees.updatePhone(code, phone || null);
+        res.json({ success: true, code, phone: phone || null });
+    } catch (error) {
+        console.error('Employee phone PUT error:', error);
+        res.status(500).json({ error: 'فشل في تحديث رقم الجوال' });
+    }
+});
+
+// استيراد جماعي — مرحلتان: معاينة (confirm:false) ثم تنفيذ (confirm:true)
+// المطابقة بالكود الوظيفي فقط (لا أسماء). لا يُستبدل رقم موجود برقم فارغ أبدًا.
+app.post('/api/employees/phones/import', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
+        const confirm = !!(req.body && req.body.confirm);
+        if (!rows.length) return res.status(400).json({ error: 'لا توجد صفوف للاستيراد' });
+        if (rows.length > 2000) return res.status(400).json({ error: 'عدد الصفوف كبير — الحد 2000' });
+
+        const invalid = [];      // رقم غير صالح
+        const skippedEmpty = []; // رقم فارغ — لا يمس الموجود
+        const byCode = new Map();
+        const duplicates = [];   // كود مكرر في الملف
+
+        for (const r of rows) {
+            const code = String(r && r.code != null ? r.code : '').trim();
+            const phone = normalizePhone(r && r.phone);
+            if (!code) { invalid.push({ code: '', phone, reason: 'كود وظيفي فارغ' }); continue; }
+            if (byCode.has(code)) {
+                duplicates.push({ code, keptPhone: byCode.get(code), droppedPhone: phone });
+                continue;
+            }
+            byCode.set(code, phone);
+        }
+
+        const matched = [];   // { code, name, oldPhone, newPhone }
+        const unmatched = []; // { code, phone }
+        const unchanged = []; // نفس الرقم المسجل
+        for (const [code, phone] of byCode) {
+            if (!phone) { skippedEmpty.push({ code }); continue; }
+            if (!isValidPhone(phone)) { invalid.push({ code, phone, reason: 'صيغة غير صالحة' }); continue; }
+            const emp = await db.Employees.getByCode(code);
+            if (!emp) { unmatched.push({ code, phone }); continue; }
+            if ((emp.phone || '') === phone) { unchanged.push({ code, name: emp.name, phone }); continue; }
+            matched.push({ code, name: emp.name, oldPhone: emp.phone || null, newPhone: phone });
+        }
+
+        const summary = {
+            total: rows.length,
+            matched: matched.length,
+            unchanged: unchanged.length,
+            unmatched: unmatched.length,
+            duplicates: duplicates.length,
+            invalid: invalid.length,
+            skippedEmpty: skippedEmpty.length
+        };
+
+        if (!confirm) {
+            return res.json({ success: true, dryRun: true, summary, toUpdate: matched, unmatched, duplicates, invalid, skippedEmpty });
+        }
+
+        for (const m of matched) {
+            await db.Employees.updatePhone(m.code, m.newPhone);
+        }
+        res.json({ success: true, dryRun: false, applied: matched.length, summary, unmatched, duplicates, invalid, skippedEmpty });
+    } catch (error) {
+        console.error('Phones import error:', error);
+        res.status(500).json({ error: 'فشل في استيراد أرقام الجوالات' });
+    }
+});
+
+// ============================================
+// API: نقل موظف بين الفرق (بنطاقين: يوم واحد / من تاريخ فصاعدًا)
+// ============================================
+// 'day'        : يعدّل shift_roster.team_id لذلك اليوم فقط — لا team_assignments ولا pattern.
+// 'from-date'  : يغلق التعيين النشط (end_date = اليوم السابق) ويفتح تعيينًا
+//                جديدًا من date مع source='manual' — محمي من الاستيراد الصامت.
+// في الحالتين: المناوبات السابقة لا تتأثر وpattern_code لا يتغير أبدًا.
+app.post('/api/employees/:employeeCode/transfer', authenticate, authorize(['admin', 'director']), validateBody({
+    teamId: { required: true, type: 'number' },
+    scope: { required: true, type: 'string', minLength: 1 },
+    date: { required: true, type: 'string', minLength: 10, maxLength: 10 }
+}), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const employee = await db.Employees.getByCode(String(req.params.employeeCode || '').trim());
+        if (!employee) return res.status(404).json({ error: 'الموظف غير موجود' });
+
+        const { teamId, scope } = req.body;
+        const date = String(req.body.date).trim();
+        if (scope !== 'day' && scope !== 'from-date') {
+            return res.status(400).json({ error: 'نطاق النقل غير صالح — القيم المقبولة: day أو from-date' });
+        }
+        if (!_isValidIsoDateStr(date)) {
+            return res.status(400).json({ error: 'صيغة التاريخ غير صالحة — المطلوب YYYY-MM-DD' });
+        }
+        const team = await db.Teams.getById(teamId);
+        if (!team || !team.is_active) return res.status(404).json({ error: 'الفرقة غير موجودة أو غير نشطة' });
+
+        if (scope === 'day') {
+            // نقل ليوم واحد: تعديل فرقة سطر المناوبة لذلك اليوم فقط
+            const row = await db.ShiftRoster.getByEmployeeAndDate(employee.id, date);
+            if (!row) {
+                return res.status(404).json({ error: 'لا توجد مناوبة مسجلة لهذا الموظف في هذا اليوم' });
+            }
+            await db.run('UPDATE shift_roster SET team_id = ? WHERE id = ?', [team.id, row.id]);
+            const updated = await db.ShiftRoster.getById(row.id);
+            await addShiftAuditLog({
+                roster_id: row.id, employee_id: employee.id, team_id: team.id,
+                shift_date: date, old_shift_code: row.shift_code, new_shift_code: row.shift_code,
+                old_team_id: row.team_id, new_team_id: team.id,
+                changed_by: req.user.username || req.user.name, changed_by_name: req.user.name,
+                change_type: 'edit', reason: `نقل يومي إلى ${team.name}`
+            });
+            await addAuditLogEntry('employee_transfer_day',
+                `نقل ${employee.name} (${employee.employee_code}) إلى ${team.name} ليوم ${date} فقط`,
+                'schedule', req.user.name, req.user.role, req.user.id);
+            broadcast({ type: 'shift_roster_updated', payload: { type: 'single', changes: [{ roster_id: row.id, change_type: 'edit' }], by_user: req.user.name || req.user.username } });
+            return res.json({ success: true, scope: 'day', entry: updated, message: `تم نقل ${employee.name} إلى ${team.name} ليوم ${date} فقط` });
+        }
+
+        // from-date: إغلاق التعيين النشط + فتح تعيين جديد (source='manual')
+        const d = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))));
+        d.setUTCDate(d.getUTCDate() - 1);
+        const prevDate = d.toISOString().slice(0, 10);
+
+        await db.beginTransaction();
+        try {
+            const activeAssign = await db.all(
+                'SELECT * FROM team_assignments WHERE employee_id = ? AND end_date IS NULL', [employee.id]);
+            for (const a of activeAssign) {
+                await db.run('UPDATE team_assignments SET end_date = ? WHERE id = ?', [prevDate, a.id]);
+            }
+            const newId = await db.TeamAssignments.create({
+                employee_id: employee.id, team_id: team.id,
+                assigned_date: date, is_primary: 1, source: 'manual'
+            });
+            await db.commitTransaction();
+            var newAssignmentId = newId;
+            var endedCount = activeAssign.length;
+        } catch (txErr) {
+            try { await db.rollbackTransaction(); } catch (_) { /* لا شيء */ }
+            throw txErr;
+        }
+
+        await addAuditLogEntry('employee_transfer_from_date',
+            `نقل ${employee.name} (${employee.employee_code}) إلى ${team.name} اعتبارًا من ${date} (أُغلق ${endedCount} تعيينًا سابقًا بتاريخ ${prevDate})`,
+            'schedule', req.user.name, req.user.role, req.user.id);
+        broadcast({ type: 'team_assignments_updated', payload: { employeeCode: employee.employee_code, teamId: team.id, fromDate: date }, by_user: req.user.name || req.user.username });
+        res.json({
+            success: true, scope: 'from-date',
+            assignmentId: newAssignmentId, endedAssignments: endedCount,
+            message: `تم نقل ${employee.name} إلى ${team.name} اعتبارًا من ${date}`
+        });
+    } catch (error) {
+        console.error('Employee transfer POST error:', error);
+        res.status(500).json({ error: 'فشل في نقل الموظف' });
     }
 });
 

@@ -190,8 +190,18 @@
                         break;
                     case 'schedule_employees_updated':
                     case 'schedule_employees_cleared':
-                        // F6/D4: إعادة الجلب من المصدر الرسمي (JSON /api/schedule/employees) بدل loadFromServer العلائقية الفارغة
-                        if (typeof fetchEmployeesFromServerSilent === 'function') {
+                        // SSOT (2026-08-10 — البند ④): إعادة الجلب من قاعدة البيانات
+                        // (fetchEmployeesFromDBSilent) — JSON لم يعد مصدرًا للحقيقة،
+                        // ولا يجوز لبثّ أن يبعث بياناته في الشاشة. عند حدث المسح
+                        // تُعتمد قائمة فارغة فورًا حتى لا تبقى بيانات ممسوحة معروضة.
+                        if (typeof fetchEmployeesFromDBSilent === 'function') {
+                            fetchEmployeesFromDBSilent().then(function(list) {
+                                if (typeof adoptServerEmployees !== 'function') return;
+                                if (list) adoptServerEmployees(list);
+                                else if (data.type === 'schedule_employees_cleared') adoptServerEmployees([]);
+                            });
+                        } else if (typeof fetchEmployeesFromServerSilent === 'function') {
+                            // سقوط مُنحط: صفحة قديمة بلا جالب القاعدة — JSON فقط
                             fetchEmployeesFromServerSilent().then(function(list) {
                                 if (list && typeof adoptServerEmployees === 'function') adoptServerEmployees(list);
                             });
