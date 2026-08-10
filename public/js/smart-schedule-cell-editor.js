@@ -767,7 +767,7 @@
                     var matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                     parsePhonesRows(matrix, sn).forEach(function (row) {
                         var prev = merged.get(row.code);
-                        if (!prev || row.phone) merged.set(row.code, row.phone || (prev && prev.phone) || '');
+                        if (!prev || row.phone) merged.set(row.code, { code: row.code, phone: row.phone || (prev && prev.phone) || '' });
                     });
                 });
                 _phonesRows = Array.from(merged.values());
