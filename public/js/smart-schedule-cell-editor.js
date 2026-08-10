@@ -671,16 +671,16 @@
     // ==========================================
     var _phonesRows = null; // صفوف الملف المقروء [{code, phone}]
 
-    var CODE_HEADERS = ['code', 'employee_code', 'employeecode', 'employeenumber', 'empcode',
-        'الكود', 'الكود الوظيفي', 'الرقم الوظيفي', 'رقم الموظف', 'كود الموظف'];
-    var PHONE_HEADERS = ['phone', 'mobile', 'phonenumber', 'phoneno',
-        'الجوال', 'رقم الجوال', 'جوال', 'الهاتف', 'رقم الهاتف', 'رقم جوال الموظف', 'الجوال '];
+    var CODE_HEADERS = ['code', 'employee_code', 'employeecode', 'employeenumber', 'empcode', 'employee code', 'employee id', 'emp no', 'empno',
+        'الكود', 'الكود الوظيفي', 'الرقم الوظيفي', 'رقم الموظف', 'كود الموظف', 'الكود الوظيفي للموظف', 'كود'];
+    var PHONE_HEADERS = ['phone', 'mobile', 'phonenumber', 'phoneno', 'phone number', 'mobile number', 'tel', 'telephone',
+        'الجوال', 'رقم الجوال', 'جوال', 'الهاتف', 'رقم الهاتف', 'رقم جوال الموظف', 'رقم جوال', 'موبايل', 'الموبايل', 'جوال الموظف', 'الجوال '];
 
     function normHeader(h) {
         return String(h == null ? '' : h).trim().toLowerCase().replace(/[ _\-]/g, '');
     }
 
-    function parsePhonesRows(matrix) {
+    function parsePhonesRows(matrix, sheetName) {
         if (!matrix || !matrix.length) return [];
         // اكتشاف صف العناوين: أول صف يحتوي عمود كود وعمود جوال
         var headerIdx = -1, codeCol = 0, phoneCol = 1;
@@ -692,6 +692,13 @@
                 if (pi < 0 && PHONE_HEADERS.some(function (h) { return normHeader(h) === cells[j]; })) pi = j;
             }
             if (ci >= 0 && pi >= 0) { headerIdx = i; codeCol = ci; phoneCol = pi; break; }
+        }
+        // تشخيص (بطلب المالك 2026-08-10): طباعة ما قرأه XLSX فعليًا قبل أي معالجة
+        if (headerIdx >= 0) {
+            console.log('[استيراد الجوالات] الورقة «' + sheetName + '» — صف العناوين رقم ' + (headerIdx + 1) + ' — القيم المقروءة فعليًا:', matrix[headerIdx]);
+            console.log('[استيراد الجوالات] الورقة «' + sheetName + '» — عمود الكود: «' + matrix[headerIdx][codeCol] + '» (رقم ' + (codeCol + 1) + ') — عمود الجوال: «' + matrix[headerIdx][phoneCol] + '» (رقم ' + (phoneCol + 1) + ')');
+        } else {
+            console.warn('[استيراد الجوالات] الورقة «' + sheetName + '» — لم يُعثر على صف عناوين يطابق القوائم المعروفة — أول 3 صفوف مقروءة فعليًا:', matrix.slice(0, 3));
         }
         var start = headerIdx >= 0 ? headerIdx + 1 : 0;
         var rows = [];
@@ -707,6 +714,7 @@
             if (!/^[0-9]{3,10}$/.test(codeStr)) continue;
             rows.push({ code: codeStr, phone: phone == null ? '' : String(phone).trim() });
         }
+        console.log('[استيراد الجوالات] الورقة «' + sheetName + '» — صفوف مستخرجة: ' + rows.length);
         return rows;
     }
 
@@ -753,10 +761,11 @@
                 var wb = XLSX.read(ev.target.result, { type: 'array' });
                 // دمج كل الأوراق بالترتيب — الأحدث يحدّث الأقدم، والفارغ لا يطغى على الموجود
                 var merged = new Map();
+                console.log('[استيراد الجوالات] الملف: «' + (file.name || '') + '» — الأوراق المقروءة فعليًا:', wb.SheetNames);
                 wb.SheetNames.forEach(function (sn) {
                     var ws = wb.Sheets[sn];
                     var matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                    parsePhonesRows(matrix).forEach(function (row) {
+                    parsePhonesRows(matrix, sn).forEach(function (row) {
                         var prev = merged.get(row.code);
                         if (!prev || row.phone) merged.set(row.code, row.phone || (prev && prev.phone) || '');
                     });

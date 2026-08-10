@@ -1490,22 +1490,10 @@
          الحاوية الرئيسية
          ========================================== -->
     <div class="container">
-        <!-- قسم رفع الملفات (مضغوط) -->
+        <!-- قنوات الاستيراد المعتمدة (الجدول الرسمي + أرقام الجوالات) -->
         <div class="section fade-in" style="padding:16px 20px;margin-bottom:16px;">
-            <div class="import-bar" id="dropZone">
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf">
-                <i class="fas fa-cloud-upload-alt icon"></i>
-                <div class="text">
-                    <strong>رفع ملف الجدول</strong>
-                    <span class="hint"> — Excel (.xlsx) أو PDF — اسحب الملف أو اضغط لاختياره</span>
-                </div>
-                <button class="btn-import">استيراد</button>
-                <div class="upload-progress" id="uploadProgress" style="position:absolute;bottom:0;left:0;right:0;">
-                    <div class="progress-bar" style="height:3px;"><div class="progress-fill" id="progressFill"></div></div>
-                </div>
-            </div>
-            <!-- استيراد الجدول الرسمي (وحدة مستقلة — لا تمس الاستيراد الحالي) -->
-            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <!-- استيراد الجدول الرسمي (القناة الشهرية المعتمدة) -->
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <input type="file" id="officialImportInput" accept=".xlsx,.xls" style="display:none;" onchange="oiFileChosen(this)">
                 <button class="btn btn-primary" type="button" onclick="oiOpenPicker()">
                     <i class="fas fa-file-import"></i> استيراد الجدول الرسمي (القطاع)
@@ -1518,32 +1506,6 @@
                     <i class="fas fa-address-book"></i> استيراد أرقام الجوالات
                 </button>
                 <span style="font-size:12px;color:#8A9BB0;">Excel/CSV بعمودَي «الكود الوظيفي» و«الجوال» — معاينة كاملة قبل الحفظ — لا يستبدل رقمًا موجودًا برقم فارغ</span>
-            </div>
-            <!-- قائمة الملفات المحفوظة -->
-            <div class="saved-files-list" id="savedFilesList"></div>
-        </div>
-
-        <!-- قسم تحليل البيانات -->
-        <div class="section hidden" id="analysisSection">
-            <div class="section-title">
-                <i class="fas fa-microscope"></i>
-                تحليل البيانات
-            </div>
-            <div class="analysis-status" id="analysisStatus">
-                <div class="spinner"></div>
-                <span>جاري تحليل الملف...</span>
-            </div>
-            <div class="analysis-result hidden" id="analysisResult">
-                <i class="fas fa-check-circle"></i>
-                <h3 id="analysisText">تم استخراج البيانات بنجاح</h3>
-                <p class="text-muted" id="analysisDetails"></p>
-            </div>
-            <!-- جدول بيانات الموظفين المستخرجة -->
-            <div class="data-table-container mt-3 hidden" id="extractedTableContainer">
-                <table class="data-table" id="extractedTable">
-                    <thead><tr></tr></thead>
-                    <tbody></tbody>
-                </table>
             </div>
         </div>
 
@@ -1560,31 +1522,15 @@
             <div class="search-results" id="searchResults"></div>
         </div>
 
-        <!-- شريط أدوات التحرير -->
+        <!-- شريط مراجعة التعديلات (الأدوات الحية المرتبطة بالجدول الكلاسيكي) -->
         <div class="section fade-in hidden" id="editorToolbarSection">
             <div class="section-title">
-                <i class="fas fa-tools"></i>
-                أدوات التحرير
+                <i class="fas fa-history"></i>
+                مراجعة التعديلات
             </div>
             <div class="editor-toolbar" id="editorToolbar">
-                <button class="btn btn-primary" onclick="toggleEditMode()" id="editModeBtn">
-                    <i class="fas fa-edit"></i> تفعيل التحرير
-                </button>
-                <button class="btn btn-green" onclick="startBulkEdit()" id="bulkEditBtn" disabled>
-                    <i class="fas fa-th-large"></i> تحرير جماعي
-                </button>
                 <button class="btn btn-purple" onclick="toggleAuditPanel()" id="auditBtn">
                     <i class="fas fa-history"></i> سجل التغييرات
-                </button>
-                <button class="btn btn-primary" onclick="toggleNotificationPanel()" id="notifBtn">
-                    <i class="fas fa-bell"></i> الإشعارات
-                    <span class="notification-badge" id="notifBadge" style="display:none;">0</span>
-                </button>
-                <button class="btn btn-gold" onclick="validateCurrentRoster()" id="validateBtn">
-                    <i class="fas fa-check-double"></i> تحقق
-                </button>
-                <button class="btn btn-info" onclick="showEmployeeScheduleModal()" id="empScheduleBtn">
-                    <i class="fas fa-user-clock"></i> جدول موظف
                 </button>
                 <button class="btn btn-coral" onclick="undoLastChange()" id="undoBtn" disabled>
                     <i class="fas fa-undo"></i> تراجع
@@ -1592,31 +1538,6 @@
                 <button class="btn btn-coral" onclick="redoLastChange()" id="redoBtn" disabled>
                     <i class="fas fa-redo"></i> إعادة
                 </button>
-            </div>
-            <div class="bulk-toolbar hidden" id="bulkToolbar">
-                <span class="bulk-count" id="bulkCount">0 خلايا محددة</span>
-                <div class="flex gap-2 items-center">
-                    <select class="filter-group select" id="bulkShiftSelect" style="min-width:160px;">
-                        <option value="">اختر المناوبة...</option>
-                        <option value="صباحية">صباحية</option>
-                        <option value="مسائية">مسائية</option>
-                        <option value="ليلية">ليلية</option>
-                        <option value="إجازة">إجازة</option>
-                        <option value="راحة">راحة</option>
-                        <option value="OFF">OFF</option>
-                        <option value="دوام رسمي">دوام رسمي</option>
-                        <option value="مكلف / مهمة رسمية">مكلف / مهمة رسمية</option>
-                        <option value="أوفر لاب / نوبات تداخلية">أوفر لاب / نوبات تداخلية</option>
-                        <option value="إجازة تعويضية">إجازة تعويضية</option>
-                        <option value="تدريب">تدريب</option>
-                    </select>
-                    <button class="btn btn-green" onclick="applyBulkEdit()">
-                        <i class="fas fa-check"></i> تطبيق
-                    </button>
-                    <button class="btn" onclick="cancelBulkEdit()">
-                        <i class="fas fa-times"></i> إلغاء
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -1627,15 +1548,6 @@
                 عرض الجدول
             </div>
             <div class="view-buttons">
-                <button class="view-btn" data-view="daily">
-                    <i class="fas fa-sun"></i> عرض يومي
-                </button>
-                <button class="view-btn" data-view="weekly">
-                    <i class="fas fa-calendar-week"></i> عرض أسبوعي
-                </button>
-                <button class="view-btn" data-view="monthly">
-                    <i class="fas fa-calendar-alt"></i> عرض شهري
-                </button>
                 <button class="view-btn" data-view="employee">
                     <i class="fas fa-user"></i> عرض حسب الموظف
                 </button>
@@ -1875,70 +1787,6 @@
         </div>
         <div class="side-panel-body" id="auditPanelBody">
             <div class="text-center mt-3" style="color:var(--text-muted);">جاري التحميل...</div>
-        </div>
-    </div>
-
-    <!-- Notification Panel -->
-    <div class="side-panel hidden" id="notificationPanel">
-        <div class="side-panel-header">
-            <div class="side-panel-title">
-                <i class="fas fa-bell"></i> الإشعارات
-            </div>
-            <button class="modal-close" onclick="toggleNotificationPanel()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="side-panel-body" id="notificationPanelBody">
-            <div class="text-center mt-3" style="color:var(--text-muted);">جاري التحميل...</div>
-        </div>
-    </div>
-
-    <!-- Employee Schedule Modal -->
-    <div class="modal-overlay" id="empScheduleModal">
-        <div class="modal-content" style="max-width:700px;">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-user-clock"></i>
-                    <span id="empScheduleModalTitle">جدول موظف</span>
-                </div>
-                <div class="modal-actions">
-                    <button class="modal-close" onclick="closeEmpScheduleModal()"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
-            <div class="modal-body" id="empScheduleModalBody">
-                <div class="filters-row" style="margin-bottom:16px;">
-                    <div class="filter-group">
-                        <label>الموظف</label>
-                        <select id="empScheduleSelect"></select>
-                    </div>
-                    <div class="filter-group">
-                        <label>الشهر</label>
-                        <input type="month" id="empScheduleMonth">
-                    </div>
-                    <div class="filter-group">
-                        <button class="btn btn-primary" onclick="loadEmployeeSchedule()" style="margin-top:auto;">
-                            <i class="fas fa-search"></i> عرض
-                        </button>
-                    </div>
-                </div>
-                <div id="empScheduleResult"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Validation Results Modal -->
-    <div class="modal-overlay" id="validationModal">
-        <div class="modal-content" style="max-width:600px;">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-check-double"></i>
-                    نتائج التحقق
-                </div>
-                <div class="modal-actions">
-                    <button class="modal-close" onclick="closeValidationModal()"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
-            <div class="modal-body" id="validationModalBody">
-                <div class="text-center mt-3">جاري التحقق...</div>
-            </div>
         </div>
     </div>
 
@@ -2186,7 +2034,7 @@
         function setupDragAndDrop() {
             try {
                 var dz = document.getElementById('dropZone');
-                if (!dz) { console.error('dropZone not found'); return; }
+                if (!dz) { return; } // بانر الاستيراد القديم حُذف (تنظيف 2026-08-10) — عودة صامتة
                 console.log('✅ setupDragAndDrop: dropZone found');
                 dz.addEventListener('dragover', function(e) {
                     e.preventDefault();
@@ -2210,7 +2058,7 @@
         function setupFileInput() {
             try {
                 var fi = document.getElementById('fileInput');
-                if (!fi) { console.error('fileInput not found'); return; }
+                if (!fi) { return; } // بانر الاستيراد القديم حُذف (تنظيف 2026-08-10) — عودة صامتة
                 fi.addEventListener('change', function(e) {
                     console.log('📁 fileInput change:', e.target.files.length, 'files');
                     if (e.target.files.length > 0) {
@@ -3246,6 +3094,7 @@
 
         function renderSavedFiles() {
             var container = document.getElementById('savedFilesList');
+            if (!container) return; // القسم حُذف مع بانر الاستيراد القديم (تنظيف 2026-08-10)
             if (savedFiles.length === 0) { container.innerHTML = ''; return; }
             var html = '<div style="font-weight:700; margin-bottom:10px; color:var(--primary); font-size:0.9rem;"><i class="fas fa-history"></i> الملفات المرفوعة مؤخراً:</div>';
             for (var i = 0; i < Math.min(savedFiles.length, 5); i++) {
@@ -3472,11 +3321,10 @@
             var container = document.getElementById('mainViewArea');
             container.innerHTML = '';
             switch (currentView) {
-                case 'daily': renderDailyView(); break;
-                case 'weekly': renderWeeklyView(); break;
-                case 'monthly': renderMonthlyView(); break;
+                // العروض اليومي/الأسبوعي/الشهري حُذفت بطلب المالك (2026-08-10) — الكلاسيكي هو المعتمد
                 case 'employee': renderEmployeeView(selectedEmployee); break;
                 case 'classic': renderClassicView(); break;
+                default: renderClassicView(); break;
             }
         }
 
@@ -3843,12 +3691,16 @@
                 if (ka !== kb) return ka < kb ? -1 : 1;
                 return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
             });
-            
+            container.innerHTML = buildClassicGridHtml(filtered);
+        }
+
+        // بناء شبكة الجدول الكلاسيكي — مشترك بين «العرض الكلاسيكي» و«عرض حسب الموظف»
+        // بحيث يعكس عرض الموظف نفس الشبكة حرفيًا (نفس الأعمدة والرموز والتعديل المباشر)
+        function buildClassicGridHtml(filtered) {
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center" style="padding:40px; color:var(--text-muted);"><i class="fas fa-table" style="font-size:3rem; margin-bottom:16px; display:block;"></i>لا توجد بيانات لعرضها</div>';
-                return;
+                return '<div class="text-center" style="padding:40px; color:var(--text-muted);"><i class="fas fa-table" style="font-size:3rem; margin-bottom:16px; display:block;"></i>لا توجد بيانات لعرضها</div>';
             }
-            
+
             // Gather all unique days from all employee schedules
             var allDays = {};
             for (var i = 0; i < filtered.length; i++) {
@@ -3860,10 +3712,9 @@
                 }
             }
             var daysList = Object.values(allDays).sort(function(a, b) { return a.date.localeCompare(b.date); });
-            
+
             if (daysList.length === 0) {
-                container.innerHTML = '<div class="text-center" style="padding:40px; color:var(--text-muted);">لا توجد أيام متاحة</div>';
-                return;
+                return '<div class="text-center" style="padding:40px; color:var(--text-muted);">لا توجد أيام متاحة</div>';
             }
             
             // Determine month/year for title
@@ -3941,8 +3792,8 @@
                 '<div class="classic-legend-item"><div class="classic-legend-color" style="background:#E0F2FE; border-color:#0EA5E9;"></div><span>OvD = أوفرلاب نهاري</span></div>' +
                 '</div>' +
                 '<div class="classic-edit-hint"><i class="fas fa-mouse-pointer"></i> انقر على أي خلية للتعديل مباشرة</div>';
-            
-            container.innerHTML = html;
+
+            return html;
         }
         
         function changeClassicMonth(delta) {
@@ -3962,186 +3813,6 @@
             showToast('تصفية حسب الشهر قيد التطوير', 'info');
         }
 
-        // ==========================================
-        // العرض اليومي - Daily View
-        // ==========================================
-        function renderDailyView() {
-            var container = document.getElementById('mainViewArea');
-            // احصل على الأيام من الموظفين المفلترين
-            var filtered = getFilteredEmployees();
-            var uniqueDays = [];
-            var daysSeen = {};
-            for (var i = 0; i < filtered.length; i++) {
-                for (var s = 0; s < filtered[i].schedule.length; s++) {
-                    var sch = filtered[i].schedule[s];
-                    if (!daysSeen[sch.date]) {
-                        daysSeen[sch.date] = true;
-                        uniqueDays.push({ date: sch.date, day: sch.day });
-                    }
-                }
-            }
-            uniqueDays.sort(function(a, b) { return a.date.localeCompare(b.date); });
-            
-            var html = '<div class="filter-group" style="max-width:300px; margin-bottom:16px;">' +
-                '<label>اختيار اليوم</label>' +
-                '<select id="dailyDaySelect" onchange="renderDailyTable(this.value)">';
-            if (uniqueDays.length === 0) {
-                html += '<option>لا توجد أيام متاحة</option>';
-            } else {
-                for (var i = 0; i < uniqueDays.length; i++) {
-                    var d = uniqueDays[i];
-                    html += '<option value="' + d.date + '">' + d.day + ' (' + d.date + ')</option>';
-                }
-            }
-            html += '</select></div>' +
-                '<div id="dailyTableContainer"></div>';
-            container.innerHTML = html;
-            if (uniqueDays.length > 0) renderDailyTable(uniqueDays[0].date);
-        }
-
-        function renderDailyTable(dateStr) {
-            var container = document.getElementById('dailyTableContainer');
-            var dayData = [];
-            var filtered = getFilteredEmployees();
-            for (var i = 0; i < filtered.length; i++) {
-                var emp = filtered[i];
-                for (var s = 0; s < emp.schedule.length; s++) {
-                    if (emp.schedule[s].date === dateStr) {
-                        dayData.push({ employee: emp, shift: emp.schedule[s] });
-                    }
-                }
-            }
-            var html = '<div class="data-table-container"><table class="data-table"><thead><tr>' +
-                '<th>الموظف</th><th>المسمى الوظيفي</th><th>الفرقة</th><th>المناوبة</th><th>الوقت</th><th>الحالة</th>' +
-                '</tr></thead><tbody>';
-            if (dayData.length === 0) {
-                html += '<tr><td colspan="6" class="text-center" style="padding:30px; color:var(--text-muted);">لا يوجد موظفين في هذا اليوم</td></tr>';
-            } else {
-                for (var d = 0; d < dayData.length; d++) {
-                    var item = dayData[d];
-                    var emp = item.employee;
-                    var sch = item.shift;
-                    var shiftClass = sch.shift === 'صباح' ? 'badge-shift-morning' : sch.shift === 'دوام 12 ساعة' ? 'badge-shift-evening' : sch.shift === 'دوام ليلي 12 ساعة' ? 'badge-shift-night' : '';
-                    var statusClass = sch.status === 'دوام' ? 'badge-status-work' : sch.status === 'إجازة' ? 'badge-status-off' : 'badge-status-rest';
-                    html += '<tr>' +
-                        '<td><strong>' + emp.name + '</strong></td>' +
-                        '<td>' + emp.jobTitle + '</td>' +
-                        '<td>' + (emp.team || '-') + '</td>' +
-                        '<td>' + (sch.shift ? '<span class="badge ' + shiftClass + '">' + sch.shift + '</span>' : '-') + '</td>' +
-                        '<td>' + (sch.time || '-') + '</td>' +
-                        '<td><span class="badge ' + statusClass + '">' + sch.status + '</span></td>' +
-                        '</tr>';
-                }
-            }
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
-        }
-
-        // ==========================================
-        // العرض الأسبوعي - Weekly View
-        // ==========================================
-        function renderWeeklyView() {
-            var container = document.getElementById('mainViewArea');
-            var html = '<div class="weekly-grid">';
-            for (var d = 0; d < 7; d++) {
-                var dayName = ARABIC_DAYS[d];
-                html += '<div class="weekly-day-col">' +
-                    '<div class="weekly-day-header">' + dayName + '</div>' +
-                    '<div class="weekly-day-content" id="weeklyDay_' + d + '"></div>' +
-                    '</div>';
-            }
-            html += '</div>';
-            container.innerHTML = html;
-            // ملء البيانات من الموظفين المفلترين
-            var filtered = getFilteredEmployees();
-            for (var day = 0; day < 7; day++) {
-                var dayContent = document.getElementById('weeklyDay_' + day);
-                var dayEmployees = [];
-                for (var i = 0; i < filtered.length; i++) {
-                    var emp = filtered[i];
-                    for (var s = 0; s < emp.schedule.length; s++) {
-                        if (emp.schedule[s].day === ARABIC_DAYS[day] && emp.schedule[s].status === 'دوام') {
-                            dayEmployees.push({ name: emp.name, shift: emp.schedule[s].shift, team: emp.team || emp.schedule[s].location });
-                        }
-                    }
-                }
-                var content = '';
-                if (dayEmployees.length === 0) {
-                    content = '<div style="text-align:center; color:var(--text-muted); padding:20px 0; font-size:0.8rem;">لا يوجد</div>';
-                } else {
-                    for (var e = 0; e < dayEmployees.length; e++) {
-                        var de = dayEmployees[e];
-                        content += '<div class="weekly-employee-item">' +
-                            '<span class="weekly-employee-name">' + de.name + '</span>' +
-                            '<span class="weekly-employee-shift">' + de.shift + ' - ' + de.team + '</span>' +
-                            '</div>';
-                    }
-                }
-                dayContent.innerHTML = content;
-            }
-        }
-
-        // ==========================================
-        // العرض الشهري - Monthly View
-        // ==========================================
-        function renderMonthlyView() {
-            var container = document.getElementById('mainViewArea');
-            var year = currentMonth.getFullYear();
-            var month = currentMonth.getMonth();
-            var firstDay = new Date(year, month, 1);
-            var lastDay = new Date(year, month + 1, 0);
-            var startDayOfWeek = firstDay.getDay();
-            var daysInMonth = lastDay.getDate();
-            var html = '<div class="month-nav">' +
-                '<button class="month-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-right"></i></button>' +
-                '<div class="month-nav-title">' + ARABIC_MONTHS[month] + ' ' + year + '</div>' +
-                '<button class="month-nav-btn" onclick="changeMonth(1)"><i class="fas fa-chevron-left"></i></button>' +
-                '</div>' +
-                '<div class="calendar-grid">';
-            // رؤوس الأيام
-            for (var h = 0; h < 7; h++) {
-                html += '<div class="calendar-header-day">' + ARABIC_DAYS[h] + '</div>';
-            }
-            // الأيام الفارغة في البداية
-            for (var empty = 0; empty < startDayOfWeek; empty++) {
-                html += '<div class="calendar-day other-month"></div>';
-            }
-            // أيام الشهر
-            for (var day = 1; day <= daysInMonth; day++) {
-                var dateStr = year + '-' + pad2(month + 1) + '-' + pad2(day);
-                var isToday = dateStr === new Date().toISOString().split('T')[0];
-                // عد الموظفين في هذا اليوم
-                var shiftCounts = { 'صباحية': 0, 'مسائية': 0, 'ليلية': 0, 'OFF': 0, 'إجازة': 0 };
-                var totalEmp = 0;
-                for (var i = 0; i < employees.length; i++) {
-                    var emp = employees[i];
-                    for (var s = 0; s < emp.schedule.length; s++) {
-                        if (emp.schedule[s].date === dateStr) {
-                            totalEmp++;
-                            var sh = emp.schedule[s].shift || emp.schedule[s].status;
-                            if (shiftCounts[sh] !== undefined) shiftCounts[sh]++;
-                        }
-                    }
-                }
-                var dayClass = isToday ? 'calendar-day today' : 'calendar-day';
-                html += '<div class="' + dayClass + '">' +
-                    '<div class="calendar-day-number">' + day + '</div>' +
-                    '<div class="calendar-shift-count">' + totalEmp + ' موظف</div>' +
-                    '<div class="calendar-shifts">' +
-                    (shiftCounts['صباحية'] > 0 ? '<span class="calendar-shift-dot dot-morning" title="صباحية: ' + shiftCounts['صباحية'] + '"></span>' : '') +
-                    (shiftCounts['مسائية'] > 0 ? '<span class="calendar-shift-dot dot-evening" title="مسائية: ' + shiftCounts['مسائية'] + '"></span>' : '') +
-                    (shiftCounts['ليلية'] > 0 ? '<span class="calendar-shift-dot dot-night" title="ليلية: ' + shiftCounts['ليلية'] + '"></span>' : '') +
-                    (shiftCounts['إجازة'] > 0 ? '<span class="calendar-shift-dot dot-off" title="إجازة: ' + shiftCounts['إجازة'] + '"></span>' : '') +
-                    '</div></div>';
-            }
-            html += '</div>';
-            container.innerHTML = html;
-        }
-
-        function changeMonth(delta) {
-            currentMonth.setMonth(currentMonth.getMonth() + delta);
-            renderMonthlyView();
-        }
 
         // ==========================================
         // عرض حسب الموظف - Employee View
@@ -4178,23 +3849,8 @@
                 '<div><strong>رقم الموظف:</strong> ' + emp.employeeNumber + '</div>' +
                 '<div><strong>الجوال:</strong> ' + emp.phone + '</div>' +
                 '</div></div>';
-            html += '<div class="data-table-container"><table class="data-table"><thead><tr>' +
-                '<th>اليوم</th><th>التاريخ</th><th>المناوبة</th><th>الوقت</th><th>الموقع</th><th>الحالة</th>' +
-                '</tr></thead><tbody>';
-            for (var s = 0; s < emp.schedule.length; s++) {
-                var sch = emp.schedule[s];
-                var shiftClass = sch.shift === 'صباحية' ? 'badge-shift-morning' : sch.shift === 'مسائية' ? 'badge-shift-evening' : sch.shift === 'ليلية' ? 'badge-shift-night' : '';
-                var statusClass = sch.status === 'دوام' ? 'badge-status-work' : sch.status === 'إجازة' ? 'badge-status-off' : 'badge-status-rest';
-                html += '<tr>' +
-                    '<td>' + sch.day + '</td>' +
-                    '<td>' + sch.date + '</td>' +
-                    '<td>' + (sch.shift ? '<span class="badge ' + shiftClass + '">' + sch.shift + '</span>' : '-') + '</td>' +
-                    '<td>' + (sch.time || '-') + '</td>' +
-                    '<td>' + (sch.location || '-') + '</td>' +
-                    '<td><span class="badge ' + statusClass + '">' + sch.status + '</span></td>' +
-                    '</tr>';
-            }
-            html += '</tbody></table></div>';
+            // يعكس نفس شبكة الجدول الكلاسيكي حرفيًا (نفس الأعمدة والرموز والتعديل المباشر)
+            html += buildClassicGridHtml([emp]);
             container.innerHTML = html;
         }
 
@@ -4840,13 +4496,11 @@
         window.loadFromServer = loadFromServer;
         window.clearServerRoster = clearServerRoster;
         window.closeDocumentViewer = closeDocumentViewer;
-        window.changeMonth = changeMonth;
         window.openDocumentViewer = openDocumentViewer;
         window.deleteSavedFile = deleteSavedFile;
         window.selectSearchResult = selectSearchResult;
         window.copyDocumentContent = copyDocumentContent;
         window.downloadDocument = downloadDocument;
-        window.renderDailyTable = renderDailyTable;
         window.renderEmployeeTable = renderEmployeeTable;
         window.renderClassicView = renderClassicView;
         window.changeClassicMonth = changeClassicMonth;
@@ -4918,14 +4572,28 @@
     </script>
 
     <!-- New Interactive Shift Management Scripts -->
-    <script src="/js/smart-schedule-editor.js"></script>
+    <!-- ملاحظة تنظيف 2026-08-10: حُذفت وحدات المحرك القديم الميتة (editor/validation/notifications/bulk) — التفاصيل في تقرير المهمة -->
     <script src="/js/smart-schedule-dragdrop.js"></script>
-    <script src="/js/smart-schedule-validation.js"></script>
     <script src="/js/smart-schedule-audit.js"></script>
-    <script src="/js/smart-schedule-notifications.js"></script>
-    <script src="/js/smart-schedule-bulk.js"></script>
     <script src="/js/smart-schedule-search.js?v=2"></script>
-    <script src="/js/smart-schedule-cell-editor.js?v=3"></script>
+    <script src="/js/smart-schedule-cell-editor.js?v=5"></script>
+
+    <!-- إظهار شريط مراجعة التعديلات للمخوَّلين (نفس منطق الوحدة القديمة المحذوفة: admin/director/supervisor) -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            var section = document.getElementById('editorToolbarSection');
+            if (!section) return;
+            var token = (typeof AuthCore !== 'undefined' && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '');
+            if (!token) return;
+            var payload = JSON.parse(atob(token.split('.')[1]));
+            var role = payload.role || null;
+            if (role === 'admin' || role === 'director' || role === 'supervisor') {
+                section.classList.remove('hidden');
+            }
+        } catch (e) { /* تجاهل — الشريط يبقى مخفيًا */ }
+    });
+    </script>
 
 <!-- RAG AI Assistant -->
 <!-- AI Assistant -->
