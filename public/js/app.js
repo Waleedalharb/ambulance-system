@@ -1437,7 +1437,7 @@ function renderNotifications() {
         var typeKey = renderNotifications.TYPE_META[n.type] ? n.type : 'info';
         var meta = renderNotifications.TYPE_META[typeKey];
         var isRead = !!(n.read || n.is_read);
-        var timeText = n.time || n.createdAt || n.created_at || '';
+        var timeText = TimeRiyadh.formatDateTime(n.created_at || n.createdAt || n.time);
         html += '<div class="nc-item nc-' + typeKey + (isRead ? ' is-read' : '') + '">' +
             '<div class="nc-icon"><i class="fas ' + meta.icon + '"></i></div>' +
             '<div class="nc-body">' +

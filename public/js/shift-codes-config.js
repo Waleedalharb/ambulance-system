@@ -149,6 +149,48 @@ const SHIFT_CODES = [
     status: 'دوام'
   },
 
+  /* ── الأكواد التشغيلية الملحقة (مطابقة لبذر db.js حرفيًا) ── */
+  {
+    code: 'O12-09',
+    name: 'أوفرلاب 12 — بداية 09:00',
+    time_start: '09:00',
+    time_end: '21:00',
+    color: '#10B981',
+    status: 'دوام'
+  },
+  {
+    code: 'O12-12',
+    name: 'أوفرلاب 12 — بداية 12:00',
+    time_start: '12:00',
+    time_end: '00:00',
+    color: '#10B981',
+    status: 'دوام'
+  },
+  {
+    code: 'O12-14',
+    name: 'أوفرلاب 12 — بداية 14:00',
+    time_start: '14:00',
+    time_end: '02:00',
+    color: '#10B981',
+    status: 'دوام'
+  },
+  {
+    code: 'RRA1-D-04',
+    name: 'تدخل سريع 1 — صباحية — بداية 04:00',
+    time_start: '04:00',
+    time_end: '16:00',
+    color: '#14B8A6',
+    status: 'دوام'
+  },
+  {
+    code: 'RRA1-N-16',
+    name: 'تدخل سريع 1 — ليلية — بداية 16:00',
+    time_start: '16:00',
+    time_end: '04:00',
+    color: '#14B8A6',
+    status: 'دوام'
+  },
+
   /* ── Mission / Field Duty (مهمة) ── */
   {
     code: 'M',
@@ -232,10 +274,18 @@ const SHIFT_CODES = [
   },
   {
     code: 'VC',
-    name: 'إجازة مرضية',
+    name: 'إجازة اضطرارية',
     time_start: null,
     time_end: null,
     color: '#F87171',
+    status: 'إجازة'
+  },
+  {
+    code: 'S',
+    name: 'مرضية',
+    time_start: null,
+    time_end: null,
+    color: '#FB7185',
     status: 'إجازة'
   },
   {

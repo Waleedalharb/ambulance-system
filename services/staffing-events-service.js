@@ -9,6 +9,8 @@
 
 const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators } = require('./operational-events-core');
 const { sortTeamsNatural } = require('./team-order'); // doc-v4 ⑫: الفرز الرقمي الطبيعي — مركزي
+// مرحلة الأوفرلاب 3: محلل الأكواد التشغيلية الملحقة (UMD — نفس نسخة المتصفح)
+const OperationalCodes = require('../public/js/core/operational-codes.js');
 
 const DOMAIN = 'staffing';
 
@@ -87,6 +89,33 @@ function shiftStartIso(shiftType, shiftDate) {
     const d = new Date(iso + (isNight ? 'T17:00:00+03:00' : 'T05:00:00+03:00'));
     return isNaN(d.getTime()) ? null : d.toISOString();
 }
+// مرحلة الأوفرلاب 3: تثبيت تاريخ البداية التشغيلية — لاحقة الكود على تاريخ
+// المناوبة، وإن سبقت بداية المناوبة العالمية تُرحَّل لليوم التالي
+// (RRA1-04 في ليلية D ⇒ D+1 04:00 · O12-09/12/14 وRRA1-16 في صباحية ⇒ نفس اليوم).
+function opStartIsoForDate(shiftDate, shiftStartAtIso, startHHMM) {
+    const iso = toIsoDate(shiftDate);
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso) || !shiftStartAtIso || !startHHMM) return null;
+    let d = new Date(iso + 'T' + startHHMM + ':00+03:00');
+    if (isNaN(d.getTime())) return null;
+    if (d.getTime() < new Date(shiftStartAtIso).getTime()) d = new Date(d.getTime() + 86400000);
+    return d.toISOString();
+}
+// إصلاح «حضر × التفعيل» — الخلل أ (قرار المالك النهائي): عائلة RRA الموقعة
+// (حرف D/N صريح في الكود — explicitShift) بلا تدحرج إطلاقًا: البداية تُثبَّت
+// على تاريخ المناوبة المسؤولة نفسه (04:00 لصباحيتها، و16:00 لليليتها ولو
+// سبقت بدايتها العالمية 17:00). حرف D/N مصدر حقيقة الوردية، فالتثبيت على
+// تاريخها متماسك دائمًا. أكواد الأوفرلاب O12-* والصيغة القديمة غير الموقعة
+// (legacy — RRA1-04/16) تبقى على قاعدة التدحرج القائمة حرفيًا.
+// نقية — بلا وصول للتخزين (كل المدخلات تُمرَّر).
+function opStartIsoForParsed(shiftDate, shiftStartAtIso, parsed) {
+    if (parsed && parsed.kind === 'rapid' && parsed.explicitShift === true) {
+        const iso = toIsoDate(shiftDate);
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso) || !parsed.start) return null;
+        const d = new Date(iso + 'T' + parsed.start + ':00+03:00');
+        return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    return opStartIsoForDate(shiftDate, shiftStartAtIso, parsed && parsed.start);
+}
 // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): توحيد التوقيت — وقت الحضور
 // المصحَّح (correction.arrivalAt) وقت جداري بتوقيت الرياض. القيمة naive (بلا إزاحة)
 // كانت تُفسَّر بمنطقة الخادم المحلية عند new Date فيزيح حساب التأخير على خادم UTC؛
@@ -101,7 +130,7 @@ function normalizeRiyadhWallIso(v) {
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d.toISOString();
 }
-function deriveLateRecords(events, shiftType, shiftDate) {
+function deriveLateRecords(events, shiftType, shiftDate, startByEmployee) {
     const sorted = (events || []).slice().sort((a, b) =>
         String(a.created_at).localeCompare(String(b.created_at)) || ((a.id || 0) - (b.id || 0)));
     const shiftStartAt = shiftStartIso(shiftType, shiftDate);
@@ -132,7 +161,8 @@ function deriveLateRecords(events, shiftType, shiftDate) {
                 pairs.push({
                     employee: ent,
                     teamId: opened.team_id || e.team_id || null,
-                    startedAt: shiftStartAt || opened.created_at, // المرجع: بداية المناوبة
+                    // المرجع: البداية التشغيلية للموظف إن وُجدت، وإلا بداية المناوبة
+                    startedAt: (startByEmployee && startByEmployee[ent]) || shiftStartAt || opened.created_at,
                     arrivedAt: e.created_at,
                     arrivalEventId: e.id || null,
                     sourceEventType
@@ -158,23 +188,31 @@ function deriveLateRecords(events, shiftType, shiftDate) {
     }
     const records = pairs.map(p => {
         const mins = Math.max(0, Math.round((new Date(p.arrivedAt) - new Date(p.startedAt)) / 60000));
-        return {
+        const rec = {
             employee: p.employee, teamId: p.teamId,
             startedAt: p.startedAt, arrivedAt: p.arrivedAt,
             durationMinutes: mins, status: 'arrived',
             sourceEventType: p.sourceEventType
         };
+        // مرحلة الأوفرلاب 3: البداية التشغيلية تُوسَم فقط لمن له كود تشغيلي
+        // (additive — سجلات بقية الموظفين تبقى مطابقة لما قبل المرحلة حرفيًا)
+        const opStart = startByEmployee && startByEmployee[p.employee];
+        if (opStart) rec.operationalStart = opStart;
+        return rec;
     });
     // تأخير/غياب بلا وصول — «لم يحضر»
     for (const [queue, sourceEventType] of [[openLate, 'late'], [openAbsence, 'absence']]) {
         for (const ent of Object.keys(queue)) {
             for (const ev of queue[ent]) {
-                records.push({
+                const rec = {
                     employee: ent, teamId: ev.team_id || null,
-                    startedAt: shiftStartAt || ev.created_at, arrivedAt: null,
+                    startedAt: (startByEmployee && startByEmployee[ent]) || shiftStartAt || ev.created_at, arrivedAt: null,
                     durationMinutes: null, status: 'not_arrived',
                     sourceEventType
-                });
+                };
+                const opStart = startByEmployee && startByEmployee[ent];
+                if (opStart) rec.operationalStart = opStart;
+                records.push(rec);
             }
         }
     }
@@ -396,6 +434,10 @@ class StaffingEventsService {
     /**
      * doc-v2: خريطة اسم → {jobTitle, code} من كادر المناوبة المجدول (shift_roster).
      * تُستخدم لإثراء سجلات التأخير وصفيًا (additive) — إن لم تُطابق الاسم يُترك بلا code.
+     * مرحلة الأوفرلاب 3: يُحتفظ أيضًا بـ shiftCode (رمز الدوام المجدول مثل O12-12)
+     * لاشتقاق البداية التشغيلية لكل موظف — نفس الاستعلام، بلا استعلام جديد.
+     * مرحلة بدايات الفرق: يُحتفظ أيضًا بـ teamId (فرقة الموظف في الكادر) لطبقة
+     * teams.operational_starts — نفس الاستعلام، عمود واحد إضافي فقط.
      */
     async _personInfoByName(shiftId) {
         const shift = await this.storage.getShiftById(shiftId);
@@ -405,7 +447,7 @@ class StaffingEventsService {
         let rows = [];
         try {
             rows = await this.storage.all(
-                `SELECT sr.shift_code, e.name, e.job_title, e.employee_code
+                `SELECT sr.shift_code, sr.team_id, e.name, e.job_title, e.employee_code
                  FROM shift_roster sr JOIN employees e ON e.id = sr.employee_id
                  WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
             );
@@ -413,10 +455,168 @@ class StaffingEventsService {
         const map = {};
         for (const r of rows) {
             // التطبيع المركزي: الأكواد الصريحة (O12C13/RRC1) لا تُطرد — تُفك لأساسها
-            if (!isWorkDayCode(r.shift_code, isNight)) continue;
-            if (!map[r.name]) map[r.name] = { jobTitle: r.job_title || null, code: r.employee_code || null };
+            if (!isWorkDayCode(r.shift_code, isNight)) {
+                // مرحلة الأوفرلاب 3: الأكواد التشغيلية الملحقة (O12-09/RRA1-04…)
+                // تُقبل في وردية تصنيفها القاموسي (O12-12 صباحية · RRA1-04 ليلية)
+                // وإلا تُستبعد كما كانت — بلا أي تغيير على بقية الأكواد.
+                if (OperationalCodes.isOperationalCode(r.shift_code)) {
+                    const cls = STD.classifyDayCode(r.shift_code);
+                    const clsNight = String((cls && cls.shift) || '').includes('ليل');
+                    if (clsNight !== isNight) continue;
+                } else {
+                    // مرحلة بدايات الفرق: الأكواد الصرفة D/N — صباحية/ليلية في فئات
+                    // القاموس الرسمي (GROUPS) لكنها خارج قوائم وردية الخادم — تُقبل
+                    // في ورديتها لأن طبقة teams.operational_starts تُبنى عليها.
+                    // الأكواد بلا وردية قاموسية (مكتب/مهمة/إجازة/غير معروف) تُستبعد
+                    // كما كانت تمامًا — التوسعة تطابق D/N الصريحين فقط.
+                    const cls = STD.classifyDayCode(r.shift_code);
+                    const sh = String((cls && cls.shift) || '');
+                    if (!sh || sh.includes('ليل') !== isNight) continue;
+                }
+            }
+            if (!map[r.name]) map[r.name] = { jobTitle: r.job_title || null, code: r.employee_code || null, shiftCode: r.shift_code || null, teamId: r.team_id != null ? r.team_id : null };
         }
         return map;
+    }
+
+    /**
+     * مرحلة بدايات الفرق التشغيلية: خريطة معرّف الفريق ← بداياته التشغيلية
+     * المفكوكة ({day, night}) من teams.operational_starts — استعلام واحد.
+     * الفرق بلا إعداد (NULL) بلا مدخل إطلاقًا ⇒ سلوك ما قبل المرحلة حرفيًا.
+     * JSON تالف يُتجاهل؛ فشل القراءة (عمود غائب في قاعدة قديمة) يُسقط على {}.
+     */
+    async _teamOperationalStartsById() {
+        const map = {};
+        try {
+            const rows = await this.storage.all('SELECT id, name, operational_starts FROM teams');
+            for (const r of rows || []) {
+                if (!r.operational_starts) continue;
+                try {
+                    const parsed = JSON.parse(r.operational_starts);
+                    if (parsed && typeof parsed === 'object') map[r.id] = parsed;
+                } catch (_) { /* JSON تالف يُتجاهل — لا يُسقط شيئًا */ }
+            }
+        } catch (_) { /* قراءة وصفية اختيارية — الفشل = بلا طبقة فريق */ }
+        return map;
+    }
+
+    /**
+     * مرحلة الأوفرلاب 3 + مرحلة بدايات الفرق: خريطة اسم ← بداية تشغيلية (UTC ISO).
+     * سلسلة الحل بالترتيب:
+     *   ① كود تشغيلي ملحق في الكادر (O12-09/RRA1-04…) ⇒ من لاحقة الكود مع قاعدة
+     *     الترحيل القائمة (opStartIsoForDate: ما سبق بداية المناوبة يُرحَّل +1 يوم).
+     *   ② طبقة الفريق: فرقة الموظف في الكادر ← teams.operational_starts ← المدخل
+     *     بحسب نوع المناوبة (day صباحية / night ليلية) ⇒ البداية مثبتة على تاريخ
+     *     المناوبة نفسه مباشرة — بلا قاعدة ترحيل هنا (قرار المالك الصريح:
+     *     ليلية + 16:00 ⇒ نفس التاريخ D رغم أن 16:00 < 17:00).
+     *   غير ذلك بلا مدخل إطلاقًا ⇒ سقوط تلقائي على بداية المناوبة العالمية
+     *   (سلوك ما قبل المرحلتين حرفيًا). نقية — بلا وصول للتخزين.
+     */
+    _personStartMap(shiftType, shiftDate, infoMap, teamStartsById) {
+        const out = {};
+        const shiftStartAt = shiftStartIso(shiftType, shiftDate);
+        if (!shiftStartAt) return out;
+        const isNight = String(shiftType).includes('ليل');
+        const isoDate = toIsoDate(shiftDate);
+        for (const name of Object.keys(infoMap || {})) {
+            const info = infoMap[name];
+            // ① الكود التشغيلي الملحق — RRA الموقعة بلا تدحرج (الخلل أ)،
+            //    وO12-*/القديمة بقاعدة الترحيل القائمة (عبر opStartIsoForParsed)
+            const parsed = OperationalCodes.parseOperationalCode(info && info.shiftCode);
+            if (parsed) {
+                const iso = opStartIsoForParsed(shiftDate, shiftStartAt, parsed);
+                if (iso) out[name] = iso;
+                continue;
+            }
+            // ② طبقة الفريق — بداية مثبتة على تاريخ المناوبة نفسه (بلا ترحيل)
+            const starts = (teamStartsById && info && info.teamId != null) ? teamStartsById[info.teamId] : null;
+            const hhmm = starts ? (isNight ? starts.night : starts.day) : null;
+            if (!hhmm || !/^\d{2}:\d{2}$/.test(String(hhmm)) || !isoDate) continue;
+            const d = new Date(isoDate + 'T' + hhmm + ':00+03:00');
+            if (!isNaN(d.getTime())) out[name] = d.toISOString();
+        }
+        return out;
+    }
+
+    /**
+     * مرحلة الأوفرلاب 3: المناوبة السابقة المتعاقبة — ليلية التاريخ D ⇒ صباحية
+     * التاريخ D، وصباحية التاريخ D ⇒ ليلية التاريخ D-1 (الترحيل بين مناوبتين
+     * متتاليتين فقط). الأحدث id عند تعدد الصفوف.
+     */
+    async _findPreviousShift(shiftType, shiftDate) {
+        const iso = toIsoDate(shiftDate);
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso) || !shiftType) return null;
+        const isNight = String(shiftType).includes('ليل');
+        let prevDate, prevIsNight;
+        if (isNight) { prevDate = iso; prevIsNight = false; }
+        else {
+            prevDate = new Date(new Date(iso + 'T00:00:00Z').getTime() - 86400000).toISOString().slice(0, 10);
+            prevIsNight = true;
+        }
+        try {
+            if (prevIsNight) {
+                return await this.storage.get(
+                    `SELECT * FROM shifts WHERE shift_date = ? AND shift_type LIKE '%ليل%' ORDER BY id DESC LIMIT 1`, [prevDate]) || null;
+            }
+            return await this.storage.get(
+                `SELECT * FROM shifts WHERE shift_date = ? AND (shift_type IS NULL OR shift_type NOT LIKE '%ليل%') ORDER BY id DESC LIMIT 1`, [prevDate]) || null;
+        } catch (_) { return null; }
+    }
+
+    /**
+     * مرحلة الأوفرلاب 3: خريطة اسم ← رمز الدوام المجدول لتاريخ معطى — بلا فلتر
+     * isWorkDayCode عامدًا: الترحيل يحتاج رمز مناوبة المنشأ كما هو (O12-12
+     * نهاري التصنيف فلا يظهر في خريطة الليلية المفلترة).
+     */
+    async _rosterShiftCodeByName(shiftDate) {
+        const isoDate = toIsoDate(shiftDate);
+        const map = {};
+        if (!isoDate) return map;
+        try {
+            const rows = await this.storage.all(
+                `SELECT sr.shift_code, e.name
+                 FROM shift_roster sr JOIN employees e ON e.id = sr.employee_id
+                 WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
+            );
+            for (const r of rows || []) { if (!map[r.name]) map[r.name] = r.shift_code || null; }
+        } catch (_) { /* قراءة وصفية اختيارية — لا تُسقط شيئًا */ }
+        return map;
+    }
+
+    /**
+     * مرحلة الأوفرلاب 3: بذور الترحيل — أحداث late/absence ما زالت مفتوحة في
+     * المناوبة السابقة (نفس قاعدة طيّ deriveLateRecords) لموظف يحقق الشرطين
+     * معًا (فلتر صارم بقرار المالك):
+     *   ① رمز دوامه المجدول في مناوبة المنشأ كود تشغيلي ملحق؛
+     *   ② نافذته [opStart, opStart+المدة) تتقاطع فعليًا مع نافذة المناوبة
+     *      الحالية [shiftStart, shiftStart+12h): opStart < shiftEnd && opEnd > shiftStart.
+     *      وجود كود الأوفرلاب وحده لا يكفي — D12 [05:00,17:00) مقابل ليلية
+     *      [17:00,…) ⇒ 17:00 > 17:00 باطل ⇒ لا يُرحَّل أبدًا.
+     * نقية — بلا وصول للتخزين (كل المدخلات تُمرَّر).
+     */
+    _computeCarrySeeds(prevShift, prevEvents, rosterCodeByName, currentShiftStartIso) {
+        const seeds = [];
+        if (!prevShift || !currentShiftStartIso) return seeds;
+        const prevStartIso = shiftStartIso(prevShift.shift_type, prevShift.shift_date);
+        if (!prevStartIso) return seeds;
+        const stillOpen = deriveLateRecords(prevEvents, prevShift.shift_type, prevShift.shift_date)
+            .filter(r => r.status === 'not_arrived');
+        const shiftStartMs = new Date(currentShiftStartIso).getTime();
+        const shiftEndMs = shiftStartMs + 12 * 3600000;
+        for (const rec of stillOpen) {
+            const parsed = OperationalCodes.parseOperationalCode(rosterCodeByName[rec.employee]);
+            if (!parsed) continue; // ① ليس كودًا تشغيليًا ⇒ لا ترحيل إطلاقًا
+            const opStartIso = opStartIsoForParsed(prevShift.shift_date, prevStartIso, parsed);
+            if (!opStartIso) continue;
+            const opStartMs = new Date(opStartIso).getTime();
+            const opEndMs = opStartMs + parsed.durationH * 3600000;
+            if (!(opStartMs < shiftEndMs && opEndMs > shiftStartMs)) continue; // ② لا تقاطع ⇒ لا ترحيل
+            seeds.push({
+                employee: rec.employee, teamId: rec.teamId,
+                sourceEventType: rec.sourceEventType, opStartIso
+            });
+        }
+        return seeds;
     }
 
     /** الخط الزمني الكامل (أو لكيان واحد) — مرتب زمنيًا، لا حذف إطلاقًا. */
@@ -432,10 +632,90 @@ class StaffingEventsService {
             const shift = await this.storage.getShiftById(shiftId);
             if (shift) { shiftType = shift.shift_type || null; shiftDate = shift.shift_date || null; }
         } catch (_) { /* deriveLateRecords يسقط على طابع حدث الفتح مع تحذير */ }
-        const lateRecords = deriveLateRecords(events, shiftType, shiftDate);
+        // doc-v2 + مرحلة الأوفرلاب 3: خريطة الإثراء الوصفي + خريطة البدايات
+        // التشغيلية لأصحاب الأكواد الملحقة (غيرهم بلا مدخل ⇒ سلوك اليوم حرفيًا)
+        let info = {};
+        try { info = await this._personInfoByName(shiftId); } catch (_) { info = {}; }
+        // مرحلة بدايات الفرق: بدايات الفرق التشغيلية (استعلام واحد — فشله = بلا طبقة فريق)
+        let teamStarts = {};
+        try { teamStarts = await this._teamOperationalStartsById(); } catch (_) { teamStarts = {}; }
+        const startByEmployee = this._personStartMap(shiftType, shiftDate, info, teamStarts);
+        // مرحلة الأوفرلاب 3: ترحيل الأحداث الشخصية المفتوحة من المناوبة السابقة —
+        // بذور اصطناعية تُطوى مع أحداث هذه المناوبة بنفس قاعدة deriveLateRecords
+        // (arrival يُغلق الأقدم، وcorrection يطبَّق على أحدث زوج لنفس الكيان).
+        // البذور لا تدخل مصفوفة events المُعادة — السجل append-only كما هو.
+        // فشل الترحيل لا يُسقط الخط الزمني إطلاقًا.
+        const seedEvents = [];
+        const carryMeta = {};   // employee -> { carriedFromShiftId, responsibilityStart, opStartIso }
+        try {
+            const currentShiftStartIso = shiftStartIso(shiftType, shiftDate);
+            const prev = currentShiftStartIso ? await this._findPreviousShift(shiftType, shiftDate) : null;
+            if (prev) {
+                const prevEvents = await this.storage.getOperationalEventsByShift(prev.id, DOMAIN);
+                const rosterCodes = await this._rosterShiftCodeByName(prev.shift_date);
+                const seeds = this._computeCarrySeeds(prev, prevEvents, rosterCodes, currentShiftStartIso);
+                for (const s of seeds) {
+                    if (entityId && s.employee !== entityId) continue;
+                    seedEvents.push({
+                        id: 0, shift_id: prev.id, entity_id: s.employee,
+                        team_id: s.teamId, event_type: s.sourceEventType,
+                        created_at: s.opStartIso, payload: null
+                    });
+                    carryMeta[s.employee] = {
+                        carriedFromShiftId: prev.id,
+                        responsibilityStart: currentShiftStartIso,
+                        opStartIso: s.opStartIso
+                    };
+                    startByEmployee[s.employee] = s.opStartIso; // مثبتة على تاريخ مناوبة المنشأ
+                }
+            }
+        } catch (e) {
+            console.warn('[StaffingEventsService] تعذّر ترحيل الأحداث المفتوحة من المناوبة السابقة:', e.message);
+        }
+        const lateRecords = deriveLateRecords(events.concat(seedEvents), shiftType, shiftDate, startByEmployee);
+        // مرحلة الأوفرلاب 3: توثيق السجلات المرحّلة بالطوابع الثلاثة —
+        // operationalStart (بدايته التشغيلية في مناوبة المنشأ) + responsibilityStart
+        // (بداية هذه المناوبة = لحظة انتقال المسؤولية، تُعرض أيضًا carryForwardAt)
+        // + carriedFromShiftId. المدة الإجمالية تبقى من operationalStart،
+        // وdelayUnderShiftMinutes = الحضور − بداية هذه المناوبة.
+        for (const r of lateRecords) {
+            const meta = carryMeta[r.employee];
+            if (!meta || r.startedAt !== meta.opStartIso) continue;
+            r.operationalStart = meta.opStartIso;
+            r.responsibilityStart = meta.responsibilityStart;
+            r.carryForwardAt = meta.responsibilityStart;
+            r.carriedFromShiftId = meta.carriedFromShiftId;
+            if (r.status === 'arrived' && r.arrivedAt) {
+                r.delayUnderShiftMinutes = Math.max(0, Math.round((new Date(r.arrivedAt) - new Date(meta.responsibilityStart)) / 60000));
+            }
+        }
+        // مرحلة الأوفرلاب 3: وسم مناوبة المنشأ (قراءة حتمية — بلا أي تعديل
+        // للأحداث): سجل «لم يحضر» لموظف تتقاطع نافذته التشغيلية مع المناوبة
+        // التالية يُوسَم carryForwardAt = نهاية هذه المناوبة («انتقلت المسؤولية»).
+        try {
+            const currentShiftStartIso = shiftStartIso(shiftType, shiftDate);
+            if (currentShiftStartIso) {
+                const rosterCodes = await this._rosterShiftCodeByName(shiftDate);
+                const shiftEndMs = new Date(currentShiftStartIso).getTime() + 12 * 3600000;
+                const nextEndMs = shiftEndMs + 12 * 3600000;
+                for (const r of lateRecords) {
+                    if (r.status !== 'not_arrived' || r.carryForwardAt) continue;
+                    const parsed = OperationalCodes.parseOperationalCode(rosterCodes[r.employee]);
+                    if (!parsed) continue;
+                    const opIso = opStartIsoForParsed(shiftDate, currentShiftStartIso, parsed);
+                    if (!opIso) continue;
+                    const opStartMs = new Date(opIso).getTime();
+                    const opEndMs = opStartMs + parsed.durationH * 3600000;
+                    if (opStartMs < nextEndMs && opEndMs > shiftEndMs) {
+                        r.carryForwardAt = new Date(shiftEndMs).toISOString();
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[StaffingEventsService] تعذّر وسم انتقال المسؤولية للمناوبة التالية:', e.message);
+        }
         // doc-v2: إثراء وصفي — التخصص/المعرف الوظيفي بالمطابقة الاسمية (إن لم يُطابق يُترك بلا code)
         try {
-            const info = await this._personInfoByName(shiftId);
             for (const r of lateRecords) {
                 const p = info[r.employee];
                 if (p) { r.jobTitle = p.jobTitle; r.code = p.code; }
@@ -593,9 +873,9 @@ class StaffingEventsService {
         const actorName = (actor && (actor.name || actor.username)) || 'system';
         const at = createdAt || new Date().toISOString();
 
-        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'offline', 'ready', 'missing', 'correction'];
+        const ALLOWED = ['absence', 'late', 'assignment', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'offline', 'ready', 'missing', 'correction', 'activation', 'activation_end'];
         const NEEDS_REASON = ['absence', 'late', 'offline'];
-        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'assignment', 'correction'];
+        const NEEDS_EMPLOYEE = ['absence', 'late', 'arrival', 'external_support', 'volunteer_support', 'support_end', 'assignment', 'correction', 'activation', 'activation_end'];
 
         // التحقق الكامل قبل أي كتابة (القرار لا يسبق البيانات)
         for (const ev of events) {
@@ -624,8 +904,10 @@ class StaffingEventsService {
                 throw err;
             }
             // كل الأنواع مرتبطة بفريق إلا دعم الاحتياط (external_support بلا فريق هدف)
+            // المرحلة ب: وsupport_end — إنهاء متطوع الحوض (volunteer_support بلا
+            // فريق) يُرسل بلا teamId فيُغلق أقدم دعم مفتوح للكيان (نفس دلالة الطيّ)
             const teamId = canonicalTeamId(ev.supportTargetTeamId || ev.teamId);
-            if (!teamId && type !== 'external_support') {
+            if (!teamId && type !== 'external_support' && type !== 'support_end') {
                 const err = new Error('الفريق إلزامي لهذا النوع من الأحداث');
                 err.statusCode = 400;
                 throw err;
@@ -663,6 +945,10 @@ class StaffingEventsService {
                 if (type === 'assignment' && open.some(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'arrival' && !open.some(o => o.event_type === 'absence' || o.event_type === 'late')) continue;
                 if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support')) continue;
+                // مرحلة الأوفرلاب 4 (التفعيل): تفعيل مكرر مفتوح لنفس الفريق يُتخطى،
+                // وإنهاء بلا تفعيل مفتوح يُتخطى — نفس قاعدة الدعم/التكليف حرفيًا
+                if (type === 'activation' && open.some(o => o.event_type === 'activation' && canonicalTeamId(o.team_id) === teamId)) continue;
+                if (type === 'activation_end' && !open.some(o => o.event_type === 'activation')) continue;
             }
 
             const payload = { source: 'completion-person-events' };
@@ -689,7 +975,7 @@ class StaffingEventsService {
                 f = { entityId: employee, entityName: employee, teamId, open: [], lastEvent: null, closedCount: 0, corrections: 0 };
                 folded.push(f);
             }
-            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support'] };
+            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support'], activation_end: ['activation'] };
             const closes = CLOSES[type];
             if (closes) {
                 const idx = f.open.findIndex(o => closes.includes(o.event_type));
@@ -757,7 +1043,20 @@ class StaffingEventsService {
         const personInfo = {};
         for (const r of rosterRows) {
             // التطبيع المركزي: الأكواد الصريحة (O12C13/RRC1) لا تُطرد — تُفك لأساسها
-            if (!isWorkDayCode(r.shift_code, isNight)) continue;
+            if (!isWorkDayCode(r.shift_code, isNight)) {
+                // إصلاح «حضر × التفعيل»: الأكواد الصرفة D/N (ليست تشغيلية ملحقة)
+                // ذات تصنيف قاموسي لوردية المناوبة — كادر فعلي لفرق
+                // teams.operational_starts (سريع 1..4). نفس استثناء
+                // _personInfoByName («مرحلة بدايات الفرق») حرفًا؛ بغيره لا يدخل
+                // موظفو سريع المجدولون D/N بطاقة فريقهم إطلاقًا فلا يظهر
+                // المتأخر منهم في absentees ولا يُرسم له زر «حضر».
+                // الأكواد التشغيلية الملحقة تبقى مستبعدة هنا كما كانت
+                // (تُدار عبر التفعيل/الحوض)، وبلا تصنيف قاموسي يُستبعد كما كان.
+                if (OperationalCodes.isOperationalCode(r.shift_code)) continue;
+                const cls = STD.classifyDayCode(r.shift_code);
+                const sh = String((cls && cls.shift) || '');
+                if (!sh || sh.includes('ليل') !== isNight) continue;
+            }
             const info = { jobTitle: r.job_title || null, code: r.employee_code || null, phone: r.phone || null };
             (crewByTeamId[r.team_id] = crewByTeamId[r.team_id] || []).push({ name: r.name, ...info });
             if (!personInfo[r.name]) personInfo[r.name] = info;
@@ -778,6 +1077,22 @@ class StaffingEventsService {
             if (!t) continue;
             teamOpen[t] = f.open;
             if (f.lastEvent) teamLastEvent[t] = f.lastEvent;
+        }
+
+        // مرحلة الأوفرلاب 4 (التفعيل): خريطة الفريق ← تفعيلات مفتوحة
+        // (team_id = اسم الفريق القياسي، مُطبَّع عبر canonicalTeamId). التفعيل
+        // يربط موظف كود تشغيلي (O12-09/12/14 · RRA1-04/16) بفريق قائم فقط —
+        // لا ينشئ فريقًا ولا يغيّر أي تصنيف kind إطلاقًا (بقرار المالك:
+        // موظف RRA يبقى تدخلًا سريعًا التصنيف، والتفعيل ربط تشغيلي فحسب).
+        const activationByTeam = {};
+        for (const f of folded) {
+            if (!f.entityId) continue;
+            for (const o of f.open) {
+                if (o.event_type !== 'activation') continue;
+                const tn = canonicalTeamId(o.team_id);
+                if (!tn) continue;
+                (activationByTeam[tn] = activationByTeam[tn] || []).push({ entityId: f.entityId, event: o });
+            }
         }
 
         // المركبات: تعيين مفتوح + آخر حالة (خط المركبة كاملًا — ليس محصورًا بالمناوبة)
@@ -825,11 +1140,14 @@ class StaffingEventsService {
         for (const t of teamRows) {
             const required = t.requiredPersonnel || 2;
             const crew = crewByTeamId[t.id] || []; // SR-2: roster فقط — لا بديل
+            const activations = activationByTeam[t.name] || [];
             // مصدر الحقيقة = الفرق المطلوب تكميلها في هذا الشفت فقط:
             // فريق بلا كادر مجدول لهذه المناوبة ليس ضمن خطتها، فلا يدخل
             // الحالة ولا عدادات القوى (باقي X فريق/نسبة الإنجاز/شرط الاكتمال)
             // ولا سير العمل الرسمي — حتى لو كان نشطًا في جدول الفرق.
-            if (crew.length === 0) continue;
+            // مرحلة الأوفرلاب 4: استثناء وحيد — فريق بلا كادر لكن عليه تفعيل
+            // مفتوح يدخل الحالة (المفعَّلون طاقمه الفعلي لهذه المناوبة).
+            if (crew.length === 0 && activations.length === 0) continue;
             const crewNames = new Set(crew.map(c => c.name));
             const members = [];
             const absentees = [];
@@ -884,6 +1202,61 @@ class StaffingEventsService {
             activeCount += supporters.length;
             members.push(...supporters);
 
+            // مرحلة الأوفرلاب 4 (التفعيل): المفعَّلون لهذا الفريق (تفعيل مفتوح،
+            // وليسوا من طاقمه المجدول) — نفس نمط حقن الداعمين: يُحسبون في
+            // activeCount ويظهرون في members بدور «activation». لا يُنشأ فريق
+            // جديد ولا يُمس تصنيف kind لأي موظف (RRA يبقى تدخلًا سريعًا).
+            const seenActivation = new Set();
+            for (const a of activations) {
+                if (crewNames.has(a.entityId) || seenActivation.has(a.entityId)) continue;
+                seenActivation.add(a.entityId);
+                const pi = personInfo[a.entityId] || {};
+                const pl = payloadOf(a.event) || {};
+                // تمييز عرضي خالص (ملاحظة المالك — بلا أي تغيير منطقي): المفعَّل
+                // الذي له volunteer_support مفتوح بلا فريق هو «متطوع الأصل»
+                // (التطوع يبقى مفتوحًا طوال التفعيل) — وإلا فهو مفعَّل أوفرلاب.
+                // حقل إضافي فقط: role/state/activeCount وكل اشتقاق آخر كما هي.
+                const activationKind = (openByEntity[a.entityId] || [])
+                    .some(o => o.event_type === 'volunteer_support' && !canonicalTeamId(o.team_id))
+                    ? 'volunteer' : 'overlap';
+                // إصلاح «حضر × التفعيل»: المفعَّل المتأخر/الغائب (حدث late/absence
+                // مفتوح باسمه) يدخل absentees — زر «✋ حضر» في الواجهة مدفوع بهذه
+                // الحالة السيرفرية وحدها — ويُوسم عضوه بحالة الغياب/التأخير بدل
+                // «activation». التفعيل نفسه يبقى مفتوحًا (لا يُغلقه إلا
+                // activation_end)، ولا يُحسب ضمن النشطين حتى يحضر — تمامًا
+                // كعضو القاعدة المتأخر في حلقة الطاقم أعلاه.
+                const openAbs = (openByEntity[a.entityId] || []).find(o => o.event_type === 'absence' || o.event_type === 'late');
+                if (openAbs) {
+                    absentees.push({
+                        name: a.entityId,
+                        jobTitle: pi.jobTitle || pl.jobTitle || null,
+                        code: pi.code || pl.employeeNumber || null,
+                        phone: pi.phone || null,
+                        reason: openAbs.reason || null,
+                        since: openAbs.created_at, recordedBy: openAbs.actor_name || null,
+                        type: openAbs.event_type
+                    });
+                    members.push({
+                        name: a.entityId,
+                        jobTitle: pi.jobTitle || pl.jobTitle || null,
+                        code: pi.code || pl.employeeNumber || null,
+                        role: 'activation', state: openAbs.event_type,
+                        activationKind, // تمييز عرضي: متطوع/أوفرلاب — بلا أثر منطقي
+                        since: a.event.created_at, recordedBy: a.event.actor_name || null
+                    });
+                    continue;
+                }
+                members.push({
+                    name: a.entityId,
+                    jobTitle: pi.jobTitle || pl.jobTitle || null,
+                    code: pi.code || pl.employeeNumber || null,
+                    role: 'activation', state: 'activation',
+                    activationKind, // تمييز عرضي: متطوع/أوفرلاب — بلا أثر منطقي
+                    since: a.event.created_at, recordedBy: a.event.actor_name || null
+                });
+                activeCount++;
+            }
+
             // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): التشكيلة
             // النهائية الفعلية — من يُنهي المناوبة مع الفريق فعلًا بعد طيّ كل
             // الأحداث (الغياب/التأخير/الدعم/الاستبدال/التطوع): القاعدة النشطة
@@ -891,7 +1264,12 @@ class StaffingEventsService {
             // (خارجي/تطوعي/تكليف داخل). حقل مشتق هنا فقط (نفس دلالة activeCount
             // تمامًا — مصدر واحد بلا طيّ مكرر) وتسجيل الخروج يقرأه فلا يظهر
             // الغائب ويظهر البديل/المتطوع. additive: members يبقى كما هو.
-            const effectiveRoster = members.filter(m => m && (m.state === 'active' || m.role === 'support'));
+            // تثبيت صفة «متطوع» عبر السلسلة: المفعَّلون (state='activation' —
+            // الأوفرلاب والمتطوع المفعَّلان الحاضران) جزء من التشكيلة الفعلية
+            // لمّا يُنهون المناوبة مع الفريق فعلًا؛ المفعَّل المتأخر/الغائب
+            // (state='late'/'absence') يبقى مستبعدًا حتى يحضر. يحمل activationKind
+            // تلقائيًا (على كائن العضو نفسه) — لا أثر على activeCount ولا عدادات القوى.
+            const effectiveRoster = members.filter(m => m && (m.state === 'active' || m.role === 'support' || m.state === 'activation'));
 
             const vehId = vehByTeamId[String(t.id)] || null;
             const vehSt = vehId ? (vehStatus[vehId] || null) : null;
@@ -1004,7 +1382,19 @@ class StaffingEventsService {
                  WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]
             );
         } catch (_) { scheduled = []; }
-        scheduled = scheduled.filter(r => isWorkDayCode(r.shift_code, isNight)); // التطبيع المركزي — لا مطابقة حرفية
+        // رمز اليوم لكل اسم (قبل الفلترة — يشمل الإجازات/WO) لوسم عناصر الحوض
+        const rosterCodeByName = {};
+        for (const r of scheduled) if (!(r.name in rosterCodeByName)) rosterCodeByName[r.name] = r.shift_code || null;
+        scheduled = scheduled.filter(r => {
+            if (isWorkDayCode(r.shift_code, isNight)) return true; // التطبيع المركزي — لا مطابقة حرفية
+            // مرحلة الأوفرلاب 4 (التفعيل): الأكواد التشغيلية الملحقة (O12-09/
+            // O12-12/O12-14/RRA1-04/RRA1-16) تُقبل في وردية تصنيفها القاموسي —
+            // نفس استثناء _personInfoByName حرفيًا، بلا تغيير لبقية الأكواد.
+            if (!OperationalCodes.isOperationalCode(r.shift_code)) return false;
+            const cls = STD.classifyDayCode(r.shift_code);
+            const clsNight = String((cls && cls.shift) || '').includes('ليل');
+            return clsNight === isNight;
+        });
 
         const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
         const folded = foldEvents(events, DOMAIN);
@@ -1016,7 +1406,8 @@ class StaffingEventsService {
         const busy = new Set();
         for (const tName of Object.keys(derived.teams)) {
             for (const m of derived.teams[tName].members) {
-                if (m.state === 'active' || m.state === 'external_support' || m.state === 'assignment') busy.add(m.name);
+                // مرحلة الأوفرلاب 4: «activation» حالة انشغال — المفعَّل يغادر الحوض
+                if (m.state === 'active' || m.state === 'external_support' || m.state === 'assignment' || m.state === 'activation') busy.add(m.name);
             }
         }
 
@@ -1043,7 +1434,372 @@ class StaffingEventsService {
                 kind: kind
             });
         }
+        // المرحلة ب (تصحيح المالك — مسار الـOverlap): المتطوعون بلا فريق
+        // (volunteer_support مفتوح بلا teamId) عناصر حوض بصفة «متطوع —
+        // غير مفعّل» مع رمز اليوم إن وجد. الإضافة للحوض فقط؛ الإسناد
+        // للفرقة عبر التفعيل (activateTeam). من عليه تفعيل مفتوح داخل
+        // busy أصلًا (عضو activation في فريق مشتق) فيختفي تلقائيًا،
+        // ويعود بعد activation_end لأن تطوعه يبقى مفتوحًا. الحقول إضافية
+        // فقط (volunteer:true) — لا يتغير أي سلوك قائم للأحداث بفريق.
+        for (const f of folded) {
+            if (!f.entityId) continue;
+            const openVol = (f.open || []).filter(o => o.event_type === 'volunteer_support' && !canonicalTeamId(o.team_id));
+            if (!openVol.length) continue;
+            if (busy.has(f.entityId)) continue; // مفعَّل/منشغل — ليس في الحوض
+            if (supporters.some(s => s.name === f.entityId)) continue; // حارس ازدواج
+            const pl = parsePayload(openVol[openVol.length - 1].payload);
+            supporters.push({
+                name: f.entityId,
+                employeeCode: pl.employeeNumber ? String(pl.employeeNumber) : null,
+                jobTitle: pl.jobTitle || null,
+                team: null,
+                shiftCode: rosterCodeByName[f.entityId] || null, // رمز اليوم إن وجد (V/WO/…)
+                sourceUnit: null,
+                kind: null,
+                volunteer: true // وسم «متطوع — غير مفعّل» + أهلية زر «تفعيل فرقة»
+            });
+        }
         return { shiftId, supporters };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // مرحلة الأوفرلاب 4 (التفعيل) — Completion-Screen Activation
+    // ربط موظف كود تشغيلي ملحق (O12-09/12/14 · RRA1-04/16) بفريق قائم نشط.
+    // نفس نمط دعم المركبات (vehicle-events-service): التحقق الكامل قبل أي
+    // كتابة، الختم سيرفري عبر appendEvent (المناوبة/الفاعل/الوقت من السيرفر)،
+    // والإغلاق دلالي (activation_end يُغلق activation لنفس الكيان).
+    // التفعيل ربط تشغيلي فحسب: لا ينشئ فريقًا ولا يحوّل فريقًا إلى عادي
+    // ولا يغيّر تصنيف kind لموظفي التدخل السريع (RRA) إطلاقًا.
+    // ═══════════════════════════════════════════════════════════
+
+    /** فريق قائم ونشط باسمه القياسي — 404 إن لم يوجد، 400 إن كان معطّلًا. */
+    async _requireActiveTeamByName(teamName) {
+        const name = canonicalTeamId(teamName);
+        const team = await this.storage.get(
+            'SELECT id, name, center, is_active FROM teams WHERE name = ?', [name]);
+        if (!team) {
+            const err = new Error('الفريق غير موجود: ' + name);
+            err.statusCode = 404;
+            throw err;
+        }
+        if (!team.is_active) {
+            const err = new Error('الفريق غير نشط حاليًا: ' + name);
+            err.statusCode = 400;
+            throw err;
+        }
+        return team;
+    }
+
+    /** صف الكادر المجدول للموظف بتاريخ معطى (الرمز + هوية الإثراء) — null إن لم يكن مجدولًا. */
+    async _rosterRowFor(shiftDate, employeeName) {
+        const isoDate = toIsoDate(shiftDate);
+        try {
+            return await this.storage.get(
+                `SELECT sr.shift_code, e.employee_code, e.job_title FROM shift_roster sr
+                 JOIN employees e ON e.id = sr.employee_id
+                 WHERE sr.shift_date = ? AND e.name = ? AND e.is_active = 1`, [isoDate, employeeName]) || null;
+        } catch (_) { return null; }
+    }
+
+    /** التفعيل المفتوح حاليًا لموظف في مناوبة (طيّ دلالي) أو null. */
+    async _openActivation(shiftId, employeeName) {
+        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const folded = foldEvents(events, DOMAIN);
+        const f = folded.find(x => x.entityId === employeeName);
+        if (!f) return null;
+        const opens = f.open.filter(o => o.event_type === 'activation');
+        return opens.length ? opens[opens.length - 1] : null;
+    }
+
+    /**
+     * تفعيل موظف كود تشغيلي على فريق قائم. الشروط (تُتحقق قبل أي كتابة):
+     *  - مناوبة نشطة (الختم سيرفري).
+     *  - الفريق موجود في teams (404) ونشط (400).
+     *  - الموظف مجدول اليوم في shift_roster برمز دوام كود تشغيلي ملحق (400).
+     *  - تفعيل مكرر مفتوح لنفس الفريق ⇒ تخطٍّ idempotent بلا حدث ثانٍ.
+     *  - تفعيل مفتوح على فريق آخر ⇒ 400 (أنهِ الحالي أولًا — نمط دعم المركبات).
+     */
+    async activateTeam({ employeeName, teamName, note }, actor) {
+        if (!employeeName || !teamName) {
+            const err = new Error('بيانات ناقصة: الموظف والفريق إلزاميان');
+            err.statusCode = 400;
+            throw err;
+        }
+        const shift = await this.engine.shifts.getActiveShift();
+        if (!shift) {
+            const err = new Error('لا توجد مناوبة نشطة - ابدأ مناوبة أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        const team = await this._requireActiveTeamByName(teamName);
+        const rosterRow = await this._rosterRowFor(shift.shift_date, employeeName);
+        const shiftCode = rosterRow ? (rosterRow.shift_code || null) : null;
+        // المرحلة ب (تصحيح المالك): صاحب تطوع مفتوح بلا فريق («في الحوض»)
+        // يُقبل للتفعيل تمامًا كصاحب الكود التشغيلي — نفس المسار ونفس
+        // الفريق (مجدولة اليوم أو غير مجدولة طالما موجودة ونشطة)، وبقية
+        // التحققات أدناه (منع الازدواج/idempotency) كما هي بلا تغيير.
+        const openVolunteer = await this._openTeamlessVolunteer(shift.id, employeeName);
+        if (!openVolunteer) {
+            if (shiftCode == null) {
+                const err = new Error('الموظف غير مجدول في مناوبة اليوم: ' + employeeName);
+                err.statusCode = 400;
+                throw err;
+            }
+            if (!OperationalCodes.isOperationalCode(shiftCode)) {
+                const err = new Error('التفعيل لموظفي الأكواد التشغيلية الملحقة فقط (رمزه الحالي: ' + shiftCode + ')');
+                err.statusCode = 400;
+                throw err;
+            }
+        }
+        const open = await this._openActivation(shift.id, employeeName);
+        if (open && canonicalTeamId(open.team_id) === team.name) {
+            return { success: true, appended: 0, skipped: 'already-activated', shiftId: shift.id, employeeName, teamName: team.name };
+        }
+        if (open) {
+            const err = new Error('الموظف مفعَّل على فريق آخر حاليًا — أنهِ التفعيل الحالي أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        // هوية الإثراء تُختم في الـ payload وقت الكتابة (نفس نمط أحداث الدعم:
+        // jobTitle/employeeNumber) حتى يجدها اشتقاق الأعضاء حتى لو كان الموظف
+        // بلا فريق مجدول (خارج خريطة personInfo). المرحلة ب: للمتطوع بلا صف
+        // كادر تُؤخذ الهوية من payload حدث تطوعه (خُتمت من employees عند الإضافة).
+        const volPayload = openVolunteer ? parsePayload(openVolunteer.payload) : {};
+        const payload = { source: 'overlap-activation', shiftCode };
+        const enrichJobTitle = (rosterRow && rosterRow.job_title) || volPayload.jobTitle || null;
+        const enrichNumber = (rosterRow && rosterRow.employee_code) || volPayload.employeeNumber || null;
+        if (enrichJobTitle) payload.jobTitle = enrichJobTitle;
+        if (enrichNumber) payload.employeeNumber = String(enrichNumber);
+        const result = await this.appendEvent({
+            eventType: 'activation',
+            entityId: employeeName, entityName: employeeName,
+            teamId: team.name, center: team.center || null,
+            note: note || null,
+            payload
+        }, actor);
+        return { success: true, appended: 1, eventId: result.eventId, shiftId: result.shiftId, employeeName, teamName: team.name };
+    }
+
+    /** إنهاء تفعيل موظف (إغلاق دلالي). بلا تفعيل مفتوح ⇒ 409. */
+    async endActivation({ employeeName, note }, actor) {
+        if (!employeeName) {
+            const err = new Error('بيانات ناقصة: الموظف إلزامي');
+            err.statusCode = 400;
+            throw err;
+        }
+        const shift = await this.engine.shifts.getActiveShift();
+        if (!shift) {
+            const err = new Error('لا توجد مناوبة نشطة - ابدأ مناوبة أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        const open = await this._openActivation(shift.id, employeeName);
+        if (!open) {
+            const err = new Error('لا يوجد تفعيل مفتوح لهذا الموظف');
+            err.statusCode = 409;
+            throw err;
+        }
+        const result = await this.appendEvent({
+            eventType: 'activation_end',
+            entityId: employeeName, entityName: employeeName,
+            teamId: open.team_id, center: open.center || null,
+            note: note || null,
+            payload: { source: 'overlap-activation' }
+        }, actor);
+        return { success: true, appended: 1, eventId: result.eventId, shiftId: result.shiftId, employeeName, teamName: canonicalTeamId(open.team_id) };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // المرحلة ب: إضافة متطوع من شاشة التكميل — Completion-Screen Volunteer
+    // مسار الـOverlap حرفيًا (تصحيح المالك النهائي): الإضافة = دخول «الدعم
+    // المتاح» فقط (volunteer_support مفتوح بلا فريق — حالة «متطوع — غير
+    // مفعّل»)، والإسناد للفرقة يتم لاحقًا عبر التفعيل (activateTeam نفسه)،
+    // وإنهاء التفعيل يعيده للحوض. جدوله الأصلي لا يُمسّ إطلاقًا.
+    // قاعدة الاختيار السيرفرية الوحيدة (بقرار المالك):
+    //   النشطون في النظام − المجدولون للعمل الفعلي اليوم = مرشحو التطوع.
+    // «مجدول للعمل الفعلي» = نفس مصنّف اشتقاق الطاقم الثلاثي المعتمد في
+    // _personInfoByName حرفيًا (isWorkDayCode ← تشغيلي في ورديته القاموسية
+    // ← D/N الصرفة لوردية المناوبة) — يُستخدم هنا فقط، بلا إعادة هيكلة
+    // للمصنّف القائم. OFF_CODES ليست قاعدة اختيار إطلاقًا: V/VC/E/EV/S
+    // (إجازات بلا وردية قاموسية) وWO (دوام رسمي بلا وردية) والراحة وبلا
+    // سجل كلها مرشحة. صفر كتابة على shift_roster: التطوع حدث تشغيلي فقط.
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * هل الرمز «عمل فعلي» لهذه المناوبة؟ — نفس منطق القبول الثلاثي في
+     * _personInfoByName خطوة بخطوة (لا يُستدعى إلا من منطق المتطوع):
+     *  ① isWorkDayCode (تطبيع مركزي: قوائم الوردية + فك رمزي ميداني)
+     *  ② كود تشغيلي ملحق في وردية تصنيفه القاموسي
+     *  ③ كود صنفه القاموس لوردية المناوبة (D/N الصرفة)
+     * كل ما عداه (إجازات/راحة/WO/مكتب بلا وردية/بلا رمز) ليس عملًا فعليًا.
+     */
+    _isScheduledForActualWork(shiftCode, isNight) {
+        if (!shiftCode) return false;
+        if (isWorkDayCode(shiftCode, isNight)) return true;
+        if (OperationalCodes.isOperationalCode(shiftCode)) {
+            const cls = STD.classifyDayCode(shiftCode);
+            const clsNight = String((cls && cls.shift) || '').includes('ليل');
+            return clsNight === isNight;
+        }
+        const cls = STD.classifyDayCode(shiftCode);
+        const sh = String((cls && cls.shift) || '');
+        return !!sh && (sh.includes('ليل') === isNight);
+    }
+
+    /**
+     * مرشحو التطوع لمناوبة: بحث LIKE (اسم/كود وظيفي) في الموظفين النشطين،
+     * ثم استبعاد سيرفري: من هو مجدول للعمل الفعلي اليوم (المصنّف الثلاثي)،
+     * ومن عليه تطوع/دعم/تفعيل/تكليف مفتوح في هذه المناوبة (طيّ الأحداث).
+     * dayCode إرشادي للعرض فقط (رمز الكادر المجدول أو null — بلا سجل).
+     */
+    async getVolunteerCandidates(shiftId, q) {
+        if (!shiftId) return { shiftId: shiftId || null, candidates: [] };
+        const shift = await this.storage.getShiftById(shiftId);
+        if (!shift) return { shiftId, candidates: [] };
+        const isNight = String(shift.shift_type || '').includes('ليل');
+        const isoDate = toIsoDate(shift.shift_date);
+        const query = String(q || '').trim();
+        if (query.length > 100) {
+            const err = new Error('استعلام طويل');
+            err.statusCode = 400;
+            throw err;
+        }
+        const like = '%' + query + '%';
+        let rows = [];
+        try {
+            rows = await this.storage.all(
+                `SELECT e.employee_code, e.name, e.job_title
+                 FROM employees e
+                 WHERE e.is_active = 1 AND (? = '' OR e.name LIKE ? OR e.employee_code LIKE ?)
+                 ORDER BY e.name LIMIT 40`, [query, like, like]);
+        } catch (_) { rows = []; }
+        // رموز كادر تاريخ المناوبة (استعلام واحد — نفس نمط _rosterShiftCodeByName)
+        let rosterRows = [];
+        try {
+            rosterRows = await this.storage.all(
+                `SELECT e.name, sr.shift_code FROM shift_roster sr
+                 JOIN employees e ON e.id = sr.employee_id
+                 WHERE sr.shift_date = ? AND e.is_active = 1`, [isoDate]);
+        } catch (_) { rosterRows = []; }
+        const codeByName = {};
+        for (const r of rosterRows) if (!(r.name in codeByName)) codeByName[r.name] = r.shift_code || null;
+        // مشغّلات مفتوحة (تطوع/دعم/تفعيل/تكليف) تُخرج صاحبها من المرشحين
+        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const folded = foldEvents(events, DOMAIN);
+        const OPEN_TRIGGERS = ['volunteer_support', 'external_support', 'activation', 'assignment'];
+        const busy = new Set();
+        for (const f of folded) {
+            if (!f.entityId) continue;
+            if ((f.open || []).some(o => OPEN_TRIGGERS.includes(o.event_type))) busy.add(f.entityId);
+        }
+        const candidates = [];
+        for (const r of rows) {
+            if (busy.has(r.name)) continue;
+            const dayCode = (r.name in codeByName) ? codeByName[r.name] : null;
+            if (this._isScheduledForActualWork(dayCode, isNight)) continue;
+            candidates.push({
+                name: r.name,
+                employeeCode: r.employee_code || null,
+                jobTitle: r.job_title || null,
+                dayCode
+            });
+            if (candidates.length >= 15) break;
+        }
+        return { shiftId, candidates };
+    }
+
+    /** التطوع المفتوح بلا فريق («في الحوض») لموظف في مناوبة (طيّ دلالي) أو null. */
+    async _openTeamlessVolunteer(shiftId, employeeName) {
+        const events = await this.storage.getOperationalEventsByShift(shiftId, DOMAIN);
+        const folded = foldEvents(events, DOMAIN);
+        const f = folded.find(x => x.entityId === employeeName);
+        if (!f) return null;
+        const opens = f.open.filter(o => o.event_type === 'volunteer_support' && !canonicalTeamId(o.team_id));
+        return opens.length ? opens[opens.length - 1] : null;
+    }
+
+    /**
+     * إضافة متطوع إلى «الدعم المتاح» من شاشة التكميل — بلا فريق (تصحيح
+     * المالك: الإسناد للفرقة عبر التفعيل فقط، نفس مسار الـOverlap). الشروط
+     * (تُتحقق قبل أي كتابة):
+     *  - مناوبة نشطة (الختم سيرفري عبر appendEvent).
+     *  - الموظف موجود ونشط في employees (404) — بالكود الوظيفي أو الاسم.
+     *  - غير مجدول للعمل الفعلي اليوم وإلا 400 (نفس قاعدة المرشحين).
+     *  - تطوع مكرر مفتوح (بفريق أو بلا فريق) ⇒ تخطٍّ idempotent بلا حدث ثانٍ.
+     *  - مشغّل مفتوح آخر (دعم/تفعيل/تكليف) ⇒ 400 (أنهِ الحالي أولًا).
+     * الحدث volunteer_support بلا teamId: يظهر في حوض الدعم المتاح بصفة
+     * «متطوع — غير مفعّل» ويُغلق بـ support_end القائم، ولا يُكتب شيء على
+     * shift_roster إطلاقًا. التوافق: volunteer_support بفريق (الأحداث
+     * القائمة) يبقى يُشتق عضو support في فريقه كما هو — لا يُكسر.
+     */
+    async addVolunteer({ employeeCode, employeeName, note }, actor) {
+        if (!employeeCode && !employeeName) {
+            const err = new Error('بيانات ناقصة: الموظف (كود أو اسم) إلزامي');
+            err.statusCode = 400;
+            throw err;
+        }
+        const shift = await this.engine.shifts.getActiveShift();
+        if (!shift) {
+            const err = new Error('لا توجد مناوبة نشطة - ابدأ مناوبة أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        // حلّ هوية الموظف من employees (SSOT) — الكود أولًا ثم الاسم
+        let emp = null;
+        try {
+            if (employeeCode) {
+                emp = await this.storage.get(
+                    'SELECT name, employee_code, job_title FROM employees WHERE employee_code = ? AND is_active = 1',
+                    [String(employeeCode).trim()]);
+            }
+            if (!emp && employeeName) {
+                emp = await this.storage.get(
+                    'SELECT name, employee_code, job_title FROM employees WHERE name = ? AND is_active = 1',
+                    [String(employeeName).trim()]);
+            }
+        } catch (_) { emp = null; }
+        if (!emp) {
+            const err = new Error('الموظف غير موجود أو غير نشط: ' + (employeeCode || employeeName));
+            err.statusCode = 404;
+            throw err;
+        }
+        const name = emp.name;
+        // الحاجز التشغيلي: مجدول للعمل الفعلي اليوم ⇒ مرفوض (نفس مصنّف الطاقم)
+        const rosterRow = await this._rosterRowFor(shift.shift_date, name);
+        const shiftCode = rosterRow ? (rosterRow.shift_code || null) : null;
+        const isNight = String(shift.shift_type || '').includes('ليل');
+        if (this._isScheduledForActualWork(shiftCode, isNight)) {
+            const err = new Error('الموظف مجدول للعمل الفعلي في مناوبة اليوم (رمزه: ' + shiftCode + ') — لا يُقبل كمتطوع');
+            err.statusCode = 400;
+            throw err;
+        }
+        // المشغّلات المفتوحة باسمه في هذه المناوبة (طيّ دلالي واحد)
+        const events = await this.storage.getOperationalEventsByShift(shift.id, DOMAIN);
+        const folded = foldEvents(events, DOMAIN);
+        const f = folded.find(x => x.entityId === name);
+        const open = f ? (f.open || []) : [];
+        if (open.some(o => o.event_type === 'volunteer_support')) {
+            return { success: true, appended: 0, skipped: 'already-volunteering', shiftId: shift.id, employeeName: name };
+        }
+        if (open.some(o => ['external_support', 'activation', 'assignment'].includes(o.event_type))) {
+            const err = new Error('للموظف دعم/تفعيل/تكليف مفتوح حاليًا — أنهِ الحالي أولاً');
+            err.statusCode = 400;
+            throw err;
+        }
+        // هوية الإثراء تُختم في الـ payload (نفس نمط أحداث الدعم) حتى يجدها
+        // الحوض والتفعيل حتى لو كان المتطوع بلا صف كادر لهذه المناوبة
+        const payload = { source: 'completion-volunteer', coverageType: 'volunteer' };
+        if (emp.job_title) payload.jobTitle = emp.job_title;
+        if (emp.employee_code) payload.employeeNumber = String(emp.employee_code);
+        const result = await this.appendEvent({
+            eventType: 'volunteer_support',
+            entityId: name, entityName: name,
+            teamId: null, center: null, // «في الحوض» — بلا فريق حتى يُفعَّل
+            note: note || null,
+            readinessBasis: 'volunteer_support',
+            payload
+        }, actor);
+        return { success: true, appended: 1, eventId: result.eventId, shiftId: result.shiftId, employeeName: name };
     }
 }
 

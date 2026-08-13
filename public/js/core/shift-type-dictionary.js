@@ -12,9 +12,26 @@
 }(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
 
+    // ── محلل الأكواد التشغيلية الملحقة (مرحلة الأوفرلاب 1 — أسبقية المحلل) ──
+    // في Node يُطلَب مباشرة (نفس المجلد)، وفي المتصفح يُتوقع window.OperationalCodes
+    // عبر وسم script يسبق هذا الملف. غيابه لا يكسر شيئًا إطلاقًا — يبقى السلوك
+    // الحالي (القوائم الصلبة) كما هو، ولا يُرمى أي خطأ.
+    var OperationalCodes = null;
+    try {
+        if (typeof require === 'function' && typeof module !== 'undefined' && module.exports) {
+            OperationalCodes = require('./operational-codes.js');
+        }
+    } catch (_) { OperationalCodes = null; }
+    if (!OperationalCodes) {
+        try {
+            var _g = (typeof globalThis !== 'undefined') ? globalThis : null;
+            if (_g && _g.OperationalCodes) OperationalCodes = _g.OperationalCodes;
+        } catch (_) { /* تجاهل — السقوط للسلوك الحالي */ }
+    }
+
     // ── فئات المناوبة التسع (المصدر الوحيد للفلاتر والإحصائيات والرسوم) ──
-    // الدلالات الرسمية (تعريف المالك): S إجازة مرضية · E إجازة اختبارات · EV إجازة استثنائية
-    // VC إجازة تعويضية · C دورة تدريبية · CP ساعات تكميلية · M مهمة رسمية · ME مكلف
+    // الدلالات الرسمية (تعريف المالك 2026-08-13): S مرضية · E إجازة اختبارات · EV إجازة استثنائية
+    // VC إجازة اضطرارية · C دورة تدريبية · CP ساعات تكميلية · M مهمة رسمية · ME مكلف
     // WO دوام رسمي · XD إضافي صباحي · XN إضافي مسائي
     var GROUPS = {
         morning:  ['D', 'D12', 'D10', 'D11', 'D8', 'D6', 'M', 'CPD', 'CP8', 'CP24', 'XD', 'CP'],
@@ -36,7 +53,7 @@
     var STATUS = { morning: 'دوام', night: 'دوام', night8: 'دوام', overlap: 'دوام', office: 'دوام', mission: 'دوام', vacation: 'إجازة', rest: 'راحة', training: 'تدريب', off: 'OFF' };
 
     // فئات فلتر «نوع المناوبة» — بالترتيب المعتمد
-    var FILTER_CATEGORIES = ['صباحية', 'ليلية', 'أوفرلاب', 'دوام رسمي', 'مهمة رسمية', 'راحة', 'إجازة', 'إجازة تعويضية', 'تدريب'];
+    var FILTER_CATEGORIES = ['صباحية', 'ليلية', 'أوفرلاب', 'دوام رسمي', 'مهمة رسمية', 'راحة', 'إجازة', 'إجازة اضطرارية', 'تدريب'];
     var FILTERCAT = { morning: 'صباحية', night: 'ليلية', night8: 'ليلية', overlap: 'أوفرلاب', office: 'دوام رسمي', mission: 'مهمة رسمية', rest: 'راحة', vacation: 'إجازة', training: 'تدريب', off: 'OFF' };
 
     // ترتيب وألوان مخطط التوزيع
@@ -81,11 +98,28 @@
     function classifyDayCode(code) {
         var c = normalizeDayCode(code);
         if (!c) return { group: 'rest', status: STATUS.rest, shift: '', filterCat: FILTERCAT.rest, label: LABELS.rest };
+        // أسبقية المحلل (مرحلة الأوفرلاب 1): الأكواد التشغيلية الملحقة (O12-09/RRA1-D-04…)
+        // تُصنف أوفرلاب. الوردية: الصيغة الجديدة RRA*-<D|N>-* تحمل حرف وردية صريحًا
+        // (D⇒صباحية · N⇒ليلية — المصدر الوحيد للحقيقة، ممنوع اشتقاقه من الساعة)؛
+        // الصيغة القديمة RRA1-04/16 وأكواد O تبقى على اشتقاق الساعة بحدود النظام
+        // نفسها (صباحية [05:00–17:00) وإلا ليلية — RRA1-04 ⇒ ليلية، RRA1-16 ⇒ صباحية).
+        // الأكواد القديمة لا يمسها هذا الفرع إطلاقًا (لا تطابق صيغة المحلل).
+        if (OperationalCodes && OperationalCodes.isOperationalCode(c)) {
+            var _parsed = OperationalCodes.parseOperationalCode(c);
+            var _opShift;
+            if (_parsed.explicitShift) {
+                _opShift = _parsed.shift === 'D' ? 'صباحية' : 'ليلية';
+            } else {
+                var _startH = parseInt(_parsed.start.slice(0, 2), 10);
+                _opShift = (_startH >= 5 && _startH < 17) ? 'صباحية' : 'ليلية';
+            }
+            return { group: 'overlap', status: STATUS.overlap, shift: _opShift, filterCat: FILTERCAT.overlap, label: LABELS.overlap };
+        }
         for (var g in GROUPS) {
             if (GROUPS[g].indexOf(c) !== -1) {
                 // القاموس الرسمي: الأوفرلاب جزء من المناوبة الليلية — الاستثناء OvD نهاري
                 var sh = (g === 'morning' || c === 'OVD') ? 'صباحية' : (g === 'night' || g === 'night8' || g === 'overlap') ? 'ليلية' : '';
-                var fc = (c === 'VC') ? 'إجازة تعويضية' : FILTERCAT[g];
+                var fc = (c === 'VC') ? 'إجازة اضطرارية' : FILTERCAT[g];
                 return { group: g, status: STATUS[g], shift: sh, filterCat: fc, label: LABELS[g] };
             }
         }

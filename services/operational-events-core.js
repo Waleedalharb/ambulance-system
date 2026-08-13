@@ -14,6 +14,7 @@ const DOMAIN_REGISTRY = {
         eventTypes: [
             'absence', 'late', 'arrival', 'exit', 'return',
             'assignment', 'overlap', 'external_support', 'volunteer_support', 'support_end',
+            'activation', 'activation_end',
             'ready', 'missing', 'offline', 'note', 'correction'
         ],
         // حدث الإغلاق ← أنواع الفتح التي يغلقها (لنفس entity_id)
@@ -21,6 +22,8 @@ const DOMAIN_REGISTRY = {
             arrival: ['absence', 'late'],
             return: ['exit'],
             support_end: ['external_support', 'volunteer_support'],
+            // مرحلة الأوفرلاب 4 (التفعيل): إنهاء التفعيل يُغلق دلاليًا التفعيل المفتوح
+            activation_end: ['activation'],
             // W1-B: عودة الفريق «جاهزًا» تُغلق دلاليًا نقصه/خروجه من الخدمة
             ready: ['missing', 'offline']
         },

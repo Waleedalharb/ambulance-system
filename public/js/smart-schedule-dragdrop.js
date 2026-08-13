@@ -225,6 +225,7 @@
                     if (typeof showToast === 'function') showToast('تم الاستبدال بنجاح', 'success');
                     // Log audit for both sides
                     logAuditSwap(source, target);
+                    if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); // Phase 2
                 } else {
                     if (typeof showToast === 'function') showToast('فشل في الاستبدال: ' + (data.error || ''), 'error');
                 }
@@ -275,6 +276,7 @@
             }).then(function(r) { return r.json(); }).then(function(data) {
                 if (data.success) {
                     if (typeof showToast === 'function') showToast('تم النقل بنجاح', 'success');
+                    if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); // Phase 2
                 } else {
                     if (typeof showToast === 'function') showToast('فشل في النقل: ' + (data.error || ''), 'error');
                 }

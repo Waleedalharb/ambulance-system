@@ -94,6 +94,12 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .pm .pm-phone a { color:var(--blue); text-decoration:none; font-weight:700; }
 .pm .pm-phone a:hover { text-decoration:underline; }
 .pm .pm-phone i { font-size:0.58rem; margin-inline-end:2px; }
+/* إصلاح «حضر × التفعيل»: شريط إجراءات ثانوي منفصل أسفل بطاقة العضو المفعَّل —
+   «إنهاء التفعيل» إجراء تشغيلي ثانوي بعيد بصريًا عن زر «حضر» (كتلة miss-info) */
+.pm .pm-secondary-actions { margin-top:5px; padding-top:4px; border-top:1px dashed var(--border); text-align:left; }
+.pm .pm-secondary-actions .btn-end-cover { font-size:0.58rem; padding:2px 7px; border-radius:6px; border:1px solid var(--red); cursor:pointer; font-weight:700; font-family:inherit; background:transparent; color:var(--red); opacity:0.85; }
+.pm .pm-secondary-actions .btn-end-cover:hover { background:var(--red); color:#fff; opacity:1; }
+.pm .pm-state-late { color:#FBBF24; font-weight:800; }
 .cover-phone { color:var(--blue); text-decoration:none; font-weight:700; direction:ltr; unicode-bidi:embed; }
 .btn-cover { width:100%; margin-top:6px; padding:7px; border:1px dashed var(--border); border-radius:10px; background:transparent; color:var(--muted); font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
 .btn-cover:hover { border-color:var(--blue); color:var(--blue); }
@@ -108,6 +114,10 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .support-card .sp-meta { font-size:0.66rem; color:var(--muted); margin-top:2px; }
 .support-card .btn-support { width:100%; margin-top:8px; padding:7px; border:none; border-radius:10px; background:var(--blue); color:#fff; font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
 .support-card .btn-support:hover { filter:brightness(0.92); }
+/* مرحلة الأوفرلاب 4 (التفعيل): شارة «غير مفعّل» + زر التفعيل لأصحاب الأكواد التشغيلية */
+.support-card .op-badge { display:inline-block; background:var(--yellow-light); color:var(--yellow); border:1px solid var(--yellow); border-radius:8px; padding:2px 8px; font-size:0.64rem; font-weight:800; }
+.support-card .btn-activate { width:100%; margin-top:8px; padding:7px; border:none; border-radius:10px; background:var(--gold); color:#0A1220; font-weight:700; font-size:0.72rem; cursor:pointer; font-family:inherit; }
+.support-card .btn-activate:hover { filter:brightness(0.92); }
 .support-person { background:var(--gray-light); border-radius:10px; padding:8px 10px; font-size:0.75rem; line-height:1.8; margin-bottom:4px; }
 
 /* بند 15: سجل التأخير (بدأ/حضر/المدة) — عرض فقط من اشتقاق الخادم */
@@ -311,6 +321,7 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 <script src="js/core/core-toast.js"></script>
 <script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
+<script src="js/core/operational-codes.js"></script>
 <script>
 (function() {
     var token = AuthCore.getToken();
@@ -499,6 +510,42 @@ function navigateToPage(url) {
     </div>
 </div>
 
+<!-- مرحلة الأوفرلاب 4 (التفعيل): تفعيل موظف كود تشغيلي على فريق قائم —
+     الفريق يُختار من قائمة /api/teams (فرق نشطة: الاسم + المركز) فقط.
+     لا إدخال حر إطلاقًا في هذه النافذة. -->
+<div class="modal-overlay" id="activationModal">
+    <div class="modal-box">
+        <h3 id="activationTitle">تفعيل فرقة</h3>
+        <div class="support-person" id="activationPersonInfo"></div>
+        <label for="activationTeam"><i class="fas fa-users"></i> الفريق</label>
+        <select id="activationTeam"></select>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmActivation()"><i class="fas fa-check"></i> تأكيد التفعيل</button>
+            <button class="mm-cancel" onclick="closeActivationModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- المرحلة ب (التطوع): إضافة متطوع إلى «الدعم المتاح» — مسار الـOverlap
+     حرفيًا (تصحيح المالك): الإضافة = دخول الحوض فقط (بلا فريق)، والإسناد
+     للفرقة يتم من الحوض عبر زر «تفعيل فرقة» القائم (openActivationModal).
+     المرشح يُبحث عنه ويُختار من نتائج /api/staffing/volunteer-candidates
+     حصرًا (قاعدة سيرفرية: النشطون − المجدولون للعمل الفعلي اليوم − من
+     عليه مشغّل مفتوح). لا إدخال حر للاسم إطلاقًا — حقل البحث مرشِّح فقط. -->
+<div class="modal-overlay" id="volunteerModal">
+    <div class="modal-box">
+        <h3 id="volunteerTitle">إضافة متطوع — إلى الدعم المتاح</h3>
+        <label for="volunteerSearch"><i class="fas fa-search"></i> بحث عن متطوع (الاسم أو الكود الوظيفي)</label>
+        <input id="volunteerSearch" placeholder="اكتب للبحث..." autocomplete="off" oninput="volunteerSearchInput()">
+        <div id="volunteerResults" style="max-height:180px;overflow-y:auto;margin:6px 0"></div>
+        <div class="support-person" id="volunteerPersonInfo" style="display:none"></div>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmVolunteer()"><i class="fas fa-check"></i> إضافة إلى الدعم المتاح</button>
+            <button class="mm-cancel" onclick="closeVolunteerModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
 <!-- سؤال قرار الحالة بعد تسجيل نقص (بند 9) — النظام لا يفترض قرارًا نيابة عن المشرف -->
 <div class="modal-overlay" id="decisionModal">
     <div class="modal-box">
@@ -595,7 +642,7 @@ var STATUS_LABELS = { ready: '✅ جاهزة', missing: '⚠️ ناقصة', off
 var MISSING_REASONS = ['غياب', 'تأخير', 'تكليف', 'إجازة'];
 var MISSING_REASON_EVENT = { 'غياب': 'absence', 'تأخير': 'late', 'تكليف': 'absence', 'إجازة': 'absence' };
 
-var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم' };
+var W1D_EVENT_LABELS = { absence: 'غياب', late: 'تأخير', arrival: 'حضر', exit: 'خروج', return: 'عودة', ready: 'جاهز', missing: 'ناقص', offline: 'خارج الخدمة', correction: 'تصحيح', note: 'ملاحظة', assignment: 'تكليف', overlap: 'أوفرلاب', external_support: 'دعم', volunteer_support: 'تطوع', support_end: 'نهاية دعم', activation: 'تفعيل فرقة', activation_end: 'إنهاء تفعيل' };
 // وسما نوع الدعم في سجل التغطية — عرض فقط فوق supportType/coverageType القادمين من الخادم
 var SUPPORT_TYPE_LABELS = { volunteer_support: 'تطوع', external_support: 'دعم من مركز آخر', assignment: 'تكليف' };
 var COVERAGE_TYPE_LABELS = { volunteer: 'تطوع', external: 'دعم من مركز آخر', assignment: 'تكليف', reserve: 'احتياط' };
@@ -924,6 +971,38 @@ function renderCard(teamId, name, type, d) {
     }
     var paramedicsHtml = members.length > 0
         ? members.map(function(m) {
+            // مرحلة الأوفرلاب 4: عضو مفعَّل (role=activation من اشتقاق الخادم) —
+            // يُعرض بشارة ⚡؛ لا حساب جاهزية محلي إطلاقًا.
+            // إصلاح «حضر × التفعيل»: زر «✋ حضر» للمفعَّل المتأخر يأتي من كتلة
+            // absentees أدناه (حالة سيرفرية) — لا يُرسم هنا إطلاقًا حتى لا تحل
+            // أي عملية محل الأخرى. و«⛔ إنهاء التفعيل» إجراء ثانوي مستقل في
+            // حاوية منفصلة (pm-secondary-actions) أسفل البطاقة — بعيدًا عن
+            // موضع زر الحضور تفاديًا للضغط الخاطئ. شارة التأخير/الغياب تُعرض
+            // من m.state القادمة من الخادم فقط (عرض — ليست اشتقاقًا).
+            if (m.role === 'activation') {
+                var anm = String(m.name).replace(/'/g, "\\'");
+                // تمييز عرضي (ملاحظة المالك): المتطوع المفعَّل يُوسم بشارة
+                // «🤝 متطوع» بجوار اسمه فتبقى الصفة ظاهرة في سطره الثانوي
+                // «منذ …» فقط — الأوفرلاب يبقى «أوفرلاب مفعَّل — منذ …».
+                // activationKind يأتي من الخادم (تطوع مفتوح بلا فريق)
+                var isVolAct = m.activationKind === 'volunteer';
+                // السطر الثانوي: المتطوع «منذ …» فقط (الشارة تحمل الصفة) —
+                // الأوفرلاب «أوفرلاب مفعَّل» + « — منذ …» عند توفر الوقت
+                var actLine = (isVolAct ? '' : 'أوفرلاب مفعَّل') +
+                    (m.since ? (isVolAct ? '' : ' — ') + 'منذ ' + TimeRiyadh.formatTime(m.since) : '');
+                var actStateBadge = (m.state === 'late' || m.state === 'absence')
+                    ? '<div class="pm-code pm-state-late">⚠️ ' + (m.state === 'late' ? 'متأخر — لم يحضر بعد' : 'غائب — لم يحضر بعد') + '</div>'
+                    : '';
+                return '<div class="pm">' +
+                    (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
+                    '<div class="pm-name">⚡ ' + escapeHtml(m.name) + (isVolAct ? ' <span class="op-badge">🤝 متطوع</span>' : '') + '</div>' +
+                    ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
+                    (actLine ? '<div class="pm-code">' + actLine + '</div>' : '') +
+                    actStateBadge +
+                    '<div class="pm-secondary-actions">' +
+                        '<button class="btn-end-cover" onclick="endActivation(\'' + teamId + '\', \'' + anm + '\')">⛔ إنهاء التفعيل</button>' +
+                    '</div></div>';
+            }
             if (m.role === 'support') return '<div class="pm">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
                 '<div class="pm-name">🤝 ' + escapeHtml(m.name) + '</div>' +
@@ -982,7 +1061,8 @@ function renderCard(teamId, name, type, d) {
             '<button class="btn btn-missing" onclick="openMissingModal(\'' + teamId + '\')">🟡 ناقصة</button>' +
             '<button class="btn btn-offline" onclick="cardSetOffline(\'' + teamId + '\')">🔴 خارج الخدمة</button>' +
           '</div>' +
-          '<button class="btn-cover" onclick="openCoverageModal(\'' + teamId + '\')">🤝 تغطية تشغيلية</button>'
+          '<button class="btn-cover" onclick="openCoverageModal(\'' + teamId + '\')">🤝 تغطية تشغيلية</button>' +
+          '<button class="btn-cover" onclick="openVolunteerModal()">🙋 متطوع</button>'
         : '';
 
     // بند 13: آخر قرار للمشرف (من الخادم) — في الـ Tooltip، ليس على البطاقة
@@ -1402,12 +1482,25 @@ function renderAvailableSupport() {
         return;
     }
     grid.innerHTML = list.map(function(p, i) {
+        // مرحلة الأوفرلاب 4 (التفعيل): صاحب كود تشغيلي ملحق (O12-09/12/14 ·
+        // RRA1-04/16) يُوسم «أوفرلاب — غير مفعّل» ويظهر له زر «تفعيل فرقة» —
+        // التفعيل يربطه بفريق قائم (لا يحوّل الفريق ولا تصنيف الموظف)
+        // المرحلة ب (تصحيح المالك): المتطوع بلا فريق يُوسم «متطوع — غير مفعّل»
+        // برمز يومه، وإسناده للفرقة عبر زر «تفعيل فرقة» نفسه (مسار الـOverlap)،
+        // وزر «إنهاء تطوع» يخرجه نهائيًا من الحوض (support_end القائم)
+        var isOp = !!(window.OperationalCodes && OperationalCodes.isOperationalCode(p.shiftCode));
+        var isVol = !!p.volunteer;
         return '<div class="support-card">' +
             (p.jobTitle ? '<div class="sp-job">' + escapeHtml(p.jobTitle) + '</div>' : '') +
             '<div class="sp-name">' + escapeHtml(p.name) + '</div>' +
             (p.employeeCode ? '<div class="sp-meta">الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) + '</div>' : '') +
             '<div class="sp-meta">الموقع الحالي: ' + escapeHtml(supportLocationLabel(p)) + '</div>' +
-            '<button class="btn-support" onclick="openSupportModal(' + i + ')">🤝 دعم فريق</button>' +
+            (isVol ? '<div class="sp-meta">رمز اليوم: ' + escapeHtml(p.shiftCode ? String(p.shiftCode) : 'بلا جدولة اليوم') + '</div>' : '') +
+            (isOp ? '<div class="sp-meta"><span class="op-badge">أوفرلاب — غير مفعّل</span></div>' : '') +
+            (isVol ? '<div class="sp-meta"><span class="op-badge">متطوع — غير مفعّل</span></div>' : '') +
+            ((isOp || isVol) ? '<button class="btn-activate" onclick="openActivationModal(' + i + ')">⚡ تفعيل فرقة</button>' : '') +
+            (isVol ? '<button class="btn-end-cover" onclick="endVolunteer(' + i + ')">⛔ إنهاء تطوع</button>' : '') +
+            (isVol ? '' : '<button class="btn-support" onclick="openSupportModal(' + i + ')">🤝 دعم فريق</button>') +
         '</div>';
     }).join('');
     section.style.display = '';
@@ -1455,6 +1548,194 @@ function confirmSupport() {
     postPersonEvents([ev]).then(function(d) {
         if (!d) { lockTeamCard(teamId, false); return; }
         showToast(d.appended > 0 ? '✅ تم تسجيل الدعم — ' + p.name + ' ← ' + teamId : 'الدعم مسجّل مسبقًا', d.appended > 0 ? 'success' : '');
+        afterTeamEvent();
+    });
+}
+
+// ─── مرحلة الأوفرلاب 4 (التفعيل): تفعيل موظف كود تشغيلي على فريق قائم ───
+// العقد: POST /api/staffing/activation {employeeName, teamName} و
+// POST /api/staffing/activation/end {employeeName} — الختم سيرفري بالكامل
+// (المناوبة/الفاعل/الوقت)، والواجهة تعيد الجلب بعد النجاح (عرض فقط —
+// لا حساب جاهزية محلي إطلاقًا).
+var activationCtx = null; // { person }
+function postActivation(path, body) {
+    var token = AuthCore.getToken();
+    if (!token) {
+        showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
+        return Promise.resolve(null);
+    }
+    return fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(body)
+    }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, d: d }; });
+    }).catch(function() {
+        showToast('⚠️ خطأ في الاتصال بالسيرفر', 'error');
+        return null;
+    });
+}
+function openActivationModal(idx) {
+    var p = (availableSupport || [])[idx];
+    if (!p) return;
+    activationCtx = { person: p };
+    // المرحلة ب: المتطوع يُعرض بحالته ورمز يومه (لا كود تشغيلي ولا بداية تشغيلية)
+    if (p.volunteer) {
+        document.getElementById('activationPersonInfo').innerHTML =
+            (p.jobTitle ? '<b>' + escapeHtml(p.jobTitle) + '</b><br>' : '') +
+            escapeHtml(p.name) +
+            '<br>الحالة: متطوع — غير مفعّل' +
+            (p.shiftCode ? '<br>رمز اليوم: ' + escapeHtml(String(p.shiftCode)) : '<br>بلا جدولة اليوم');
+    } else {
+        // البداية التشغيلية من المحلل المشترك (تعريف الكود ذاته) — عرض فقط
+        var parsed = (window.OperationalCodes && OperationalCodes.parseOperationalCode(p.shiftCode)) || null;
+        document.getElementById('activationPersonInfo').innerHTML =
+            (p.jobTitle ? '<b>' + escapeHtml(p.jobTitle) + '</b><br>' : '') +
+            escapeHtml(p.name) +
+            (p.shiftCode ? '<br>الكود التشغيلي: ' + escapeHtml(String(p.shiftCode)) : '') +
+            (parsed ? '<br>البداية التشغيلية: ' + escapeHtml(parsed.start) : '');
+    }
+    // الفرق من بيانات /api/teams الجاهزة (vbTeamsCache) — كل الفرق النشطة
+    // (مجدولة اليوم أو غير مجدولة — نفس قاعدة تفعيل الـOverlap المعتمدة)،
+    // بالاسم + المركز — قائمة اختيار حصرًا، بلا أي إدخال حر
+    var teams = (vbTeamsCache || []).filter(function(t) { return Number(t.is_active) === 1; });
+    document.getElementById('activationTeam').innerHTML = teams.map(function(t) {
+        return '<option value="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + (t.center ? ' — ' + escapeHtml(t.center) : '') + '</option>';
+    }).join('');
+    document.getElementById('activationModal').classList.add('active');
+}
+function closeActivationModal() {
+    document.getElementById('activationModal').classList.remove('active');
+    activationCtx = null;
+}
+function confirmActivation() {
+    if (!activationCtx) return;
+    var p = activationCtx.person;
+    var teamName = document.getElementById('activationTeam').value;
+    if (!teamName) { showToast('⚠️ اختر الفريق', 'error'); return; }
+    closeActivationModal();
+    postActivation('/api/staffing/activation', { employeeName: p.name, teamName: teamName }).then(function(res) {
+        if (!res || !res.ok || !res.d || !res.d.success) {
+            showToast('⚠️ ' + ((res && res.d && res.d.error) || 'فشل في التفعيل'), 'error');
+            return;
+        }
+        showToast(res.d.appended > 0 ? '✅ تم التفعيل — ' + p.name + ' ← ' + teamName : 'التفعيل مسجّل مسبقًا', res.d.appended > 0 ? 'success' : '');
+        afterTeamEvent(); // نفس مسار التحديث بعد حفظ أحداث التكميل
+    });
+}
+// إنهاء التفعيل — من بطاقة الفريق (عضو role=activation) — ضغطة واحدة
+function endActivation(teamId, employee) {
+    lockTeamCard(teamId, true);
+    postActivation('/api/staffing/activation/end', { employeeName: employee }).then(function(res) {
+        if (!res || !res.ok || !res.d || !res.d.success) {
+            lockTeamCard(teamId, false);
+            showToast('⚠️ ' + ((res && res.d && res.d.error) || 'فشل في إنهاء التفعيل'), 'error');
+            return;
+        }
+        showToast('✅ انتهى تفعيل ' + employee, 'success');
+        afterTeamEvent();
+    });
+}
+
+// ─── المرحلة ب (التطوع): إضافة متطوع إلى «الدعم المتاح» — مسار الـOverlap ───
+// العقد: GET /api/staffing/volunteer-candidates?q= (المرشحون سيرفريًا:
+// النشطون − المجدولون للعمل الفعلي اليوم − من عليه مشغّل مفتوح) و
+// POST /api/staffing/volunteer {employeeCode, employeeName} — بلا فريق:
+// الإضافة = دخول الحوض فقط بصفة «متطوع — غير مفعّل»، والإسناد للفرقة
+// من الحوض عبر زر «تفعيل فرقة» القائم (openActivationModal)، و«إنهاء
+// تطوع» يبعث support_end القائم فيخرج نهائيًا من الحوض. الاسم يأتي من
+// اختيار نتيجة بحث فقط (بلا إدخال حر).
+var volunteerCtx = null;        // { person } — المرشح المختار من النتائج
+var volunteerCandidates = [];   // آخر نتائج بحث المرشحين
+var volunteerSearchTimer = null;
+function openVolunteerModal() {
+    volunteerCtx = null;
+    volunteerCandidates = [];
+    document.getElementById('volunteerSearch').value = '';
+    document.getElementById('volunteerResults').innerHTML = '';
+    var info = document.getElementById('volunteerPersonInfo');
+    info.style.display = 'none';
+    info.innerHTML = '';
+    document.getElementById('volunteerModal').classList.add('active');
+    fetchVolunteerCandidates(''); // القائمة الأولية: كل المرشحين (بلا نص بحث)
+}
+function closeVolunteerModal() {
+    document.getElementById('volunteerModal').classList.remove('active');
+    volunteerCtx = null;
+    volunteerCandidates = [];
+    if (volunteerSearchTimer) { clearTimeout(volunteerSearchTimer); volunteerSearchTimer = null; }
+}
+function volunteerSearchInput() {
+    if (volunteerSearchTimer) clearTimeout(volunteerSearchTimer);
+    volunteerSearchTimer = setTimeout(function() {
+        fetchVolunteerCandidates(document.getElementById('volunteerSearch').value);
+    }, 300); // debounce — لا طلب مع كل ضغطة مفتاح
+}
+function fetchVolunteerCandidates(q) {
+    var token = AuthCore.getToken();
+    if (!token) { showToast('⚠️ يجب تسجيل الدخول أولاً', 'error'); return; }
+    fetch('/api/staffing/volunteer-candidates?q=' + encodeURIComponent(q || ''), {
+        headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, d: d }; });
+    }).then(function(res) {
+        if (!res || !res.ok || !res.d || !res.d.success) return;
+        volunteerCandidates = res.d.candidates || [];
+        renderVolunteerCandidates();
+    }).catch(function() { /* انقطاع مؤقت — تُعاد المحاولة مع الإدخال التالي */ });
+}
+function renderVolunteerCandidates() {
+    var box = document.getElementById('volunteerResults');
+    if (!volunteerCandidates.length) {
+        box.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:6px">لا يوجد مرشحون مطابقون (النشطون غير المجدولين للعمل الفعلي اليوم فقط)</div>';
+        return;
+    }
+    box.innerHTML = volunteerCandidates.map(function(p, i) {
+        var selected = volunteerCtx && volunteerCtx.name === p.name;
+        return '<div onclick="selectVolunteer(' + i + ')" style="cursor:pointer;padding:6px 8px;border-radius:6px;margin-bottom:2px;font-size:0.82rem;' +
+            (selected ? 'background:var(--accent,#2f6fed);color:#fff;' : 'background:rgba(127,127,127,0.08);') + '">' +
+            '<b>' + escapeHtml(p.name) + '</b>' +
+            (p.employeeCode ? ' · كود: ' + escapeHtml(String(p.employeeCode)) : '') +
+            (p.jobTitle ? ' · ' + escapeHtml(p.jobTitle) : '') +
+            (p.dayCode ? ' · رمز اليوم: ' + escapeHtml(String(p.dayCode)) : ' · بلا جدولة اليوم') +
+        '</div>';
+    }).join('');
+}
+function selectVolunteer(idx) {
+    var p = volunteerCandidates[idx];
+    if (!p) return;
+    volunteerCtx = p;
+    var info = document.getElementById('volunteerPersonInfo');
+    info.style.display = '';
+    info.innerHTML =
+        (p.jobTitle ? '<b>' + escapeHtml(p.jobTitle) + '</b><br>' : '') +
+        escapeHtml(p.name) +
+        (p.employeeCode ? '<br>الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) : '') +
+        (p.dayCode ? '<br>رمز اليوم: ' + escapeHtml(String(p.dayCode)) : '<br>بلا جدولة اليوم');
+    renderVolunteerCandidates(); // إبراز المختار
+}
+function confirmVolunteer() {
+    if (!volunteerCtx) { showToast('⚠️ اختر المتطوع من نتائج البحث أولاً', 'error'); return; }
+    var p = volunteerCtx;
+    closeVolunteerModal();
+    // الإضافة = دخول «الدعم المتاح» فقط (بلا فريق) — الإسناد عبر التفعيل من الحوض
+    postActivation('/api/staffing/volunteer', { employeeCode: p.employeeCode, employeeName: p.name }).then(function(res) {
+        if (!res || !res.ok || !res.d || !res.d.success) {
+            showToast('⚠️ ' + ((res && res.d && res.d.error) || 'فشل في تسجيل التطوع'), 'error');
+            return;
+        }
+        showToast(res.d.appended > 0 ? '✅ أُضيف إلى الدعم المتاح — ' + p.name + ' (متطوع — غير مفعّل)' : 'التطوع مسجّل مسبقًا', res.d.appended > 0 ? 'success' : '');
+        afterTeamEvent(); // نفس مسار التحديث — يعيد جلب الحوض فيظهر العنصر الجديد
+    });
+}
+// إنهاء تطوع عنصر الحوض — support_end القائم (بلا فريق: يُغلق التطوع المفتوح)
+// فيخرج الموظف نهائيًا من «الدعم المتاح»
+function endVolunteer(idx) {
+    var p = (availableSupport || [])[idx];
+    if (!p || !p.volunteer) return;
+    postPersonEvents([{ type: 'support_end', employeeName: p.name }]).then(function(d) {
+        if (!d) return;
+        showToast(d.appended > 0 ? '✅ انتهى تطوع ' + p.name + ' — خرج من الدعم المتاح' : 'لا يوجد تطوع مفتوح لهذا الموظف', d.appended > 0 ? 'success' : '');
         afterTeamEvent();
     });
 }

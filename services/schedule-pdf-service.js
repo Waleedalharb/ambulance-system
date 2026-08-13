@@ -29,6 +29,80 @@ const LOGO_PATH = path.join(ROOT, 'public', 'logo.png');
 // القواميس المركزية المشتركة (تعمل في Node عبر module.exports) — نفس مصدر الشاشة
 const ShiftTypeDictionary = require('../public/js/core/shift-type-dictionary.js');
 const TimeRiyadh = require('../public/js/time-riyadh.js');
+// تفويض «تصدير الجداول حسب فئة رمز القوة (A/B/C/D)»: فك الرموز عبر القاموس
+// المركزي حصرًا (مصدر الحقيقة الوحيد — يُستدعى ولا يُعدَّل ولا يُصنَّف موازيًا)،
+// وترتيب الأقسام/الفرق عبر قاموس الفرق المركزي، وحساب ساعات/مناوبات الموظف
+// عبر محرك المقاييس الرسمي (resolveCodeDurationHours/_resolveWithKind) —
+// صفر حساب مستقل هنا.
+const SymbolDictionary = require('../public/js/core/symbol-dictionary.js');
+const TeamDictionary = require('../public/js/core/team-dictionary.js');
+const ScheduleMetricsService = require('./schedule-metrics-service.js');
+
+// نسخة واحدة من محرك المقاييس لاستخدام دوال الحل النقية فقط
+// (_resolveWithKind لا تلمس القاعدة إطلاقًا — المُحوِّل هيكلي لشرط المنشئ).
+const metricsResolver = new ScheduleMetricsService({ db: { get: async () => null, all: async () => [] } });
+
+// ─── فئة رمز القوة (قاعدة التجميع المعتمدة من المالك — تنفيذ حرفي) ───
+// الفئة تُستخرج من الرمز المُطبَّع + مخرجات resolveSymbol فقط:
+//   A1/AA10/A0/A00/AZ ⇒ الحرف الأول (حرف القوة) · RRA1 ⇒ الحرف بعد RR (الدورية)
+//   O12A12 ⇒ حرف الطاقم (آخر حرف من overlapCrew) · O12B الكلاسيكي ⇒ حرفه B
+//   أوفرلاب بلا حرف (O15) ⇒ null ⇒ يُستبعد من تصدير الفئة (معالجة موثقة —
+//   الأقل كلفة: لا قسم خاص؛ الرمز لا يحمل فئة أصلًا فإدخاله في أي فئة اختلاق).
+//   XX/XY/Z/0/Y وبلا symbol ⇒ null ⇒ مستبعدة (لا حرف قوة فيها).
+function resolveGroupCategory(rawSym, jobTitle) {
+    const resolved = SymbolDictionary.resolveSymbol(rawSym, jobTitle);
+    if (!resolved) return null;
+    const sym = SymbolDictionary.normalize(rawSym);
+    let m = sym.match(/^RR([A-D])\d+$/);                    // RRA1 — الدورية
+    if (m && resolved.kind === 'rapid') return m[1];
+    if (resolved.overlapCrew) {                              // O12A12 — فئة صريحة من الطاقم
+        const cm = String(resolved.overlapCrew).match(/([A-D])$/);
+        return cm ? cm[1] : null;
+    }
+    if (resolved.kind === 'overlap') {                       // O12B ⇒ B · O15 ⇒ null
+        m = sym.match(/^O\d+([A-D])$/);
+        return m ? m[1] : null;
+    }
+    m = sym.match(/^([A-D])/);                               // حرف القوة الأول (مركز/قيادة/عمليات/دعم)
+    return m ? m[1] : null;
+}
+
+// الأقسام التشغيلية وترتيبها المعتمد: كبير المسعفين ← العمليات ← المراكز ←
+// سريع ← الأوفرلاب ← الإدارات (نفس ترتيب team-dictionary ORDER).
+const GROUP_SECTION_ORDER = ['leadership', 'ops', 'center', 'rapid', 'overlap', 'admin'];
+const GROUP_SECTION_LABELS = {
+    leadership: 'كبير المسعفين', ops: 'العمليات', center: 'المراكز',
+    rapid: 'سريع', overlap: 'الأوفرلاب', admin: 'الإدارات'
+};
+
+// اسم الفرقة الحقيقي للعرض: «جنوب 1 — A» · «سريع 2 — A» · «جنوب 12 — طاقم O12A — A»
+function groupTeamLabel(resolved, category) {
+    const base = resolved.team + (resolved.overlapCrew ? ' — طاقم ' + resolved.overlapCrew : '');
+    return { sortName: base, label: base + ' — ' + category };
+}
+
+// ملخص الموظف للشهر المُصدَّر — من محرك المقاييس حصرًا:
+//   الساعات = مجموع حلول _resolveWithKind (دوام + تغطية؛ EV/الغير قابل null لا يُحسب)
+//   المناوبات = عدد خلايا العمل الفعلي (kind==='work') فقط — التغطية E/VC/V/S
+//   «إجازة محسوبة» لا تدخل العد (قرار المالك 2026-08-13 نفسه في dayScope).
+//   D/N من تصنيف القاموس المركزي للخلية: صباح/OVD ⇒ D · ليل/ليل8/أوفرلاب ⇒ N
+//   (نفس قاعدة «صباحية/ليلية» في shift-type-dictionary — لا تصنيف مستقل).
+function summarizeEmployeeCells(cells, codesByCode) {
+    let hours = 0, work = 0, day = 0, night = 0;
+    Object.keys(cells).forEach(d => {
+        const s = cells[d];
+        const r = metricsResolver._resolveWithKind(s.shiftCode || s.shift || '', codesByCode);
+        if (!r) return;
+        hours += r.hours;
+        if (r.kind !== 'work') return;
+        work++;
+        const g = ShiftTypeDictionary.classifyEntry(s).group;
+        const code = String(s.shiftCode || s.shift || '').trim().toUpperCase();
+        if (g === 'morning' || code === 'OVD') day++;
+        else if (g === 'night' || g === 'night8' || g === 'overlap') night++;
+    });
+    return { hours: Math.round(hours * 10) / 10, work, day, night };
+}
 
 // ─── خط أنبوب العربية (محسوم ومُثبت بصريًا في workflow-pdf-service — لا يُغيَّر) ───
 function ar(t) {
@@ -57,15 +131,30 @@ function cellText(s) {
  * بنّاء بيانات الجدول (نقي ومُصدَّر للاختبار):
  * يفلتر الموظفين/السجلات بمعيار فلتر «الموقع» نفسه، ويجمع أيام الفترة،
  * ويشتق الشهر/السنة من أول تاريخ إن لم يُمرَّر month.
+ *
+ * نمط المجموعة (تفويض «تصدير حسب فئة رمز القوة»): opts.group = A/B/C/D —
+ * يدخل الموظف إن كانت فئة رمزه (resolveGroupCategory عبر symbol-dictionary
+ * حصرًا) = المطلوبة، مع الاحتفاظ باسم الفرقة الحقيقي للعرض (teamLabel) وقسمه
+ * التشغيلي (sectionKey) وملخص ساعاته/مناوباته (summary — من محرك المقاييس
+ * عبر opts.codesByCode). فرع center أعلاه لم يُمس — سلوكه حرفي كما كان.
  */
 function buildSchedulePdfData(allEmployees, opts) {
     opts = opts || {};
     const center = String(opts.center || '').trim();
+    const group = String(opts.group || '').trim().toUpperCase();
+    const codesByCode = (opts.codesByCode instanceof Map) ? opts.codesByCode : null;
     const month = String(opts.month || '').trim();        // YYYY-MM أو فراغ
     const employees = [];
     const daySet = {};
     (Array.isArray(allEmployees) ? allEmployees : []).forEach(e => {
         if (!e) return;
+        // نمط المجموعة: الفئة من رمز القوة فقط؛ بلا رمز/بلا فئة ⇒ استبعاد موثق
+        let resolved = null, category = null;
+        if (group) {
+            resolved = SymbolDictionary.resolveSymbol(e.symbol, e.jobTitle);
+            category = resolveGroupCategory(e.symbol, e.jobTitle);
+            if (!resolved || category !== group) return;
+        }
         const entries = (Array.isArray(e.schedule) ? e.schedule : []).filter(s => {
             if (!s || !s.date) return false;
             if (center && s.location !== center && e.team !== center) return false;
@@ -75,14 +164,22 @@ function buildSchedulePdfData(allEmployees, opts) {
         if (!entries.length) return;
         const cells = {};
         entries.forEach(s => { if (!cells[s.date]) cells[s.date] = s; daySet[s.date] = true; });
-        employees.push({
+        const emp = {
             id: e.id || '',
             code: e.employeeNumber || e.id || '',
             name: e.name || '',
             jobTitle: e.jobTitle || '',
             team: e.team || '',
             cells
-        });
+        };
+        if (group) {
+            const tl = groupTeamLabel(resolved, category);
+            emp.sectionKey = resolved.kind;                 // leadership/ops/center/rapid/overlap/admin
+            emp.teamSortName = tl.sortName;
+            emp.teamLabel = tl.label;                       // «جنوب 1 — A»
+            if (codesByCode) emp.summary = summarizeEmployeeCells(cells, codesByCode);
+        }
+        employees.push(emp);
     });
     employees.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'));
 
@@ -115,7 +212,34 @@ function buildSchedulePdfData(allEmployees, opts) {
         });
     });
 
-    return { center, month: month || (year ? year + '-' + String(monthNum).padStart(2, '0') : ''), monthLabel, year, monthNum, days, employees, groupCounts };
+    const out = { center, month: month || (year ? year + '-' + String(monthNum).padStart(2, '0') : ''), monthLabel, year, monthNum, days, employees, groupCounts };
+
+    // نمط المجموعة: هيكلة الأقسام والفرق (الترتيب من قاموس الفرق المركزي)
+    if (group) {
+        const byKey = {};   // sectionKey|sortName → { name, label, employees[] }
+        employees.forEach(emp => {
+            const k = emp.sectionKey + '|' + emp.teamSortName;
+            if (!byKey[k]) byKey[k] = { sectionKey: emp.sectionKey, sortName: emp.teamSortName, label: emp.teamLabel, employees: [] };
+            byKey[k].employees.push(emp);
+        });
+        out.group = group;
+        out.sections = GROUP_SECTION_ORDER
+            .filter(sk => Object.keys(byKey).some(k => k.indexOf(sk + '|') === 0))
+            .map(sk => {
+                const teams = Object.keys(byKey)
+                    .filter(k => k.indexOf(sk + '|') === 0)
+                    .map(k => byKey[k]);
+                const sorted = TeamDictionary.sortTeamNames(teams.map(t => t.sortName));
+                return {
+                    key: sk,
+                    label: GROUP_SECTION_LABELS[sk] || sk,
+                    teams: sorted.map(sn => teams.find(t => t.sortName === sn))
+                        .map(t => ({ name: t.label, employees: t.employees }))
+                };
+            });
+    }
+
+    return out;
 }
 
 /**
@@ -167,14 +291,14 @@ function generateSchedulePdf(data) {
             doc.font('amiri').fontSize(12).fillColor(BLUE);
             tr('قطاع جنوب الرياض', M, y + 12, CW - 56);
             doc.font('amiri').fontSize(11).fillColor(BLUE);
-            tr('جدول المناوبات الشهري للمركز', M, y + 40, CW - 56);
+            tr(data.group ? ('جدول المناوبات الشهري — فئة القوة ' + data.group) : 'جدول المناوبات الشهري للمركز', M, y + 40, CW - 56);
             y += 54;
 
-            // شريط التعريف: المركز • الفترة • عدد الكادر • وقت التوليد (الرياض)
+            // شريط التعريف: المركز/الفئة • الفترة • عدد الكادر • وقت التوليد (الرياض)
             const generatedAt = TimeRiyadh.formatDateTime(new Date().toISOString());
             doc.roundedRect(M, y, CW, 22, 4).fill('#eff6ff');
             doc.font('amiri').fontSize(10).fillColor(BLUE);
-            tr('المركز: ' + data.center, M + 10, y + 6, 200);
+            tr(data.group ? ('الفئة: ' + data.group) : ('المركز: ' + data.center), M + 10, y + 6, 200);
             doc.font('amiri').fontSize(9).fillColor('#0f172a');
             tr('الفترة: ' + data.monthLabel + '   •   الكادر: ' + data.employees.length + ' موظف   •   وُلِّد: ' + generatedAt, M + 10, y + 6.5, CW - 220);
             y += 28;
@@ -187,7 +311,8 @@ function generateSchedulePdf(data) {
             const nameW = 128;
             const dayW = days.length ? (CW - nameW) / days.length : 0;
             const HEADER_H = 24;
-            const ROW_H = 15;
+            // نمط المجموعة: صف أعلى (24) ليسع خط الملخص تحت اسم الموظف؛ نمط المركز 15 كما كان حرفيًا
+            const ROW_H = data.sections ? 24 : 15;
 
             // قياس خط الاسماء: تخفيض تناسبي حتى يتسع أطول اسم بسطر واحد (بلا التفاف أبدًا)
             let nameFs = 7;
@@ -236,16 +361,51 @@ function generateSchedulePdf(data) {
                 // الاسم أخيرًا ليبقى فوق أي خلية متاخمة — في عموده بأقصى اليمين
                 doc.font('amiri').fontSize(nameFs).fillColor('#0f172a');
                 tr(emp.name || '—', M + CW - nameW + 4, y + 4, nameW - 8, { lineBreak: false });
+                // نمط المجموعة: تحت كل موظف ملخصه — إجمالي الساعات + إجمالي
+                // المناوبات (خلايا العمل الفعلي) + تفصيل نوعها D/N
+                if (emp.summary) {
+                    const sm = emp.summary;
+                    doc.font('amiri').fontSize(Math.max(4.2, nameFs - 1.6)).fillColor(MUTED);
+                    tr(sm.hours + ' ساعة · مناوبات: ' + sm.work + ' · D:' + sm.day + ' N:' + sm.night,
+                        M + CW - nameW + 4, y + 14, nameW - 8, { lineBreak: false });
+                }
                 y += ROW_H;
                 doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(0.4).strokeColor(BORDER).stroke();
                 doc.moveTo(M + CW - nameW, y - ROW_H).lineTo(M + CW - nameW, y).lineWidth(0.7).strokeColor(BORDER).stroke();
             }
 
             drawGridHeader();
-            data.employees.forEach((emp, idx) => {
-                if (y + ROW_H + 8 > PAGE_H - 56) { doc.addPage(); y = M; drawGridHeader(); }
-                drawRow(emp, idx);
-            });
+            if (data.sections) {
+                // ═══ نمط المجموعة: قسم ← فرقة باسمها الحقيقي ← موظفوها ═══
+                const SEC_H = 17, TEAM_H = 13;
+                let rowIdx = 0;
+                data.sections.forEach(sec => {
+                    const secCount = sec.teams.reduce((n, t) => n + t.employees.length, 0);
+                    if (y + SEC_H + TEAM_H + ROW_H + 8 > PAGE_H - 56) { doc.addPage(); y = M; drawGridHeader(); }
+                    doc.rect(M, y, CW, SEC_H).fill('#1e3a8a');
+                    doc.font('amiri').fontSize(8.5).fillColor('#FFFFFF');
+                    tr(sec.label + ' (' + secCount + ')', M + 8, y + 4.5, CW - 16, { lineBreak: false });
+                    y += SEC_H;
+                    doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(0.7).strokeColor(BORDER).stroke();
+                    sec.teams.forEach(team => {
+                        if (y + TEAM_H + ROW_H + 8 > PAGE_H - 56) { doc.addPage(); y = M; drawGridHeader(); }
+                        doc.rect(M, y, CW, TEAM_H).fill('#e2e8f0');
+                        doc.font('amiri').fontSize(7).fillColor('#0f172a');
+                        tr(team.name + ' — ' + team.employees.length + ' موظف', M + 8, y + 3, CW - 16, { lineBreak: false });
+                        y += TEAM_H;
+                        doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(0.5).strokeColor(BORDER).stroke();
+                        team.employees.forEach(emp => {
+                            if (y + ROW_H + 8 > PAGE_H - 56) { doc.addPage(); y = M; drawGridHeader(); }
+                            drawRow(emp, rowIdx++);
+                        });
+                    });
+                });
+            } else {
+                data.employees.forEach((emp, idx) => {
+                    if (y + ROW_H + 8 > PAGE_H - 56) { doc.addPage(); y = M; drawGridHeader(); }
+                    drawRow(emp, idx);
+                });
+            }
 
             // ═══ ملخص الفئات + وسيلة الإيضاح (للمجموعات الحاضرة فقط) ═══
             const presentGroups = Object.keys(data.groupCounts);
@@ -290,4 +450,4 @@ function generateSchedulePdf(data) {
     });
 }
 
-module.exports = { buildSchedulePdfData, generateSchedulePdf };
+module.exports = { buildSchedulePdfData, generateSchedulePdf, resolveGroupCategory };

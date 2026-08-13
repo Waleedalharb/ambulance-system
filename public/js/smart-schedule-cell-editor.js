@@ -273,7 +273,7 @@
             var emp = findEmployee(ctx.empId);
             if (emp) {
                 var status = 'دوام';
-                if (shiftCode === 'V' || shiftCode === 'VC' || shiftCode === 'E' || shiftCode === 'EV') status = 'إجازة';
+                if (shiftCode === 'V' || shiftCode === 'VC' || shiftCode === 'E' || shiftCode === 'EV' || shiftCode === 'S') status = 'إجازة';
                 else if (shiftCode === 'WO') status = 'راحة';
                 else if (shiftCode === 'C') status = 'تدريب';
                 else if (shiftCode === 'ME' || shiftCode === 'F' || shiftCode.indexOf('CP') === 0) status = 'تكميل';
@@ -296,6 +296,7 @@
 
             toast('✅ تم تعديل المناوبة إلى ' + shiftCode, 'success');
             try { if (typeof updateStats === 'function') updateStats(); } catch (e) { /* تجاهل */ }
+            try { if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); } catch (e) { /* تجاهل */ } // Phase 2
         } catch (err) {
             console.error('Cell shift update error:', err);
             renderCellCode(cell, oldCode);

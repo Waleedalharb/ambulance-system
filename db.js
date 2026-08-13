@@ -261,7 +261,8 @@ const TABLE_SCHEMAS = [
     team_type TEXT,
     sort_order INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
-    requiredPersonnel INTEGER DEFAULT 2
+    requiredPersonnel INTEGER DEFAULT 2,
+    operational_starts TEXT
   );`,
 
   // Shift Codes
@@ -950,6 +951,9 @@ async function runMigrations() {
   await ensureColumn('report_times', 'type', 'TEXT');
   // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
   await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
+  // مرحلة بدايات الفرق التشغيلية: JSON nullable لكل فريق {"day":"HH:MM","night":"HH:MM"} —
+  // فصل نوع المناوبة (D/N في الجدول كما هو) عن بداية الفريق التشغيلية (idempotent)
+  await ensureColumn('teams', 'operational_starts', 'TEXT');
   // W-تكامل ③ب: الرمز الأساسي للموظف من الجدولة الرسمية (O12A/O14B/D0…)
   // مفتاح تجميع أطقم الأوفرلاب لاشتقاق الفرق الديناميكية — بيانات وصفية فقط (idempotent)
   await ensureColumn('employees', 'symbol', 'TEXT');
@@ -1461,7 +1465,59 @@ async function runMigrations() {
   // سيارة الصيانة المتنقلة لفرقة الدعم اللوجستي (قرار المالك 2026-07-27)
   await ensureLogisticsVehicleAssignment();
 
+  // تسمية الرموز (قرار المالك 2026-08-13): VC = «إجازة اضطرارية» + إضافة S = «مرضية».
+  // البذر يتخطى القواعد المعبأة — هذا الترحيل idempotent يصل القواعد الموجودة (الإنتاج).
+  await migrateShiftCodeNames();
+
+  // الأكواد التشغيلية الملحقة (مرحلة الأوفرلاب 1): البذر يتخطى القواعد المعبأة،
+  // وهذا الترحيل idempotent يدرجها في القواعد الموجودة بلا مساس بأي رمز آخر.
+  await migrateOperationalCodes();
+
+  // مرحلة بدايات الفرق التشغيلية: بذر فرق التدخل السريع — idempotent (عند NULL فقط)
+  await migrateTeamOperationalStarts();
+
   logger.info('Migrations complete');
+}
+
+// idempotent: يصحّح اسم VC ويُدرج S إن غاب — لا يمس أي رمز آخر ولا أوقات أي رمز.
+async function migrateShiftCodeNames() {
+  try {
+    await run(`UPDATE shift_codes SET name = 'إجازة اضطرارية' WHERE code = 'VC' AND name <> 'إجازة اضطرارية'`);
+    await run(`INSERT INTO shift_codes (code, name, time_start, time_end, color, status)
+               SELECT 'S', 'مرضية', NULL, NULL, '#FB7185', 'إجازة'
+               WHERE NOT EXISTS (SELECT 1 FROM shift_codes WHERE code = 'S')`);
+  } catch (err) {
+    logger.warn('migrateShiftCodeNames: ' + err.message);
+  }
+}
+
+// idempotent (مرحلة الأوفرلاب 1): يدرج الأكواد التشغيلية الملحقة إن غابت —
+// WHERE NOT EXISTS لكل رمز على حدة؛ إعادة التشغيل لا-op ولا يمس الأوقات المعدلة يدويًا.
+// القواعد القائمة تكسب صفّي الصيغة الجديدة (RRA1-D-04/RRA1-N-16) وتحتفظ بالقديمين.
+async function migrateOperationalCodes() {
+  try {
+    for (const sc of OPERATIONAL_SHIFT_CODES) {
+      await run(`INSERT INTO shift_codes (code, name, time_start, time_end, color, status)
+                 SELECT ?, ?, ?, ?, ?, ?
+                 WHERE NOT EXISTS (SELECT 1 FROM shift_codes WHERE code = ?)`,
+        [sc.code, sc.name, sc.time_start, sc.time_end, sc.color, sc.status, sc.code]);
+    }
+  } catch (err) {
+    logger.warn('migrateOperationalCodes: ' + err.message);
+  }
+}
+
+// idempotent (مرحلة بدايات الفرق التشغيلية): يضبط البدايات التشغيلية لفرق
+// التدخل السريع «سريع 1..4» = {"day":"04:00","night":"16:00"} — عند NULL فقط،
+// فإعادة التشغيل لا-op ولا يمس أي تعديل يدوي لاحق عبر PUT /api/teams/:id.
+// موظفو هذه الفرق يبقون مجدولين بأكواد D/N الصرفة — صفر تغيير على الكادر.
+async function migrateTeamOperationalStarts() {
+  try {
+    await run(`UPDATE teams SET operational_starts = '{"day":"04:00","night":"16:00"}'
+               WHERE name IN ('سريع 1', 'سريع 2', 'سريع 3', 'سريع 4') AND operational_starts IS NULL`);
+  } catch (err) {
+    logger.warn('migrateTeamOperationalStarts: ' + err.message);
+  }
 }
 
 // ============================================
@@ -2049,6 +2105,22 @@ const ChatAttachments = {
 // ============================================
 // DEFAULT SEED DATA
 // ============================================
+// الأكواد التشغيلية الملحقة (مرحلة الأوفرلاب 1 — بذر فقط): اللاحقة = ساعة البداية
+// ويحللها public/js/core/operational-codes.js. عائلة O12-* ترث لون O12 (#10B981)
+// وRRA* لون مستقل (#14B8A6 — غير مستخدم في أي بذر آخر).
+// الصيغة الجديدة الموقعة RRA1-D-04/RRA1-N-16 تحمل حرف الوردية صراحة (D صباحية ·
+// N ليلية)؛ الصفان القديمان RRA1-04/RRA1-16 يُبقيان للعرض التاريخي ولا يُعدَّلان.
+// تُستخدم نفسها في migrateOperationalCodes() حتى لا يتكرر التعريف.
+const OPERATIONAL_SHIFT_CODES = [
+  { code: 'O12-09', name: 'أوفرلاب 12 — بداية 09:00', time_start: '09:00', time_end: '21:00', color: '#10B981', status: 'دوام' },
+  { code: 'O12-12', name: 'أوفرلاب 12 — بداية 12:00', time_start: '12:00', time_end: '00:00', color: '#10B981', status: 'دوام' },
+  { code: 'O12-14', name: 'أوفرلاب 12 — بداية 14:00', time_start: '14:00', time_end: '02:00', color: '#10B981', status: 'دوام' },
+  { code: 'RRA1-D-04', name: 'تدخل سريع 1 — صباحية — بداية 04:00', time_start: '04:00', time_end: '16:00', color: '#14B8A6', status: 'دوام' },
+  { code: 'RRA1-N-16', name: 'تدخل سريع 1 — ليلية — بداية 16:00', time_start: '16:00', time_end: '04:00', color: '#14B8A6', status: 'دوام' },
+  { code: 'RRA1-04', name: 'تدخل سريع 1 — بداية 04:00', time_start: '04:00', time_end: '16:00', color: '#14B8A6', status: 'دوام' },
+  { code: 'RRA1-16', name: 'تدخل سريع 1 — بداية 16:00', time_start: '16:00', time_end: '04:00', color: '#14B8A6', status: 'دوام' }
+];
+
 const DEFAULT_SHIFT_CODES = [
   { code: 'D12', name: 'دوام 12 صباحاً', time_start: '05:00', time_end: '17:00', color: '#2563EB', status: 'دوام' },
   { code: 'N12', name: 'دوام 12 ليلاً', time_start: '17:00', time_end: '05:00', color: '#7C3AED', status: 'دوام' },
@@ -2056,7 +2128,7 @@ const DEFAULT_SHIFT_CODES = [
   { code: 'O12', name: 'أوفرلاب 12', time_start: '05:00', time_end: '17:00', color: '#10B981', status: 'دوام' },
   { code: 'V', name: 'إجازة', time_start: null, time_end: null, color: '#EF4444', status: 'إجازة' },
   { code: 'WO', name: 'Weekend Off', time_start: null, time_end: null, color: '#F97316', status: 'راحة' },
-  { code: 'VC', name: 'إجازة مرضية', time_start: null, time_end: null, color: '#EC4899', status: 'إجازة' },
+  { code: 'VC', name: 'إجازة اضطرارية', time_start: null, time_end: null, color: '#EC4899', status: 'إجازة' },
   { code: 'C', name: 'تدريب', time_start: null, time_end: null, color: '#8B5CF6', status: 'تدريب' },
   { code: 'ME', name: 'مكلف', time_start: null, time_end: null, color: '#06B6D4', status: 'دوام' },
   { code: 'N8', name: 'دوام 8 ليلاً', time_start: '22:00', time_end: '06:00', color: '#7C3AED', status: 'دوام' },
@@ -2065,6 +2137,7 @@ const DEFAULT_SHIFT_CODES = [
   { code: 'CPD', name: 'تكميلية صباحية', time_start: '05:00', time_end: '17:00', color: '#84CC16', status: 'تكميل' },
   { code: 'CPN', name: 'تكميلية ليلية', time_start: '17:00', time_end: '05:00', color: '#84CC16', status: 'تكميل' },
   { code: 'E', name: 'إجازة', time_start: null, time_end: null, color: '#EF4444', status: 'إجازة' },
+  { code: 'S', name: 'مرضية', time_start: null, time_end: null, color: '#FB7185', status: 'إجازة' },
   { code: 'EV', name: 'إجازة استثنائية', time_start: null, time_end: null, color: '#F43F5E', status: 'إجازة' },
   { code: 'F', name: 'مكلف', time_start: null, time_end: null, color: '#06B6D4', status: 'دوام' },
   { code: 'LN8', name: 'ليلية 8', time_start: '22:00', time_end: '06:00', color: '#7C3AED', status: 'دوام' },
@@ -2077,7 +2150,8 @@ const DEFAULT_SHIFT_CODES = [
   { code: 'N11', name: 'دوام 11 ليلاً', time_start: '18:00', time_end: '05:00', color: '#7C3AED', status: 'دوام' },
   { code: 'N6', name: 'دوام 6 ليلاً', time_start: '17:00', time_end: '23:00', color: '#7C3AED', status: 'دوام' },
   { code: 'O10', name: 'أوفرلاب 10', time_start: '07:00', time_end: '17:00', color: '#10B981', status: 'دوام' },
-  { code: 'O6', name: 'أوفرلاب 6', time_start: '05:00', time_end: '11:00', color: '#10B981', status: 'دوام' }
+  { code: 'O6', name: 'أوفرلاب 6', time_start: '05:00', time_end: '11:00', color: '#10B981', status: 'دوام' },
+  ...OPERATIONAL_SHIFT_CODES
 ];
 
 const DEFAULT_TEAMS = [
@@ -2251,6 +2325,13 @@ const Teams = {
     return result.id;
   },
   async update(id, data) {
+    // مرحلة بدايات الفرق التشغيلية: operational_starts (JSON نصي nullable)
+    // يُحدَّث فقط عند تمريره صراحة — بقية الحقول وسلوكها كما هي حرفيًا.
+    if (Object.prototype.hasOwnProperty.call(data, 'operational_starts')) {
+      const os = data.operational_starts;
+      const osVal = (os === null || os === undefined || typeof os === 'string') ? (os ?? null) : JSON.stringify(os);
+      return run('UPDATE teams SET name = ?, center = ?, team_type = ?, sort_order = ?, is_active = ?, operational_starts = ? WHERE id = ?;', [data.name, data.center, data.team_type, data.sort_order, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, osVal, id]);
+    }
     return run('UPDATE teams SET name = ?, center = ?, team_type = ?, sort_order = ?, is_active = ? WHERE id = ?;', [data.name, data.center, data.team_type, data.sort_order, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id]);
   },
   async delete(id) {
@@ -2304,6 +2385,12 @@ const ShiftRoster = {
   },
   async getByMonthYear(month, year) {
     return all('SELECT sr.*, e.name as employee_name, e.employee_code, t.name as team_name FROM shift_roster sr JOIN employees e ON sr.employee_id = e.id LEFT JOIN teams t ON sr.team_id = t.id WHERE sr.month = ? AND sr.year = ? ORDER BY sr.shift_date, t.name, e.name', [month, year]);
+  },
+  // الشهور المتاحة في الجدول ('YYYY-MM' مرتبة تصاعديًا) — تغذي فلتر الشهر متعدد الشهور.
+  // جدول فارغ ⇒ مصفوفة فارغة (الواجهة حينها تبقي بلا فلتر شهر = السلوك القائم).
+  async getMonths() {
+    const rows = await all('SELECT DISTINCT year, month FROM shift_roster ORDER BY year, month');
+    return rows.map(r => `${r.year}-${String(r.month).padStart(2, '0')}`);
   },
   async getByEmployeeAndDate(employee_id, shift_date) {
     return get('SELECT * FROM shift_roster WHERE employee_id = ? AND shift_date = ?', [employee_id, shift_date]);

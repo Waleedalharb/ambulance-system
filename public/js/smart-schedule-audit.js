@@ -163,6 +163,7 @@
                 if (typeof showToast === 'function') showToast('تم التراجع بنجاح', 'success');
                 loadAuditLog();
                 if (typeof renderCurrentView === 'function') renderCurrentView();
+                if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); // Phase 2
             } else {
                 if (typeof showToast === 'function') showToast('فشل في التراجع: ' + (data.error || ''), 'error');
             }
@@ -192,6 +193,7 @@
                 if (typeof showToast === 'function') showToast('تم التراجع عن آخر تغيير', 'success');
                 if (typeof renderCurrentView === 'function') renderCurrentView();
                 updateUndoRedoButtons(data);
+                if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); // Phase 2
             } else {
                 if (typeof showToast === 'function') showToast('لا يوجد تغيير للتراجع عنه', 'warning');
             }
@@ -221,6 +223,7 @@
                 if (typeof showToast === 'function') showToast('تم إعادة التغيير', 'success');
                 if (typeof renderCurrentView === 'function') renderCurrentView();
                 updateUndoRedoButtons(data);
+                if (typeof refreshHoursIndicators === 'function') refreshHoursIndicators(); // Phase 2
             } else {
                 if (typeof showToast === 'function') showToast('لا يوجد تغيير لإعادته', 'warning');
             }

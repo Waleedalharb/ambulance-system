@@ -59,6 +59,13 @@ function lateNote(lateRecords, name) {
     const r = lateFor(lateRecords, name);
     if (!r) return null;                                    // doc-v4 ②: بلا سطر بدل «—»
     if (r.status === 'arrived' && r.arrivedAt) {
+        // مرحلة الأوفرلاب 3 (عرض فقط): سجل مرحّل من مناوبة سابقة ⇒ صيغة مركبة
+        // بثلاث طوابع — ممنوع عرض الإجمالي وحده للسجلات المرحّلة.
+        if (r.carriedFromShiftId && r.operationalStart && r.responsibilityStart && typeof r.delayUnderShiftMinutes === 'number') {
+            return 'حضر ' + fTime(r.arrivedAt) +
+                ' — تأخير إجمالي ' + r.durationMinutes + ' د عن بدايته التشغيلية (' + fTime(r.operationalStart) + ')' +
+                ' · منها ' + r.delayUnderShiftMinutes + ' د تحت مسؤولية هذه المناوبة (منذ ' + fTime(r.responsibilityStart) + ')';
+        }
         // doc-v4 ①: قالب موحد بسطر واحد — «وقت الحضور: … • مدة التأخير: …»
         const d = (typeof r.durationMinutes === 'number') ? ' • مدة التأخير: ' + r.durationMinutes + ' دقيقة' : '';
         return 'وقت الحضور: ' + fTime(r.arrivedAt) + d;
@@ -521,7 +528,8 @@ function generateWorkflowPdf(workflow) {
                         // doc-v4 ④: اسم المركز سطرًا ثانيًا أصغر وبلون رمادي — التركيز على «جنوب 1»
                         t.center ? [name, segInfo('(' + t.center + ')')] : [name],
                         statusCell,
-                        personsCell(g.active),
+                        personsCell(g.active, p => (p && p.role === 'activation' && p.activationKind === 'volunteer')
+                            ? '🤝 متطوع مفعَّل — ليس من جدول الفرقة' : null), // تمييز عرضي (ملاحظة المالك) — بلا أثر على التخطيط ماعدا سطر معلومة باهت
                         exceptionsCell(teams, vehMap, t, name, g, lateRecords)
                     ];
                 });

@@ -30,6 +30,8 @@ const notificationService = require('./services/notification-service');
 const schedulePdfService = require('./services/schedule-pdf-service');
 // الطبقة المركزية الوحيدة لتحويل وعرض الوقت (Asia/Riyadh) — نفس ملف المتصفح
 const TimeRiyadh = require('./public/js/time-riyadh.js');
+// محلل الأكواد التشغيلية الملحقة (مرحلة الأوفرلاب 1) — نفس ملف المتصفح
+const OperationalCodes = require('./public/js/core/operational-codes.js');
 
 // ═══════════════════════════════════════════════════════════
 // Operations Engine v1.0 — The New Single Source of Truth
@@ -49,6 +51,7 @@ let indicatorService = null; // F5a: read-only operational indicators
 let staffingEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث القوى البشرية
 let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث المركبات
 let rosterSyncService = null; // SR-2: المزامنة الوحيدة الجدولة ← employees + shift_roster (SSOT)
+let scheduleMetricsService = null; // Phase 2: مؤشرات الساعات الشهرية (اشتقاق حي، بلا عدادات مخزنة)
 let workflowService = null; // WF-1: سير العمل الرسمي — منظومة مستقلة، قراءة فقط من التكميل
 
 // Set timezone to Saudi Arabia (Riyadh)
@@ -4626,6 +4629,9 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
             if (!p.shift_code) return false;
             const codeBase = baseDayCode(p.shift_code);
             if (!codeBase) return false;
+            // الأكواد التشغيلية الملحقة (O12-09/RRA1-16…) — مرحلة الأوفرلاب 1:
+            // قبول عرض/فلتر فقط عبر المحلل المشترك، بلا تغيير لبقية الشروط.
+            if (OperationalCodes.isOperationalCode(codeBase)) return true;
             return validCodes.includes(codeBase) || offCodes.includes(codeBase) || isExplicitFieldCode(codeBase);
         });
         
@@ -4882,6 +4888,79 @@ app.get('/api/staffing/available-support', authenticate, async (req, res) => {
     } catch (error) {
         console.error('[API] Error available support:', error);
         res.status(500).json({ error: 'فشل في جلب القوى المتاحة للدعم' });
+    }
+});
+
+// ============================================
+// مرحلة الأوفرلاب 4 (التفعيل): ربط موظف كود تشغيلي ملحق (O12-09/12/14 ·
+// RRA1-04/16) بفريق قائم من شاشة التكميل — نفس نمط دعم المركبات حرفيًا
+// (authenticate + تحقق في الخدمة + ختم سيرفري + بث SSE). هوية الفريق =
+// الاسم القياسي (اتفاق staffing)، وليس رقم مركبة. التفعيل لا يغيّر أي
+// تصنيف kind — موظف RRA يبقى تدخلًا سريعًا (بقرار المالك).
+// ============================================
+app.post('/api/staffing/activation', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { employeeName, teamName, note } = req.body || {};
+        if (!employeeName || !teamName) return res.status(400).json({ error: 'بيانات ناقصة: الموظف والفريق إلزاميان' });
+        const result = await staffingEventsService.activateTeam({ employeeName, teamName, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'staffing_events_updated', shiftId: result.shiftId }); // التفعيل يغيّر الجاهزية والحوض
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error staffing activation:', error);
+        res.status(500).json({ error: 'فشل في تفعيل الفرقة' });
+    }
+});
+
+app.post('/api/staffing/activation/end', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { employeeName, note } = req.body || {};
+        if (!employeeName) return res.status(400).json({ error: 'بيانات ناقصة: الموظف إلزامي' });
+        const result = await staffingEventsService.endActivation({ employeeName, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'staffing_events_updated', shiftId: result.shiftId });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error staffing activation end:', error);
+        res.status(500).json({ error: 'فشل في إنهاء التفعيل' });
+    }
+});
+
+// ============================================
+// المرحلة ب: إضافة متطوع من شاشة التكميل — مسار الـOverlap حرفيًا
+// (تصحيح المالك): الإضافة = دخول «الدعم المتاح» فقط (بلا فريق)،
+// والإسناد للفرقة عبر POST /api/staffing/activation القائم، وإنهاء
+// التفعيل يعيده للحوض. قاعدة المرشحين سيرفرية: النشطون − المجدولون
+// للعمل الفعلي اليوم (نفس مصنّف اشتقاق الطاقم) − من عليه مشغّل مفتوح.
+// ============================================
+app.get('/api/staffing/volunteer-candidates', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const resolved = await resolveEventsShiftId(req);
+        if (resolved.error) return res.status(400).json({ error: resolved.error });
+        const result = await staffingEventsService.getVolunteerCandidates(resolved.shiftId, req.query.q);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error volunteer candidates:', error);
+        res.status(500).json({ error: 'فشل في جلب مرشحي التطوع' });
+    }
+});
+
+app.post('/api/staffing/volunteer', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const { employeeCode, employeeName, note } = req.body || {};
+        if (!employeeCode && !employeeName) return res.status(400).json({ error: 'بيانات ناقصة: الموظف إلزامي' });
+        const result = await staffingEventsService.addVolunteer({ employeeCode, employeeName, note }, req.user);
+        if (result.appended > 0) broadcast({ type: 'staffing_events_updated', shiftId: result.shiftId }); // التطوع يغيّر الحوض
+        res.json({ success: true, ...result });
+    } catch (error) {
+        if (error && error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+        console.error('[API] Error staffing volunteer:', error);
+        res.status(500).json({ error: 'فشل في تسجيل التطوع' });
     }
 });
 
@@ -7505,6 +7584,10 @@ async function readScheduleEmployeesFromDB(month) {
             name: e.name || '',
             jobTitle: e.job_title || '',
             team: empTeamMap[e.id] || '',
+            // تفويض «تصدير حسب فئة رمز القوة»: الرمز الخام يُرفق بالنموذج
+            // ويُفك سيرفريًا عبر symbol-dictionary (مع job_title لقاعدة
+            // «تنسيق الاستجابة») — لا يدخل فرع center إطلاقًا.
+            symbol: e.symbol || '',
             schedule: []
         };
     });
@@ -7526,7 +7609,7 @@ async function readScheduleEmployeesFromDB(month) {
         if (!emp) return;
         const c = r.shift_code;
         let status = 'دوام';
-        if (c === 'V' || c === 'VC' || c === 'E' || c === 'EV') status = 'إجازة';
+        if (c === 'V' || c === 'VC' || c === 'E' || c === 'EV' || c === 'S') status = 'إجازة';
         else if (c === 'WO') status = 'راحة';
         else if (c === 'C') status = 'تدريب';
         else if (c === 'ME' || c === 'F' || (c && c.indexOf('CP') === 0)) status = 'تكميل';
@@ -7543,7 +7626,12 @@ async function readScheduleEmployeesFromDB(month) {
 app.get('/api/schedule/pdf', authenticate, async (req, res) => {
     try {
         const center = String(req.query.center || '').trim();
-        if (!center) return res.status(400).json({ error: 'المركز مطلوب' });
+        // تفويض «تصدير الجداول حسب فئة رمز القوة (A/B/C/D)»: group بجوار center —
+        // مع center يبقى السلوك الحالي حرفيًا (يُتجاهل group)؛ بلا center يُشترط
+        // group صالح. الفئة تُستخرج من symbol عبر القاموس المركزي داخل الخدمة.
+        const group = String(req.query.group || '').trim().toUpperCase();
+        if (!center && !group) return res.status(400).json({ error: 'المركز أو الفئة مطلوب' });
+        if (!center && !/^[A-D]$/.test(group)) return res.status(400).json({ error: 'الفئة غير صالحة (A/B/C/D)' });
         const month = String(req.query.month || '').trim();
         if (month && !/^\d{4}-\d{2}$/.test(month)) {
             return res.status(400).json({ error: 'صيغة الشهر غير صالحة (YYYY-MM)' });
@@ -7560,12 +7648,37 @@ app.get('/api/schedule/pdf', authenticate, async (req, res) => {
         } else {
             employees = await readScheduleEmployees();
         }
-        const data = schedulePdfService.buildSchedulePdfData(employees, { center, month: month || undefined });
-        if (!data.employees.length) {
-            return res.status(404).json({ error: 'لا توجد بيانات جدول لهذا المركز' });
+        let data;
+        if (center) {
+            // فرع المركز — لم يتغير أي حرف في سلوكه
+            data = schedulePdfService.buildSchedulePdfData(employees, { center, month: month || undefined });
+            if (!data.employees.length) {
+                return res.status(404).json({ error: 'لا توجد بيانات جدول لهذا المركز' });
+            }
+        } else {
+            // فرع الفئة: خريطة رموز المناوبات لمحرك المقاييس (نفس استعلام
+            // computeMetrics — الساعات/المناوبات من المحرك الرسمي بلا حساب مستقل)
+            let codesByCode = new Map();
+            if (dbAvailable()) {
+                try {
+                    const codeRows = await db.all('SELECT code, name, time_start, time_end FROM shift_codes');
+                    for (const r of codeRows) {
+                        const c = String(r.code || '').trim();
+                        if (!c) continue;
+                        codesByCode.set(c, r);
+                        codesByCode.set(c.toUpperCase(), r);
+                    }
+                } catch (e) {
+                    console.warn('[SchedulePDF] تعذّرت قراءة shift_codes — ملخصات نصية فقط:', e.message);
+                }
+            }
+            data = schedulePdfService.buildSchedulePdfData(employees, { group, month: month || undefined, codesByCode });
+            if (!data.employees.length) {
+                return res.status(404).json({ error: 'لا توجد بيانات جدول لهذه الفئة' });
+            }
         }
         const buf = await schedulePdfService.generateSchedulePdf(data);
-        const fname = 'جدول-' + data.center + '-' + (data.month || '') + '.pdf';
+        const fname = (center ? 'جدول-' + data.center : 'جدول-فئة-' + group) + '-' + (data.month || '') + '.pdf';
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', "attachment; filename=\"schedule.pdf\"; filename*=UTF-8''" + encodeURIComponent(fname));
         res.send(buf);
@@ -9362,6 +9475,98 @@ app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).json({ error: 'فشل في جلب الإحصائيات' });
+    }
+});
+
+// ============================================
+// API: Shift Roster - Available Months
+// ============================================
+// قائمة الشهور المتاحة في الجدول — تغذي فلتر الشهر متعدد الشهور في smart-schedule.
+// مسار ثابت يُسجَّل قبل /:id (نفس قاعدة D-35 أدناه) حتى لا يُبتلع كمعرّف.
+app.get('/api/shift-roster/months', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const months = await db.ShiftRoster.getMonths();
+        res.json({ success: true, months });
+    } catch (error) {
+        console.error('ShiftRoster months error:', error);
+        res.status(500).json({ error: 'فشل في جلب قائمة الشهور' });
+    }
+});
+
+// ============================================
+// API: مؤشرات الساعات الشهرية (Phase 2)
+// ============================================
+// AppSettings معرّف في db.js لكنه غير مُصدَّر ضمن module.exports — نفس دلالته
+// هنا عبر get/run المُصدَّرتين (قيمة JSON في app_settings) دون تعديل db.js.
+async function appSettingGet(key) {
+    const row = await db.get('SELECT value FROM app_settings WHERE key = ?', [key]);
+    return row ? JSON.parse(row.value) : null;
+}
+async function appSettingSet(key, value) {
+    const json = JSON.stringify(value);
+    const existing = await db.get('SELECT key FROM app_settings WHERE key = ?', [key]);
+    if (existing) {
+        return db.run("UPDATE app_settings SET value = ?, updated_at = datetime('now') WHERE key = ?", [json, key]);
+    }
+    return db.run('INSERT INTO app_settings (key, value) VALUES (?, ?)', [key, json]);
+}
+
+// المطلوب الشهري من الإعدادات — أول قراءة تزرع الافتراضي 192 ثم تعيده
+const DEFAULT_MONTHLY_REQUIRED_HOURS = 192;
+async function getMonthlyRequiredHours() {
+    let value = await appSettingGet('monthly_required_hours');
+    if (value === null || isNaN(Number(value))) {
+        await appSettingSet('monthly_required_hours', DEFAULT_MONTHLY_REQUIRED_HOURS);
+        value = DEFAULT_MONTHLY_REQUIRED_HOURS;
+    }
+    return Number(value);
+}
+
+// مؤشرات الساعات لفترة — اشتقاق حي من shift_roster + shift_codes عبر الخدمة
+app.get('/api/schedule/metrics', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        if (!scheduleMetricsService) return res.status(503).json({ error: 'خدمة مؤشرات الساعات غير متاحة' });
+        const from = String(req.query.from || '').trim();
+        const to = String(req.query.to || '').trim();
+        if (!_isValidIsoDateStr(from) || !_isValidIsoDateStr(to) || from > to) {
+            return res.status(400).json({ error: 'صيغة التاريخ غير صالحة — المطلوب from و to بصيغة YYYY-MM-DD و from قبل to' });
+        }
+        const requiredHours = await getMonthlyRequiredHours();
+        const metrics = await scheduleMetricsService.computeMetrics(from, to, requiredHours);
+        res.json({ success: true, ...metrics });
+    } catch (error) {
+        console.error('Schedule metrics error:', error);
+        res.status(500).json({ error: 'فشل في حساب مؤشرات الساعات' });
+    }
+});
+
+// قراءة المطلوب الشهري (يُزرع 192 عند أول قراءة)
+app.get('/api/settings/monthly-required-hours', authenticate, async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const value = await getMonthlyRequiredHours();
+        res.json({ success: true, value });
+    } catch (error) {
+        console.error('Monthly required hours GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب المطلوب الشهري' });
+    }
+});
+
+// تحديث المطلوب الشهري — admin/director فقط (رقم موجب 1..744 = ساعات شهر كحد أقصى)
+app.put('/api/settings/monthly-required-hours', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
+        const value = Number(req.body && req.body.value);
+        if (!isFinite(value) || value < 1 || value > 744) {
+            return res.status(400).json({ error: 'قيمة المطلوب الشهري غير صالحة — رقم موجب بين 1 و 744' });
+        }
+        await appSettingSet('monthly_required_hours', value);
+        res.json({ success: true, value });
+    } catch (error) {
+        console.error('Monthly required hours PUT error:', error);
+        res.status(500).json({ error: 'فشل في حفظ المطلوب الشهري' });
     }
 });
 
@@ -11847,6 +12052,11 @@ server.listen(PORT, async () => {
             const RosterSyncService = require('./services/roster-sync-service');
             rosterSyncService = new RosterSyncService({ db });
             console.log('✅ RosterSyncService wired (SR-2)');
+            // Phase 2: ScheduleMetricsService — مؤشرات الساعات الشهرية (قراءة فقط،
+            // اشتقاق حي من shift_roster + shift_codes بلا عدادات مخزنة)
+            const ScheduleMetricsService = require('./services/schedule-metrics-service');
+            scheduleMetricsService = new ScheduleMetricsService({ db });
+            console.log('✅ ScheduleMetricsService wired (Phase 2)');
             // W1-B: late binding — CompletionService هو نقطة الكتابة الوحيدة للأحداث
             if (completionService) completionService.staffingEventsService = staffingEventsService;
             console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');
@@ -11874,6 +12084,7 @@ server.listen(PORT, async () => {
             staffingEventsService = null;
             vehicleEventsService = null;
             rosterSyncService = null;
+            scheduleMetricsService = null;
             workflowService = null;
         }
     }

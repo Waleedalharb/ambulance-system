@@ -1080,6 +1080,11 @@ function personHtml(m, cls, note) {
         '<span class="c-sep">|</span>' +
         '<span class="c-code">' + (m && m.code ? esc(String(m.code)) : '') + '</span>' +
         '</span>';
+    // تمييز عرضي (ملاحظة المالك): المفعَّل متطوع الأصل يُوسم «🤝 متطوع» أينما
+    // ظهر (كادر أساسي/استثناءات) حتى لا يُقرأ كعضو مجدول — من حقل الخادم فقط
+    if (m && m.role === 'activation' && m.activationKind === 'volunteer') {
+        h += '<span class="p-note">🤝 متطوع</span>';
+    }
     if (note) h += '<span class="p-note">' + esc(note) + '</span>';
     return h + '</span>';
 }

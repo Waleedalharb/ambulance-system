@@ -17,7 +17,7 @@
         { code: 'دوام رسمي', label: 'دوام رسمي', color: 'green' },
         { code: 'مكلف / مهمة رسمية', label: 'مكلف / مهمة رسمية', color: 'gold' },
         { code: 'أوفر لاب / نوبات تداخلية', label: 'أوفر لاب', color: 'gold' },
-        { code: 'إجازة تعويضية', label: 'إجازة تعويضية', color: 'red' },
+        { code: 'إجازة اضطرارية', label: 'إجازة اضطرارية', color: 'red' },
         { code: 'تدريب', label: 'تدريب', color: 'blue' }
     ];
 
