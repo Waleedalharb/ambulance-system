@@ -28,6 +28,44 @@
 // «اليوم» وأُسس الأسابيع تُشتق من توقيت الرياض/UTC الصريح، لا من منطقة الخادم.
 const TimeRiyadh = require('../public/js/time-riyadh.js');
 
+// ─── مؤشر المساهمة التشغيلية P1 (DECISION-CONTRIBUTION-INDICATOR-P1.md) ───
+// التصنيف الإداري المعتمد: مطابقة تامة على employees.job_title — بلا مطابقة
+// جزئية وبلا users.role. غير المطابقين يُرصدون للمراجعة اليدوية فقط.
+const CONTRIBUTION_GROUPS = {
+    operations: ['تحكم عملياتي', 'تنسيق استجابة'],
+    fieldLeadership: ['كبير مسعفين', 'مساعد كبير مسعفين']
+};
+// سلال audit_log (أفعال موثقة في خريطة الفحص — لا يُخترع غيرها)
+const AUDIT_BUCKET_MAP = {
+    completion_saved: 'completions',
+    report_created: 'dispatchActions',
+    report_undone: 'dispatchUndo',
+    report_entry_added: 'reportEntries',
+    report_entry_deleted: 'reportEntryMods',
+    report_entry_cleared: 'reportEntryMods',
+    doc_uploaded: 'docs',
+    identity_uploaded: 'docs',
+    ops_files_uploaded: 'docs',
+    shift_cell_update: 'scheduleEdits',
+    employee_transfer_day: 'scheduleEdits',
+    employee_transfer_from_date: 'scheduleEdits',
+    roster_clear_all: 'scheduleEdits',
+    import_overwrite_manual: 'scheduleEdits',
+    shift_pattern_update: 'scheduleEdits',
+    employee_pattern_update: 'scheduleEdits',
+    shift_updated: 'shiftLifecycle',
+    shift_deleted: 'shiftLifecycle',
+    shift_started: 'shiftLifecycle',
+    shift_ended: 'shiftLifecycle',
+    shift_archived: 'shiftLifecycle',
+    announcements_updated: 'announcements'
+    // ملاحظة: shift_event_added مستبعد عمدًا — أحداث المناوبة اليدوية تُعدّ من
+    // سجلها الرسمي operational_events(domain=logistics) حتى لا تُحسب مرتين.
+    // user_login والأفعال العربية القديمة («بدء مناوبة جديدة»…) مستبعدة:
+    // الأولى بقرار المالك (الدخول ليس إنجازًا)، والثانية صدوى مكررة لنفس الحدث
+    // باسم عربي إلى جانب الاسم القانوني — عدّها = ازدواج.
+};
+
 class IndicatorService {
     /**
      * @param {Object} deps
@@ -39,6 +77,9 @@ class IndicatorService {
         if (!reportService) throw new Error('IndicatorService requires a ReportService instance');
         this.engine = engine;
         this.reportService = reportService;
+        // P1 (حقن متأخر من server.js — نمط StaffingEventsService): محلل رموز
+        // المناوبات المركزي الوحيد لحساب الساعات/المناوبات لكل موظف.
+        this.scheduleMetrics = null;
     }
 
     /**
@@ -164,6 +205,253 @@ class IndicatorService {
         } catch (e) { /* جدول قد لا يسبق التهيئة في بيئات الاختبار — الإجمالي صفر آمن */ }
 
         return { shiftStats, recentShifts, dailySeries, shiftTypes, weekly, centerDistribution, hourlyProfile, positioning };
+    }
+
+    /**
+     * مؤشر المساهمة التشغيلية — المرحلة الأولى (أعداد خام، بلا نقاط ولا ترتيب).
+     * DECISION-CONTRIBUTION-INDICATOR-P1.md — قراءة فقط، اشتقاق حي عند كل طلب.
+     *
+     * لكل موظف مصنَّف (job_title مطابقة تامة): التوظيف (ساعات/مناوبات من
+     * shift_roster عبر محلل الرموز المركزي) + سلال الأعمال من:
+     *   audit_log · operational_events · positioning_events · shift_signout_events
+     *   · shift_forms · workflow_audit_log · shift_alerts
+     *
+     * مفاتيح الفاعل المختلفة بين الجداول (موثقة في خريطة الفحص):
+     *   String(users.id)  → audit_log.user_id, operational_events.actor_id,
+     *                       positioning_events.actor_id, signouts, workflow_audit
+     *   users.username    → shift_forms.created_by (= الكود الوظيفي)
+     *   الاسم             → shift_alerts.acknowledged_by
+     *
+     * @param {number} year  (ميلادي)
+     * @param {number} month (1-12)
+     */
+    async getEmployeeContribution(year, month) {
+        const y = Number(year), m = Number(month);
+        if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12 || y < 2000) {
+            throw new Error('سنة/شهر غير صالحين');
+        }
+        const mm = String(m).padStart(2, '0');
+        const monthKey = `${y}-${mm}`;                       // لختم substr(created_at,1,7)
+        const from = `${monthKey}-01`;
+        const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        const to = `${monthKey}-${String(lastDay).padStart(2, '0')}`;
+        const storage = this.engine.storage;
+
+        // ── 1) الموظفون النشطون + التصنيف بالمطابقة التامة ──
+        const empRows = await storage.all(
+            'SELECT id, employee_code, name, job_title FROM employees WHERE COALESCE(is_active, 1) != 0'
+        );
+        const classified = [];
+        const unmatchedTitles = {};
+        for (const e of empRows) {
+            const jt = String(e.job_title || '');
+            const group = CONTRIBUTION_GROUPS.operations.includes(jt) ? 'operations'
+                : CONTRIBUTION_GROUPS.fieldLeadership.includes(jt) ? 'fieldLeadership' : null;
+            if (!group) {
+                unmatchedTitles[jt || '(فارغ)'] = (unmatchedTitles[jt || '(فارغ)'] || 0) + 1;
+                continue;
+            }
+            classified.push({
+                empId: e.id,
+                code: String(e.employee_code || ''),
+                name: e.name || '',
+                jobTitle: jt,
+                group,
+                actorKeys: new Set(),   // String(users.id)
+                hours: 0,
+                shifts: 0,
+                uncountedRosterDays: 0,
+                hasSchedule: false,
+                works: {
+                    completions: 0, dispatchActions: 0, dispatchUndo: 0,
+                    reportEntries: 0, reportEntryMods: 0,
+                    positioning: { created: 0, updated: 0, ended: 0, swept: 0, total: 0 },
+                    signouts: 0,
+                    forms: { total: 0, byType: {} },
+                    staffingEvents: 0, vehicleEvents: 0, logisticsEvents: 0, centerEvents: 0,
+                    workflowActions: { create: 0, approve: 0, pdf: 0, reissue: 0, edit_fields: 0, other: 0, total: 0 },
+                    scheduleEdits: 0, shiftLifecycle: 0, docs: 0, announcements: 0,
+                    alertsAcked: 0
+                }
+            });
+        }
+        const byCode = new Map(classified.map(c => [c.code, c]));
+        const byName = new Map(classified.map(c => [c.name, c]));
+
+        // ── 2) مفاتيح الفاعل: المصادقة تقرأ data/users.json حيث id='emp-<الكود>'،
+        // بينما جدول users يحمل id رقميًا — نغطي الصيغتين معًا (موثق في خريطة الفحص).
+        const userRows = await storage.all('SELECT id, username FROM users');
+        for (const u of userRows) {
+            const emp = byCode.get(String(u.username || ''));
+            if (emp) emp.actorKeys.add(String(u.id));
+        }
+        for (const emp of classified) {
+            emp.actorKeys.add('emp-' + emp.code); // صيغة users.json الفعلية
+        }
+        // فهرس عكسي: مفتاح الفاعل → الموظف (للجداول المختومة بـ users.id)
+        const byActorKey = new Map();
+        for (const emp of classified) {
+            for (const k of emp.actorKeys) byActorKey.set(k, emp);
+        }
+
+        // ── 3) التوظيف: ساعات + مناوبات من shift_roster عبر المحلل المركزي ──
+        const sm = this.scheduleMetrics;
+        const rosterRows = await storage.all(
+            'SELECT employee_id, shift_code FROM shift_roster WHERE shift_date >= ? AND shift_date <= ?',
+            [from, to]
+        );
+        let codesByCode = null;
+        if (sm) {
+            codesByCode = new Map();
+            for (const r of await storage.all('SELECT code, name, time_start, time_end FROM shift_codes')) {
+                const c = String(r.code || '').trim();
+                if (!c) continue;
+                codesByCode.set(c, r);
+                codesByCode.set(c.toUpperCase(), r);
+            }
+        }
+        const byEmpId = new Map(classified.map(c => [c.empId, c]));
+        for (const r of rosterRows) {
+            const emp = byEmpId.get(r.employee_id);
+            if (!emp) continue;
+            emp.hasSchedule = true;
+            if (!sm) { emp.hours = null; emp.shifts = null; continue; }
+            // resolveCodeDurationHours → number|null؛ resolveCodeDurationKind → 'work'|'coverage'|null
+            const hours = sm.resolveCodeDurationHours(r.shift_code, codesByCode);
+            if (hours === null) { emp.uncountedRosterDays++; continue; }
+            emp.hours = Math.round((emp.hours + hours) * 10) / 10;
+            if (sm.resolveCodeDurationKind(r.shift_code, codesByCode) === 'work') emp.shifts++; // رموز التغطية (E/VC/V/S) ساعات محسوبة لا مناوبات — قرار المالك 2026-08-13
+        }
+
+        // ── 4) audit_log ──
+        for (const r of await storage.all(
+            'SELECT user_id, action, COUNT(*) AS c FROM audit_log WHERE substr(created_at, 1, 7) = ? GROUP BY user_id, action',
+            [monthKey]
+        )) {
+            const emp = byActorKey.get(String(r.user_id));
+            const bucket = AUDIT_BUCKET_MAP[r.action];
+            if (!emp || !bucket) continue;
+            emp.works[bucket] += r.c;
+        }
+
+        // ── 5) operational_events (السجل التشغيلي الموحد) ──
+        const OE_DOMAIN_BUCKET = { staffing: 'staffingEvents', vehicle: 'vehicleEvents', logistics: 'logisticsEvents', center: 'centerEvents' };
+        for (const r of await storage.all(
+            'SELECT actor_id, domain, COUNT(*) AS c FROM operational_events WHERE substr(created_at, 1, 7) = ? GROUP BY actor_id, domain',
+            [monthKey]
+        )) {
+            const emp = byActorKey.get(String(r.actor_id));
+            const bucket = OE_DOMAIN_BUCKET[r.domain];
+            if (!emp || !bucket) continue;
+            emp.works[bucket] += r.c;
+        }
+
+        // ── 6) positioning_events ──
+        for (const r of await storage.all(
+            'SELECT actor_id, event_type, COUNT(*) AS c FROM positioning_events WHERE substr(created_at, 1, 7) = ? GROUP BY actor_id, event_type',
+            [monthKey]
+        )) {
+            const emp = byActorKey.get(String(r.actor_id));
+            if (!emp) continue;
+            const p = emp.works.positioning;
+            if (r.event_type === 'created') p.created += r.c;
+            else if (r.event_type === 'updated') p.updated += r.c;
+            else if (r.event_type === 'ended') p.ended += r.c;
+            else if (r.event_type === 'swept') p.swept += r.c;
+        }
+
+        // ── 7) shift_signout_events ──
+        for (const r of await storage.all(
+            'SELECT actor_id, COUNT(*) AS c FROM shift_signout_events WHERE substr(created_at, 1, 7) = ? GROUP BY actor_id',
+            [monthKey]
+        )) {
+            const emp = byActorKey.get(String(r.actor_id));
+            if (emp) emp.works.signouts += r.c;
+        }
+
+        // ── 8) shift_forms (created_by = الكود الوظيفي) ──
+        for (const r of await storage.all(
+            'SELECT created_by, form_name, COUNT(*) AS c FROM shift_forms WHERE substr(created_at, 1, 7) = ? GROUP BY created_by, form_name',
+            [monthKey]
+        )) {
+            const emp = byCode.get(String(r.created_by || ''));
+            if (!emp) continue;
+            emp.works.forms.total += r.c;
+            emp.works.forms.byType[r.form_name] = (emp.works.forms.byType[r.form_name] || 0) + r.c;
+        }
+
+        // ── 9) workflow_audit_log ──
+        try {
+            for (const r of await storage.all(
+                'SELECT actor_id, action, COUNT(*) AS c FROM workflow_audit_log WHERE substr(at, 1, 7) = ? GROUP BY actor_id, action',
+                [monthKey]
+            )) {
+                const emp = byActorKey.get(String(r.actor_id));
+                if (!emp) continue;
+                const w = emp.works.workflowActions;
+                if (Object.prototype.hasOwnProperty.call(w, r.action)) w[r.action] += r.c;
+                else w.other += r.c;
+            }
+        } catch (e) { /* الجدول ذاتي الإنشاء — قد يسبق التهيئة في بيئات الاختبار */ }
+
+        // ── 10) shift_alerts المُقروءة (acknowledged_by = الاسم) ──
+        try {
+            for (const r of await storage.all(
+                `SELECT acknowledged_by, COUNT(*) AS c FROM shift_alerts
+                 WHERE is_acknowledged = 1 AND acknowledged_by IS NOT NULL AND substr(acknowledged_at, 1, 7) = ?
+                 GROUP BY acknowledged_by`,
+                [monthKey]
+            )) {
+                const emp = byName.get(String(r.acknowledged_by || ''));
+                if (emp) emp.works.alertsAcked += r.c;
+            }
+        } catch (e) { /* دفاعي */ }
+
+        // ── التجميع النهائي: إجمالي الأعمال + تفكيك الحقول الداخلية ──
+        const finalize = (emp) => {
+            const w = emp.works;
+            w.positioning.total = w.positioning.created + w.positioning.updated + w.positioning.ended; // swept = كنس آلي، ليس عمل موظف
+            w.workflowActions.total = w.workflowActions.create + w.workflowActions.approve + w.workflowActions.pdf
+                + w.workflowActions.reissue + w.workflowActions.edit_fields + w.workflowActions.other;
+            const totalWorks = w.completions + w.dispatchActions + w.dispatchUndo + w.reportEntries + w.reportEntryMods
+                + w.positioning.total + w.signouts + w.forms.total
+                + w.staffingEvents + w.vehicleEvents + w.logisticsEvents + w.centerEvents
+                + w.workflowActions.total + w.scheduleEdits + w.shiftLifecycle + w.docs + w.announcements + w.alertsAcked;
+            return {
+                employeeCode: emp.code,
+                name: emp.name,
+                jobTitle: emp.jobTitle,
+                hasUserAccount: emp.actorKeys.size > 0,
+                hasSchedule: emp.hasSchedule,
+                scheduledHours: emp.hours,
+                shifts: emp.shifts,
+                uncountedRosterDays: emp.uncountedRosterDays,
+                works: w,
+                totalWorks
+            };
+        };
+        // ترتيب محايد أبجدي بالاسم داخل كل فئة (ليس ترتيب أداء — قرار المالك)
+        const byAlpha = (a, b) => a.name.localeCompare(b.name, 'ar');
+        return {
+            year: y,
+            month: m,
+            monthKey,
+            range: { from, to },
+            generatedAt: new Date().toISOString(),
+            groups: {
+                operations: classified.filter(c => c.group === 'operations').map(finalize).sort(byAlpha),
+                fieldLeadership: classified.filter(c => c.group === 'fieldLeadership').map(finalize).sort(byAlpha)
+            },
+            unmatchedJobTitles: Object.entries(unmatchedTitles)
+                .map(([jobTitle, count]) => ({ jobTitle, count }))
+                .sort((a, b) => b.count - a.count),
+            caveats: [
+                'توزيع البلاغات يعدّ إجراءات التوزيع لا البلاغات المفردة (الإدخال الجماعي = إجراء واحد).',
+                'أعمال القيادة الميدانية المقاسة هي المسجلة في المنصة فقط؛ المتابعة بلا كتابة غير مسجلة بنيويًا.',
+                'ملاحظات المناوبة مستبعدة (لا تحمل ختم مؤلف سيرفري).',
+                'حدود الشهر محسوبة على الختم المخزن (UTC) وقد تزيح ساعات قليلة عن ليلة الرياض.'
+            ]
+        };
     }
 }
 

@@ -4212,6 +4212,24 @@ app.get('/api/indicators/dashboard', authenticate, async (req, res) => {
     }
 });
 
+// P1: مؤشر المساهمة التشغيلية — أعداد خام شهرية لكل موظف مصنَّف
+// (DECISION-CONTRIBUTION-INDICATOR-P1.md). قراءة فقط؛ بلا نقاط ولا ترتيب.
+// بيانات أداء موظفين ⇒ امتياز إداري (admin/director).
+app.get('/api/indicators/contribution', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        if (!indicatorService) return res.status(503).json({ error: 'الخدمة غير متوفرة' });
+        // الافتراضي: الشهر الحالي بتوقيت الرياض (الطبقة المركزية — TIME-POLICY)
+        const nowRiyadh = TimeRiyadh.formatDate(new Date()); // YYYY-MM-DD
+        const year = parseInt(req.query.year, 10) || Number(nowRiyadh.slice(0, 4));
+        const month = parseInt(req.query.month, 10) || Number(nowRiyadh.slice(5, 7));
+        const stats = await indicatorService.getEmployeeContribution(year, month);
+        res.json({ success: true, ...stats });
+    } catch (error) {
+        console.error('Contribution indicators error:', error);
+        res.status(500).json({ error: 'فشل في جلب إحصائيات المساهمة' });
+    }
+});
+
 // ============================================
 // API: البلاغات
 // ============================================
@@ -12057,6 +12075,9 @@ server.listen(PORT, async () => {
             const ScheduleMetricsService = require('./services/schedule-metrics-service');
             scheduleMetricsService = new ScheduleMetricsService({ db });
             console.log('✅ ScheduleMetricsService wired (Phase 2)');
+            // P1 (DECISION-CONTRIBUTION-INDICATOR): حقن متأخر لمحلل الرموز
+            // المركزي في IndicatorService — يمنع نسخ منطق مدة الرموز.
+            if (indicatorService) indicatorService.scheduleMetrics = scheduleMetricsService;
             // W1-B: late binding — CompletionService هو نقطة الكتابة الوحيدة للأحداث
             if (completionService) completionService.staffingEventsService = staffingEventsService;
             console.log('✅ Staffing/Vehicle Events services wired (W1-A, read-only)');

@@ -5066,6 +5066,24 @@ function oiParseOfficial(workbook) {
             if (seen[empCode]) { out.issues.duplicates.push(empCode + ' — ' + name); continue; }
             seen[empCode] = true;
             var resolved = oiResolveSymbol(rawSym, job); // قاعدة «تنسيق الاستجابة» محسومة داخل القاموس
+            // فجوة مسار الرمز (اعتماد 2026-08-14): الأكواد التشغيلية الملحقة تصل أيضًا
+            // كرمز موظف في عمود «رمز» (O12-09/12/14). الهوية = الأساس المفرد من قاموس
+            // الرموز (O12 ⇒ أوفرلاب O12) وبداية التشغيل من اللاحقة عبر المحلل المركزي
+            // — بلا تحويل إلى O12A12 وبلا استبعاد. أوفرلاب فقط: التدخل السريع لا يكون
+            // رمز موظف (موظفوه مجدولون D/N ويُعرفون من تصنيف الفرقة).
+            if (!resolved && window.OperationalCodes) {
+                var opNs = oiNormalize(rawSym);
+                var opc = OperationalCodes.parseOperationalCode(opNs);
+                if (opc && opc.kind === 'overlap') {
+                    var opBase = oiResolveSymbol('O' + opc.durationH, job);
+                    resolved = {
+                        kind: 'overlap',
+                        team: (opBase && opBase.team) || ('أوفرلاب O' + opc.durationH),
+                        num: opc.durationH,
+                        opCode: opNs, opStart: opc.start, opEnd: opc.end
+                    };
+                }
+            }
             if (!resolved) {
                 var ns = oiNormalize(rawSym);
                 if (!ns) out.issues.noSymbol.push(empCode + ' — ' + name);

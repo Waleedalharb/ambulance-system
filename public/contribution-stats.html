@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مؤشر المساهمة التشغيلية — إحصائيات شهرية</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي — نفس وصفة السطوح الزجاجية في الثيم التنفيذي للمنصة */
+    :root {
+        --navy-900: #0B1E33; --navy-700: #1A3A5C;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --ops: #60A5FA; --lead-hi: #4FBF9A; --emerald: #0EA47A; --coral: #EF4444;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46, 139, 122, 0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232, 200, 74, 0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%);
+    }
+    body::after {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, rgba(0,0,0,0.85), transparent 100%);
+    }
+    .container { max-width: 1500px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .controls { display: flex; gap: 8px; align-items: center; background: var(--surface); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-soft); box-shadow: var(--shadow-card); }
+    .controls select, .controls button { font-family: inherit; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.9rem; }
+    .controls select { cursor: pointer; }
+    .controls button { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border: none; cursor: pointer; font-weight: 600; box-shadow: 0 6px 18px rgba(14,164,122,0.25); transition: filter 0.2s ease; }
+    .controls button:hover { filter: brightness(1.1); }
+    .caveats { background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.28); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; font-size: 0.82rem; color: #EADDA8; }
+    .caveats strong { color: var(--gold-id); }
+    .caveats li { margin: 2px 0; }
+    .group-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); margin-bottom: 22px; overflow: hidden; box-shadow: var(--shadow-card); }
+    .group-header { padding: 14px 18px; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; border-bottom: 1px solid var(--border-soft); }
+    .group-header.ops { border-right: 4px solid var(--ops); }
+    .group-header.ops i { color: var(--ops); }
+    .group-header.lead { border-right: 4px solid var(--teal-id); }
+    .group-header.lead i { color: var(--lead-hi); }
+    .group-header .count { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px; padding: 2px 12px; font-size: 0.8rem; color: var(--text-2); }
+    .table-wrap { overflow-x: auto; }
+    .table-wrap::-webkit-scrollbar { height: 8px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; white-space: nowrap; }
+    th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 10px 8px; text-align: center; position: sticky; top: 0; }
+    th[rowspan="2"] { vertical-align: middle; }
+    thead tr.grp th { border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+    td { padding: 9px 8px; text-align: center; border-top: 1px solid var(--border-soft); }
+    td.name { text-align: right; font-weight: 600; }
+    td .jt { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+    tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .num { font-variant-numeric: tabular-nums; }
+    .zero { color: var(--muted); opacity: 0.5; }
+    .total-cell { font-weight: 700; color: var(--gold-id); }
+    .warn { color: var(--gold-id); font-size: 0.72rem; display: block; }
+    .noaccount { color: var(--coral); font-size: 0.72rem; display: block; }
+    .detail-toggle { cursor: pointer; color: var(--ops); font-size: 0.75rem; }
+    .detail-row td { background: rgba(0,0,0,0.28); text-align: right; font-size: 0.78rem; color: var(--text-2); padding: 10px 18px; white-space: normal; }
+    .unmatched { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px 18px; font-size: 0.85rem; box-shadow: var(--shadow-card); }
+    .unmatched h3 { font-size: 0.95rem; margin-bottom: 8px; color: var(--text-2); }
+    .chip { display: inline-block; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px; padding: 4px 12px; margin: 3px; font-size: 0.8rem; color: var(--text-2); }
+    .loading, .error-box { text-align: center; padding: 40px; color: var(--muted); }
+    .error-box { color: var(--coral); }
+    .meta { color: var(--muted); font-size: 0.78rem; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-chart-simple"></i>مؤشر المساهمة التشغيلية</h1>
+            <div class="subtitle">المرحلة الأولى — أعداد خام شهرية · بلا نقاط ولا ترتيب · العمليات والقيادة الميدانية</div>
+        </div>
+        <div class="controls">
+            <select id="monthSel"></select>
+            <select id="yearSel"></select>
+            <button onclick="loadStats()"><i class="fas fa-rotate"></i> عرض</button>
+        </div>
+    </div>
+
+    <div class="caveats" id="caveatsBox" style="display:none">
+        <strong><i class="fas fa-circle-info"></i> ملاحظات القراءة:</strong>
+        <ul id="caveatsList" style="padding-right: 18px;"></ul>
+    </div>
+
+    <div class="meta" id="metaLine"></div>
+    <div id="content"><div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري التحميل…</div></div>
+    <div id="unmatchedBox"></div>
+</div>
+
+<script src="js/core/core-auth.js"></script>
+<script src="/js/time-riyadh.js"></script>
+<script>
+// ═══ عرض فقط — بلا منطق تشغيلي: كل الأرقام تُحسب سيرفريًا (قاعدة Zero Business Logic) ═══
+var MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+
+function initPickers() {
+    var p = TimeRiyadh.riyadhParts(new Date());
+    var curY = parseInt(p.year, 10), curM = parseInt(p.month, 10);
+    var mSel = document.getElementById('monthSel');
+    MONTHS_AR.forEach(function (n, i) {
+        var o = document.createElement('option');
+        o.value = i + 1; o.textContent = n;
+        if (i + 1 === curM) o.selected = true;
+        mSel.appendChild(o);
+    });
+    var ySel = document.getElementById('yearSel');
+    for (var y = curY; y >= curY - 2; y--) {
+        var oy = document.createElement('option');
+        oy.value = y; oy.textContent = y;
+        ySel.appendChild(oy);
+    }
+}
+
+function n(v) {
+    if (v === null || v === undefined) return '<span class="zero">—</span>';
+    if (!v) return '<span class="zero">0</span>';
+    return '<span class="num">' + v + '</span>';
+}
+
+function empRow(e) {
+    var w = e.works;
+    var flags = '';
+    if (!e.hasUserAccount) flags += '<span class="noaccount"><i class="fas fa-triangle-exclamation"></i> بلا حساب دخول</span>';
+    var detailId = 'd-' + e.employeeCode;
+    // دمج عرضي لسلتين موثقتين مستقلتين (لوجستية + مراكز) — عرض فقط بلا اشتقاق
+    var logiCenter = (w.logisticsEvents || 0) + (w.centerEvents || 0);
+    var html = '<tr>' +
+        '<td class="name">' + e.name + '<span class="jt">' + e.jobTitle + ' · ' + e.employeeCode + '</span>' + flags + '</td>' +
+        '<td>' + n(e.scheduledHours) + '</td>' +
+        '<td>' + n(e.shifts) + '</td>' +
+        '<td>' + n(e.uncountedRosterDays) + '</td>' +
+        '<td class="total-cell">' + n(e.totalWorks) + '</td>' +
+        '<td>' + n(w.completions) + '</td>' +
+        '<td>' + n(w.dispatchActions) + '</td>' +
+        '<td>' + n(w.dispatchUndo) + '</td>' +
+        '<td>' + n(w.reportEntries) + '</td>' +
+        '<td>' + n(w.positioning.created) + '</td>' +
+        '<td>' + n(w.positioning.updated) + '</td>' +
+        '<td>' + n(w.positioning.ended) + '</td>' +
+        '<td>' + n(w.signouts) + '</td>' +
+        '<td>' + n(w.forms.total) + '</td>' +
+        '<td>' + n(w.staffingEvents) + '</td>' +
+        '<td>' + n(w.vehicleEvents) + '</td>' +
+        '<td>' + n(logiCenter) + '</td>' +
+        '<td>' + n(w.workflowActions.total) + '</td>' +
+        '<td>' + n(w.scheduleEdits) + '</td>' +
+        '<td>' + n(w.docs) + '</td>' +
+        '<td>' + n(w.alertsAcked) + '</td>' +
+        '<td><span class="detail-toggle" onclick="toggleDetail(\'' + detailId + '\')"><i class="fas fa-ellipsis"></i></span></td>' +
+        '</tr>';
+    // صف التفصيل: أنواع النماذج فقط (اعتماد المالك — لا drill-down)
+    var ft = Object.keys(w.forms.byType || {}).map(function (k) { return k + ': ' + w.forms.byType[k]; });
+    html += '<tr class="detail-row" id="' + detailId + '" style="display:none"><td colspan="22">' +
+        (ft.length ? 'النماذج حسب النوع — ' + ft.join(' · ') : 'لا نماذج مسجلة هذا الشهر') + '</td></tr>';
+    return html;
+}
+
+function toggleDetail(id) {
+    var el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function groupCard(title, icon, cls, employees) {
+    var rows = employees.map(empRow).join('');
+    return '<div class="group-card">' +
+        '<div class="group-header ' + cls + '"><i class="fas ' + icon + '"></i>' + title +
+        '<span class="count">' + employees.length + ' موظفًا</span></div>' +
+        '<div class="table-wrap"><table><thead>' +
+        '<tr class="grp">' +
+        '<th rowspan="2">الموظف</th><th rowspan="2">الساعات<br>المجدولة</th><th rowspan="2">المناوبات</th>' +
+        '<th rowspan="2">أيام بلا<br>اشتقاق</th><th rowspan="2">إجمالي<br>الأعمال</th>' +
+        '<th rowspan="2">التكميل</th><th rowspan="2">توزيع<br>البلاغات*</th><th rowspan="2">التراجع<br>عن بلاغ</th>' +
+        '<th rowspan="2">بلاغات<br>تفصيلية</th><th colspan="3">التمركزات</th>' +
+        '<th rowspan="2">خروج<br>الفرق</th><th rowspan="2">النماذج</th>' +
+        '<th rowspan="2">قوى<br>بشرية</th><th rowspan="2">مركبات</th><th rowspan="2">لوجستية<br>ومراكز</th>' +
+        '<th rowspan="2">سير<br>العمل</th><th rowspan="2">تعديلات<br>الجداول</th><th rowspan="2">ملفات</th>' +
+        '<th rowspan="2">تنبيهات</th><th rowspan="2"></th>' +
+        '</tr>' +
+        '<tr><th>إنشاء</th><th>تعديل</th><th>إنهاء</th></tr>' +
+        '</thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
+async function loadStats() {
+    var y = document.getElementById('yearSel').value;
+    var m = document.getElementById('monthSel').value;
+    var box = document.getElementById('content');
+    box.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري التحميل…</div>';
+    try {
+        var res = await fetch('/api/indicators/contribution?year=' + y + '&month=' + m, { headers: authHeaders() });
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+            box.innerHTML = '<div class="error-box"><i class="fas fa-circle-xmark"></i> ' + (data.error || 'فشل الجلب') + '</div>';
+            return;
+        }
+        document.getElementById('metaLine').textContent =
+            MONTHS_AR[data.month - 1] + ' ' + data.year + ' · الفترة: ' + data.range.from + ' → ' + data.range.to;
+        var cav = document.getElementById('caveatsBox');
+        document.getElementById('caveatsList').innerHTML = (data.caveats || []).map(function (c) { return '<li>' + c + '</li>'; }).join('');
+        cav.style.display = (data.caveats && data.caveats.length) ? '' : 'none';
+
+        box.innerHTML =
+            groupCard('موظفو العمليات', 'fa-headset', 'ops', data.groups.operations) +
+            groupCard('القيادة الميدانية', 'fa-user-shield', 'lead', data.groups.fieldLeadership);
+
+        var um = document.getElementById('unmatchedBox');
+        if (data.unmatchedJobTitles && data.unmatchedJobTitles.length) {
+            um.innerHTML = '<div class="unmatched"><h3><i class="fas fa-user-slash"></i> مسميات نشطة خارج فئتي المؤشر (مراجعة يدوية)</h3>' +
+                data.unmatchedJobTitles.map(function (u) {
+                    return '<span class="chip">' + u.jobTitle + ' — ' + u.count + '</span>';
+                }).join('') + '</div>';
+        } else { um.innerHTML = ''; }
+    } catch (e) {
+        box.innerHTML = '<div class="error-box"><i class="fas fa-circle-xmark"></i> خطأ اتصال</div>';
+    }
+}
+
+initPickers();
+loadStats();
+</script>
+</body>
+</html>

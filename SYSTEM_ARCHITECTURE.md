@@ -53,7 +53,7 @@ Frontend (public/*.html)  →  server.js (Express API)  →  OperationsEngine (o
 | `roster-sync-service.js` | مزامنة الجدولة إلى القاعدة |
 | `operational-events-core.js` | نواة جدول الأحداث التشغيلية |
 | `archive-service.js` | الأرشيف العام |
-| `indicator-service.js` | المؤشرات |
+| `indicator-service.js` | المؤشرات + إحصائيات المساهمة الشهرية لكل موظف (P1 — DECISION-CONTRIBUTION-INDICATOR-P1.md؛ تصنيف بالمطابقة التامة على `job_title`؛ `GET /api/indicators/contribution` لـ admin/director؛ واجهة `contribution-stats.html`) |
 | `positioning-service.js` | التموضع |
 | `notes-service.js` / `forms-service.js` | الملاحظات / النماذج |
 | `team-order.js` | الفرز الرقمي المركزي للفرق |
