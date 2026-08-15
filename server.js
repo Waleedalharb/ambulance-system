@@ -8784,6 +8784,165 @@ app.delete('/api/shift-codes/:id', authenticate, authorize(['admin']), async (re
 });
 
 // ============================================
+// API: إدارة رموز الجداول (السجل المركزي)
+// ============================================
+// طبقتا حماية: حساب Admin/Director ثم رمز سري مستقل (Hash في الخادم فقط).
+// القراءة للإداريين دون فتح القفل؛ كل التعديلات تتطلب قفلًا مفتوحًا مؤقتًا.
+let symbolRegistryService = null;
+function getSymbolRegistryService() {
+    if (!symbolRegistryService && db) {
+        const SymbolRegistryService = require('./services/symbol-registry-service');
+        symbolRegistryService = new SymbolRegistryService({ db });
+    }
+    return symbolRegistryService;
+}
+
+// جلسات فتح القفل: رمز عشوائي قصير العمر (15 دقيقة) — ذاكرة الخادم فقط،
+// لا يُحفظ في المتصفح إلا كتوكن جلسة يدوي الإتلاف وليس له معنى بعد انتهائه.
+const symbolUnlockTokens = new Map(); // token → { userId, expiresAt }
+const SYMBOL_UNLOCK_TTL_MS = 15 * 60 * 1000;
+function requireSymbolsUnlock(req, res, next) {
+    const token = req.headers['x-symbols-unlock'];
+    const session = token && symbolUnlockTokens.get(token);
+    if (!session || session.expiresAt < Date.now()) {
+        if (token) symbolUnlockTokens.delete(token);
+        return res.status(423).json({ error: 'إدارة الأكواد مقفلة — افتح القفل أولًا', code: 'SYMBOLS_LOCKED' });
+    }
+    session.expiresAt = Date.now() + SYMBOL_UNLOCK_TTL_MS; // تمديد مع النشاط
+    next();
+}
+
+app.get('/api/schedule-symbols', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const svc = getSymbolRegistryService();
+        const { symbols, patterns } = await svc.list();
+        const secretRow = await db.SymbolAdminSecret.get();
+        res.json({ success: true, symbols, patterns, secretConfigured: !!secretRow });
+    } catch (error) {
+        console.error('ScheduleSymbols GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل الرموز' });
+    }
+});
+
+// حمولة التشغيل للمحللات الأمامية — أي مستخدم موثّق (صفحات الجداول تحتاجها)
+app.get('/api/schedule-symbols/runtime', authenticate, async (req, res) => {
+    try {
+        const svc = getSymbolRegistryService();
+        const payload = await svc.runtimePayload();
+        res.json({ success: true, ...payload });
+    } catch (error) {
+        console.error('ScheduleSymbols runtime error:', error);
+        res.status(500).json({ error: 'فشل في جلب رموز التشغيل' });
+    }
+});
+
+app.get('/api/schedule-symbols/audit', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const log = await db.SymbolAuditLog.getAll(300);
+        res.json({ success: true, log });
+    } catch (error) {
+        console.error('ScheduleSymbols audit error:', error);
+        res.status(500).json({ error: 'فشل في جلب سجل التعديلات' });
+    }
+});
+
+// فتح القفل بالرمز السري المستقل
+app.post('/api/schedule-symbols/unlock', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const secretRow = await db.SymbolAdminSecret.get();
+        if (!secretRow) return res.status(409).json({ error: 'لم يُضبط رمز إدارة الأكواد بعد — اضبطه أولًا', code: 'SECRET_NOT_SET' });
+        const { secret } = req.body || {};
+        if (!secret) return res.status(400).json({ error: 'الرمز السري مطلوب' });
+        const ok = await bcrypt.compare(String(secret), secretRow.secret_hash);
+        if (!ok) return res.status(401).json({ error: 'الرمز السري غير صحيح' });
+        const token = crypto.randomBytes(32).toString('hex');
+        symbolUnlockTokens.set(token, { userId: req.user.id, expiresAt: Date.now() + SYMBOL_UNLOCK_TTL_MS });
+        res.json({ success: true, unlockToken: token, expiresInMinutes: 15 });
+    } catch (error) {
+        console.error('ScheduleSymbols unlock error:', error);
+        res.status(500).json({ error: 'فشل في فتح القفل' });
+    }
+});
+
+app.post('/api/schedule-symbols/lock', authenticate, authorize(['admin', 'director']), (req, res) => {
+    const token = req.headers['x-symbols-unlock'];
+    if (token) symbolUnlockTokens.delete(token);
+    res.json({ success: true });
+});
+
+// ضبط/تغيير الرمز السري — لا رمز افتراضي في الكود إطلاقًا؛ الضبط الأول من حساب إداري.
+app.post('/api/schedule-symbols/secret', authenticate, authorize(['admin', 'director']), async (req, res) => {
+    try {
+        const { current, next, confirm } = req.body || {};
+        if (!next || String(next).length < 6) return res.status(400).json({ error: 'الرمز الجديد يجب ألا يقل عن 6 أحرف' });
+        if (next !== confirm) return res.status(400).json({ error: 'تأكيد الرمز الجديد غير متطابق' });
+        const secretRow = await db.SymbolAdminSecret.get();
+        if (secretRow) {
+            const ok = current && await bcrypt.compare(String(current), secretRow.secret_hash);
+            if (!ok) return res.status(401).json({ error: 'الرمز الحالي غير صحيح' });
+        }
+        const salt = await bcrypt.genSalt(12);
+        await db.SymbolAdminSecret.set(await bcrypt.hash(String(next), salt), req.user.name);
+        symbolUnlockTokens.clear(); // إبطال كل الجلسات المفتوحة عند تغيير الرمز
+        await db.SymbolAuditLog.add({
+            actor_id: req.user.id, actor_name: req.user.name,
+            action: secretRow ? 'secret_change' : 'secret_set', code: null, old_value: null, new_value: null
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('ScheduleSymbols secret error:', error);
+        res.status(500).json({ error: 'فشل في حفظ الرمز السري' });
+    }
+});
+
+// إضافة رمز جديد — يتطلب قفلًا مفتوحًا
+app.post('/api/schedule-symbols', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, validateBody({
+    code: { required: true, type: 'string', minLength: 1, maxLength: 20 },
+    symbol_type: { required: true, type: 'string', minLength: 1, maxLength: 30 }
+}), async (req, res) => {
+    try {
+        const svc = getSymbolRegistryService();
+        const result = await svc.addCustom(req.body, req.user);
+        res.json({ success: true, id: result.id, symbol: result.entry });
+    } catch (error) {
+        console.error('ScheduleSymbols POST error:', error);
+        res.status(400).json({ error: error.message || 'فشل في إضافة الرمز' });
+    }
+});
+
+// تعديل رمز — إن كان له أثر تاريخي يتطلب تأكيدًا صريحًا (confirmHistorical)
+app.put('/api/schedule-symbols/:id', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, async (req, res) => {
+    try {
+        const svc = getSymbolRegistryService();
+        const result = await svc.editSymbol(parseInt(req.params.id, 10), req.body, req.user, req.body.confirmHistorical === true);
+        if (result.requiresConfirmation) {
+            return res.status(409).json({
+                error: `الرمز ${result.code} مستخدم في ${result.usageCount} سجل سابق — التعديل سيغيّر قراءة الجداول التاريخية`,
+                code: 'HISTORICAL_IMPACT', usageCount: result.usageCount
+            });
+        }
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('ScheduleSymbols PUT error:', error);
+        res.status(400).json({ error: error.message || 'فشل في تعديل الرمز' });
+    }
+});
+
+// تعطيل/تفعيل — لا حذف أبدًا
+app.post('/api/schedule-symbols/:id/status', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, async (req, res) => {
+    try {
+        const svc = getSymbolRegistryService();
+        const status = req.body && req.body.status;
+        if (status !== 'active' && status !== 'disabled') return res.status(400).json({ error: 'الحالة غير صالحة' });
+        const result = await svc.setStatus(parseInt(req.params.id, 10), status, req.user);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('ScheduleSymbols status error:', error);
+        res.status(400).json({ error: error.message || 'فشل في تغيير الحالة' });
+    }
+});
+
+// ============================================
 // API: Shift Roster
 // ============================================
 app.get('/api/shift-roster', authenticate, async (req, res) => {
@@ -11946,6 +12105,19 @@ server.listen(PORT, async () => {
     
     // Initialize DB after server starts
     await initDatabase();
+
+    // إدارة رموز الجداول: بذر السجل المركزي من المحللات الفعلية (مرة واحدة فقط)
+    try {
+        const symbolSvc = getSymbolRegistryService();
+        const seedResult = await symbolSvc.seedIfEmpty();
+        if (seedResult.seeded) console.log(`✅ سجل رموز الجداول: بُذر ${seedResult.count} رمزًا من المحللات الفعلية`);
+        else {
+            const added = await symbolSvc.syncMissingBuiltin();
+            if (added > 0) console.log(`✅ سجل رموز الجداول: أُضيف ${added} رمزًا مدمجًا جديدًا`);
+        }
+    } catch (symErr) {
+        console.error('⚠️ Symbol registry seed failed:', symErr.message);
+    }
     
     // D-15: تنظيف token_blacklist — عند الإقلاع ثم كل 24 ساعة.
     // محافظ: يحذف فقط الصفوف ذات expires_at المنتهية فعلاً؛ بلا مكتبات جديدة.

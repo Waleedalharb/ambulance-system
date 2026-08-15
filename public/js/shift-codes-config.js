@@ -390,6 +390,25 @@ function getShiftBadgeStyle(code) {
   return `background-color: ${shift.color}20; color: ${shift.color}; border: 1px solid ${shift.color}40;`;
 }
 
+/**
+ * Register a custom shift code from the admin symbol management (additive).
+ * Rejects duplicates; never mutates or overrides builtin entries.
+ */
+function registerCustomShiftCode(entry) {
+  if (!entry || !entry.code) return false;
+  const upper = entry.code.toString().trim().toUpperCase();
+  if (SHIFT_CODES.some(s => s.code === upper)) return false;
+  SHIFT_CODES.push({
+    code: upper,
+    name: entry.name || upper,
+    time_start: entry.time_start || null,
+    time_end: entry.time_end || null,
+    color: entry.color || '#2E8B7A',
+    status: entry.status || 'دوام'
+  });
+  return true;
+}
+
 /* ============================================================================
    Exports (CommonJS + ES Module compatible)
    ============================================================================ */
@@ -402,7 +421,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getShiftLabel,
     getCodesByStatus,
     getSortedCodes,
-    getShiftBadgeStyle
+    getShiftBadgeStyle,
+    registerCustomShiftCode
   };
 }
 
@@ -420,4 +440,5 @@ if (typeof window !== 'undefined') {
   window.getCodesByStatus = getCodesByStatus;
   window.getSortedCodes = getSortedCodes;
   window.getShiftBadgeStyle = getShiftBadgeStyle;
+  window.registerCustomShiftCode = registerCustomShiftCode;
 }

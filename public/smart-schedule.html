@@ -1973,6 +1973,9 @@
     <script src="js/core/operational-codes.js"></script>
     <script src="js/core/shift-type-dictionary.js"></script>
     <script src="js/core/team-dictionary.js"></script>
+    <!-- محمّل الرموز المخصصة من إدارة الرموز — additive، الفشل صامت، يعمل بعد القواميس -->
+    <script src="js/core/symbol-runtime-loader.js"></script>
+    <script>if (window.SymbolRuntimeLoader) SymbolRuntimeLoader.load();</script>
     <script src="js/core/system-validator.js"></script>
     <script>
         // فحص ذاتي غير مانع في المتصفح — يحذر في الكونسول إن كانت القواميس معطوبة

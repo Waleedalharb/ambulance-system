@@ -27,6 +27,28 @@
 
     function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
+    // ── أكواد تشغيلية مخصصة من إدارة الرموز (additive — لا تغيّر الأنماط المدمجة) ──
+    // كود مخصص يُسجَّل فقط إن لم يطابق أي نمط مدمج؛ يُفك من خصائصه المسجلة حرفيًا.
+    var CUSTOM_CODES = {};
+    function registerCustom(code, def) {
+        var c = String(code || '').trim().toUpperCase();
+        if (!c || !def || !def.durationH || !def.start) return false;
+        if (parseOperationalCode(c)) return false;                 // يطابق نمطًا مدمجًا — لا حاجة
+        if (Object.prototype.hasOwnProperty.call(CUSTOM_CODES, c)) return false;
+        CUSTOM_CODES[c] = {
+            kind: def.kind === 'rapid' ? 'rapid' : 'overlap',
+            series: def.series || '',
+            rapidNo: def.rapidNo || null,
+            shift: def.shift || null,
+            explicitShift: !!def.explicitShift,
+            durationH: def.durationH,
+            start: def.start,
+            end: def.end || pad2((parseInt(def.start.slice(0, 2), 10) + def.durationH) % 24) + ':00',
+            custom: true
+        };
+        return true;
+    }
+
     /**
      * تحليل كود تشغيلي ملحق ← { kind, durationH, start, end, ... } أو null.
      * start/end بصيغة 'HH:00' دائمًا (اللاحقة ساعة فقط بلا دقائق).
@@ -36,6 +58,15 @@
         if (code === null || code === undefined) return null;
         var c = String(code).trim();
         var m;
+        // أولوية صفر: كود تشغيلي مخصص مسجل من إدارة الرموز (لا يطابق نمطًا مدمجًا)
+        if (Object.prototype.hasOwnProperty.call(CUSTOM_CODES, c.toUpperCase())) {
+            var cu = CUSTOM_CODES[c.toUpperCase()];
+            return {
+                kind: cu.kind, series: cu.series, rapidNo: cu.rapidNo,
+                shift: cu.shift, explicitShift: cu.explicitShift,
+                durationH: cu.durationH, start: cu.start, end: cu.end, custom: true
+            };
+        }
         // أوفرلاب ملحق: O<مدة 1-99 ساعة>-<بداية 00-23> — بلا لاحقة ⇒ null (كود قديم)
         m = c.match(/^O(\d{1,2})-(\d{2})$/);
         if (m) {
@@ -108,6 +139,7 @@
     return {
         parseOperationalCode: parseOperationalCode,
         isOperationalCode: isOperationalCode,
-        resolveOperationalStart: resolveOperationalStart
+        resolveOperationalStart: resolveOperationalStart,
+        registerCustom: registerCustom
     };
 }));

@@ -322,6 +322,9 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 <script src="/js/time-riyadh.js"></script>
 <script src="js/core/core-time.js"></script>
 <script src="js/core/operational-codes.js"></script>
+<!-- محمّل الرموز المخصصة من إدارة الرموز — additive، الفشل صامت -->
+<script src="js/core/symbol-runtime-loader.js"></script>
+<script>if (window.SymbolRuntimeLoader) SymbolRuntimeLoader.load();</script>
 <script>
 (function() {
     var token = AuthCore.getToken();

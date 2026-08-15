@@ -277,6 +277,56 @@ const TABLE_SCHEMAS = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );`,
 
+  // Schedule Symbols Registry — السجل المركزي لرموز الجداول (إدارة من لوحة الأدمن)
+  // يجمع كل أنواع الرموز: كود يوم / رمز موظف / كود تشغيلي ملحق — مع مصدره وحالته.
+  // لا يستبدل القواميس الثابتة؛ يوثّقها ويضيف الرموز المخصصة فوقها (additive).
+  `CREATE TABLE IF NOT EXISTS schedule_symbols_registry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT,
+    symbol_type TEXT NOT NULL,           -- day_code | employee_symbol | operational_code
+    group_name TEXT,                     -- فئة القاموس: morning/night/overlap/leadership/...
+    team TEXT,                           -- الفريق المستنتج لرموز الموظفين
+    hours REAL,                          -- ساعات الرمز (NULL = غير قابلة للاشتقاق)
+    time_start TEXT,
+    time_end TEXT,
+    is_shift INTEGER DEFAULT 0,          -- هل يُعد مناوبة؟
+    accepts_day_cell INTEGER DEFAULT 0,  -- يقبل في خلية اليوم؟
+    accepts_employee_symbol INTEGER DEFAULT 0, -- يقبل في رمز الموظف؟
+    is_operational INTEGER DEFAULT 0,    -- كود تشغيلي ملحق (OperationalCodes)؟
+    shift_side TEXT,                     -- صباحية | ليلية | كلاهما | ''
+    source TEXT DEFAULT 'builtin',       -- builtin (من القواميس) | custom (أضيف من الإدارة)
+    status TEXT DEFAULT 'active',        -- active | disabled
+    needs_review INTEGER DEFAULT 0,      -- ⚠️ رمز يحتاج قرارًا
+    review_reason TEXT,
+    usage_count INTEGER DEFAULT 0,       -- آخر عدّ معروف في shift_roster (يُحدَّث عند العرض)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    updated_by TEXT,
+    UNIQUE(code, symbol_type)
+  );`,
+
+  // سجل تعديلات الرموز — لا يُحذف أبدًا (بند 9 من المواصفة)
+  `CREATE TABLE IF NOT EXISTS symbol_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id TEXT,
+    actor_name TEXT,
+    action TEXT NOT NULL,                -- add | edit | disable | enable | secret_set | secret_change
+    code TEXT,
+    old_value TEXT,                      -- JSON
+    new_value TEXT,                      -- JSON
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`,
+
+  // الرمز السري المستقل لإدارة الأكواد — Hash فقط (bcrypt)، صف واحد id=1.
+  // لا يوجد رمز افتراضي مكتوب في الكود؛ يُضبط أول مرة من حساب Admin/Director.
+  `CREATE TABLE IF NOT EXISTS symbol_admin_secret (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    secret_hash TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT
+  );`,
+
   // Shift Patterns (A/B/C/D) — بنية تقنية فقط: لا دورة مفترضة ولا تحويل تلقائي
   // لأي رمز موجود؛ cycle_json يبقى NULL حتى يُهيَّأ لاحقًا من الإعدادات.
   `CREATE TABLE IF NOT EXISTS shift_patterns (
@@ -2343,6 +2393,100 @@ const Teams = {
 };
 
 // ============================================
+// CRUD: SCHEDULE SYMBOLS REGISTRY (إدارة رموز الجداول)
+// ============================================
+const ScheduleSymbols = {
+  async getAll() {
+    return all('SELECT * FROM schedule_symbols_registry ORDER BY symbol_type, code');
+  },
+  async getById(id) {
+    return get('SELECT * FROM schedule_symbols_registry WHERE id = ?', [id]);
+  },
+  async getByCodeAndType(code, symbolType) {
+    return get('SELECT * FROM schedule_symbols_registry WHERE code = ? AND symbol_type = ?', [code, symbolType]);
+  },
+  async insert(data) {
+    const result = await run(
+      `INSERT INTO schedule_symbols_registry
+        (code, name, symbol_type, group_name, team, hours, time_start, time_end, is_shift,
+         accepts_day_cell, accepts_employee_symbol, is_operational, shift_side, source, status,
+         needs_review, review_reason, usage_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [data.code, data.name || null, data.symbol_type, data.group_name || null, data.team || null,
+       data.hours ?? null, data.time_start || null, data.time_end || null,
+       data.is_shift ? 1 : 0, data.accepts_day_cell ? 1 : 0, data.accepts_employee_symbol ? 1 : 0,
+       data.is_operational ? 1 : 0, data.shift_side || '', data.source || 'builtin',
+       data.status || 'active', data.needs_review ? 1 : 0, data.review_reason || null,
+       data.usage_count || 0]);
+    return result.id;
+  },
+  async update(id, data, updatedBy) {
+    const allowed = ['name', 'group_name', 'team', 'hours', 'time_start', 'time_end', 'is_shift',
+      'accepts_day_cell', 'accepts_employee_symbol', 'is_operational', 'shift_side',
+      'status', 'needs_review', 'review_reason', 'usage_count'];
+    const sets = [], vals = [];
+    for (const k of allowed) {
+      if (Object.prototype.hasOwnProperty.call(data, k)) {
+        sets.push(k + ' = ?');
+        vals.push(typeof data[k] === 'boolean' ? (data[k] ? 1 : 0) : data[k]);
+      }
+    }
+    if (!sets.length) return null;
+    sets.push('updated_at = CURRENT_TIMESTAMP', 'updated_by = ?');
+    vals.push(updatedBy || null, id);
+    return run(`UPDATE schedule_symbols_registry SET ${sets.join(', ')} WHERE id = ?;`, vals);
+  },
+  async count() {
+    const r = await get('SELECT COUNT(*) AS c FROM schedule_symbols_registry');
+    return r ? r.c : 0;
+  },
+  async getActiveCustom() {
+    return all("SELECT * FROM schedule_symbols_registry WHERE source = 'custom' AND status = 'active'");
+  },
+  // عدّ استخدام الرمز فعليًا في الجداول (خلية يوم في shift_roster أو فريق مرتبط برمز موظف)
+  async usageCount(code, symbolType, team) {
+    if (symbolType === 'employee_symbol') {
+      if (!team) return 0;
+      const r = await get(
+        `SELECT COUNT(DISTINCT ta.employee_id) AS c
+         FROM team_assignments ta JOIN teams t ON t.id = ta.team_id
+         WHERE t.name = ? AND ta.is_primary = 1`, [team]);
+      return r ? r.c : 0;
+    }
+    const r = await get('SELECT COUNT(*) AS c FROM shift_roster WHERE UPPER(shift_code) = UPPER(?)', [code]);
+    return r ? r.c : 0;
+  }
+};
+
+const SymbolAuditLog = {
+  async add(entry) {
+    const result = await run(
+      'INSERT INTO symbol_audit_log (actor_id, actor_name, action, code, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?);',
+      [entry.actor_id || null, entry.actor_name || null, entry.action, entry.code || null,
+       entry.old_value ? JSON.stringify(entry.old_value) : null,
+       entry.new_value ? JSON.stringify(entry.new_value) : null]);
+    return result.id;
+  },
+  async getAll(limit = 200) {
+    return all('SELECT * FROM symbol_audit_log ORDER BY id DESC LIMIT ?', [limit]);
+  }
+  // لا يوجد حذف — السجل التاريخي دائم (بند 9)
+};
+
+const SymbolAdminSecret = {
+  async get() {
+    return get('SELECT * FROM symbol_admin_secret WHERE id = 1');
+  },
+  async set(hash, updatedBy) {
+    return run(
+      `INSERT INTO symbol_admin_secret (id, secret_hash, updated_by) VALUES (1, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET secret_hash = excluded.secret_hash,
+         updated_at = CURRENT_TIMESTAMP, updated_by = excluded.updated_by;`,
+      [hash, updatedBy || null]);
+  }
+};
+
+// ============================================
 // CRUD: SHIFT CODES
 // ============================================
 const ShiftCodes = {
@@ -3799,6 +3943,9 @@ module.exports = {
   Employees,
   Teams,
   ShiftCodes,
+  ScheduleSymbols,
+  SymbolAuditLog,
+  SymbolAdminSecret,
   ShiftRoster,
   TeamAssignments,
   ShiftPatterns,

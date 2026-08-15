@@ -68,6 +68,22 @@
     var SHARED_CODES = ['CP24', 'M', 'ME', 'F'];
     var OFF_CODES = ['V', 'VC', 'E', 'EV', 'S', 'WO', 'C'];
 
+    // ── أكواد أيام مخصصة من إدارة الرموز (additive — لا تغيّر أي كود مدمج) ──
+    // تُسجَّل عبر registerCustom من symbol-runtime-loader بعد جلبها من الخادم.
+    // التسجيل = إلحاق الكود بفئة قائمة + قائمة وردية اختيارية. ممنوع تجاوز مدمج.
+    function registerCustom(code, group, shiftSide) {
+        var c = normalize(code);
+        if (!c || !Object.prototype.hasOwnProperty.call(GROUPS, group)) return false;
+        for (var g in GROUPS) {
+            if (GROUPS[g].indexOf(c) !== -1) return false; // مدمج أو مسجل مسبقًا
+        }
+        GROUPS[group].push(c);
+        if (shiftSide === 'صباحية' && DAY_ONLY_CODES.indexOf(c) === -1) DAY_ONLY_CODES.push(c);
+        else if (shiftSide === 'ليلية' && NIGHT_ONLY_CODES.indexOf(c) === -1) NIGHT_ONLY_CODES.push(c);
+        else if (shiftSide === 'كلاهما' && SHARED_CODES.indexOf(c) === -1) SHARED_CODES.push(c);
+        return true;
+    }
+
     var ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
     function normalize(code) {
         if (code === null || code === undefined) return '';
@@ -210,6 +226,7 @@
         classifyEntry: classifyEntry,
         isRotationEmployee: isRotationEmployee,
         blankDayGroup: blankDayGroup,
+        registerCustom: registerCustom,
         validate: validate
     };
 }));

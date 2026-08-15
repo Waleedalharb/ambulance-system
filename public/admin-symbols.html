@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚙️ إدارة رموز الجداول — منصة الجنوب</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<style>
+:root {
+    --bg: #0B1E33;
+    --card: #1A3A5C;
+    --teal: #2E8B7A;
+    --gold: #E8C84A;
+    --white: #FFFFFF;
+    --muted: #9DB2C8;
+    --danger: #E87461;
+    --border: rgba(255,255,255,.10);
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--bg); color: var(--white);
+    font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh;
+}
+.header {
+    background: linear-gradient(135deg, #0B1E33, #1A3A5C);
+    border-bottom: 2px solid var(--teal);
+    padding: 20px 28px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+.header .sub { color: var(--muted); font-size: 13px; }
+.container { max-width: 1500px; margin: 0 auto; padding: 20px; }
+.card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+.card h2 { margin: 0 0 14px; font-size: 17px; color: var(--gold); display: flex; align-items: center; gap: 8px; }
+.btn {
+    background: var(--teal); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 16px; font-family: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.12); }
+.btn.gold { background: var(--gold); color: #0B1E33; }
+.btn.danger { background: var(--danger); }
+.btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn.sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; text-align: center;
+}
+.stat .num { font-size: 26px; font-weight: 700; color: var(--gold); }
+.stat .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filters select, .filters input, .modal select, .modal input, .modal textarea {
+    background: #0B1E33; color: var(--white); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+}
+.filters select:focus, .filters input:focus, .modal select:focus, .modal input:focus { outline: none; border-color: var(--teal); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+    background: #0B1E33; color: var(--gold); padding: 10px 8px; text-align: right;
+    border-bottom: 2px solid var(--teal); font-weight: 600; white-space: nowrap; position: sticky; top: 0;
+}
+td { padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:hover td { background: rgba(46,139,122,.08); }
+.badge {
+    display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.badge.active { background: rgba(46,139,122,.25); color: #7FE3CF; }
+.badge.disabled { background: rgba(232,116,97,.2); color: var(--danger); }
+.badge.builtin { background: rgba(157,178,200,.15); color: var(--muted); }
+.badge.custom { background: rgba(232,200,74,.18); color: var(--gold); }
+.badge.review { background: rgba(232,200,74,.25); color: var(--gold); }
+.badge.type { background: rgba(46,139,122,.18); color: #8FD8C7; }
+.badge.used { background: rgba(46,139,122,.15); color: #7FE3CF; }
+.badge.unused { background: rgba(157,178,200,.12); color: var(--muted); }
+.code-cell { font-family: 'Consolas', monospace; font-weight: 700; color: var(--gold); direction: ltr; display: inline-block; }
+.lockbar {
+    display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px;
+    border: 1px solid var(--border); font-weight: 600;
+}
+.lockbar.locked { background: rgba(232,116,97,.12); border-color: rgba(232,116,97,.4); color: #F2B1A5; }
+.lockbar.open { background: rgba(46,139,122,.15); border-color: var(--teal); color: #7FE3CF; }
+.modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 1000;
+    align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+    background: var(--card); border: 1px solid var(--teal); border-radius: 14px;
+    padding: 24px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.modal h3 { margin: 0 0 16px; color: var(--gold); font-size: 17px; }
+.form-row { margin-bottom: 12px; }
+.form-row label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.form-row input, .form-row select, .form-row textarea { width: 100%; }
+.checks { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0; }
+.checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--white); cursor: pointer; }
+.checks input { width: auto; }
+.note-box {
+    background: rgba(232,200,74,.10); border: 1px solid rgba(232,200,74,.35); border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #F0DFA0; margin-bottom: 18px; line-height: 1.8;
+}
+.review-reason { font-size: 11px; color: var(--gold); display: block; margin-top: 3px; line-height: 1.6; }
+.pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.pattern-item {
+    background: #0B1E33; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px;
+}
+.pattern-item .p-code { color: var(--gold); font-family: monospace; font-weight: 700; direction: ltr; display: inline-block; }
+.pattern-item .p-meaning { color: var(--muted); margin-top: 4px; line-height: 1.7; }
+.toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--teal); color: #fff;
+    padding: 12px 20px; border-radius: 10px; font-weight: 600; z-index: 2000;
+    box-shadow: 0 6px 20px rgba(0,0,0,.4); display: none; max-width: 400px;
+}
+.toast.err { background: var(--danger); }
+.hidden { display: none !important; }
+.audit-table td { font-size: 12px; }
+.type-section-title {
+    margin: 18px 0 10px; font-size: 15px; font-weight: 700; color: var(--white);
+    display: flex; align-items: center; gap: 8px;
+}
+.type-section-title .count { font-size: 12px; color: var(--muted); font-weight: 400; }
+@media (max-width: 900px) { .container { padding: 10px; } th, td { padding: 7px 5px; font-size: 12px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <i class="fas fa-cogs" style="font-size:26px;color:var(--gold);"></i>
+    <div>
+        <h1>⚙️ إدارة رموز الجداول</h1>
+        <div class="sub">السجل المركزي لكل رموز الجداول — أكواد الأيام، رموز الموظفين، والأكواد التشغيلية</div>
+    </div>
+    <div style="margin-right:auto;display:flex;gap:8px;">
+        <a href="admin-dashboard.html" class="btn ghost"><i class="fas fa-arrow-right"></i> لوحة المشرف</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- شريط القفل -->
+    <div id="lockbar" class="lockbar locked">
+        <i class="fas fa-lock" id="lockIcon"></i>
+        <span id="lockText">🔒 إدارة الأكواد مقفلة — القراءة متاحة، والتعديل يتطلب فتح القفل</span>
+        <div style="margin-right:auto;display:flex;gap:8px;">
+            <span id="lockTimer" style="font-size:12px;color:var(--muted);"></span>
+            <button class="btn gold sm" id="btnUnlock" onclick="openUnlockModal()"><i class="fas fa-lock-open"></i> فتح القفل</button>
+            <button class="btn danger sm hidden" id="btnLock" onclick="lockNow()"><i class="fas fa-lock"></i> قفل الآن</button>
+            <button class="btn ghost sm" onclick="openSecretModal()"><i class="fas fa-key"></i> تغيير رمز إدارة الأكواد</button>
+        </div>
+    </div>
+
+    <div class="note-box">
+        <i class="fas fa-info-circle"></i>
+        <b>مصادر الحقيقة محفوظة:</b> رمز الموظف ← قاموس الرموز · كود خلية اليوم ← قاموس أنواع المناوبات · الكود التشغيلي الملحق ← محلل الأكواد التشغيلية · حساب الساعات ← خدمة مؤشرات الجداول.
+        الرموز المخصصة تُضاف <b>فوق</b> القواميس دون تغيير معنى أي رمز قائم. الرموز المدمجة لا تُعطَّل ولا تُحذف من هنا.
+    </div>
+
+    <!-- بطاقات الإحصاء -->
+    <div class="stats" id="statsCards"></div>
+
+    <!-- الفلاتر + الإضافة -->
+    <div class="card">
+        <h2><i class="fas fa-table"></i> سجل الرموز</h2>
+        <div class="filters">
+            <input type="text" id="fSearch" placeholder="🔍 بحث بالرمز أو الاسم..." oninput="renderTable()" style="min-width:200px;">
+            <select id="fType" onchange="renderTable()">
+                <option value="">كل الأنواع</option>
+                <option value="day_code">كود خلية اليوم</option>
+                <option value="employee_symbol">رمز موظف/قوة</option>
+                <option value="operational_code">كود تشغيلي ملحق</option>
+            </select>
+            <select id="fSource" onchange="renderTable()">
+                <option value="">مدمج + مخصص</option>
+                <option value="builtin">مدمج في القواميس</option>
+                <option value="custom">مخصص (أضيف من الإدارة)</option>
+            </select>
+            <select id="fStatus" onchange="renderTable()">
+                <option value="">فعال + معطل</option>
+                <option value="active">فعال</option>
+                <option value="disabled">معطل</option>
+            </select>
+            <select id="fReview" onchange="renderTable()">
+                <option value="">الكل</option>
+                <option value="1">⚠️ يحتاج مراجعة فقط</option>
+            </select>
+            <select id="fUsage" onchange="renderTable()">
+                <option value="">مستخدم + غير مستخدم</option>
+                <option value="1">مستخدم حاليًا في البيانات</option>
+                <option value="0">مدعوم برمجيًا — غير مستخدم</option>
+            </select>
+            <div style="margin-right:auto;">
+                <button class="btn" id="btnAdd" onclick="openAddModal()" disabled><i class="fas fa-plus"></i> إضافة كود جديد</button>
+                <button class="btn ghost" onclick="loadAll()"><i class="fas fa-sync-alt"></i> تحديث</button>
+            </div>
+        </div>
+        <div style="overflow-x:auto;max-height:640px;overflow-y:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الرمز</th><th>الاسم / المعنى</th><th>نوع الرمز</th><th>أين يُستخدم؟</th>
+                        <th>الساعات</th><th>مناوبة؟</th><th>خلية اليوم؟</th><th>رمز الموظف؟</th>
+                        <th>تشغيلي؟</th><th>المصدر</th><th>الاستخدام الحالي</th><th>الحالة</th><th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="symbolsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- الأنماط المدعومة برمجيًا -->
+    <div class="card">
+        <h2><i class="fas fa-shapes"></i> عائلات الأنماط المدعومة برمجيًا</h2>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            هذه أنماط (Regex) يفهمها المحلل مباشرة — أي رمز يطابقها مفهوم تلقائيًا ولا يحتاج إضافة يدوية.
+        </div>
+        <div class="pattern-grid" id="patternsGrid"></div>
+    </div>
+
+    <!-- سجل التعديلات -->
+    <div class="card">
+        <h2><i class="fas fa-history"></i> سجل التعديلات <span style="font-size:12px;color:var(--muted);font-weight:400;">(دائم — لا يُحذف)</span></h2>
+        <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+            <table class="audit-table">
+                <thead><tr><th>الوقت</th><th>الموظف</th><th>العملية</th><th>الرمز</th><th>القيمة السابقة</th><th>القيمة الجديدة</th></tr></thead>
+                <tbody id="auditBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- نافذة فتح القفل -->
+<div class="modal-overlay" id="unlockModal">
+    <div class="modal">
+        <h3><i class="fas fa-lock-open"></i> فتح إدارة الأكواد</h3>
+        <div id="unlockSetArea">
+            <div class="form-row" id="currentSecretRow">
+                <label>الرمز السري لإدارة الأكواد</label>
+                <input type="password" id="unlockSecret" autocomplete="off" placeholder="••••••">
+            </div>
+            <div id="firstSetupNote" class="note-box hidden" style="margin-bottom:12px;">
+                لم يُضبط رمز إدارة الأكواد بعد. اضبط رمزًا أول مرة (6 أحرف فأكثر) — يُحفظ Hash فقط في الخادم.
+            </div>
+            <div class="form-row hidden" id="newSecretRow">
+                <label>الرمز الجديد</label>
+                <input type="password" id="newSecret" autocomplete="off">
+            </div>
+            <div class="form-row hidden" id="confirmSecretRow">
+                <label>تأكيد الرمز الجديد</label>
+                <input type="password" id="confirmSecret" autocomplete="off">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn ghost" onclick="closeModal('unlockModal')">إلغاء</button>
+            <button class="btn gold" id="unlockSubmit" onclick="submitUnlock()"><i class="fas fa-unlock"></i> فتح</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تغيير الرمز السري -->
+<div class="modal-overlay" id="secretModal">
+    <div class="modal">
+        <h3><i class="fas fa-key"></i> 🔑 تغيير رمز إدارة الأكواد</h3>
+        <div class="form-row"><label>الرمز الحالي</label><input type="password" id="chgCurrent" autocomplete="off"></div>
+        <div class="form-row"><label>الرمز الجديد (6 أحرف فأكثر)</label><input type="password" id="chgNext" autocomplete="off"></div>
+        <div class="form-row"><label>تأكيد الرمز الجديد</label><input type="password" id="chgConfirm" autocomplete="off"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn ghost" onclick="closeModal('secretModal')">إلغاء</button>
+            <button class="btn gold" onclick="submitSecretChange()"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة رمز -->
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <h3><i class="fas fa-plus-circle"></i> إضافة كود جديد</h3>
+        <div class="form-row">
+            <label>نوع الرمز أولًا (يحدد المصدر الذي يُسجَّل فيه)</label>
+            <select id="aType" onchange="onAddTypeChange()">
+                <option value="day_code">كود خلية يوم (مثل D12 — مناوبة/إجازة/راحة...)</option>
+                <option value="employee_symbol">رمز موظف/قوة (مثل A1 — هوية فريق)</option>
+                <option value="operational_code">كود تشغيلي ملحق (أوفرلاب/تدخل سريع بخصائص صريحة)</option>
+            </select>
+        </div>
+        <div class="form-row"><label>الرمز</label><input type="text" id="aCode" dir="ltr" placeholder="مثال: D12"></div>
+        <div class="form-row"><label>الاسم / الوصف</label><input type="text" id="aName" placeholder="مثال: دوام 12 صباحًا"></div>
+
+        <div id="aDayFields">
+            <div class="form-row">
+                <label>الفئة (تصنيف قاموس أنواع المناوبات)</label>
+                <select id="aGroup">
+                    <option value="morning">مناوبة صباحية</option>
+                    <option value="night">مناوبة ليلية</option>
+                    <option value="night8">ليلية 8 ساعات</option>
+                    <option value="overlap">أوفرلاب</option>
+                    <option value="office">دوام رسمي</option>
+                    <option value="mission">مهمة رسمية</option>
+                    <option value="vacation">إجازة</option>
+                    <option value="rest">راحة دورية</option>
+                    <option value="training">تدريب</option>
+                    <option value="off">OFF</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>جهة الوردية (قوائم الخادم)</label>
+                <select id="aShiftSide">
+                    <option value="">— غير محدد —</option>
+                    <option value="صباحية">صباحية</option>
+                    <option value="ليلية">ليلية</option>
+                    <option value="كلاهما">كلاهما</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="aEmpFields" class="hidden">
+            <div class="form-row">
+                <label>النوع التشغيلي (قاموس الرموز)</label>
+                <select id="aKind">
+                    <option value="center">مركز جنوب</option>
+                    <option value="leadership">قيادة ميدانية</option>
+                    <option value="rapid">تدخل سريع</option>
+                    <option value="ops">عمليات</option>
+                    <option value="admin">إدارة/دعم</option>
+                    <option value="overlap">أوفرلاب</option>
+                </select>
+            </div>
+            <div class="form-row"><label>الفريق المرتبط (الاسم التشغيلي)</label><input type="text" id="aTeam" placeholder="مثال: جنوب 13"></div>
+        </div>
+
+        <div id="aOpFields" class="hidden">
+            <div class="form-row">
+                <label>نوع الكود التشغيلي</label>
+                <select id="aOpKind">
+                    <option value="overlap">أوفرلاب</option>
+                    <option value="rapid">تدخل سريع</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>الوردية الصريحة (D/N — إن وُجدت)</label>
+                <select id="aOpShift">
+                    <option value="">— تُشتق من الساعة —</option>
+                    <option value="D">D — صباحية صريحة</option>
+                    <option value="N">N — ليلية صريحة</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="aTimeFields">
+            <div style="display:flex;gap:10px;">
+                <div class="form-row" style="flex:1;"><label>بداية التشغيل</label><input type="time" id="aStart" dir="ltr"></div>
+                <div class="form-row" style="flex:1;"><label>نهاية التشغيل</label><input type="time" id="aEnd" dir="ltr"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;">
+                أوقات البداية/النهاية هي المصدر الأول لحساب الساعات (عبور منتصف الليل محسوب تلقائيًا). اتركها فارغة للرموز بلا ساعات (إجازات...).
+            </div>
+        </div>
+
+        <div class="checks">
+            <label><input type="checkbox" id="aIsShift" checked> يُعد مناوبة</label>
+            <label><input type="checkbox" id="aDayCell" checked> يقبل في خلية اليوم</label>
+            <label><input type="checkbox" id="aEmpSym"> يقبل في رمز الموظف</label>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn ghost" onclick="closeModal('addModal')">إلغاء</button>
+            <button class="btn" onclick="submitAdd()"><i class="fas fa-save"></i> إضافة الرمز</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تعديل رمز -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <h3><i class="fas fa-edit"></i> تعديل الرمز: <span id="eCodeLabel" class="code-cell"></span></h3>
+        <input type="hidden" id="eId">
+        <div class="form-row"><label>الاسم / الوصف</label><input type="text" id="eName"></div>
+        <div class="form-row" id="eTeamRow"><label>الفريق المرتبط</label><input type="text" id="eTeam"></div>
+        <div id="eTimeFields">
+            <div style="display:flex;gap:10px;">
+                <div class="form-row" style="flex:1;"><label>بداية التشغيل</label><input type="time" id="eStart" dir="ltr"></div>
+                <div class="form-row" style="flex:1;"><label>نهاية التشغيل</label><input type="time" id="eEnd" dir="ltr"></div>
+            </div>
+        </div>
+        <div class="checks">
+            <label><input type="checkbox" id="eIsShift"> يُعد مناوبة</label>
+            <label><input type="checkbox" id="eDayCell"> يقبل في خلية اليوم</label>
+            <label><input type="checkbox" id="eEmpSym"> يقبل في رمز الموظف</label>
+        </div>
+        <div class="note-box hidden" id="eHistWarn" style="margin-top:10px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn ghost" onclick="closeModal('editModal')">إلغاء</button>
+            <button class="btn" onclick="submitEdit(false)"><i class="fas fa-save"></i> حفظ التعديل</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/core/core-auth.js"></script>
+<script>
+// ═══ إدارة رموز الجداول — واجهة عرض وإدارة، كل المنطق في الخادم ═══
+let TOKEN = null;
+let UNLOCK = null;          // توكن فتح القفل — ذاكرة الصفحة فقط، لا يُخزن في المتصفح
+let unlockExpiry = 0;
+let SYMBOLS = [];
+let PATTERNS = [];
+let SECRET_CONFIGURED = true;
+
+function getToken() {
+    try { if (window.AuthCore && AuthCore.getToken) return AuthCore.getToken(); } catch (_) {}
+    try { if (window.CoreAuth && CoreAuth.getToken) return CoreAuth.getToken(); } catch (_) {}
+    return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+}
+
+async function api(path, opts = {}) {
+    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
+    if (UNLOCK) headers['x-symbols-unlock'] = UNLOCK;
+    const res = await fetch(path, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const err = new Error(data.error || ('خطأ ' + res.status));
+        err.status = res.status; err.data = data;
+        throw err;
+    }
+    return data;
+}
+
+function toast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isErr ? ' err' : '');
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 4000);
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+
+// ─── التهيئة ───
+(async function init() {
+    TOKEN = getToken();
+    if (!TOKEN) { location.href = 'index.html'; return; }
+    try {
+        const me = await api('/api/auth/me');
+        const role = (me.user && me.user.role) || me.role;
+        if (role !== 'admin' && role !== 'director') {
+            document.querySelector('.container').innerHTML =
+                '<div class="card" style="text-align:center;padding:50px;"><h2 style="color:var(--danger);">🚫 الصلاحية: Admin / Director فقط</h2></div>';
+            return;
+        }
+    } catch (e) { location.href = 'index.html'; return; }
+    await loadAll();
+})();
+
+async function loadAll() {
+    try {
+        const data = await api('/api/schedule-symbols');
+        SYMBOLS = data.symbols || [];
+        PATTERNS = data.patterns || [];
+        SECRET_CONFIGURED = !!data.secretConfigured;
+        renderStats();
+        renderTable();
+        renderPatterns();
+        renderLockbar();
+        loadAudit();
+    } catch (e) { toast(e.message, true); }
+}
+
+async function loadAudit() {
+    try {
+        const data = await api('/api/schedule-symbols/audit');
+        const body = document.getElementById('auditBody');
+        const ACTION_LABELS = { add: 'إضافة', edit: 'تعديل', disable: 'تعطيل', enable: 'تفعيل', secret_set: 'ضبط الرمز السري', secret_change: 'تغيير الرمز السري' };
+        body.innerHTML = (data.log || []).map(l => `<tr>
+            <td style="white-space:nowrap;">${(l.created_at || '').replace('T', ' ').slice(0, 19)}</td>
+            <td>${esc(l.actor_name || '—')}</td>
+            <td>${ACTION_LABELS[l.action] || l.action}</td>
+            <td><span class="code-cell">${esc(l.code || '—')}</span></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;">${esc(summarizeJson(l.old_value))}</td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;">${esc(summarizeJson(l.new_value))}</td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">لا توجد تعديلات مسجلة بعد</td></tr>';
+    } catch (e) { /* صامت */ }
+}
+
+function summarizeJson(v) {
+    if (!v) return '—';
+    try {
+        const o = JSON.parse(v);
+        const parts = [];
+        if (o.name) parts.push(o.name);
+        if (o.symbol_type) parts.push(o.symbol_type);
+        if (o.status) parts.push(o.status);
+        if (o.time_start) parts.push(o.time_start + '→' + (o.time_end || ''));
+        if (o.hours != null) parts.push(o.hours + 'س');
+        return parts.join(' · ') || '—';
+    } catch (_) { return '—'; }
+}
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── الإحصاءات ───
+function renderStats() {
+    const total = SYMBOLS.length;
+    const active = SYMBOLS.filter(s => s.status === 'active').length;
+    const disabled = total - active;
+    const review = SYMBOLS.filter(s => s.needs_review).length;
+    const custom = SYMBOLS.filter(s => s.source === 'custom').length;
+    const used = SYMBOLS.filter(s => (s.usage_count || 0) > 0).length;
+    document.getElementById('statsCards').innerHTML = [
+        [total, 'إجمالي الرموز'], [active, 'فعالة'], [used, 'مستخدمة حاليًا'],
+        [total - used, 'مدعومة — غير مستخدمة'], [custom, 'مخصصة'], [review, '⚠️ تحتاج مراجعة'], [disabled, 'معطلة']
+    ].map(([n, l]) => `<div class="stat"><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join('');
+}
+
+// ─── الجدول ───
+const TYPE_LABELS = { day_code: 'كود خلية يوم', employee_symbol: 'رمز موظف/قوة', operational_code: 'كود تشغيلي ملحق' };
+const GROUP_LABELS = {
+    morning: 'صباحية', night: 'ليلية', night8: 'ليل 8س', overlap: 'أوفرلاب', office: 'دوام رسمي',
+    mission: 'مهمة', vacation: 'إجازات', rest: 'راحة', training: 'تدريب', off: 'OFF',
+    leadership: 'قيادة', center: 'مركز جنوب', rapid: 'تدخل سريع', ops: 'عمليات', admin: 'إدارة/دعم'
+};
+
+function whereUsed(s) {
+    const parts = [];
+    if (s.accepts_day_cell) parts.push('خلية اليوم');
+    if (s.accepts_employee_symbol) parts.push('رمز الموظف');
+    if (s.is_operational) parts.push('المحلل التشغيلي');
+    return parts.join(' + ') || '—';
+}
+
+function renderTable() {
+    const q = document.getElementById('fSearch').value.trim().toUpperCase();
+    const ft = document.getElementById('fType').value;
+    const fs = document.getElementById('fSource').value;
+    const fst = document.getElementById('fStatus').value;
+    const fr = document.getElementById('fReview').value;
+    const fu = document.getElementById('fUsage').value;
+
+    let rows = SYMBOLS.filter(s => {
+        if (q && s.code.toUpperCase().indexOf(q) === -1 && (s.name || '').indexOf(q) === -1) return false;
+        if (ft && s.symbol_type !== ft) return false;
+        if (fs && s.source !== fs) return false;
+        if (fst && s.status !== fst) return false;
+        if (fr === '1' && !s.needs_review) return false;
+        if (fu === '1' && !(s.usage_count > 0)) return false;
+        if (fu === '0' && (s.usage_count > 0)) return false;
+        return true;
+    });
+
+    const body = document.getElementById('symbolsBody');
+    body.innerHTML = rows.map(s => `<tr>
+        <td><span class="code-cell">${esc(s.code)}</span>${s.needs_review ? `<span class="review-reason">⚠️ ${esc(s.review_reason || 'يحتاج مراجعة')}</span>` : ''}</td>
+        <td>${esc(s.name || '—')}</td>
+        <td><span class="badge type">${TYPE_LABELS[s.symbol_type] || s.symbol_type}</span>${s.group_name ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${GROUP_LABELS[s.group_name] || esc(s.group_name)}${s.shift_side ? ' · ' + esc(s.shift_side) : ''}</div>` : ''}</td>
+        <td style="font-size:12px;">${whereUsed(s)}</td>
+        <td>${s.hours != null ? s.hours + ' س' : '<span style="color:var(--muted);">—</span>'}</td>
+        <td>${s.is_shift ? '✅' : '—'}</td>
+        <td>${s.accepts_day_cell ? '✅' : '—'}</td>
+        <td>${s.accepts_employee_symbol ? '✅' : '—'}</td>
+        <td>${s.is_operational ? '✅' : '—'}</td>
+        <td><span class="badge ${s.source}">${s.source === 'builtin' ? 'مدمج' : 'مخصص'}</span></td>
+        <td>${(s.usage_count || 0) > 0 ? `<span class="badge used">${s.usage_count}</span>` : '<span class="badge unused">غير مستخدم</span>'}</td>
+        <td><span class="badge ${s.status}">${s.status === 'active' ? 'فعال' : 'معطل'}</span></td>
+        <td style="white-space:nowrap;">
+            <button class="btn ghost sm" onclick="openEditModal(${s.id})" ${UNLOCK ? '' : 'disabled'} title="تعديل"><i class="fas fa-edit"></i></button>
+            ${s.source === 'custom' ? (s.status === 'active'
+                ? `<button class="btn danger sm" onclick="setStatus(${s.id}, 'disabled')" ${UNLOCK ? '' : 'disabled'} title="تعطيل"><i class="fas fa-ban"></i></button>`
+                : `<button class="btn sm" onclick="setStatus(${s.id}, 'active')" ${UNLOCK ? '' : 'disabled'} title="تفعيل"><i class="fas fa-check"></i></button>`)
+            : ''}
+        </td>
+    </tr>`).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:30px;">لا توجد رموز مطابقة للفلاتر</td></tr>';
+}
+
+function renderPatterns() {
+    document.getElementById('patternsGrid').innerHTML = PATTERNS.map(p => `<div class="pattern-item">
+        <div><b>${esc(p.family)}</b> — <span class="p-code">${esc(p.pattern)}</span>${p.needs_review ? ' ⚠️' : ''}</div>
+        <div class="p-meaning">${esc(p.meaning)}${p.review_reason ? '<br>⚠️ ' + esc(p.review_reason) : ''}<br>أمثلة: <span class="p-code">${esc(p.examples)}</span> · يقبل في: ${esc(p.accepts)}</div>
+    </div>`).join('');
+}
+
+// ─── القفل ───
+function renderLockbar() {
+    const bar = document.getElementById('lockbar');
+    const open = !!UNLOCK;
+    bar.className = 'lockbar ' + (open ? 'open' : 'locked');
+    document.getElementById('lockIcon').className = open ? 'fas fa-lock-open' : 'fas fa-lock';
+    document.getElementById('lockText').textContent = open
+        ? '🔓 إدارة الأكواد مفتوحة — التعديلات متاحة الآن'
+        : '🔒 إدارة الأكواد مقفلة — القراءة متاحة، والتعديل يتطلب فتح القفل';
+    document.getElementById('btnUnlock').classList.toggle('hidden', open);
+    document.getElementById('btnLock').classList.toggle('hidden', !open);
+    document.getElementById('btnAdd').disabled = !open;
+}
+setInterval(() => {
+    if (!UNLOCK) { document.getElementById('lockTimer').textContent = ''; return; }
+    const left = Math.max(0, Math.round((unlockExpiry - Date.now()) / 1000));
+    document.getElementById('lockTimer').textContent = '⏱️ يُقفل تلقائيًا بعد ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    if (left <= 0) { UNLOCK = null; renderLockbar(); renderTable(); toast('انتهت مهلة القفل — أُقفل تلقائيًا', true); }
+}, 1000);
+
+function openUnlockModal() {
+    const firstSetup = !SECRET_CONFIGURED;
+    document.getElementById('firstSetupNote').classList.toggle('hidden', !firstSetup);
+    document.getElementById('currentSecretRow').classList.toggle('hidden', firstSetup);
+    document.getElementById('newSecretRow').classList.toggle('hidden', !firstSetup);
+    document.getElementById('confirmSecretRow').classList.toggle('hidden', !firstSetup);
+    document.getElementById('unlockSecret').value = '';
+    document.getElementById('newSecret').value = '';
+    document.getElementById('confirmSecret').value = '';
+    openModal('unlockModal');
+}
+
+async function submitUnlock() {
+    try {
+        if (!SECRET_CONFIGURED) {
+            // الضبط الأول للرمز ثم فتح القفل به مباشرة
+            const next = document.getElementById('newSecret').value;
+            const confirm = document.getElementById('confirmSecret').value;
+            await api('/api/schedule-symbols/secret', { method: 'POST', body: JSON.stringify({ next, confirm }) });
+            SECRET_CONFIGURED = true;
+            const res = await api('/api/schedule-symbols/unlock', { method: 'POST', body: JSON.stringify({ secret: next }) });
+            UNLOCK = res.unlockToken; unlockExpiry = Date.now() + res.expiresInMinutes * 60000;
+        } else {
+            const secret = document.getElementById('unlockSecret').value;
+            const res = await api('/api/schedule-symbols/unlock', { method: 'POST', body: JSON.stringify({ secret }) });
+            UNLOCK = res.unlockToken; unlockExpiry = Date.now() + res.expiresInMinutes * 60000;
+        }
+        closeModal('unlockModal');
+        renderLockbar(); renderTable();
+        toast('🔓 إدارة الأكواد مفتوحة');
+    } catch (e) { toast(e.message, true); }
+}
+
+async function lockNow() {
+    try { await api('/api/schedule-symbols/lock', { method: 'POST' }); } catch (_) {}
+    UNLOCK = null; renderLockbar(); renderTable();
+    toast('🔒 إدارة الأكواد مقفلة');
+}
+
+function openSecretModal() {
+    document.getElementById('chgCurrent').value = '';
+    document.getElementById('chgNext').value = '';
+    document.getElementById('chgConfirm').value = '';
+    if (!SECRET_CONFIGURED) { toast('لم يُضبط رمز بعد — استخدم فتح القفل للضبط الأول', true); return; }
+    openModal('secretModal');
+}
+
+async function submitSecretChange() {
+    try {
+        await api('/api/schedule-symbols/secret', {
+            method: 'POST',
+            body: JSON.stringify({
+                current: document.getElementById('chgCurrent').value,
+                next: document.getElementById('chgNext').value,
+                confirm: document.getElementById('chgConfirm').value
+            })
+        });
+        UNLOCK = null; // كل الجلسات أُبطلت في الخادم
+        closeModal('secretModal');
+        renderLockbar(); renderTable(); loadAudit();
+        toast('✅ تم تغيير رمز إدارة الأكواد — أُقفلت كل الجلسات');
+    } catch (e) { toast(e.message, true); }
+}
+
+// ─── الإضافة ───
+function onAddTypeChange() {
+    const t = document.getElementById('aType').value;
+    document.getElementById('aDayFields').classList.toggle('hidden', t !== 'day_code');
+    document.getElementById('aEmpFields').classList.toggle('hidden', t !== 'employee_symbol');
+    document.getElementById('aOpFields').classList.toggle('hidden', t !== 'operational_code');
+    document.getElementById('aTimeFields').classList.toggle('hidden', t === 'employee_symbol');
+    document.getElementById('aDayCell').checked = t !== 'employee_symbol';
+    document.getElementById('aEmpSym').checked = t === 'employee_symbol';
+}
+
+function openAddModal() {
+    if (!UNLOCK) { toast('افتح القفل أولًا', true); return; }
+    ['aCode', 'aName', 'aTeam', 'aStart', 'aEnd'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('aType').value = 'day_code';
+    onAddTypeChange();
+    openModal('addModal');
+}
+
+async function submitAdd() {
+    const t = document.getElementById('aType').value;
+    const body = {
+        code: document.getElementById('aCode').value,
+        name: document.getElementById('aName').value,
+        symbol_type: t,
+        is_shift: document.getElementById('aIsShift').checked,
+        accepts_day_cell: document.getElementById('aDayCell').checked,
+        accepts_employee_symbol: document.getElementById('aEmpSym').checked,
+        time_start: document.getElementById('aStart').value || null,
+        time_end: document.getElementById('aEnd').value || null
+    };
+    if (t === 'day_code') {
+        body.group_name = document.getElementById('aGroup').value;
+        body.shift_side = document.getElementById('aShiftSide').value;
+    } else if (t === 'employee_symbol') {
+        body.group_name = document.getElementById('aKind').value;
+        body.team = document.getElementById('aTeam').value;
+    } else if (t === 'operational_code') {
+        body.group_name = document.getElementById('aOpKind').value;
+        const sh = document.getElementById('aOpShift').value;
+        body.shift_side = sh === 'D' ? 'صباحية' : sh === 'N' ? 'ليلية' : '';
+    }
+    try {
+        const res = await api('/api/schedule-symbols', { method: 'POST', body: JSON.stringify(body) });
+        closeModal('addModal');
+        toast('✅ أُضيف الرمز ' + res.symbol.code + ' وأصبح مفهومًا للنظام من التحميل القادم للصفحات');
+        await loadAll();
+    } catch (e) { toast(e.message, true); }
+}
+
+// ─── التعديل ───
+function openEditModal(id) {
+    const s = SYMBOLS.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('eId').value = s.id;
+    document.getElementById('eCodeLabel').textContent = s.code;
+    document.getElementById('eName').value = s.name || '';
+    document.getElementById('eTeam').value = s.team || '';
+    document.getElementById('eStart').value = s.time_start || '';
+    document.getElementById('eEnd').value = s.time_end || '';
+    document.getElementById('eIsShift').checked = !!s.is_shift;
+    document.getElementById('eDayCell').checked = !!s.accepts_day_cell;
+    document.getElementById('eEmpSym').checked = !!s.accepts_employee_symbol;
+    document.getElementById('eTeamRow').classList.toggle('hidden', s.symbol_type !== 'employee_symbol');
+    document.getElementById('eTimeFields').classList.toggle('hidden', s.symbol_type === 'employee_symbol');
+    const warn = document.getElementById('eHistWarn');
+    if ((s.usage_count || 0) > 0) {
+        warn.classList.remove('hidden');
+        warn.innerHTML = '⚠️ <b>تنبيه تاريخي:</b> هذا الرمز مستخدم في ' + s.usage_count + ' سجل سابق. تعديل أوقاته/ساعاته سيغيّر قراءة الجداول التاريخية — سيُطلب تأكيد صريح عند الحفظ.';
+    } else warn.classList.add('hidden');
+    openModal('editModal');
+}
+
+async function submitEdit(confirmHistorical) {
+    const id = document.getElementById('eId').value;
+    const body = {
+        name: document.getElementById('eName').value,
+        team: document.getElementById('eTeam').value || null,
+        time_start: document.getElementById('eStart').value || null,
+        time_end: document.getElementById('eEnd').value || null,
+        is_shift: document.getElementById('eIsShift').checked,
+        accepts_day_cell: document.getElementById('eDayCell').checked,
+        accepts_employee_symbol: document.getElementById('eEmpSym').checked,
+        confirmHistorical: confirmHistorical === true
+    };
+    try {
+        await api('/api/schedule-symbols/' + id, { method: 'PUT', body: JSON.stringify(body) });
+        closeModal('editModal');
+        toast('✅ تم حفظ التعديل');
+        await loadAll();
+    } catch (e) {
+        if (e.status === 409 && e.data && e.data.code === 'HISTORICAL_IMPACT') {
+            if (confirm(e.data.error + '\n\nهل تريد المتابعة رغم ذلك؟ (سيُسجَّل في سجل التعديلات)')) {
+                return submitEdit(true);
+            }
+            return;
+        }
+        toast(e.message, true);
+    }
+}
+
+async function setStatus(id, status) {
+    try {
+        await api('/api/schedule-symbols/' + id + '/status', { method: 'POST', body: JSON.stringify({ status }) });
+        toast(status === 'disabled' ? '⛔ عُطّل الرمز (المحلل المدمج يبقى كما هو — التعطيل يوقف الرموز المخصصة فقط)' : '✅ فُعّل الرمز');
+        await loadAll();
+    } catch (e) { toast(e.message, true); }
+}
+</script>
+</body>
+</html>

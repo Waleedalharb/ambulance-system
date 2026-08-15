@@ -72,6 +72,20 @@
     }
     var CODE_MAP = buildCodeMap(CODE_ENTRIES);
 
+    // ── رموز مخصصة من إدارة الرموز (additive — لا تغيّر أي سلوك مدمج) ──
+    // تُسجَّل عبر registerCustom من symbol-runtime-loader بعد جلبها من الخادم.
+    // ممنوع تجاوز رمز مدمج أو مخصص مسجل — الرفض الصامت المدوَّن أفضل من الكسر.
+    var CUSTOM_CODE_MAP = {};
+    function registerCustom(code, def) {
+        var sym = normalize(code);
+        if (!sym || !def || !def.team) return false;
+        if (VALID_KINDS.indexOf(def.kind) === -1) return false;
+        if (Object.prototype.hasOwnProperty.call(CODE_MAP, sym)) return false;   // مدمج مسبقًا
+        if (Object.prototype.hasOwnProperty.call(CUSTOM_CODE_MAP, sym)) return false;
+        CUSTOM_CODE_MAP[sym] = { kind: def.kind, team: def.team, num: def.num || null };
+        return true;
+    }
+
     // فحص بنيوي ذاتي (يستدعيه system-validator)
     function validate() {
         var errors = [];
@@ -112,7 +126,7 @@
     function resolveSymbol(rawSym, jobNature) {
         var sym = normalize(rawSym);
         if (!sym) return null;
-        var hit = CODE_MAP[sym];
+        var hit = CODE_MAP[sym] || CUSTOM_CODE_MAP[sym];
         if (hit) {
             var out = { kind: hit.kind, team: hit.team, num: hit.num || null };
             if (hit.jobTitleTeam && jobNature && String(jobNature).indexOf('تنسيق') !== -1) {
@@ -156,6 +170,7 @@
         VALID_KINDS: VALID_KINDS,
         normalize: normalize,
         resolveSymbol: resolveSymbol,
+        registerCustom: registerCustom,
         validate: validate
     };
 }));
