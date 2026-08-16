@@ -886,6 +886,34 @@ function authorize(roles) {
 }
 
 // ============================================
+// منظومة الصلاحيات — المرحلة 0 (معتمدة 2026-08-16): بنية فقط
+// authorizePerm لا يُربط بأي مسار قائم في هذه المرحلة؛ يخدم نقاط
+// إدارة الصلاحيات الجديدة فقط. authorize الحالي يبقى كما هو حرفيًا.
+// ============================================
+let permissionService = null;
+function getPermissionService() {
+    if (!permissionService && db) {
+        const PermissionService = require('./services/permission-service');
+        permissionService = new PermissionService({ db });
+    }
+    return permissionService;
+}
+function authorizePerm(permissionKey) {
+    return async (req, res, next) => {
+        if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
+        try {
+            const svc = getPermissionService();
+            const ok = await svc.hasPermission(req.user.id, req.user.role, permissionKey);
+            if (!ok) return res.status(403).json({ error: 'ليس لديك الصلاحية', code: 'PERMISSION_DENIED', permission: permissionKey });
+            next();
+        } catch (e) {
+            console.error('authorizePerm error:', e.message);
+            return res.status(500).json({ error: 'فشل فحص الصلاحية' });
+        }
+    };
+}
+
+// ============================================
 // SSE - تحديثات فورية عبر Server-Sent Events
 // ============================================
 var sseClients = []; // مصفوفة عملاء SSE
@@ -1123,9 +1151,114 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
             }
         } catch (e) { /* ignore session check errors */ }
         
-        res.json({ success: true, user, sessionValid });
+        // الصلاحيات الفعلية (المرحلة 0 — حقول إضافية لا تكسر العقد القائم)
+        let permissionsPayload = null;
+        try {
+            const svc = getPermissionService();
+            permissionsPayload = await svc.mePayload(user.id, user.role);
+        } catch (e) { /* فشل حساب الصلاحيات لا يكسر auth/me أبدًا */ }
+
+        res.json({ success: true, user, sessionValid, ...(permissionsPayload || {}) });
     } catch (error) {
         res.json({ success: true, user: req.user });
+    }
+});
+
+// الصلاحيات الفعلية للمستخدم الحالي — نقطة قراءة مستقلة لمن يريدها وحدها
+app.get('/api/auth/me/permissions', authenticate, async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        const payload = await svc.mePayload(req.user.id, req.user.role);
+        res.json({ success: true, ...payload });
+    } catch (error) {
+        console.error('me/permissions error:', error);
+        res.status(500).json({ error: 'فشل في حساب الصلاحيات' });
+    }
+});
+
+// ═══ إدارة الصلاحيات — بنية المرحلة 0 (تُحمى بنفس المحرك الجديد إثباتًا) ═══
+const { PERMISSIONS: PERMISSIONS_CATALOG, ROLE_LABELS: ROLE_LABELS_MAP } = require('./config/permissions');
+
+app.get('/api/permissions/catalog', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
+    res.json({ success: true, permissions: PERMISSIONS_CATALOG, roles: ROLE_LABELS_MAP });
+});
+
+app.get('/api/permissions/user/:userId', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        // مصدر المستخدمين الفعلي: users.json (نفس مصدر تسجيل الدخول)
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const target = users.find(u => String(u.id) === String(req.params.userId) || u.username === req.params.userId);
+        if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        const payload = await svc.mePayload(target.id, target.role);
+        const overrides = await db.UserPermissions.getByUser(target.id);
+        res.json({ success: true, user: { id: target.id, name: target.name, role: target.role }, ...payload, overrides });
+    } catch (error) {
+        console.error('permissions/user error:', error);
+        res.status(500).json({ error: 'فشل في جلب صلاحيات المستخدم' });
+    }
+});
+
+app.post('/api/permissions/grant', authenticate, authorizePerm('admin.users_manage'), validateBody({
+    user_id: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    permission: { required: true, type: 'string', minLength: 1, maxLength: 60 }
+}), async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        // حل المعرف على users.json (نفس مصدر الدخول): يقبل id أو username
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const target = users.find(u => String(u.id) === String(req.body.user_id) || u.username === req.body.user_id);
+        if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        // ممنوع تعديل صلاحيات الحساب نفسه — لا منح ولا سحب ذاتي مهما كان الدور
+        if (String(target.id) === String(req.user.id)) {
+            return res.status(403).json({ error: 'لا يمكن تعديل صلاحيات حسابك بنفسك', code: 'SELF_MODIFY_DENIED' });
+        }
+        const result = await svc.setPermission(target.id, req.body.permission, true, req.user);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('permissions/grant error:', error);
+        res.status(400).json({ error: error.message || 'فشل في منح الصلاحية' });
+    }
+});
+
+app.post('/api/permissions/revoke', authenticate, authorizePerm('admin.users_manage'), validateBody({
+    user_id: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    permission: { required: true, type: 'string', minLength: 1, maxLength: 60 }
+}), async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const target = users.find(u => String(u.id) === String(req.body.user_id) || u.username === req.body.user_id);
+        if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        if (String(target.id) === String(req.user.id)) {
+            return res.status(403).json({ error: 'لا يمكن تعديل صلاحيات حسابك بنفسك', code: 'SELF_MODIFY_DENIED' });
+        }
+        const result = await svc.setPermission(target.id, req.body.permission, false, req.user);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('permissions/revoke error:', error);
+        res.status(400).json({ error: error.message || 'فشل في سحب الصلاحية' });
+    }
+});
+
+// إعادة صلاحية إلى افتراضي الدور (حذف صف المنحة/السحب)
+app.post('/api/permissions/clear', authenticate, authorizePerm('admin.users_manage'), validateBody({
+    user_id: { required: true, type: 'string', minLength: 1, maxLength: 50 },
+    permission: { required: true, type: 'string', minLength: 1, maxLength: 60 }
+}), async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const target = users.find(u => String(u.id) === String(req.body.user_id) || u.username === req.body.user_id);
+        if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        if (String(target.id) === String(req.user.id)) {
+            return res.status(403).json({ error: 'لا يمكن تعديل صلاحيات حسابك بنفسك', code: 'SELF_MODIFY_DENIED' });
+        }
+        const result = await svc.clearPermission(target.id, req.body.permission, req.user);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('permissions/clear error:', error);
+        res.status(400).json({ error: error.message || 'فشل في إعادة الصلاحية' });
     }
 });
 

@@ -327,6 +327,19 @@ const TABLE_SCHEMAS = [
     updated_by TEXT
   );`,
 
+  // User Permissions — منح/سحب صلاحيات فردية فوق الدور (المرحلة 0: بنية فقط)
+  // granted: 1 = منحة فوق الدور · 0 = سحب حتى مما يمنحه الدور · غياب الصف = افتراضي الدور
+  `CREATE TABLE IF NOT EXISTS user_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    permission_key TEXT NOT NULL,
+    granted INTEGER NOT NULL,            -- 1 منحة | 0 سحب
+    granted_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    UNIQUE(user_id, permission_key)
+  );`,
+
   // Shift Patterns (A/B/C/D) — بنية تقنية فقط: لا دورة مفترضة ولا تحويل تلقائي
   // لأي رمز موجود؛ cycle_json يبقى NULL حتى يُهيَّأ لاحقًا من الإعدادات.
   `CREATE TABLE IF NOT EXISTS shift_patterns (
@@ -2487,6 +2500,30 @@ const SymbolAdminSecret = {
 };
 
 // ============================================
+// CRUD: USER PERMISSIONS (المرحلة 0 — بنية فقط)
+// ============================================
+const UserPermissions = {
+  async getByUser(userId) {
+    return all('SELECT * FROM user_permissions WHERE user_id = ?', [String(userId)]);
+  },
+  async getAll() {
+    return all('SELECT * FROM user_permissions ORDER BY user_id, permission_key');
+  },
+  // upsert: منحة (granted=1) أو سحب (granted=0)
+  async set(userId, permissionKey, granted, grantedBy) {
+    return run(
+      `INSERT INTO user_permissions (user_id, permission_key, granted, granted_by) VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id, permission_key) DO UPDATE SET
+         granted = excluded.granted, granted_by = excluded.granted_by, updated_at = CURRENT_TIMESTAMP;`,
+      [String(userId), permissionKey, granted ? 1 : 0, grantedBy || null]);
+  },
+  // إزالة الصف = العودة لافتراضي الدور
+  async clear(userId, permissionKey) {
+    return run('DELETE FROM user_permissions WHERE user_id = ? AND permission_key = ?', [String(userId), permissionKey]);
+  }
+};
+
+// ============================================
 // CRUD: SHIFT CODES
 // ============================================
 const ShiftCodes = {
@@ -3946,6 +3983,7 @@ module.exports = {
   ScheduleSymbols,
   SymbolAuditLog,
   SymbolAdminSecret,
+  UserPermissions,
   ShiftRoster,
   TeamAssignments,
   ShiftPatterns,
