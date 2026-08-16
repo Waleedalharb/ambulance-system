@@ -68,14 +68,16 @@ const ROLE_LABELS = {
     user: 'مستخدم'
 };
 
-// '*' = كل الصلاحيات. المرحلة 1 (معتمد 2026-08-17):
+// '*' = كل الصلاحيات. المرحلة 1 (معتمد 2026-08-17) + الحزم الموحدة (معتمدة 2026-08-17):
 //  - كل مفاتيح schedule.* أُفرغت من جميع الأدوار — منح فردي حصرًا (بند سابعًا).
 //  - ops.execute الشامل بقي في الكتالوج للتوافق لكنه لا يُمنح افتراضيًا إلا للدور القديم user.
-//  - field_leadership = التشغيل الدقيق + workflow.approve (بند رابعًا).
-const OPS_ALL = [
-    'ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail',
-    'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers'
-];
+//  - operator/field_leadership: حزمة موحدة — تنفيذ: completion/dispatch/deployments/forms،
+//    اطلاع: reports/report_revert/report_detail/team_exit/volunteers + workflow.view.
+//    الفرق تنفيذ/اطلاع يُحسم في ربط المسارات لاحقًا (GET↔مفاتيح الاطلاع، POST↔مفاتيح التنفيذ).
+//  - field_leadership تزيد workflow.approve فقط. ops_supervisor غير مُسند حاليًا.
+const OPS_EXECUTE = ['ops.completion', 'ops.dispatch', 'ops.deployments', 'ops.forms'];
+const OPS_VIEW = ['ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.team_exit', 'ops.volunteers'];
+const OPS_ALL = OPS_EXECUTE.concat(OPS_VIEW);
 const ROLES_PERMISSIONS = {
     sysadmin: ['*'],
     ops_supervisor: [
@@ -87,12 +89,14 @@ const ROLES_PERMISSIONS = {
         'archive.sensitive'
     ],
     field_leadership: [
-        ...OPS_ALL,             // صلاحيات التشغيل الأساسية للتحكم والتنسيق
+        ...OPS_ALL,             // نفس حزمة operator التشغيلية
         'workflow.view',
-        'workflow.approve',     // اعتماد سير العمل (كبير/مساعد كبير المسعفين)
-        'archive.sensitive'     // متابعة ميدانية تشمل اللقطات
+        'workflow.approve'      // اعتماد سير العمل (كبير/مساعد كبير المسعفين)
     ],
-    operator: [],                  // التحكم والتنسيق: الصلاحيات الدقيقة تُمنح فرديًا حسب التكليف
+    operator: [
+        ...OPS_ALL,             // 4 تنفيذ + 5 اطلاع — حزمة التحكم والتنسيق الموحدة
+        'workflow.view'
+    ],
     viewer: [],                    // مشاهدة فقط — القراءة متاحة للموثّقين أصلًا، ولا كتابة إطلاقًا
     // ── الأدوار التقنية الحالية (لا تغيير سلوكي — الـ20 يبقون admin='*') ──
     admin: ['*'],

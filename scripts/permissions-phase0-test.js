@@ -90,9 +90,9 @@ async function waitReady(tries = 60) {
     check('viewer بلا صلاحيات كتابة', (await svc.getEffective('v1', 'viewer')).effective.length === 0);
     check('schedule.import غائبة من كل دور افتراضيًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.import') === -1 || ROLES_PERMISSIONS[r][0] === '*'));
 
-    // إثبات 6: لا سجل ← افتراضي الدور (المرحلة 1: operator فارغ — المنح فردية حصرًا)
+    // إثبات 6: لا سجل ← افتراضي الدور (الحزمة الموحدة: operator = 4 تنفيذ + 5 اطلاع + workflow.view)
     const effDefault = await svc.getEffective('u100', 'operator');
-    check('إثبات 6: بلا سجل = افتراضي الدور (operator فارغ — المرحلة 1)', effDefault.effective.length === 0 && effDefault.granted.length === 0);
+    check('إثبات 6: بلا سجل = افتراضي الدور (حزمة operator الموحدة)', JSON.stringify(effDefault.effective) === JSON.stringify(ROLES_PERMISSIONS.operator.slice().sort()) && effDefault.granted.length === 0);
     check('operator لا يملك schedule.import افتراضيًا', effDefault.effective.indexOf('schedule.import') === -1);
     check('المرحلة 1: لا دور يحمل أي schedule.*', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
     check('المرحلة 1: field_leadership يحمل workflow.approve', ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);

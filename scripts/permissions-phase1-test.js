@@ -76,8 +76,9 @@ async function login(u, p) {
     check('§7: schedule.import فردية حصرًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.import') === -1));
     check('§2ب: ops_supervisor بلا إدارة مستخدمين/رموز/تقنية', ['admin.users_manage', 'symbols.manage', 'admin.tech', 'admin.settings', 'data.delete'].every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) === -1));
     check('§2ب: ops_supervisor يحمل التشغيل التسعة + سير العمل كاملًا', OPS9.every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1) && ['workflow.view', 'workflow.manage', 'workflow.approve'].every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1));
-    check('§4: field_leadership = التشغيل + workflow.approve', OPS9.every(k => ROLES_PERMISSIONS.field_leadership.indexOf(k) !== -1) && ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);
-    check('§3/§5: operator فارغ — التحكم والتنسيق يُمنحان فرديًا', ROLES_PERMISSIONS.operator.length === 0);
+    check('§4: field_leadership = حزمة operator + workflow.approve', OPS9.every(k => ROLES_PERMISSIONS.field_leadership.indexOf(k) !== -1) && ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);
+    check('§3/§5: operator = 4 تنفيذ + 5 اطلاع + workflow.view', ROLES_PERMISSIONS.operator.length === 10 && OPS9.every(k => ROLES_PERMISSIONS.operator.indexOf(k) !== -1) && ROLES_PERMISSIONS.operator.indexOf('workflow.view') !== -1);
+    check('operator بلا اعتماد ولا إدارة ولا جداول', ['workflow.approve', 'workflow.manage', 'admin.users_manage', 'symbols.manage', 'admin.settings', 'admin.tech', 'data.delete'].every(k => ROLES_PERMISSIONS.operator.indexOf(k) === -1));
     check('viewer فارغ', ROLES_PERMISSIONS.viewer.length === 0);
 
     // ── خادم الاختبار بعزل كامل ──
@@ -139,12 +140,18 @@ async function login(u, p) {
 
         console.log('\n🌟 حارس النجمة (admin ← دور عادي: لا بقايا * إطلاقًا):');
         const ADMIN_KEYS = ['admin.users_manage', 'admin.settings', 'admin.tech', 'symbols.manage', 'data.delete', 'employees.manage'];
-        check('الفعلية = افتراضي operator (∅) + الاستثناءات الفردية حصرًا', JSON.stringify(meOp.data.permissions.slice().sort()) === JSON.stringify(['ops.dispatch']), JSON.stringify(meOp.data.permissions));
+        const expectedOp = ROLES_PERMISSIONS.operator.slice().sort(); // ops.dispatch ضمن الحزمة أصلًا
+        check('الفعلية = حزمة operator + الاستثناءات الفردية حصرًا', JSON.stringify(meOp.data.permissions.slice().sort()) === JSON.stringify(expectedOp), JSON.stringify(meOp.data.permissions));
         check('لا صلاحية إدارية بقيت من دور admin القديم', ADMIN_KEYS.every(k => meOp.data.permissions.indexOf(k) === -1));
         check('لا schedule.* تسرّبت من النجمة القديمة', meOp.data.permissions.every(k => k.indexOf('schedule.') !== 0));
 
         console.log('\n🧩 التفكيك والفردية (§1/§7/§8):');
-        check('§1: ops.dispatch لا تستلزم ops.forms (التفكيك حقيقي)', meOp.data.permissions.indexOf('ops.forms') === -1);
+        // إثبات التفكيك على viewer (فارغ): منحة ops.dispatch وحدها لا تمنح ops.forms
+        const toViewer = await api('/api/users/101353/role', { method: 'POST', token: T, body: { role: 'viewer' } });
+        check('operator ← viewer ينجح', toViewer.status === 200 && toViewer.data.changed === true);
+        T2 = await login('101353', '101353');
+        const meV = await api('/api/auth/me/permissions', { token: T2 });
+        check('§1: التفكيك حقيقي — viewer + منحة ops.dispatch وحدها (بلا ops.forms)', meV.data.permissions.indexOf('ops.dispatch') !== -1 && meV.data.permissions.indexOf('ops.forms') === -1 && meV.data.permissions_star === false, JSON.stringify(meV.data.permissions));
         const grantView = await api('/api/permissions/grant', { method: 'POST', token: T, body: { user_id: '101353', permission: 'schedule.view' } });
         check('منح schedule.view فرديًا ينجح', grantView.status === 200);
         T2 = await login('101353', '101353');
