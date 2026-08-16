@@ -1262,6 +1262,72 @@ app.post('/api/permissions/clear', authenticate, authorizePerm('admin.users_mana
     }
 });
 
+// قائمة المستخدمين لشاشة الإدارة: الدور + تسميته + عدّاد الاستثناءات الفردية
+app.get('/api/permissions/users', authenticate, authorizePerm('admin.users_manage'), async (req, res) => {
+    try {
+        const svc = getPermissionService();
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const allOverrides = await db.UserPermissions.getAll();
+        const list = users.map(u => {
+            const rows = (allOverrides || []).filter(r => String(r.user_id) === String(u.id));
+            const grants = rows.filter(r => r.granted === 1).length;
+            const revokes = rows.filter(r => r.granted === 0).length;
+            return {
+                id: u.id, username: u.username, name: u.name, role: u.role,
+                role_label: ROLE_LABELS_MAP[u.role] || u.role,
+                isActive: !!u.isActive,
+                overrides: { grants, revokes }
+            };
+        });
+        res.json({ success: true, users: list });
+    } catch (error) {
+        console.error('permissions/users error:', error);
+        res.status(500).json({ error: 'فشل في جلب المستخدمين' });
+    }
+});
+
+// تغيير الدور الأساسي لمستخدم — المرحلة 1 (إسناد يدوي فردي، بلا ربط بـ job_title)
+app.post('/api/users/:id/role', authenticate, authorizePerm('admin.users_manage'), validateBody({
+    role: { required: true, type: 'string', minLength: 1, maxLength: 30 }
+}), async (req, res) => {
+    try {
+        // الأدوار الخمسة المعتمدة + الأدوار التقنية الحالية (للتراجع الآمن أثناء الترحيل الفردي)
+        const NEW_ROLES = ['sysadmin', 'ops_supervisor', 'field_leadership', 'operator', 'viewer'];
+        const ALLOWED_ROLES = NEW_ROLES.concat(['admin', 'director', 'user']);
+        const newRole = req.body.role;
+        if (ALLOWED_ROLES.indexOf(newRole) === -1) {
+            return res.status(400).json({ error: 'الدور غير معتمد — الأدوار المتاحة: ' + ALLOWED_ROLES.join(', ') });
+        }
+        const users = JSON.parse(await fs.readFile(USERS_PATH, 'utf8'));
+        const idx = users.findIndex(u => String(u.id) === String(req.params.id) || u.username === req.params.id);
+        if (idx === -1) return res.status(404).json({ error: 'المستخدم غير موجود' });
+        const target = users[idx];
+        // حاجز التعديل الذاتي: لا أحد يغيّر دور حسابه بنفسه
+        if (String(target.id) === String(req.user.id)) {
+            return res.status(403).json({ error: 'لا يمكن تغيير دور حسابك بنفسك', code: 'SELF_MODIFY_DENIED' });
+        }
+        const oldRole = target.role;
+        if (oldRole === newRole) {
+            return res.json({ success: true, changed: false, message: 'الدور لم يتغير', sessionsRevoked: 0 });
+        }
+        users[idx].role = newRole;
+        await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2));
+        const svc = getPermissionService();
+        const sessionsRevoked = await svc.revokeUserSessions(target.id);
+        if (db.AuditLog && db.AuditLog.create) {
+            await db.AuditLog.create({
+                user_id: req.user.id, user_name: req.user.name, action: 'role_change',
+                detail: `تغيير دور ${target.name} (${target.username}): ${ROLE_LABELS_MAP[oldRole] || oldRole} ← ${ROLE_LABELS_MAP[newRole]} · أُبطلت ${sessionsRevoked} جلسة`,
+                type: 'permissions'
+            });
+        }
+        res.json({ success: true, changed: true, oldRole, newRole, role_label: ROLE_LABELS_MAP[newRole], sessionsRevoked });
+    } catch (error) {
+        console.error('users/role error:', error);
+        res.status(500).json({ error: 'فشل في تغيير الدور' });
+    }
+});
+
 // Token refresh endpoint - exchanges refreshToken for a new accessToken
 app.post('/api/auth/refresh', async (req, res) => {
     try {

@@ -90,24 +90,26 @@ async function waitReady(tries = 60) {
     check('viewer بلا صلاحيات كتابة', (await svc.getEffective('v1', 'viewer')).effective.length === 0);
     check('schedule.import غائبة من كل دور افتراضيًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.import') === -1 || ROLES_PERMISSIONS[r][0] === '*'));
 
-    // إثبات 6: لا سجل ← افتراضي الدور
+    // إثبات 6: لا سجل ← افتراضي الدور (المرحلة 1: operator فارغ — المنح فردية حصرًا)
     const effDefault = await svc.getEffective('u100', 'operator');
-    check('إثبات 6: بلا سجل = افتراضي الدور (operator يملك ops.execute)', effDefault.effective.indexOf('ops.execute') !== -1 && effDefault.granted.length === 0);
+    check('إثبات 6: بلا سجل = افتراضي الدور (operator فارغ — المرحلة 1)', effDefault.effective.length === 0 && effDefault.granted.length === 0);
     check('operator لا يملك schedule.import افتراضيًا', effDefault.effective.indexOf('schedule.import') === -1);
+    check('المرحلة 1: لا دور يحمل أي schedule.*', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
+    check('المرحلة 1: field_leadership يحمل workflow.approve', ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);
 
     // إثبات 4: granted=1 يمنح فوق الدور
     await svc.setPermission('u100', 'schedule.import', true, { id: '4252', name: 'اختبار' });
     const effGranted = await svc.getEffective('u100', 'operator');
     check('إثبات 4: granted=1 يمنح schedule.import فوق دور operator', effGranted.effective.indexOf('schedule.import') !== -1 && effGranted.granted.indexOf('schedule.import') !== -1);
 
-    // إثبات 5: granted=0 يسحب مما يمنحه الدور
-    await svc.setPermission('u100', 'ops.execute', false, { id: '4252', name: 'اختبار' });
-    const effRevoked = await svc.getEffective('u100', 'operator');
+    // إثبات 5: granted=0 يسحب مما يمنحه الدور (user يحمل ops.execute الشامل القديم)
+    await svc.setPermission('u101', 'ops.execute', false, { id: '4252', name: 'اختبار' });
+    const effRevoked = await svc.getEffective('u101', 'user');
     check('إثبات 5: granted=0 يسحب ops.execute رغم أن الدور يمنحها', effRevoked.effective.indexOf('ops.execute') === -1 && effRevoked.revoked.indexOf('ops.execute') !== -1);
 
     // إعادة للافتراضي
-    await svc.clearPermission('u100', 'ops.execute', { id: '4252', name: 'اختبار' });
-    const effCleared = await svc.getEffective('u100', 'operator');
+    await svc.clearPermission('u101', 'ops.execute', { id: '4252', name: 'اختبار' });
+    const effCleared = await svc.getEffective('u101', 'user');
     check('clear يعيد الصلاحية لافتراضي الدور', effCleared.effective.indexOf('ops.execute') !== -1 && effCleared.revoked.length === 0);
 
     // مفتاح مجهول مرفوض

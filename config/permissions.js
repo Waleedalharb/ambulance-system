@@ -14,19 +14,30 @@
 
 // ── كتالوج الصلاحيات المعتمد ──
 const PERMISSIONS = {
-    // التشغيل اليومي (يُفكَّك لاحقًا عند حاجة فعلية فقط: ops.reports/completion/...)
-    'ops.execute':          { label: 'التشغيل اليومي (بلاغات/تكميل/تمركزات/نماذج/حالات/خروج فرق/متطوعون)', domain: 'ops' },
-    // الجداول — مفصولة بالكامل (بند ثالثًا)
-    'schedule.view':        { label: 'مشاهدة الجداول', domain: 'schedule' },
+    // التشغيل اليومي — المرحلة 1: فُكِّك إلى مفاتيح دقيقة (معتمد 2026-08-17)
+    // ops.execute يبقى مؤقتًا للتوافق مع أي منح سابق — لا يُحذف
+    'ops.execute':          { label: 'التشغيل اليومي (مفتاح شامل قديم — للتوافق فقط)', domain: 'ops' },
+    'ops.completion':       { label: 'التكميل', domain: 'ops' },
+    'ops.dispatch':         { label: 'توزيع البلاغات', domain: 'ops' },
+    'ops.reports':          { label: 'البلاغات', domain: 'ops' },
+    'ops.report_revert':    { label: 'التراجع عن البلاغ', domain: 'ops' },
+    'ops.report_detail':    { label: 'البلاغات التفصيلية', domain: 'ops' },
+    'ops.deployments':      { label: 'التمركزات', domain: 'ops' },
+    'ops.forms':            { label: 'النماذج', domain: 'ops' },
+    'ops.team_exit':        { label: 'تسجيل خروج الفرق', domain: 'ops' },
+    'ops.volunteers':       { label: 'المتطوعون والتفعيل', domain: 'ops' },
+    // الجداول — مفصولة بالكامل، وكلها منح فردية حصرًا: لا دور يحملها (بند ثالثًا/سابعًا)
+    'schedule.view':        { label: 'مشاهدة الجداول (منح فردي فقط)', domain: 'schedule' },
     'schedule.import':      { label: 'استيراد الجداول (منح فردي فقط — لا دور يمنحها)', domain: 'schedule' },
-    'schedule.edit_cell':   { label: 'تعديل خلية جدول', domain: 'schedule' },
-    'schedule.generate':    { label: 'توليد الجدول الذكي', domain: 'schedule' },
-    'schedule.swap':        { label: 'استبدال/تراجع/إعادة بالجداول', domain: 'schedule' },
-    'schedule.bulk_update': { label: 'تحديث جماعي ومسودات الجداول', domain: 'schedule' },
+    'schedule.edit_cell':   { label: 'تعديل خلية جدول (منح فردي فقط)', domain: 'schedule' },
+    'schedule.generate':    { label: 'توليد الجدول الذكي (منح فردي فقط)', domain: 'schedule' },
+    'schedule.swap':        { label: 'استبدال/تراجع/إعادة بالجداول (منح فردي فقط)', domain: 'schedule' },
+    'schedule.bulk_update': { label: 'تحديث جماعي ومسودات الجداول (منح فردي فقط)', domain: 'schedule' },
     // المناوبة: الدورة ≠ الاعتماد
     'shift.lifecycle':      { label: 'دورة حياة المناوبة (بدء/إنهاء/تحديث)', domain: 'shift' },
     'shift.approve':        { label: 'اعتماد المناوبة (تسليم/أرشفة/استعادة)', domain: 'shift' },
-    // سير العمل: الإدارة ≠ الاعتماد
+    // سير العمل: المشاهدة ≠ الإدارة ≠ الاعتماد
+    'workflow.view':        { label: 'مشاهدة سير العمل', domain: 'workflow' },
     'workflow.manage':      { label: 'إدارة سير العمل (إعداد/تعديل/إعادة إصدار)', domain: 'workflow' },
     'workflow.approve':     { label: 'اعتماد سير العمل', domain: 'workflow' },
     // المؤشرات
@@ -57,40 +68,43 @@ const ROLE_LABELS = {
     user: 'مستخدم'
 };
 
-// '*' = كل الصلاحيات. schedule.import غائبة عمدًا من كل دور (منح فردي فقط).
+// '*' = كل الصلاحيات. المرحلة 1 (معتمد 2026-08-17):
+//  - كل مفاتيح schedule.* أُفرغت من جميع الأدوار — منح فردي حصرًا (بند سابعًا).
+//  - ops.execute الشامل بقي في الكتالوج للتوافق لكنه لا يُمنح افتراضيًا إلا للدور القديم user.
+//  - field_leadership = التشغيل الدقيق + workflow.approve (بند رابعًا).
+const OPS_ALL = [
+    'ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail',
+    'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers'
+];
 const ROLES_PERMISSIONS = {
     sysadmin: ['*'],
     ops_supervisor: [
-        'ops.execute',
-        'schedule.view', 'schedule.edit_cell', 'schedule.generate', 'schedule.swap', 'schedule.bulk_update',
+        ...OPS_ALL,
         'shift.lifecycle', 'shift.approve',
-        'workflow.manage', 'workflow.approve',
+        'workflow.view', 'workflow.manage', 'workflow.approve',
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive'
     ],
     field_leadership: [
-        'ops.execute',          // جاهزية الفرق/المركبات/الحالات/خروج الفرق/النماذج الميدانية
-        'schedule.view',        // مشاهدة فقط — بلا تعديل ولا استيراد
+        ...OPS_ALL,             // صلاحيات التشغيل الأساسية للتحكم والتنسيق
+        'workflow.view',
+        'workflow.approve',     // اعتماد سير العمل (كبير/مساعد كبير المسعفين)
         'archive.sensitive'     // متابعة ميدانية تشمل اللقطات
     ],
-    operator: [
-        'ops.execute',
-        'schedule.view'
-    ],
-    viewer: [],                  // مشاهدة فقط — القراءة متاحة للموثّقين أصلًا، ولا كتابة إطلاقًا
-    // ── الأدوار التقنية الحالية (المرحلة 0: لا تغيير سلوكي) ──
+    operator: [],                  // التحكم والتنسيق: الصلاحيات الدقيقة تُمنح فرديًا حسب التكليف
+    viewer: [],                    // مشاهدة فقط — القراءة متاحة للموثّقين أصلًا، ولا كتابة إطلاقًا
+    // ── الأدوار التقنية الحالية (لا تغيير سلوكي — الـ20 يبقون admin='*') ──
     admin: ['*'],
     director: [
-        'ops.execute',
-        'schedule.view', 'schedule.edit_cell', 'schedule.generate', 'schedule.swap', 'schedule.bulk_update',
+        ...OPS_ALL,
         'shift.lifecycle', 'shift.approve',
-        'workflow.manage', 'workflow.approve',
+        'workflow.view', 'workflow.manage', 'workflow.approve',
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive'
     ],
-    user: ['ops.execute', 'schedule.view']
+    user: ['ops.execute']          // المفتاح الشامل القديم — توافق فقط، بلا schedule.*
 };
 
 module.exports = { PERMISSIONS, PERMISSION_KEYS, ROLE_LABELS, ROLES_PERMISSIONS };

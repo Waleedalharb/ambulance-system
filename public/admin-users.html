@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إدارة المستخدمين والصلاحيات — منصة الجنوب</title>
+<style>
+:root {
+    --bg: #0B1E33;
+    --card: #1A3A5C;
+    --card-2: #142C46;
+    --teal: #2E8B7A;
+    --gold: #E8C84A;
+    --white: #FFFFFF;
+    --muted: #9DB2C8;
+    --danger: #D16060;
+    --line: rgba(255,255,255,.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    background: var(--bg); color: var(--white);
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh; padding: 24px;
+}
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header h1 span { color: var(--gold); }
+.btn {
+    background: var(--teal); color: var(--white); border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 14px; cursor: pointer; font-family: inherit; transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.btn.small { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+.btn.warn { background: var(--danger); }
+.note {
+    background: var(--card-2); border: 1px solid var(--line); border-right: 3px solid var(--gold);
+    border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.8;
+}
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { background: var(--card-2); color: var(--gold); font-weight: 600; padding: 12px 14px; text-align: right; font-size: 13px; }
+td { padding: 12px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+tr:hover td { background: rgba(255,255,255,.03); }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge.role { background: rgba(46,139,122,.2); color: #7FD4C3; border: 1px solid rgba(46,139,122,.45); }
+.badge.active { background: rgba(46,139,122,.18); color: #7FD4C3; }
+.badge.inactive { background: rgba(209,96,96,.15); color: #E89A9A; }
+.badge.ovr { background: rgba(232,200,74,.12); color: var(--gold); border: 1px solid rgba(232,200,74,.3); }
+.badge.src-role { background: rgba(46,139,122,.18); color: #7FD4C3; }
+.badge.src-grant { background: rgba(96,165,250,.15); color: #93C5FD; border: 1px solid rgba(96,165,250,.35); }
+.badge.src-revoke { background: rgba(209,96,96,.15); color: #E89A9A; border: 1px solid rgba(209,96,96,.35); }
+.badge.src-none { background: rgba(255,255,255,.06); color: var(--muted); }
+.badge.src-star { background: rgba(232,200,74,.15); color: var(--gold); }
+.code-pill { font-family: Consolas, monospace; background: var(--card-2); padding: 3px 9px; border-radius: 6px; font-size: 13px; color: var(--muted); }
+/* اللوحة الجانبية */
+.overlay { position: fixed; inset: 0; background: rgba(4,12,22,.72); display: none; z-index: 40; }
+.overlay.open { display: block; }
+.panel {
+    position: fixed; top: 0; left: 0; bottom: 0; width: min(560px, 96vw);
+    background: var(--bg); border-right: 1px solid var(--line); z-index: 50;
+    transform: translateX(-105%); transition: transform .22s ease; overflow-y: auto; padding: 22px;
+}
+.panel.open { transform: translateX(0); }
+.panel h2 { font-size: 18px; margin-bottom: 2px; }
+.panel .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.role-row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+select {
+    background: var(--card-2); color: var(--white); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 14px; min-width: 200px;
+}
+.section { margin-bottom: 16px; }
+.section h3 {
+    font-size: 14px; color: var(--gold); margin-bottom: 8px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+}
+.perm-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: var(--card-2);
+    border: 1px solid transparent;
+}
+.perm-row .label { font-size: 13px; flex: 1; }
+.perm-row .actions { display: flex; gap: 5px; }
+.perm-row button {
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 6px; padding: 4px 9px; font-size: 11px; cursor: pointer; font-family: inherit;
+}
+.perm-row button:hover { border-color: var(--teal); color: var(--white); }
+.perm-row button.on-grant { border-color: var(--teal); color: #7FD4C3; }
+.perm-row button.on-revoke { border-color: var(--danger); color: #E89A9A; }
+.self-block {
+    background: rgba(209,96,96,.1); border: 1px solid rgba(209,96,96,.35); color: #E89A9A;
+    border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-bottom: 14px;
+}
+.toast {
+    position: fixed; bottom: 22px; right: 50%; transform: translateX(50%);
+    background: var(--card); border: 1px solid var(--teal); color: var(--white);
+    padding: 10px 20px; border-radius: 10px; font-size: 14px; display: none; z-index: 90;
+}
+.loading { text-align: center; color: var(--muted); padding: 40px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛡️ إدارة المستخدمين <span>والصلاحيات</span></h1>
+    <div>
+        <button class="btn ghost" onclick="location.href='index.html'">← الرئيسية</button>
+        <button class="btn" onclick="loadUsers()">🔄 تحديث</button>
+    </div>
+</div>
+
+<div class="note">
+    الإسناد يدوي فردي فقط — لا ربط تلقائي بالمسمى الوظيفي أو رمز القوة أو الفريق أو المركز.<br>
+    <b style="color:var(--gold)">الجداول الست كلها (بما فيها المشاهدة والاستيراد) منح فردية حصرًا — لا دور يحملها.</b>
+    أي تغيير يُبطل جلسات المستخدم فورًا ويُوثَّق في سجل التدقيق. لا يمكن تعديل صلاحيات حسابك بنفسك.
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>المستخدم</th>
+                <th>الكود</th>
+                <th>الدور الأساسي</th>
+                <th>استثناءات فردية</th>
+                <th>الحالة</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="usersBody">
+            <tr><td colspan="6" class="loading">جارٍ التحميل…</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+    <div id="panelContent" class="loading">…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+let TOKEN = null;
+let CATALOG = null;
+let CURRENT = null;   // المستخدم المفتوح حاليًا
+let ME_ID = null;
+
+function getToken() {
+    try { if (window.AuthCore && AuthCore.getToken) return AuthCore.getToken(); } catch (_) {}
+    try { if (window.CoreAuth && CoreAuth.getToken) return CoreAuth.getToken(); } catch (_) {}
+    return localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+}
+
+async function api(path, opts) {
+    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
+    const res = await fetch(path, { ...opts, headers: { ...headers, ...(opts && opts.headers || {}) } });
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (res.status === 401 || (res.status === 403 && data && data.code === 'TOKEN_REVOKED')) {
+        location.href = 'index.html'; throw new Error('unauthorized');
+    }
+    if (res.status === 403) { toast('⛔ غير مصرّح — هذه الشاشة لمدير النظام فقط'); throw new Error(data && data.error || 'forbidden'); }
+    return data;
+}
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3200);
+}
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const SECTIONS = [
+    { key: 'ops',        title: '🎛️ التشغيل' },
+    { key: 'schedule',   title: '📅 الجداول (منح فردية حصرًا 🔒)' },
+    { key: 'shift',      title: '🕐 المناوبة' },
+    { key: 'workflow',   title: '📋 سير العمل' },
+    { key: 'indicators', title: '📊 المؤشرات' },
+    { key: 'admin',      title: '🛡️ الإدارة' },
+    { key: 'archive',    title: '🗄️ الأرشيف الحساس' }
+];
+
+async function loadUsers() {
+    const body = document.getElementById('usersBody');
+    body.innerHTML = '<tr><td colspan="6" class="loading">جارٍ التحميل…</td></tr>';
+    const data = await api('/api/permissions/users');
+    body.innerHTML = '';
+    (data.users || []).forEach(u => {
+        const isSelf = String(u.id) === String(ME_ID);
+        const ovr = u.overrides || { grants: 0, revokes: 0 };
+        const ovrTxt = (ovr.grants || ovr.revokes)
+            ? '<span class="badge ovr">' + ovr.grants + ' منحة · ' + ovr.revokes + ' سحب</span>'
+            : '<span style="color:var(--muted);font-size:12px">افتراضي الدور</span>';
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td><b>' + esc(u.name) + '</b>' + (isSelf ? ' <span class="badge src-star">أنت</span>' : '') + '</td>' +
+            '<td><span class="code-pill">' + esc(u.username) + '</span></td>' +
+            '<td><span class="badge role">' + esc(u.role_label) + '</span></td>' +
+            '<td>' + ovrTxt + '</td>' +
+            '<td><span class="badge ' + (u.isActive ? 'active' : 'inactive') + '">' + (u.isActive ? 'فعّال' : 'موقوف') + '</span></td>' +
+            '<td><button class="btn small" data-id="' + esc(u.id) + '">فتح</button></td>';
+        tr.querySelector('button').onclick = () => openUser(u.id);
+        body.appendChild(tr);
+    });
+}
+
+async function openUser(userId) {
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('panel').classList.add('open');
+    document.getElementById('panelContent').innerHTML = 'جارٍ التحميل…';
+    const d = await api('/api/permissions/user/' + encodeURIComponent(userId));
+    CURRENT = d;
+    renderPanel();
+}
+
+function closePanel() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('panel').classList.remove('open');
+    CURRENT = null;
+}
+
+function permSource(key, d) {
+    if (d.permissions_star) return { cls: 'src-star', txt: 'مدير النظام (*)' };
+    if ((d.permissions_granted || []).indexOf(key) !== -1) return { cls: 'src-grant', txt: 'منحة فردية' };
+    if ((d.permissions_revoked || []).indexOf(key) !== -1) return { cls: 'src-revoke', txt: 'مسحوبة فرديًا' };
+    if ((d.permissions || []).indexOf(key) !== -1) return { cls: 'src-role', txt: 'من الدور' };
+    return { cls: 'src-none', txt: 'غير ممنوحة' };
+}
+
+function renderPanel() {
+    const d = CURRENT;
+    const isSelf = String(d.user.id) === String(ME_ID);
+    const roles = ['sysadmin', 'ops_supervisor', 'field_leadership', 'operator', 'viewer'];
+    const roleNames = { sysadmin: 'مدير النظام', ops_supervisor: 'مشرف العمليات', field_leadership: 'القيادة الميدانية', operator: 'مستخدم تشغيل', viewer: 'مستخدم قراءة' };
+
+    let html = '<h2>' + esc(d.user.name) + '</h2>' +
+        '<div class="sub">' + esc(d.user.username) + ' · الدور الحالي: <b style="color:var(--gold)">' + esc(d.role_label) + '</b></div>';
+
+    if (isSelf) {
+        html += '<div class="self-block">🔒 هذا حسابك — لا يمكن تعديل دورك أو صلاحياتك بنفسك. أي تغيير يتم من حساب إداري آخر.</div>';
+    }
+
+    html += '<div class="role-row">' +
+        '<select id="roleSelect" ' + (isSelf ? 'disabled' : '') + '>' +
+        roles.map(r => '<option value="' + r + '"' + (d.user.role === r ? ' selected' : '') + '>' + roleNames[r] + '</option>').join('') +
+        '</select>' +
+        '<button class="btn small" id="roleSave" ' + (isSelf ? 'disabled' : '') + '>حفظ الدور</button>' +
+        '</div>';
+
+    SECTIONS.forEach(sec => {
+        const keys = Object.keys(CATALOG).filter(k => CATALOG[k].domain === sec.key);
+        if (!keys.length) return;
+        html += '<div class="section"><h3>' + sec.title + '</h3>';
+        keys.forEach(k => {
+            const src = permSource(k, d);
+            const isGrant = (d.permissions_granted || []).indexOf(k) !== -1;
+            const isRevoke = (d.permissions_revoked || []).indexOf(k) !== -1;
+            html += '<div class="perm-row">' +
+                '<span class="label">' + esc(CATALOG[k].label) + '</span>' +
+                '<span class="badge ' + src.cls + '">' + src.txt + '</span>' +
+                '<span class="actions">' +
+                (isSelf || d.permissions_star ? '' :
+                    '<button data-k="' + k + '" data-a="grant" class="' + (isGrant ? 'on-grant' : '') + '">منح</button>' +
+                    '<button data-k="' + k + '" data-a="revoke" class="' + (isRevoke ? 'on-revoke' : '') + '">سحب</button>' +
+                    ((isGrant || isRevoke) ? '<button data-k="' + k + '" data-a="clear">إعادة للافتراضي</button>' : '')) +
+                '</span></div>';
+        });
+        html += '</div>';
+    });
+
+    document.getElementById('panelContent').innerHTML = html;
+
+    const saveBtn = document.getElementById('roleSave');
+    if (saveBtn && !isSelf) {
+        saveBtn.onclick = async () => {
+            const role = document.getElementById('roleSelect').value;
+            const r = await api('/api/users/' + encodeURIComponent(d.user.id) + '/role', { method: 'POST', body: JSON.stringify({ role }) });
+            if (r && r.success) { toast(r.changed ? '✅ تغيّر الدور إلى «' + r.role_label + '» وأُبطلت جلساته' : 'الدور لم يتغير'); await openUser(d.user.id); loadUsers(); }
+            else toast('❌ ' + (r && r.error || 'فشل'));
+        };
+    }
+    document.querySelectorAll('.perm-row button[data-k]').forEach(btn => {
+        btn.onclick = async () => {
+            const k = btn.dataset.k, a = btn.dataset.a;
+            const url = a === 'grant' ? '/api/permissions/grant' : a === 'revoke' ? '/api/permissions/revoke' : '/api/permissions/clear';
+            const r = await api(url, { method: 'POST', body: JSON.stringify({ user_id: d.user.id, permission: k }) });
+            if (r && r.success) { toast('✅ تم (' + CATALOG[k].label + ') — أُبطلت ' + (r.sessionsRevoked || 0) + ' جلسة'); await openUser(d.user.id); loadUsers(); }
+            else toast('❌ ' + (r && r.error || 'فشل'));
+        };
+    });
+}
+
+(async function init() {
+    TOKEN = getToken();
+    if (!TOKEN) { location.href = 'index.html'; return; }
+    const me = await api('/api/auth/me');
+    ME_ID = me.user && me.user.id;
+    const cat = await api('/api/permissions/catalog');
+    CATALOG = cat.permissions;
+    await loadUsers();
+})().catch(e => { if (e.message !== 'unauthorized' && e.message !== 'forbidden') console.error(e); });
+</script>
+</body>
+</html>
