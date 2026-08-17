@@ -62,6 +62,7 @@ const BOUND = [
     ['POST', '/api/shift-roster/validate', 'schedule.view'],
     ['POST', '/api/upload-monthly-table', 'schedule.import'],
     ['POST', '/api/shift-roster/import', 'schedule.import'],
+    ['POST', '/api/schedule/official-import', 'schedule.import'],
     ['PUT', '/api/shift-roster/cell', 'schedule.edit_cell'],
     ['POST', '/api/shift-roster/audit-log', 'schedule.edit_cell'],
     ['POST', '/api/schedule/employees', 'schedule.employees'],
@@ -118,6 +119,10 @@ const BOUND = [
     grant('probe-emps', 'schedule.employees');
     grant('probe-export', 'schedule.export');
     grant('probe-clear', 'schedule.clear');
+    grant('probe-vi', 'schedule.view'); grant('probe-vi', 'schedule.import');
+    grant('probe-ve', 'schedule.view'); grant('probe-ve', 'schedule.employees');
+    check('الواجهة: زر الاستيراد الرسمي مربوط بـ schedule.import في البوابة', pageSrc.includes('oiOpenPicker()")]\',   perm: \'schedule.import\'') || pageSrc.includes('button[onclick="oiOpenPicker()"]'));
+    check('الواجهة: oiApply يحفظ عبر official-import وليس schedule/employees', pageSrc.includes('/api/schedule/official-import'));
 
     console.log('\n🚀 تشغيل خادم الاختبار على المنفذ ' + PORT + '...');
     const server = spawn(process.execPath, ['server.js'], {
@@ -143,16 +148,18 @@ const BOUND = [
         const T_EMPS = tok('probe-emps', 'viewer');
         const T_EXPORT = tok('probe-export', 'viewer');
         const T_CLEAR = tok('probe-clear', 'viewer');
+        const T_VI = tok('probe-vi', 'viewer');      // view + import
+        const T_VE = tok('probe-ve', 'viewer');      // view + employees
         const T_NONE = tok('probe-none', 'viewer');
 
-        console.log('\n🚫 البوابة: director بلا منح على كل المسارات الـ31:');
+        console.log('\n🚫 البوابة: director بلا منح على كل المسارات الـ32:');
         let deniedCount = 0, wrongCodes = [];
         for (const [m, p] of BOUND) {
             const r = await api(p, { method: m, token: T_DIR, body: m === 'GET' || m === 'DELETE' ? undefined : {} });
             if (r.status === 403 && r.data && r.data.code === 'PERMISSION_DENIED') deniedCount++;
             else wrongCodes.push(m + ' ' + p + '=' + r.status);
         }
-        check('الـ31 مسارًا كلها ← 403 PERMISSION_DENIED (authorizePerm هو البوابة)', deniedCount === 31, wrongCodes.join(' | '));
+        check('الـ32 مسارًا كلها ← 403 PERMISSION_DENIED (authorizePerm هو البوابة)', deniedCount === 32, wrongCodes.join(' | '));
         // المرفوض لا يكتب: العدّادات بعد موجة الرفض الكاملة يجب أن تطابق قبلها
         const afterDenied = { shift_roster: count('shift_roster'), employees: count('employees') };
         check('موجة الـ403 الـ31 لم تكتب شيئًا (صفر تغيير)', JSON.stringify(beforeCounts) === JSON.stringify(afterDenied), JSON.stringify(afterDenied));
@@ -185,6 +192,37 @@ const BOUND = [
         const cl3 = await api('/api/monthly-table', { method: 'DELETE', token: T_NONE });
         check('clear بالمنحة: المسح يجتاز البوابة والقراءة 403', cl1.status !== 403 && cl2.status === 403, 'clear=' + cl1.status);
         check('بلا منحة clear: DELETE monthly-table ← 403', cl3.status === 403);
+
+        console.log('\n🧪 السيناريوهات الخمسة المعتمدة (الاستيراد الرسمي = schedule.import حصرًا):');
+        // ① view فقط: مشاهدة نعم — استيراد 403 — إدارة موظفين 403
+        const s1a = await api('/api/shift-roster', { token: T_VIEW });
+        const s1b = await api('/api/schedule/official-import', { method: 'POST', token: T_VIEW, body: { employees: [] } });
+        const s1c = await api('/api/schedule/employees', { method: 'POST', token: T_VIEW, body: { employees: [] } });
+        check('① view فقط: مشاهدة ✅ · استيراد رسمي 403 · إدارة موظفين 403', s1a.status === 200 && s1b.status === 403 && s1c.status === 403);
+        // ② import فقط: الاستيراد الرسمي يجتاز البوابة — إدارة الموظفين اليدوية 403
+        const s2a = await api('/api/schedule/official-import', { method: 'POST', token: T_IMPORT, body: { employees: [] } });
+        const s2b = await api('/api/schedule/employees', { method: 'POST', token: T_IMPORT, body: { employees: [] } });
+        check('② import فقط: استيراد رسمي يجتاز (≠403) · إدارة موظفين 403 — لا تسلل بين الصلاحيتين', s2a.status !== 403 && s2b.status === 403, 'oi=' + s2a.status);
+        // ③ employees فقط: إدارة يدوية تجتاز — الاستيراد الرسمي 403
+        const s3a = await api('/api/schedule/employees', { method: 'POST', token: T_EMPS, body: { employees: [] } });
+        const s3b = await api('/api/schedule/official-import', { method: 'POST', token: T_EMPS, body: { employees: [] } });
+        check('③ employees فقط: إدارة موظفين تجتاز (≠403) · استيراد رسمي 403', s3a.status !== 403 && s3b.status === 403, 'emps=' + s3a.status);
+        // ④ view + import: مشاهدة + استيراد
+        const s4a = await api('/api/shift-roster', { token: T_VI });
+        const s4b = await api('/api/schedule/official-import', { method: 'POST', token: T_VI, body: { employees: [] } });
+        check('④ view+import: مشاهدة ✅ + استيراد ✅', s4a.status === 200 && s4b.status !== 403);
+        // ⑤ view + employees: مشاهدة + إدارة موظفين — بلا استيراد
+        const s5a = await api('/api/shift-roster', { token: T_VE });
+        const s5b = await api('/api/schedule/employees', { method: 'POST', token: T_VE, body: { employees: [] } });
+        const s5c = await api('/api/schedule/official-import', { method: 'POST', token: T_VE, body: { employees: [] } });
+        check('⑤ view+employees: مشاهدة ✅ + إدارة ✅ · استيراد 403', s5a.status === 200 && s5b.status !== 403 && s5c.status === 403);
+
+        // استيراد فعلي كامل بمنحة import وحدها: حمولة حقيقية ← نجاح + مزامنة قاعدة
+        const realImp = await api('/api/schedule/official-import', {
+            method: 'POST', token: T_VI,
+            body: { employees: [{ id: '999001', employeeNumber: '999001', name: 'موظف اختبار الاستيراد', jobTitle: 'تحكم عملياتي', team: 'A1', schedule: [{ date: '2026-08-01', shiftCode: 'D', location: 'A1' }] }] }
+        });
+        check('استيراد فعلي حقيقي بمنحة import وحدها: success + rosterSync', realImp.status === 200 && realImp.data && realImp.data.success === true && !!realImp.data.rosterSync, JSON.stringify(realImp.data || {}).slice(0, 160));
 
         console.log('\n⚠️ الاستثناء الانتقالي الوحيد:');
         const g1 = await api('/api/get-monthly-table', { token: T_NONE });

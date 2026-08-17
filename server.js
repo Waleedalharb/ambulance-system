@@ -7685,7 +7685,11 @@ app.get('/api/schedule/employees', authenticate, authorizePerm('schedule.view'),
     }
 });
 
-app.post('/api/schedule/employees', authenticate, authorizePerm('schedule.employees'), async (req, res) => {
+// معالج حفظ كادر الجدولة — مشترك بين قناتين بصلاحيتين مختلفتين:
+//   POST /api/schedule/employees          ← schedule.employees (إدارة يدوية)
+//   POST /api/schedule/official-import    ← schedule.import   (الاستيراد الرسمي)
+// (معتمد 2026-08-17: لا تجمع الصلاحيتين — لكل قناة مفتاحها)
+async function handleScheduleEmployeesSave(req, res) {
     try {
         const employees = Array.isArray(req.body) ? req.body : req.body.employees;
         if (!employees || !Array.isArray(employees)) {
@@ -7740,7 +7744,12 @@ app.post('/api/schedule/employees', authenticate, authorizePerm('schedule.employ
         console.error(error);
         res.status(500).json({ error: 'فشل في حفظ بيانات الموظفين' });
     }
-});
+}
+
+// إدارة موظفي الجدول يدويًا — schedule.employees
+app.post('/api/schedule/employees', authenticate, authorizePerm('schedule.employees'), handleScheduleEmployeesSave);
+// قناة الحفظ المخصصة للاستيراد الرسمي — schedule.import حصرًا (لا تتطلب schedule.employees)
+app.post('/api/schedule/official-import', authenticate, authorizePerm('schedule.import'), handleScheduleEmployeesSave);
 
 app.get('/api/schedule/files', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {

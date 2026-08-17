@@ -5254,6 +5254,53 @@ function oiShowReport() {
 }
 
 // ─── التطبيق: دمج بلا مسح ← قناة الحفظ الوحيدة (/api/schedule/employees) ───
+// ─── حفظ الاستيراد الرسمي — مسار مخصص محمي بـ schedule.import حصرًا ───
+// نفس منطق saveToServer (نفس الحمولة ونفس مودال التعارض 409) لكن على
+// /api/schedule/official-import حتى لا يتطلب الاستيراد schedule.employees.
+async function oiSaveToServer(confirmOverwrite) {
+    try {
+        var token = AuthCore.getToken();
+        var shiftId = await fetchVerifiedShiftId();
+        var payload = { employees: employees };
+        if (shiftId) payload.shift_id = parseInt(shiftId);
+        if (confirmOverwrite === true) payload.confirmOverwriteManual = true;
+        var response = await fetch('/api/schedule/official-import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(payload)
+        });
+        if (response.status === 403) {
+            if (typeof showToast === 'function') showToast('⛔ لا تملك صلاحية استيراد الجداول (schedule.import)', 'error');
+            return 'error';
+        }
+        if (response.status === 409) {
+            var conflict = await response.json().catch(function () { return {}; });
+            if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
+                window.showImportConflictModal(conflict.conflicts, function () {
+                    toast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
+                    oiSaveToServer(true);
+                });
+            } else {
+                showToast('⚠️ ' + (conflict.error || 'يوجد تعارض مع تعديلات يدوية'), 'error');
+            }
+            return 'conflict';
+        }
+        var result = await response.json();
+        if (result.success) {
+            showToast('تم حفظ البيانات في السيرفر بنجاح', 'success');
+            loadAvailableMonths();
+            refreshHoursIndicators();
+            return 'ok';
+        }
+        console.warn('فشل حفظ الاستيراد الرسمي:', result.error);
+        showToast('❌ ' + (result.error || 'فشل حفظ البيانات في السيرفر'), 'error');
+        return 'error';
+    } catch (error) {
+        console.error('خطأ في حفظ الاستيراد الرسمي:', error);
+        return 'error';
+    }
+}
+
 async function oiApply() {
     if (!oiState) return;
     var month = oiState.month, year = oiState.year;
@@ -5295,10 +5342,9 @@ async function oiApply() {
     Object.keys(byCode).forEach(function (k) { employees.push(byCode[k]); });
     document.getElementById('oiReportModal').classList.remove('active');
     if (typeof showToast === 'function') showToast('⏳ جاري المزامنة مع الخادم…', 'info');
-    // W-تكامل ②: قناة الحفظ الوحيدة للاستيراد الرسمي — POST /api/schedule/employees
-    // (يكتب JSON الاستيراد + يزامن القاعدة ذريًا عبر RosterSyncService: موظفون +
-    // roster + تعيينات). لا كاتب ثانٍ — syncToServer القديمة لا تُستدعى هنا.
-    var saveResult = await saveToServer();
+    // قناة الحفظ المخصصة للاستيراد الرسمي — POST /api/schedule/official-import
+    // محمية بـ schedule.import حصرًا (معتمد 2026-08-17: الاستيراد ≠ إدارة الموظفين اليدوية)
+    var saveResult = await oiSaveToServer(false);
     saveToIndexedDB();
     saveToLocalStorage();
     // تحديث الواجهة بالكامل بعد الدمج (نفس مسار التحديث القياسي في الصفحة)
@@ -5330,6 +5376,8 @@ window.oiApply = oiApply;
 // سيرفريًا؛ إخفاء أزرارها هنا ردع بصري موثّق، لا حماية.
 (function () {
     var GATES = [
+        { sel: 'button[onclick="oiOpenPicker()"]',   perm: 'schedule.import' },
+        { sel: '#officialImportInput',               perm: 'schedule.import' },
         { sel: 'button[onclick="exportToExcel()"]',  perm: 'schedule.export' },
         { sel: 'button[onclick="exportToPDF()"]',    perm: 'schedule.export' },
         { sel: 'button[onclick="exportCenterPdf()"]', perm: 'schedule.export' },
