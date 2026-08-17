@@ -27,12 +27,20 @@ const PERMISSIONS = {
     'ops.team_exit':        { label: 'تسجيل خروج الفرق', domain: 'ops' },
     'ops.volunteers':       { label: 'المتطوعون والتفعيل', domain: 'ops' },
     // الجداول — مفصولة بالكامل، وكلها منح فردية حصرًا: لا دور يحملها (بند ثالثًا/سابعًا)
+    // مرحلة تفكيك الجداول (معتمدة 2026-08-17): +employees/sync/export/print/clear
+    // schedule.print: لا مسار خادمي — تحكم واجهة فقط (موثّق أنه ليس حماية أمنية)
+    // schedule.clear: شديدة الحساسية — ممنوعة من كل دور، يدوية حصرًا
     'schedule.view':        { label: 'مشاهدة الجداول (منح فردي فقط)', domain: 'schedule' },
     'schedule.import':      { label: 'استيراد الجداول (منح فردي فقط — لا دور يمنحها)', domain: 'schedule' },
     'schedule.edit_cell':   { label: 'تعديل خلية جدول (منح فردي فقط)', domain: 'schedule' },
+    'schedule.employees':   { label: 'إدارة موظفي الجدول: إضافة/حذف/ترتيب (منح فردي فقط)', domain: 'schedule' },
     'schedule.generate':    { label: 'توليد الجدول الذكي (منح فردي فقط)', domain: 'schedule' },
     'schedule.swap':        { label: 'استبدال/تراجع/إعادة بالجداول (منح فردي فقط)', domain: 'schedule' },
     'schedule.bulk_update': { label: 'تحديث جماعي ومسودات الجداول (منح فردي فقط)', domain: 'schedule' },
+    'schedule.sync':        { label: 'مزامنة الجدول مع الخادم/حفظه (منح فردي فقط)', domain: 'schedule' },
+    'schedule.export':      { label: 'تصدير الجداول عبر الخادم — PDF مركز/فئة (أزرار Excel/الطباعة: تحكم واجهة فقط)', domain: 'schedule' },
+    'schedule.print':       { label: 'طباعة الجداول (تحكم واجهة فقط — لا مسار خادمي)', domain: 'schedule' },
+    'schedule.clear':       { label: '⚠️ مسح كل بيانات الجداول — شديدة الحساسية: يدوية حصرًا ولا دور يحملها', domain: 'schedule' },
     // المناوبة: الدورة ≠ الاعتماد
     'shift.lifecycle':      { label: 'دورة حياة المناوبة (بدء/إنهاء/تحديث)', domain: 'shift' },
     'shift.approve':        { label: 'اعتماد المناوبة (تسليم/أرشفة/استعادة)', domain: 'shift' },

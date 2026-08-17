@@ -5323,5 +5323,44 @@ async function oiApply() {
 window.oiApply = oiApply;
 })();
 </script>
+<script>
+// ═══ بوابة أزرار الجداول — مرحلة تفكيك الصلاحيات (معتمدة 2026-08-17) ═══
+// تحكم واجهة فقط — ليست حماية أمنية: الحسم الخادمي عبر authorizePerm على
+// المسارات. تصدير Excel/PDF العام والطباعة عميلة 100% ولا يمكن منعها
+// سيرفريًا؛ إخفاء أزرارها هنا ردع بصري موثّق، لا حماية.
+(function () {
+    var GATES = [
+        { sel: 'button[onclick="exportToExcel()"]',  perm: 'schedule.export' },
+        { sel: 'button[onclick="exportToPDF()"]',    perm: 'schedule.export' },
+        { sel: 'button[onclick="exportCenterPdf()"]', perm: 'schedule.export' },
+        { sel: 'button[onclick="exportGroupPdf()"]',  perm: 'schedule.export' },
+        { sel: 'button[onclick="printSchedule()"]',  perm: 'schedule.print' },
+        { sel: '#syncBtn',                           perm: 'schedule.sync' },
+        { sel: 'button[onclick="clearServerRoster()"]', perm: 'schedule.clear' }
+    ];
+    function applyGates(perms, star) {
+        GATES.forEach(function (g) {
+            if (star || perms.indexOf(g.perm) !== -1) return; // يبقى ظاهرًا
+            document.querySelectorAll(g.sel).forEach(function (el) {
+                el.style.display = 'none';
+                el.title = 'لا تملك صلاحية: ' + g.perm;
+            });
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var token = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+            if (!token) return;
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    applyGates(Array.isArray(d.permissions) ? d.permissions : [], d.permissions_star === true);
+                })
+                .catch(function () { /* فشل القراءة: لا نخفي شيئًا — الحسم خادمي */ });
+        } catch (_) { }
+    });
+})();
+</script>
     </body>
 </html>

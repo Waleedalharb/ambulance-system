@@ -7237,7 +7237,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 // ============================================
 // API: الجدول الشهري
 // ============================================
-app.post('/api/upload-monthly-table', authenticate, uploadExcel.single('file'), handleMulterError, async (req, res) => {
+app.post('/api/upload-monthly-table', authenticate, authorizePerm('schedule.import'), uploadExcel.single('file'), handleMulterError, async (req, res) => {
     try {
         const file = req.file;
         if (!file) {
@@ -7288,7 +7288,7 @@ app.get('/api/check-monthly-table', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/monthly-table', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.delete('/api/monthly-table', authenticate, authorizePerm('schedule.clear'), async (req, res) => {
     try {
         await fs.unlink(MONTHLY_TABLE_PATH);
 
@@ -7676,7 +7676,7 @@ app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
 // ============================================
 // API: الجدولة الذكية (Smart Schedule)
 // ============================================
-app.get('/api/schedule/employees', authenticate, async (req, res) => {
+app.get('/api/schedule/employees', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         const employees = await readScheduleEmployees();
         res.json({ success: true, employees });
@@ -7685,7 +7685,7 @@ app.get('/api/schedule/employees', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/schedule/employees', authenticate, async (req, res) => {
+app.post('/api/schedule/employees', authenticate, authorizePerm('schedule.employees'), async (req, res) => {
     try {
         const employees = Array.isArray(req.body) ? req.body : req.body.employees;
         if (!employees || !Array.isArray(employees)) {
@@ -7742,7 +7742,7 @@ app.post('/api/schedule/employees', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/schedule/files', authenticate, async (req, res) => {
+app.get('/api/schedule/files', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         const files = await readScheduleFiles();
         res.json({ success: true, files });
@@ -7751,7 +7751,7 @@ app.get('/api/schedule/files', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/schedule/files', authenticate, async (req, res) => {
+app.post('/api/schedule/files', authenticate, authorizePerm('schedule.sync'), async (req, res) => {
     try {
         const files = Array.isArray(req.body) ? req.body : req.body.files;
         if (!files || !Array.isArray(files)) {
@@ -7840,7 +7840,7 @@ async function readScheduleEmployeesFromDB(month) {
     return Object.values(empMap);
 }
 
-app.get('/api/schedule/pdf', authenticate, async (req, res) => {
+app.get('/api/schedule/pdf', authenticate, authorizePerm('schedule.export'), async (req, res) => {
     try {
         const center = String(req.query.center || '').trim();
         // تفويض «تصدير الجداول حسب فئة رمز القوة (A/B/C/D)»: group بجوار center —
@@ -7905,7 +7905,7 @@ app.get('/api/schedule/pdf', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/schedule/employees', authenticate, authorize(['admin']), async (req, res) => {
+app.delete('/api/schedule/employees', authenticate, authorizePerm('schedule.employees'), async (req, res) => {
     try {
         await writeScheduleEmployees([]);
         // SR-2: مسح الجدولة = مسح roster بالكامل + تعطيل جميع الموظفين (لا حذف)
@@ -9144,7 +9144,7 @@ app.post('/api/schedule-symbols/:id/status', authenticate, authorize(['admin', '
 // ============================================
 // API: Shift Roster
 // ============================================
-app.get('/api/shift-roster', authenticate, async (req, res) => {
+app.get('/api/shift-roster', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         const { month, year } = req.query;
         if (month && year) {
@@ -9179,7 +9179,7 @@ function _isValidIsoDateStr(d) {
     return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
 }
 
-app.put('/api/shift-roster/cell', authenticate, authorize(['admin', 'director']), validateBody({
+app.put('/api/shift-roster/cell', authenticate, authorizePerm('schedule.edit_cell'), validateBody({
     employeeCode: { required: true, type: 'string', minLength: 1, maxLength: 50 },
     date: { required: true, type: 'string', minLength: 10, maxLength: 10 },
     shiftCode: { required: true, type: 'string', minLength: 1, maxLength: 20 }
@@ -9245,7 +9245,7 @@ app.put('/api/shift-roster/cell', authenticate, authorize(['admin', 'director'])
     }
 });
 
-app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
+app.post('/api/shift-roster', authenticate, authorizePerm('schedule.employees'), validateBody({
     employee_id: { required: true, type: 'number' },
     shift_date: { required: true, type: 'string', minLength: 1 },
     shift_code: { required: true, type: 'string', minLength: 1 },
@@ -9270,7 +9270,7 @@ app.post('/api/shift-roster', authenticate, authorize(['admin']), validateBody({
     }
 });
 
-app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+app.put('/api/shift-roster/:id', authenticate, authorizePerm('schedule.employees'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const existing = await db.ShiftRoster.getById(req.params.id);
@@ -9291,7 +9291,7 @@ app.put('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req,
     }
 });
 
-app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (req, res) => {
+app.delete('/api/shift-roster/:id', authenticate, authorizePerm('schedule.employees'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const existing = await db.ShiftRoster.getById(req.params.id);
@@ -9315,7 +9315,7 @@ app.delete('/api/shift-roster/:id', authenticate, authorize(['admin']), async (r
 // ============================================
 // API: Bulk Import Shift Roster from Excel
 // ============================================
-app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (req, res) => {
+app.post('/api/shift-roster/import', authenticate, authorizePerm('schedule.import'), async (req, res) => {
     try {
         const { employees, roster } = req.body;
         if (!employees || !Array.isArray(employees) || !roster || !Array.isArray(roster)) {
@@ -9418,7 +9418,7 @@ app.post('/api/shift-roster/import', authenticate, authorize(['admin']), async (
 // ============================================
 // API: Clear All Shift Roster Data
 // ============================================
-app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), async (req, res) => {
+app.post('/api/shift-roster/clear-all', authenticate, authorizePerm('schedule.clear'), async (req, res) => {
     try {
         await db.ShiftRoster.deleteAll();
         // W-توحيد (البند ④ 2026-08-10): مسح القاعدة يجب ألّا يترك نسخة بديلة —
@@ -9442,7 +9442,7 @@ app.post('/api/shift-roster/clear-all', authenticate, authorize(['admin']), asyn
 // ============================================
 // API: Clear Shift Roster by Date Range
 // ============================================
-app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (req, res) => {
+app.post('/api/shift-roster/clear', authenticate, authorizePerm('schedule.clear'), async (req, res) => {
     try {
         const { startDate, endDate } = req.body;
         if (!startDate || !endDate) {
@@ -9462,7 +9462,7 @@ app.post('/api/shift-roster/clear', authenticate, authorize(['admin']), async (r
 // ============================================
 // API: Shift Roster - Audit Log
 // ============================================
-app.get('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+app.get('/api/shift-roster/audit-log', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { employee_id, date_from, date_to, limit = 50 } = req.query;
@@ -9481,7 +9481,7 @@ app.get('/api/shift-roster/audit-log', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/shift-roster/audit-log', authenticate, async (req, res) => {
+app.post('/api/shift-roster/audit-log', authenticate, authorizePerm('schedule.edit_cell'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { roster_id, employee_id, team_id, shift_date, old_shift_code, new_shift_code, old_team_id, new_team_id, change_type, reason } = req.body;
@@ -9503,7 +9503,7 @@ app.post('/api/shift-roster/audit-log', authenticate, async (req, res) => {
 // ============================================
 // API: Shift Roster - Bulk Update
 // ============================================
-app.post('/api/shift-roster/bulk-update', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-roster/bulk-update', authenticate, authorizePerm('schedule.bulk_update'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { changes } = req.body;
@@ -9566,7 +9566,7 @@ app.post('/api/shift-roster/bulk-update', authenticate, authorize(['admin', 'dir
 // ============================================
 // API: Shift Roster - Swap
 // ============================================
-app.post('/api/shift-roster/swap', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-roster/swap', authenticate, authorizePerm('schedule.swap'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { roster_id_1, roster_id_2, employee_id_1, employee_id_2, shift_date } = req.body;
@@ -9629,7 +9629,7 @@ app.post('/api/shift-roster/swap', authenticate, authorize(['admin', 'director']
 // ============================================
 // API: Shift Roster - Validate
 // ============================================
-app.post('/api/shift-roster/validate', authenticate, async (req, res) => {
+app.post('/api/shift-roster/validate', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { changes } = req.body;
@@ -9669,7 +9669,7 @@ app.post('/api/shift-roster/validate', authenticate, async (req, res) => {
 // ============================================
 // API: Shift Roster - Drafts (Undo/Redo)
 // ============================================
-app.get('/api/shift-roster/drafts', authenticate, async (req, res) => {
+app.get('/api/shift-roster/drafts', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { limit = 50 } = req.query;
@@ -9681,7 +9681,7 @@ app.get('/api/shift-roster/drafts', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/shift-roster/draft', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-roster/draft', authenticate, authorizePerm('schedule.bulk_update'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { draft_data_json, operation_type } = req.body;
@@ -9701,7 +9701,7 @@ app.post('/api/shift-roster/draft', authenticate, authorize(['admin', 'director'
     }
 });
 
-app.post('/api/shift-roster/undo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-roster/undo', authenticate, authorizePerm('schedule.bulk_update'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const drafts = await db.ShiftRosterDrafts.getPendingByCreatedBy(req.user.username || req.user.name);
@@ -9717,7 +9717,7 @@ app.post('/api/shift-roster/undo', authenticate, authorize(['admin', 'director']
     }
 });
 
-app.post('/api/shift-roster/redo', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-roster/redo', authenticate, authorizePerm('schedule.bulk_update'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const allDrafts = await db.ShiftRosterDrafts.getByCreatedBy(req.user.username || req.user.name, 100);
@@ -9795,7 +9795,7 @@ app.post('/api/notifications/:id/delivered', authenticate, async (req, res) => {
 // ============================================
 // API: Shift Roster - Export
 // ============================================
-app.post('/api/shift-roster/export', authenticate, async (req, res) => {
+app.post('/api/shift-roster/export', authenticate, authorizePerm('schedule.export'), async (req, res) => {
     try {
         const { format, month, year, filters } = req.body;
         if (!format || !month || !year) {
@@ -9820,7 +9820,7 @@ app.post('/api/shift-roster/export', authenticate, async (req, res) => {
 // ============================================
 // API: Shift Roster - Stats
 // ============================================
-app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
+app.get('/api/shift-roster/stats', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const { month, year } = req.query;
@@ -9859,7 +9859,7 @@ app.get('/api/shift-roster/stats', authenticate, async (req, res) => {
 // ============================================
 // قائمة الشهور المتاحة في الجدول — تغذي فلتر الشهر متعدد الشهور في smart-schedule.
 // مسار ثابت يُسجَّل قبل /:id (نفس قاعدة D-35 أدناه) حتى لا يُبتلع كمعرّف.
-app.get('/api/shift-roster/months', authenticate, async (req, res) => {
+app.get('/api/shift-roster/months', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const months = await db.ShiftRoster.getMonths();
@@ -9900,7 +9900,7 @@ async function getMonthlyRequiredHours() {
 }
 
 // مؤشرات الساعات لفترة — اشتقاق حي من shift_roster + shift_codes عبر الخدمة
-app.get('/api/schedule/metrics', authenticate, async (req, res) => {
+app.get('/api/schedule/metrics', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         if (!scheduleMetricsService) return res.status(503).json({ error: 'خدمة مؤشرات الساعات غير متاحة' });
@@ -9949,7 +9949,7 @@ app.put('/api/settings/monthly-required-hours', authenticate, authorize(['admin'
 // D-35: المسارات الثابتة قبل المتغيرة — /:id يُسجَّل الآن بعد /stats و/drafts
 // و/audit-log حتى لا يبتلعها. (المسارات ذات المقطعين مثل employee-schedule/:id
 // لا تتأثر أصلاً بمسار مقطع واحد.)
-app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
+app.get('/api/shift-roster/:id', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         const entry = await db.ShiftRoster.getById(req.params.id);
         if (!entry) return res.status(404).json({ error: 'السجل غير موجود' });
@@ -9963,7 +9963,7 @@ app.get('/api/shift-roster/:id', authenticate, async (req, res) => {
 // ============================================
 // API: Shift Roster - Employee Schedule
 // ============================================
-app.get('/api/shift-roster/employee-schedule/:employeeId', authenticate, async (req, res) => {
+app.get('/api/shift-roster/employee-schedule/:employeeId', authenticate, authorizePerm('schedule.view'), async (req, res) => {
     try {
         if (!dbAvailable()) return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
         const employeeId = parseInt(req.params.employeeId);

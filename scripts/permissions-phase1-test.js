@@ -68,7 +68,7 @@ async function login(u, p) {
     const { PERMISSIONS, PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج بعد التفكيك:');
     const OPS9 = ['ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers'];
-    check('الكتالوج 29 مفتاحًا (19 + 9 تشغيل دقيقة + workflow.view)', PERMISSION_KEYS.length === 29, 'keys=' + PERMISSION_KEYS.length);
+    check('الكتالوج 34 مفتاحًا (29 + 5 جداول: employees/sync/export/print/clear)', PERMISSION_KEYS.length === 34, 'keys=' + PERMISSION_KEYS.length);
     check('مفاتيح التشغيل التسعة الدقيقة موجودة', OPS9.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('ops.execute الشامل باقٍ للتوافق', PERMISSION_KEYS.indexOf('ops.execute') !== -1);
     check('workflow.view أُضيف', PERMISSION_KEYS.indexOf('workflow.view') !== -1);
