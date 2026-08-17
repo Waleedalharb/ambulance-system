@@ -2402,6 +2402,44 @@ window.syncUpdate = async function() {
 
 <script src="js/websocket-sync.js?v=36"></script>
 <script src="/js/smart-toolbar.js"></script>
+<script>
+// ═══ بوابات صلاحيات العمليات — مرحلة ربط العمليات (معتمدة 2026-08-17) ═══
+// الحسم خادمي: POST/DELETE /api/report-entry ← ops.report_detail،
+// وPOST /api/undo ← ops.report_revert. اللفّ هنا ردع بصري موثّق لا حماية —
+// إن سبق النقرُ تحميلَ الصلاحيات يحسم الخادم بـ 403.
+(function () {
+    function guard(name, perm) {
+        var orig = window[name];
+        if (typeof orig !== 'function') return;
+        window[name] = function () {
+            var st = window.__opsPermsState;
+            if (st && st.loaded && !st.star && st.perms.indexOf(perm) === -1) {
+                var msg = '⛔ لا تملك صلاحية: ' + perm;
+                if (typeof showToast === 'function') showToast(msg, 'error'); else alert(msg);
+                return Promise && Promise.resolve ? Promise.resolve(false) : false;
+            }
+            return orig.apply(this, arguments);
+        };
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var token = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+            if (!token) return;
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    window.__opsPermsState = { loaded: true, perms: Array.isArray(d.permissions) ? d.permissions : [], star: d.permissions_star === true };
+                    guard('saveQuickReport', 'ops.report_detail');
+                    guard('saveAdvancedReport', 'ops.report_detail');
+                    guard('deleteReport', 'ops.report_detail');
+                    guard('undoLastReport', 'ops.report_revert');
+                })
+                .catch(function () { /* الحسم خادمي */ });
+        } catch (_) { }
+    });
+})();
+</script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>

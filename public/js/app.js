@@ -11331,3 +11331,48 @@ function renderEventsStrip() {
         }
     }
 }
+
+// ═══ بوابات صلاحيات العمليات — مرحلة ربط العمليات (معتمدة 2026-08-17) ═══
+// الحسم خادمي: كل مسارات التنفيذ محمية بـ authorizePerm ← 403.
+// هذا اللفّ ردع بصري موثّق لا حماية — يمنع المحاولة مبكرًا برسالة واضحة
+// بعد تحميل الصلاحيات؛ وإن سبق النقرُ التحميلَ يحسم الخادم.
+(function () {
+    function opsGuard(name, perm) {
+        var orig = window[name];
+        if (typeof orig !== 'function') return;
+        window[name] = function () {
+            var st = window.__opsPermsState;
+            if (st && st.loaded && !st.star && st.perms.indexOf(perm) === -1) {
+                var msg = '⛔ لا تملك صلاحية: ' + perm;
+                if (typeof showToast === 'function') showToast(msg, 'error'); else alert(msg);
+                return Promise.resolve(false);
+            }
+            return orig.apply(this, arguments);
+        };
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var token = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+            if (!token) return;
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    window.__opsPermsState = { loaded: true, perms: Array.isArray(d.permissions) ? d.permissions : [], star: d.permissions_star === true };
+                    // التوزيع والتراجع
+                    opsGuard('addReportToServer', 'ops.dispatch');
+                    opsGuard('undoLastReport', 'ops.report_revert');
+                    // النماذج الستة
+                    opsGuard('saveIncident', 'ops.forms');
+                    opsGuard('saveSenior', 'ops.forms');
+                    opsGuard('saveAirAmbulance', 'ops.forms');
+                    opsGuard('saveDailyReport', 'ops.forms');
+                    opsGuard('saveE', 'ops.forms');
+                    opsGuard('saveEscalation', 'ops.forms');
+                    // التمركزات
+                    opsGuard('savePeakPlan', 'ops.deployments');
+                })
+                .catch(function () { /* فشل القراءة: الحسم خادمي */ });
+        } catch (_) { }
+    });
+})();

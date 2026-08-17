@@ -625,7 +625,14 @@ function init() {
             });
             if (draft) {
                 // مسودة قائمة — prepare idempotent يرجعها بلقطة حية
-                return api('/api/workflow/prepare', { method: 'POST' });
+                // ربط العمليات (2026-08-17): prepare ← workflow.manage؛ من يملك
+                // workflow.view فقط تعرض عليه النسخة المعتمدة قراءةً إن وُجدت
+                return api('/api/workflow/prepare', { method: 'POST' }).catch(function(e) {
+                    if (e && e.status === 403 && locked) {
+                        return api('/api/workflow/version/' + encodeURIComponent(locked.id));
+                    }
+                    throw e;
+                });
             }
             if (locked) {
                 // نسخة معتمدة — تُفتح مباشرة بلقطتها المجمدة قراءة فقط
@@ -1803,6 +1810,38 @@ document.getElementById('recBox').addEventListener('change', queueSave);
 document.getElementById('rec-notes').addEventListener('input', queueSave);
 
 init();
+
+// ═══ بوابات صلاحيات سير العمل — مرحلة ربط العمليات (معتمدة 2026-08-17) ═══
+// الحسم خادمي: approve ← workflow.approve وmanage ← workflow.manage.
+// إخفاء الأزرار ردع بصري موثّق لا حماية.
+(function () {
+    var GATES = [
+        { sel: '#btnApprove',                          perm: 'workflow.approve' },
+        { sel: '#btnReissue',                          perm: 'workflow.manage' },
+        { sel: 'button[onclick="submitReissue()"]',    perm: 'workflow.manage' }
+    ];
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var token = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+            if (!token) return;
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    var perms = Array.isArray(d.permissions) ? d.permissions : [];
+                    var star = d.permissions_star === true;
+                    GATES.forEach(function (g) {
+                        if (star || perms.indexOf(g.perm) !== -1) return;
+                        document.querySelectorAll(g.sel).forEach(function (el) {
+                            el.style.display = 'none';
+                            el.title = 'لا تملك صلاحية: ' + g.perm;
+                        });
+                    });
+                })
+                .catch(function () { /* الحسم خادمي */ });
+        } catch (_) { }
+    });
+})();
 </script>
 </body>
 </html>

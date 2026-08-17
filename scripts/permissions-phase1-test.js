@@ -67,17 +67,19 @@ async function login(u, p) {
     // ── وحدات الكتالوج (بلا خادم) ──
     const { PERMISSIONS, PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج بعد التفكيك:');
-    const OPS9 = ['ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers'];
-    check('الكتالوج 34 مفتاحًا (29 + 5 جداول: employees/sync/export/print/clear)', PERMISSION_KEYS.length === 34, 'keys=' + PERMISSION_KEYS.length);
-    check('مفاتيح التشغيل التسعة الدقيقة موجودة', OPS9.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
+    const OPS10 = ['ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers', 'ops.vehicles'];
+    check('الكتالوج 37 مفتاحًا (34 + 3 ربط العمليات: vehicles/files/alerts)', PERMISSION_KEYS.length === 37, 'keys=' + PERMISSION_KEYS.length);
+    check('مفاتيح التشغيل العشرة الدقيقة موجودة', OPS10.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
+    check('مفاتيح ربط العمليات الجديدة موجودة (vehicles/files/alerts)', ['ops.vehicles', 'ops.files', 'ops.alerts'].every(k => PERMISSION_KEYS.indexOf(k) !== -1));
+    check('ops.files وops.alerts فرديتان — لا دور يحملهما إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('ops.files') === -1 && ROLES_PERMISSIONS[r].indexOf('ops.alerts') === -1));
     check('ops.execute الشامل باقٍ للتوافق', PERMISSION_KEYS.indexOf('ops.execute') !== -1);
     check('workflow.view أُضيف', PERMISSION_KEYS.indexOf('workflow.view') !== -1);
     check('§7: لا دور يحمل أي schedule.* إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
     check('§7: schedule.import فردية حصرًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.import') === -1));
     check('§2ب: ops_supervisor بلا إدارة مستخدمين/رموز/تقنية', ['admin.users_manage', 'symbols.manage', 'admin.tech', 'admin.settings', 'data.delete'].every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) === -1));
-    check('§2ب: ops_supervisor يحمل التشغيل التسعة + سير العمل كاملًا', OPS9.every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1) && ['workflow.view', 'workflow.manage', 'workflow.approve'].every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1));
-    check('§4: field_leadership = حزمة operator + workflow.approve', OPS9.every(k => ROLES_PERMISSIONS.field_leadership.indexOf(k) !== -1) && ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);
-    check('§3/§5: operator = 4 تنفيذ + 5 اطلاع + workflow.view', ROLES_PERMISSIONS.operator.length === 10 && OPS9.every(k => ROLES_PERMISSIONS.operator.indexOf(k) !== -1) && ROLES_PERMISSIONS.operator.indexOf('workflow.view') !== -1);
+    check('§2ب: ops_supervisor يحمل التشغيل العشرة + سير العمل كاملًا', OPS10.every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1) && ['workflow.view', 'workflow.manage', 'workflow.approve'].every(k => ROLES_PERMISSIONS.ops_supervisor.indexOf(k) !== -1));
+    check('§4: field_leadership = حزمة operator + workflow.approve', OPS10.every(k => ROLES_PERMISSIONS.field_leadership.indexOf(k) !== -1) && ROLES_PERMISSIONS.field_leadership.indexOf('workflow.approve') !== -1);
+    check('§3/§5: operator = 5 تنفيذ + 5 اطلاع + workflow.view', ROLES_PERMISSIONS.operator.length === 11 && OPS10.every(k => ROLES_PERMISSIONS.operator.indexOf(k) !== -1) && ROLES_PERMISSIONS.operator.indexOf('workflow.view') !== -1);
     check('operator بلا اعتماد ولا إدارة ولا جداول', ['workflow.approve', 'workflow.manage', 'admin.users_manage', 'symbols.manage', 'admin.settings', 'admin.tech', 'data.delete'].every(k => ROLES_PERMISSIONS.operator.indexOf(k) === -1));
     check('viewer فارغ', ROLES_PERMISSIONS.viewer.length === 0);
 

@@ -104,7 +104,7 @@ const BOUND = [
     const { PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج:');
     const SCHED_KEYS = ['schedule.view', 'schedule.import', 'schedule.edit_cell', 'schedule.employees', 'schedule.generate', 'schedule.swap', 'schedule.bulk_update', 'schedule.sync', 'schedule.export', 'schedule.print', 'schedule.clear'];
-    check('الكتالوج 34 مفتاحًا (29 + 5 جداول جديدة)', PERMISSION_KEYS.length === 34, 'keys=' + PERMISSION_KEYS.length);
+    check('الكتالوج 37 مفتاحًا (34 + 3 ربط العمليات)', PERMISSION_KEYS.length === 37, 'keys=' + PERMISSION_KEYS.length);
     check('مفاتيح الجداول الـ11 كلها موجودة', SCHED_KEYS.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('لا دور يحمل أي schedule.* إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => !ROLES_PERMISSIONS[r].some(k => k.indexOf('schedule.') === 0)));
     check('schedule.clear ممنوعة من كل دور تحديدًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('schedule.clear') === -1));

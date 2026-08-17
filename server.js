@@ -2846,7 +2846,7 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/start-new-shift', authenticate, authorizePerm('shift.lifecycle'), async (req, res) => {
     // Operations Engine → ShiftManager → SQLite
     try {
         const { shiftType } = req.body;
@@ -2866,7 +2866,7 @@ app.post('/api/start-new-shift', authenticate, authorize(['admin', 'director']),
 // ═══════════════════════════════════════════════════════════
 
 // End shift: Active → Pending Handover
-app.post('/api/shift/:id/end', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift/:id/end', authenticate, authorizePerm('shift.lifecycle'), async (req, res) => {
     // Operations Engine → ShiftManager → SQLite
     try {
         const shiftId = parseInt(req.params.id);
@@ -2882,7 +2882,7 @@ app.post('/api/shift/:id/end', authenticate, authorize(['admin', 'director']), a
         res.status(500).json({ error: 'فشل في إنهاء المناوبة' });
     }
 });// Approve handover: Pending Handover → Archived + Snapshot
-app.post('/api/shift/:id/handover-approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift/:id/handover-approve', authenticate, authorizePerm('shift.approve'), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.id);
         const user = req.user;
@@ -3032,7 +3032,7 @@ app.post('/api/emergency/edit-shift', authenticate, authorize(['admin']), async 
 // الشريحة 7 ⇒ 500 دائماً) وبلا أي مستهلك في public/ (grep شامل). البديل الحي:
 // GET /api/current-shift و GET /api/shifts/:id(\d+).
 
-app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/update-shift-data', authenticate, authorizePerm('shift.lifecycle'), async (req, res) => {
     try {
         const { shiftId, shiftData, shiftDate, shiftType } = req.body;
         const shifts = await readShifts();
@@ -3164,7 +3164,7 @@ app.post('/api/update-shift-data', authenticate, authorize(['admin', 'director']
 
 // POST /api/shift-save - حفظ موثوق للمناوبة
 // OV-S9-04: authorize كبقية مسارات دورة حياة المناوبة (start-new-shift/end)
-app.post('/api/shift-save', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shift-save', authenticate, authorizePerm('shift.lifecycle'), async (req, res) => {
     try {
         const { shiftId, shiftData } = req.body;
         if (!shiftId) {
@@ -3997,7 +3997,7 @@ app.get('/api/shifts/alerts', authenticate, async (req, res) => {
 });
 
 // POST /api/shifts/alerts/:id/acknowledge - acknowledge alert
-app.post('/api/shifts/alerts/:id/acknowledge', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shifts/alerts/:id/acknowledge', authenticate, authorizePerm('ops.alerts'), async (req, res) => {
     try {
         if (!dbAvailable() || !db.ShiftAlerts) {
             return res.status(503).json({ error: 'قاعدة البيانات غير متوفرة' });
@@ -4012,7 +4012,7 @@ app.post('/api/shifts/alerts/:id/acknowledge', authenticate, authorize(['admin',
 });
 
 // POST /api/shifts/alerts/calculate - trigger alert calculation
-app.post('/api/shifts/alerts/calculate', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/shifts/alerts/calculate', authenticate, authorizePerm('ops.alerts'), async (req, res) => {
     try {
         const shiftId = req.body.shift_id ? parseInt(req.body.shift_id) : null;
         const shifts = await readShifts();
@@ -4432,7 +4432,7 @@ app.get('/api/indicators/contribution', authenticate, authorize(['admin', 'direc
 // ============================================
 // API: البلاغات
 // ============================================
-app.post('/api/report', authenticate, validateBody({
+app.post('/api/report', authenticate, authorizePerm('ops.dispatch'), validateBody({
     center: { required: true, type: 'string', minLength: 1, maxLength: 100 },
     unit: { required: true, type: 'string', minLength: 1, maxLength: 100 }
 }), async (req, res) => {
@@ -4466,7 +4466,7 @@ app.post('/api/report', authenticate, validateBody({
 });
 
 
-app.post('/api/undo', authenticate, async (req, res) => {
+app.post('/api/undo', authenticate, authorizePerm('ops.report_revert'), async (req, res) => {
     // Slice 1: Route → ReportService → SQLite tx → COMMIT → DispatchUndone
     // event → broadcast subscriber emits the SAME 'report_undone' WS payload.
     const { center, unit } = req.body;
@@ -4876,7 +4876,7 @@ app.get('/api/shift-completion/:shiftId/:teamName', authenticate, async (req, re
 // ============================================
 // API: Save Radio Completion (Shift Quick Log)
 // ============================================
-app.post('/api/shift-completion', authenticate, async (req, res) => {
+app.post('/api/shift-completion', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     // Slice 1: Route → CompletionService → SQLite tx → COMMIT →
     // CompletionUpdated (+ CenterStatusChanged on ready/not-ready flips).
     // VA: عقدان — events[] (أحداث أشخاص، التدفق الجديد) أو teams (أحكام قديمة
@@ -5115,7 +5115,7 @@ app.get('/api/staffing/available-support', authenticate, async (req, res) => {
 // الاسم القياسي (اتفاق staffing)، وليس رقم مركبة. التفعيل لا يغيّر أي
 // تصنيف kind — موظف RRA يبقى تدخلًا سريعًا (بقرار المالك).
 // ============================================
-app.post('/api/staffing/activation', authenticate, async (req, res) => {
+app.post('/api/staffing/activation', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { employeeName, teamName, note } = req.body || {};
@@ -5130,7 +5130,7 @@ app.post('/api/staffing/activation', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/staffing/activation/end', authenticate, async (req, res) => {
+app.post('/api/staffing/activation/end', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { employeeName, note } = req.body || {};
@@ -5166,7 +5166,7 @@ app.get('/api/staffing/volunteer-candidates', authenticate, async (req, res) => 
     }
 });
 
-app.post('/api/staffing/volunteer', authenticate, async (req, res) => {
+app.post('/api/staffing/volunteer', authenticate, authorizePerm('ops.volunteers'), async (req, res) => {
     try {
         if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { employeeCode, employeeName, note } = req.body || {};
@@ -5494,7 +5494,7 @@ app.get('/api/vehicles/board', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/vehicles/events', authenticate, async (req, res) => {
+app.post('/api/vehicles/events', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, status, reason, note } = req.body || {};
@@ -5532,7 +5532,7 @@ app.post('/api/vehicles/events', authenticate, async (req, res) => {
 // قراءة فقط من التكميل/المركبات. صفر كتابة في أي جدول قائم.
 // الاعتماد/القفل/المرجع/PDF/الإرسال = مراحل لاحقة (W-3/W-4/W-5).
 // ============================================
-app.post('/api/workflow/prepare', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/workflow/prepare', authenticate, authorizePerm('workflow.manage'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const result = await workflowService.prepare({ actor: req.user });
@@ -5544,7 +5544,7 @@ app.post('/api/workflow/prepare', authenticate, authorize(['admin', 'director'])
     }
 });
 
-app.get('/api/workflow/shift/:shiftId', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.get('/api/workflow/shift/:shiftId', authenticate, authorizePerm('workflow.view'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const shiftId = parseInt(req.params.shiftId);
@@ -5557,7 +5557,7 @@ app.get('/api/workflow/shift/:shiftId', authenticate, authorize(['admin', 'direc
     }
 });
 
-app.get('/api/workflow/version/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.get('/api/workflow/version/:id', authenticate, authorizePerm('workflow.view'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
@@ -5571,7 +5571,7 @@ app.get('/api/workflow/version/:id', authenticate, authorize(['admin', 'director
     }
 });
 
-app.put('/api/workflow/version/:id', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.put('/api/workflow/version/:id', authenticate, authorizePerm('workflow.manage'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
@@ -5599,7 +5599,7 @@ app.get('/api/workflow/version/:id/audit', authenticate, authorize(['admin']), a
 });
 
 // ─── W-3: الاعتماد الرسمي (قفل + مرجع + بصمة + PDF) وإعادة الإصدار ───
-app.post('/api/workflow/version/:id/approve', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/workflow/version/:id/approve', authenticate, authorizePerm('workflow.approve'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
@@ -5624,7 +5624,7 @@ app.post('/api/workflow/version/:id/approve', authenticate, authorize(['admin', 
     }
 });
 
-app.post('/api/workflow/version/:id/reissue', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/workflow/version/:id/reissue', authenticate, authorizePerm('workflow.manage'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
@@ -5639,7 +5639,7 @@ app.post('/api/workflow/version/:id/reissue', authenticate, authorize(['admin', 
     }
 });
 
-app.get('/api/workflow/version/:id/pdf', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.get('/api/workflow/version/:id/pdf', authenticate, authorizePerm('workflow.view'), async (req, res) => {
     try {
         if (!workflowService) return res.status(503).json({ error: 'Engine unavailable' });
         const id = parseInt(req.params.id);
@@ -5668,7 +5668,7 @@ app.get('/api/workflow/version/:id/pdf', authenticate, authorize(['admin', 'dire
 // تعيين / إنهاء / نقل بين الفرق عبر VehicleEventsService فقط (ختم سيرفري،
 // append-only، معاملة واحدة للتبديل). لا حالة مخزنة — الأحداث هي المصدر.
 // ============================================
-app.post('/api/vehicles/assignment', authenticate, async (req, res) => {
+app.post('/api/vehicles/assignment', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, teamId, note } = req.body || {};
@@ -5683,7 +5683,7 @@ app.post('/api/vehicles/assignment', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/vehicles/assignment/end', authenticate, async (req, res) => {
+app.post('/api/vehicles/assignment/end', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, note } = req.body || {};
@@ -5698,7 +5698,7 @@ app.post('/api/vehicles/assignment/end', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/vehicles/assignment/switch', authenticate, async (req, res) => {
+app.post('/api/vehicles/assignment/switch', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, teamId, note } = req.body || {};
@@ -5717,7 +5717,7 @@ app.post('/api/vehicles/assignment/switch', authenticate, async (req, res) => {
 // V-B ②: دعم المركبات — المركبة تبقى لفريقها الأصلي وتدعم فريقًا آخر مؤقتًا.
 // الدعم يدخل في جاهزية الفريق المدعوم (اشتقاق سيرفري) ويُغلق بإنهاء الدعم.
 // ============================================
-app.post('/api/vehicles/support', authenticate, async (req, res) => {
+app.post('/api/vehicles/support', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, targetTeamId, note } = req.body || {};
@@ -5735,7 +5735,7 @@ app.post('/api/vehicles/support', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/vehicles/support/end', authenticate, async (req, res) => {
+app.post('/api/vehicles/support/end', authenticate, authorizePerm('ops.vehicles'), async (req, res) => {
     try {
         if (!opsEngine || !vehicleEventsService) return res.status(503).json({ error: 'Engine unavailable' });
         const { vehicleId, note } = req.body || {};
@@ -5766,7 +5766,7 @@ app.get('/api/docs', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/upload-doc', authenticate, async (req, res) => {
+app.post('/api/upload-doc', authenticate, authorizePerm('ops.files'), async (req, res) => {
     try {
         const { filename, fileData, description, fileType, category, priority } = req.body;
         if (!filename || !fileData) {
@@ -5829,7 +5829,7 @@ app.get('/api/download-doc/:id', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/delete-doc/:id', authenticate, async (req, res) => {
+app.delete('/api/delete-doc/:id', authenticate, authorizePerm('ops.files'), async (req, res) => {
     try {
         const docs = await readDocs();
         const filtered = docs.filter(d => d.id !== req.params.id);
@@ -5917,7 +5917,7 @@ app.get('/api/air-ambulance', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
+app.post('/api/save-air-ambulance', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const { reportNumber, dateTime, pickupLocation, destinationHospital, diagnosis, reason, patientName, patientAge, unit, paramedic } = req.body;
         if (!reportNumber || !unit || !dateTime || !destinationHospital) {
@@ -5952,7 +5952,7 @@ app.post('/api/save-air-ambulance', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/delete-air-ambulance/:id', authenticate, async (req, res) => {
+app.delete('/api/delete-air-ambulance/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'air_ambulance_deleted'
         await formsService.remove('air_ambulance', req.params.id);
@@ -5985,7 +5985,7 @@ app.get('/api/incidents', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/incidents', authenticate, async (req, res) => {
+app.post('/api/incidents', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const record = req.body;
         if (!record) {
@@ -6001,7 +6001,7 @@ app.post('/api/incidents', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/incidents/:id', authenticate, async (req, res) => {
+app.delete('/api/incidents/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'incident_deleted'
         await formsService.remove('incident', req.params.id);
@@ -6024,7 +6024,7 @@ app.get('/api/senior-shifts', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/senior-shifts', authenticate, async (req, res) => {
+app.post('/api/senior-shifts', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const record = req.body;
         if (!record) {
@@ -6039,7 +6039,7 @@ app.post('/api/senior-shifts', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/senior-shifts/:id', authenticate, async (req, res) => {
+app.delete('/api/senior-shifts/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'senior_shift_deleted'
         await formsService.remove('senior_shift', req.params.id);
@@ -6062,7 +6062,7 @@ app.get('/api/e-cases', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/e-cases', authenticate, async (req, res) => {
+app.post('/api/e-cases', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const record = req.body;
         if (!record) {
@@ -6077,7 +6077,7 @@ app.post('/api/e-cases', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/e-cases/:id', authenticate, async (req, res) => {
+app.delete('/api/e-cases/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'e_case_deleted'
         await formsService.remove('e_case', req.params.id);
@@ -6100,7 +6100,7 @@ app.get('/api/escalations', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/escalations', authenticate, async (req, res) => {
+app.post('/api/escalations', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const record = req.body;
         if (!record) {
@@ -6115,7 +6115,7 @@ app.post('/api/escalations', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/escalations/:id', authenticate, async (req, res) => {
+app.delete('/api/escalations/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'escalation_deleted'
         await formsService.remove('escalation', req.params.id);
@@ -6138,7 +6138,7 @@ app.get('/api/daily-reports', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/daily-reports', authenticate, async (req, res) => {
+app.post('/api/daily-reports', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const record = req.body;
         if (!record) {
@@ -6153,7 +6153,7 @@ app.post('/api/daily-reports', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/daily-reports/:id', authenticate, async (req, res) => {
+app.delete('/api/daily-reports/:id', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         // Slice 6 + Catalog D-6: FormDeleted fires inside the service → engine broadcasts 'daily_report_deleted'
         await formsService.remove('daily_report', req.params.id);
@@ -6180,7 +6180,7 @@ app.get('/api/control-notes', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/save-control-notes', authenticate, async (req, res) => {
+app.post('/api/save-control-notes', authenticate, authorizePerm('ops.forms'), async (req, res) => {
     try {
         const { notes } = req.body;
         await fs.writeFile(CONTROL_NOTES_PATH, JSON.stringify({ notes, updatedAt: new Date().toISOString() }));
@@ -6316,7 +6316,7 @@ app.get('/api/peak-data', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/peak-mission', authenticate, async (req, res) => {
+app.post('/api/peak-mission', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { location, unit, startTime, endTime, priority, notes, lat, lng } = req.body;
         if (!location || !unit || !startTime || !endTime) {
@@ -6386,7 +6386,7 @@ app.post('/api/peak-mission', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/peak-resolve', authenticate, async (req, res) => {
+app.post('/api/peak-resolve', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { alertId } = req.body;
         if (!alertId) {
@@ -6802,7 +6802,7 @@ app.get('/api/unit-locations', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/unit-locations', authenticate, async (req, res) => {
+app.post('/api/unit-locations', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { center, unit, lat, lng, address } = req.body;
         if (!center || !unit || lat === undefined || lng === undefined) {
@@ -6839,7 +6839,7 @@ app.post('/api/unit-locations', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/unit-location-addresses', authenticate, async (req, res) => {
+app.post('/api/unit-location-addresses', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { unit, address } = req.body;
         if (!unit || !address) {
@@ -7398,7 +7398,7 @@ const opsUpload = multer({
     }
 });
 
-app.post('/api/upload-operational', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
+app.post('/api/upload-operational', authenticate, authorizePerm('ops.files'), opsUpload.array('files'), handleMulterError, async (req, res) => {
     try {
         const files = req.files;
         if (!files || files.length === 0) {
@@ -7502,7 +7502,7 @@ app.get('/api/ops-files', authenticate, async (req, res) => {
 });
 
 // POST /api/ops-files - alias for upload (multipart form-data)
-app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterError, async (req, res) => {
+app.post('/api/ops-files', authenticate, authorizePerm('ops.files'), opsUpload.array('files'), handleMulterError, async (req, res) => {
     try {
         const files = req.files;
         if (!files || files.length === 0) {
@@ -7584,7 +7584,7 @@ app.post('/api/ops-files', authenticate, opsUpload.array('files'), handleMulterE
 });
 
 // DELETE /api/ops-files/:id - alias for delete
-app.delete('/api/ops-files/:id', authenticate, async (req, res) => {
+app.delete('/api/ops-files/:id', authenticate, authorizePerm('ops.files'), async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
         const index = metadata.findIndex(f => f.id === req.params.id);
@@ -7636,7 +7636,7 @@ app.get('/api/download-operational/:id', authenticate, async (req, res) => {
 });
 
 // حذف ملف (legacy endpoint — kept for backward compatibility)
-app.delete('/api/delete-operational/:id', authenticate, async (req, res) => {
+app.delete('/api/delete-operational/:id', authenticate, authorizePerm('ops.files'), async (req, res) => {
     try {
         const metadata = await readOpsMetadata();
         const index = metadata.findIndex(f => f.id === req.params.id);
@@ -8105,7 +8105,7 @@ async function w1eDeriveShiftAbsences(shiftId) {
 }
 
 
-app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
+app.post('/api/shift-events/:shiftId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         const { type, description, timestamp } = req.body;
@@ -8152,7 +8152,7 @@ app.post('/api/shift-events/:shiftId', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/shift-events/:shiftId/:eventId', authenticate, async (req, res) => {
+app.delete('/api/shift-events/:shiftId/:eventId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const { shiftId, eventId } = req.params;
         // W1-C Facade: الحذف الفيزيائي يبقى (عقد القراءة القديم) لكن لا يُفقد
@@ -8197,7 +8197,7 @@ app.get('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
+app.post('/api/shift-absences/:shiftId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         const { absences } = req.body;
@@ -8253,7 +8253,7 @@ app.post('/api/shift-absences/:shiftId', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, async (req, res) => {
+app.delete('/api/shift-absences/:shiftId/:absenceId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const { shiftId, absenceId } = req.params;
         // W1-C Facade: حذف فيزيائي (عقد) + correction موثق بنسخة المحذوف بمعاملة واحدة
@@ -8298,7 +8298,7 @@ app.get('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
+app.post('/api/shift-notes/:shiftId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const shiftId = parseInt(req.params.shiftId);
         const { notes } = req.body;
@@ -8314,7 +8314,7 @@ app.post('/api/shift-notes/:shiftId', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, async (req, res) => {
+app.delete('/api/shift-notes/:shiftId/:noteId', authenticate, authorizePerm('ops.completion'), async (req, res) => {
     try {
         const { shiftId, noteId } = req.params;
         // Slice 5: delete via NotesService.
@@ -8342,7 +8342,7 @@ app.get('/api/peak-plans', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/peak-plans', authenticate, async (req, res) => {
+app.post('/api/peak-plans', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { title, location } = req.body;
         if (!title || !location) {
@@ -8365,7 +8365,7 @@ app.post('/api/peak-plans', authenticate, async (req, res) => {
     }
 });
 
-app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
+app.put('/api/peak-plans/:id', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         const { id } = req.params;
         // Slice 4: merge + save via PositioningService.
@@ -8387,7 +8387,7 @@ app.put('/api/peak-plans/:id', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/peak-plans/:id', authenticate, async (req, res) => {
+app.delete('/api/peak-plans/:id', authenticate, authorizePerm('ops.deployments'), async (req, res) => {
     try {
         // Slice 4: delete via PositioningService; PositioningEnded fires after
         // the write when a row existed (engine broadcasts peak_plan_deleted)
@@ -8426,7 +8426,7 @@ app.get('/api/signouts/suggest', authenticate, async (req, res) => {
 // التسجيل: الخادم يختم المناوبة النشطة ونوعها وتاريخها والمستخدم والوقت —
 // الواجهة ترسل الفرقة والأسماء والملاحظات فقط. append-only: إعادة التسجيل
 // لنفس الفرقة = حدث TEAM_CHECKOUT جديد (تصحيح يبقي الأثر — لا UPDATE).
-app.post('/api/signouts', authenticate, async (req, res) => {
+app.post('/api/signouts', authenticate, authorizePerm('ops.team_exit'), async (req, res) => {
     try {
         if (!signoutService) return res.status(503).json({ error: 'الخدمة غير متاحة' });
         // تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): createdAt اختياري
@@ -8678,7 +8678,7 @@ app.get('/api/report-entry', authenticate, async (req, res) => {
     }
 });
 
-app.post('/api/report-entry', authenticate, async (req, res) => {
+app.post('/api/report-entry', authenticate, authorizePerm('ops.report_detail'), async (req, res) => {
     try {
         const record = req.body;
         if (!record || typeof record !== 'object') {
@@ -8746,7 +8746,7 @@ app.post('/api/report-entry', authenticate, async (req, res) => {
     }
 });
 
-app.delete('/api/report-entry/:id', authenticate, async (req, res) => {
+app.delete('/api/report-entry/:id', authenticate, authorizePerm('ops.report_detail'), async (req, res) => {
     try {
         // D-29: تحقق ملكية/حالة — القرار المتبنّى (الأبسط المتسق مع POST الذي
         // يختم بالمناوبة النشطة حصراً): الحذف مسموح فقط على سجلات المناوبة

@@ -25,7 +25,13 @@ const PERMISSIONS = {
     'ops.deployments':      { label: 'التمركزات', domain: 'ops' },
     'ops.forms':            { label: 'النماذج', domain: 'ops' },
     'ops.team_exit':        { label: 'تسجيل خروج الفرق', domain: 'ops' },
-    'ops.volunteers':       { label: 'المتطوعون والتفعيل', domain: 'ops' },
+    'ops.volunteers':       { label: 'المتطوعون', domain: 'ops' },
+    // مرحلة ربط العمليات (معتمدة 2026-08-17): 3 مفاتيح جديدة
+    // ops.vehicles ضمن حزمة operator/field_leadership — مسؤولية مستقلة عن التكميل
+    // ops.files وops.alerts: منح فردي حاليًا حصرًا — لا تدخل أي دور تلقائيًا (قرار المالك ④)
+    'ops.vehicles':         { label: 'تشغيل وإسناد المركبات', domain: 'ops' },
+    'ops.files':            { label: 'رفع الملفات التشغيلية (منح فردي حاليًا — لا دور يحملها)', domain: 'ops' },
+    'ops.alerts':           { label: 'معالجة التنبيهات (منح فردي حاليًا — لا دور يحملها)', domain: 'ops' },
     // الجداول — مفصولة بالكامل، وكلها منح فردية حصرًا: لا دور يحملها (بند ثالثًا/سابعًا)
     // مرحلة تفكيك الجداول (معتمدة 2026-08-17): +employees/sync/export/print/clear
     // schedule.print: لا مسار خادمي — تحكم واجهة فقط (موثّق أنه ليس حماية أمنية)
@@ -79,11 +85,13 @@ const ROLE_LABELS = {
 // '*' = كل الصلاحيات. المرحلة 1 (معتمد 2026-08-17) + الحزم الموحدة (معتمدة 2026-08-17):
 //  - كل مفاتيح schedule.* أُفرغت من جميع الأدوار — منح فردي حصرًا (بند سابعًا).
 //  - ops.execute الشامل بقي في الكتالوج للتوافق لكنه لا يُمنح افتراضيًا إلا للدور القديم user.
-//  - operator/field_leadership: حزمة موحدة — تنفيذ: completion/dispatch/deployments/forms،
-//    اطلاع: reports/report_revert/report_detail/team_exit/volunteers + workflow.view.
-//    الفرق تنفيذ/اطلاع يُحسم في ربط المسارات لاحقًا (GET↔مفاتيح الاطلاع، POST↔مفاتيح التنفيذ).
+//  - operator/field_leadership: حزمة موحدة — تنفيذ: completion/dispatch/deployments/forms/vehicles،
+//    + report_revert/report_detail/team_exit/volunteers (مفاتيح تنفيذ نطاقاتها بعد ربط العمليات)
+//    + ops.reports (محجوزة لمرحلة ربط القراءات لاحقًا) + workflow.view.
+//    مرحلة ربط العمليات (2026-08-17): GET العمليات تبقى للموثّقين (قرار ①)؛
+//    مفاتيح ops.* تحرس مسارات التنفيذ فقط. ops.files/ops.alerts فرديتان — لا دور يحملهما.
 //  - field_leadership تزيد workflow.approve فقط. ops_supervisor غير مُسند حاليًا.
-const OPS_EXECUTE = ['ops.completion', 'ops.dispatch', 'ops.deployments', 'ops.forms'];
+const OPS_EXECUTE = ['ops.completion', 'ops.dispatch', 'ops.deployments', 'ops.forms', 'ops.vehicles'];
 const OPS_VIEW = ['ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.team_exit', 'ops.volunteers'];
 const OPS_ALL = OPS_EXECUTE.concat(OPS_VIEW);
 const ROLES_PERMISSIONS = {

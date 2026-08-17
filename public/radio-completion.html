@@ -2255,5 +2255,45 @@ renderAll = function() {
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
 
+<script>
+// ═══ بوابات صلاحيات العمليات — مرحلة ربط العمليات (معتمدة 2026-08-17) ═══
+// الحسم خادمي دائمًا: كل مسارات التنفيذ محمية بـ authorizePerm ← 403.
+// إخفاء الأزرار هنا ردع بصري موثّق، لا حماية. الأزرار المولّدة ديناميكيًا
+// داخل بطاقات الفرق (إنهاء تفعيل/إسناد من البطاقة) يحسمها الخادم مباشرة.
+(function () {
+    var GATES = [
+        { sel: 'button[onclick="confirmMissing()"]',     perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmOffline()"]',     perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmCoverage()"]',    perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmSupport()"]',     perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmActivation()"]',  perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmVolunteer()"]',   perm: 'ops.volunteers' },
+        { sel: 'button[onclick="confirmVehicleTeam()"]', perm: 'ops.vehicles' },
+        { sel: '#signoutSaveBtn',                        perm: 'ops.team_exit' }
+    ];
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var token = (window.AuthCore && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken'));
+            if (!token) return;
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    var perms = Array.isArray(d.permissions) ? d.permissions : [];
+                    var star = d.permissions_star === true;
+                    GATES.forEach(function (g) {
+                        if (star || perms.indexOf(g.perm) !== -1) return;
+                        document.querySelectorAll(g.sel).forEach(function (el) {
+                            el.style.display = 'none';
+                            el.title = 'لا تملك صلاحية: ' + g.perm;
+                        });
+                    });
+                })
+                .catch(function () { /* فشل القراءة: لا نخفي شيئًا — الحسم خادمي */ });
+        } catch (_) { }
+    });
+})();
+</script>
+
 </body>
 </html>
