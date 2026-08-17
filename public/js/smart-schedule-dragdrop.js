@@ -23,9 +23,14 @@
         }
     }
 
+    // إصلاح موحد 2026-08-18: السحب/الاستبدال بصلاحيات schedule.swap / schedule.edit_cell
+    // أو بنجمة sysadmin (عبر window.__schedPermsState من auth/me)، مع بقاء الأدوار القديمة للتوافق.
     function canEdit() {
         var role = userRole();
-        return role === 'admin' || role === 'director' || role === 'supervisor';
+        if (role === 'admin' || role === 'director' || role === 'supervisor' || role === 'sysadmin') return true;
+        var st = window.__schedPermsState;
+        if (st && st.loaded) return st.star || st.perms.indexOf('schedule.swap') !== -1 || st.perms.indexOf('schedule.edit_cell') !== -1;
+        return false;
     }
 
     // ==========================================

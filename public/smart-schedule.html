@@ -4898,19 +4898,25 @@
     <script src="/js/smart-schedule-search.js?v=2"></script>
     <script src="/js/smart-schedule-cell-editor.js?v=6"></script>
 
-    <!-- إظهار شريط مراجعة التعديلات للمخوَّلين (نفس منطق الوحدة القديمة المحذوفة: admin/director/supervisor) -->
+    <!-- إظهار شريط مراجعة التعديلات — إصلاح موحد 2026-08-18: بالصلاحيات الدقيقة schedule.* (أو النجمة) بدل أدوار admin/director القديمة -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         try {
             var section = document.getElementById('editorToolbarSection');
-            if (!section) return;
             var token = (typeof AuthCore !== 'undefined' && AuthCore.getToken) ? AuthCore.getToken() : (localStorage.getItem('auth_access_token') || localStorage.getItem('authToken') || '');
             if (!token) return;
-            var payload = JSON.parse(atob(token.split('.')[1]));
-            var role = payload.role || null;
-            if (role === 'admin' || role === 'director' || role === 'supervisor') {
-                section.classList.remove('hidden');
-            }
+            fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    // حالة مشتركة لوحدات الجداول (cell-editor / dragdrop) — مصدر واحد من auth/me
+                    window.__schedPermsState = { loaded: true, star: d.permissions_star === true, perms: Array.isArray(d.permissions) ? d.permissions : [] };
+                    if (!section) return;
+                    var p = window.__schedPermsState;
+                    var canEditAny = p.star || ['schedule.edit_cell', 'schedule.swap', 'schedule.bulk_update', 'schedule.generate'].some(function (k) { return p.perms.indexOf(k) !== -1; });
+                    if (canEditAny) section.classList.remove('hidden');
+                })
+                .catch(function () { /* فشل القراءة: الشريط يبقى مخفيًا — الحسم خادمي */ });
         } catch (e) { /* تجاهل — الشريط يبقى مخفيًا */ }
     });
     </script>

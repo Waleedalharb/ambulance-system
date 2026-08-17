@@ -877,11 +877,22 @@ async function authenticate(req, res, next) {
     }
 }
 
+// إصلاح موحد (معتمد 2026-08-18): دور بنجمة في config/permissions (sysadmin)
+// يمر عبر بوابات authorize القديمة التي تستهدف admin. ليس alias أعمى:
+// 1) يمر فقط إذا كانت البوابة أصلًا تتضمن 'admin' — بوابات director المنفردة لا يمسها.
+// 2) النجمة تُشتق من ROLES_PERMISSIONS (المصدر الوحيد) — لا استثناءات فردية هنا.
+// 3) لا يغيّر شيئًا لـ operator/field_leadership/viewer — يبقون مرفوضين كما كانوا.
+const { ROLES_PERMISSIONS: LEGACY_ROLES_PERMS } = require('./config/permissions');
+function isStarRole(role) {
+    const perms = LEGACY_ROLES_PERMS[role];
+    return Array.isArray(perms) && perms.indexOf('*') !== -1;
+}
 function authorize(roles) {
     return (req, res, next) => {
         if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
-        if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'ليس لديك الصلاحية' });
-        next();
+        if (roles.includes(req.user.role)) return next();
+        if (roles.includes('admin') && isStarRole(req.user.role)) return next();
+        return res.status(403).json({ error: 'ليس لديك الصلاحية' });
     };
 }
 

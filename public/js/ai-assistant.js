@@ -81,7 +81,11 @@
         }
 
         isAdmin() {
-            return this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'director');
+            // إصلاح موحد 2026-08-18: يقبل نجمة sysadmin (permissions_star) إضافة للأدوار القديمة
+            const cu = this.currentUser;
+            if (!cu) return false;
+            const role = cu.role || (cu.user && cu.user.role);
+            return role === 'admin' || role === 'director' || role === 'sysadmin' || cu.permissions_star === true;
         }
 
         getUserRoleCategories() {

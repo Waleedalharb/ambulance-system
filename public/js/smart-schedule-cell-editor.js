@@ -7,7 +7,8 @@
      الرمز المعروض = الرمز المخزن = الرمز في التقارير.
    - أنماط A/B/C/D (shift_patterns) منفصلة تمامًا عن رموز المناوبات اليومية.
    - تعديل يوم واحد عبر PUT /api/shift-roster/cell لا يغيّر غيره.
-   - النقل والنمط وتعديل الخلايا: admin/director فقط.
+   - النقل والنمط وتعديل الخلايا: بصلاحيات schedule.* الدقيقة أو نجمة sysadmin
+     (إصلاح موحد 2026-08-18) — الحسم دائمًا سيرفري عبر authorizePerm.
 */
 (function () {
     'use strict';
@@ -31,9 +32,14 @@
         }
     }
 
+    // إصلاح موحد 2026-08-18: التعديل بصلاحية schedule.edit_cell أو بنجمة sysadmin
+    // (تُقرأ من auth/me عبر window.__schedPermsState)، مع بقاء الأدوار القديمة للتوافق.
     function canEdit() {
         var role = userRole();
-        return role === 'admin' || role === 'director';
+        if (role === 'admin' || role === 'director' || role === 'sysadmin') return true;
+        var st = window.__schedPermsState;
+        if (st && st.loaded) return st.star || st.perms.indexOf('schedule.edit_cell') !== -1;
+        return false;
     }
 
     function apiFetch(url, options) {

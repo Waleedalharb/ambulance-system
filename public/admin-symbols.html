@@ -451,7 +451,9 @@ function openModal(id) { document.getElementById(id).classList.add('show'); }
     try {
         const me = await api('/api/auth/me');
         const role = (me.user && me.user.role) || me.role;
-        if (role !== 'admin' && role !== 'director') {
+        // إصلاح موحد 2026-08-18: sysadmin يدخل بنجمته (permissions_star) — والقفل السري للرموز يبقى مستقلًا سيرفريًا كما هو
+        const star = me.permissions_star === true;
+        if (!star && role !== 'admin' && role !== 'director') {
             document.querySelector('.container').innerHTML =
                 '<div class="card" style="text-align:center;padding:50px;"><h2 style="color:var(--danger);">🚫 الصلاحية: Admin / Director فقط</h2></div>';
             return;

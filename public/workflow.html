@@ -482,12 +482,19 @@ function empId(raw) {
     return cleaned || '—';
 }
 
-// المسمى الوظيفي من دور المنشئ (signature_meta)
+// المسمى الوظيفي من دور المنشئ (signature_meta) — إصلاح موحد 2026-08-18: الأدوار الخمسة + القديمة
 function roleLabel(role) {
     if (!role) return '—';
-    if (role === 'admin') return 'مدير النظام';
-    if (role === 'director') return 'مدير القطاع';
-    return String(role);
+    var map = {
+        sysadmin: 'مدير النظام',
+        ops_supervisor: 'مشرف العمليات',
+        field_leadership: 'القيادة الميدانية',
+        operator: 'مستخدم تشغيل',
+        viewer: 'مستخدم قراءة',
+        admin: 'مدير النظام',
+        director: 'مدير القطاع'
+    };
+    return map[role] || String(role);
 }
 
 function toast(msg, type) {

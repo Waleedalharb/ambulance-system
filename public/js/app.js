@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser = data.user;
             hideLogin();
             applyUserPermissions(data.user);
-            if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + (data.user.role === 'admin' ? 'مدير' : data.user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
+            if (userDisplay) userDisplay.textContent = (data.user.name || 'مستخدم') + ' (' + roleLabel(data.user.role) + ')';
             AuthGate.start(); // الإقلاع التشغيلي الموحّد (loadAllData + loadNotifications + SSE + المؤقتات) عبر البوابة
             addAuditEntry('system', 'تسجيل دخول', 'المستخدم ' + (data.user.name || data.user.username || 'غير معروف') + ' سجل الدخول إلى النظام', getCurrentUserName());
         } catch (e) {
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser = user;
             hideLogin();
             applyUserPermissions(user);
-            if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + (user.role === 'admin' ? 'مدير' : user.role === 'director' ? 'مدير عمليات' : 'مستخدم') + ')';
+            if (userDisplay) userDisplay.textContent = (user.name || 'مستخدم') + ' (' + roleLabel(user.role) + ')';
             AuthGate.start(); // جلسة صالحة عند تحميل الصفحة — الإقلاع التشغيلي عبر البوابة
         } else {
             hideSkeleton();
@@ -10245,10 +10245,26 @@ document.head.appendChild(shiftRippleStyle);
 // ============================================
 // applyUserPermissions (من inline.js)
 // ============================================
+// خريطة تسميات الأدوار (إصلاح موحد 2026-08-18): الأدوار الخمسة الجديدة + القديمة للتوافق
+function roleLabel(role) {
+    var map = {
+        sysadmin: 'مدير النظام',
+        ops_supervisor: 'مشرف العمليات',
+        field_leadership: 'القيادة الميدانية',
+        operator: 'مستخدم تشغيل',
+        viewer: 'مستخدم قراءة',
+        admin: 'مدير',
+        director: 'مدير عمليات',
+        user: 'مستخدم'
+    };
+    return map[role] || 'مستخدم';
+}
+
 function applyUserPermissions(user) {
     if (!user) user = currentUser;
     if (!user) return;
-    var isAdmin = user.role === 'admin';
+    // sysadmin = نجمة بحكم config/permissions → يرى عناصر .admin-only كالمدير القديم (إصلاح موحد 2026-08-18)
+    var isAdmin = user.role === 'admin' || user.role === 'sysadmin';
     var isDirector = user.role === 'director';
     var isUser = user.role === 'user';
     var adminOnly = document.querySelectorAll('.admin-only');
