@@ -48,6 +48,7 @@ let signoutService = null; // المرحلة ب: single owner of shift_signouts 
 let notesService = null; // Slice 5: single owner of shift_notes writes
 let formsService = null; // Slice 6: single owner of all form writes (form_type)
 let indicatorService = null; // F5a: read-only operational indicators
+let crewActivityService = null; // Phase B: «الأكثر نشاطًا» — قراءة فقط من SSOT
 let staffingEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث القوى البشرية
 let vehicleEventsService = null; // W1-A: المصدر الرسمي الوحيد لأحداث المركبات
 let rosterSyncService = null; // SR-2: المزامنة الوحيدة الجدولة ← employees + shift_roster (SSOT)
@@ -4405,6 +4406,25 @@ app.get('/api/daily-report', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Daily report error:', error);
         res.status(500).json({ error: 'فشل في إنشاء التقرير اليومي' });
+    }
+});
+
+// ============================================
+// API: نشاط الفرق الإسعافية (Phase B — Crew Activity Engine)
+// «الأكثر نشاطًا» فقط — قراءة حية من SSOT بلا تجميد ولا Phase C.
+// authenticate فقط (قرار المالك 2026-08-18): لوحة تحفيزية مستقبلية للمسعفين،
+// وبياناتها غير حساسة (أسماء فرق وأفراد وأعداد) — نفس نمط indicators/dashboard.
+// ============================================
+app.get('/api/crew-performance/activity', authenticate, async (req, res) => {
+    try {
+        if (!crewActivityService) return res.status(503).json({ error: 'الخدمة غير متوفرة' });
+        const { scope, period, top } = req.query;
+        const result = await crewActivityService.getActivity({ scope, period, top });
+        res.json(result);
+    } catch (error) {
+        if (error && error.status) return res.status(error.status).json({ success: false, error: error.message });
+        console.error('Crew activity error:', error);
+        res.status(500).json({ error: 'فشل في جلب نشاط الفرق' });
     }
 });
 
@@ -12402,6 +12422,11 @@ server.listen(PORT, async () => {
             indicatorService = new IndicatorService({ engine: opsEngine, reportService });
             console.log('✅ IndicatorService wired (F5a, read-only)');
 
+            // Phase B: CrewActivityService — «الأكثر نشاطًا» من SSOT (قراءة فقط)
+            const CrewActivityService = require('./services/crew-activity-service');
+            crewActivityService = new CrewActivityService({ engine: opsEngine });
+            console.log('✅ CrewActivityService wired (Phase B, read-only)');
+
             // Archive slice: single archive path (Archive Contract §2) —
             // seal + conversation archiving + status transition
             const ArchiveService = require('./services/archive-service');
@@ -12490,6 +12515,7 @@ server.listen(PORT, async () => {
             reportService = null;
             completionService = null;
             indicatorService = null;
+            crewActivityService = null;
             positioningService = null;
             notesService = null;
             formsService = null;
