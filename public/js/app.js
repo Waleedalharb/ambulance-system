@@ -610,6 +610,8 @@ function handleSSEEvent(data) {
     // الناقل الوحيد للأحداث التشغيلية على الصفحة الرئيسية. الفروع أدناه تغطي
     // بالضبط الأنواع التي كانت تستهلكها الصفحة عبر websocket-sync (أي أن
     // معالجاتها معرّفة فعلاً في app.js) وتستدعي نفس المعالجات الموجودة.
+    // Phase D (خطاف عام معتمد): بثّ كل حدث SSE كـ CustomEvent 'ops:sse' على document — قناة الاشتراك الصريحة للوحات العرض. فشله لا يؤثر على الـ switch أدناه.
+    try { document.dispatchEvent(new CustomEvent('ops:sse', { detail: data })); } catch(e) {}
     switch(data.type) {
         case 'new_report':
             showNotification('بلاغ جديد', data.message, 'info', 5000);

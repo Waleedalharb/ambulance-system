@@ -1130,6 +1130,45 @@ window.addEventListener('load', function() {
         </div>
     </div>
 
+    <!-- ===== 🏆 إنجاز الفرق (Phase D) — لوحة تحفيزية عرض فقط فوق /api/crew-performance/activity ===== -->
+    <!-- كل القواعد أدناه scoped ببادئة .crew-board ولا تلمس أي عنصر آخر؛ بلا position:fixed وبلا z-index -->
+    <style id="crew-board-styles">
+    .crew-board { order: 10; background: var(--white, #fff); border: 1px solid var(--gray-200, #E5E7EB); border-radius: var(--radius-lg, 14px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(16,24,40,.05)); padding: 20px 24px; margin-bottom: 20px; }
+    .crew-board-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-100, #F3F4F6); }
+    .crew-board-title { font-size: 1.1rem; font-weight: 800; color: var(--gray-800, #1F2937); }
+    .crew-board-tabs { display: flex; gap: 6px; }
+    .crew-board-tab { border: 1px solid var(--gray-200, #E5E7EB); background: transparent; color: var(--gray-600, #4B5563); border-radius: 999px; padding: 4px 14px; font-size: .8rem; font-family: inherit; cursor: pointer; transition: all .15s ease; }
+    .crew-board-tab.active { background: var(--navy, #1E3A5F); color: var(--white, #fff); border-color: var(--navy, #1E3A5F); }
+    .crew-board-sublabel { font-size: .8rem; color: var(--gray-500, #6B7280); margin-bottom: 10px; }
+    .crew-board-gold { background: linear-gradient(135deg, var(--amber-50, #FFFBEB), var(--amber-100, #FEF3C7)); border: 1px solid var(--amber-300, #FCD34D); border-radius: var(--radius-lg, 14px); padding: 16px 18px; margin-bottom: 12px; }
+    .crew-board-gold .crew-board-team { font-size: 1.15rem; font-weight: 800; color: var(--amber-800, #92400E); }
+    .crew-board-names { font-size: 1.02rem; font-weight: 700; color: var(--gray-800, #1F2937); margin-top: 6px; line-height: 1.8; }
+    .crew-board-stats { font-size: .9rem; color: var(--gray-600, #4B5563); margin-top: 6px; }
+    .crew-board-tag { display: inline-block; margin-top: 8px; font-size: .75rem; font-weight: 600; color: var(--amber-800, #92400E); background: var(--amber-50, #FFFBEB); border: 1px dashed var(--amber-300, #FCD34D); border-radius: 999px; padding: 2px 10px; }
+    .crew-board-shiftdate { font-size: .8rem; color: var(--gray-500, #6B7280); margin-top: 6px; }
+    .crew-board-row { padding: 10px 4px; border-top: 1px dashed var(--gray-200, #E5E7EB); }
+    .crew-board-row-main { font-weight: 700; color: var(--gray-800, #1F2937); line-height: 1.7; }
+    .crew-board-row-stats { font-size: .85rem; color: var(--gray-600, #4B5563); margin-top: 2px; }
+    .crew-board-details { margin-top: 6px; }
+    .crew-board-details summary { cursor: pointer; font-size: .82rem; color: var(--teal, #0D9488); }
+    .crew-board-shiftline { font-size: .83rem; color: var(--gray-600, #4B5563); padding: 3px 8px 0 0; }
+    .crew-board-expand { display: block; margin: 10px auto 0; border: 1px solid var(--gray-200, #E5E7EB); background: transparent; color: var(--gray-600, #4B5563); border-radius: 999px; padding: 5px 16px; font-size: .8rem; font-family: inherit; cursor: pointer; }
+    .crew-board-empty { text-align: center; padding: 18px 8px; color: var(--gray-500, #6B7280); font-size: .9rem; }
+    .crew-board-faded { opacity: .55; }
+    .crew-board-fairness { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--gray-100, #F3F4F6); text-align: center; font-size: .75rem; color: var(--gray-400, #9CA3AF); }
+    </style>
+    <div id="crewAchievementBoard" class="crew-board" dir="rtl">
+        <div class="crew-board-header">
+            <div class="crew-board-title">🏆 إنجاز الفرق</div>
+            <div class="crew-board-tabs">
+                <button type="button" class="crew-board-tab active" data-period="current_shift">الحالية</button>
+                <button type="button" class="crew-board-tab" data-period="today">اليوم</button>
+                <button type="button" class="crew-board-tab" data-period="week">أسبوع</button>
+                <button type="button" class="crew-board-tab" data-period="month">شهر</button>
+            </div>
+        </div>
+        <div id="crewBoardBody" class="crew-board-body"></div>
+    </div>
 
     <footer style="font-size:0.7rem;text-align:center;margin-top:auto;padding:12px 0;color:var(--gray-500);">جميع الحقوق محفوظة © 2026 | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</footer>
 </div>
@@ -2179,6 +2218,7 @@ window.addEventListener('load', function() {
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
 <script src="js/app.js?v=46" defer></script>
+<script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
