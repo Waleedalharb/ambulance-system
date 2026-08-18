@@ -12461,6 +12461,9 @@ server.listen(PORT, async () => {
             const VehicleEventsService = require('./services/vehicle-events-service');
             staffingEventsService = new StaffingEventsService({ storage: opsEngine.storage, engine: opsEngine });
             vehicleEventsService = new VehicleEventsService({ storage: opsEngine.storage, engine: opsEngine });
+            // Phase D.1: ربط متأخر — أسماء لوحة «إنجاز الفرق» تُشتق من نفس منطق
+            // التكميل (deriveTeamReadiness) استدعاءً مباشرًا، بلا نسخ قواعد.
+            if (crewActivityService) crewActivityService.staffingEventsService = staffingEventsService;
 
             // جولة Operational Workflow Completion (المرحلة ب): SignoutService —
             // المالك الوحيد لأحداث TEAM_CHECKOUT (shift_signout_events، append-only)

@@ -14,6 +14,13 @@
  * صادق للمناوبات القديمة (shift_roster لتاريخها) — ولا يجوز إطلاقًا أن
  * تظهر أسماء مناوبة سابقة بجانب إنجاز مناوبة جديدة.
  *
+ * Phase D.1 (قرار المالك 2026-08-18): التكميل هو المرجع الوحيد لتشكيل
+ * الفرقة. الأسماء لا تُجمع من أحداث staffing الخام إطلاقًا، بل تُؤخذ من
+ * deriveTeamReadiness لنفس shift_id (نفس منطق التكميل حرفيًا — استدعاء
+ * مباشر بلا نسخ قواعد): effectiveRoster = القاعدة الحاضرة (بلا غياب/تأخير
+ * مفتوح وغير مكلَّفة خارج الفريق) + الدعم/التفعيل المفتوح. الغائب والداعم
+ * المنتهي لا يظهران. تعذّر إثبات التشكيل ← members_incomplete (لا تخمين).
+ *
  * الترتيب الثابت (قرار المالك): activity_rate_per_hour تنازليًا، عند
  * التعادل reports_count تنازليًا، ثم اسم الفرقة أبجديًا كـ tie-breaker ثابت.
  */
@@ -70,6 +77,9 @@ class CrewActivityService {
     constructor({ engine }) {
         if (!engine) throw new Error('CrewActivityService requires an OperationsEngine instance');
         this.engine = engine;
+        // Phase D.1: ربط متأخر (late binding) — نفس نمط CompletionService.
+        // يُسند في server.js بعد إنشاء StaffingEventsService. مرجع الأسماء الوحيد.
+        this.staffingEventsService = null;
     }
 
     storage() { return this.engine.storage; }
@@ -116,7 +126,8 @@ class CrewActivityService {
                  FROM reports r JOIN report_times rt ON rt.report_id = r.id
                  WHERE r.shift_id IN (${shiftIds.map(() => '?').join(',')})
                  GROUP BY r.shift_id, r.unit`, shiftIds),
-            // الأسماء: أحداث المناوبة نفسها حصرًا — لا أسماء ثابتة ولا مناوبة سابقة
+            // أحداث الأشخاص: دليل «عمل» فقط (hasPersonEvents) — الأسماء لا تُؤخذ
+            // من هنا إطلاقًا (D.1: الأحداث الخام ليست قائمة أعضاء)
             this.storage().all(
                 `SELECT shift_id, team_id, entity_name, MIN(created_at) AS first_at
                  FROM operational_events
@@ -144,7 +155,7 @@ class CrewActivityService {
             const k = cellKey(sid, team);
             if (!cells[k]) {
                 cells[k] = { shift: shiftById[sid], team, reports_count: 0, members: [],
-                    hasPersonEvents: false, hasStatusEvents: false, hasRoster: false };
+                    hasPersonEvents: false, hasStatusEvents: false, membersIncomplete: false };
             }
             return cells[k];
         };
@@ -157,9 +168,7 @@ class CrewActivityService {
         for (const p of personRows) {
             const team = canonicalTeam(p.team_id);
             if (!team || !shiftById[p.shift_id]) continue;
-            const cell = ensureCell(p.shift_id, team);
-            cell.hasPersonEvents = true;
-            cell.members.push(p.entity_name);
+            ensureCell(p.shift_id, team).hasPersonEvents = true;
         }
         for (const st of statusRows) {
             const team = canonicalTeam(st.team_id);
@@ -169,20 +178,36 @@ class CrewActivityService {
             (cell.statusEvents = cell.statusEvents || []).push(st);
         }
 
-        // ─── السقوط الصادق للأسماء: roster لتاريخ المناوبة نفسها (بلا اختلاق) ───
+        // ─── D.1: الأسماء من اشتقاق التكميل نفسه — استدعاء مباشر بلا نسخ قواعد ───
+        // deriveTeamReadiness(shiftId) ← effectiveRoster: القاعدة الحاضرة + الدعم/التفعيل
+        // المفتوح فقط. الغائب/المتأخر والداعم المنتهي لا يظهران إطلاقًا. الاشتقاق
+        // يُستدعى مرة واحدة لكل مناوبة لها خلايا، ويُطبَّق على كل خلاياها.
+        // تعذّر الإثبات (خدمة غير موصولة/فشل/فريق خارج الاشتقاق وبلا طاقم حاضر)
+        // ← members فارغة + members_incomplete — حالة صادقة، لا تخمين.
+        const crewsByShift = {}; // shiftId → { team → names[] } | null (فشل/غير موصول)
+        const shiftIdsWithCells = [...new Set(Object.keys(cells).map(k => k.split('|')[0]))];
+        for (const sid of shiftIdsWithCells) {
+            crewsByShift[sid] = null;
+            if (!this.staffingEventsService) continue;
+            try {
+                const derived = await this.staffingEventsService.deriveTeamReadiness(Number(sid));
+                const m = {};
+                const dTeams = (derived && derived.teams) || {};
+                for (const tName of Object.keys(dTeams)) {
+                    const key = canonicalTeam(tName) || tName;
+                    const eff = dTeams[tName].effectiveRoster || [];
+                    m[key] = eff.map(x => x && x.name).filter(Boolean);
+                }
+                crewsByShift[sid] = m;
+            } catch (_) { crewsByShift[sid] = null; }
+        }
         for (const k of Object.keys(cells)) {
             const cell = cells[k];
-            if (cell.members.length) continue;
-            const named = await this.storage().all(
-                `SELECT e.name AS name
-                 FROM shift_roster sr
-                 JOIN teams t ON t.id = sr.team_id
-                 JOIN employees e ON e.id = sr.employee_id
-                 WHERE sr.shift_date = ? AND t.name = ?`, [cell.shift.shift_date, cell.team]);
-            for (const n of named) {
-                if (!cell.members.includes(n.name)) cell.members.push(n.name);
-            }
-            if (named.length) cell.hasRoster = true;
+            const cmap = crewsByShift[String(cell.shift.id)];
+            const names = cmap ? (cmap[cell.team] || null) : null;
+            cell.members = names || [];
+            // إنجاز (بلاغات ≥1) بلا تشكيل مُثبت ← يُوسم صراحة ولا تُختلق أسماء
+            cell.membersIncomplete = cell.reports_count > 0 && cell.members.length === 0;
         }
 
         // ─── الفرق العاملة بلا بلاغات: دليل عملها = أحداث/roster للفترة ───
@@ -228,20 +253,25 @@ class CrewActivityService {
             const t = teams[cell.team] || (teams[cell.team] = {
                 team: cell.team, center: null, reports_count: 0,
                 members: [], shift_minutes: 0, active_minutes: 0,
-                active_minutes_estimated: true, shifts: [], worked: false
+                active_minutes_estimated: true, shifts: [], worked: false,
+                members_incomplete: false
             });
             const s = cell.shift;
-            t.worked = t.worked || cell.hasPersonEvents || cell.hasStatusEvents || cell.hasRoster || cell.reports_count > 0;
+            t.worked = t.worked || cell.hasPersonEvents || cell.hasStatusEvents || cell.members.length > 0 || cell.reports_count > 0;
             t.reports_count += cell.reports_count;
             t.shift_minutes += cell.shift_minutes;
             t.active_minutes += cell.active_minutes;
             if (!cell.active_minutes_estimated) t.active_minutes_estimated = false;
+            // D.1: أي خلية بإنجاز بلا تشكيل مُثبت توسم الفرقة — الواجهة تعرض
+            // «بيانات طاقم المناوبة غير مكتملة» بدل تخمين الأسماء
+            if (cell.membersIncomplete) t.members_incomplete = true;
             // اتحاد الأسماء بترتيب ظهورها زمنيًا عبر مناوبات الفترة
             for (const m of cell.members) if (!t.members.includes(m)) t.members.push(m);
             if (cell.reports_count > 0 || cell.members.length || cell.hasStatusEvents) {
                 t.shifts.push({
                     shift_id: s.id, shift_date: s.shift_date, shift_type: s.shift_type,
-                    reports_count: cell.reports_count, members: cell.members
+                    reports_count: cell.reports_count, members: cell.members,
+                    members_incomplete: cell.membersIncomplete
                 });
             }
         }
@@ -282,6 +312,7 @@ class CrewActivityService {
             standings: ranked.slice(0, top).map(t => ({
                 rank: t.rank, team: t.team, center: t.center,
                 reports_count: t.reports_count, members: t.members,
+                members_incomplete: t.members_incomplete,
                 shift_minutes: t.shift_minutes, active_minutes: t.active_minutes,
                 active_minutes_estimated: t.active_minutes_estimated,
                 activity_rate_per_hour: t.activity_rate_per_hour,

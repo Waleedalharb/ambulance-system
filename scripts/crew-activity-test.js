@@ -9,6 +9,10 @@
  *  8) اتساق التفصيل مع الإجمالي        9) scope غير مدعوم ← 400
  * 10) الأداء ضمن العتبة               11) قاعدة الترتيب الثابتة (rate ← count ← الاسم)
  * 12) التسمية «الأكثر نشاطًا» ولا «أفضل فرقة» في أي حقل
+ * D.1) ★ التكميل هو المرجع الوحيد (قرار المالك 2026-08-18): أسماء اللوحة =
+ *      effectiveRoster من اشتقاق التكميل لنفس shift+team ونفس اللحظة — الغائب
+ *      والداعم/المفعَّل المنتهي لا يظهران، والمفتوح يظهر، وبلا تشكيل مُثبت
+ *      ← members_incomplete بلا أسماء مختلقة.
  * التشغيل: node scripts/crew-activity-test.js
  */
 'use strict';
@@ -142,6 +146,31 @@ function dateAdd(ymd, days) {
     seedShift(S_OLD, oldMonth, O0, oplus(480));
     seedReports(S_OLD, 'جنوب 7', 5, oplus(50));
     seedMembers(S_OLD, oldMonth, 'جنوب 7', ['اسم قديم واحد', 'اسم قديم اثنان'], O0);
+
+    // ═══ D.1: سيناريو جنوب 8 الكامل على المناوبة النشطة (مرجعية التكميل) ═══
+    // المناوبة النشطة في اللقطة (1784126563174 — 2026-08-13) بلا بلاغات إطلاقًا،
+    // فلا يزاحم البذرُ اختبارَ الترتيب (today) ولا الفترات. غائب أساسي + داعم
+    // مفتوح + داعم منتهٍ + مفعَّل منتهٍ + مفعَّل مفتوح — اللوحة يجب أن تعرض
+    // التشكيل الفعلي فقط (ما يثبته اشتقاق التكميل لنفس shift_id).
+    const ACTIVE_SID = 1784126563174;
+    const ACTIVE_DATE = '2026-08-13';
+    function seedEvent(shiftId, date, team, name, type, atZ) {
+        db.prepare(`INSERT INTO operational_events (shift_id, shift_date, shift_type, domain, entity_id, entity_name, team_id, event_type, actor_id, actor_name, created_at)
+                    VALUES (?, ?, 'صباح', 'staffing', ?, ?, ?, ?, 'seed', 'seed', ?)`)
+            .run(shiftId, date, name, name, team, type, atZ);
+    }
+    const g8roster = db.prepare(`SELECT e.name AS name FROM shift_roster sr JOIN teams t ON t.id = sr.team_id JOIN employees e ON e.id = sr.employee_id WHERE sr.shift_date = ? AND t.name = 'جنوب 8' LIMIT 1`).get(ACTIVE_DATE);
+    const ABSENT_G8 = g8roster ? g8roster.name : null;
+    const A0 = ACTIVE_DATE + 'T05:00:00.000Z';
+    const aplus = (min) => new Date(new Date(A0).getTime() + min * 60000).toISOString();
+    seedReports(ACTIVE_SID, 'جنوب 8', 6, aplus(90));
+    if (ABSENT_G8) seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', ABSENT_G8, 'absence', aplus(5));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'داعم اختبار مفتوح', 'external_support', aplus(10));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'داعم اختبار منتهي', 'external_support', aplus(12));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'داعم اختبار منتهي', 'support_end', aplus(200));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'مفعل اختبار منتهي', 'activation', aplus(14));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'مفعل اختبار منتهي', 'activation_end', aplus(210));
+    seedEvent(ACTIVE_SID, ACTIVE_DATE, 'جنوب 8', 'مفعل اختبار مفتوح', 'activation', aplus(16));
     db.close();
 
     console.log('🚀 تشغيل خادم الاختبار على المنفذ ' + PORT + '...');
@@ -192,13 +221,23 @@ function dateAdd(ymd, days) {
         const todayHasG1Live = todayRes.data.standings.some(t => t.team === 'جنوب 1');
         check('④ عزل المناوبات: بلاغ المناوبة النشطة القديمة التاريخ لا يدخل today', !todayHasG1Live);
 
-        // ── 5) ★ قاعدة الأسماء الذهبية ──
-        console.log('\n🏆 قاعدة الأسماء الذهبية:');
+        // ── 5) ★ قاعدة الأسماء الذهبية — D.1: التكميل هو المرجع الوحيد ──
+        console.log('\n🏆 قاعدة الأسماء الذهبية (D.1: التكميل = الإنجاز):');
+        // مرجع التكميل لنفس shift+team وبنفس اللحظة — عبر نفس الاشتقاق الذي
+        // تستهلكه شاشة التكميل (/api/staffing/state ← deriveTeamReadiness)
+        async function expectedCrew(date, team) {
+            const r = await api('/api/staffing/state?date=' + encodeURIComponent(date) + '&type=' + encodeURIComponent('صباح'), { token: TK });
+            const t = r.data && r.data.teams && r.data.teams[team];
+            return (t && t.effectiveRoster ? t.effectiveRoster.map(m => m.name) : []).sort();
+        }
+        const sameNames = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
         const todayG7 = todayRes.data.standings.find(t => t.team === 'جنوب 7');
-        check('⑤ today: جنوب 7 بأسماء مناوبة اليوم فقط',
-            !!todayG7 && todayG7.members.length === 2
-            && todayG7.members.includes('محمد اختبار اليوم') && todayG7.members.includes('فهد اختبار اليوم'),
-            JSON.stringify(todayG7 && todayG7.members));
+        const expTodayG7 = await expectedCrew(today, 'جنوب 7');
+        check('⑤★ today: أسماء جنوب 7 = تشكيل التكميل حرفيًا (نفس shift+team ونفس اللحظة)',
+            !!todayG7 && sameNames(todayG7.members, expTodayG7),
+            'board=' + JSON.stringify(todayG7 && todayG7.members) + ' completion=' + JSON.stringify(expTodayG7));
+        check('⑤ today: الأسماء المزروعة ضمن التشكيل', !!todayG7 && todayG7.members.includes('محمد اختبار اليوم') && todayG7.members.includes('فهد اختبار اليوم'));
         const noStaleToday = todayRes.data.standings.every(t => !t.members.some(m => m.includes('الأمس') || m.includes('قديم')));
         check('⑤ today: صفر أسماء قديمة/أمس في كل النتائج', noStaleToday);
 
@@ -207,14 +246,32 @@ function dateAdd(ymd, days) {
         const wShifts = weekG7 ? weekG7.shifts : [];
         const wToday = wShifts.find(s => s.shift_date === today);
         const wYst = wShifts.find(s => s.shift_date === yesterday);
-        check('⑤ week: مناوبة اليوم تعرض أسماء اليوم حصرًا',
-            !!wToday && wToday.members.length === 2 && wToday.members.includes('محمد اختبار اليوم') && !wToday.members.some(m => m.includes('الأمس')),
-            JSON.stringify(wToday && wToday.members));
-        check('⑤ week: مناوبة أمس تعرض أسماء أمس حصرًا',
-            !!wYst && wYst.members.length === 2 && wYst.members.includes('خالد اختبار الأمس') && !wYst.members.some(m => m.includes('اليوم')),
-            JSON.stringify(wYst && wYst.members));
-        check('⑤ week: الاتحاد يجمع الأربعة بلا خلط', !!weekG7 && weekG7.members.length === 4, JSON.stringify(weekG7 && weekG7.members));
+        const expYstG7 = await expectedCrew(yesterday, 'جنوب 7');
+        check('⑤★ week: مناوبة اليوم تعرض تشكيل تكميلها حصرًا',
+            !!wToday && sameNames(wToday.members, expTodayG7) && !wToday.members.some(m => m.includes('الأمس')),
+            'board=' + JSON.stringify(wToday && wToday.members) + ' completion=' + JSON.stringify(expTodayG7));
+        check('⑤★ week: مناوبة أمس تعرض تشكيل تكميلها حصرًا',
+            !!wYst && sameNames(wYst.members, expYstG7) && !wYst.members.some(m => m.includes('اليوم')),
+            'board=' + JSON.stringify(wYst && wYst.members) + ' completion=' + JSON.stringify(expYstG7));
+        check('⑤ week: الاتحاد يجمع الأربعة المزروعين بلا خلط', !!weekG7 && ['محمد اختبار اليوم', 'فهد اختبار اليوم', 'خالد اختبار الأمس', 'سعد اختبار الأمس'].every(n => weekG7.members.includes(n)), JSON.stringify(weekG7 && weekG7.members));
         check('⑤ week: جنوب 7 إجمالي = 2+3 = 5 (بلاغ يناير مستبعد)', !!weekG7 && weekG7.reports_count === 5, 'count=' + (weekG7 && weekG7.reports_count));
+
+        // ── D.1) سيناريو جنوب 8 الكامل — حالات الطاقم الست (على المناوبة النشطة) ──
+        console.log('\n🛡️ D.1 — التكميل هو المرجع الوحيد (جنوب 8):');
+        const d1Res = await act('?period=current_shift&top=5');
+        const g8 = d1Res.data.standings.find(t => t.team === 'جنوب 8');
+        const expG8 = await expectedCrew('2026-08-13', 'جنوب 8');
+        check('D.1-① التكميل = الإنجاز: أسماء جنوب 8 مطابقة حرفيًا للتشكيل الفعلي (نفس shift+team ونفس اللحظة)',
+            !!g8 && sameNames(g8.members, expG8),
+            'board=' + JSON.stringify(g8 && g8.members) + ' completion=' + JSON.stringify(expG8));
+        check('D.1-② الغائب لا يظهر ضمن طاقم الإنجاز', !!g8 && (!ABSENT_G8 || !g8.members.includes(ABSENT_G8)), 'absent=' + ABSENT_G8);
+        check('D.1-③ الداعم المفتوح حاليًا يظهر', !!g8 && g8.members.includes('داعم اختبار مفتوح'), JSON.stringify(g8 && g8.members));
+        check('D.1-④ الداعم المنتهي لا يظهر (ولا أي حدث قديم لغير المشكَّل)', !!g8 && !g8.members.some(m => m.includes('منتهي')), JSON.stringify(g8 && g8.members));
+        check('D.1-⑤ المفعَّل المفتوح يظهر', !!g8 && g8.members.includes('مفعل اختبار مفتوح'), JSON.stringify(g8 && g8.members));
+        const testA = todayRes.data.standings.find(t => t.team === 'اختبار أ');
+        check('D.1-⑥ إنجاز بلا تشكيل مُثبت ← members_incomplete=true وصفر أسماء مختلقة',
+            !!testA && testA.members_incomplete === true && testA.members.length === 0,
+            JSON.stringify(testA && { mi: testA.members_incomplete, m: testA.members }));
 
         // ── 6) عزل الفترات ──
         console.log('\n📅 عزل الفترات:');

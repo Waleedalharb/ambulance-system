@@ -67,6 +67,7 @@ console.log('① القاعدة الذهبية الموسّعة (week، مناو
     const head = cut !== -1 ? html.slice(0, cut) : html;
     const tail = cut !== -1 ? html.slice(cut) : '';
     check('البطاقة الرئيسية تعرض طاقم أحدث مناوبة (محمد · فهد)', head.includes('محمد صالح') && head.includes('فهد العتيبي'));
+    check('كل اسم عنصر بصري مستقل (بند 8 — لا كتلة أسماء)', (head.match(/crew-board-person/g) || []).length === 2);
     check('البطاقة الرئيسية تعرض تاريخ المناوبة «مناوبة 18»', head.includes('مناوبة 18'));
     check('خالد لا يتسرب للسطر الرئيسي إطلاقًا', !head.includes('خالد'));
     check('سعد لا يتسرب للسطر الرئيسي إطلاقًا', !head.includes('سعد'));
@@ -138,23 +139,40 @@ console.log('⑦ العدد والمعدل معًا في كل صف:');
         ], meta: { teams_ranked: 3 }
     };
     const html = BOARD.renderBoard(p, 'today', false);
-    check('معدل رقمي يعرض «0.55 بلاغ/ساعة»', html.includes('0.55 بلاغ/ساعة'));
-    check('rate=null يعرض «—» بلا اختلاق', /3 بلاغات · —/.test(html));
-    check('كل صف فيه عدد ومعدل معًا', (html.match(/بلاغ\/ساعة|· —/g) || []).length >= 3);
+    check('معدل رقمي يعرض «⚡ 0.55 بلاغ/ساعة»', html.includes('⚡ 0.55 بلاغ/ساعة'));
+    check('rate=null يعرض «⚡ —» بلا اختلاق', html.includes('⚡ —'));
+    check('كل صف فيه العدد (🚑) والمعدل (⚡) معًا', (html.match(/🚑/g) || []).length >= 3 && (html.match(/⚡/g) || []).length >= 3);
     check('الجمع: 11 بلاغ وليس بلاغات', html.includes('11 بلاغ'));
 }
 
-// ─── 8) صفر «أفضل فرقة» + سطر العدالة دائمًا ───
+// ─── D.1-UI) عدم التخمين + المركز بسطر مستقل + الأسماء عناصر مستقلة ───
+console.log('⑦ب D.1 — العرض: لا تخمين، المركز منفصل، كل اسم عنصر مستقل:');
+{
+    const inc = BOARD.renderBoard({ standings: [standing({ rank: 1, team: 'جنوب 9', reports_count: 3, members: [], members_incomplete: true })], meta: { teams_ranked: 1 } }, 'current_shift', false);
+    check('تعذّر الإثبات ← «⚠️ بيانات طاقم المناوبة غير مكتملة»', inc.includes('⚠️ بيانات طاقم المناوبة غير مكتملة'));
+    check('لا يُعرض أي اسم عند عدم الإثبات (لا تخمين)', !inc.includes('crew-board-person'));
+    const withCenter = BOARD.renderBoard({ standings: [standing({ rank: 1, team: 'جنوب 1', reports_count: 2, members: ['أحمد الاختبار الطويل بن فلان الفلاني'], center: 'الشفاء' })], meta: { teams_ranked: 1 } }, 'today', false);
+    check('المركز في سطر مستقل (📍) وليس ممزوجًا بالأسماء', withCenter.includes('crew-board-center') && withCenter.includes('📍 الشفاء'));
+    check('سطر الفرقة لا يحتوي المركز', /<div class="crew-board-team">🥇 جنوب 1<\/div>/.test(withCenter));
+    check('الاسم الطويل كاملًا في عنصر مستقل', withCenter.includes('<div class="crew-board-person">👤 أحمد الاختبار الطويل بن فلان الفلاني</div>'));
+    const incWeek = BOARD.renderBoard({ standings: [standing({ rank: 1, team: 'جنوب 2', reports_count: 4, members: ['س'], shifts: [{ shift_id: 9, shift_date: '2026-08-18', shift_type: 'صباح', reports_count: 4, members: [], members_incomplete: true }] })], meta: { teams_ranked: 1 } }, 'week', false);
+    const incHead = incWeek.slice(0, incWeek.indexOf('<details'));
+    check('week: أحدث مناوبة بلا تشكيل مُثبت ← التحذير في البطاقة الرئيسية', incHead.includes('بيانات طاقم المناوبة غير مكتملة'));
+}
+
+// ─── 8) صفر «أفضل فرقة» + سطر العدالة دائمًا (صيغة D.1 المعتمدة) ───
 console.log('⑧ لغة التحفيز المنضبطة:');
 {
+    const FAIR = 'الترتيب يعكس النشاط التشغيلي فقط — وليس تقييمًا وظيفيًا';
     const periods = ['current_shift', 'today', 'week', 'month'];
     const sample = { standings: [standing({ rank: 1, team: 'جنوب 7', reports_count: 2, members: ['س'] })], meta: { teams_ranked: 1 } };
-    const allFair = periods.every(pp => BOARD.renderBoard(sample, pp, false).includes('الترتيب نشاط فقط — وليس تقييم أداء'));
-    const statesFair = [BOARD.renderNoActiveShift(), BOARD.renderEmptyRace(), BOARD.renderError()].every(h => h.includes('الترتيب نشاط فقط — وليس تقييم أداء'));
+    const allFair = periods.every(pp => BOARD.renderBoard(sample, pp, false).includes(FAIR));
+    const statesFair = [BOARD.renderNoActiveShift(), BOARD.renderEmptyRace(), BOARD.renderError()].every(h => h.includes(FAIR));
     const noBest = periods.every(pp => !BOARD.renderBoard(sample, pp, false).includes('أفضل فرقة'));
-    check('سطر العدالة في كل الفترات', allFair);
+    check('سطر العدالة (صيغة D.1) في كل الفترات', allFair);
     check('سطر العدالة في كل الحالات (404/فارغ/خطأ)', statesFair);
     check('صفر «أفضل فرقة» في المخرجات', noBest);
+    check('الصيغة القديمة لسطر العدالة أُزيلت', !BOARD.renderBoard(sample, 'today', false).includes('الترتيب نشاط فقط — وليس تقييم أداء'));
     check('صفر «أفضل فرقة» في ملفات الواجهة (ساكن)', !readFile('public/js/crew-achievement-board.js').includes('أفضل فرقة') && !readFile('public/index.html').includes('أفضل فرقة'));
 }
 

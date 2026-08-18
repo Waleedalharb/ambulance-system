@@ -33,7 +33,8 @@
     var MSG_EMPTY_RACE = 'السباق لم يبدأ — أول بلاغ يصنع المتصدر 🚑';
     var MSG_NO_SHIFT = 'لا توجد مناوبة نشطة — يبدأ السباق مع المناوبة القادمة';
     var MSG_ERROR = 'تعذر تحديث اللوحة — ستُعاد المحاولة مع أول حدث';
-    var FAIRNESS_LINE = 'الترتيب نشاط فقط — وليس تقييم أداء';
+    var MSG_INCOMPLETE = '⚠️ بيانات طاقم المناوبة غير مكتملة';
+    var FAIRNESS_LINE = 'الترتيب يعكس النشاط التشغيلي فقط — وليس تقييمًا وظيفيًا';
     var EXPAND_TOP5 = '▾ عرض الخمسة الأوائل';
     var COLLAPSE_TOP3 = '▴ إظهار الثلاثة الأوائل';
     var EXPAND_SHIFTS = '▾ تفاصيل الإنجاز حسب المناوبة';
@@ -84,48 +85,56 @@
         if (!members || !members.length) return '—';
         return members.map(esc).join(' · ');
     }
-    function statsLine(count, rate) {
-        var rateTxt = (rate === null || rate === undefined || !isFinite(Number(rate)))
-            ? '—' : (formatRate(rate) + ' بلاغ/ساعة');
-        return count + ' ' + pluralReports(count) + ' · ' + rateTxt;
-    }
 
-    // ─── رسم صف واحد ───
-    // long period: الأسماء من shifts[0] (أحدث مناوبة) + تاريخها + تفاصيل كل مناوبة.
-    // short period: الأسماء من members مباشرة.
+    // ─── رسم صف واحد (D.1: هرمية واضحة — فرقة ← مركز ← طاقم ← أرقام) ───
+    // كل شخص عنصر بصري مستقل (بند 8). long period: الأسماء من shifts[0]
+    // (أحدث مناوبة) + تاريخها + تفاصيل كل مناوبة. short period: members مباشرة.
+    // تعذّر إثبات التشكيل ← «بيانات طاقم المناوبة غير مكتملة» (بند 10 — لا تخمين).
+    function renderPeople(names) {
+        var html = '<div class="crew-board-people">';
+        for (var i = 0; i < names.length; i++) {
+            html += '<div class="crew-board-person">👤 ' + esc(names[i]) + '</div>';
+        }
+        return html + '</div>';
+    }
+    function renderCrew(names, incomplete) {
+        if (incomplete && (!names || !names.length)) {
+            return '<div class="crew-board-incomplete">' + MSG_INCOMPLETE + '</div>';
+        }
+        if (!names || !names.length) return '';
+        return '<div class="crew-board-crewlabel">👥 طاقم المناوبة</div>' + renderPeople(names);
+    }
     function renderRow(s, period) {
         var longP = isLongPeriod(period);
         var latest = (longP && s.shifts && s.shifts.length) ? s.shifts[0] : null;
         var names = longP ? (latest ? latest.members : null) : s.members;
-        var html = '';
-        if (s.rank === 1) {
-            html += '<div class="crew-board-gold">';
-            html += '<div class="crew-board-team">' + medal(s.rank) + ' ' + esc(s.team) + '</div>';
-            html += '<div class="crew-board-names">' + joinNames(names) + '</div>';
-            html += '<div class="crew-board-stats">' + statsLine(s.reports_count, s.activity_rate_per_hour) + ' ' + periodDef(period).qualifier + '</div>';
-            if (longP) {
-                if (latest) html += '<div class="crew-board-shiftdate">🕐 مناوبة ' + formatShiftDate(latest.shift_date) + '</div>';
-            } else {
-                html += '<div class="crew-board-tag">' + TAG_SHIFT_CREW + '</div>';
-            }
-            html += renderShiftDetails(s, longP);
-            html += '</div>';
-        } else {
-            html += '<div class="crew-board-row">';
-            html += '<div class="crew-board-row-main">' + medal(s.rank) + ' ' + esc(s.team) + ' — ' + joinNames(names) + '</div>';
-            html += '<div class="crew-board-row-stats">' + statsLine(s.reports_count, s.activity_rate_per_hour) + '</div>';
-            if (longP && latest) html += '<div class="crew-board-shiftdate">🕐 مناوبة ' + formatShiftDate(latest.shift_date) + '</div>';
-            html += renderShiftDetails(s, longP);
-            html += '</div>';
+        var incomplete = longP ? !!(latest && latest.members_incomplete) : !!s.members_incomplete;
+        var rate = s.activity_rate_per_hour;
+        var html = '<div class="crew-board-row crew-board-r' + s.rank + '">';
+        html += '<div class="crew-board-team">' + medal(s.rank) + ' ' + esc(s.team) + '</div>';
+        if (s.center) html += '<div class="crew-board-center">📍 ' + esc(s.center) + '</div>';
+        html += renderCrew(names, incomplete);
+        html += '<div class="crew-board-stats">'
+            + '<span class="crew-board-count">🚑 ' + s.reports_count + ' ' + pluralReports(s.reports_count) + ' ' + periodDef(period).qualifier + '</span>'
+            + '<span class="crew-board-rate">⚡ ' + (rate === null || rate === undefined || !isFinite(Number(rate)) ? '—' : formatRate(rate) + ' بلاغ/ساعة') + '</span>'
+            + '</div>';
+        if (longP) {
+            if (latest) html += '<div class="crew-board-shiftdate">🕐 مناوبة ' + formatShiftDate(latest.shift_date) + '</div>';
+        } else if (s.rank === 1) {
+            html += '<div class="crew-board-tag">' + TAG_SHIFT_CREW + '</div>';
         }
-        return html;
+        html += renderShiftDetails(s, longP);
+        return html + '</div>';
     }
     function renderShiftDetails(s, longP) {
         if (!longP || !s.shifts || !s.shifts.length) return '';
         var html = '<details class="crew-board-details"><summary>' + EXPAND_SHIFTS + '</summary>';
         for (var i = 0; i < s.shifts.length; i++) {
             var sh = s.shifts[i];
-            html += '<div class="crew-board-shiftline">' + formatShiftDate(sh.shift_date) + ': ' + joinNames(sh.members) + ' — ' + sh.reports_count + ' ' + pluralReports(sh.reports_count) + '</div>';
+            var crewTxt = (sh.members_incomplete && (!sh.members || !sh.members.length))
+                ? '⚠️ بيانات الطاقم غير مكتملة'
+                : joinNames(sh.members);
+            html += '<div class="crew-board-shiftline">' + formatShiftDate(sh.shift_date) + ': ' + crewTxt + ' — ' + sh.reports_count + ' ' + pluralReports(sh.reports_count) + '</div>';
         }
         html += '</details>';
         return html;
@@ -166,7 +175,7 @@
     var api = {
         TITLE: TITLE, LABEL_TOP: LABEL_TOP, FAIRNESS_LINE: FAIRNESS_LINE,
         MSG_EMPTY_RACE: MSG_EMPTY_RACE, MSG_NO_SHIFT: MSG_NO_SHIFT, MSG_ERROR: MSG_ERROR,
-        TAG_SHIFT_CREW: TAG_SHIFT_CREW,
+        MSG_INCOMPLETE: MSG_INCOMPLETE, TAG_SHIFT_CREW: TAG_SHIFT_CREW,
         PERIODS: PERIODS, REFRESH_EVENTS: REFRESH_EVENTS,
         esc: esc, pluralReports: pluralReports, formatRate: formatRate, formatShiftDate: formatShiftDate,
         renderBoard: renderBoard, renderNoActiveShift: renderNoActiveShift,
