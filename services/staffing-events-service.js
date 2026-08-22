@@ -7,7 +7,12 @@
  * الكتابة الفعلية تُفعَّل في W1-B (ترجمة التكميل) — القراءات جاهزة الآن.
  */
 
-const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators } = require('./operational-events-core');
+const { isValidEventType, isReasonRequired, foldEvents, deriveIndicators, DOMAIN_REGISTRY } = require('./operational-events-core');
+// T3 (إعادة التوزيع — «إنهاء التكليف»): support_end يُغلق دلاليًا التكليف المفتوح
+// أيضًا (إضافةً إلى الدعم الخارجي/التطوعي). قاعدة الإغلاق المرجعية تعيش في
+// operational-events-core المشترك، وتُوسَّع من هنا حتى يبقى التعديل كله ضمن
+// خدمة القوى المالكة لدلالة أحداث staffing (append-only — الأحداث لا تُمس).
+DOMAIN_REGISTRY.staffing.closureRules.support_end.push('assignment');
 const { sortTeamsNatural } = require('./team-order'); // doc-v4 ⑫: الفرز الرقمي الطبيعي — مركزي
 // مرحلة الأوفرلاب 3: محلل الأكواد التشغيلية الملحقة (UMD — نفس نسخة المتصفح)
 const OperationalCodes = require('../public/js/core/operational-codes.js');
@@ -944,7 +949,8 @@ class StaffingEventsService {
                 if ((type === 'external_support' || type === 'volunteer_support') && open.some(o => (o.event_type === 'external_support' || o.event_type === 'volunteer_support') && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'assignment' && open.some(o => o.event_type === 'assignment' && canonicalTeamId(o.team_id) === teamId)) continue;
                 if (type === 'arrival' && !open.some(o => o.event_type === 'absence' || o.event_type === 'late')) continue;
-                if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support')) continue;
+                // T3: يُقبل «إنهاء التكليف» — support_end صالح أيضًا عند وجود تكليف مفتوح
+                if (type === 'support_end' && !open.some(o => o.event_type === 'external_support' || o.event_type === 'volunteer_support' || o.event_type === 'assignment')) continue;
                 // مرحلة الأوفرلاب 4 (التفعيل): تفعيل مكرر مفتوح لنفس الفريق يُتخطى،
                 // وإنهاء بلا تفعيل مفتوح يُتخطى — نفس قاعدة الدعم/التكليف حرفيًا
                 if (type === 'activation' && open.some(o => o.event_type === 'activation' && canonicalTeamId(o.team_id) === teamId)) continue;
@@ -975,7 +981,8 @@ class StaffingEventsService {
                 f = { entityId: employee, entityName: employee, teamId, open: [], lastEvent: null, closedCount: 0, corrections: 0 };
                 folded.push(f);
             }
-            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support'], activation_end: ['activation'] };
+            // T3: support_end يُغلق التكليف أيضًا (طيّ الدفعة المحلي — المرجع الدائم: closureRules أعلى الملف)
+            const CLOSES = { arrival: ['absence', 'late'], support_end: ['external_support', 'volunteer_support', 'assignment'], activation_end: ['activation'] };
             const closes = CLOSES[type];
             if (closes) {
                 const idx = f.open.findIndex(o => closes.includes(o.event_type));

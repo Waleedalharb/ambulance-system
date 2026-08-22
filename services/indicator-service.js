@@ -38,11 +38,19 @@ const CONTRIBUTION_GROUPS = {
 // سلال audit_log (أفعال موثقة في خريطة الفحص — لا يُخترع غيرها)
 const AUDIT_BUCKET_MAP = {
     completion_saved: 'completions',
+    // مسار قديم لنفس حدث «حفظ التكميل» (detail مطابق حرفيًا). أُثبت عدم التداخل
+    // مع completion_saved: كل صفوفه shift_id=null وصفر توأمة زمنية (فحص 2026-08-15)
+    // — استبعاده كان يُسقط تكميل يوليو الحقيقي، وهذا خطأ تعريفي يجيزه §8 من المواصفة.
+    shift_completion_saved: 'completions',
     report_created: 'dispatchActions',
+    // «البلاغات» (تحديث المواصفة 2026-08-15): سجل الواجهة لكل ضغطة تسجيل بلاغ
+    // (addReportToServer في app.js) — سلة مستقلة عن report_created الخادمية.
+    'تسجيل بلاغ': 'reports',
     report_undone: 'dispatchUndo',
-    report_entry_added: 'reportEntries',
-    report_entry_deleted: 'reportEntryMods',
-    report_entry_cleared: 'reportEntryMods',
+    // «البلاغات التفصيلية»: إدخال/تعديل (صفحة معلومات بلاغات الفرق المدخلة) — سلة مدمجة
+    report_entry_added: 'detailedReports',
+    report_entry_deleted: 'detailedReports',
+    report_entry_cleared: 'detailedReports',
     doc_uploaded: 'docs',
     identity_uploaded: 'docs',
     ops_files_uploaded: 'docs',
@@ -61,9 +69,9 @@ const AUDIT_BUCKET_MAP = {
     announcements_updated: 'announcements'
     // ملاحظة: shift_event_added مستبعد عمدًا — أحداث المناوبة اليدوية تُعدّ من
     // سجلها الرسمي operational_events(domain=logistics) حتى لا تُحسب مرتين.
-    // user_login والأفعال العربية القديمة («بدء مناوبة جديدة»…) مستبعدة:
-    // الأولى بقرار المالك (الدخول ليس إنجازًا)، والثانية صدوى مكررة لنفس الحدث
-    // باسم عربي إلى جانب الاسم القانوني — عدّها = ازدواج.
+    // user_login و«تسجيل دخول/خروج» مستبعدة بقرار المالك (الدخول ليس إنجازًا)،
+    // و«بدء مناوبة جديدة» صدى عربي لـ shift_started — عدّها = ازدواج.
+    // الاستثناء الوحيد: «تسجيل بلاغ» ليست صدى — لها عدد مستقل (انظر أعلاه).
 };
 
 class IndicatorService {
@@ -263,8 +271,8 @@ class IndicatorService {
                 uncountedRosterDays: 0,
                 hasSchedule: false,
                 works: {
-                    completions: 0, dispatchActions: 0, dispatchUndo: 0,
-                    reportEntries: 0, reportEntryMods: 0,
+                    completions: 0, dispatchActions: 0, reports: 0, dispatchUndo: 0,
+                    detailedReports: 0,
                     positioning: { created: 0, updated: 0, ended: 0, swept: 0, total: 0 },
                     signouts: 0,
                     forms: { total: 0, byType: {} },
@@ -413,10 +421,17 @@ class IndicatorService {
             w.positioning.total = w.positioning.created + w.positioning.updated + w.positioning.ended; // swept = كنس آلي، ليس عمل موظف
             w.workflowActions.total = w.workflowActions.create + w.workflowActions.approve + w.workflowActions.pdf
                 + w.workflowActions.reissue + w.workflowActions.edit_fields + w.workflowActions.other;
-            const totalWorks = w.completions + w.dispatchActions + w.dispatchUndo + w.reportEntries + w.reportEntryMods
-                + w.positioning.total + w.signouts + w.forms.total
-                + w.staffingEvents + w.vehicleEvents + w.logisticsEvents + w.centerEvents
-                + w.workflowActions.total + w.scheduleEdits + w.shiftLifecycle + w.docs + w.announcements + w.alertsAcked;
+            // تحديث المواصفة 2026-08-15: إجمالي أعمال موظف العمليات = مجموع
+            // المؤشرات التسعة المعتمدة فقط (تكميل/توزيع/بلاغات/تراجع/تفصيلية/
+            // تمركزات/خروج فرق/نماذج/سير عمل). أحداث القوى والمركبات واللوجستية
+            // وتعديلات الجداول والملفات والتنبيهات ودورة المناوبة لا تدخل فيه.
+            const opsNineTotal = w.completions + w.dispatchActions + w.reports + w.dispatchUndo
+                + w.detailedReports + w.positioning.total + w.signouts + w.forms.total + w.workflowActions.total;
+            // القيادة الميدانية: تُعالج مؤشراتها لاحقًا بشكل مستقل (§6) — يبقى
+            // إجمالها الشامل لكل المسجل كما هو دون تغيير في هذه المرحلة.
+            const totalWorks = emp.group === 'operations' ? opsNineTotal
+                : opsNineTotal + w.staffingEvents + w.vehicleEvents + w.logisticsEvents + w.centerEvents
+                    + w.scheduleEdits + w.shiftLifecycle + w.docs + w.announcements + w.alertsAcked;
             return {
                 employeeCode: emp.code,
                 name: emp.name,
@@ -446,8 +461,10 @@ class IndicatorService {
                 .map(([jobTitle, count]) => ({ jobTitle, count }))
                 .sort((a, b) => b.count - a.count),
             caveats: [
-                'توزيع البلاغات يعدّ إجراءات التوزيع لا البلاغات المفردة (الإدخال الجماعي = إجراء واحد).',
-                'أعمال القيادة الميدانية المقاسة هي المسجلة في المنصة فقط؛ المتابعة بلا كتابة غير مسجلة بنيويًا.',
+                'إجمالي أعمال العمليات = مجموع المؤشرات التسعة فقط؛ أحداث القوى البشرية والمركبات واللوجستية وتعديلات الجداول والملفات والتنبيهات ودورة المناوبة لا تدخل فيه.',
+                '«البلاغات» من سجل الواجهة (كل ضغطة تسجيل) و«توزيع البلاغات» من سجل الخادم (إجراء لكل عملية؛ الإدخال الجماعي = إجراء واحد) — عدستان لنشاط متداخل وليستا بالضرورة متساويتين.',
+                'التكميل يشمل المسار القديم shift_completion_saved بعد إثبات عدم تداخله مع completion_saved (يؤثر على يوليو 2026 وما قبله فقط).',
+                'أعمال القيادة الميدانية المقاسة هي المسجلة في المنصة فقط؛ المتابعة بلا كتابة غير مسجلة بنيويًا، وإجمالها يبقى الشامل حتى تُضبط مؤشراتها لاحقًا.',
                 'ملاحظات المناوبة مستبعدة (لا تحمل ختم مؤلف سيرفري).',
                 'حدود الشهر محسوبة على الختم المخزن (UTC) وقد تزيح ساعات قليلة عن ليلة الرياض.'
             ]

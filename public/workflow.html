@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سير العمل الرسمي</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
 <style>
 :root {
     /* الهوية التنفيذية الداكنة — نفس رموز executive-theme.css المعتمدة (توحيد بصري فقط) */
@@ -232,6 +233,24 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.10); border-radius:8px; }
 ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.16); }
+
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* جسر ألوان الصفحة القديمة إلى ألوان التكميل الإشارية:
+   الزمردي التشغيلي #0EA47A (عناصر «نشطة») → أزرق التكميل،
+   وأخضر الإنجاز → أخضر التكميل #34D399. رموز فقط — لا بنية ولا منطق. */
+:root {
+    --primary:#2F6BF0;
+    --primary-dark:#60A5FA;
+    --green:#34D399;
+    --green-light:rgba(52,211,153,0.12);
+    --yellow:#FBBF24; --yellow-light:rgba(251,191,36,0.12);
+    --red:#F87171;    --red-light:rgba(248,113,113,0.12);
+}
+.page-header { border-bottom-color:rgba(52,211,153,0.35); }
+.step.current .dot { box-shadow:0 0 0 4px rgba(47,107,240,0.25); }
+.field textarea:focus, .modal-card textarea:focus {
+    border-color:rgba(96,165,250,0.55); box-shadow:0 0 0 3px rgba(96,165,250,0.12);
+}
 </style>
 </head>
 <body>

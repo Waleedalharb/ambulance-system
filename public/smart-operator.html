@@ -190,6 +190,30 @@
     #ask-send:hover { background: rgba(14,164,122,0.10); }
     #ask-send:disabled { opacity: 0.45; cursor: default; }
 </style>
+<!-- Google Fonts: Tajawal (هوية التكميل) -->
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة؛
+     جسور --ex-* فيها تنقل رموز هذه الصفحة إلى لوحة التكميل تلقائيًا -->
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+<style>
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* قسم ختامي بصري فقط: الجسور المركزية (--ex-*) حوّلت الرموز تلقائيًا؛
+   هنا تُكسر الاستخدامات الحرفية المتبقية للزمردي القديم rgba(14,164,122,*)
+   وتُزال طبقتا الخلفية القديمتان لصالح توهجات التكميل. بصري فقط. */
+body::before, body::after { display: none !important; }
+.glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+#identity::before { background: linear-gradient(90deg, var(--pi-blue), var(--pi-green)); box-shadow: 0 0 12px rgba(52,211,153,0.45); }
+.tone-stable  #readiness-card { border-color: rgba(52,211,153,0.35) !important; }
+.action-card:not(.p1):not(.p2) .action-priority { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; border-color: rgba(52,211,153,0.30) !important; }
+.action-card.p1 .action-priority { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important; border-color: rgba(248,113,113,0.35) !important; }
+.action-card.p2 .action-priority { background: rgba(251,191,36,0.12) !important; color: var(--pi-amber) !important; border-color: rgba(251,191,36,0.30) !important; }
+.tone-attention #readiness-card { border-color: rgba(251,191,36,0.35) !important; }
+.tone-critical #readiness-card { border-color: rgba(248,113,113,0.40) !important; }
+.ask-shortcut:hover { color: var(--pi-green); border-color: rgba(52,211,153,0.40); background: rgba(52,211,153,0.08); }
+#ask-input:focus { border-bottom-color: rgba(52,211,153,0.55); }
+#ask-send { border-color: rgba(52,211,153,0.40); color: var(--pi-green); }
+#ask-send:hover { background: rgba(52,211,153,0.12); }
+</style>
 </head>
 <body>
 

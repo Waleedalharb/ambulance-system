@@ -141,6 +141,34 @@
         .clear-result.success { background: rgba(16,185,129,0.14); color: #6EE7B7; display: block; }
         .clear-result.error { background: rgba(239,68,68,0.14); color: #FCA5A5; display: block; }
     </style>
+    <!-- Google Fonts: Tajawal (هوية التكميل) — رابط مستقل لأن خطوط الصفحة عبر @import في app.css -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
+    <style>
+    /* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+    /* جسر رموز الصفحة المحلية إلى قيم التكميل + إزاحة الزمردي القديم.
+       بصري فقط — لا منطق ولا id ولا بنية. */
+    :root { --teal: var(--pi-green); }
+    /* التوهجات الزمردية القديمة → لغة التكميل */
+    body::after { background: radial-gradient(1200px 500px at 50% 110%, rgba(52,211,153,0.05), transparent 65%); }
+    :focus-visible { outline-color: rgba(96,165,250,0.55) !important; }
+    ::selection { background: rgba(96,165,250,0.35); color: var(--pi-ink); }
+    /* أزرار الإجراءات الزمردية المصمتة → التدرج الأزرق التنفيذي */
+    .btn-refresh, .btn-force-check {
+        background: linear-gradient(150deg, #2F6BF0, #1D4FD7) !important; color: #fff !important;
+        border: none !important; border-radius: 12px;
+        box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .btn-refresh:hover, .btn-force-check:hover { background: linear-gradient(150deg, #2F6BF0, #1D4FD7) !important; filter: brightness(1.1); }
+    /* بطاقات الإحصاء — زجاج التكميل مع الحفاظ على شريط الحالة الملوّن */
+    .stat-card, .chart-container, .top-list, .audit-log, .monitor-card, .admin-tools {
+        background: var(--pi-glass); border: 1px solid var(--pi-line);
+        box-shadow: var(--pi-shadow-soft);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .stat-card { border-right: 4px solid var(--pi-blue); }
+    </style>
 </head>
 <body>
     <div class="dashboard-container">

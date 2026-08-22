@@ -197,7 +197,7 @@ class ReportManager {
         this.storage = storage;
     }
 
-    async addReport(shiftId, center, unit, type) {
+    async addReport(shiftId, center, unit, type, incidentNumber = null, phases = null, respArrivalMin = null, respMubasharaMin = null) {
         if (!shiftId) return { success: false, error: 'لا توجد مناوبة نشطة' };
 
         // Find existing report for this center/unit/shift
@@ -214,8 +214,8 @@ class ReportManager {
             reportId = created.id;
         }
 
-        // Single source: record the report time (+ type) in report_times
-        await this.storage.addReportTime(reportId, new Date().toISOString(), type || null);
+        // Single source: record the report time (+ type + هوية البلاغ وأزمنة الاستجابة إن وُجدت)
+        await this.storage.addReportTime(reportId, new Date().toISOString(), type || null, incidentNumber, phases, respArrivalMin, respMubasharaMin);
 
         // Update shift total
         const total = await this.storage.getTotalReports(shiftId);

@@ -140,6 +140,20 @@ const TABLE_SCHEMAS = [
     timestamp TEXT NOT NULL
   );`,
 
+  // سجل البلاغات برقم Incident ID (إعادة بناء محرك التوزيع 2026-08-20):
+  // البلاغ يُحسب مرة واحدة مهما تعددت الفرق؛ النوع يُصنف مرة واحدة لكل رقم.
+  // المشاركات نفسها تبقى في report_times (عدّاد الفرقة = مشاركاتها).
+  `CREATE TABLE IF NOT EXISTS incident_registry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+    number TEXT NOT NULL,
+    code TEXT,
+    type TEXT,
+    source TEXT,
+    created_at TEXT,
+    UNIQUE(shift_id, number)
+  );`,
+
   // Shifts
   `CREATE TABLE IF NOT EXISTS shifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1012,6 +1026,32 @@ async function runMigrations() {
   await ensureColumn('timeline', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
   await ensureColumn('announcements', 'shift_id', 'INTEGER REFERENCES shifts(id) ON DELETE SET NULL');
   await ensureColumn('report_times', 'type', 'TEXT');
+  // محرك التوزيع برقم البلاغ (2026-08-20): هوية البلاغ والأزمنة الخام لكل مشاركة
+  // فرقة — additive وnullable: الضغطات اليدوية تبقى NULL وسلوكها لا يتغير إطلاقًا
+  await ensureColumn('report_times', 'incident_number', 'TEXT');
+  await ensureColumn('report_times', 'phases', 'TEXT');
+  // مؤشر زمن الاستجابة (تعريف المالك 2026-08-20): وقت إنشاء البلاغ من CAD يُحفظ على
+  // السجل، والزمنان المحسوبان (وصول/مباشرة) يُحفظان مع كل مشاركة — قابلان للتتبع إلى phases الخام
+  await ensureColumn('incident_registry', 'cad_created_at', 'TEXT');
+  await ensureColumn('report_times', 'resp_arrival_min', 'REAL');
+  await ensureColumn('report_times', 'resp_mubashara_min', 'REAL');
+  // حالة المشاركة (قرار المالك 2026-08-21 — بند §4): الفرقة المسحوبة/الملغاة من البلاغ
+  // تُعلَّم withdrawn=1 فتُستبعد من العدّادات والمؤقتات والتنبيهات والخريطة فورًا،
+  // ويبقى سجلها في التفاصيل للتاريخ — additive وبقيمة افتراضية 0: السلوك القائم لا يتغير
+  await ensureColumn('report_times', 'withdrawn', 'INTEGER DEFAULT 0');
+  // طبقة التقاط الموقع (قرار المالك 2026-08-20): عنوان CAD الخام + المنطقة + الحي المشتق —
+  // أساس مستقبلي لأكثر الأحياء وكثافة البلاغات وساعات الذروة (لا خرائط/تحليلات في هذه المرحلة)
+  await ensureColumn('incident_registry', 'address', 'TEXT');
+  await ensureColumn('incident_registry', 'region', 'TEXT');
+  await ensureColumn('incident_registry', 'district', 'TEXT');
+  // الموقع التفصيلي كبيانات مستقلة (قرار المالك 2026-08-20): الشارع كما ورد (برقم المبنى)
+  // والمدينة — مشتقان من العنوان الخام المحفوظ، أساسًا لتحليل الشوارع/التقاطعات وخريطة الضغط
+  await ensureColumn('incident_registry', 'street', 'TEXT');
+  await ensureColumn('incident_registry', 'city', 'TEXT');
+  // إحداثيات البلاغ الأصلية من CAD فقط (اعتماد المالك 2026-08-20): تُلتقط سلبيًا من استجابات
+  // التطبيق نفسه إن مرّت — لا Geocoding ولا تخمين؛ إن لم تتوفر تبقى NULL بصدق
+  await ensureColumn('incident_registry', 'lat', 'REAL');
+  await ensureColumn('incident_registry', 'lng', 'REAL');
   // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
   await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
   // مرحلة بدايات الفرق التشغيلية: JSON nullable لكل فريق {"day":"HH:MM","night":"HH:MM"} —

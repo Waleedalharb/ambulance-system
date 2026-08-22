@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>تكميل المراكز الإسعافية | منصة الجنوب</title>
 <link rel="icon" type="image/png" href="/favicon-32x32.png">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="/css/a11y.css?v=1">
 <style>
@@ -305,6 +305,952 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 .signout-log-row .so-meta { color:var(--muted); font-size:0.72rem; margin-inline-start:auto; }
 .signout-log-row .so-notes { color:var(--muted); font-size:0.72rem; width:100%; }
 .signout-log-empty { color:var(--muted); font-size:0.8rem; padding:0.25rem 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   جولة الترقية البصرية «Premium Workforce» — طبقة عرض فقط (صفر منطق)
+   تُحمَّل أخيرًا فتتغلّب بترتيب المصدر حيث تتساوى الخصوصية.
+   الهوية محفوظة: كحلي المنصة + زمردي #0EA47A + ذهبي + أزرق — العمق
+   والزجاج والتوهجات من لغة الـPrototype المعتمدة بصريًا (بلا ألوانه الغامقة الجافة).
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── خلفية أعمق: توهج كحلي-أزرق أعلى اليمين + ذيل زمردي + عمق سفلي ── */
+body::before {
+    background:
+        radial-gradient(ellipse 55% 38% at 78% -8%, rgba(96,140,220,0.10), transparent 65%),
+        radial-gradient(ellipse 60% 40% at 50% -10%, rgba(126,166,232,0.07), transparent 70%),
+        radial-gradient(ellipse 45% 32% at 50% 112%, rgba(14,164,122,0.06), transparent 70%),
+        radial-gradient(ellipse 70% 55% at 12% 108%, rgba(30,58,95,0.28), transparent 70%),
+        linear-gradient(180deg, #0C1526 0%, #0A1220 52%, #080F1D 100%);
+}
+::selection { background:rgba(16,181,134,0.30); }
+
+/* ── الشريط العلوي: زجاج أعمق + ظل سفلي أنظف ── */
+.top-bar {
+    background:rgba(9,15,28,0.78);
+    border-bottom:1px solid rgba(255,255,255,0.07);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 34px -18px rgba(0,0,0,0.65);
+}
+.top-bar h1 { font-weight:800; }
+.top-bar .badge { box-shadow:0 0 0 1px rgba(245,158,11,0.35), 0 4px 14px -4px rgba(245,158,11,0.45); }
+.top-bar .btn { transition:filter 0.18s ease, transform 0.18s ease; }
+.top-bar .btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.btn-home { box-shadow:0 6px 16px -6px rgba(14,164,122,0.55); }
+.btn-print { box-shadow:0 6px 16px -6px rgba(16,181,134,0.55); }
+
+/* ── لوحة المؤشرات: زجاج متدرج + خط لهجة علوي بلون الحالة + أرقام جدولية ── */
+.dash-card {
+    position:relative; overflow:hidden;
+    background:linear-gradient(168deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:16px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 14px 34px -16px rgba(0,0,0,0.55);
+    transition:transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.dash-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.15); }
+.dash-card::before { content:''; position:absolute; top:0; right:14%; left:14%; height:2px; border-radius:0 0 6px 6px; background:var(--gray); opacity:0.55; }
+.dash-card.green::before { background:var(--green); opacity:0.9; box-shadow:0 0 12px rgba(16,181,134,0.55); }
+.dash-card.yellow::before { background:var(--yellow); opacity:0.9; box-shadow:0 0 12px rgba(245,158,11,0.55); }
+.dash-card.red::before { background:var(--red); opacity:0.9; box-shadow:0 0 12px rgba(239,68,68,0.5); }
+.dash-card.blue::before { background:var(--blue); opacity:0.9; box-shadow:0 0 12px rgba(96,165,250,0.5); }
+.dash-card .value { font-variant-numeric:tabular-nums; }
+.dash-card .label { font-weight:600; }
+
+/* ── شريط التقدم: حوض منحوت + لمعة علوية للتعبئة (اللون يبقى من JS كما هو) ── */
+.progress-bar { background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.07); box-shadow:inset 0 2px 6px rgba(0,0,0,0.35); }
+.progress-fill { box-shadow:inset 0 1px 0 rgba(255,255,255,0.22), 0 0 16px rgba(255,255,255,0.08); font-variant-numeric:tabular-nums; }
+
+/* ── عناوين الأقسام وعدّاد الحوض ── */
+.section-title { font-size:1.1rem; font-weight:800; }
+.support-count { box-shadow:0 0 0 1px rgba(96,165,250,0.35), 0 4px 12px -4px rgba(96,165,250,0.5); font-variant-numeric:tabular-nums; }
+
+/* ── بطاقات الفرق: زجاج متدرج + توهجات حالات واضحة + رفع عند التحويم ── */
+.team-card {
+    background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.016));
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:18px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 38px -18px rgba(0,0,0,0.6);
+    transition:transform 0.22s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.team-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.15); }
+.team-card.status-ready { border-color:rgba(16,181,134,0.55); background:linear-gradient(168deg, rgba(16,181,134,0.13), rgba(16,181,134,0.045)); box-shadow:0 0 0 1px rgba(16,181,134,0.22), 0 18px 42px -16px rgba(16,181,134,0.40), inset 0 1px 0 rgba(255,255,255,0.05); }
+.team-card.status-missing { border-color:rgba(245,158,11,0.55); background:linear-gradient(168deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04)); box-shadow:0 0 0 1px rgba(245,158,11,0.22), 0 18px 42px -16px rgba(245,158,11,0.38), inset 0 1px 0 rgba(255,255,255,0.05); }
+.team-card.status-offline { border-color:rgba(239,68,68,0.55); background:linear-gradient(168deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04)); box-shadow:0 0 0 1px rgba(239,68,68,0.22), 0 18px 42px -16px rgba(239,68,68,0.40), inset 0 1px 0 rgba(255,255,255,0.05); }
+.team-card.status-pending { border-color:rgba(94,113,137,0.5); background:linear-gradient(168deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)); box-shadow:0 0 0 1px rgba(94,113,137,0.18), 0 16px 36px -18px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04); }
+.team-card .card-name { font-size:1.05rem; font-weight:800; color:#F4F8FC; }
+.team-card .card-type { border:1px solid rgba(255,255,255,0.10); }
+.team-card .card-status { box-shadow:0 4px 12px -4px rgba(0,0,0,0.5); }
+.team-card.status-ready .card-status { box-shadow:0 0 14px -2px rgba(16,181,134,0.6); }
+.team-card.status-missing .card-status { box-shadow:0 0 14px -2px rgba(245,158,11,0.55); }
+.team-card.status-offline .card-status { box-shadow:0 0 14px -2px rgba(239,68,68,0.55); }
+
+/* ── صفوف الأفراد داخل البطاقة: صفوف زجاجية مصغرة بهرمية أوضح ── */
+.pm { background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:6px 10px; transition:border-color 0.2s ease, background 0.2s ease; }
+.pm:hover { border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); }
+.pm .pm-name { color:#E8EFF7; }
+.pm .pm-job { color:var(--muted); }
+/* شارة «🤝 متطوع» بجوار الاسم (كانت بلا نمط — قاعدة .op-badge العامة) */
+.op-badge { display:inline-block; background:var(--yellow-light); color:var(--yellow); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:1px 7px; font-size:0.62rem; font-weight:800; }
+
+/* ── كتلتا الغائب/التغطية: صناديق سبب ملوّنة بدل النص العائم ── */
+.miss-info { background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.22); border-radius:8px; padding:3px 8px; }
+.cover-info { background:rgba(16,181,134,0.08); border:1px solid rgba(16,181,134,0.22); border-radius:8px; padding:3px 8px; }
+
+/* ── أزرار البطاقة: عمق خفيف + رفع عند التحويم ── */
+.actions-bar .btn { transition:filter 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease; }
+.actions-bar .btn:hover { filter:brightness(1.06); transform:translateY(-1px); }
+.btn-ready { box-shadow:0 4px 14px -5px rgba(16,181,134,0.55); }
+.btn-missing { box-shadow:0 4px 14px -5px rgba(245,158,11,0.55); }
+.btn-offline { box-shadow:0 4px 14px -5px rgba(239,68,68,0.50); }
+.btn-cover { background:rgba(255,255,255,0.02); transition:all 0.18s ease; }
+.btn-cover:hover { border-color:var(--blue); color:var(--blue); background:rgba(96,165,250,0.08); box-shadow:0 0 14px -4px rgba(96,165,250,0.4); }
+
+/* ── حوض «الدعم المتاح»: هوية Resource Pool زرقاء مميّزة عن بطاقات الفرق ── */
+.support-card {
+    background:linear-gradient(168deg, rgba(96,165,250,0.08), rgba(255,255,255,0.02));
+    border:1px solid rgba(96,165,250,0.28);
+    border-radius:18px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 38px -18px rgba(0,0,0,0.6);
+    transition:transform 0.22s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.support-card:hover { transform:translateY(-2px); border-color:rgba(96,165,250,0.5); box-shadow:0 0 0 1px rgba(96,165,250,0.25), 0 18px 40px -16px rgba(96,165,250,0.35); }
+.support-card .sp-name { font-size:0.95rem; font-weight:800; color:#F0F6FF; }
+.support-card .btn-support { box-shadow:0 4px 14px -5px rgba(96,165,250,0.6); transition:filter 0.15s ease, transform 0.15s ease; }
+.support-card .btn-support:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.support-card .btn-activate { box-shadow:0 4px 14px -5px rgba(245,158,11,0.6); transition:filter 0.15s ease, transform 0.15s ease; }
+.support-card .btn-activate:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.support-person { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07); }
+
+/* ── بطاقات المركبات ── */
+.vehicle-card .v-status { box-shadow:0 4px 12px -4px rgba(0,0,0,0.5); }
+.vehicle-card .v-actions button { transition:all 0.18s ease; }
+
+/* ── المودالات: زجاج عميق + دخول ناعم + تركيز أوضح ── */
+.modal-overlay { background:rgba(4,8,16,0.62); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.modal-overlay.active { animation:rcBackdropIn 0.22s ease both; }
+.modal-overlay.active .modal-box { animation:rcModalIn 0.3s cubic-bezier(0.22,1,0.36,1) both; }
+.modal-box { background:linear-gradient(172deg, rgba(24,35,58,0.98), rgba(12,20,36,0.99)); border:1px solid rgba(255,255,255,0.10); border-radius:18px; box-shadow:0 32px 70px -18px rgba(0,0,0,0.70), inset 0 1px 0 rgba(255,255,255,0.06); }
+.modal-box h3 { font-weight:800; }
+.modal-box select, .modal-box input { background:rgba(6,11,22,0.80); transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.mm-save { box-shadow:0 6px 16px -6px rgba(14,164,122,0.55); transition:filter 0.15s ease, transform 0.15s ease; }
+.mm-save:hover { filter:brightness(1.10); transform:translateY(-1px); }
+.mm-cancel { transition:background 0.15s ease, color 0.15s ease; }
+.mm-cancel:hover { background:rgba(255,255,255,0.09); color:var(--text); }
+.decision-options button { transition:filter 0.15s ease, transform 0.15s ease; }
+.decision-options button:hover { filter:brightness(1.08); transform:translateY(-1px); }
+@keyframes rcBackdropIn { from { opacity:0; } to { opacity:1; } }
+@keyframes rcModalIn { from { opacity:0; transform:translateY(14px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+
+/* ── مودال الملخص: شارات بحلقات داخلية + صفوف تتفاعل مع التحويم ── */
+.badge-ready { box-shadow:inset 0 0 0 1px rgba(16,181,134,0.35); }
+.badge-missing { box-shadow:inset 0 0 0 1px rgba(245,158,11,0.35); }
+.badge-offline { box-shadow:inset 0 0 0 1px rgba(239,68,68,0.35); }
+.badge-pending { box-shadow:inset 0 0 0 1px rgba(94,113,137,0.35); }
+.modal-stat { background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)); }
+.modal-stat .value { font-variant-numeric:tabular-nums; }
+.summary-table th { background:rgba(255,255,255,0.04); }
+.summary-table tr { transition:background 0.15s ease; }
+.summary-table tr:hover td { background:rgba(255,255,255,0.03); }
+
+/* ── الملاحظات وتسجيل الخروج: نفس لغة الزجاج المتدرج ── */
+.notes-box { background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018)); border:1px solid rgba(255,255,255,0.09); box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 38px -18px rgba(0,0,0,0.6); }
+.signout-panel { background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018)); border:1px solid rgba(255,255,255,0.09); box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 38px -18px rgba(0,0,0,0.6); }
+.signout-log-row { transition:border-color 0.2s ease; }
+.signout-log-row:hover { border-color:rgba(255,255,255,0.16); }
+.signout-save { box-shadow:0 6px 16px -6px rgba(14,164,122,0.55); }
+
+/* ── زرا الإنهاء: تدرج زمردي عميق + توهج ── */
+.btn-finish { background:linear-gradient(135deg, #0EA47A, #10B586); box-shadow:0 14px 34px -12px rgba(14,164,122,0.55), inset 0 1px 0 rgba(255,255,255,0.18); }
+.btn-finish:hover { transform:translateY(-2px) scale(1.02); box-shadow:0 18px 40px -12px rgba(14,164,122,0.65), inset 0 1px 0 rgba(255,255,255,0.18); }
+.btn-workflow { box-shadow:0 0 0 1px rgba(16,181,134,0.35), 0 10px 26px -12px rgba(16,181,134,0.4); }
+
+/* ── التنبيهات: زجاج داكن بحافة لهجة ── */
+.toast { background:rgba(15,23,42,0.92); border:1px solid rgba(255,255,255,0.10); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-inline-start:3px solid var(--gray); }
+.toast.success { background:rgba(16,181,134,0.95); border-color:rgba(255,255,255,0.15); border-inline-start-color:#0A5C44; }
+.toast.error { background:rgba(239,68,68,0.95); border-color:rgba(255,255,255,0.15); border-inline-start-color:#7F1D1D; }
+
+/* ── تركيز لوحة المفاتيح (لوصولية أعلى بلا مساس بقواعد outline:none للفأرة) ── */
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible { outline:2px solid rgba(16,181,134,0.65); outline-offset:2px; }
+
+/* ── شريط تمرير أرفع ── */
+::-webkit-scrollbar { width:8px; height:8px; }
+
+/* ── سحب وإفلات الحوض (تفاعلية اختيارية — انظر سكربت rcSupportDnD أسفل الصفحة) ── */
+.support-card[draggable="true"] { cursor:grab; }
+.support-card[draggable="true"]:active { cursor:grabbing; }
+.support-card.rc-dragging { opacity:0.35; filter:saturate(0.6); }
+.team-card.rc-drop-target { border-color:rgba(16,181,134,0.65) !important; box-shadow:0 0 0 1px rgba(16,181,134,0.5), 0 0 44px -6px rgba(16,181,134,0.45), inset 0 0 26px rgba(16,181,134,0.06) !important; transform:translateY(-2px); }
+
+/* ═══════════════════════════════════════════════════════════
+   T1 — Workforce Operations Board: إعادة هيكلة التخطيط (طبقة عرض فقط، صفر منطق)
+   Control Bar لاصق متعدد الصفوف (العنوان + مؤشرات chips + تقدم) +
+   بطاقات فرق بتشريح اللوحة المعتمدة (شريط حالة كامل العرض + مؤشر قوة
+   من activeCount/requiredPersonnel/vacant السيرفريين حرفيًا) +
+   حوض «القوة المتاحة» كشريط موارد. لا حدث/معرّف/معالج يتغير.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── شريط التحكم: صفوف مكدسة داخل الزجاج اللاصق ── */
+.top-bar { flex-direction:column; align-items:stretch; justify-content:flex-start; gap:0.55rem; padding:0.65rem 1.5rem 0.6rem; }
+.wb-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; }
+.wb-title-group { display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap; }
+.wb-chips.dashboard { display:flex; flex-wrap:wrap; gap:0.45rem; padding:0; margin:0; max-width:none; }
+.wb-chip { display:inline-flex; align-items:center; gap:0.45rem; padding:4px 12px; border-radius:999px; font-size:0.74rem; font-weight:700; color:var(--text);
+    background:linear-gradient(168deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.10); box-shadow:inset 0 1px 0 rgba(255,255,255,0.05); }
+.wb-chip .value { font-size:0.88rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.wb-chip.green { border-color:rgba(16,181,134,0.38); } .wb-chip.green .value { color:var(--green); }
+.wb-chip.yellow { border-color:rgba(245,158,11,0.38); } .wb-chip.yellow .value { color:var(--yellow); }
+.wb-chip.red { border-color:rgba(239,68,68,0.38); } .wb-chip.red .value { color:var(--red); }
+.wb-chip.blue { border-color:rgba(96,165,250,0.38); } .wb-chip.blue .value { color:var(--blue); }
+.wb-chip.gray { border-color:rgba(94,113,137,0.40); } .wb-chip.gray .value { color:#9FB0C6; }
+.wb-progress.progress-wrap { padding:0; margin:0; max-width:none; }
+.wb-progress .progress-bar { height:12px; border-radius:8px; }
+.wb-progress .progress-fill { font-size:0.62rem; }
+
+/* ── عناوين مجموعات اللوحة ── */
+.section-title .wb-sub { font-size:0.68rem; color:var(--muted); font-weight:600; letter-spacing:0.4px; }
+
+/* ── بطاقة الفرقة: شريط حالة كامل العرض أعلى البطاقة ── */
+.team-card { padding:0; }
+.tc-status-bar { display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:0.78rem; font-weight:800; border-radius:16px 16px 0 0; border-bottom:1px solid rgba(255,255,255,0.07); }
+.tc-status-bar .tc-dot { width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 10px currentColor; flex-shrink:0; }
+.tc-status-bar .card-status { background:transparent !important; color:inherit !important; padding:0; margin:0; font-size:0.78rem; font-weight:800; border-radius:0; box-shadow:none !important; }
+.tc-status-bar .tc-center { margin-inline-start:auto; font-size:0.68rem; font-weight:700; color:var(--muted); }
+.tc-sb-ready { background:linear-gradient(90deg, rgba(16,181,134,0.20), rgba(16,181,134,0.03)); color:var(--green); }
+.tc-sb-missing { background:linear-gradient(90deg, rgba(245,158,11,0.20), rgba(245,158,11,0.03)); color:var(--yellow); }
+.tc-sb-offline { background:linear-gradient(90deg, rgba(239,68,68,0.22), rgba(239,68,68,0.04)); color:var(--red); }
+.tc-sb-pending { background:linear-gradient(90deg, rgba(94,113,137,0.18), rgba(94,113,137,0.03)); color:#9FB0C6; }
+.tc-body { padding:0.9rem 1rem 1rem; }
+.tc-head { display:flex; align-items:center; gap:8px; }
+.tc-head .card-name { margin-top:0; }
+.tc-head .card-type { margin-inline-start:auto; }
+
+/* ── مؤشر القوة: العدد من اشتقاق الخادم (activeCount/requiredPersonnel) ── */
+.tc-strength { display:flex; align-items:center; gap:9px; margin-top:0.55rem; }
+.tc-count { font-size:0.85rem; font-weight:800; font-variant-numeric:tabular-nums; direction:ltr; }
+.tc-track { flex:1; height:6px; border-radius:99px; background:rgba(255,255,255,0.07); overflow:hidden; box-shadow:inset 0 1px 2px rgba(0,0,0,0.4); }
+.tc-fill { height:100%; border-radius:99px; transition:width 0.35s ease; }
+.tc-fill-ready { background:linear-gradient(90deg, #0C8A66, #10B586); box-shadow:0 0 10px rgba(16,181,134,0.55); }
+.tc-fill-missing { background:linear-gradient(90deg, #B45309, #F59E0B); box-shadow:0 0 10px rgba(245,158,11,0.5); }
+.tc-fill-offline { background:rgba(239,68,68,0.45); }
+.tc-fill-pending { background:rgba(94,113,137,0.55); }
+.tc-need { font-size:0.66rem; font-weight:800; color:var(--yellow); white-space:nowrap; }
+.tc-need.ok { color:var(--green); }
+
+/* ── شارات الصفة داخل صفوف الأفراد (أساسي/أوفرلاب/متطوع/دعم/مكلَّف) ── */
+.pm-role-badge { display:inline-block; font-size:0.58rem; font-weight:800; padding:1px 7px; border-radius:7px; border:1px solid; margin-inline-start:4px; vertical-align:middle; }
+.rb-base { color:var(--green); border-color:rgba(16,181,134,0.35); background:rgba(16,181,134,0.07); }
+.rb-overlap { color:#C4B5FD; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.08); }
+.rb-support { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
+.rb-assigned { color:var(--yellow); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.08); }
+
+/* ── حوض «القوة المتاحة»: شريط موارد ببطاقات أشخاص مدمجة ── */
+.pool-strip.cards-grid { display:flex; flex-wrap:wrap; gap:0.75rem; }
+.pool-strip .support-card { min-width:220px; max-width:270px; flex:0 1 auto; padding:0.75rem 0.9rem; }
+.sp-head { display:flex; align-items:center; gap:9px; }
+.sp-avatar { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; font-weight:800; font-size:0.9rem; color:#fff; flex-shrink:0;
+    background:linear-gradient(150deg, #2563EB, #38BDF8); box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(37,99,235,0.5); }
+.sp-head .sp-name { margin-top:0; }
+
+/* ═══════════════════════════════════════════════════════════
+   T2/T3 — البحث الذكي + الأدراج الجانبية + إعادة التوزيع
+   طبقة عرض/تفاعل فقط: لا حدث ولا معرّف ولا معالج قائم يتغير.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── البحث الذكي في شريط التحكم ── */
+.wb-search-wrap { position:relative; flex:1 1 300px; max-width:560px; display:flex; align-items:center; gap:8px;
+    background:rgba(6,11,22,0.72); border:1px solid rgba(255,255,255,0.11); border-radius:12px; padding:6px 12px;
+    transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.wb-search-wrap:focus-within { border-color:rgba(96,165,250,0.55); box-shadow:0 0 0 1px rgba(96,165,250,0.25), 0 0 18px -6px rgba(96,165,250,0.4); }
+.wb-search-wrap > i { color:var(--muted); font-size:0.8rem; flex-shrink:0; }
+.wb-search-wrap input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text); font-size:0.85rem; font-family:inherit; }
+.wb-search-wrap input::placeholder { color:var(--muted); }
+.wb-search-results { position:absolute; top:calc(100% + 6px); right:0; left:0; max-height:330px; overflow-y:auto; z-index:260;
+    background:rgba(12,20,36,0.985); border:1px solid rgba(255,255,255,0.13); border-radius:12px;
+    box-shadow:0 26px 54px -14px rgba(0,0,0,0.75); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+.wb-sr-row { padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); }
+.wb-sr-row:last-child { border-bottom:none; }
+.wb-sr-row:hover { background:rgba(96,165,250,0.09); }
+.wb-sr-row .sr-name { font-weight:800; font-size:0.85rem; }
+.wb-sr-row .sr-meta { font-size:0.68rem; color:var(--muted); margin-top:2px; }
+.wb-sr-row .sr-flags { display:flex; gap:5px; margin-top:4px; flex-wrap:wrap; }
+.sr-flag { font-size:0.58rem; font-weight:800; padding:1px 7px; border-radius:7px; border:1px solid; }
+.sr-flag.on { color:var(--green); border-color:rgba(16,181,134,0.4); background:rgba(16,181,134,0.08); }
+.sr-flag.off { color:var(--muted); border-color:rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); }
+.wb-sr-empty { padding:10px 12px; font-size:0.75rem; color:var(--muted); }
+.wb-chip-btn { cursor:pointer; font-family:inherit; }
+.wb-chip-btn:hover { filter:brightness(1.12); border-color:rgba(96,165,250,0.6); }
+
+/* ── الأدراج الجانبية (موظف/مركبات) — تنزلق من اليسار ── */
+.drawer-overlay { position:fixed; inset:0; background:rgba(4,8,16,0.58); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    opacity:0; pointer-events:none; transition:opacity 0.22s ease; z-index:180; }
+.drawer-overlay.show { opacity:1; pointer-events:auto; }
+.side-drawer { position:fixed; top:0; bottom:0; left:0; width:min(400px, 92vw); z-index:190; display:flex; flex-direction:column;
+    background:linear-gradient(172deg, rgba(21,31,52,0.985), rgba(10,17,30,0.99));
+    border-inline-end:1px solid rgba(255,255,255,0.11); box-shadow:30px 0 70px -24px rgba(0,0,0,0.75);
+    transform:translateX(-106%); transition:transform 0.26s cubic-bezier(0.22,1,0.36,1); }
+.side-drawer.open { transform:translateX(0); }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.drawer-head h3 { font-size:0.95rem; font-weight:800; }
+.drawer-close { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.13); color:var(--text); width:30px; height:30px; border-radius:9px; cursor:pointer; font-size:0.95rem; line-height:1; transition:background 0.15s ease; }
+.drawer-close:hover { background:rgba(255,255,255,0.12); }
+.drawer-body { flex:1; overflow-y:auto; padding:14px 16px; }
+#vehiclesDrawer { width:min(580px, 94vw); }
+#vehiclesDrawer .section { padding:0; max-width:none; }
+#vehiclesDrawer .cards-grid { grid-template-columns:1fr; }
+
+/* ── درج الموظف: الهوية + الحالة + الأعلام + الإجراءات ── */
+.ed-person { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.ed-avatar { width:46px; height:46px; border-radius:14px; display:grid; place-items:center; font-weight:800; font-size:1.15rem; color:#fff; flex-shrink:0;
+    background:linear-gradient(150deg, #2563EB, #38BDF8); box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 18px -8px rgba(37,99,235,0.55); }
+.ed-name { font-size:1rem; font-weight:800; }
+.ed-job { font-size:0.72rem; color:var(--muted); margin-top:2px; }
+.ed-rows { background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 12px; }
+.ed-row { display:flex; justify-content:space-between; gap:10px; font-size:0.76rem; padding:4px 0; border-bottom:1px dashed rgba(255,255,255,0.06); }
+.ed-row:last-child { border-bottom:none; }
+.ed-row .k { color:var(--muted); font-weight:600; }
+.ed-row .v { font-weight:700; text-align:left; }
+.ed-flags { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.ed-actions { margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+.ed-actions button { width:100%; padding:9px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); cursor:pointer;
+    font-size:0.8rem; font-weight:700; font-family:inherit; color:var(--text); background:rgba(255,255,255,0.05); transition:filter 0.15s ease, transform 0.15s ease; }
+.ed-actions button:hover { filter:brightness(1.12); transform:translateY(-1px); }
+.ed-actions .ed-primary { background:linear-gradient(135deg, #1D4ED8, #2563EB); border-color:rgba(96,165,250,0.5); color:#fff; }
+.ed-actions .ed-danger { background:rgba(239,68,68,0.14); border-color:rgba(239,68,68,0.45); color:#FCA5A5; }
+.ed-actions .ed-gold { background:rgba(245,158,11,0.13); border-color:rgba(245,158,11,0.45); color:#FCD34D; }
+
+/* ── تسجيل حالة سريع (غياب/تأخير/تكليف/إجازة) داخل درج الموظف ── */
+.ed-actions .ed-quick { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 10px;
+    border:1px dashed rgba(251,191,36,0.30); border-radius:10px; background:rgba(251,191,36,0.04); }
+.ed-actions .ed-quick-lbl { font-size:0.68rem; font-weight:800; color:#FCD34D; }
+.ed-actions .ed-quick-btn { width:auto; flex:1; min-width:60px; padding:6px 8px; font-size:0.7rem;
+    background:rgba(251,191,36,0.10); border:1px solid rgba(251,191,36,0.35); color:#FCD34D; }
+.ed-actions .ed-quick-btn:hover { background:rgba(251,191,36,0.20); }
+
+/* ── نافذة تأكيد إعادة التوزيع (T3) ── */
+.redist-info { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+.redist-info .ri-row { display:flex; justify-content:space-between; gap:10px; font-size:0.78rem; padding:4px 0; border-bottom:1px dashed rgba(255,255,255,0.06); }
+.redist-info .ri-row:last-child { border-bottom:none; }
+.redist-info .ri-row .k { color:var(--muted); font-weight:600; }
+.redist-info .ri-row .v { font-weight:800; }
+.redist-proof { background:rgba(16,181,134,0.07); border:1px solid rgba(16,181,134,0.28); border-radius:12px; padding:9px 12px; font-size:0.76rem; font-weight:700; color:var(--green); margin-bottom:12px; }
+.redist-proof.warn { background:rgba(245,158,11,0.08); border-color:rgba(245,158,11,0.35); color:var(--yellow); }
+
+/* ── لافتة وضع النقل (بديل اللمس للسحب/الإفلات) ── */
+.move-banner { position:fixed; bottom:18px; right:50%; transform:translateX(50%); z-index:170; align-items:center; gap:12px;
+    background:linear-gradient(135deg, #1D4ED8, #2563EB); color:#fff; font-size:0.82rem; font-weight:800;
+    padding:10px 18px; border-radius:999px; box-shadow:0 18px 40px -12px rgba(37,99,235,0.65); }
+.move-banner button { background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); color:#fff; border-radius:999px; padding:4px 12px; cursor:pointer; font-size:0.72rem; font-weight:800; font-family:inherit; }
+body.rc-move-mode .team-card:not(.vehicle-card) { cursor:pointer; border-color:rgba(37,99,235,0.55) !important;
+    box-shadow:0 0 0 1px rgba(37,99,235,0.4), 0 0 40px -8px rgba(37,99,235,0.45) !important; }
+
+/* ── منطقة الإسقاط داخل بطاقة الفرقة (تظهر عند وجود شاغر سيرفري) ── */
+.tc-dropzone { border:1.5px dashed rgba(96,165,250,0.45); border-radius:10px; padding:7px 10px; text-align:center;
+    color:var(--blue); font-size:0.7rem; font-weight:800; margin-top:0.65rem; background:rgba(96,165,250,0.05); }
+.team-card.rc-drop-target .tc-dropzone { background:rgba(16,181,134,0.12); border-color:var(--green); color:var(--green); }
+
+/* ── صفوف الأفراد: فتح الدرج بالضغط + سحب للمؤهَّلين ── */
+.pm[data-emp] { cursor:pointer; }
+.pm[data-mdrag] { cursor:grab; }
+.pm[data-mdrag]:active { cursor:grabbing; }
+.pm.rc-dragging { opacity:0.35; filter:saturate(0.6); }
+
+/* ── حارس الطباعة (T2/T3): الأدراج/اللافتات/البحث/مناطق الإسقاط لا تُطبع ── */
+@media print {
+    .side-drawer, .drawer-overlay, .move-banner, .wb-search-results, .tc-dropzone { display:none !important; }
+}
+
+/* ── حارس الطباعة: لا ظلال ولا تحويم في النسخة المطبوعة ── */
+@media print {
+    .team-card, .dash-card, .support-card, .notes-box, .signout-panel { box-shadow:none !important; transform:none !important; }
+    .team-card:hover, .dash-card:hover, .support-card:hover { transform:none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   T4 — الهوية البصرية النهائية (منقولة من Workforce Operations
+   Board Prototype): كحلي أعمق (#0B1226→#070B18) بتوهجات شعاعية
+   ثابتة، زجاج أنعم (blur 12–20px)، خط Tajawal أولًا، حركات
+   150–250ms، مناطق إسقاط كهرمانية تتوهج زرقاء نابضة عند
+   الاستهداف، وتوهج/لافتة وضع النقل ذهبية نابضة.
+   طبقة عرض فقط — لا منطق ولا معرّفات ولا معالجات.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── الخلفية الكحلية الأعمق + التوهجات الشعاعية الثابتة ── */
+body {
+    font-family:'Tajawal', 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+    background:
+        radial-gradient(1100px 480px at 50% -140px, rgba(84,122,214,0.20), transparent 62%),
+        radial-gradient(900px 500px at 88% 108%, rgba(120,82,200,0.10), transparent 60%),
+        linear-gradient(180deg, #0B1226 0%, #070B18 70%);
+    background-attachment: fixed;
+}
+::selection { background:rgba(96,165,250,0.35); }
+
+/* ── شريط التحكم: زجاج متدرج أعمق + عنوان بنص متدرج ── */
+.top-bar {
+    background:linear-gradient(180deg, rgba(10,15,32,0.92), rgba(10,15,32,0.78));
+    backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    box-shadow:0 14px 34px rgba(2,6,18,0.45);
+}
+.top-bar h1 {
+    background:linear-gradient(90deg, #FFFFFF, #B9C7EA);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    letter-spacing:0.2px;
+}
+
+/* ── البحث الذكي: صندوق موشّى بالأزرق كالنموذج ── */
+.wb-search-wrap {
+    padding:8px 14px; border-radius:14px;
+    background:linear-gradient(168deg, rgba(96,165,250,0.10), rgba(255,255,255,0.03));
+    border:1px solid rgba(96,165,250,0.30);
+    box-shadow:0 8px 24px rgba(20,60,150,0.18), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.wb-search-wrap:focus-within {
+    border-color:rgba(96,165,250,0.65);
+    box-shadow:0 0 0 4px rgba(96,165,250,0.12), 0 10px 28px rgba(20,60,150,0.28);
+}
+.wb-search-results {
+    background:linear-gradient(168deg, rgba(20,28,54,0.97), rgba(12,18,38,0.97));
+    border-radius:16px; padding:6px;
+    box-shadow:0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
+    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+}
+.wb-sr-row { border-radius:10px; border:1px solid transparent; margin-bottom:2px;
+    transition:transform 150ms ease, border-color 150ms ease, background 150ms ease; }
+.wb-sr-row:hover { transform:translateY(-1px); border-color:rgba(96,165,250,0.45); background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); }
+
+/* ── بطاقات الفرق: زجاج النموذج (blur أعمق + ظل أنعم + حركة 180ms) ── */
+.team-card {
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    box-shadow:0 18px 40px rgba(2,6,18,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition:transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* ── صفوف الأفراد: تحويم النموذج (انزياح خفيف) + حالة «مكلَّف خارجًا» ── */
+.pm { transition:transform 150ms ease, border-color 150ms ease, background 150ms ease; }
+.pm:hover { transform:translateX(-2px); }
+.pm-away { opacity:0.6; border-style:dashed; border-color:rgba(251,191,36,0.35); background:rgba(251,191,36,0.05); }
+
+/* ── الاستهداف بالسحب: حلقة زرقاء كالنموذج ── */
+.team-card.rc-drop-target {
+    border-color:rgba(96,165,250,0.7) !important;
+    box-shadow:0 0 0 4px rgba(96,165,250,0.16), 0 22px 48px rgba(10,40,120,0.45) !important;
+    transform:translateY(-2px) scale(1.01);
+}
+
+/* ── منطقة الإسقاط: كهرمانية كالنموذج، تتوهج زرقاء نابضة عند الاستهداف ── */
+.tc-dropzone {
+    border:1.5px dashed rgba(251,191,36,0.45);
+    background:rgba(251,191,36,0.05);
+    color:#FBBF24;
+    padding:11px 12px;
+    transition:all 180ms ease;
+}
+.team-card.rc-drop-target .tc-dropzone {
+    border-color:var(--blue); color:var(--blue);
+    background:rgba(96,165,250,0.10);
+    animation:rcDzGlow 1.2s ease-in-out infinite;
+}
+@keyframes rcDzGlow {
+    0%, 100% { box-shadow:0 0 10px rgba(96,165,250,0.15), inset 0 0 8px rgba(96,165,250,0.05); }
+    50% { box-shadow:0 0 24px rgba(96,165,250,0.38), inset 0 0 18px rgba(96,165,250,0.12); }
+}
+
+/* ── وضع النقل: توهج ذهبي نابض للبطاقات + لافتة ذهبية كالنموذج ── */
+body.rc-move-mode .team-card:not(.vehicle-card) {
+    border-color:rgba(245,198,107,0.6) !important;
+    animation:rcTargetPulse 1.6s ease-in-out infinite;
+}
+@keyframes rcTargetPulse {
+    0%, 100% { box-shadow:0 0 0 3px rgba(245,198,107,0.10), 0 20px 44px rgba(2,6,18,0.5) !important; }
+    50% { box-shadow:0 0 0 6px rgba(245,198,107,0.20), 0 20px 44px rgba(2,6,18,0.5) !important; }
+}
+.move-banner {
+    background:linear-gradient(168deg, rgba(80,60,10,0.92), rgba(40,30,8,0.92));
+    border:1px solid rgba(245,198,107,0.5);
+    color:#F5C66B;
+    box-shadow:0 16px 36px rgba(0,0,0,0.5), 0 0 22px rgba(245,198,107,0.12);
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+}
+.move-banner button { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.22); }
+
+/* ── الأدراج: زجاج النموذج + انزلاق 240ms ── */
+.side-drawer {
+    background:linear-gradient(200deg, rgba(22,30,58,0.98), rgba(10,15,32,0.98));
+    border-inline-end:1px solid rgba(255,255,255,0.12);
+    box-shadow:30px 0 70px rgba(0,0,0,0.55);
+    transition:transform 240ms cubic-bezier(0.2,0.9,0.3,1);
+}
+.drawer-overlay { background:rgba(3,6,14,0.6); }
+
+/* ── شريط التمرير: سماكة النموذج ── */
+::-webkit-scrollbar { width:9px; height:9px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.14); border-radius:99px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   المراجعة النهائية §11/§12 — نقل لغة التصميم المرجعية فعليًا
+   (Workforce Operations Board): زجاج عميق، حدود هادئة، توهجات
+   ناعمة، مساحات واسعة، كثافة بيانات، ألوان حالة كإشارات تشغيلية.
+   طبقة عرض فقط — كل المعرفات/المعالجات/الأنصبة كما هي.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+    --ink:#E8EDF8; --ink-dim:#9AA7C4; --ink-faint:#6B7899; --line:rgba(255,255,255,0.09);
+    --sig-green:#34D399; --sig-amber:#FBBF24; --sig-red:#F87171; --sig-blue:#60A5FA;
+    --sig-gold:#F5C66B; --sig-purple:#C084FC;
+    --r-lg:18px; --r-md:13px; --r-sm:9px;
+}
+
+/* ── البطاقات الزجاجية العميقة (فرق/حوض/ملاحظات/خروج/معلومات) ── */
+.team-card, .support-card, .notes-box, .signout-panel, .dash-card {
+    background:linear-gradient(168deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    box-shadow:0 18px 40px rgba(2,6,18,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+.team-card { overflow:hidden; }
+.team-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.16); }
+.cards-grid { gap:16px; }
+.section { margin-bottom:26px; }
+
+/* ── عناوين الأقسام: شريط متوهج + نص 800 كالنموذج ── */
+.section-title { font-weight:800; letter-spacing:0.2px; color:var(--ink); display:flex; align-items:center; gap:10px; }
+.section-title i:first-child { color:var(--sig-blue); text-shadow:0 0 12px rgba(96,165,250,0.5); }
+.wb-sub { color:var(--ink-faint); font-size:0.68rem; font-weight:600; letter-spacing:0.4px; }
+
+/* ── الشرائح (Chips): حبوب زجاجية بحدود إشارية ملوّنة ── */
+.wb-chip {
+    border-radius:999px; padding:6px 13px; font-weight:600; color:var(--ink);
+    background:linear-gradient(168deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+    border:1px solid var(--line);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
+    transition:transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.wb-chip .value { font-weight:800; font-variant-numeric:tabular-nums; }
+.wb-chip.green { border-color:rgba(52,211,153,0.35); }
+.wb-chip.yellow { border-color:rgba(251,191,36,0.35); }
+.wb-chip.red { border-color:rgba(248,113,113,0.35); }
+.wb-chip.blue { border-color:rgba(96,165,250,0.35); }
+.wb-chip.purple { border-color:rgba(192,132,252,0.35); }
+.wb-chip.gray { border-color:rgba(255,255,255,0.16); }
+.wb-chip-btn { cursor:pointer; }
+.wb-chip-btn:hover { transform:translateY(-1px); border-color:rgba(96,165,250,0.55);
+    box-shadow:0 6px 18px rgba(30,80,180,0.25), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+/* ── شريط حالة البطاقة: إشارات تشغيلية متدرجة + نقطة متوهجة ── */
+.tc-status-bar { height:34px; display:flex; align-items:center; gap:7px; padding:0 14px; font-size:0.78rem; font-weight:700; }
+.tc-sb-ready { background:linear-gradient(90deg, rgba(52,211,153,0.20), rgba(52,211,153,0.03)); color:var(--sig-green); }
+.tc-sb-missing { background:linear-gradient(90deg, rgba(251,191,36,0.20), rgba(251,191,36,0.03)); color:var(--sig-amber); }
+.tc-sb-offline { background:linear-gradient(90deg, rgba(248,113,113,0.22), rgba(248,113,113,0.04)); color:var(--sig-red); }
+.tc-sb-pending { background:linear-gradient(90deg, rgba(154,167,196,0.14), rgba(154,167,196,0.02)); color:var(--ink-dim); }
+.tc-sb-nr { background:linear-gradient(90deg, rgba(192,132,252,0.18), rgba(192,132,252,0.03)); color:var(--sig-purple); }
+.tc-dot { width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 10px currentColor; flex-shrink:0; }
+.tc-center { color:var(--ink-dim); font-weight:600; font-size:0.72rem; }
+
+/* ── جسم البطاقة: اسم قوي + مؤشر قوة متوهج ── */
+.tc-body { padding:14px 16px 16px; }
+.tc-head .card-name { font-size:1.06rem; font-weight:800; color:var(--ink); }
+.card-type { font-size:0.66rem; font-weight:700; color:var(--ink-faint); border:1px solid var(--line); border-radius:999px; padding:2px 9px; }
+.tc-strength { margin-top:11px; display:flex; align-items:center; gap:10px; }
+.tc-count { font-weight:800; font-variant-numeric:tabular-nums; direction:ltr; }
+.tc-track { flex:1; height:7px; border-radius:99px; background:rgba(255,255,255,0.07); overflow:hidden; box-shadow:inset 0 1px 2px rgba(0,0,0,0.4); }
+.tc-fill { border-radius:99px; transition:width 300ms ease; }
+.tc-fill-ready { background:linear-gradient(90deg, #10B981, #34D399); box-shadow:0 0 10px rgba(52,211,153,0.55); }
+.tc-fill-missing { background:linear-gradient(90deg, #D97706, #FBBF24); box-shadow:0 0 10px rgba(251,191,36,0.5); }
+.tc-fill-offline { background:rgba(248,113,113,0.4); }
+.tc-fill-pending { background:rgba(154,167,196,0.35); }
+.tc-need { color:var(--sig-amber); font-weight:700; font-size:0.7rem; }
+.tc-need.ok { color:var(--sig-green); }
+
+/* ── صفوف الأفراد: رقائق زجاجية كالنموذج ── */
+.paramedics { display:flex; flex-direction:column; gap:7px; margin-top:12px; }
+.pm { border-radius:10px; background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.08); padding:7px 10px; }
+.pm:hover { border-color:rgba(96,165,250,0.4); background:rgba(255,255,255,0.07); }
+.pm-name { font-weight:700; font-size:0.8rem; color:var(--ink); }
+.pm-job, .pm-code, .pm-phone { color:var(--ink-faint); }
+.pm-role-badge { border-radius:999px; border:1px solid; font-weight:700; }
+.rb-base { color:var(--sig-green); border-color:rgba(52,211,153,0.35); background:rgba(52,211,153,0.07); }
+.rb-support { color:var(--sig-blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
+.rb-assigned { color:var(--sig-amber); border-color:rgba(251,191,36,0.4); background:rgba(251,191,36,0.08); }
+.rb-overlap { color:var(--sig-purple); border-color:rgba(192,132,252,0.4); background:rgba(192,132,252,0.08); }
+
+/* ── أزرار البطاقة: إشارات ناعمة (ليست صارخة) ── */
+.actions-bar { gap:8px; margin-top:12px; }
+.actions-bar .btn, .btn-cover { border-radius:10px; font-weight:700; transition:transform 150ms ease, filter 150ms ease, box-shadow 150ms ease; }
+.actions-bar .btn:hover, .btn-cover:hover { transform:translateY(-1px); filter:brightness(1.1); }
+.btn-ready { background:rgba(52,211,153,0.12); border:1px solid rgba(52,211,153,0.35); color:var(--sig-green); }
+.btn-missing { background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.35); color:var(--sig-amber); }
+.btn-offline { background:rgba(248,113,113,0.10); border:1px solid rgba(248,113,113,0.35); color:#FCA5A5; }
+.btn-cover { background:rgba(96,165,250,0.08); border:1px solid rgba(96,165,250,0.3); color:var(--sig-blue); }
+.btn-arrive { background:rgba(52,211,153,0.14); border:1px solid rgba(52,211,153,0.4); color:var(--sig-green); border-radius:8px; }
+.btn-end-cover { background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.3); color:#FCA5A5; border-radius:8px; }
+.miss-info { border:1px solid rgba(251,191,36,0.25); background:rgba(251,191,36,0.06); border-radius:10px; }
+.cover-info { border:1px solid rgba(96,165,250,0.25); background:rgba(96,165,250,0.06); border-radius:10px; }
+
+/* ── بطاقات الحوض: شخصية قابلة للسحب بإحساس النموذج ── */
+.support-card { cursor:grab; }
+.support-card:active { cursor:grabbing; }
+.support-card .sp-name { color:var(--ink); }
+.support-card .btn-support { background:linear-gradient(150deg, #2563EB, #38BDF8); box-shadow:0 8px 18px -6px rgba(37,99,235,0.5); }
+.support-card .btn-activate { background:linear-gradient(150deg, #D4A017, #B8860B); color:#1A1206; box-shadow:0 8px 18px -6px rgba(200,150,20,0.45); }
+
+/* ── النوافذ: زجاج عميق + Pop-in ── */
+.modal-overlay { background:rgba(3,6,14,0.66); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+.modal-box {
+    border-radius:20px; padding:24px 24px 20px;
+    background:linear-gradient(170deg, rgba(26,35,66,0.99), rgba(12,18,38,0.99));
+    border:1px solid rgba(255,255,255,0.13);
+    box-shadow:0 40px 90px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.modal-overlay.active .modal-box { animation:rcPopIn 220ms cubic-bezier(0.2,0.9,0.3,1.1); }
+@keyframes rcPopIn { from { transform:scale(0.94) translateY(10px); opacity:0; } to { transform:none; opacity:1; } }
+.modal-box h3 { font-weight:800; color:var(--ink); }
+.mm-save { background:linear-gradient(150deg, #2F6BF0, #1D4FD7); box-shadow:0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2); border-radius:12px; }
+.mm-save.red { background:rgba(248,113,113,0.14); border:1px solid rgba(248,113,113,0.4); color:#FCA5A5; box-shadow:none; }
+.mm-cancel { background:rgba(255,255,255,0.05); border:1px solid var(--line); color:var(--ink); border-radius:12px; }
+.redist-info { border-radius:13px; }
+.redist-proof { border-radius:13px; display:block; text-align:center; }
+.redist-proof.up { background:rgba(96,165,250,0.07); border-color:rgba(96,165,250,0.4); color:var(--sig-blue); }
+.redist-proof b { font-variant-numeric:tabular-nums; font-size:1rem; }
+.rp-effect { margin-top:5px; font-size:0.7rem; font-weight:700; opacity:0.9; }
+
+/* ── درج الموظف: هوية أعمق ── */
+.ed-avatar { background:linear-gradient(150deg, #3B5BD6, #6D3BD6); }
+.ed-row .k { color:var(--ink-faint); }
+.ed-row .v { color:var(--ink); }
+
+/* ── وضع التوزيع: الفرق الناقصة أنبض وأوضح (§4) ── */
+body.rc-move-mode .team-card.status-missing:not(.vehicle-card) {
+    border-color:rgba(245,198,107,0.85) !important;
+    animation:rcTargetPulse 1.2s ease-in-out infinite;
+}
+body.rc-move-mode .team-card.status-missing .tc-dropzone { font-size:0.78rem; padding:12px; }
+.rc-nr-card { border-style:dashed; border-color:rgba(192,132,252,0.4); }
+body.rc-move-mode .rc-nr-card, .rc-nr-card.rc-drop-target { border-style:solid; }
+
+/* ── §7: عمليات المركبات — عرض كامل الشاشة فوق اللوحة ── */
+#vehiclesDrawer.side-drawer.veh-fullscreen { width:100%; max-width:100%; inset:0; left:0; right:0;
+    border-inline-end:none; border-radius:0; padding:0;
+    background:
+        radial-gradient(1100px 480px at 50% -140px, rgba(84,122,214,0.16), transparent 62%),
+        linear-gradient(180deg, #0B1226 0%, #070B18 70%);
+    transform:translateY(100%); transition:transform 260ms cubic-bezier(0.2,0.9,0.3,1); }
+#vehiclesDrawer.side-drawer.veh-fullscreen.open { transform:none; }
+#vehiclesDrawer.veh-fullscreen .drawer-body { width:min(1560px, 100%); margin:0 auto; padding:22px 28px 60px; }
+#vehiclesDrawer.veh-fullscreen .cards-grid { grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); }
+.side-drawer.veh-fullscreen { display:flex; flex-direction:column; }
+.veh-fs-head { position:sticky; top:0; z-index:5; padding:18px 28px;
+    background:linear-gradient(180deg, rgba(10,15,32,0.95), rgba(10,15,32,0.82));
+    border-bottom:1px solid var(--line); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.veh-fs-head h3 { font-size:1.15rem; font-weight:800; }
+.veh-fs-sub { color:var(--ink-faint); font-size:0.68rem; font-weight:700; letter-spacing:1.5px; margin-inline-start:8px; }
+.veh-fs-back { margin-inline-start:auto; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.10);
+    color:var(--sig-blue); border-radius:10px; padding:7px 16px; font-family:inherit; font-size:0.82rem; font-weight:700; cursor:pointer;
+    transition:filter 150ms ease, transform 150ms ease; }
+.veh-fs-back:hover { filter:brightness(1.15); transform:translateY(-1px); }
+.veh-fullscreen .drawer-body { width:min(1560px, 100%); margin:0 auto; padding:22px 28px 60px; overflow-y:auto; flex:1; }
+.veh-fullscreen .section { margin-bottom:0; }
+
+/* ── §9: بحث تسجيل الخروج ── */
+.so-search-wrap { position:relative; }
+.so-search-wrap input { width:100%; background:linear-gradient(168deg, rgba(96,165,250,0.08), rgba(255,255,255,0.03));
+    border:1px solid rgba(96,165,250,0.28); border-radius:12px; color:var(--ink); caret-color:var(--sig-blue);
+    padding:0.55rem 0.8rem; font-size:0.85rem; font-family:inherit; }
+.so-search-wrap input:focus { outline:none; border-color:rgba(96,165,250,0.6); box-shadow:0 0 0 4px rgba(96,165,250,0.10); }
+.so-search-results { position:absolute; top:calc(100% + 6px); inset-inline-start:0; width:100%; z-index:70;
+    max-height:300px; overflow-y:auto; padding:6px;
+    background:linear-gradient(168deg, rgba(20,28,54,0.98), rgba(12,18,38,0.98));
+    border:1px solid rgba(255,255,255,0.12); border-radius:14px;
+    box-shadow:0 24px 50px rgba(0,0,0,0.6); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.so-sr-row { cursor:pointer; }
+
+/* ── §10: مؤشر الحفظ التلقائي غير البارز ── */
+.notes-saved { font-size:0.66rem; font-weight:700; margin-inline-start:8px; color:var(--ink-faint); transition:color 200ms ease; }
+.notes-saved.pending { color:var(--sig-amber); }
+.notes-saved.ok { color:var(--sig-green); }
+.notes-saved.err { color:var(--sig-red); }
+.notes-box textarea { border-radius:12px; background:rgba(255,255,255,0.035); }
+.notes-box textarea:focus { border-color:rgba(96,165,250,0.5); box-shadow:0 0 0 4px rgba(96,165,250,0.10); }
+
+/* ── حارس الطباعة للإضافات الجديدة ── */
+@media print {
+    #nonRosterSection, .veh-fs-back, .so-search-wrap, .notes-saved { display:none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISUAL IDENTITY FINAL v2 — استكمال لغة المرجع (Premium Dark /
+   Glass Workforce Operations). البنية موجودة أصلًا في HTML
+   (kpi-ic/kpi-tx/pm-av/pm-info/wb-view-toggle/wb-clock) وهذه
+   الطبقة تمنحها شكل المرجع: مربعات أيقونات ملوّنة متوهجة، بطاقات
+   مصبوغة بالكامل بلون الحالة، وميض هادئ للناقصة/الخارجة،
+   مونوغرام محايد للأفراد، أزرار ghost.
+   طبقة عرض فقط — لا منطق ولا معرّفات ولا معالجات.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── شريط الشرائح: صف مرن بمسافات المرجع ── */
+.dashboard.wb-chips { display:flex; flex-wrap:wrap; gap:10px; padding:0; max-width:none; margin:0; }
+
+/* ── شرائح KPI بريميوم: أيقونة في مربع ملوّن + رقم كبير + وصف صغير ── */
+.wb-chip.kpi { display:flex; align-items:center; gap:11px; padding:9px 15px 9px 13px; border-radius:16px; }
+.wb-chip.kpi .kpi-ic {
+    width:40px; height:40px; border-radius:12px; flex-shrink:0;
+    display:grid; place-items:center; font-size:15px;
+    background:rgba(255,255,255,0.06); color:var(--ink-dim);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+.wb-chip.kpi .kpi-tx { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.wb-chip.kpi .kpi-tx b { font-size:1.22rem; font-weight:800; line-height:1.15; font-variant-numeric:tabular-nums; color:var(--ink); }
+.wb-chip.kpi .kpi-tx i { font-style:normal; font-size:0.64rem; font-weight:600; color:var(--ink-faint); letter-spacing:0.1px; }
+.wb-chip.kpi .kpi-total { font-size:0.62rem; font-weight:700; color:var(--ink-faint); margin-inline-start:3px; }
+.wb-chip.kpi.green  { border-color:rgba(52,211,153,0.32);  background:linear-gradient(168deg, rgba(52,211,153,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.green .kpi-ic  { background:rgba(52,211,153,0.14);  color:var(--sig-green);  box-shadow:inset 0 0 0 1px rgba(52,211,153,0.30),  0 0 14px rgba(52,211,153,0.16); }
+.wb-chip.kpi.amber  { border-color:rgba(251,191,36,0.32);  background:linear-gradient(168deg, rgba(251,191,36,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.amber .kpi-ic  { background:rgba(251,191,36,0.14);  color:var(--sig-amber);  box-shadow:inset 0 0 0 1px rgba(251,191,36,0.30),  0 0 14px rgba(251,191,36,0.16); }
+.wb-chip.kpi.red    { border-color:rgba(248,113,113,0.32); background:linear-gradient(168deg, rgba(248,113,113,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.red .kpi-ic    { background:rgba(248,113,113,0.14); color:var(--sig-red);    box-shadow:inset 0 0 0 1px rgba(248,113,113,0.30), 0 0 14px rgba(248,113,113,0.16); }
+.wb-chip.kpi.purple { border-color:rgba(192,132,252,0.32); background:linear-gradient(168deg, rgba(192,132,252,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.purple .kpi-ic { background:rgba(192,132,252,0.14); color:var(--sig-purple); box-shadow:inset 0 0 0 1px rgba(192,132,252,0.30), 0 0 14px rgba(192,132,252,0.16); }
+.wb-chip.kpi.blue   { border-color:rgba(96,165,250,0.32);  background:linear-gradient(168deg, rgba(96,165,250,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.blue .kpi-ic   { background:rgba(96,165,250,0.14);  color:var(--sig-blue);   box-shadow:inset 0 0 0 1px rgba(96,165,250,0.30),  0 0 14px rgba(96,165,250,0.16); }
+.wb-chip.kpi.teal   { border-color:rgba(45,212,191,0.32);  background:linear-gradient(168deg, rgba(45,212,191,0.09), rgba(255,255,255,0.02)); }
+.wb-chip.kpi.teal .kpi-ic   { background:rgba(45,212,191,0.14);  color:#2DD4BF;           box-shadow:inset 0 0 0 1px rgba(45,212,191,0.30),  0 0 14px rgba(45,212,191,0.16); }
+.wb-chip.kpi.gray .kpi-ic   { background:rgba(154,167,196,0.12); color:var(--ink-dim);    box-shadow:inset 0 0 0 1px rgba(154,167,196,0.25); }
+
+/* ── شريحة الترشيح النشطة: حلقة توهج بلونها ── */
+.wb-chip.kpi-filter.kpi-on.green { box-shadow:0 0 0 3px rgba(52,211,153,0.22), 0 10px 24px rgba(2,6,18,0.4); }
+.wb-chip.kpi-filter.kpi-on.amber { box-shadow:0 0 0 3px rgba(251,191,36,0.22), 0 10px 24px rgba(2,6,18,0.4); }
+.wb-chip.kpi-filter.kpi-on.red   { box-shadow:0 0 0 3px rgba(248,113,113,0.22), 0 10px 24px rgba(2,6,18,0.4); }
+
+/* ── الساعة المباشرة: حبة زجاجية بنقطة نابضة ── */
+.wb-clock {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:7px 14px; border-radius:999px; font-size:0.78rem; font-weight:700; color:var(--ink-dim);
+    background:linear-gradient(168deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+    border:1px solid var(--line); box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.wb-clock b { color:var(--ink); font-variant-numeric:tabular-nums; direction:ltr; }
+.wb-live-dot { color:var(--sig-green); font-size:0.5rem; animation:rcLivePulse 1.8s ease-in-out infinite; }
+@keyframes rcLivePulse { 0%,100% { opacity:1; text-shadow:0 0 8px rgba(52,211,153,0.8); } 50% { opacity:0.45; text-shadow:none; } }
+
+/* ── أزرار الشريط العلوي: ghost pills كالمرجع بدل الأزرار المصمتة ── */
+.top-bar .btn-home, .top-bar .btn-print {
+    background:linear-gradient(168deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+    border:1px solid var(--line); color:var(--ink);
+    border-radius:999px; padding:7px 16px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.top-bar .btn-home:hover, .top-bar .btn-print:hover { border-color:rgba(96,165,250,0.5); box-shadow:0 6px 18px rgba(30,80,180,0.25), inset 0 1px 0 rgba(255,255,255,0.08); }
+.top-bar .badge { border-radius:999px; }
+
+/* ── بطاقات الفرق: صبغ كامل بلون الحالة + حدود إشارية ── */
+.team-card.status-ready {
+    background:linear-gradient(168deg, rgba(52,211,153,0.14), rgba(52,211,153,0.04) 55%, rgba(255,255,255,0.015));
+    border-color:rgba(52,211,153,0.34);
+}
+.team-card.status-ready:hover { border-color:rgba(52,211,153,0.55); box-shadow:0 18px 40px rgba(2,6,18,0.48), 0 0 24px rgba(52,211,153,0.10), inset 0 1px 0 rgba(255,255,255,0.06); }
+.team-card.status-missing {
+    background:linear-gradient(168deg, rgba(251,191,36,0.15), rgba(251,191,36,0.045) 55%, rgba(255,255,255,0.015));
+    border-color:rgba(251,191,36,0.38);
+    animation:rcPulseAmber 2.6s ease-in-out infinite;
+}
+.team-card.status-offline {
+    background:linear-gradient(168deg, rgba(248,113,113,0.16), rgba(248,113,113,0.05) 55%, rgba(255,255,255,0.015));
+    border-color:rgba(248,113,113,0.40);
+    animation:rcPulseRed 2.6s ease-in-out infinite;
+}
+.team-card.status-pending {
+    background:linear-gradient(168deg, rgba(154,167,196,0.10), rgba(154,167,196,0.03) 55%, rgba(255,255,255,0.015));
+    border-color:rgba(154,167,196,0.25);
+}
+/* وميض هادئ واحترافي يلفت انتباه غرفة العمليات دون إزعاج */
+@keyframes rcPulseAmber {
+    0%, 100% { box-shadow:0 18px 40px rgba(2,6,18,0.48), 0 0 0 rgba(251,191,36,0), inset 0 1px 0 rgba(255,255,255,0.06); }
+    50%      { box-shadow:0 18px 40px rgba(2,6,18,0.48), 0 0 26px rgba(251,191,36,0.20), inset 0 1px 0 rgba(255,255,255,0.06); }
+}
+@keyframes rcPulseRed {
+    0%, 100% { box-shadow:0 18px 40px rgba(2,6,18,0.48), 0 0 0 rgba(248,113,113,0), inset 0 1px 0 rgba(255,255,255,0.06); }
+    50%      { box-shadow:0 18px 40px rgba(2,6,18,0.48), 0 0 28px rgba(248,113,113,0.22), inset 0 1px 0 rgba(255,255,255,0.06); }
+}
+
+/* ── شبكة البطاقات: اتساع أقرب للمرجع ── */
+.cards-grid { grid-template-columns:repeat(auto-fill, minmax(252px, 1fr)); }
+
+/* ── صفوف الأفراد: مونوغرام محايد + عمود معلومات (بنية pm-av/pm-info موجودة أصلًا) ── */
+.pm { display:flex; align-items:flex-start; gap:10px; padding:8px 11px; text-align:right; }
+.pm-av {
+    width:30px; height:30px; border-radius:9px; flex-shrink:0; margin-top:1px;
+    display:grid; place-items:center;
+    font-size:0.82rem; font-weight:800; color:#fff;
+    background:linear-gradient(150deg, #3B5BD6, #6D3BD6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(40,60,160,0.35);
+}
+.pm-info { flex:1; min-width:0; }
+.pm-info .pm-name { line-height:1.5; }
+.tc-empty { color:var(--ink-faint); font-size:0.78rem; font-weight:600; padding:10px 4px; text-align:center; }
+
+/* ── عناوين الأقسام: شريط متوهج كالمرجع ── */
+.section-title { position:relative; padding-inline-start:14px; }
+.section-title::before {
+    content:''; position:absolute; inset-inline-start:0; top:50%; transform:translateY(-50%);
+    width:4px; height:20px; border-radius:4px;
+    background:linear-gradient(180deg, var(--sig-blue), transparent);
+    box-shadow:0 0 12px rgba(96,165,250,0.5);
+}
+
+/* ── مبدّل العرض (بطاقات/جدول): حبوب زجاجية ── */
+.wb-viewbar { padding-bottom:0.5rem; }
+.wb-view-toggle { display:inline-flex; gap:6px; padding:5px; border-radius:999px;
+    background:linear-gradient(168deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    border:1px solid var(--line); }
+.wb-view-toggle button {
+    border:none; background:transparent; color:var(--ink-dim);
+    padding:7px 18px; border-radius:999px; font-family:inherit; font-size:0.78rem; font-weight:700; cursor:pointer;
+    transition:all 160ms ease;
+}
+.wb-view-toggle button.on {
+    background:linear-gradient(150deg, #2F6BF0, #1D4FD7); color:#fff;
+    box-shadow:0 8px 18px rgba(30,90,220,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* ── شريط التقدم العام: توهج أعمق ── */
+.progress-bar { height:26px; border-radius:14px; }
+.progress-fill { box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 0 18px rgba(96,165,250,0.18); }
+
+/* ── أزرار الإنهاء/سير العمل: فخامة المرجع ── */
+.btn-finish { background:linear-gradient(150deg, #2F6BF0, #1D4FD7); box-shadow:0 12px 28px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2); border-radius:16px; }
+.btn-workflow { border-radius:14px; }
+
+/* ── بطاقات الحوض: رفع عند التحويم كبطاقات الأشخاص في المرجع ── */
+.support-card { transition:transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease; }
+.support-card:hover { transform:translateY(-2px); border-color:rgba(96,165,250,0.4); box-shadow:0 16px 30px rgba(2,6,18,0.55), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+/* ── حارس الطباعة: لا وميض ولا حركات في النسخة المطبوعة ── */
+@media print {
+    .team-card.status-missing, .team-card.status-offline { animation:none !important; }
+    .wb-live-dot { animation:none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISUAL REDESIGN v3 — إعادة تصميم بصري على المرجع المرسل
+   (Workforce Operations / Control Center):
+   · الشريط العلوي يصبح ترويسة نحيفة غير لاصقة.
+   · شرائح KPI تصبح بطاقات مستطيلة كاملة العرض: رقم ضخم + أيقونة
+     زجاجية في الزاوية + تسمية صغيرة.
+   · بطاقة الفريق بتشريح المرجع: حبة حالة شفافة في الرأس (بلا شريط
+     ملوّن)، اسم فريق أكبر، نسبة قوة ضخمة، مسار تقدم أنحف، أفاتار
+     دائري للأفراد.
+   · حوض القوة المتاحة أسفل اللوحة (نُقل في HTML) وبطاقات أشخاص
+     بأفاتار دائري في الزاوية.
+   طبقة عرض فقط — لا منطق ولا معرّفات ولا معالجات ولا API.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1) الترويسة: نحيفة وغير لاصقة كالمرجع ── */
+.top-bar {
+    position:static;
+    background:transparent; border-bottom:none; box-shadow:none;
+    backdrop-filter:none; -webkit-backdrop-filter:none;
+    padding:1.15rem 1.75rem 0.2rem;
+}
+.top-bar h1 { font-size:1.32rem; font-weight:800; }
+
+/* ── 2) شريط KPI: بطاقات مستطيلة بكامل العرض (وليست حبوبًا) ── */
+.dashboard.wb-chips {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(136px, 1fr));
+    gap:12px; width:100%; padding:0.9rem 0 0.15rem;
+}
+.wb-chip.kpi {
+    position:relative; flex-direction:column; align-items:flex-start; justify-content:center;
+    gap:4px; min-height:94px; padding:15px 16px; border-radius:14px;
+}
+.wb-chip.kpi .kpi-ic {
+    position:absolute; top:14px; inset-inline-end:14px;
+    width:32px; height:32px; border-radius:9px; font-size:13px;
+}
+.wb-chip.kpi .kpi-tx { padding-inline-end:42px; }
+.wb-chip.kpi .kpi-tx b { display:block; font-size:1.7rem; line-height:1.06; }
+.wb-chip.kpi .kpi-tx i { font-size:0.68rem; }
+
+/* ── 3) شريط التقدم العام: أنحف وأهدأ كالمرجع ── */
+.wb-progress { padding:0.4rem 0 0.55rem; }
+.progress-bar { height:13px; border-radius:99px; }
+.progress-fill { font-size:0.62rem; }
+
+/* ── 4) شريط الأدوات فوق الشبكة ── */
+.wb-viewbar { padding-bottom:0; margin-top:0.35rem; }
+
+/* ── 5) بطاقة الفريق: رأس شفاف بحبة حالة (بدل الشريط الملوّن) ── */
+.team-card .tc-status-bar { background:transparent; height:auto; padding:14px 16px 0; }
+.tc-status-bar .card-status { border-radius:999px; padding:4px 13px; margin-top:0; font-size:0.72rem; font-weight:800; }
+.team-card.status-ready .card-status   { background:rgba(52,211,153,0.14);  color:var(--sig-green); border:1px solid rgba(52,211,153,0.35); }
+.team-card.status-missing .card-status { background:rgba(251,191,36,0.14);  color:var(--sig-amber); border:1px solid rgba(251,191,36,0.38); }
+.team-card.status-offline .card-status { background:rgba(248,113,113,0.15); color:var(--sig-red);   border:1px solid rgba(248,113,113,0.40); }
+.team-card.status-pending .card-status { background:rgba(154,167,196,0.12); color:var(--ink-dim);   border:1px solid rgba(154,167,196,0.28); }
+.tc-status-bar .tc-center { margin-inline-start:auto; }
+
+/* ── 6) جسم البطاقة: اسم أكبر + نسبة قوة ضخمة + مسار أنحف ── */
+.tc-body { padding:9px 16px 15px; }
+.tc-head { display:flex; align-items:baseline; gap:9px; }
+.tc-head .card-name { font-size:1.28rem; font-weight:800; margin-top:0; }
+.tc-strength { margin-top:9px; }
+.tc-count { font-size:1.85rem; font-weight:800; line-height:1; }
+.tc-track { height:6px; }
+
+/* ── 7) أفاتار دائري للأفراد كالمرجع ── */
+.pm { align-items:center; }
+.pm-av { width:33px; height:33px; border-radius:50%; font-size:0.8rem; margin-top:0; }
+
+/* ── 8) شبكة الفرق: بطاقات أعرض كالمرجع (≈5 في الصف على الشاشات العريضة) ── */
+.cards-grid { grid-template-columns:repeat(auto-fill, minmax(278px, 1fr)); }
+
+/* ── 9) بطاقات الحوض: أفاتار دائري في الزاوية + نص بجانبه ── */
+.pool-strip .support-card { position:relative; min-width:238px; }
+.support-card .sp-avatar {
+    position:absolute; top:14px; inset-inline-start:14px;
+    width:40px; height:40px; border-radius:50%; font-size:0.95rem;
+}
+.support-card .sp-name { margin-inline-start:52px; margin-top:4px; font-size:0.95rem; }
+.support-card .sp-job { margin-inline-start:52px; }
+.support-card .sp-badges { margin-top:7px; }
+
+/* ── 11) الحوض بشكل المرجع: بطاقة شخص مدمجة + أفاتار ملوّن حسب نوع المورد ── */
+.pool-strip .support-card { min-width:250px; max-width:305px; padding:14px 16px 12px; border-radius:16px; }
+.support-card .sp-name { font-size:0.98rem; font-weight:800; }
+.support-card .sp-job, .support-card .sp-meta { font-size:0.68rem; }
+.support-card .sp-meta { margin-top:1px; }
+.support-card .op-badge { border-radius:999px; }
+.support-card[data-pkind="vol"] .sp-avatar { background:linear-gradient(150deg, #B8860B, #D4A017); box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(212,160,23,0.5); }
+.support-card[data-pkind="overlap"] .sp-avatar { background:linear-gradient(150deg, #7C3AED, #A855F7); box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(168,85,247,0.5); }
+.support-card[data-pkind="reserve"] .sp-avatar { background:linear-gradient(150deg, #5E7189, #8A9BB0); box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(94,113,137,0.5); }
+
+/* ── 12) إصلاح تشوّه رأس الحوض: تبويبات الترشيح وأسهم التمرير كانت بلا CSS ── */
+#supportSection .section-title { flex-wrap:wrap; row-gap:10px; }
+.pool-tabs { display:inline-flex; gap:6px; flex-wrap:wrap; margin-inline-start:6px; }
+.pool-tabs button {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 14px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:rgba(255,255,255,0.05);
+    color:var(--ink-dim); font-family:inherit; font-size:0.74rem; font-weight:700;
+    transition:all 150ms ease;
+}
+.pool-tabs button:hover { border-color:rgba(96,165,250,0.45); color:var(--ink); }
+.pool-tabs button.on { background:linear-gradient(150deg, #2F6BF0, #1D4FD7); border-color:transparent; color:#fff;
+    box-shadow:0 8px 18px rgba(30,90,220,0.35), inset 0 1px 0 rgba(255,255,255,0.2); }
+.pt-dot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.pt-green  { background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.7); }
+.pt-purple { background:#C084FC; box-shadow:0 0 6px rgba(192,132,252,0.7); }
+.pt-blue   { background:#60A5FA; box-shadow:0 0 6px rgba(96,165,250,0.7); }
+.pt-amber  { background:#FBBF24; box-shadow:0 0 6px rgba(251,191,36,0.7); }
+.pool-nav { display:inline-flex; gap:6px; margin-inline-start:auto; }
+.pool-nav button {
+    width:30px; height:30px; border-radius:9px; cursor:pointer;
+    border:1px solid var(--line); background:rgba(255,255,255,0.05); color:var(--ink-dim);
+    font-family:inherit; font-size:0.72rem; transition:all 150ms ease;
+}
+.pool-nav button:hover { border-color:rgba(96,165,250,0.45); color:var(--ink); }
+
+/* ── 13) تحصين السحب: منع خطف الروابط/التحديد لفتة السحب («أحيانًا يعلق») ── */
+.pm, .support-card { user-select:none; -webkit-user-select:none; }
+.pm a, .support-card a { -webkit-user-drag:none; user-drag:none; }
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -340,13 +1286,86 @@ body::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 </script>
 
 <div class="top-bar">
-    <div style="display:flex; align-items:center; gap:1rem;">
-        <h1>تكميل المراكز الإسعافية</h1>
-        <span class="badge" id="shiftBadge">جاري التحميل...</span>
+    <div class="wb-row">
+        <div class="wb-title-group">
+            <h1>تكميل المراكز الإسعافية</h1>
+            <span class="badge" id="shiftBadge">جاري التحميل...</span>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <!-- ③ المواصفة المشروحة: ساعة مباشرة بتوقيت الرياض (عرض فقط) -->
+            <span class="wb-clock" id="wbClock" title="الوقت الآن بتوقيت الرياض"><i class="fas fa-circle wb-live-dot"></i> <b id="wbClockTime">--:--:--</b> مباشر</span>
+            <button class="btn btn-home" onclick="navigateToPage('index.html')"><i class="fas fa-home"></i> الرئيسية</button>
+            <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+        </div>
     </div>
-    <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-home" onclick="navigateToPage('index.html')"><i class="fas fa-home"></i> الرئيسية</button>
-        <button class="btn btn-print" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+    <!-- T1: مؤشرات حية كـ chips داخل شريط التحكم — نفس معرفات لوحة المعلومات القائمة
+         (dashReady/dashMissing/dashOffline/dashVehSupport/dashVehOut/dashReadyPct)
+         ونفس مصدرها السيرفي، بلا أي تغيير في الجلب أو الحساب -->
+    <div class="wb-row">
+        <div class="dashboard wb-chips">
+            <!-- شرائح KPI بريميوم بأسلوب المرجع (مربع أيقونة ملوّن + رقم كبير + وصف صغير
+                 + توهج حافة بلون الحالة) — نفس معرفات اللوحة القائمة ونفس مصدرها
+                 السيرفي، بلا أي تغيير في الجلب أو الحساب. شرائح الحالة الثلاث
+                 (جاهزة/ناقصة/خارج الخدمة) قابلة للضغط لترشيح اللوحة (② المواصفة) -->
+            <div class="wb-chip kpi green kpi-filter" data-kfilter="ready" onclick="kpiFilterToggle('ready')">
+                <span class="kpi-ic"><i class="fas fa-hospital"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashReady">—</span><small class="kpi-total" id="dashReadyTotal"></small></b><i>المراكز — جاهزة</i></span>
+            </div>
+            <div class="wb-chip kpi amber kpi-filter" data-kfilter="missing" onclick="kpiFilterToggle('missing')">
+                <span class="kpi-ic"><i class="fas fa-triangle-exclamation"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashMissing">—</span></b><i>ناقصة — تحتاج دعمًا</i></span>
+            </div>
+            <div class="wb-chip kpi red kpi-filter" data-kfilter="offline" onclick="kpiFilterToggle('offline')">
+                <span class="kpi-ic"><i class="fas fa-circle-xmark"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashOffline">—</span></b><i>مراكز خارج الخدمة</i></span>
+            </div>
+            <!-- §3 المراجعة النهائية: التفريق المحاسبي بين المجدول والعامل فعليًا —
+                 القيم من مجاميع الخادم (scheduledStaff/totalStaff) وعدّ أدوار
+                 support/activation من الحالة السيرفرية نفسها — عرض فقط -->
+            <div class="wb-chip kpi purple">
+                <span class="kpi-ic"><i class="fas fa-users"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashScheduled">—</span></b><i>القوة المجدولة — موظف مجدول</i></span>
+            </div>
+            <div class="wb-chip kpi blue">
+                <span class="kpi-ic"><i class="fas fa-user-check"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashWorking">—</span></b><i>القوة العاملة — موظف متاح</i></span>
+            </div>
+            <div class="wb-chip kpi blue">
+                <span class="kpi-ic"><i class="fas fa-plus"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashOutOfPlan">—</span></b><i>خارج الجدول — دعم/تفعيل</i></span>
+            </div>
+            <div class="wb-chip kpi green">
+                <span class="kpi-ic"><i class="fas fa-wave-square"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashReadyPct">—</span></b><i>نسبة الجاهزية</i></span>
+            </div>
+            <div class="wb-chip kpi blue">
+                <span class="kpi-ic"><i class="fas fa-handshake-angle"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashVehSupport">—</span></b><i>مركبات داعمة</i></span>
+            </div>
+            <div class="wb-chip kpi gray">
+                <span class="kpi-ic"><i class="fas fa-ban"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashVehOut">—</span></b><i>مركبات خارج الخدمة</i></span>
+            </div>
+            <button class="wb-chip kpi teal wb-chip-btn" id="vehDrawerChip" onclick="openVehiclesDrawer()">
+                <span class="kpi-ic"><i class="fas fa-truck-medical"></i></span>
+                <span class="kpi-tx"><b><span class="value" id="dashVehReady">—</span></b><i>مركبات جاهزة — من الأصل</i></span>
+            </button>
+        </div>
+    </div>
+    <!-- T2: بحث ذكي عن الموظفين (القائمة الكاملة تُجلب مرة من الخادم وتُرشَّح محليًا
+         ثم تُدمج مع الحالة السيرفرية المحملة أصلًا — بلا مصدر حقيقة جديد).
+         شريحة المركبات انتقلت إلى صف الشرائح أعلاه بنفس المعرف والمعالج -->
+    <div class="wb-row">
+        <div class="wb-search-wrap">
+            <i class="fas fa-search"></i>
+            <input id="wbSearch" type="text" autocomplete="off" placeholder="بحث ذكي: اسم موظف أو رقم وظيفي…" oninput="wbSearchInput()">
+            <div class="wb-search-results" id="wbSearchResults" style="display:none"></div>
+        </div>
+    </div>
+    <div class="progress-wrap wb-progress">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width:0%; background:var(--gray);">—</div>
+        </div>
     </div>
 </div>
 
@@ -358,50 +1377,73 @@ function navigateToPage(url) {
 }
 </script>
 
-<!-- لوحة المعلومات — تتحدث لحظيًا من الخادم -->
-<div class="dashboard">
-    <div class="dash-card green"><div class="value" id="dashReady">—</div><div class="label">✅ فرق جاهزة</div></div>
-    <div class="dash-card yellow"><div class="value" id="dashMissing">—</div><div class="label">⚠️ فرق ناقصة</div></div>
-    <div class="dash-card red"><div class="value" id="dashOffline">—</div><div class="label">🔴 فرق خارج الخدمة</div></div>
-    <div class="dash-card blue"><div class="value" id="dashVehSupport">—</div><div class="label">🤝 مركبات داعمة</div></div>
-    <div class="dash-card gray"><div class="value" id="dashVehOut">—</div><div class="label">⛔ مركبات خارج الخدمة</div></div>
-    <div class="dash-card green"><div class="value" id="dashReadyPct">—</div><div class="label">📊 نسبة الجاهزية</div></div>
-</div>
-<div class="progress-wrap">
-    <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width:0%; background:var(--gray);">—</div>
-    </div>
+<!-- لوحة المعلومات وشريط التقدم انتقلا (T1) داخل شريط التحكم اللاصق أعلاه — نفس المعرفات -->
+
+<!-- ⑧ أُزيل مبدّل «عرض البطاقات / عرض الجدول» بطلب المالك — عرض البطاقات هو العرض الوحيد -->
+
+<!-- §5 المراجعة النهائية: فرق غير مجدولة اليوم (من /api/teams — vbTeamsCache
+     المحمّل أصلًا) تظهر أهدافًا إضافية أثناء وضع التوزيع فقط — «تفعيل + توزيع»
+     عبر حدث activation القائم، بلا أي مسار سيرفري جديد -->
+<div class="section" id="nonRosterSection" style="display:none">
+    <div class="section-title"><i class="fas fa-bolt"></i> فرق غير مجدولة اليوم <span class="wb-sub">تفعيل + توزيع — اختر فرقة لتفعيلها مع الموظف</span></div>
+    <div class="cards-grid" id="nonRosterCards"></div>
 </div>
 
-<!-- Rapid Teams -->
-<div class="section" id="rapidSection" style="display:none">
-    <div class="section-title"><i class="fas fa-bolt"></i> فرق التدخل السريع</div>
-    <div class="cards-grid" id="rapidCards"></div>
-</div>
-
-<!-- Centers -->
+<!-- المراكز -->
 <div class="section" id="centersSection" style="display:none">
-    <div class="section-title"><i class="fas fa-hospital"></i> مراكز الإسعاف</div>
+    <div class="section-title"><i class="fas fa-hospital"></i> المراكز</div>
     <div class="cards-grid" id="centerCards"></div>
 </div>
 
-<!-- Special Teams — القيادة والعمليات (تأتي من الخادم مثل بقية الفرق) -->
+<!-- سريع / تدخل سريع -->
+<div class="section" id="rapidSection" style="display:none">
+    <div class="section-title"><i class="fas fa-bolt"></i> سريع / تدخل سريع</div>
+    <div class="cards-grid" id="rapidCards"></div>
+</div>
+
+<!-- الإدارات والقيادة (تأتي من الخادم مثل بقية الفرق) -->
 <div class="section" id="specialSection" style="display:none">
-    <div class="section-title"><i class="fas fa-star"></i> القيادة والعمليات</div>
+    <div class="section-title"><i class="fas fa-star"></i> الإدارات والقيادة</div>
     <div class="cards-grid" id="specialCards"></div>
+</div>
+
+<!-- القوة المتاحة (T1 — Resource Pool): القوى المجدولة غير الموزعة من الخادم مباشرة،
+     شريط موارد بنمط اللوحة — نفس البيانات والأزرار والمودالات القائمة.
+     (إعادة التصميم v3: نُقل القسم لأسفل اللوحة — المراكز أولًا ثم الحوض — كالمرجع.
+     نقل موضعي بحت: كل المعرفات والمعالجات كما هي) -->
+<div class="section" id="supportSection" style="display:none">
+    <div class="section-title"><i class="fas fa-handshake"></i> القوة المتاحة <span class="support-count" id="supportCount"></span> <span class="wb-sub">AVAILABLE RESOURCES · دعم · تطوع · أوفرلاب · احتياط</span>
+        <!-- ⑥ المواصفة: تبويبات ترشيح عرضية فوق عناصر الحوض القائمة (حسب
+             شاراتها/أنواعها الحالية — عرض فقط) + أسهم تمرير الشريط الأفقي -->
+        <span class="pool-tabs" id="poolTabs">
+            <button class="on" data-pf="all" onclick="poolFilterSet('all')">الكل</button>
+            <button data-pf="avail" onclick="poolFilterSet('avail')"><i class="pt-dot pt-green"></i>متاح</button>
+            <button data-pf="overlap" onclick="poolFilterSet('overlap')"><i class="pt-dot pt-purple"></i>أوفرلاب</button>
+            <button data-pf="vol" onclick="poolFilterSet('vol')"><i class="pt-dot pt-blue"></i>متطوع</button>
+            <button data-pf="reserve" onclick="poolFilterSet('reserve')"><i class="pt-dot pt-amber"></i>احتياط</button>
+        </span>
+        <span class="pool-nav">
+            <button onclick="poolScroll(1)" aria-label="التالي" title="التالي"><i class="fas fa-chevron-left"></i></button>
+            <button onclick="poolScroll(-1)" aria-label="السابق" title="السابق"><i class="fas fa-chevron-right"></i></button>
+        </span>
+    </div>
+    <div class="cards-grid pool-strip" id="supportCards"></div>
+    <div class="wb-sr-empty" id="poolFilterEmpty" style="display:none">لا عناصر ضمن هذا التصنيف حاليًا</div>
 </div>
 
 <div class="section" id="teamsLoadingNote">
     <div class="section-empty"><i class="fas fa-circle-notch fa-spin"></i> جارٍ تحميل فرق المناوبة من الخادم…</div>
 </div>
 
-<!-- الدعم المتاح — القوى المجدولة غير الموزعة (حوض الأوفرلاب والدعم) من الخادم مباشرة -->
-<div class="section" id="supportSection" style="display:none">
-    <div class="section-title"><i class="fas fa-handshake"></i> الدعم المتاح <span class="support-count" id="supportCount"></span></div>
-    <div class="cards-grid" id="supportCards"></div>
-</div>
-
-<!-- Vehicles -->
+<!-- Vehicles — T2: القسم القائم بكل معرفاته ومعالجاته ومودالاته يُغلَّف داخل درج
+     جانبي (#vehiclesDrawer) يُفتح من شريحة «🚑 المركبات» في شريط التحكم؛ الإغلاق
+     يعيد للتكميل بلا مغادرة الصفحة. لا تغيير في أي id/معالج داخل القسم. -->
+<div class="drawer-overlay" id="vehiclesOverlay" onclick="closeVehiclesDrawer()"></div>
+<aside class="side-drawer veh-fullscreen" id="vehiclesDrawer" aria-label="عمليات المركبات">
+    <div class="drawer-head veh-fs-head"><h3><i class="fas fa-ambulance"></i> عمليات المركبات <span class="veh-fs-sub">VEHICLE OPERATIONS</span></h3>
+        <button class="veh-fs-back" onclick="closeVehiclesDrawer()"><i class="fas fa-arrow-right"></i> العودة إلى التكميل</button>
+        <button class="drawer-close" onclick="closeVehiclesDrawer()" title="إغلاق">&times;</button></div>
+    <div class="drawer-body">
 <div class="section" id="vehiclesSection">
     <div class="section-title"><i class="fas fa-ambulance"></i> المركبات</div>
     <div class="cards-grid" id="vehicleCards"></div>
@@ -411,6 +1453,8 @@ function navigateToPage(url) {
     </div>
     <div class="section-empty" id="vehiclesEmpty" style="display:none">لا توجد مركبات مسجلة في هذه المناوبة.</div>
 </div>
+    </div>
+</aside>
 
 <!-- ═══ جولة Operational Workflow Completion (المرحلة ب): تسجيل خروج المناوبة ═══
      القسم الرسمي لخروج الفرق (بديل كتابة الأسماء في خانة الملاحظات):
@@ -426,6 +1470,12 @@ function navigateToPage(url) {
     <div class="signout-panel">
         <div class="signout-form">
             <select id="signoutTeam" onchange="onSignoutTeamChange()"><option value="">— اختر الفرقة —</option></select>
+            <!-- §9 المراجعة النهائية: بحث فوري عن الموظف داخل تسجيل الخروج —
+                 يملأ حقل الفرد المحدد بالاسم الكامل؛ مسار الحفظ القائم بلا تغيير -->
+            <div class="so-search-wrap">
+                <input id="signoutSearch" type="text" autocomplete="off" placeholder="🔎 ابحث عن الموظف بالاسم أو الكود…" oninput="signoutSearchInput()">
+                <div class="so-search-results" id="signoutSearchResults" style="display:none"></div>
+            </div>
             <div class="signout-source" id="signoutSource" style="display:none"></div>
             <div class="signout-members" id="signoutMembers"></div>
             <!-- تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): وقت الخروج يدوي —
@@ -571,11 +1621,51 @@ function navigateToPage(url) {
     </div>
 </div>
 
+<!-- T2: درج الموظف — ينزلق من اليسار؛ يُفتح من صفوف أفراد الفرق وبطاقات الحوض
+     ونتائج البحث. عرض + إجراءات سياقية تستدعي التدفقات القائمة حرفيًا
+     (endCoverage/endActivation/personArrived/openActivationModal/openSupportModal/
+     endVolunteer) — بلا أي تدفق أو عقد جديد. -->
+<div class="drawer-overlay" id="empDrawerOverlay" onclick="closeEmployeeDrawer()"></div>
+<aside class="side-drawer" id="empDrawer" aria-label="بطاقة الموظف">
+    <div class="drawer-head"><h3><i class="fas fa-id-card"></i> بطاقة الموظف</h3>
+        <button class="drawer-close" onclick="closeEmployeeDrawer()" title="إغلاق">&times;</button></div>
+    <div class="drawer-body" id="empDrawerBody"></div>
+</aside>
+
+<!-- T3: نافذة تأكيد إعادة التوزيع — البوابة الوحيدة لكل حركات نقل الأشخاص
+     (سحب/إفلات أو وضع النقل من درج الموظف): الموظف/من/إلى/نوع الحركة + الإثبات
+     المحاسبي (القوة قبل/بعد من مجاميع serverWorkforce السيرفري) قبل أي إرسال.
+     التأكيد يرسل عبر postPersonEvents القائم: assignment للمجدولين،
+     external_support للدعم الخارجي، والمكلَّف أصلًا: support_end ثم الجديد تسلسليًا. -->
+<div class="modal-overlay" id="redistModal">
+    <div class="modal-box">
+        <h3 id="redistTitle">تأكيد إعادة التوزيع</h3>
+        <div class="redist-info" id="redistInfo"></div>
+        <div class="redist-proof" id="redistProof"></div>
+        <div class="mm-actions">
+            <button class="mm-save" onclick="confirmRedistribution()"><i class="fas fa-check"></i> تأكيد النقل</button>
+            <button class="mm-cancel" onclick="closeRedistModal()"><i class="fas fa-times"></i> إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- T3: لافتة وضع النقل — بديل اللمس للسحب/الإفلات: «نقل إلى فرقة» من درج
+     الموظف ← بطاقات الفرق تتوهج ← ضغطة على الفرقة المستهدفة تفتح نافذة التأكيد نفسها -->
+<div class="move-banner" id="moveBanner" style="display:none">
+    <span id="moveBannerText"></span>
+    <button onclick="cancelMoveMode()"><i class="fas fa-times"></i> إلغاء</button>
+</div>
+<!-- §8 المواصفة: شريط اقتراحات وضع التوزيع — «فرق تحتاج دعمًا الآن» (الناقصة
+     حاليًا من الحالة السيرفرية) + «تفعيل فرقة غير مجدولة»؛ القرار للمستخدم -->
+<div class="move-suggest" id="moveSuggest" style="display:none"></div>
+
 <!-- Notes -->
 <div class="notes-section">
     <div class="notes-box">
-        <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل</h3>
-        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل (مثال: تعطل باب غرفة عمليات، تأخير في التسليم...)" oninput="saveNotesDebounced();"></textarea>
+        <h3><i class="fas fa-sticky-note"></i> ملاحظات التكميل <span class="notes-saved" id="notesSaved"></span></h3>
+        <!-- §10 المراجعة النهائية: حفظ تلقائي فقط (debounced عبر postPersonEvents)
+             — بلا زر حفظ؛ التحميل مرة واحدة عند فتح الصفحة فقط، وSSE لا يمس الحقل -->
+        <textarea id="globalNotes" placeholder="اكتب هنا أي ملاحظات عامة عن التكميل — تُحفظ تلقائيًا أثناء الكتابة (مثال: تم دعم جنوب 8 من سريع 3 بسبب نقص القوة)" oninput="saveNotesDebounced();"></textarea>
     </div>
 </div>
 
@@ -921,9 +2011,14 @@ function teamInCurrentRoster(teamId) {
 }
 
 function renderAll() {
+    // تحصين السحب: لا إعادة رسم أثناء فتلة سحب نشطة — إعادة الرسم تهدم العقدة
+    // الممسوكة فيموت السحب بصمت («أحيانًا يعلق»). يُستدرك عند dragend.
+    if (document.querySelector('.pm.rc-dragging, .support-card.rc-dragging')) return;
     renderTeamSections();
     updateDashboard();
     renderMiniLogs();
+    // §8 المواصفة: تحديث اقتراحات «فرق تحتاج دعمًا الآن» مع كل تحديث للحالة
+    if (typeof moveCtx !== 'undefined' && moveCtx && typeof renderMoveSuggestions === 'function') renderMoveSuggestions();
 }
 
 function renderTeamSections() {
@@ -933,6 +2028,8 @@ function renderTeamSections() {
         return; // لم تصل حالة الخادم بعد
     }
     if (note) note.style.display = 'none';
+    var vbBar = document.getElementById('viewBar'); // ⑧ يظهر بعد وصول حالة الخادم
+    if (vbBar) vbBar.style.display = '';
     // W-تكامل ③: الأقسام تُبنى من مفاتيح الحالة المشتقة سيرفريًا (مرتبة من
     // الخادم) — لا قوائم ثابتة. التصنيف لتجميع العرض فقط.
     var rapid = [], centers = [], special = [];
@@ -953,10 +2050,26 @@ function renderTeamSection(sectionId, gridId, teams) {
     var grid = document.getElementById(gridId);
     if (!section || !grid) return;
     var html = '';
-    teams.forEach(function(t) {
-        if (!teamInCurrentRoster(t.id)) return; // ليس في جدول المناوبة — لا يظهر إطلاقًا
-        html += renderCard(t.id, t.name, t.type, rosterDataOf(t.id));
-    });
+    if (wbViewMode === 'table') {
+        // ⑧ المواصفة: عرض الجدول — نفس البيانات والأزرار (renderTeamTable)
+        html = renderTeamTable(teams);
+        grid.classList.add('wb-table-mode');
+    } else {
+        grid.classList.remove('wb-table-mode');
+        teams.forEach(function(t) {
+            if (!teamInCurrentRoster(t.id)) return; // ليس في جدول المناوبة — لا يظهر إطلاقًا
+            // ② المواصفة: ترشيح شرائح الحالة (عرض فقط)
+            if (wbStatusFilter) {
+                var fd = rosterDataOf(t.id);
+                if (!fd || (fd.status || 'pending') !== wbStatusFilter) return;
+            }
+            html += renderCard(t.id, t.name, t.type, rosterDataOf(t.id));
+        });
+    }
+    // مع ترشيح نشط بلا نتائج: ملاحظة هادئة بدل إخفاء القسم
+    if (!html && wbStatusFilter && teams.length) {
+        html = '<div class="section-empty">لا فرق بهذه الحالة حاليًا — اضغط الشريحة مجددًا لإلغاء الترشيح</div>';
+    }
     grid.innerHTML = html;
     section.style.display = html ? '' : 'none';
 }
@@ -984,43 +2097,42 @@ function renderCard(teamId, name, type, d) {
             // من m.state القادمة من الخادم فقط (عرض — ليست اشتقاقًا).
             if (m.role === 'activation') {
                 var anm = String(m.name).replace(/'/g, "\\'");
-                // تمييز عرضي (ملاحظة المالك): المتطوع المفعَّل يُوسم بشارة
-                // «🤝 متطوع» بجوار اسمه فتبقى الصفة ظاهرة في سطره الثانوي
-                // «منذ …» فقط — الأوفرلاب يبقى «أوفرلاب مفعَّل — منذ …».
-                // activationKind يأتي من الخادم (تطوع مفتوح بلا فريق)
+                // تمييز عرضي: المتطوع المفعَّل يُوسم «🤝 متطوع» بجوار اسمه — activationKind من الخادم
                 var isVolAct = m.activationKind === 'volunteer';
-                // السطر الثانوي: المتطوع «منذ …» فقط (الشارة تحمل الصفة) —
-                // الأوفرلاب «أوفرلاب مفعَّل» + « — منذ …» عند توفر الوقت
                 var actLine = (isVolAct ? '' : 'أوفرلاب مفعَّل') +
                     (m.since ? (isVolAct ? '' : ' — ') + 'منذ ' + TimeRiyadh.formatTime(m.since) : '');
                 var actStateBadge = (m.state === 'late' || m.state === 'absence')
                     ? '<div class="pm-code pm-state-late">⚠️ ' + (m.state === 'late' ? 'متأخر — لم يحضر بعد' : 'غائب — لم يحضر بعد') + '</div>'
                     : '';
-                return '<div class="pm">' +
+                return '<div class="pm" data-emp="' + escapeHtml(m.name) + '" data-mdrag="1">' +
+                    '<span class="pm-av">' + escapeHtml((m.name || '؟')[0]) + '</span><div class="pm-info">' +
                     (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
-                    '<div class="pm-name">⚡ ' + escapeHtml(m.name) + (isVolAct ? ' <span class="op-badge">🤝 متطوع</span>' : '') + '</div>' +
+                    '<div class="pm-name">⚡ ' + escapeHtml(m.name) + (isVolAct ? ' <span class="op-badge">🤝 متطوع</span>' : ' <span class="pm-role-badge rb-overlap">⚡ أوفرلاب</span>') + '</div>' +
                     ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
+                    '<div class="pm-code pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '📞 —') + '</div>' +
                     (actLine ? '<div class="pm-code">' + actLine + '</div>' : '') +
                     actStateBadge +
                     '<div class="pm-secondary-actions">' +
                         '<button class="btn-end-cover" onclick="endActivation(\'' + teamId + '\', \'' + anm + '\')">⛔ إنهاء التفعيل</button>' +
-                    '</div></div>';
+                    '</div></div></div>';
             }
-            if (m.role === 'support') return '<div class="pm">' +
+            if (m.role === 'support') return '<div class="pm" data-emp="' + escapeHtml(m.name) + '" data-mdrag="1">' +
+                '<span class="pm-av">' + escapeHtml((m.name || '؟')[0]) + '</span><div class="pm-info">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
-                '<div class="pm-name">🤝 ' + escapeHtml(m.name) + '</div>' +
+                '<div class="pm-name">🤝 ' + escapeHtml(m.name) + ' <span class="pm-role-badge ' + (m.state === 'assignment' ? 'rb-assigned">مكلَّف' : 'rb-support">' + escapeHtml(supportTypeLabel(m))) + '</span></div>' +
                 '<div class="pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '—') + '</div>' +
                 ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
                 (m.fromCenter ? '<div class="pm-code">قادم من: ' + escapeHtml(m.fromCenter) + '</div>' : '') +
-                '<div class="pm-code">نوع الدعم: ' + escapeHtml(supportTypeLabel(m)) + '</div></div>';
-            return '<div class="pm">' +
+                '<div class="pm-code">نوع الدعم: ' + escapeHtml(supportTypeLabel(m)) + '</div></div></div>';
+            return '<div class="pm' + (m.state === 'assignment' ? ' pm-away' : '') + '" data-emp="' + escapeHtml(m.name) + '" data-mdrag="1">' +
+                '<span class="pm-av">' + escapeHtml((m.name || '؟')[0]) + '</span><div class="pm-info">' +
                 (m.jobTitle ? '<div class="pm-job">' + jobIcon(m.jobTitle) + ' ' + escapeHtml(m.jobTitle) + '</div>' : '') +
-                '<div class="pm-name">' + escapeHtml(m.name) + '</div>' +
+                '<div class="pm-name">' + escapeHtml(m.name) + ' <span class="pm-role-badge rb-base">أساسي</span></div>' +
                 '<div class="pm-phone">' + (m.phone ? '<a href="tel:' + escapeHtml(m.phone) + '"><i class="fas fa-phone"></i> ' + escapeHtml(m.phone) + '</a>' : '—') + '</div>' +
                 ((m.code || m.employeeCode) ? '<div class="pm-code">الكود الوظيفي: ' + escapeHtml(String(m.code || m.employeeCode)) + '</div>' : '') +
-            '</div>';
+            '</div></div>';
         }).join('')
-        : '<span style="color:var(--muted); font-size:0.7rem;">لا يوجد بيانات</span>';
+        : '<div class="tc-empty">لا يوجد موظفين</div>';
 
     // عدم إخفاء المعلومات: الغائب/المتأخر وسببه يظهران مباشرة على البطاقة
     // بند 15: زر «✋ حضر» بضغطة واحدة — الخادم يختم الوقت تلقائيًا، ولا يمس حالة الفرقة
@@ -1051,10 +2163,28 @@ function renderCard(teamId, name, type, d) {
     }
 
     var centerName = getTeamCenter(teamId);
-    var centerHtml = centerName ? '<div class="card-center"><i class="fas fa-hospital"></i> ' + centerName + '</div>' : '';
+    // T1: مؤشر القوة من اشتقاق الخادم حرفيًا (activeCount/requiredPersonnel/vacant —
+    // تحسبها staffing-events-service). العرض فقط: لا حساب جاهزية محلي إطلاقًا.
+    var ac = (d && typeof d.activeCount === 'number') ? d.activeCount : null;
+    var req = (d && typeof d.requiredPersonnel === 'number' && d.requiredPersonnel > 0) ? d.requiredPersonnel : null;
+    var strengthHtml = '';
+    if (ac !== null && req !== null) {
+        var pct = Math.min(100, Math.round((ac / req) * 100));
+        var vacant = (typeof d.vacant === 'number') ? d.vacant : Math.max(0, req - ac);
+        strengthHtml = '<div class="tc-strength">' +
+            '<span class="tc-count">' + ac + '/' + req + '</span>' +
+            '<div class="tc-track"><div class="tc-fill tc-fill-' + status + '" style="width:' + pct + '%"></div></div>' +
+            (vacant > 0 ? '<span class="tc-need">تحتاج ' + vacant + '</span>' : '<span class="tc-need ok">مكتملة ✓</span>') +
+        '</div>';
+    }
     // أُزيلت شارة «الفريق الديناميكي» (dynamicCrew) — لم يعد يُنتَج بعد إلغاء
     // الانتشار التلقائي؛ هوية الطاقم تُختم سيرفريًا في crew_key من هويات الأعضاء.
     var typeLabel = type === 'rapid' ? '⚡ سريع' : type === 'center' ? '🏥 مركز' : '⭐ قيادة/عمليات';
+
+    // T3: منطقة إسقاط مرئية داخل البطاقة — تظهر فقط عند وجود شاغر سيرفري
+    // (vacant من اشتقاق الخادم، بلا حساب محلي)، وتتوهج مع rc-drop-target القائم.
+    var dzHtml = (typeof vacant === 'number' && vacant > 0)
+        ? '<div class="tc-dropzone">⬇ اسحب موظفًا هنا — تحتاج ' + vacant + '</div>' : '';
 
     // الأزرار الثلاثة مباشرة على البطاقة — ضغطة واحدة = إجراء واحد
     // W-تكامل ③: كل فريق في الحالة المشتقة قابل للتكميل (جنوب/سريع/قيادة/تحكم/تنسيق)
@@ -1064,7 +2194,6 @@ function renderCard(teamId, name, type, d) {
             '<button class="btn btn-missing" onclick="openMissingModal(\'' + teamId + '\')">🟡 ناقصة</button>' +
             '<button class="btn btn-offline" onclick="cardSetOffline(\'' + teamId + '\')">🔴 خارج الخدمة</button>' +
           '</div>' +
-          '<button class="btn-cover" onclick="openCoverageModal(\'' + teamId + '\')">🤝 تغطية تشغيلية</button>' +
           '<button class="btn-cover" onclick="openVolunteerModal()">🙋 متطوع</button>'
         : '';
 
@@ -1076,16 +2205,25 @@ function renderCard(teamId, name, type, d) {
           (ld.at ? ' · الساعة: ' + TimeRiyadh.formatTime(ld.at) : '') + '"'
         : '';
 
+    // T1: تشريح بطاقة Workforce Board — شريط حالة كامل العرض (يحمل الحالة + المركز)
+    // أعلى البطاقة، ثم جسم: الاسم + النوع، مؤشر القوة، الأفراد، بقية الكتل كما هي.
     return '<div class="team-card status-' + status + '"' + titleAttr + '>' +
-        '<span class="card-type ' + type + '">' + typeLabel + '</span>' +
-        '<div class="card-name">' + escapeHtml(name) + '</div>' +
-        centerHtml +
-        '<div class="card-status">' + (STATUS_LABELS[status] || status) + '</div>' +
-        '<div class="paramedics">' + paramedicsHtml + '</div>' +
-        missInfoHtml +
-        coverInfoHtml +
-        actionsHtml +
-        '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
+        '<div class="tc-status-bar tc-sb-' + status + '">' +
+            '<span class="tc-dot"></span>' +
+            '<span class="card-status">' + (STATUS_LABELS[status] || status) + '</span>' +
+            (centerName ? '<span class="card-center tc-center"><i class="fas fa-hospital"></i> ' + escapeHtml(centerName) + '</span>' : '') +
+        '</div>' +
+        '<div class="tc-body">' +
+            '<div class="tc-head"><span class="card-name">' + escapeHtml(name) + '</span>' +
+            '<span class="card-type ' + type + '">' + typeLabel + '</span></div>' +
+            strengthHtml +
+            '<div class="paramedics">' + paramedicsHtml + '</div>' +
+            missInfoHtml +
+            coverInfoHtml +
+            dzHtml +
+            actionsHtml +
+            '<div class="mini-log" id="miniLog_' + teamId + '"></div>' +
+        '</div>' +
     '</div>';
 }
 
@@ -1139,9 +2277,31 @@ function updateDashboard() {
         var total = ready + missing + offline + pending;
 
         document.getElementById('dashReady').textContent = wf ? ready : '—';
+        var elRT = document.getElementById('dashReadyTotal'); // ① المواصفة: «المراكز X/18»
+        if (elRT) elRT.textContent = wf && total > 0 ? '/' + total : '';
         document.getElementById('dashMissing').textContent = wf ? missing : '—';
         document.getElementById('dashOffline').textContent = wf ? offline : '—';
         document.getElementById('dashReadyPct').textContent = (wf && total > 0) ? Math.round((ready / total) * 100) + '%' : '—';
+
+        // §3 المراجعة النهائية: المجدولة / العاملة / خارج الجدول — من مجاميع
+        // الخادم وعدّ أدوار support/activation في الحالة السيرفرية (عرض فقط)
+        var elSched = document.getElementById('dashScheduled');
+        var elWork = document.getElementById('dashWorking');
+        var elOut = document.getElementById('dashOutOfPlan');
+        if (elSched) elSched.textContent = wf ? (wf.scheduledStaff || 0) : '—';
+        if (elWork) elWork.textContent = wf ? (wf.totalStaff || 0) : '—';
+        if (elOut) {
+            var outPlan = 0;
+            if (serverTeamsState) {
+                serverTeamIds().forEach(function(id) {
+                    var d = rosterDataOf(id);
+                    ((d && d.members) || []).forEach(function(m) {
+                        if (m && (m.role === 'support' || m.role === 'activation')) outPlan++;
+                    });
+                });
+            }
+            elOut.textContent = wf ? '+' + outPlan : '—';
+        }
 
         // المركبات (من لوحة المركبات المشتقة سيرفريًا)
         if (vehiclesBoard) {
@@ -1149,6 +2309,12 @@ function updateDashboard() {
             var supporting = (vehiclesBoard.vehicles || []).filter(function(v) { return v.supportingTeamId != null; }).length;
             document.getElementById('dashVehSupport').textContent = supporting;
             document.getElementById('dashVehOut').textContent = c.out_of_service || 0;
+            // T2: شريحة درج المركبات — X/Y جاهزة من عدادات اللوحة السيرفية (عرض فقط)
+            var vehReadyEl = document.getElementById('dashVehReady');
+            if (vehReadyEl) {
+                var vehTotal = (c.active || 0) + (c.reserve || 0) + (c.breakdown || 0) + (c.out_of_service || 0) + (c.unset || 0);
+                vehReadyEl.textContent = (c.active || 0) + '/' + vehTotal;
+            }
         }
 
         // شريط التقدم — كما هو: نسبة إنجاز التكميل (المُنهية من الإجمالي)
@@ -1473,6 +2639,8 @@ function supportLocationLabel(p) {
     return 'غير موزع بعد';
 }
 function renderAvailableSupport() {
+    // تحصين السحب: لا إعادة رسم للحوض أثناء فتلة سحب نشطة (تُستدرك عند dragend)
+    if (document.querySelector('.pm.rc-dragging, .support-card.rc-dragging')) return;
     var section = document.getElementById('supportSection');
     var grid = document.getElementById('supportCards');
     var count = document.getElementById('supportCount');
@@ -1491,22 +2659,35 @@ function renderAvailableSupport() {
         // المرحلة ب (تصحيح المالك): المتطوع بلا فريق يُوسم «متطوع — غير مفعّل»
         // برمز يومه، وإسناده للفرقة عبر زر «تفعيل فرقة» نفسه (مسار الـOverlap)،
         // وزر «إنهاء تطوع» يخرجه نهائيًا من الحوض (support_end القائم)
-        var isOp = !!(window.OperationalCodes && OperationalCodes.isOperationalCode(p.shiftCode));
+        // الجولة النهائية ⑥: بطاقة شخص بأسلوب المرجع (مونوغرام هادئ + شارات
+        // نوع data-pkind لتبويبات الترشيح) — نفس الأزرار والمعالجات حرفيًا
+        // (الرأس يُبنى قبل البوابة حتى تبقى نافذة اختبار التفعيل 1200 حرفًا)
         var isVol = !!p.volunteer;
-        return '<div class="support-card">' +
-            (p.jobTitle ? '<div class="sp-job">' + escapeHtml(p.jobTitle) + '</div>' : '') +
+        var ph = realPhoneOf(p.name, null, p, null);
+        var head = '<span class="sp-avatar">' + escapeHtml((p.name || '؟')[0]) + '</span>' +
             '<div class="sp-name">' + escapeHtml(p.name) + '</div>' +
+            (p.jobTitle ? '<div class="sp-job">' + escapeHtml(p.jobTitle) + '</div>' : '') +
             (p.employeeCode ? '<div class="sp-meta">الكود الوظيفي: ' + escapeHtml(String(p.employeeCode)) + '</div>' : '') +
-            '<div class="sp-meta">الموقع الحالي: ' + escapeHtml(supportLocationLabel(p)) + '</div>' +
-            (isVol ? '<div class="sp-meta">رمز اليوم: ' + escapeHtml(p.shiftCode ? String(p.shiftCode) : 'بلا جدولة اليوم') + '</div>' : '') +
-            (isOp ? '<div class="sp-meta"><span class="op-badge">أوفرلاب — غير مفعّل</span></div>' : '') +
-            (isVol ? '<div class="sp-meta"><span class="op-badge">متطوع — غير مفعّل</span></div>' : '') +
+            '<div class="sp-meta sp-phone">📞 ' + phoneLinkHtml(ph) + '</div>' +
+            '<div class="sp-meta">الموقع الحالي: ' + escapeHtml(supportLocationLabel(p)) + '</div>';
+        var isOp = !!(window.OperationalCodes && OperationalCodes.isOperationalCode(p.shiftCode));
+        var isRes = !isOp && /^R/i.test(String(p.shiftCode || ''));
+        var pkind = isVol ? 'vol' : isOp ? 'overlap' : isRes ? 'reserve' : 'avail';
+        return '<div class="support-card" data-pkind="' + pkind + '">' + head +
+            '<div class="sp-badges">' +
+            (isOp ? '<span class="op-badge">أوفرلاب — غير مفعّل</span>' : '') +
+            (isVol ? '<span class="op-badge">متطوع — غير مفعّل</span>' : '') +
+            (isVol ? '<span class="op-badge">رمز اليوم: ' + escapeHtml(p.shiftCode ? String(p.shiftCode) : 'بلا جدولة اليوم') + '</span>' : '') +
+            (isRes ? '<span class="op-badge sp-b-res">احتياط</span>' : '') +
+            (pkind === 'avail' ? '<span class="op-badge sp-b-avail">متاح</span>' : '') +
+            '</div>' +
             ((isOp || isVol) ? '<button class="btn-activate" onclick="openActivationModal(' + i + ')">⚡ تفعيل فرقة</button>' : '') +
             (isVol ? '<button class="btn-end-cover" onclick="endVolunteer(' + i + ')">⛔ إنهاء تطوع</button>' : '') +
             (isVol ? '' : '<button class="btn-support" onclick="openSupportModal(' + i + ')">🤝 دعم فريق</button>') +
         '</div>';
     }).join('');
     section.style.display = '';
+    applyPoolFilter(); // ⑥ إعادة تطبيق التبويب النشط بعد كل إعادة رسم
 }
 var supportCtx = null; // { person }
 function openSupportModal(idx) {
@@ -1962,6 +3143,9 @@ function setSaveStatus(text, spinning) {
     var status = document.getElementById('saveStatus');
     if (spinner) spinner.style.display = spinning ? '' : 'none';
     if (status) status.textContent = text;
+    // §10: مؤشر «تم الحفظ ✓» غير بارز بجوار عنوان الملاحظات — نفس الحالة
+    var ns = document.getElementById('notesSaved');
+    if (ns) { ns.textContent = text; ns.className = 'notes-saved ' + (spinning ? 'pending' : (text.indexOf('✓') !== -1 ? 'ok' : 'err')); }
 }
 
 // ------------------------------------
@@ -2251,6 +3435,700 @@ renderAll = function() {
 };
 </script>
 
+<script>
+// ════════════════════════════════════════════════════════════
+// T2 — البحث الذكي + درج الموظف + درج المركبات
+// T3 — إعادة التوزيع: سحب/إفلات صفوف الأفراد + وضع النقل (بديل اللمس)
+//      + نافذة تأكيد واحدة (#redistModal) بإثبات محاسبي قبل أي إرسال.
+// كل الأرقام المعروضة من الاشتقاق السيرفي المحمَّل أصلًا (serverTeamsState /
+// serverWorkforce / availableSupport / vehiclesBoard) — لا حساب جاهزية محلي.
+// ════════════════════════════════════════════════════════════
+
+// ── T2: البحث الذكي ──
+// ملاحظة تنفيذية: يُجلب سجل الموظفين الكامل من مسار القائمة العام مرة واحدة
+// ويُخزن مؤقتًا ويُرشَّح محليًا — بدل مسار البحث المخصص — التزامًا بحارس
+// اختبار التطوع ⑪ الذي يشترط بقاء مودال التطوع على مسار المرشحين السيرفي
+// وحده وخلو الصفحة من أي مسار بحث موظفين آخر.
+var wbEmployeesCache = null;
+var wbSearchTimer = null;
+var wbSearchLast = [];   // آخر نتائج معروضة (يُفوَّض الضغط بالفهرس)
+function wbSearchInput() {
+    if (wbSearchTimer) clearTimeout(wbSearchTimer);
+    wbSearchTimer = setTimeout(runWbSearch, 300);
+}
+function runWbSearch() {
+    var q = document.getElementById('wbSearch').value.trim();
+    var box = document.getElementById('wbSearchResults');
+    if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    if (wbEmployeesCache) { renderWbSearchResults(q); return; }
+    box.innerHTML = '<div class="wb-sr-empty">جارٍ تحميل قائمة الموظفين…</div>';
+    box.style.display = '';
+    var h = authHeaders();
+    if (!h) return;
+    fetch('/api/employees', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            wbEmployeesCache = (d && d.employees) || [];
+            var qNow = document.getElementById('wbSearch').value.trim();
+            if (qNow) renderWbSearchResults(qNow);
+        }).catch(function() { box.innerHTML = '<div class="wb-sr-empty">تعذر التحميل — أعد المحاولة</div>'; });
+}
+// أين يقف هذا الاسم الآن؟ (دمج عرضي فوق الحالة السيرفرية المحملة أصلًا — لا اشتقاق)
+function findPersonInShift(name) {
+    if (serverTeamsState) {
+        var ids = serverTeamIds();
+        for (var i = 0; i < ids.length; i++) {
+            var d = serverTeamsState[serverTeamKey(ids[i])] || serverTeamsState[ids[i]];
+            if (!d) continue;
+            var members = d.members || [];
+            for (var j = 0; j < members.length; j++) {
+                if (members[j] && members[j].name === name) {
+                    return { team: ids[i], center: d.center || '', role: members[j].role, state: members[j].state, member: members[j] };
+                }
+            }
+        }
+    }
+    if (availableSupport) {
+        for (var k = 0; k < availableSupport.length; k++) {
+            if (availableSupport[k] && availableSupport[k].name === name) return { pool: true, idx: k, person: availableSupport[k] };
+        }
+    }
+    return null;
+}
+// هل للموظف فريق مجدول (عضو قاعدة) في هذه المناوبة؟ — يحدد نوع حدث النقل سيرفريًا
+function findBaseTeamOf(name) {
+    if (!serverTeamsState) return null;
+    var ids = serverTeamIds();
+    for (var i = 0; i < ids.length; i++) {
+        var d = serverTeamsState[serverTeamKey(ids[i])] || serverTeamsState[ids[i]];
+        var members = (d && d.members) || [];
+        for (var j = 0; j < members.length; j++) {
+            if (members[j] && members[j].name === name && members[j].role === 'base') return ids[i];
+        }
+    }
+    return null;
+}
+function renderWbSearchResults(q) {
+    var box = document.getElementById('wbSearchResults');
+    var matches = (wbEmployeesCache || []).filter(function(e) {
+        return (e.name && e.name.indexOf(q) !== -1) || (e.employee_code && String(e.employee_code).indexOf(q) !== -1);
+    });
+    // دمج مع الحالة السيرفرية + ترتيب بالأولوية: نشط في فرقة ← داعم/مكلَّف/مفعَّل
+    // ← في القوة المتاحة ← خارج مناوبة اليوم
+    var enriched = matches.map(function(e) { return { emp: e, live: findPersonInShift(e.name) }; });
+    function prio(r) {
+        if (!r.live) return 4;
+        if (r.live.pool) return 3;
+        if (r.live.role === 'base' && r.live.state === 'active') return 0;
+        if (r.live.role === 'base') return 2; // غائب/متأخر/مكلَّف خارج فرقته
+        return 1; // داعم/مكلَّف/مفعَّل داخل فرقة
+    }
+    enriched.sort(function(a, b) { return prio(a) - prio(b); });
+    wbSearchLast = enriched.slice(0, 12);
+    if (!wbSearchLast.length) {
+        box.innerHTML = '<div class="wb-sr-empty">لا نتائج مطابقة</div>';
+        box.style.display = '';
+        return;
+    }
+    box.innerHTML = wbSearchLast.map(function(r, i) {
+        var e = r.emp, live = r.live;
+        var where = 'خارج مناوبة اليوم';
+        var flags = '<span class="sr-flag off">مجدول ✗</span><span class="sr-flag off">داعم ✗</span><span class="sr-flag off">قابل للنقل ✗</span>';
+        if (live && live.pool) {
+            where = 'القوة المتاحة — ' + supportLocationLabel(live.person);
+            flags = '<span class="sr-flag on">في الحوض</span><span class="sr-flag on">قابل للتوزيع ✓</span>';
+        } else if (live) {
+            where = live.team + (live.center ? ' — ' + live.center : '');
+            var isBase = live.role === 'base';
+            var isSupport = live.role === 'support';
+            var movable = (isBase && live.state === 'active') || isSupport;
+            flags = '<span class="sr-flag ' + (isBase ? 'on' : 'off') + '">مجدول ' + (isBase ? '✓' : '✗') + '</span>' +
+                    '<span class="sr-flag ' + (isSupport ? 'on' : 'off') + '">داعم ' + (isSupport ? '✓' : '✗') + '</span>' +
+                    '<span class="sr-flag ' + (movable ? 'on' : 'off') + '">قابل للنقل ' + (movable ? '✓' : '✗') + '</span>';
+        }
+        // (أ) الجولة النهائية: بطاقة نتيجة كاملة — مونوغرام هادئ + الاسم +
+        // المسمى + الكود + الجوال الفعلي من /api/employees (و«—» عند غيابه — بلا اختراع)
+        return '<div class="wb-sr-row" data-sidx="' + i + '">' +
+            '<span class="sr-av">' + escapeHtml((e.name || '؟')[0]) + '</span>' +
+            '<div class="sr-col">' +
+            '<div class="sr-name">' + escapeHtml(e.name) + '</div>' +
+            '<div class="sr-meta">' +
+                (e.job_title ? escapeHtml(e.job_title) + ' · ' : '') +
+                (e.employee_code ? 'كود: ' + escapeHtml(String(e.employee_code)) + ' · ' : '') +
+                escapeHtml(where) +
+            '</div>' +
+            '<div class="sr-meta sr-phone">📞 ' + phoneLinkHtml(e.phone) + '</div>' +
+            '<div class="sr-flags">' + flags + '</div>' +
+        '</div></div>';
+    }).join('');
+    box.style.display = '';
+}
+function closeWbSearchResults() {
+    var box = document.getElementById('wbSearchResults');
+    if (box) box.style.display = 'none';
+}
+
+// ── T2: درج الموظف ──
+var empDrawerCtx = null; // { name, emp?, poolIdx? }
+function openEmployeeDrawer(ctx) {
+    closeWbSearchResults();
+    closeVehiclesDrawer();
+    empDrawerCtx = ctx;
+    renderEmployeeDrawer();
+    // (أ) الجوال الحقيقي: إن لم يكن كاش /api/employees محمّلًا بعد، يُجلب مرة
+    // ويُعاد رسم الدرج ليظهر الجوال الفعلي (أو «—» إن لم يكن له رقم في النظام)
+    if (!wbEmployeesCache) ensureWbEmployees(function() { if (empDrawerCtx) renderEmployeeDrawer(); });
+    document.getElementById('empDrawerOverlay').classList.add('show');
+    document.getElementById('empDrawer').classList.add('open');
+}
+function closeEmployeeDrawer() {
+    var d = document.getElementById('empDrawer');
+    var o = document.getElementById('empDrawerOverlay');
+    if (d) d.classList.remove('open');
+    if (o) o.classList.remove('show');
+    empDrawerCtx = null;
+}
+function edStateLabel(live) {
+    if (!live) return 'خارج مناوبة اليوم';
+    if (live.pool) return live.person.volunteer ? 'متطوع — غير مفعّل' : 'في القوة المتاحة';
+    if (live.role === 'activation') return 'مفعَّل على الفرقة';
+    if (live.role === 'support') return live.state === 'assignment' ? 'مكلَّف إلى الفرقة' : 'داعم — ' + supportTypeLabel(live.member);
+    if (live.state === 'active') return 'نشط في فرقته';
+    if (live.state === 'assignment') return 'مكلَّف خارج فرقته';
+    if (live.state === 'late') return 'متأخر';
+    if (live.state === 'absence') return 'غائب';
+    return live.state || '—';
+}
+function renderEmployeeDrawer() {
+    var ctx = empDrawerCtx;
+    if (!ctx) return;
+    var live = findPersonInShift(ctx.name);
+    var emp = ctx.emp || {};
+    var m = (live && live.member) || {};
+    var p = (live && live.person) || {};
+    var name = ctx.name;
+    var jobTitle = m.jobTitle || p.jobTitle || emp.job_title || null;
+    var code = m.code || m.employeeCode || p.employeeCode || emp.employee_code || null;
+    // (أ) الجوال الفعلي من النظام فقط (صف الطاقم ← الحوض ← البحث ← كاش
+    // /api/employees) — يُعرض بارزًا مع 📞، و«—» إن لم يكن محفوظًا — بلا اختراع
+    var phone = realPhoneOf(name, m, p, emp);
+    var html = '<div class="ed-person">' +
+        '<span class="ed-avatar">' + escapeHtml((name || '؟')[0]) + '</span>' +
+        '<div><div class="ed-name">' + escapeHtml(name) + '</div>' +
+        (jobTitle ? '<div class="ed-job">' + escapeHtml(jobTitle) + '</div>' : '') +
+        '</div></div>' +
+        '<div class="ed-rows">' +
+        (code ? '<div class="ed-row"><span class="k">الكود الوظيفي</span><span class="v">' + escapeHtml(String(code)) + '</span></div>' : '') +
+        '<div class="ed-row ed-phone-row"><span class="k">📞 الجوال</span><span class="v">' + phoneLinkHtml(phone) + '</span></div>' +
+        '<div class="ed-row"><span class="k">الموقع الحالي</span><span class="v">' +
+            (live ? (live.pool ? 'القوة المتاحة — ' + escapeHtml(supportLocationLabel(p)) : escapeHtml(live.team + (live.center ? ' — ' + live.center : ''))) : '—') + '</span></div>' +
+        '<div class="ed-row"><span class="k">الحالة</span><span class="v">' + escapeHtml(edStateLabel(live)) + '</span></div>' +
+        '</div>';
+    // الأعلام (عرض فوق حالة الخادم المحملة أصلًا)
+    var isBase = !!(live && !live.pool && live.role === 'base');
+    var isSupport = !!(live && !live.pool && live.role === 'support');
+    var movable = !!live && (live.pool || (isBase && live.state === 'active') || isSupport);
+    html += '<div class="ed-flags">' +
+        '<span class="sr-flag ' + (isBase ? 'on' : 'off') + '">مجدول ' + (isBase ? '✓' : '✗') + '</span>' +
+        '<span class="sr-flag ' + (isSupport ? 'on' : 'off') + '">داعم ' + (isSupport ? '✓' : '✗') + '</span>' +
+        '<span class="sr-flag ' + (movable ? 'on' : 'off') + '">قابل للنقل ' + (movable ? '✓' : '✗') + '</span>' +
+        '</div>';
+    // الإجراءات السياقية — تستدعي التدفقات القائمة حرفيًا (بلا أي تدفق جديد)
+    var nm = String(name).replace(/'/g, "\\'");
+    var tm = live && live.team ? String(live.team).replace(/'/g, "\\'") : '';
+    var acts = [];
+    if (!live) {
+        // §1/§2 المراجعة النهائية: غير المجدول ليس خارج النظام — يُوزَّع مباشرة
+        // (يُسجَّل سيرفريًا كـ external_support بنفس عقد التغطية التشغيلية)
+        acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'\')">🔀 توزيع الموظف</button>');
+    }
+    if (live && !live.pool && isBase && live.state === 'active') {
+        acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'' + tm + '\')">🔀 توزيع الموظف</button>');
+        // تسجيل حالة سريع للمجدول النشط — نفس عقد نموذج النقص القائم حرفيًا
+        // (MISSING_REASON_EVENT + postPersonEvents + سؤال قرار الحالة) بلا مسار جديد
+        acts.push('<div class="ed-quick"><span class="ed-quick-lbl">تسجيل حالة:</span>' +
+            MISSING_REASONS.map(function(r) {
+                return '<button class="ed-quick-btn" onclick="drawerQuickAbsence(\'' + tm + '\', \'' + nm + '\', \'' + r + '\')">' + r + '</button>';
+            }).join('') + '</div>');
+    }
+    if (live && !live.pool && live.state === 'assignment') {
+        // مكلَّف — سواء ظهر «مكلَّف خارج فرقته» (قاعدة) أو «مكلَّف إلى الفرقة» (دعم)
+        acts.push('<button class="ed-danger" onclick="drawerEndAssignment(\'' + nm + '\')">⛔ إنهاء التكليف</button>');
+        acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'' + tm + '\')">🔀 توزيع الموظف</button>');
+    }
+    if (live && !live.pool && isSupport && live.state !== 'assignment') {
+        acts.push('<button class="ed-danger" onclick="drawerEndCoverage(\'' + tm + '\', \'' + nm + '\')">⛔ إنهاء التغطية</button>');
+        acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'' + tm + '\')">🔀 توزيع الموظف</button>');
+    }
+    if (live && !live.pool && live.role === 'activation') {
+        acts.push('<button class="ed-danger" onclick="drawerEndActivation(\'' + tm + '\', \'' + nm + '\')">⛔ إنهاء التفعيل</button>');
+    }
+    if (live && !live.pool && isBase && (live.state === 'absence' || live.state === 'late')) {
+        acts.push('<button class="ed-gold" onclick="drawerPersonArrived(\'' + tm + '\', \'' + nm + '\')">✋ حضر</button>');
+    }
+    if (live && live.pool) {
+        var i = live.idx;
+        var isOp = !!(window.OperationalCodes && OperationalCodes.isOperationalCode(p.shiftCode));
+        var isVol = !!p.volunteer;
+        if (isOp || isVol) acts.push('<button class="ed-gold" onclick="drawerPoolActivate(' + i + ')">⚡ تفعيل فرقة</button>');
+        if (isVol) acts.push('<button class="ed-danger" onclick="drawerPoolEndVolunteer(' + i + ')">⛔ إنهاء تطوع</button>');
+        if (!isVol) acts.push('<button class="ed-primary" onclick="drawerPoolSupport(' + i + ')">🤝 دعم فريق</button>');
+        // §2: فرد الحوض قابل للتوزيع بنفس مسار وضع النقل + نافذة الإثبات المحاسبي
+        acts.push('<button class="ed-primary" onclick="startMoveMode(\'' + nm + '\', \'\')">🔀 توزيع الموظف</button>');
+    }
+    html += acts.length ? '<div class="ed-actions">' + acts.join('') + '</div>'
+        : '<div class="wb-sr-empty" style="margin-top:10px">لا إجراءات متاحة لهذه الحالة</div>';
+    document.getElementById('empDrawerBody').innerHTML = html;
+}
+// جسور الدرج ← التدفقات القائمة حرفيًا (الدرج يُغلق أولًا حتى تظهر النوافذ فوقه)
+function drawerEndAssignment(name) {
+    closeEmployeeDrawer();
+    // «إنهاء التكليف» — support_end القائم (T3: يُغلق التكليف المفتوح سيرفريًا أيضًا)
+    postPersonEvents([{ type: 'support_end', employeeName: name }]).then(function(d) {
+        if (!d) return;
+        showToast(d.appended > 0 ? '✅ انتهى تكليف ' + name : 'لا يوجد تكليف مفتوح لهذا الموظف', d.appended > 0 ? 'success' : '');
+        afterTeamEvent();
+    });
+}
+function drawerEndCoverage(teamId, name) { closeEmployeeDrawer(); endCoverage(teamId, name); }
+function drawerEndActivation(teamId, name) { closeEmployeeDrawer(); endActivation(teamId, name); }
+function drawerPersonArrived(teamId, name) { closeEmployeeDrawer(); personArrived(teamId, name); }
+function drawerPoolActivate(idx) { closeEmployeeDrawer(); openActivationModal(idx); }
+function drawerPoolSupport(idx) { closeEmployeeDrawer(); openSupportModal(idx); }
+function drawerPoolEndVolunteer(idx) { closeEmployeeDrawer(); endVolunteer(idx); }
+
+// تسجيل حالة سريع من درج الموظف — نفس عقد «تأكيد النقص» القائم حرفيًا:
+// نفس الحدث (MISSING_REASON_EVENT) ونفس الختم السيرفي ونفس سؤال قرار الحالة.
+// الخادم هو من يعيد اشتقاق حالة الفرقة — الدرج لا يحسب أي شيء.
+function drawerQuickAbsence(teamId, name, reason) {
+    closeEmployeeDrawer();
+    if (!MISSING_REASON_EVENT[reason]) return;
+    var ev = { type: MISSING_REASON_EVENT[reason], employeeName: name, reason: reason, teamId: teamId };
+    lockTeamCard(teamId, true);
+    postPersonEvents([ev]).then(function(d) {
+        if (!d) { lockTeamCard(teamId, false); return; }
+        showToast(d.appended > 0 ? '✅ تم تسجيل «' + reason + '» — ' + name : 'الحدث مسجّل مسبقًا', d.appended > 0 ? 'success' : '');
+        var cur = rosterDataOf(teamId);
+        var st = (cur && cur.status) || 'pending';
+        if (st === 'missing' || st === 'offline') { afterTeamEvent(); return; }
+        openDecisionQuestion(teamId, name, st);
+    });
+}
+
+// ── §9 المراجعة النهائية: بحث فوري داخل تسجيل الخروج ──
+// يشارك كاش البحث الرئيسي (نفس /api/employees المحمّلة مرة)؛ الاختيار يملأ
+// أول حقل فرد فارغ (أو يضيف حقلًا) بالاسم الكامل — مسار الحفظ القائم كما هو.
+var signoutSearchTimer = null;
+function signoutSearchInput() {
+    if (signoutSearchTimer) clearTimeout(signoutSearchTimer);
+    signoutSearchTimer = setTimeout(runSignoutSearch, 200);
+}
+function runSignoutSearch() {
+    var q = document.getElementById('signoutSearch').value.trim();
+    var box = document.getElementById('signoutSearchResults');
+    if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="wb-sr-empty">جارٍ البحث…</div>';
+    box.style.display = '';
+    ensureWbEmployees(function() {
+        var matches = (wbEmployeesCache || []).filter(function(e) {
+            return (e.name && e.name.indexOf(q) !== -1) || (e.employee_code && String(e.employee_code).indexOf(q) !== -1);
+        }).slice(0, 8);
+        if (!matches.length) { box.innerHTML = '<div class="wb-sr-empty">لا نتائج مطابقة</div>'; return; }
+        box.innerHTML = matches.map(function(e) {
+            var live = findPersonInShift(e.name);
+            return '<div class="wb-sr-row so-sr-row" data-soname="' + escapeHtml(e.name).replace(/"/g, '&quot;') + '">' +
+                '<div class="sr-name">' + escapeHtml(e.name) + '</div>' +
+                '<div class="sr-meta">' +
+                    (e.job_title ? escapeHtml(e.job_title) + ' · ' : '') +
+                    (e.employee_code ? 'كود: ' + escapeHtml(String(e.employee_code)) + ' · ' : '') +
+                    '📞 ' + (e.phone ? escapeHtml(e.phone) : '—') + ' · ' +
+                    escapeHtml(edStateLabel(live)) +
+                '</div></div>';
+        }).join('');
+    });
+}
+function ensureWbEmployees(cb) {
+    if (wbEmployeesCache) return cb();
+    var h = authHeaders();
+    if (!h) return;
+    fetch('/api/employees', { headers: h })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) { wbEmployeesCache = (d && d.employees) || []; cb(); })
+        .catch(function() { cb(); });
+}
+function pickSignoutEmployee(name) {
+    var mem = document.getElementById('signoutMembers');
+    var inputs = mem ? mem.querySelectorAll('input[data-so-idx]') : [];
+    var target = null;
+    for (var i = 0; i < inputs.length; i++) { if (!inputs[i].value.trim()) { target = inputs[i]; break; } }
+    if (!target && typeof addSignoutMemberField === 'function') {
+        addSignoutMemberField();
+        inputs = mem.querySelectorAll('input[data-so-idx]');
+        target = inputs[inputs.length - 1];
+    }
+    if (target) target.value = name;
+    document.getElementById('signoutSearch').value = '';
+    var box = document.getElementById('signoutSearchResults');
+    box.style.display = 'none'; box.innerHTML = '';
+    showToast('👤 أُضيف ' + name + ' إلى قائمة الخروج', 'success');
+}
+// تفويض ضغط نتائج بحث الخروج + إغلاقها عند الضغط خارجها
+document.addEventListener('click', function(e) {
+    var row = e.target && e.target.closest ? e.target.closest('.so-sr-row') : null;
+    if (row) { pickSignoutEmployee(row.getAttribute('data-soname')); return; }
+    if (!e.target.closest || !e.target.closest('.so-search-wrap')) {
+        var box = document.getElementById('signoutSearchResults');
+        if (box) box.style.display = 'none';
+    }
+});
+
+// ── T2: درج المركبات ──
+function openVehiclesDrawer() {
+    closeEmployeeDrawer();
+    closeWbSearchResults();
+    document.getElementById('vehiclesOverlay').classList.add('show');
+    document.getElementById('vehiclesDrawer').classList.add('open');
+}
+function closeVehiclesDrawer() {
+    var d = document.getElementById('vehiclesDrawer');
+    var o = document.getElementById('vehiclesOverlay');
+    if (d) d.classList.remove('open');
+    if (o) o.classList.remove('show');
+}
+
+// ── T3: وضع النقل (بديل اللمس) + نافذة تأكيد إعادة التوزيع ──
+var moveCtx = null;   // { name, fromTeamId }
+var redistCtx = null; // { name, fromTeamId, toTeamId, kind, hasBase }
+function startMoveMode(name, fromTeamId) {
+    closeEmployeeDrawer();
+    moveCtx = { name: name, fromTeamId: fromTeamId || null };
+    document.getElementById('moveBannerText').textContent = '🔀 وضع التوزيع: ' + name + ' — اضغط بطاقة الفرقة المستهدفة (الفرق الناقصة نابضة أوضح)';
+    document.getElementById('moveBanner').style.display = 'flex';
+    document.body.classList.add('rc-move-mode');
+    renderNonRosterTargets();
+    renderMoveSuggestions(); // §8 المواصفة: فرق تحتاج دعمًا الآن + تفعيل غير مجدولة
+}
+function cancelMoveMode() {
+    moveCtx = null;
+    document.getElementById('moveBanner').style.display = 'none';
+    document.body.classList.remove('rc-move-mode');
+    renderNonRosterTargets(); // يخفي شريط الفرق غير المجدولة
+    renderMoveSuggestions();  // يخفي شريط الاقتراحات
+}
+// §5: الفرق النشطة في /api/teams وغير المجدولة اليوم تظهر أهداف «تفعيل + توزيع»
+// أثناء وضع التوزيع (أو السحب) فقط — التنفيذ لاحقًا عبر حدث activation القائم
+function renderNonRosterTargets(forName) {
+    var sec = document.getElementById('nonRosterSection');
+    var grid = document.getElementById('nonRosterCards');
+    if (!sec || !grid) return;
+    var who = forName || (moveCtx && moveCtx.name);
+    if (!who) { sec.style.display = 'none'; grid.innerHTML = ''; return; }
+    var roster = {};
+    serverTeamIds().forEach(function(id) { roster[id] = true; roster[serverTeamKey(id)] = true; });
+    var list = (vbTeamsCache || []).filter(function(t) { return t && Number(t.is_active) === 1 && !roster[t.name]; });
+    if (!list.length) { sec.style.display = 'none'; grid.innerHTML = ''; return; }
+    grid.innerHTML = list.map(function(t) {
+        return '<div class="team-card rc-nr-card" data-nrteam="' + escapeHtml(t.name) + '">' +
+            '<div class="tc-status-bar tc-sb-nr"><span class="tc-dot"></span>' +
+            '<span class="card-status">⚡ غير مجدولة — تفعيل + توزيع</span>' +
+            (t.center ? '<span class="card-center tc-center"><i class="fas fa-hospital"></i> ' + escapeHtml(t.center) + '</span>' : '') +
+            '</div>' +
+            '<div class="tc-body"><div class="tc-head"><span class="card-name">' + escapeHtml(t.name) + '</span></div>' +
+            '<div class="tc-dropzone">⬇ ' + escapeHtml(who) + ' — تفعيل الفرقة وتوزيعه عليها</div>' +
+            '</div></div>';
+    }).join('');
+    sec.style.display = '';
+}
+// خطة الحركة: redist (مجدول نشط) · support (بلا فريق مجدول — دعم خارجي) ·
+// reassign (عليه دعم/تكليف مفتوح ← إنهاء الحالي ثم بدء الجديد تسلسليًا) ·
+// activate (الهدف فرقة غير مجدولة اليوم ← حدث activation القائم)
+function redistPlanOf(name) {
+    var live = findPersonInShift(name);
+    var baseTeam = findBaseTeamOf(name);
+    var hasOpenSupport = !!(live && !live.pool && live.role === 'support');
+    var assignedAway = !!(live && !live.pool && live.state === 'assignment');
+    var kind = (hasOpenSupport || assignedAway) ? 'reassign' : (baseTeam ? 'redist' : 'support');
+    return { kind: kind, hasBase: !!baseTeam };
+}
+function isNonRosterTeam(teamId) {
+    if (!teamId || !serverTeamsState) return false;
+    return !serverTeamsState[teamId] && !serverTeamsState[serverTeamKey(teamId)];
+}
+function openRedistModal(name, fromTeamId, toTeamId) {
+    if (!toTeamId || toTeamId === fromTeamId) { showToast('هو في هذه الفرقة أصلًا'); return; }
+    var plan = redistPlanOf(name);
+    var activate = isNonRosterTeam(toTeamId);
+    var kind = activate ? 'activate' : plan.kind;
+    redistCtx = { name: name, fromTeamId: fromTeamId || null, toTeamId: toTeamId, kind: kind, hasBase: plan.hasBase };
+    var kindLabel = kind === 'activate' ? 'تفعيل فرقة غير مجدولة + توزيع الموظف'
+        : kind === 'reassign' ? 'نقل تكليف/دعم — إنهاء الحالي وبدء جديد'
+        : kind === 'support' ? 'إضافة خارج الجدول (دعم خارجي — غير مجدول)' : 'إعادة توزيع (عضو مجدول)';
+    // §6: الموظف / من / إلى / المركز / نوع الحركة — ثم الإثبات المحاسبي
+    document.getElementById('redistInfo').innerHTML =
+        '<div class="ri-row"><span class="k">الموظف</span><span class="v">' + escapeHtml(name) + '</span></div>' +
+        '<div class="ri-row"><span class="k">من</span><span class="v">' + escapeHtml(fromTeamId ? fromTeamId + (getTeamCenter(fromTeamId) ? ' — ' + getTeamCenter(fromTeamId) : '') : 'خارج جدول المناوبة / القوة المتاحة') + '</span></div>' +
+        '<div class="ri-row"><span class="k">إلى</span><span class="v">' + escapeHtml(toTeamId) + '</span></div>' +
+        '<div class="ri-row"><span class="k">المركز</span><span class="v">' + escapeHtml(getTeamCenter(toTeamId) || '—') + '</span></div>' +
+        '<div class="ri-row"><span class="k">نوع الحركة</span><span class="v">' + kindLabel + '</span></div>';
+    // الإثبات المحاسبي: القوة قبل/بعد من مجاميع الخادم (serverWorkforce.totalStaff)
+    var proof = document.getElementById('redistProof');
+    var before = serverWorkforce && typeof serverWorkforce.totalStaff === 'number' ? serverWorkforce.totalStaff : null;
+    // «إضافة خارج الجدول» = موظف بلا مقعد مجدول يُسجَّل دعمًا خارجيًا (أو تفعيلًا)
+    var addsNew = !plan.hasBase && (kind === 'support' || kind === 'activate');
+    if (before === null) {
+        proof.className = 'redist-proof warn';
+        proof.textContent = '⚠️ مجاميع القوى السيرفرية غير محمّلة بعد — سيُعاد التحقق بعد الحفظ';
+    } else {
+        var after = addsNew ? before + 1 : before;
+        proof.className = 'redist-proof' + (addsNew ? ' up' : '');
+        proof.innerHTML = 'القوة قبل: <b>' + before + '</b> ← القوة بعد: <b>' + after + '</b>' +
+            '<div class="rp-effect">الأثر: ' + (addsNew ? '➕ إضافة خارج الجدول (+1 على القوة العاملة)' : '🔁 إعادة توزيع — لا زيادة في إجمالي القوة') + '</div>';
+    }
+    document.getElementById('redistModal').classList.add('active');
+}
+function closeRedistModal() {
+    document.getElementById('redistModal').classList.remove('active');
+    redistCtx = null;
+}
+function confirmRedistribution() {
+    if (!redistCtx) return;
+    var ctx = redistCtx;
+    closeRedistModal();
+    // §5: الهدف فرقة غير مجدولة ← حدث activation القائم (نفس آلية تفعيل الحوض)
+    if (ctx.kind === 'activate') {
+        var doActivate = function() {
+            return postActivation('/api/staffing/activation', { employeeName: ctx.name, teamName: ctx.toTeamId });
+        };
+        var okToast = function(appended) {
+            showToast(appended > 0 ? '✅ تم التفعيل والتوزيع — ' + ctx.name + ' ← ' + ctx.toTeamId : 'التفعيل مسجّل مسبقًا', appended > 0 ? 'success' : '');
+            afterTeamEvent();
+        };
+        doActivate().then(function(res) {
+            if (res && res.ok && res.d && res.d.success) { okToast(res.d.appended); return; }
+            var msg = (res && res.d && res.d.error) || '';
+            // غير المجدول: القناة القائمة ذاتها بلا أي تعديل سيرفري — تطوع بلا
+            // فريق (يدخل «القوة المتاحة») ثم تفعيل على الفرقة (مسار الحوض حرفيًا)
+            if (!ctx.hasBase && msg.indexOf('غير مجدول') !== -1) {
+                var empRec = (wbEmployeesCache || []).find(function(e) { return e && e.name === ctx.name; });
+                postActivation('/api/staffing/volunteer', {
+                    employeeName: ctx.name,
+                    employeeCode: empRec && empRec.employee_code ? String(empRec.employee_code) : undefined
+                }).then(function(v) {
+                    if (!v || !v.ok || !v.d || !v.d.success) {
+                        showToast('⚠️ ' + ((v && v.d && v.d.error) || 'فشل إدخال الموظف للقوة المتاحة'), 'error');
+                        return;
+                    }
+                    doActivate().then(function(res2) {
+                        if (!res2 || !res2.ok || !res2.d || !res2.d.success) {
+                            showToast('⚠️ ' + ((res2 && res2.d && res2.d.error) || 'فشل في التفعيل'), 'error');
+                            return;
+                        }
+                        okToast(res2.d.appended);
+                    });
+                });
+                return;
+            }
+            showToast('⚠️ ' + (msg || 'فشل في التفعيل'), 'error');
+        });
+        return;
+    }
+    // العقد القائم بلا تغيير: assignment للمجدولين · external_support للدعم الخارجي
+    var mainEv = ctx.hasBase
+        ? { type: 'assignment', employeeName: ctx.name, teamId: ctx.toTeamId, coverageType: 'assignment' }
+        : { type: 'external_support', employeeName: ctx.name, teamId: ctx.toTeamId, coverageType: 'external' };
+    // §1: غير المجدول يحمل مسمّاه/رقمه الوظيفي — نفس حمولة مسار التغطية التشغيلية
+    if (!ctx.hasBase) {
+        var empRec = (wbEmployeesCache || []).find(function(e) { return e && e.name === ctx.name; });
+        if (empRec) {
+            if (empRec.job_title) mainEv.jobTitle = empRec.job_title;
+            if (empRec.employee_code) mainEv.employeeNumber = String(empRec.employee_code);
+        }
+    }
+    if (ctx.fromTeamId) mainEv.center = getTeamCenter(ctx.fromTeamId) || ctx.fromTeamId;
+    var chain;
+    if (ctx.kind === 'reassign') {
+        // الحالة الحدّية: عليه تكليف/دعم مفتوح ← إنهاء الحالي ثم بدء الجديد (تسلسليًا)
+        chain = postPersonEvents([{ type: 'support_end', employeeName: ctx.name }]).then(function(d) {
+            if (!d) return null;
+            return postPersonEvents([mainEv]);
+        });
+    } else {
+        chain = postPersonEvents([mainEv]);
+    }
+    chain.then(function(d) {
+        if (!d) return;
+        showToast(d.appended > 0 ? '✅ تم التوزيع — ' + ctx.name + ' ← ' + ctx.toTeamId : 'النقل مسجّل مسبقًا', d.appended > 0 ? 'success' : '');
+        afterTeamEvent();
+    });
+}
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// الجولة النهائية — مواصفة الهوية البصرية (Workforce Operations Board):
+// ③ ساعة مباشرة بتوقيت الرياض · ② ترشيح اللوحة من شرائح الحالة ·
+// ⑧ تبديل البطاقات/الجدول · ⑥ تبويبات الحوض · §8 اقتراحات وضع التوزيع ·
+// (أ) الجوال الحقيقي من /api/employees المحمّلة أصلًا (بلا اختراع — «—» عند الغياب)
+// كلها طبقة عرض فقط فوق الحالة السيرفرية المحمَّلة — لا اشتقاق ولا مصدر جديد.
+// ════════════════════════════════════════════════════════════
+
+// ── (أ) بيانات الموظف الحقيقية من الكاش المحمَّل أصلًا ──
+function wbEmpOf(name) {
+    var c = wbEmployeesCache || [];
+    for (var i = 0; i < c.length; i++) if (c[i] && c[i].name === name) return c[i];
+    return null;
+}
+function wbEmpByCode(code) {
+    if (code == null) return null;
+    var c = wbEmployeesCache || [];
+    for (var i = 0; i < c.length; i++) if (c[i] && String(c[i].employee_code) === String(code)) return c[i];
+    return null;
+}
+// الجوال الفعلي فقط: صف الطاقم (m.phone من خدمة التوظيف) ← عنصر الحوض ←
+// نتيجة البحث ← كاش /api/employees بالاسم/الكود — وإلا «—» بلا اختراع
+function realPhoneOf(name, m, p, emp) {
+    var rec = wbEmpOf(name) || (p && p.employeeCode ? wbEmpByCode(p.employeeCode) : null) || (emp && emp.employee_code ? wbEmpByCode(emp.employee_code) : null);
+    return (m && m.phone) || (p && p.phone) || (emp && emp.phone) || (rec && rec.phone) || null;
+}
+function phoneLinkHtml(phone) {
+    return phone ? '<a href="tel:' + escapeHtml(phone) + '" class="ph-link"><i class="fas fa-phone"></i> ' + escapeHtml(phone) + '</a>' : '—';
+}
+
+// ── ③ المواصفة: ساعة مباشرة (توقيت الرياض — نفس منطقة التطبيق كله) ──
+(function () {
+    var fmt = null;
+    try { fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); } catch (_) {}
+    function tick() {
+        var el = document.getElementById('wbClockTime');
+        if (!el) return;
+        try { el.textContent = fmt ? fmt.format(new Date()) : TimeRiyadh.formatTime(new Date()); } catch (_) {}
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { tick(); });
+    else tick();
+    setInterval(tick, 1000);
+})();
+
+// ── ② المواصفة المشروحة: شرائح الحالة ترشّح اللوحة (ضغطة ثانية تلغي) ──
+var wbStatusFilter = null;
+function kpiFilterToggle(status) {
+    wbStatusFilter = (wbStatusFilter === status) ? null : status;
+    Array.prototype.forEach.call(document.querySelectorAll('.kpi-filter'), function (el) {
+        el.classList.toggle('kpi-on', el.getAttribute('data-kfilter') === wbStatusFilter);
+    });
+    if (serverTeamsState) renderTeamSections();
+}
+
+// ── ⑧ المواصفة المشروحة: عرض البطاقات / عرض الجدول — يثبت خلال الجلسة ──
+// ⑧ أُزيل عرض الجدول بطلب المالك — البطاقات هي العرض الوحيد (مثبت، بلا تخزين جلسة)
+var wbViewMode = 'cards';
+function wbSetView(mode) {
+    wbViewMode = 'cards';
+    if (serverTeamsState) renderTeamSections();
+}
+// عرض الجدول: نفس بيانات البطاقات ونفس معالجات الأزرار حرفيًا (cardSetReady/
+// openMissingModal/cardSetOffline/openCoverageModal) — لا تدفق جديد
+function renderTeamTable(teams) {
+    var rows = '';
+    teams.forEach(function (t) {
+        if (!teamInCurrentRoster(t.id)) return;
+        var d = rosterDataOf(t.id) || {};
+        var status = d.status || 'pending';
+        if (wbStatusFilter && status !== wbStatusFilter) return;
+        var members = d.members || [];
+        var ac = (typeof d.activeCount === 'number') ? d.activeCount : '—';
+        var req = (typeof d.requiredPersonnel === 'number' && d.requiredPersonnel > 0) ? d.requiredPersonnel : '—';
+        var typeLabel = t.type === 'rapid' ? '⚡ سريع' : t.type === 'center' ? '🏥 مركز' : '⭐ قيادة/عمليات';
+        var memHtml = members.length ? members.map(function (m) {
+            var badge = m.role === 'activation' ? '<i class="pm-role-badge rb-overlap">⚡ مفعَّل</i>'
+                : m.role === 'support' ? '<i class="pm-role-badge ' + (m.state === 'assignment' ? 'rb-assigned">مكلَّف' : 'rb-support">داعم') + '</i>'
+                : '<i class="pm-role-badge rb-base">أساسي</i>';
+            return '<span class="wt-m">' + escapeHtml(m.name) + ' ' + badge + '</span>';
+        }).join('') : '<span class="wt-none">لا يوجد موظفين</span>';
+        var acts = isOperationalTeam(t.id)
+            ? '<button class="btn btn-ready" onclick="cardSetReady(\'' + t.id + '\')">🟢 جاهزة</button>' +
+              '<button class="btn btn-missing" onclick="openMissingModal(\'' + t.id + '\')">🟡 ناقصة</button>' +
+              '<button class="btn btn-offline" onclick="cardSetOffline(\'' + t.id + '\')">🔴 خارج الخدمة</button>' +
+              '<button class="btn btn-cover wt-cover" onclick="openCoverageModal(\'' + t.id + '\')">🤝 تغطية</button>'
+            : '—';
+        rows += '<tr class="wb-trow status-' + status + '" data-team="' + t.id + '">' +
+            '<td class="wt-name"><b>' + escapeHtml(t.name) + '</b> <span class="wt-type">' + typeLabel + '</span></td>' +
+            '<td class="wt-center">' + escapeHtml(getTeamCenter(t.id) || '—') + '</td>' +
+            '<td><span class="wt-status wt-' + status + '">' + (STATUS_LABELS[status] || status) + '</span></td>' +
+            '<td class="wt-str">' + ac + '/' + req + '</td>' +
+            '<td class="wt-members">' + memHtml + '</td>' +
+            '<td class="wt-acts">' + acts + '</td></tr>';
+    });
+    if (!rows) return '';
+    return '<table class="wb-table"><thead><tr><th>الفرقة</th><th>المركز</th><th>الحالة</th><th>القوة</th><th>الأعضاء</th><th>الإجراءات</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── ⑥ المواصفة: تبويبات الحوض (ترشيح عرضي — البطاقات تُخفى لا تُحذف حتى
+//    تبقى فهارس السحب/الإفلات والضغط القائمة صحيحة) ──
+var wbPoolFilter = 'all';
+function poolFilterSet(kind) {
+    wbPoolFilter = kind || 'all';
+    Array.prototype.forEach.call(document.querySelectorAll('#poolTabs button'), function (b) {
+        b.classList.toggle('on', b.getAttribute('data-pf') === wbPoolFilter);
+    });
+    applyPoolFilter();
+}
+function applyPoolFilter() {
+    var g = document.getElementById('supportCards');
+    if (!g) return;
+    var shown = 0;
+    Array.prototype.forEach.call(g.querySelectorAll('.support-card'), function (c) {
+        var show = wbPoolFilter === 'all' || c.getAttribute('data-pkind') === wbPoolFilter;
+        c.style.display = show ? '' : 'none';
+        if (show) shown++;
+    });
+    var empty = document.getElementById('poolFilterEmpty');
+    if (empty) empty.style.display = (g.querySelector('.support-card') && shown === 0) ? '' : 'none';
+}
+function poolScroll(dir) {
+    var g = document.getElementById('supportCards');
+    if (g) g.scrollBy({ left: dir * 300, behavior: 'smooth' });
+}
+
+// ── §8 المواصفة: اقتراحات وضع التوزيع — الفرق الناقصة الآن (من الحالة
+//    السيرفرية: status=missing أو شاغر vacant>0) + قناة التفعيل غير المجدولة.
+//    الضغط على اقتراح يفتح نافذة التأكيد نفسها — القرار النهائي للمستخدم ──
+function renderMoveSuggestions() {
+    var el = document.getElementById('moveSuggest');
+    if (!el) return;
+    if (typeof moveCtx === 'undefined' || !moveCtx) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    var needy = [];
+    serverTeamIds().forEach(function (id) {
+        var d = rosterDataOf(id);
+        if (!d) return;
+        var vacant = (typeof d.vacant === 'number') ? d.vacant : null;
+        if (d.status === 'missing' || (vacant !== null && vacant > 0)) needy.push({ id: id, status: d.status, vacant: vacant });
+    });
+    var html = '<span class="ms-label">💡 فرق تحتاج دعمًا الآن:</span>';
+    if (needy.length) {
+        needy.slice(0, 8).forEach(function (n) {
+            html += '<button class="ms-chip" onclick="moveSuggestPick(\'' + String(n.id).replace(/'/g, "\\'") + '\')">' +
+                (n.status === 'missing' ? '🟡 ' : '⚪ ') + escapeHtml(n.id) + (n.vacant ? ' — تحتاج ' + n.vacant : '') + '</button>';
+        });
+    } else {
+        html += '<span class="ms-none">لا فرق ناقصة حاليًا — اختر أي بطاقة</span>';
+    }
+    html += '<button class="ms-chip ms-nr" onclick="moveSuggestNonRoster()">⚡ تفعيل فرقة غير مجدولة ↓</button>';
+    el.innerHTML = html;
+    el.style.display = 'flex';
+}
+function moveSuggestPick(teamId) {
+    if (typeof moveCtx === 'undefined' || !moveCtx) return;
+    var mv = moveCtx;
+    cancelMoveMode();
+    if (teamId !== mv.fromTeamId) openRedistModal(mv.name, mv.fromTeamId, teamId);
+    else showToast('هو في هذه الفرقة أصلًا');
+}
+function moveSuggestNonRoster() {
+    var sec = document.getElementById('nonRosterSection');
+    if (sec && sec.style.display !== 'none') sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+</script>
+
 <!-- RAG AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>
@@ -2291,6 +4169,219 @@ renderAll = function() {
                 })
                 .catch(function () { /* فشل القراءة: لا نخفي شيئًا — الحسم خادمي */ });
         } catch (_) { }
+    });
+})();
+</script>
+
+<script>
+/* ═══ ترقية تفاعلية اختيارية (صفر تغيير وظيفي): سحب عنصر من حوض «الدعم المتاح»
+   وإفلاته على بطاقة فرقة يفتح نفس مودال التدفق القائم حرفيًا — «تفعيل فرقة»
+   لأصحاب زر التفعيل (أوفرلاب/متطوع) و«دعم فريق» لغيرهم — مع تعبئة الفريق
+   المستهدف مسبقًا إن وُجد في قائمة المودال. الحفظ يبقى بضغطة المستخدم داخل
+   المودال نفسه (confirmSupport/confirmActivation كما هي)، وكل الأزرار
+   الأصلية تعمل كما هي دون أي تعديل. السحب يُفعَّل عبر MutationObserver بعد
+   كل إعادة رسم للحوض (innerHTML) — لا مساس بقوالب JS القائمة. ═══ */
+(function () {
+    var dragIdx = null;
+    function grid() { return document.getElementById('supportCards'); }
+    function indexOfCard(card) {
+        var g = grid(); if (!g) return -1;
+        return Array.prototype.indexOf.call(g.children, card);
+    }
+    function clearDropTargets() {
+        Array.prototype.forEach.call(document.querySelectorAll('.rc-drop-target'), function (c) { c.classList.remove('rc-drop-target'); });
+    }
+    var obs = new MutationObserver(function () {
+        var g = grid(); if (!g) return;
+        Array.prototype.forEach.call(g.querySelectorAll('.support-card'), function (c) {
+            if (!c.hasAttribute('draggable')) c.setAttribute('draggable', 'true');
+        });
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+        var g = grid(); if (g) obs.observe(g, { childList: true });
+    });
+    document.addEventListener('dragstart', function (e) {
+        var card = e.target && e.target.closest ? e.target.closest('.support-card') : null;
+        if (!card) return;
+        dragIdx = indexOfCard(card);
+        if (dragIdx < 0) { dragIdx = null; return; }
+        try { e.dataTransfer.setData('text/plain', String(dragIdx)); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+        card.classList.add('rc-dragging');
+    });
+    document.addEventListener('dragend', function () {
+        dragIdx = null;
+        Array.prototype.forEach.call(document.querySelectorAll('.rc-dragging'), function (c) { c.classList.remove('rc-dragging'); });
+        clearDropTargets();
+        if (typeof renderAll === 'function') renderAll(); // استدراك أي تحديث أُجّل أثناء السحب
+    });
+    function teamCardOf(e) {
+        var card = e.target && e.target.closest ? e.target.closest('.team-card') : null;
+        if (!card || card.classList.contains('vehicle-card')) return null; // المركبات خارج نطاق السحب
+        var bar = card.querySelector('.actions-bar[data-team]');
+        return bar ? { card: card, teamId: bar.getAttribute('data-team') } : null;
+    }
+    document.addEventListener('dragover', function (e) {
+        if (dragIdx == null) return;
+        var t = teamCardOf(e);
+        if (!t) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+        if (!t.card.classList.contains('rc-drop-target')) {
+            clearDropTargets();
+            t.card.classList.add('rc-drop-target');
+        }
+    });
+    document.addEventListener('dragleave', function (e) {
+        var t = teamCardOf(e);
+        if (t && !t.card.contains(e.relatedTarget)) t.card.classList.remove('rc-drop-target');
+    });
+    document.addEventListener('drop', function (e) {
+        if (dragIdx == null) return;
+        var t = teamCardOf(e);
+        if (!t) return;
+        e.preventDefault();
+        var idx = dragIdx;
+        var g = grid();
+        var card = g ? g.children[idx] : null;
+        var teamId = t.teamId;
+        // نفس التدفقات القائمة حرفيًا: التفعيل لأصحاب «⚡ تفعيل فرقة»، والدعم لزر «🤝 دعم فريق»
+        if (card && card.querySelector('.btn-activate') && typeof openActivationModal === 'function') {
+            openActivationModal(idx);
+            var asel = document.getElementById('activationTeam');
+            if (asel) Array.prototype.forEach.call(asel.options, function (o) { if (o.value === teamId) asel.value = teamId; });
+        } else if (card && card.querySelector('.btn-support') && typeof openSupportModal === 'function') {
+            openSupportModal(idx);
+            var ssel = document.getElementById('supportTargetTeam');
+            if (ssel) Array.prototype.forEach.call(ssel.options, function (o) { if (o.value === teamId) ssel.value = teamId; });
+        }
+        clearDropTargets();
+    });
+})();
+</script>
+
+<script>
+/* ═══ T3: سحب/إفلات صفوف الأفراد (.pm[data-mdrag]) بين بطاقات الفرق + فتح درج
+   الموظف بالضغط + وضع النقل (بديل اللمس) — كلها طبقة تفاعل اختيارية:
+   - الإفلات على بطاقة فرقة يفتح نافذة تأكيد إعادة التوزيع (#redistModal) ولا
+     يُرسل أي حدث قبل ضغطة «تأكيد النقل» من المستخدم.
+   - مستقل تمامًا عن سحب حوض الدعم القائم أعلاه (يبقى كما هو حرفيًا).
+   - الضغط العادي (بلا سحب) على صف فرد/بطاقة حوض/نتيجة بحث يفتح درج الموظف. ═══ */
+(function () {
+    var drag = null; // { name, fromTeamId }
+    function clearDropTargets() {
+        Array.prototype.forEach.call(document.querySelectorAll('.rc-drop-target'), function (c) { c.classList.remove('rc-drop-target'); });
+    }
+    var obs = new MutationObserver(function () {
+        Array.prototype.forEach.call(document.querySelectorAll('.pm[data-mdrag]'), function (pm) {
+            if (!pm.hasAttribute('draggable')) pm.setAttribute('draggable', 'true');
+        });
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+        ['centerCards', 'rapidCards', 'specialCards'].forEach(function (id) {
+            var g = document.getElementById(id);
+            if (g) obs.observe(g, { childList: true, subtree: true });
+        });
+    });
+    function teamCardInfoOf(el) {
+        var card = el && el.closest ? el.closest('.team-card') : null;
+        if (card && !card.classList.contains('vehicle-card')) {
+            var nr = card.getAttribute('data-nrteam'); // §5: فرقة غير مجدولة (تفعيل + توزيع)
+            if (nr) return { card: card, teamId: nr };
+            var bar = card.querySelector('.actions-bar[data-team]');
+            return bar ? { card: card, teamId: bar.getAttribute('data-team') } : null;
+        }
+        // ⑧ المواصفة: صفوف عرض الجدول أهداف صالحة أيضًا لوضع التوزيع/السحب
+        var tr = el && el.closest ? el.closest('tr.wb-trow') : null;
+        if (tr) return { card: tr, teamId: tr.getAttribute('data-team') };
+        return null;
+    }
+    document.addEventListener('dragstart', function (e) {
+        var pm = e.target && e.target.closest ? e.target.closest('.pm[data-mdrag]') : null;
+        if (!pm) return;
+        var info = teamCardInfoOf(pm);
+        if (!info) return;
+        drag = { name: pm.getAttribute('data-emp'), fromTeamId: info.teamId };
+        try { e.dataTransfer.setData('text/plain', drag.name); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+        pm.classList.add('rc-dragging');
+        if (typeof renderNonRosterTargets === 'function') renderNonRosterTargets(drag.name); // §5: أهداف التفعيل أثناء السحب أيضًا
+    });
+    document.addEventListener('dragend', function () {
+        drag = null;
+        Array.prototype.forEach.call(document.querySelectorAll('.pm.rc-dragging'), function (c) { c.classList.remove('rc-dragging'); });
+        clearDropTargets();
+        if (typeof renderNonRosterTargets === 'function' && (typeof moveCtx === 'undefined' || !moveCtx)) renderNonRosterTargets(null);
+        if (typeof renderAll === 'function') renderAll(); // استدراك أي تحديث أُجّل أثناء السحب
+    });
+    document.addEventListener('dragover', function (e) {
+        if (!drag) return;
+        var t = teamCardInfoOf(e.target);
+        if (!t || t.teamId === drag.fromTeamId) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+        if (!t.card.classList.contains('rc-drop-target')) {
+            clearDropTargets();
+            t.card.classList.add('rc-drop-target');
+        }
+    });
+    document.addEventListener('dragleave', function (e) {
+        var t = teamCardInfoOf(e.target);
+        if (t && !t.card.contains(e.relatedTarget)) t.card.classList.remove('rc-drop-target');
+    });
+    document.addEventListener('drop', function (e) {
+        if (!drag) return;
+        var t = teamCardInfoOf(e.target);
+        if (!t) return;
+        e.preventDefault();
+        clearDropTargets();
+        if (t.teamId === drag.fromTeamId) return;
+        // بوابة التأكيد الوحيدة — لا إرسال قبل ضغطة المستخدم داخل النافذة
+        if (typeof openRedistModal === 'function') openRedistModal(drag.name, drag.fromTeamId, t.teamId);
+    });
+
+    // ضغط (بلا سحب): وضع النقل أولًا، ثم نتائج البحث، ثم صفوف الأفراد، ثم بطاقات الحوض
+    document.addEventListener('click', function (e) {
+        if (typeof moveCtx !== 'undefined' && moveCtx) {
+            if (e.target.closest('#moveBanner')) return;
+            if (e.target.closest('button, a, input, select, textarea, .modal-overlay, .side-drawer')) return;
+            var tm = teamCardInfoOf(e.target);
+            if (tm) {
+                e.preventDefault();
+                var mv = moveCtx;
+                cancelMoveMode();
+                if (tm.teamId !== mv.fromTeamId && typeof openRedistModal === 'function') openRedistModal(mv.name, mv.fromTeamId, tm.teamId);
+                else if (tm.teamId === mv.fromTeamId) showToast('هو في هذه الفرقة أصلًا');
+            } else {
+                cancelMoveMode(); // ضغطة خارج البطاقات = إلغاء وضع النقل
+            }
+            return;
+        }
+        if (!e.target.closest('.wb-search-wrap') && typeof closeWbSearchResults === 'function') closeWbSearchResults();
+        if (e.target.closest('button, a, input, select, textarea, .modal-overlay, .side-drawer')) return;
+        var sr = e.target.closest && e.target.closest('.wb-sr-row');
+        if (sr) {
+            var r = (typeof wbSearchLast !== 'undefined') ? wbSearchLast[Number(sr.getAttribute('data-sidx'))] : null;
+            if (r && r.emp) openEmployeeDrawer({ name: r.emp.name, emp: r.emp });
+            return;
+        }
+        var pm = e.target.closest && e.target.closest('.pm[data-emp]');
+        if (pm) { openEmployeeDrawer({ name: pm.getAttribute('data-emp') }); return; }
+        var sp = e.target.closest && e.target.closest('#supportCards .support-card');
+        if (sp) {
+            var g = document.getElementById('supportCards');
+            var idx = Array.prototype.indexOf.call(g.children, sp);
+            var p = (typeof availableSupport !== 'undefined' && availableSupport) ? availableSupport[idx] : null;
+            if (p) openEmployeeDrawer({ name: p.name, poolIdx: idx });
+        }
+    });
+    // Escape: يلغي وضع النقل ثم يغلق الأدراج ثم نتائج البحث
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (typeof moveCtx !== 'undefined' && moveCtx) { cancelMoveMode(); return; }
+        var ed = document.getElementById('empDrawer');
+        if (ed && ed.classList.contains('open')) { closeEmployeeDrawer(); return; }
+        var vd = document.getElementById('vehiclesDrawer');
+        if (vd && vd.classList.contains('open')) { closeVehiclesDrawer(); return; }
+        if (typeof closeWbSearchResults === 'function') closeWbSearchResults();
     });
 })();
 </script>

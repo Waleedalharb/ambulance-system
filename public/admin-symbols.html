@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>⚙️ إدارة رموز الجداول — منصة الجنوب</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap">
 <style>
 :root {
     --bg: #0B1E33;
@@ -127,6 +127,49 @@ tr:hover td { background: rgba(46,139,122,.08); }
 }
 .type-section-title .count { font-size: 12px; color: var(--muted); font-weight: 400; }
 @media (max-width: 900px) { .container { padding: 10px; } th, td { padding: 7px 5px; font-size: 12px; } }
+</style>
+<!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+<style>
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* جسر رموز الصفحة الداكنة القديمة (كحلي/زمردي/ذهبي) إلى قيم التكميل.
+   بصري فقط — لا منطق ولا id ولا بنية. */
+:root {
+    --bg: var(--pi-bg-1);
+    --card: #101B30;
+    --teal: var(--pi-green);
+    --gold: var(--pi-gold);
+    --muted: var(--pi-ink-dim);
+    --danger: var(--pi-red);
+    --border: var(--pi-line);
+}
+/* الرأس — كحلي تنفيذي بلمسة إشارية (مطابق workflow-prototype) */
+.header { background: linear-gradient(135deg, #0B1424, #101B30); border-bottom: 2px solid rgba(52,211,153,0.35); }
+/* أسطح كانت تحمل الكحلي القديم #0B1E33 مضمّنًا */
+th { background: rgba(255,255,255,0.04); border-bottom-color: rgba(52,211,153,0.35); }
+.pattern-item { background: rgba(255,255,255,0.03); }
+.filters select, .filters input, .modal select, .modal input, .modal textarea { background: rgba(255,255,255,0.04); }
+tr:hover td { background: rgba(255,255,255,0.03); }
+/* الزر الافتراضي الزمردي المصمت → التدرج الأزرق التنفيذي */
+.btn {
+    background: linear-gradient(150deg, #2F6BF0, #1D4FD7); color: #fff;
+    box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn.gold { background: rgba(245,198,107,0.14); color: var(--pi-gold); border: 1px solid rgba(245,198,107,0.4); box-shadow: none; }
+.btn.danger { background: rgba(248,113,113,0.14); color: #FCA5A5; border: 1px solid rgba(248,113,113,0.4); box-shadow: none; }
+/* شارات الزمردي القديم → إشارية التكميل */
+.badge.active, .badge.used { background: rgba(52,211,153,0.14); color: var(--pi-green); }
+.badge.type { background: rgba(52,211,153,0.12); color: var(--pi-green); }
+.lockbar.open { background: rgba(52,211,153,0.12); border-color: rgba(52,211,153,0.4); color: var(--pi-green); }
+/* تنبيه §8: في هذه الصفحة .modal هو صندوق النافذة لا الستارة —
+   الملف المشترك عامله كستارة، فنعيده هنا صندوقًا زجاجيًا */
+.modal {
+    background: linear-gradient(170deg, rgba(26,35,66,0.99), rgba(12,18,38,0.99)) !important;
+    border: 1px solid rgba(255,255,255,0.13) !important;
+    border-radius: var(--pi-r-lg);
+    box-shadow: 0 40px 90px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+    color: var(--pi-ink);
+}
 </style>
 </head>
 <body>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تثبيت أداة CAD — منصة الجنوب</title>
+<style>
+  :root { --navy:#0B1E33; --navy2:#12293F; --teal:#2E8B7A; --teal-l:#7fd8c4; --gold:#E8C84A; --white:#EAF1F8; --muted:#8A9BB0; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--navy); color:var(--white); font-family:Tahoma,Arial,sans-serif; min-height:100vh; padding:24px 16px 48px; }
+  .wrap { max-width:640px; margin:0 auto; }
+  .head { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+  .head .logo { width:44px; height:44px; border-radius:12px; background:var(--navy2); border:1px solid var(--teal);
+    display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .head h1 { font-size:20px; }
+  .head small { color:var(--muted); font-size:12px; display:block; margin-top:3px; }
+  .card { background:var(--navy2); border:1px solid rgba(46,139,122,.4); border-radius:16px; padding:20px; margin-bottom:16px; }
+  .status { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:bold; }
+  .status .dot { width:12px; height:12px; border-radius:50%; flex:none; }
+  .status.ok .dot { background:var(--teal-l); box-shadow:0 0 10px var(--teal); }
+  .status.no .dot { background:var(--gold); box-shadow:0 0 10px var(--gold); }
+  .status small { display:block; font-weight:normal; color:var(--muted); font-size:12px; margin-top:4px; }
+  .btn { display:block; width:100%; text-align:center; background:var(--teal); color:#fff; border:none; border-radius:14px;
+    padding:16px; font-size:17px; font-weight:bold; font-family:inherit; cursor:pointer; transition:filter .15s; }
+  .btn:hover { filter:brightness(1.12); }
+  .btn:disabled { opacity:.6; cursor:wait; }
+  .btn.gold { background:transparent; border:1px solid var(--gold); color:var(--gold); font-size:14px; padding:10px; width:auto; display:inline-block; text-decoration:none; }
+  ol.steps { margin:6px 18px 0 0; line-height:2.3; font-size:14px; }
+  ol.steps b { color:var(--teal-l); }
+  code { background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.15); border-radius:6px; padding:1px 8px; font-size:13px; direction:ltr; display:inline-block; }
+  .note { color:var(--muted); font-size:12.5px; line-height:2; }
+  .err { color:#ff9d9d; font-size:13px; margin-top:10px; display:none; }
+  .back { display:inline-block; margin-top:6px; color:var(--teal-l); text-decoration:none; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="logo">🚑</div>
+    <div>
+      <h1>تثبيت أداة CAD Overlay</h1>
+      <small>منصة الجنوب — تسجيل بلاغات CAD بضغطة واحدة</small>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="status no" id="statusBox">
+      <span class="dot"></span>
+      <span id="statusText">جارٍ فحص حالة الأداة على هذا الجهاز…</span>
+    </div>
+  </div>
+
+  <div class="card" id="installCard">
+    <button class="btn" id="dlBtn">🚑 تثبيت CAD Overlay — تنزيل الحزمة</button>
+    <div class="err" id="errBox"></div>
+    <ol class="steps" style="margin-top:16px">
+      <li>نزّل الحزمة بالزر أعلاه ثم <b>فكّ ضغطها</b> في مجلد ثابت (لا تحذفه لاحقًا).</li>
+      <li>في Chrome افتح <code>chrome://extensions</code></li>
+      <li>فعّل <b>وضع المطوّر</b> (Developer mode) أعلى الصفحة.</li>
+      <li>اضغط <b>Load unpacked / تحميل غير مُعبأ</b> واختر مجلد الحزمة المفكوك.</li>
+      <li>افتح <b>CAD</b> — تظهر لوحة «🚑 منصة الجنوب» تلقائيًا. انتهى ✅</li>
+    </ol>
+    <p class="note" style="margin-top:14px">
+      بعد التثبيت مرة واحدة: كل مرة تفتح Chrome وCAD تعمل الأداة تلقائيًا —
+      بلا حقن يدوي ولا خطوة يومية. التسجيل بضغطة 「＋ تسجيل للجنوب」 مرة واحدة،
+      والموقع وأي تحديث يصل تلقائيًا دون ضغطة ثانية.
+    </p>
+  </div>
+
+  <div class="card">
+    <p class="note">
+      🎯 الحزمة تُولَّد من هذه المنصة مباشرة وتتصل بعنوانها:
+      <code id="baseUrl"></code><br>
+      🔒 الأداة قراءة فقط من CAD — لا تلمس بيانات الدخول ولا ترسل شيئًا لـCAD.
+      للتحديث لاحقًا: نزّل الحزمة مجددًا، استبدل المجلد، ثم ⟳ في صفحة الإضافات.
+    </p>
+    <a class="back" href="/">← العودة للصفحة الرئيسية</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var statusBox = document.getElementById('statusBox');
+  var statusText = document.getElementById('statusText');
+  document.getElementById('baseUrl').textContent = location.origin;
+
+  function setInstalled(version) {
+    statusBox.className = 'status ok';
+    statusText.innerHTML = '✅ أداة CAD مثبتة وتعمل على هذا الجهاز' +
+      (version ? ' <small>الإصدار ' + version + '</small>' : '') +
+      '<small>افتح CAD وستجد لوحة «🚑 منصة الجنوب» — يمكنك سحبها لأي مكان.</small>';
+  }
+  function setMissing() {
+    statusBox.className = 'status no';
+    statusText.innerHTML = '⚠️ الأداة غير مثبتة على هذا المتصفح بعد' +
+      '<small>نزّل الحزمة وثبّتها بالخطوات أدناه — مرة واحدة فقط.</small>';
+  }
+
+  // الفحص الذاتي: علامة تزرعها الإضافة (platform-marker.js) على صفحات المنصة
+  function detect() {
+    var v = document.documentElement.getAttribute('data-south-cad-overlay');
+    if (v) { setInstalled(v); return; }
+    window.postMessage({ source: 'south-platform', kind: 'overlay-ping' }, '*');
+    setTimeout(function () {
+      if (statusBox.className.indexOf('ok') === -1 &&
+          !document.documentElement.getAttribute('data-south-cad-overlay')) setMissing();
+    }, 900);
+  }
+  // المستمع دائم: إن تأخر تحميل content script تُحدَّث الحالة فور وصول pong
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (d && d.source === 'south-cad-overlay-marker' && d.kind === 'overlay-pong') setInstalled(d.version);
+  });
+  detect();
+  window.addEventListener('focus', detect);
+
+  // تنزيل الحزمة — تُولَّد من الخادم لحظة الطلب (بعنوان هذه المنصة)
+  var dlBtn = document.getElementById('dlBtn');
+  var errBox = document.getElementById('errBox');
+  dlBtn.addEventListener('click', async function () {
+    errBox.style.display = 'none';
+    dlBtn.disabled = true;
+    try {
+      var tk = localStorage.getItem('auth_access_token') || localStorage.getItem('authToken');
+      var r = await fetch('/api/cad-overlay/package', { headers: tk ? { Authorization: 'Bearer ' + tk } : {} });
+      if (r.status === 401 || r.status === 403) throw new Error('سجّل دخولك للمنصة أولًا ثم أعد المحاولة.');
+      if (!r.ok) throw new Error('تعذّر توليد الحزمة (HTTP ' + r.status + ').');
+      var blob = await r.blob();
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'south-cad-overlay-extension.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    } catch (e) {
+      errBox.textContent = '❌ ' + (e.message || e);
+      errBox.style.display = 'block';
+    } finally { dlBtn.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

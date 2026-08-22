@@ -30,7 +30,7 @@
     <meta name="msapplication-config" content="none">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/a11y.css?v=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -38,6 +38,7 @@
     <!-- Leaflet.js للخريطة -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     
     <!-- QRCode.js لإنشاء QR Codes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -51,7 +52,9 @@
     <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
     <link rel="stylesheet" href="css/app.css?v=41">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
-    <link rel="stylesheet" href="css/executive-theme.css?v=1">
+    <link rel="stylesheet" href="css/executive-theme.css?v=3">
+    <!-- طبقة الهوية الموحدة (هوية التكميل المعتمدة FROZEN) — تُحمَّل بعد كل ملفات CSS -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
 <script src="js/shift-codes-config.js"></script>
 <script>
 // Session check - skip login if token exists
@@ -799,27 +802,317 @@ window.addEventListener('load', function() {
     </div>
     <div class="update-status" id="updateStatus"><i class="fas fa-circle" style="color:#34D399;font-size:7px;"></i> متصل | تحديث تلقائي مفعل</div>
 
-    <!-- المستوى 3: الخريطة التشغيلية الذكية — امتداد مركز القرار -->
-    <div class="ops-eyebrow ops-eyebrow-map"><i class="fas fa-map-marked-alt"></i><span>الخريطة التشغيلية — صورة القطاع لحظيًا من حالة الخادم</span></div>
-    <div class="ops-map-section" id="opsMapSection">
-        <div class="ops-map-wrap">
-            <div id="opsMap"></div>
-            <div class="ops-map-tile-note" id="opsMapTileNote" style="display:none;">
-                <i class="fas fa-triangle-exclamation"></i> تعذّر تحميل خلفية الخريطة — العلامات تعمل من بيانات الخادم
-            </div>
+    <!-- ═══ مركز القيادة — الهوية التنفيذية الداكنة (بصري فقط؛ البيانات من المصادر القائمة عبر home-command.js) ═══ -->
+    <style id="home-command-styles">
+    /* ═══ v2 — إعادة تشكيل الرئيسية: «أعرف حالة القطاع خلال 3 ثوانٍ» ═══ */
+
+    /* إخفاء الأقسام القديمة — ما يزال app.js يكتب فيها، لذلك تُخفى ولا تُحذف من DOM */
+    /* #distributionIndicator أُعيد إظهاره (قرار المالك 2026-08-21): بجوار الخريطة في الصف الأول */
+    #workforceDashboard, #opsFocus, #opsResources, #opsEvents, #liveReportStats { display: none !important; }
+
+    /* ترتيب الصفحة الجديد: مؤشرات ← خريطة+توزيع ← حالة+إنجاز ← تذييل */
+    .hc-kpi-strip { order: 3; }
+    .hc-row-map-dist { order: 4; }
+    .hc-row-status-teams { order: 5; }
+    .container > footer { order: 99; }
+
+    /* ── شريط المؤشرات التنفيذية — 8 مؤشرات بأرقام كبيرة جدًا ── */
+    .hc-kpi-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }
+    .hc-kpi { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--pi-r-md); border: 1px solid var(--pi-line); background: var(--pi-glass); box-shadow: var(--pi-shadow-soft); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-family: inherit; cursor: default; text-align: right; overflow: hidden; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    button.hc-kpi { cursor: pointer; }
+    .hc-kpi:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.17); }
+    .hc-kpi::before { content: ''; position: absolute; inset-inline-start: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--hc-accent, var(--pi-blue)); box-shadow: 0 0 10px var(--hc-accent, var(--pi-blue)); opacity: .9; }
+    .hc-kpi-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: .9rem; flex-shrink: 0; }
+    .hc-kpi-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+    .hc-kpi-label { font-size: .71rem; color: var(--pi-ink-dim); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hc-kpi-value { font-size: 2rem; font-weight: 800; color: var(--pi-ink); line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .hc-kpi-sub { font-size: .67rem; color: var(--pi-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hc-kpi-sub.hc-bad { color: var(--pi-red); font-weight: 700; }
+    .hc-kpi-blue   { --hc-accent: var(--pi-blue);   background: linear-gradient(168deg, rgba(96,165,250,0.10), rgba(255,255,255,0.02));  border-color: rgba(96,165,250,0.28); }
+    .hc-kpi-green  { --hc-accent: var(--pi-green);  background: linear-gradient(168deg, rgba(52,211,153,0.10), rgba(255,255,255,0.02));  border-color: rgba(52,211,153,0.28); }
+    .hc-kpi-amber  { --hc-accent: var(--pi-amber);  background: linear-gradient(168deg, rgba(251,191,36,0.10), rgba(255,255,255,0.02));  border-color: rgba(251,191,36,0.28); }
+    .hc-kpi-red    { --hc-accent: var(--pi-red);    background: linear-gradient(168deg, rgba(248,113,113,0.10), rgba(255,255,255,0.02)); border-color: rgba(248,113,113,0.28); }
+    .hc-kpi-purple { --hc-accent: var(--pi-purple); background: linear-gradient(168deg, rgba(192,132,252,0.10), rgba(255,255,255,0.02)); border-color: rgba(192,132,252,0.28); }
+    .hc-kpi-blue   .hc-kpi-icon { background: rgba(96,165,250,0.14);   color: var(--pi-blue);   box-shadow: inset 0 0 0 1px rgba(96,165,250,0.30); }
+    .hc-kpi-green  .hc-kpi-icon { background: rgba(52,211,153,0.14);   color: var(--pi-green);  box-shadow: inset 0 0 0 1px rgba(52,211,153,0.30); }
+    .hc-kpi-amber  .hc-kpi-icon { background: rgba(251,191,36,0.14);   color: var(--pi-amber);  box-shadow: inset 0 0 0 1px rgba(251,191,36,0.30); }
+    .hc-kpi-red    .hc-kpi-icon { background: rgba(248,113,113,0.14);  color: var(--pi-red);    box-shadow: inset 0 0 0 1px rgba(248,113,113,0.30); }
+    .hc-kpi-purple .hc-kpi-icon { background: rgba(192,132,252,0.14);  color: var(--pi-purple); box-shadow: inset 0 0 0 1px rgba(192,132,252,0.30); }
+    .hc-kpi-red.hc-alert-on { animation: hcCardPulse 3.2s ease-in-out infinite; }
+    @keyframes hcCardPulse {
+        0%, 100% { box-shadow: var(--pi-shadow-soft), 0 0 0 0 rgba(248,113,113,0.0); }
+        50%      { box-shadow: var(--pi-shadow-soft), 0 0 18px 2px rgba(248,113,113,0.16); }
+    }
+
+    /* ── صفّا إعادة التشكيل (قرار المالك 2026-08-21): خريطة+توزيع ثم حالة+إنجاز ── */
+    .hc-row { display: grid; gap: 16px; align-items: stretch; }
+    .hc-row-map-dist { grid-template-columns: 1.25fr 1fr; }   /* يمين: الخريطة · يسار: توزيع البلاغات */
+    .hc-row-status-teams { grid-template-columns: 1fr 1.25fr; } /* يمين: الحالة التشغيلية · يسار: إنجاز الفرق */
+    .hc-dist-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+    /* ── البطاقة الزجاجية العامة ── */
+    .hc-card { background: var(--pi-glass); border: 1px solid var(--pi-line); border-radius: var(--pi-r-lg); box-shadow: var(--pi-shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 18px 20px; display: flex; flex-direction: column; min-width: 0; }
+    .hc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--pi-line-soft); }
+    .hc-card-title { font-size: .95rem; font-weight: 800; color: var(--pi-ink); display: flex; align-items: center; gap: 8px; }
+    .hc-card-title > i { color: var(--pi-amber); font-size: .85rem; }
+    .hc-link-btn { background: transparent; border: 1px solid var(--pi-line); color: var(--pi-ink-dim); border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: all .15s ease; white-space: nowrap; }
+    .hc-link-btn:hover { color: var(--pi-ink); border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); }
+    .hc-link-btn i { font-size: .6rem; }
+    .hc-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pi-green); box-shadow: 0 0 8px rgba(52,211,153,0.8); animation: hcLivePulse 2.8s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes hcLivePulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+    .hc-feed { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .hc-empty { text-align: center; color: var(--pi-ink-faint); font-size: .84rem; padding: 24px 10px; border: 1px dashed var(--pi-line); border-radius: var(--pi-r-md); }
+    .hc-empty.hc-ok { color: var(--pi-green); border-color: rgba(52,211,153,0.30); background: rgba(52,211,153,0.05); }
+
+    /* ── بطاقة «الحالة التشغيلية الآن» ── */
+    .hc-status-pill { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 16px; border-radius: var(--pi-r-md); font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; border: 1px solid transparent; }
+    .hc-status-pill.hc-ok { background: rgba(52,211,153,0.12); color: var(--pi-green); border-color: rgba(52,211,153,0.35); }
+    .hc-status-pill.hc-watch { background: rgba(251,191,36,0.12); color: var(--pi-amber); border-color: rgba(251,191,36,0.35); }
+    .hc-status-pill.hc-crit { background: rgba(248,113,113,0.12); color: var(--pi-red); border-color: rgba(248,113,113,0.40); animation: hcCardPulse 3.2s ease-in-out infinite; }
+    .hc-status-pill.hc-none { background: transparent; color: var(--pi-ink-faint); border-color: var(--pi-line); border-style: dashed; font-size: .95rem; }
+    .hc-status-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .hc-status-count { text-align: center; padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--pi-line-soft); }
+    .hc-status-count b { display: block; font-size: 1.3rem; font-weight: 800; color: var(--pi-ink); font-variant-numeric: tabular-nums; line-height: 1.25; }
+    .hc-status-count span { font-size: .66rem; color: var(--pi-ink-faint); }
+    .hc-status-count.hc-c-green b { color: var(--pi-green); }
+    .hc-status-count.hc-c-amber b { color: var(--pi-amber); }
+    .hc-status-count.hc-c-red b { color: var(--pi-red); }
+    .hc-status-count.hc-c-purple b { color: var(--pi-purple); }
+    .hc-status-sub { font-size: .78rem; font-weight: 700; color: var(--pi-ink-dim); margin: 2px 0 8px; }
+    .hc-status-feed { max-height: 200px; overflow-y: auto; padding-inline-end: 4px; }
+
+    /* ── المراكز تحتاج دعمًا — Soft Pulse هادئ ── */
+    .hc-sup-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--pi-r-md); border: 1px solid var(--pi-line-soft); background: rgba(255,255,255,0.03); cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+    .hc-sup-item:hover { background: rgba(255,255,255,0.06); }
+    .hc-sup-item.hc-amber { border-color: rgba(251,191,36,0.32); }
+    .hc-sup-item.hc-red { border-color: rgba(248,113,113,0.38); }
+    .hc-sup-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .hc-amber .hc-sup-dot { background: var(--pi-amber); animation: hcSoftPulseAmber 3.2s ease-in-out infinite; }
+    .hc-red .hc-sup-dot { background: var(--pi-red); animation: hcSoftPulseRed 3.2s ease-in-out infinite; }
+    @keyframes hcSoftPulseAmber { 0%,100% { box-shadow: 0 0 0 3px rgba(251,191,36,0.16); } 50% { box-shadow: 0 0 0 7px rgba(251,191,36,0.04); } }
+    @keyframes hcSoftPulseRed { 0%,100% { box-shadow: 0 0 0 3px rgba(248,113,113,0.18); } 50% { box-shadow: 0 0 0 7px rgba(248,113,113,0.05); } }
+    .hc-sup-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+    .hc-sup-name { font-weight: 700; font-size: .88rem; color: var(--pi-ink); }
+    .hc-sup-detail { font-size: .71rem; color: var(--pi-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hc-sup-badge { margin-inline-start: auto; font-size: .67rem; font-weight: 700; border-radius: 999px; padding: 2px 10px; white-space: nowrap; flex-shrink: 0; }
+    .hc-amber .hc-sup-badge { background: rgba(251,191,36,0.14); color: var(--pi-amber); }
+    .hc-red .hc-sup-badge { background: rgba(248,113,113,0.14); color: var(--pi-red); }
+
+    /* ── بطاقة البلاغات المختصرة: إجمالي كبير + دونات أنواع + أشرطة الفرق ── */
+    .hc-rep-top { display: flex; align-items: center; gap: 18px; }
+    .hc-rep-total-wrap { text-align: center; flex-shrink: 0; }
+    .hc-rep-total { font-size: 2.6rem; font-weight: 800; color: var(--pi-ink); line-height: 1; font-variant-numeric: tabular-nums; }
+    .hc-rep-total-label { font-size: .72rem; color: var(--pi-ink-faint); margin-top: 6px; }
+    .hc-donut { position: relative; width: 118px; height: 118px; flex-shrink: 0; }
+    .hc-donut svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+    .hc-donut-legend { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; max-height: 132px; overflow-y: auto; padding-inline-end: 4px; }
+    .hc-lg-item { display: flex; align-items: center; gap: 8px; font-size: .74rem; }
+    .hc-lg-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+    .hc-lg-label { color: var(--pi-ink-dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hc-lg-val { color: var(--pi-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .hc-lg-pct { color: var(--pi-ink-faint); font-size: .66rem; min-width: 34px; text-align: left; }
+    .hc-unit-bars { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--pi-line-soft); display: flex; flex-direction: column; gap: 7px; max-height: 168px; overflow-y: auto; padding-inline-end: 4px; }
+    .hc-unit-row { display: flex; align-items: center; gap: 10px; font-size: .76rem; }
+    .hc-unit-name { width: 118px; flex-shrink: 0; color: var(--pi-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hc-unit-track { flex: 1; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.05); overflow: hidden; }
+    .hc-unit-fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--pi-blue), var(--pi-purple)); transition: width .4s ease; }
+    .hc-unit-val { min-width: 26px; text-align: left; font-weight: 700; color: var(--pi-ink); font-variant-numeric: tabular-nums; }
+    .hc-cta { margin-top: 14px; align-self: center; background: rgba(96,165,250,0.12); color: var(--pi-blue); border: 1px solid rgba(96,165,250,0.35); border-radius: 999px; padding: 6px 20px; font-size: .78rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .15s ease; }
+    .hc-cta:hover { background: rgba(96,165,250,0.22); }
+    .hc-cta i { font-size: .66rem; }
+
+    /* ── عمود الخريطة (الوضع المدمج — نفس المكان والحجم بجوار إنجاز الفرق) ── */
+    .hc-map-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .hc-map-col .ops-map-section { flex: 1; display: flex; flex-direction: column; }
+    .hc-map-col .ops-map-wrap { flex: 1; }
+    .hc-map-col #opsMap { height: 100%; min-height: 340px; }
+    .hc-map-col .smap-maincol #opsMap { height: 340px; }
+
+    /* ── توحيد أزرار الشريط العلوي بأسلوب ghost/glass (بصري فقط — كل الوظائف باقية) ── */
+    .smart-topbar .operations-room-btn { background: rgba(255,255,255,0.05) !important; border: 1px solid var(--pi-line) !important; color: var(--pi-ink-dim) !important; box-shadow: none !important; }
+    .smart-topbar .operations-room-btn:hover { background: rgba(255,255,255,0.10) !important; color: var(--pi-ink) !important; }
+    .smart-topbar #logoutBtn { color: var(--pi-red) !important; border-color: rgba(248,113,113,0.35) !important; }
+
+    /* ── استجابة ── */
+    @media (max-width: 1450px) { .hc-kpi-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (max-width: 1200px) {
+        .hc-row-map-dist, .hc-row-status-teams { grid-template-columns: 1fr; }
+        .hc-map-col #opsMap { height: 360px; }
+    }
+    @media (max-width: 640px) {
+        .hc-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .hc-rep-top { flex-direction: column; }
+        .hc-status-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .hc-live-dot, .hc-amber .hc-sup-dot, .hc-red .hc-sup-dot, .hc-kpi-red.hc-alert-on, .hc-status-pill.hc-crit { animation: none; }
+    }
+
+    /* ═══ v3 — الهيدر طبقة تنفيذية مستقلة (Polish بصري فقط: طبقات/مسافات/Hierarchy، بلا عناصر جديدة) ═══ */
+
+    /* ارتفاع أكبر ومساحة تنفس — .container padding-top يتبع نفس المتغير تلقائيًا */
+    :root { --topbar-height: 78px; }
+
+    /* الطبقة المستقلة: خلفية أعمق + حد سفلي أوضح + ظل فاصل — بلا مظهر «بطاقة عائمة» تختلط بالمؤشرات */
+    .smart-topbar {
+        border: none !important;
+        border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+        border-radius: 0 !important;
+        background: linear-gradient(180deg, rgba(10,16,30,0.97), rgba(9,14,26,0.94)) !important;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.42) !important;
+        padding: 0 22px !important;
+        gap: 18px;
+    }
+
+    /* ① يمين: الشعار + اسم المنصة — أوضح وأكبر من بقية العناصر */
+    .smart-topbar .brand { gap: 11px; }
+    .smart-topbar .brand span { white-space: nowrap !important; }
+    .smart-topbar .topbar-left, .smart-topbar .topbar-right { flex-shrink: 0; }
+    .smart-topbar .topbar-center { min-width: 0; }
+    .smart-topbar .brand img { width: 40px !important; height: 40px !important; border-radius: 10px !important; }
+    .smart-topbar .brand span:first-child { font-size: 1.02rem !important; font-weight: 800 !important; }
+    .smart-topbar .brand span:last-child { font-size: .71rem !important; }
+    .smart-topbar .menu-toggle { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--pi-line); color: var(--pi-ink-dim); }
+    .smart-topbar .menu-toggle:hover { background: rgba(255,255,255,0.10); color: var(--pi-ink); border-color: rgba(255,255,255,0.2); transform: none; box-shadow: none; }
+
+    /* ② وسط: التنقل الرئيسي — أزرار متناسقة بارتفاع واحد، أصغر بصريًا من عنوان المنصة */
+    .smart-topbar .quick-actions { gap: 8px; flex-wrap: nowrap; }
+    .smart-topbar .qa-btn { height: 34px !important; padding: 4px 13px !important; font-size: .76rem !important; border-radius: 10px !important; }
+
+    /* ③ يسار: حالة النظام/المستخدم + الإشعارات منطقة مستقلة بصريًا، ثم الأدوات */
+    .smart-topbar .topbar-right { gap: 8px; }
+    .smart-topbar .topbar-info {
+        order: 1;
+        background: rgba(255,255,255,0.045);
+        border: 1px solid var(--pi-line);
+        border-radius: 999px;
+        padding: 6px 16px;
+        gap: 8px;
+        white-space: nowrap;
+    }
+    .smart-topbar .notification-bell { order: 2; }
+    .smart-topbar .chat-icon { order: 3; }
+    .smart-topbar .notification-bell, .smart-topbar .chat-icon { width: 36px; height: 36px; border-radius: 10px !important; }
+    .smart-topbar #changePasswordBtn { order: 4; margin-inline-start: 14px !important; }
+    .smart-topbar #opsRoomBtn { order: 5; }
+    .smart-topbar #logoutBtn { order: 6; }
+    .smart-topbar .operations-room-btn { height: 36px !important; border-radius: 10px !important; }
+
+    /* فاصل واضح: شريط المؤشرات يبدأ تحت الهيدر بمسافة — لا يلتصق به */
+    .hc-kpi-strip { margin-top: 22px; }
+
+    /* استجابة الهيدر: تقليص النصوص قبل أي التفاف */
+    @media (max-width: 1400px) {
+        .smart-topbar .topbar-info #currentDateTopbar { display: none; }
+        .smart-topbar .qa-btn span { display: none; }
+        .smart-topbar .qa-btn { min-width: 38px; padding: 4px 9px !important; }
+    }
+    @media (max-width: 1150px) {
+        .smart-topbar .operations-room-btn span { display: none; }
+        .smart-topbar .operations-room-btn { min-width: 38px; padding: 4px 9px !important; }
+    }
+    </style>
+
+    <!-- شريط المؤشرات التنفيذية — الأرقام من مرايا الخادم القائمة (home-command.js) -->
+    <div class="hc-kpi-strip" id="hcKpiStrip" dir="rtl">
+        <div class="hc-kpi hc-kpi-blue" title="الكادر المجدول في الجدول الرسمي">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الكادر المجدول</span>
+                <span class="hc-kpi-value" id="hcKpiSched">—</span>
+                <span class="hc-kpi-sub">موظف مجدول</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-clipboard-list"></i></span>
         </div>
-        <div class="ops-map-legend">
-            <span class="ops-map-legend-item"><span class="ops-map-legend-dot green"></span>جاهزة</span>
-            <span class="ops-map-legend-item"><span class="ops-map-legend-dot yellow"></span>متابعة</span>
-            <span class="ops-map-legend-item"><span class="ops-map-legend-dot red"></span>إجراء فوري</span>
-            <span class="ops-map-legend-note">النقر على أي علامة يعرض القرار والإجراء</span>
+        <div class="hc-kpi hc-kpi-green" title="الكادر الحاضر فعليًا">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الكادر الحاضر</span>
+                <span class="hc-kpi-value" id="hcKpiPresent">—</span>
+                <span class="hc-kpi-sub">موظف حاضر</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-user-md"></i></span>
+        </div>
+        <div class="hc-kpi hc-kpi-red" id="hcKpiAbsentCard" title="الغياب عن المناوبة الحالية">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الغياب</span>
+                <span class="hc-kpi-value" id="hcKpiAbsent">—</span>
+                <span class="hc-kpi-sub">غائب عن المناوبة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-user-times"></i></span>
+        </div>
+        <div class="hc-kpi hc-kpi-purple" title="الدعم المؤقت من خارج الجدول">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الدعم المؤقت</span>
+                <span class="hc-kpi-value" id="hcKpiSupport">—</span>
+                <span class="hc-kpi-sub">دعم من خارج الجدول</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-user-plus"></i></span>
+        </div>
+        <div class="hc-kpi hc-kpi-amber" title="عدد الفرق المطلوبة تغطيتها في المناوبة">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الفرق المطلوبة</span>
+                <span class="hc-kpi-value" id="hcKpiRequired">—</span>
+                <span class="hc-kpi-sub">فرقة مطلوبة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-bullseye"></i></span>
+        </div>
+        <button type="button" class="hc-kpi hc-kpi-green" onclick="navigateToPage('radio-completion.html?v=41')" title="الفرق الجاهزة — فتح تكميل المراكز الإسعافية">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">الفرق الجاهزة</span>
+                <span class="hc-kpi-value" id="hcKpiReadyTeams">—</span>
+                <span class="hc-kpi-sub">فرقة جاهزة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-user-shield"></i></span>
+        </button>
+        <div class="hc-kpi hc-kpi-blue" title="نسبة الجاهزية التشغيلية من الخادم">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">نسبة الجاهزية</span>
+                <span class="hc-kpi-value" id="hcKpiReadiness">—</span>
+                <span class="hc-kpi-sub">جاهزية عامة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-shield-halved"></i></span>
+        </div>
+        <div class="hc-kpi hc-kpi-amber" title="المركبات العاملة في المناوبة">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">المركبات</span>
+                <span class="hc-kpi-value" id="hcKpiVehicles">—</span>
+                <span class="hc-kpi-sub">مركبة عاملة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-ambulance"></i></span>
         </div>
     </div>
 
-    <!-- المستوى 1: النبض التشغيلي -->
-    <div class="ops-eyebrow ops-eyebrow-pulse"><i class="fas fa-heartbeat"></i><span>النبض التشغيلي</span></div>
+    <!-- الصف الثاني (قرار المالك 2026-08-21): الحالة التشغيلية الآن (يمين) + إنجاز الفرق (يسار) -->
+    <div class="hc-row hc-row-status-teams">
+        <section class="hc-card" id="hcStatusCard" aria-label="الحالة التشغيلية الآن">
+            <div class="hc-card-head">
+                <div class="hc-card-title"><span class="hc-live-dot"></span> الحالة التشغيلية الآن</div>
+                <button type="button" class="hc-link-btn" onclick="navigateToPage('radio-completion.html?v=41')">فتح التكميل <i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="hc-status-pill hc-none" id="hcStatusPill">— بانتظار البيانات</div>
+            <div class="hc-status-counts">
+                <div class="hc-status-count hc-c-green"><b id="hcStReady">—</b><span>جاهزة</span></div>
+                <div class="hc-status-count hc-c-amber"><b id="hcStMonitor">—</b><span>متابعة</span></div>
+                <div class="hc-status-count hc-c-red"><b id="hcStCrit">—</b><span>تحتاج تدخلًا</span></div>
+                <div class="hc-status-count hc-c-purple"><b id="hcStSup">—</b><span>دعم مؤقت</span></div>
+            </div>
+            <div class="hc-status-sub"><i class="fas fa-tower-broadcast"></i> المراكز تحتاج دعمًا الآن</div>
+            <div class="hc-feed hc-status-feed" id="hcSupportList"><div class="hc-empty">لا توجد بيانات</div></div>
+        </section>
+    <div id="crewAchievementBoard" class="crew-board" dir="rtl">
+        <div class="crew-board-header">
+            <div class="crew-board-title">🏆 إنجاز الفرق</div>
+            <div class="crew-board-tabs">
+                <button type="button" class="crew-board-tab active" data-period="current_shift">الحالية</button>
+                <button type="button" class="crew-board-tab" data-period="today">اليوم</button>
+                <button type="button" class="crew-board-tab" data-period="week">أسبوع</button>
+                <button type="button" class="crew-board-tab" data-period="month">شهر</button>
+            </div>
+        </div>
+        <div id="crewBoardBody" class="crew-board-body"></div>
+    </div>
+    </div>
 
-    <!-- ===== مؤشرات القوى العاملة (احترافية) ===== -->
+    <!-- ===== مؤشرات القوى العاملة (احترافية) — قسم قديم مخفي في v2 عبر home-command-styles ===== -->
     <div class="workforce-dashboard" id="workforceDashboard">
         <div class="workforce-header">
             <div class="workforce-header-left">
@@ -986,10 +1279,7 @@ window.addEventListener('load', function() {
         </div>
     </div>
 
-    <!-- المستوى 2: القرارات التشغيلية -->
-    <div class="ops-eyebrow ops-eyebrow-decisions"><i class="fas fa-compass"></i><span>قرارات تشغيلية — ما يحتاج انتباهك وفعلك</span></div>
-
-    <!-- بؤرة التركيز التشغيلي — تعرض حالات الفرق المشتقة سيرفريًا (تُملأ عبر renderOperationalFocus) -->
+    <!-- بؤرة التركيز التشغيلي — تعرض حالات الفرق المشتقة سيرفريًا (تُملأ عبر renderOperationalFocus) — قسم قديم مخفي في v2 -->
     <div class="ops-focus" id="opsFocus">
         <div class="ops-focus-header">
             <div class="ops-focus-header-right">
@@ -1049,33 +1339,7 @@ window.addEventListener('load', function() {
         </div>
     </div>
 
-    <!-- ===== مؤشر توزيع البلاغات (احترافي) ===== -->
-    <div class="distribution-card" id="distributionIndicator">
-        <div class="distribution-header">
-            <div class="distribution-header-left">
-                <div class="distribution-icon-wrap">
-                    <i class="fas fa-chart-bar"></i>
-                </div>
-                <div>
-                    <div class="distribution-header-title">توزيع البلاغات على الفرق</div>
-                    <div class="distribution-header-subtitle" id="distTotal">0 بلاغ</div>
-                </div>
-            </div>
-            <button class="distribution-expand-btn" onclick="openModalById('distributionModal'); renderAdvancedDistribution();" title="عرض كامل">
-                <i class="fas fa-expand-alt"></i>
-                <span>عرض كامل</span>
-            </button>
-            <button class="btn-chat-share" onclick="ChatIntegration.shareToChat({type:'shift', id:'distribution', title:'توزيع البلاغات على الفرق'})" title="ناقش في الدردشة">
-                <i class="fas fa-comment-dots"></i> ناقش
-            </button>
-        </div>
-        <div class="distribution-list" id="distList">
-            <div class="distribution-empty">
-                <i class="fas fa-inbox"></i>
-                <span>لا توجد بلاغات مسجلة</span>
-            </div>
-        </div>
-    </div>
+    <!-- مؤشر توزيع البلاغات نُقل إلى عمود الصف الأول بجوار الخريطة (قرار المالك 2026-08-21) -->
 
     <!-- ===== إحصائيات البلاغات الحية (احترافية) ===== -->
     <div id="liveReportStats" class="live-report-card" style="display:none;">
@@ -1133,45 +1397,153 @@ window.addEventListener('load', function() {
     <!-- ===== 🏆 إنجاز الفرق (Phase D) — لوحة تحفيزية عرض فقط فوق /api/crew-performance/activity ===== -->
     <!-- كل القواعد أدناه scoped ببادئة .crew-board ولا تلمس أي عنصر آخر؛ بلا position:fixed وبلا z-index -->
     <style id="crew-board-styles">
-    .crew-board { order: 10; background: var(--white, #fff); border: 1px solid var(--gray-200, #E5E7EB); border-radius: var(--radius-lg, 14px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(16,24,40,.05)); padding: 20px 24px; margin-bottom: 20px; }
-    .crew-board-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-100, #F3F4F6); }
-    .crew-board-title { font-size: 1.1rem; font-weight: 800; color: var(--gray-800, #1F2937); }
-    .crew-board-tabs { display: flex; gap: 6px; }
-    .crew-board-tab { border: 1px solid var(--gray-200, #E5E7EB); background: transparent; color: var(--gray-600, #4B5563); border-radius: 999px; padding: 4px 14px; font-size: .8rem; font-family: inherit; cursor: pointer; transition: all .15s ease; }
-    .crew-board-tab.active { background: var(--navy, #1E3A5F); color: var(--white, #fff); border-color: var(--navy, #1E3A5F); }
-    .crew-board-sublabel { font-size: .8rem; color: var(--gray-500, #6B7280); margin-bottom: 10px; }
-    .crew-board-row { padding: 14px 16px; border: 1px solid var(--gray-200, #E5E7EB); border-radius: var(--radius-lg, 14px); margin-bottom: 12px; background: var(--white, #fff); }
-    .crew-board-r1 { border-color: #E8C84A; background: linear-gradient(135deg, rgba(232,200,74,.10), rgba(232,200,74,.03)); box-shadow: 0 2px 10px rgba(232,200,74,.10); }
-    .crew-board-r2 { border-color: var(--gray-300, #D1D5DB); }
-    .crew-board-r3 { border-color: rgba(205,127,50,.35); }
-    .crew-board-team { font-size: 1.05rem; font-weight: 800; color: var(--gray-800, #1F2937); }
-    .crew-board-center { font-size: .82rem; color: var(--gray-500, #6B7280); margin-top: 3px; }
-    .crew-board-crewlabel { font-size: .8rem; font-weight: 700; color: var(--teal, #2E8B7A); margin-top: 10px; }
+    .crew-board { order: 10; background: var(--pi-glass, linear-gradient(168deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))); border: 1px solid var(--pi-line, rgba(255,255,255,0.09)); border-radius: var(--pi-r-lg, 18px); box-shadow: var(--pi-shadow, 0 18px 40px rgba(2,6,18,0.48)); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 20px 22px; margin-bottom: 0; min-width: 0; }
+    .crew-board-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--pi-line-soft, rgba(255,255,255,0.07)); }
+    .crew-board-title { font-size: 1.1rem; font-weight: 800; color: var(--pi-ink, #E8EDF8); }
+    .crew-board-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .crew-board-tab { border: 1px solid var(--pi-line, rgba(255,255,255,0.09)); background: var(--pi-glass-soft, rgba(255,255,255,0.04)); color: var(--pi-ink-dim, #9AA7C4); border-radius: 999px; padding: 4px 14px; font-size: .8rem; font-family: inherit; cursor: pointer; transition: all .15s ease; }
+    .crew-board-tab.active { background: linear-gradient(150deg, #2F6BF0, #1D4FD7); color: var(--pi-ink, #fff); border-color: transparent; box-shadow: 0 8px 18px rgba(30,90,220,0.35); }
+    .crew-board-body { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 14px; align-items: end; }
+    .crew-board-sublabel { grid-column: 1 / -1; font-size: .8rem; color: var(--pi-ink-dim, #9AA7C4); margin-bottom: 0; }
+    .crew-board-row { padding: 14px 16px; border: 1px solid var(--pi-line, rgba(255,255,255,0.09)); border-radius: var(--pi-r-md, 13px); margin-bottom: 0; background: var(--pi-glass-soft, linear-gradient(168deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))); }
+    .crew-board-r1 { grid-column: 2; grid-row: 2; text-align: center; border-color: rgba(245,198,107,0.45); background: linear-gradient(168deg, rgba(245,198,107,0.12), rgba(255,255,255,0.02)); box-shadow: 0 14px 34px rgba(2,6,18,0.40), 0 0 24px rgba(245,198,107,0.08); padding: 20px 16px; }
+    .crew-board-r2 { grid-column: 1; grid-row: 2; text-align: center; border-color: rgba(154,167,196,0.35); }
+    .crew-board-r3 { grid-column: 3; grid-row: 2; text-align: center; border-color: rgba(205,127,50,0.40); }
+    .crew-board-r4, .crew-board-r5 { grid-column: 1 / -1; }
+    .crew-board-r1::before { content: ''; display: block; width: 86px; height: 86px; margin: 0 auto 10px; border-radius: 50%; background: url('/assets/ambulance-srca.png') center / cover no-repeat, var(--pi-glass-soft, rgba(255,255,255,0.04)); border: 3px solid var(--pi-gold, #F5C66B); box-shadow: 0 0 0 5px rgba(245,198,107,0.14), 0 12px 26px rgba(0,0,0,0.45); }
+    .crew-board-r2::before { content: ''; display: block; width: 62px; height: 62px; margin: 0 auto 8px; border-radius: 50%; background: url('/assets/ambulance-srca.png') center / cover no-repeat, var(--pi-glass-soft, rgba(255,255,255,0.04)); border: 3px solid var(--pi-ink-dim, #9AA7C4); box-shadow: 0 0 0 4px rgba(154,167,196,0.14), 0 10px 22px rgba(0,0,0,0.40); }
+    .crew-board-r3::before { content: ''; display: block; width: 62px; height: 62px; margin: 0 auto 8px; border-radius: 50%; background: url('/assets/ambulance-srca.png') center / cover no-repeat, var(--pi-glass-soft, rgba(255,255,255,0.04)); border: 3px solid rgba(205,127,50,0.85); box-shadow: 0 0 0 4px rgba(205,127,50,0.14), 0 10px 22px rgba(0,0,0,0.40); }
+    .crew-board-team { font-size: 1.05rem; font-weight: 800; color: var(--pi-ink, #E8EDF8); }
+    .crew-board-r1 .crew-board-team { font-size: 1.2rem; color: var(--pi-gold, #F5C66B); }
+    .crew-board-center { font-size: .8rem; color: var(--pi-ink-dim, #9AA7C4); margin-top: 3px; }
+    .crew-board-crewlabel { font-size: .78rem; font-weight: 700; color: var(--pi-green, #34D399); margin-top: 10px; }
     .crew-board-people { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-    .crew-board-person { border: 1px solid var(--gray-200, #E5E7EB); border-radius: 8px; padding: 6px 12px; font-size: .95rem; font-weight: 700; color: var(--gray-800, #1F2937); background: var(--gray-100, #F3F4F6); line-height: 1.6; }
-    .crew-board-incomplete { margin-top: 8px; font-size: .85rem; font-weight: 600; color: var(--amber-800, #92400E); background: var(--amber-50, #FFFBEB); border: 1px dashed var(--amber-300, #FCD34D); border-radius: 8px; padding: 6px 12px; }
-    .crew-board-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: .9rem; font-weight: 600; color: var(--gray-700, #374151); }
-    .crew-board-tag { display: inline-block; margin-top: 8px; font-size: .75rem; font-weight: 600; color: var(--amber-800, #92400E); background: var(--amber-50, #FFFBEB); border: 1px dashed var(--amber-300, #FCD34D); border-radius: 999px; padding: 2px 10px; }
-    .crew-board-shiftdate { font-size: .8rem; color: var(--gray-500, #6B7280); margin-top: 6px; }
-    .crew-board-details { margin-top: 6px; }
-    .crew-board-details summary { cursor: pointer; font-size: .82rem; color: var(--teal, #0D9488); }
-    .crew-board-shiftline { font-size: .83rem; color: var(--gray-600, #4B5563); padding: 3px 8px 0 0; }
-    .crew-board-expand { display: block; margin: 10px auto 0; border: 1px solid var(--gray-200, #E5E7EB); background: transparent; color: var(--gray-600, #4B5563); border-radius: 999px; padding: 5px 16px; font-size: .8rem; font-family: inherit; cursor: pointer; }
-    .crew-board-empty { text-align: center; padding: 18px 8px; color: var(--gray-500, #6B7280); font-size: .9rem; }
+    .crew-board-person { border: 1px solid var(--pi-line, rgba(255,255,255,0.09)); border-radius: 8px; padding: 6px 12px; font-size: .92rem; font-weight: 700; color: var(--pi-ink, #E8EDF8); background: var(--pi-glass-soft, rgba(255,255,255,0.04)); line-height: 1.6; }
+    .crew-board-incomplete { margin-top: 8px; font-size: .85rem; font-weight: 600; color: var(--pi-amber, #FBBF24); background: rgba(251,191,36,0.10); border: 1px dashed rgba(251,191,36,0.40); border-radius: 8px; padding: 6px 12px; }
+    .crew-board-stats { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px; font-size: .88rem; font-weight: 600; color: var(--pi-ink-dim, #9AA7C4); }
+    .crew-board-r4 .crew-board-stats, .crew-board-r5 .crew-board-stats { justify-content: flex-start; }
+    .crew-board-count { color: var(--pi-ink, #E8EDF8); }
+    .crew-board-tag { display: inline-block; margin-top: 8px; font-size: .72rem; font-weight: 600; color: var(--pi-amber, #FBBF24); background: rgba(251,191,36,0.10); border: 1px dashed rgba(251,191,36,0.40); border-radius: 999px; padding: 2px 10px; }
+    .crew-board-shiftdate { font-size: .78rem; color: var(--pi-ink-dim, #9AA7C4); margin-top: 6px; }
+    .crew-board-details { margin-top: 6px; text-align: right; }
+    .crew-board-details summary { cursor: pointer; font-size: .82rem; color: var(--pi-green, #34D399); }
+    .crew-board-shiftline { font-size: .82rem; color: var(--pi-ink-dim, #9AA7C4); padding: 3px 8px 0 0; }
+    .crew-board-expand { grid-column: 1 / -1; display: block; margin: 4px auto 0; border: 1px solid var(--pi-line, rgba(255,255,255,0.09)); background: var(--pi-glass-soft, rgba(255,255,255,0.04)); color: var(--pi-ink-dim, #9AA7C4); border-radius: 999px; padding: 5px 16px; font-size: .8rem; font-family: inherit; cursor: pointer; }
+    .crew-board-empty { grid-column: 1 / -1; text-align: center; padding: 24px 10px; color: var(--pi-ink-faint, #6B7899); font-size: .9rem; border: 1px dashed var(--pi-line, rgba(255,255,255,0.09)); border-radius: var(--pi-r-md, 13px); }
     .crew-board-faded { opacity: .55; }
-    .crew-board-fairness { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--gray-100, #F3F4F6); text-align: center; font-size: .75rem; color: var(--gray-400, #9CA3AF); }
+    .crew-board-fairness { grid-column: 1 / -1; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--pi-line-soft, rgba(255,255,255,0.07)); text-align: center; font-size: .72rem; color: var(--pi-ink-faint, #6B7899); }
     </style>
-    <div id="crewAchievementBoard" class="crew-board" dir="rtl">
-        <div class="crew-board-header">
-            <div class="crew-board-title">🏆 إنجاز الفرق</div>
-            <div class="crew-board-tabs">
-                <button type="button" class="crew-board-tab active" data-period="current_shift">الحالية</button>
-                <button type="button" class="crew-board-tab" data-period="today">اليوم</button>
-                <button type="button" class="crew-board-tab" data-period="week">أسبوع</button>
-                <button type="button" class="crew-board-tab" data-period="month">شهر</button>
+    <!-- الصف الأول (قرار المالك 2026-08-21): الخريطة الذكية (يمين) + توزيع البلاغات (يسار) -->
+    <div class="hc-row hc-row-map-dist">
+        <div class="hc-map-col">
+        <div class="ops-map-section smap" id="opsMapSection">
+                <div class="smap-topbar">
+                    <div class="smap-kpis">
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiStatus"><span class="smap-status-dot"></span>—</span><span class="smap-kpi-l">الضغط الحالي</span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiCount">—</span><span class="smap-kpi-l">بلاغات المناوبة</span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiReady">—</span><span class="smap-kpi-l">فرق جاهزة</span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiArrival">—</span><span class="smap-kpi-l">متوسط الوصول <small id="smapKpiArrivalN"></small></span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiPeak">—</span><span class="smap-kpi-l">ذروة المناوبة</span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v sev-green" id="smapKpiAlerts">0</span><span class="smap-kpi-l">حالات حرجة</span></div>
+                    </div>
+                    <button type="button" class="smap-expand-btn" id="smapExpandBtn" title="تكبير الخريطة — وضع التشغيل المتقدم"><i class="fas fa-expand"></i></button>
+                </div>
+                <div class="smap-layerbar">
+                    <span class="smap-layerbar-lbl">الطبقات:</span>
+                    <button type="button" class="smap-chip active" id="smapLayerIncidents" title="البلاغات النشطة في مواقعها الحقيقية"><i class="fas fa-location-dot"></i> البلاغات</button>
+                    <button type="button" class="smap-chip active" id="smapLayerTeams" title="فرق المناوبة وحالة جاهزيتها"><i class="fas fa-truck-medical"></i> الفرق</button>
+                    <button type="button" class="smap-chip active" id="smapLayerCenters" title="المراكز التشغيلية التسعة"><i class="fas fa-hospital"></i> المراكز</button>
+                    <button type="button" class="smap-chip" id="smapLayerHot" title="تجمعات البلاغات: شارع عليه بلاغان أو أكثر"><i class="fas fa-bullseye"></i> المواقع الساخنة</button>
+                    <button type="button" class="smap-chip" id="smapLayerHeat" title="طبقة كثافة البلاغات الموقَّعة في المناوبة الحالية"><i class="fas fa-fire"></i> الكثافة</button>
+                    <button type="button" class="smap-chip" id="smapLayerPeak" title="ذروة البلاغات في المناوبة الحالية حسب وقت الإنشاء"><i class="fas fa-chart-line"></i> الذروة</button>
+                    <button type="button" class="smap-chip" id="smapLayerStreets" title="شارات أكثر الشوارع بلاغًا — على مواقع بلاغات حقيقية فقط"><i class="fas fa-road"></i> الشوارع الأكثر بلاغًا</button>
+                </div>
+                <div class="smap-map-grid">
+                <div class="smap-maincol">
+                <div class="ops-map-wrap">
+                    <div id="opsMap"></div>
+                    <div class="smk-alertbar" id="smkAlertBar" style="display:none;"></div>
+                    <div class="ops-map-tile-note" id="opsMapTileNote" style="display:none;">
+                        <i class="fas fa-triangle-exclamation"></i> تعذّر تحميل خلفية الخريطة — العلامات تعمل من بيانات الخادم
+                    </div>
+                    <div class="smap-card" id="smapCard" style="display:none;"></div>
+                    <div class="smap-peak-pop" id="smapPeakPop" style="display:none;">
+                        <div class="smap-peak-pop-head"><i class="fas fa-chart-line"></i> الذروة — المناوبة الحالية</div>
+                        <div class="smap-peak-pop-body" id="smapPeakPopBody">—</div>
+                    </div>
+                </div>
+                <div class="ops-map-legend">
+                    <span class="ops-map-legend-item"><i class="fas fa-location-dot lg-inc"></i> بلاغ</span>
+                    <span class="ops-map-legend-item"><i class="fas fa-truck-medical lg-team"></i> فرقة</span>
+                    <span class="ops-map-legend-item"><i class="fas fa-hospital lg-center"></i> مركز</span>
+                    <span class="ops-map-legend-item"><span class="ops-map-legend-dot green"></span>طبيعي</span>
+                    <span class="ops-map-legend-item"><span class="ops-map-legend-dot yellow"></span>متابعة</span>
+                    <span class="ops-map-legend-item"><span class="ops-map-legend-dot red"></span>يحتاج تدخلًا</span>
+                    <span class="ops-map-legend-note">النقر على أي عنصر يفتح بطاقته ويربطه بصريًا بفرقته ومركزه</span>
+                </div>
+                </div>
+                <aside class="smap-side">
+                    <div class="smap-panel">
+                        <h4><i class="fas fa-bullseye"></i> أكثر المواقع بلاغًا — المناوبة</h4>
+                        <div class="smap-panel-body" id="smapTopStreets"><div class="smap-empty">—</div></div>
+                    </div>
+                    <div class="smap-panel">
+                        <h4><i class="fas fa-chart-line"></i> الذروة</h4>
+                        <div class="smap-panel-body" id="smapPeakBody"><div class="smap-empty">—</div></div>
+                    </div>
+                    <div class="smap-panel">
+                        <h4><i class="fas fa-circle-question"></i> بلاغات بلا موقع دقيق</h4>
+                        <div class="smap-panel-body" id="smapNoLoc"><div class="smap-empty">—</div></div>
+                    </div>
+                </aside>
+                </div>
+        </div>
+        </div>
+        <div class="hc-dist-col">
+        <!-- ===== مؤشر توزيع البلاغات — أُعيد إظهاره بجوار الخريطة (قرار المالك 2026-08-21) ===== -->
+        <div class="distribution-card" id="distributionIndicator">
+            <div class="distribution-header">
+                <div class="distribution-header-left">
+                    <div class="distribution-icon-wrap">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <div>
+                        <div class="distribution-header-title">توزيع البلاغات على الفرق</div>
+                        <div class="distribution-header-subtitle" id="distTotal">0 بلاغ</div>
+                    </div>
+                </div>
+                <button class="distribution-expand-btn" onclick="openModalById('distributionModal'); renderAdvancedDistribution();" title="عرض كامل">
+                    <i class="fas fa-expand-alt"></i>
+                    <span>عرض كامل</span>
+                </button>
+                <button class="btn-chat-share" onclick="ChatIntegration.shareToChat({type:'shift', id:'distribution', title:'توزيع البلاغات على الفرق'})" title="ناقش في الدردشة">
+                    <i class="fas fa-comment-dots"></i> ناقش
+                </button>
+            </div>
+            <div class="distribution-list" id="distList">
+                <div class="distribution-empty">
+                    <i class="fas fa-inbox"></i>
+                    <span>لا توجد بلاغات مسجلة</span>
+                </div>
             </div>
         </div>
-        <div id="crewBoardBody" class="crew-board-body"></div>
+        <!-- البلاغات المختصرة — تكملة بصرية لعمود التوزيع -->
+        <section class="hc-card" id="hcReportsCard" aria-label="البلاغات">
+            <div class="hc-card-head">
+                <div class="hc-card-title"><i class="fas fa-file-medical-alt"></i> البلاغات</div>
+            </div>
+            <div class="hc-rep-top">
+                <div class="hc-rep-total-wrap">
+                    <div class="hc-rep-total" id="hcRepTotal">—</div>
+                    <div class="hc-rep-total-label">إجمالي البلاغات</div>
+                </div>
+                <div class="hc-donut" id="hcDonut"></div>
+                <div class="hc-donut-legend" id="hcDonutLegend"></div>
+            </div>
+            <div class="hc-unit-bars" id="hcUnitBars"></div>
+            <button type="button" class="hc-cta" onclick="openModalById('distributionModal'); renderAdvancedDistribution();"><i class="fas fa-arrow-left"></i> عرض جميع البلاغات</button>
+        </section>
+        </div>
     </div>
 
     <footer style="font-size:0.7rem;text-align:center;margin-top:auto;padding:12px 0;color:var(--gray-500);">جميع الحقوق محفوظة © 2026 | منصة إدارة العمليات الإسعافية – قطاع جنوب الرياض</footer>
@@ -2199,6 +2571,7 @@ window.addEventListener('load', function() {
             <div class="group-items">
                 <button class="sidebar-item" onclick="toggleSidebar(); document.getElementById('soundSettingsPanel').style.display='flex';"><i class="fas fa-volume-up"></i> إعدادات الصوت</button>
                 <button class="sidebar-item" onclick="toggleSidebar(); toggleNotificationPanel();"><i class="fas fa-bell"></i> الإشعارات</button>
+                <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('cad-overlay');"><i class="fas fa-truck-medical"></i> تثبيت أداة CAD</button>
             </div>
         </div>
     </nav>
@@ -2221,8 +2594,11 @@ window.addEventListener('load', function() {
 <script src="/js/auth-manager.js"></script>
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
-<script src="js/app.js?v=46" defer></script>
+<script src="js/app.js?v=47" defer></script>
+<script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
+<script src="js/smart-map.js?v=4" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
+<script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
@@ -2265,4 +2641,120 @@ function navigateToPage(url) {
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
     transform: translateY(-1px);
 }
+
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* طبقة ختامية بصرية فقط: تُحمَّل بعد app.css وexecutive-theme.css
+   وplatform-identity.css، فتكسب بالترتيب عند تساوي الخصوصية،
+   و!important هنا فقط لكسر قواعد قديمة تحمل !important أو أنماطًا مضمّنة.
+   لا حذف لأي عنصر ولا تغيير لأي id/منطق. */
+
+/* ① جسور الرموز — الخط والسطوح تسري في كل var() بالطبقات السابقة */
+:root {
+    --font-main: var(--pi-font);              /* Tajawal أولًا — أولوية الهوية §3 */
+    --ex-surface: var(--pi-glass-soft);       /* كل لوحات executive تصبح زجاج التكميل */
+    --ex-surface-2: var(--pi-glass);
+    --ex-emerald-txt: var(--pi-green);        /* توحيد نص «النجاح» بلون التكميل الإشاري */
+}
+
+/* ② خلفية الصفحة — إزالة نقش الشبكة ووهج شاشة الدخول القديم،
+   والإبقاء على التوهجات الشعاعية العميقة من platform-identity.css */
+body::before, body::after { display: none !important; }
+
+/* ③ إصلاح تصادم بنيوي: .modal في هذه الصفحة هو الستارة الممتدة (inset:0)،
+   لا صندوق النافذة — نعيده ستارة داكنة ونمنع عنه زجاج platform-identity */
+.modal {
+    background: rgba(3,6,14,0.66) !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* ④ بطاقات مؤشرات القوى العاملة — صبغ زجاجي بلون الحالة كما في شرائح
+   KPI بشاشة التكميل (wb-chip.kpi.green/amber/red/blue) */
+.wf-card {
+    background: var(--pi-glass) !important;
+    border: 1px solid var(--pi-line) !important;
+    border-radius: var(--pi-r-lg) !important;
+    box-shadow: var(--pi-shadow) !important;
+}
+.wf-card-blue  { border-color: rgba(96,165,250,0.32) !important;  background: linear-gradient(168deg, rgba(96,165,250,0.09), rgba(255,255,255,0.02)) !important; }
+.wf-card-green { border-color: rgba(52,211,153,0.32) !important;  background: linear-gradient(168deg, rgba(52,211,153,0.09), rgba(255,255,255,0.02)) !important; }
+.wf-card-gold  { border-color: rgba(251,191,36,0.32) !important;  background: linear-gradient(168deg, rgba(251,191,36,0.09), rgba(255,255,255,0.02)) !important; }
+.wf-card-red   { border-color: rgba(248,113,113,0.32) !important; background: linear-gradient(168deg, rgba(248,113,113,0.09), rgba(255,255,255,0.02)) !important; }
+.wf-card-blue  .wf-card-icon-wrap { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important;  box-shadow: inset 0 0 0 1px rgba(96,165,250,0.30), 0 0 14px rgba(96,165,250,0.16) !important; }
+.wf-card-green .wf-card-icon-wrap { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; box-shadow: inset 0 0 0 1px rgba(52,211,153,0.30), 0 0 14px rgba(52,211,153,0.16) !important; }
+.wf-card-gold  .wf-card-icon-wrap { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; box-shadow: inset 0 0 0 1px rgba(251,191,36,0.30), 0 0 14px rgba(251,191,36,0.16) !important; }
+.wf-card-red   .wf-card-icon-wrap { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important;   box-shadow: inset 0 0 0 1px rgba(248,113,113,0.30), 0 0 14px rgba(248,113,113,0.16) !important; }
+.wf-card-blue  .wf-card-progress-fill { background: linear-gradient(90deg, #3D7BF2, var(--pi-blue)) !important; }
+.wf-card-green .wf-card-progress-fill { background: linear-gradient(90deg, #2FBF8F, var(--pi-green)) !important; }
+.wf-card-gold  .wf-card-progress-fill { background: linear-gradient(90deg, #E5A812, var(--pi-amber)) !important; }
+.wf-card-red   .wf-card-progress-fill { background: linear-gradient(90deg, #E85D5D, var(--pi-red)) !important; }
+.wf-card-trend.up   { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; border-color: rgba(52,211,153,0.35) !important; }
+.wf-card-trend.down { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important;   border-color: rgba(248,113,113,0.35) !important; }
+
+/* ⑤ عناوين الأقسام — الشريط المتوهج بلغة التكميل (.section-title::before) */
+.wf-section-title { position: relative; padding-inline-start: 14px !important; border-bottom-color: var(--pi-line-soft) !important; }
+.wf-section-title::before {
+    content: ''; position: absolute; inset-inline-start: 0; top: 2px;
+    width: 4px; height: 18px; border-radius: 4px;
+    background: linear-gradient(180deg, var(--pi-blue), transparent);
+    box-shadow: 0 0 12px rgba(96,165,250,0.5);
+}
+
+/* ⑥ توحيد بقايا الأخضر الزمردي القديم (14,164,122) بلون التكميل الإشاري */
+.workforce-update-badge { background: rgba(52,211,153,0.12) !important; color: var(--pi-green) !important; border-color: rgba(52,211,153,0.32) !important; }
+.total-box span { background: rgba(52,211,153,0.12) !important; color: var(--pi-green) !important; }
+.ops-focus-badge.stable { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; border-color: rgba(52,211,153,0.35) !important; }
+.ops-focus-badge.attention { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important; border-color: rgba(248,113,113,0.35) !important; }
+.live-report-icon-wrap { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; }
+.live-report-stat-icon.green { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; }
+.live-report-stat-icon.blue  { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important; }
+.live-report-stat-icon.gold  { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; }
+.live-report-badge { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important; border-color: rgba(96,165,250,0.35) !important; }
+.viewing-badge { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; border-color: rgba(251,191,36,0.35) !important; }
+.chat-badge { background: var(--pi-red) !important; }
+.paramedic-dot.present { background: var(--pi-green); box-shadow: 0 0 4px rgba(52,211,153,0.5); }
+.paramedic-dot.absent  { background: var(--pi-red);  box-shadow: 0 0 4px rgba(248,113,113,0.5); }
+
+/* ⑦ الجداول الداكنة — كسر طبقة app.css الفاتحة (--white/--gray-*) التي تحمل !important */
+.table-container { background: var(--pi-glass-soft) !important; border-color: var(--pi-line) !important; box-shadow: var(--pi-shadow-soft) !important; border-radius: var(--pi-r-md) !important; }
+thead th { background: rgba(255,255,255,0.04) !important; color: var(--pi-ink-dim) !important; border-bottom-color: var(--pi-line-soft) !important; }
+tbody td { color: var(--pi-ink) !important; border-bottom-color: var(--pi-line-soft) !important; }
+tbody tr:hover { background: rgba(255,255,255,0.03) !important; }
+tbody tr.active-row, tbody tr.selected-row { background: rgba(96,165,250,0.10) !important; border-right-color: var(--pi-blue) !important; }
+
+/* ⑧ حبوب الحالة — كسر خلفيات *-50 الفاتحة إلى الشفافية الإشارية للتكميل */
+.badge-primary { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important; }
+.badge-teal, .badge-success { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; }
+.badge-coral, .badge-danger { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important; }
+.badge-gold, .badge-warning { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; }
+.badge-gray { background: rgba(154,167,196,0.12) !important; color: var(--pi-ink-dim) !important; }
+.vehicle-status-label.status-ready       { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; }
+.vehicle-status-label.status-maintenance { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; }
+.vehicle-status-label.status-broken      { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important; }
+.note-priority-badge.priority-normal { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important; }
+
+/* ⑨ الأزرار الملوّنة الثانوية — شفافة إشارية بدل التدرجات المصمتة القديمة
+   (الأساسي الأزرق المتدرج يأتي من platform-identity.css) */
+.btn-teal, .btn-success { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; border: 1px solid rgba(52,211,153,0.4) !important; box-shadow: none !important; }
+.btn-coral, .btn-danger { background: rgba(248,113,113,0.14) !important; color: #FCA5A5 !important; border: 1px solid rgba(248,113,113,0.4) !important; box-shadow: none !important; }
+.btn-gold, .btn-warning { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; border: 1px solid rgba(251,191,36,0.4) !important; box-shadow: none !important; }
+
+/* ⑩ المدخلات — كسر --white/--gray-200 الفاتحة في app.css */
+.form-control, input[type="text"], input[type="number"], input[type="date"],
+input[type="time"], input[type="datetime-local"], input[type="email"], input[type="tel"],
+input[type="search"], textarea, select {
+    background: rgba(255,255,255,0.04) !important;
+    color: var(--pi-ink) !important;
+    border: 1px solid var(--pi-line) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+.form-control:focus, input:focus, textarea:focus, select:focus {
+    border-color: rgba(96,165,250,0.55) !important;
+    box-shadow: 0 0 0 4px rgba(96,165,250,0.12) !important;
+}
+.form-label { color: var(--pi-ink-dim) !important; }
 </style>

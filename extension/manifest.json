@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "منصة الجنوب — تسجيل بلاغات CAD",
+  "version": "2.0.0",
+  "description": "تسجيل بلاغات CAD في منصة الجنوب بضغطة واحدة — قراءة فقط، مراقبة سلبية، بلا استخراج جلسات وبلا طلبات إضافية إلى CAD. مفتاح التكامل في خلفية الإضافة فقط (خارج سياق الصفحة).",
+  "host_permissions": [
+    "http://localhost:3002/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://cad.alsahab.sa/*"
+      ],
+      "js": [
+        "cad-overlay-content.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "*://cad.alsahab.sa/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "http://localhost/*"
+      ],
+      "js": [
+        "platform-marker.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ]
+}

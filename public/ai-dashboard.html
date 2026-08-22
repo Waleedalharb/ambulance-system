@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم المساعد الذكي - الأسئلة غير المجابة</title>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/a11y.css?v=1">
     <style>
@@ -381,6 +381,63 @@
             background: var(--success);
             color: white;
         }
+    </style>
+    <!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
+    <style>
+    /* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+    /* الصفحة وُلدت فاتحة؛ نجسر رموزها إلى هوية التكميل الداكنة ونعالج
+       الألوان الفاتحة المضمّنة. بصري فقط — لا منطق ولا id ولا بنية. */
+    :root {
+        --primary: #2F6BF0; --primary-light: #60A5FA;
+        --success: #34D399; --warning: #FBBF24; --danger: #F87171;
+        --bg: var(--pi-bg-1);
+        --card-bg: rgba(255,255,255,0.035);
+        --text: var(--pi-ink);
+        --text-muted: var(--pi-ink-dim);
+        --border: var(--pi-line);
+    }
+    /* الخط: قاعدة * المحلية تفرض IBM Plex — نستبدلها بخط الهوية مع حماية أيقونات FontAwesome (كلها <i>) */
+    *:not(i) { font-family: var(--pi-font); }
+    /* الرأس الأزرق المتدرج → كحلي تنفيذي زجاجي بلغة التكميل */
+    .header {
+        background: linear-gradient(170deg, rgba(17,25,48,0.94), rgba(9,14,28,0.94));
+        border-bottom: 1px solid var(--pi-line);
+        box-shadow: var(--pi-shadow-soft);
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    /* أيقونات الإحصاء الفاتحة المضمّنة → شفافية إشارية */
+    .stat-card .stat-icon.blue { background: rgba(96,165,250,0.14); color: var(--pi-blue); }
+    .stat-card .stat-icon.green { background: rgba(52,211,153,0.14); color: var(--pi-green); }
+    .stat-card .stat-icon.orange { background: rgba(251,191,36,0.14); color: var(--pi-amber); }
+    .stat-card .stat-icon.red { background: rgba(248,113,113,0.14); color: var(--pi-red); }
+    /* الجدول — كسر الفاتح المضمّن */
+    th { background: rgba(255,255,255,0.04); }
+    tr:hover { background: rgba(255,255,255,0.03); }
+    /* حبوب الحالة الفاتحة → إشارية التكميل */
+    .status-badge.pending { background: rgba(251,191,36,0.14); color: var(--pi-amber); }
+    .status-badge.resolved { background: rgba(52,211,153,0.14); color: var(--pi-green); }
+    .status-badge.dismissed { background: rgba(154,167,196,0.12); color: var(--pi-ink-dim); }
+    .score-bar { background: rgba(255,255,255,0.08); }
+    /* أزرار الإجراءات */
+    .filters button {
+        background: linear-gradient(150deg, #2F6BF0, #1D4FD7);
+        box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .actions .btn-resolve { background: rgba(52,211,153,0.14); color: var(--pi-green); border: 1px solid rgba(52,211,153,0.4); }
+    .actions .btn-resolve:hover { background: rgba(52,211,153,0.22); }
+    .actions .btn-dismiss, .modal-actions .btn-cancel { background: rgba(255,255,255,0.06); color: var(--pi-ink-dim); border: 1px solid var(--pi-line); }
+    .actions .btn-dismiss:hover, .modal-actions .btn-cancel:hover { background: rgba(255,255,255,0.10); }
+    .resolution-box { background: rgba(52,211,153,0.10); color: var(--pi-green); border: 1px solid rgba(52,211,153,0.25); }
+    /* تنبيه §8: في هذه الصفحة .modal هو صندوق النافذة لا الستارة —
+       الملف المشترك عامله كستارة، فنعيده هنا صندوقًا زجاجيًا */
+    .modal {
+        background: linear-gradient(170deg, rgba(26,35,66,0.99), rgba(12,18,38,0.99)) !important;
+        border: 1px solid rgba(255,255,255,0.13) !important;
+        border-radius: var(--pi-r-lg);
+        box-shadow: 0 40px 90px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+        color: var(--pi-ink);
+    }
     </style>
 </head>
 <body>

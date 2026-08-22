@@ -15,8 +15,8 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/a11y.css?v=1">
-    <!-- Google Fonts: IBM Plex Sans Arabic + Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Google Fonts: IBM Plex Sans Arabic + Inter + Tajawal (هوية التكميل) -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS for Excel -->
@@ -1502,6 +1502,8 @@
     </style>
     <!-- New Interactive Editor Styles -->
     <link rel="stylesheet" href="/css/smart-schedule-editor.css">
+    <!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد كل أنماط الصفحة -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
@@ -5416,5 +5418,50 @@ window.oiApply = oiApply;
     });
 })();
 </script>
+
+<style>
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* قسم ختامي بصري فقط: يُحمَّل آخر الصفحة فيكسب بالترتيب عند تساوي
+   الخصوصية، و!important هنا فقط لكسر بقايا الزمردي القديم #0EA47A /
+   rgba(14,164,122,*). لا حذف لأي عنصر ولا تغيير لأي id/منطق.
+   خلايا رموز المناوبات (.classic-shift-*) ذات الدلالة الوظيفية لا تُمس —
+   ألوانها داكنة اللغة أصلًا وتحمل معنى تشغيليًا. */
+
+/* ① جسور الرموز — الخط والخلفية والأخضر الإشاري تسري في كل var() */
+:root {
+    --font: var(--pi-font);          /* Tajawal أولًا */
+    --bg: var(--pi-bg-1);            /* كحلي التكميل العميق */
+    --success: var(--pi-green);      /* #34D399 بدل #10B981 */
+}
+
+/* ② إزالة نقش الشبكة والوهج الزمردي القديم — التوهجات الشعاعية
+   العميقة تأتي من platform-identity.css */
+body::before, body::after { display: none !important; }
+
+/* ③ بقايا الزمردي القديم → أخضر/أزرق التكميل الإشاري */
+:focus-visible { outline-color: rgba(52,211,153,0.55); }
+.view-btn.active {
+    background: linear-gradient(150deg, #2F6BF0, #1D4FD7) !important;
+    color: #fff !important; border-color: transparent !important;
+    box-shadow: 0 8px 18px rgba(30,90,220,0.35), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+.btn-icon:hover, .month-nav-btn:hover {
+    background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important;
+    border-color: rgba(96,165,250,0.40) !important;
+}
+.btn-icon.danger:hover {
+    background: rgba(248,113,113,0.14) !important; color: #FCA5A5 !important;
+    border-color: rgba(248,113,113,0.40) !important;
+}
+.import-bar .btn-import {
+    background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important;
+    border: 1px solid rgba(52,211,153,0.40) !important;
+}
+.search-bar input:focus, .filter-group select:focus, .filter-group input:focus,
+.um-search:focus, .oi-input:focus {
+    border-color: rgba(52,211,153,0.55) !important;
+    box-shadow: 0 0 0 3px rgba(52,211,153,0.14) !important;
+}
+</style>
     </body>
 </html>

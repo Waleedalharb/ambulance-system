@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════════════════════════
+   platform-identity.css — الهوية البصرية الموحدة لمنصة الجنوب
+   المصدر: شاشة التكميل المعتمدة (FROZEN) — تُستخرج منها القيم ولا تُلمس.
+   طبقة عرض فقط: لا تغيّر DOM ولا منطقًا ولا API. تُحمَّل بعد ملفات
+   الصفحة لتتغلب عليها، و!important تُستخدم فقط عند الحاجة لكسر
+   أنماط مضمّنة قديمة.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1) الرموز التصميمية (من التكميل v3) ── */
+:root {
+    --pi-bg-0:#070B18; --pi-bg-1:#0B1226;
+    --pi-ink:#E8EDF8; --pi-ink-dim:#9AA7C4; --pi-ink-faint:#6B7899;
+    --pi-line:rgba(255,255,255,0.09); --pi-line-soft:rgba(255,255,255,0.07);
+    --pi-green:#34D399; --pi-amber:#FBBF24; --pi-red:#F87171; --pi-blue:#60A5FA;
+    --pi-gold:#F5C66B; --pi-purple:#C084FC;
+    --pi-r-lg:18px; --pi-r-md:13px; --pi-r-sm:9px;
+    --pi-glass:linear-gradient(168deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+    --pi-glass-soft:linear-gradient(168deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+    --pi-shadow:0 18px 40px rgba(2,6,18,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
+    --pi-shadow-soft:0 10px 26px rgba(2,6,18,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+    --pi-font:'Tajawal','IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif;
+
+    /* جسور الرموز القديمة — نفس القيم الجديدة حتى ترثها الصفحات القائمة */
+    --ex-bg:var(--pi-bg-1); --ex-surface:rgba(255,255,255,0.045); --ex-surface-2:rgba(255,255,255,0.06);
+    --ex-border:var(--pi-line); --ex-border-soft:var(--pi-line-soft);
+    --ex-text:var(--pi-ink); --ex-text-2:var(--pi-ink-dim); --ex-text-3:var(--pi-ink-dim);
+    --ex-text-4:var(--pi-ink-faint); --ex-text-5:var(--pi-ink-faint);
+    --ex-emerald:#10B981; --ex-emerald-hi:var(--pi-green); --ex-emerald-txt:var(--pi-green);
+    --ex-blue:var(--pi-blue); --ex-gold:var(--pi-amber); --ex-red:var(--pi-red);
+    --ex-radius:var(--pi-r-lg); --ex-radius-md:var(--pi-r-md);
+    --ex-shadow-card:var(--pi-shadow-soft); --ex-shadow-deep:var(--pi-shadow);
+
+    /* جسر app.css: يفرض app.css الخط عبر * { font-family:var(--font-main) !important }
+       فنوجّه رمزه إلى خط الهوية بدل كسر قاعدته صفحةً صفحة */
+    --font-main:var(--pi-font);
+}
+
+/* ── 2) الأساس: خلفية كحلية عميقة بتوهجات شعاعية ثابتة + خط Tajawal ── */
+body {
+    font-family:var(--pi-font);
+    color:var(--pi-ink);
+    background:
+        radial-gradient(1100px 480px at 50% -140px, rgba(84,122,214,0.20), transparent 62%),
+        radial-gradient(900px 500px at 88% 108%, rgba(120,82,200,0.10), transparent 60%),
+        linear-gradient(180deg, var(--pi-bg-1) 0%, var(--pi-bg-0) 70%) !important;
+    background-attachment:fixed;
+}
+::selection { background:rgba(96,165,250,0.35); }
+
+/* ── 3) أشرطة التمرير بلغة التكميل ── */
+::-webkit-scrollbar { width:9px; height:9px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.14); border-radius:99px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.24); }
+
+/* ── 4) البطاقات الزجاجية — الأنماط الشائعة في المنصة ── */
+.card, .stat-card, .dash-card, .panel, .box, .widget-card,
+.form-card, .table-card, .info-card, .section-card {
+    background:var(--pi-glass);
+    border:1px solid var(--pi-line);
+    border-radius:var(--pi-r-lg);
+    box-shadow:var(--pi-shadow);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+
+/* ── 5) الأزرار — حبوب/مدمجة بلغة التكميل ── */
+button, .btn, input[type="submit"], input[type="button"] {
+    font-family:var(--pi-font);
+    transition:transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.btn-primary, .btn-save, button.primary {
+    background:linear-gradient(150deg, #2F6BF0, #1D4FD7) !important; color:#fff !important;
+    border:none !important; border-radius:12px;
+    box-shadow:0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-danger, button.danger {
+    background:rgba(248,113,113,0.14) !important; color:#FCA5A5 !important;
+    border:1px solid rgba(248,113,113,0.4) !important; border-radius:12px; box-shadow:none;
+}
+button:hover:not(:disabled), .btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
+button:active:not(:disabled) { transform:translateY(0); }
+button:disabled { opacity:0.45; cursor:not-allowed; }
+
+/* ── 6) المدخلات والنماذج ── */
+input, select, textarea {
+    font-family:var(--pi-font); color-scheme:dark;
+    background:rgba(255,255,255,0.04); color:var(--pi-ink);
+    border:1px solid var(--pi-line); border-radius:10px;
+}
+input:focus, select:focus, textarea:focus {
+    outline:none; border-color:rgba(96,165,250,0.55);
+    box-shadow:0 0 0 4px rgba(96,165,250,0.12);
+}
+input::placeholder, textarea::placeholder { color:var(--pi-ink-faint); }
+select option { background:var(--pi-bg-1); color:var(--pi-ink); }
+
+/* ── 7) الجداول ── */
+table { border-collapse:separate; border-spacing:0; }
+th { background:rgba(255,255,255,0.04); color:var(--pi-ink-dim); font-weight:700; }
+td, th { border-bottom:1px solid var(--pi-line-soft); }
+tr:hover td { background:rgba(255,255,255,0.03); }
+
+/* ── 8) النوافذ المنبثقة والأدراج — زجاج التكميل العميق ──
+   تحذير بنيوي: في هذه المنصة (app.css) الصنف .modal هو الستارة الممتدة
+   (inset:0) لا صندوق النافذة — فلا نمنحه زجاجًا وإلا غطّى الشاشة بصندوق.
+   الستائر أولًا، ثم الصناديق الزجاجية داخلها. */
+.modal, .modal-overlay, .overlay, .modal-backdrop {
+    background:rgba(3,6,14,0.66) !important;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    border:none !important; box-shadow:none !important;
+}
+.modal-box, .modal-content, .dialog, .popup, .drawer, .side-drawer {
+    background:linear-gradient(170deg, rgba(26,35,66,0.99), rgba(12,18,38,0.99)) !important;
+    border:1px solid rgba(255,255,255,0.13) !important;
+    border-radius:var(--pi-r-lg);
+    box-shadow:0 40px 90px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08);
+    color:var(--pi-ink);
+}
+
+/* ── 9) الشارات وحبوب الحالة التشغيلية (ألوان التكميل الإشارية) ── */
+.badge, .status-badge, .tag, .pill { border-radius:999px; font-weight:700; }
+.badge-success, .badge-ready, .status-active, .badge-green { background:rgba(52,211,153,0.14) !important; color:var(--pi-green) !important; border-color:rgba(52,211,153,0.35) !important; }
+.badge-warning, .badge-missing, .badge-amber, .status-late { background:rgba(251,191,36,0.14) !important; color:var(--pi-amber) !important; border-color:rgba(251,191,36,0.35) !important; }
+.badge-danger, .badge-offline, .badge-red, .status-absence { background:rgba(248,113,113,0.14) !important; color:var(--pi-red) !important; border-color:rgba(248,113,113,0.35) !important; }
+.badge-info, .badge-blue { background:rgba(96,165,250,0.14) !important; color:var(--pi-blue) !important; border-color:rgba(96,165,250,0.35) !important; }
+
+/* ── 10) التنبيهات والحالات الفارغة ── */
+.alert, .notification, .notice { border-radius:var(--pi-r-md); border:1px solid var(--pi-line); background:var(--pi-glass-soft); }
+.empty-state, .empty, .no-data { color:var(--pi-ink-faint); }
+
+/* ── 11) التبويبات والفلاتر ── */
+.tab, .filter-btn, .chip { border-radius:999px; }
+.tab.active, .filter-btn.active, .tab.on, .filter-btn.on {
+    background:linear-gradient(150deg, #2F6BF0, #1D4FD7); color:#fff; border-color:transparent;
+    box-shadow:0 8px 18px rgba(30,90,220,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   12) كسر طبقة app.css الفاتحة — قواعده تحمل !important برموز
+       --white/--gray-50..800 وخلفيات *-50، فنكسرها هنا مركزيًا
+       (تعميمًا لما أثبتته دفعة الرئيسية) بدل إعادة كتابته في كل صفحة.
+       هذه القواعد لا تضر الصفحات التي لا تربط app.css لأن أصنافها
+       غير موجودة هناك أصلًا.
+       ═══════════════════════════════════════════════════════════════════ */
+
+/* جداول داكنة */
+.table-container { background:var(--pi-glass-soft) !important; border-color:var(--pi-line) !important; box-shadow:var(--pi-shadow-soft) !important; border-radius:var(--pi-r-md) !important; }
+thead th { background:rgba(255,255,255,0.04) !important; color:var(--pi-ink-dim) !important; border-bottom-color:var(--pi-line-soft) !important; }
+tbody td { color:var(--pi-ink) !important; border-bottom-color:var(--pi-line-soft) !important; }
+tbody tr:hover { background:rgba(255,255,255,0.03) !important; }
+tbody tr.active-row, tbody tr.selected-row { background:rgba(96,165,250,0.10) !important; border-right-color:var(--pi-blue) !important; }
+
+/* حبوب الحالة — من خلفيات *-50 الفاتحة إلى الشفافية الإشارية للتكميل */
+.badge-primary { background:rgba(96,165,250,0.14) !important; color:var(--pi-blue) !important; }
+.badge-teal, .badge-success { background:rgba(52,211,153,0.14) !important; color:var(--pi-green) !important; }
+.badge-coral, .badge-danger { background:rgba(248,113,113,0.14) !important; color:var(--pi-red) !important; }
+.badge-gold, .badge-warning { background:rgba(251,191,36,0.14) !important; color:var(--pi-amber) !important; }
+.badge-gray { background:rgba(154,167,196,0.12) !important; color:var(--pi-ink-dim) !important; }
+.badge-purple { background:rgba(192,132,252,0.14) !important; color:var(--pi-purple) !important; }
+
+/* الأزرار الملوّنة الثانوية — شفافة إشارية بدل التدرجات المصمتة القديمة
+   (الأساسي الأزرق المتدرج يبقى من §5 أعلاه) */
+.btn-teal, .btn-success { background:rgba(52,211,153,0.14) !important; color:var(--pi-green) !important; border:1px solid rgba(52,211,153,0.4) !important; box-shadow:none !important; }
+.btn-coral, .btn-danger { background:rgba(248,113,113,0.14) !important; color:#FCA5A5 !important; border:1px solid rgba(248,113,113,0.4) !important; box-shadow:none !important; }
+.btn-gold, .btn-warning { background:rgba(251,191,36,0.14) !important; color:var(--pi-amber) !important; border:1px solid rgba(251,191,36,0.4) !important; box-shadow:none !important; }
+.btn-secondary { background:rgba(255,255,255,0.06) !important; color:var(--pi-ink-dim) !important; border:1px solid var(--pi-line) !important; box-shadow:none !important; }
+
+/* المدخلات — كسر --white/--gray-200 الفاتحة */
+.form-control, input[type="text"], input[type="number"], input[type="date"],
+input[type="time"], input[type="datetime-local"], input[type="email"], input[type="tel"],
+input[type="search"], input[type="password"], textarea, select {
+    background:rgba(255,255,255,0.04) !important;
+    color:var(--pi-ink) !important;
+    border:1px solid var(--pi-line) !important;
+    border-radius:10px !important;
+    box-shadow:none !important;
+}
+.form-control:focus, input:focus, textarea:focus, select:focus {
+    border-color:rgba(96,165,250,0.55) !important;
+    box-shadow:0 0 0 4px rgba(96,165,250,0.12) !important;
+}
+.form-label { color:var(--pi-ink-dim) !important; }
+
+/* بقايا الزمردي القديم rgba(14,164,122,*) — النصوص والحدود تصبح
+   بلون التكميل الإشاري #34D399 */
+.text-success, .text-emerald, .text-teal { color:var(--pi-green) !important; }

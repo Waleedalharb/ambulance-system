@@ -82,11 +82,119 @@ class StorageAdapter {
         return row ? row.count : 0;
     }
 
-    async addReportTime(reportId, timestamp, type) {
+    async addReportTime(reportId, timestamp, type, incidentNumber = null, phases = null, respArrivalMin = null, respMubasharaMin = null) {
         await this.db.run(
-            'INSERT INTO report_times (report_id, timestamp, type) VALUES (?, ?, ?)',
-            [reportId, timestamp, type || null]
+            'INSERT INTO report_times (report_id, timestamp, type, incident_number, phases, resp_arrival_min, resp_mubashara_min) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [reportId, timestamp, type || null, incidentNumber || null, phases || null, respArrivalMin, respMubasharaMin]
         );
+    }
+
+    // ─── سجل البلاغات برقم Incident ID (محرك التوزيع 2026-08-20) ───
+    async findIncident(shiftId, number) {
+        return this.db.get('SELECT * FROM incident_registry WHERE shift_id = ? AND number = ?', [shiftId, number]);
+    }
+    /** رقم البلاغ هو المفتاح بنيويًا (قرار المالك 2026-08-21): بحث عابر للمناوبات —
+        يمنع تكرار البلاغ عند التسليم بين مناوبتين (نفس البلاغ كان يُنشأ من جديد) */
+    async findIncidentByNumber(number) {
+        return this.db.get('SELECT * FROM incident_registry WHERE number = ? ORDER BY id DESC LIMIT 1', [number]);
+    }
+    async createIncident(shiftId, number, code, type, source, cadCreatedAt = null, address = null, region = null, district = null, street = null, city = null, lat = null, lng = null) {
+        const result = await this.db.run(
+            'INSERT INTO incident_registry (shift_id, number, code, type, source, created_at, cad_created_at, address, region, district, street, city, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [shiftId, number, code || null, type || null, source || null, new Date().toISOString(), cadCreatedAt || null, address || null, region || null, district || null, street || null, city || null, lat, lng]
+        );
+        return result.id;
+    }
+    async updateIncidentCode(id, code) {
+        await this.db.run('UPDATE incident_registry SET code = ? WHERE id = ? AND code IS NULL', [code, id]);
+    }
+    /** وقت إنشاء البلاغ في CAD يُستكمل إن وصل متأخرًا — الموجود لا يُمس أبدًا */
+    async updateIncidentCadCreatedAt(id, cadCreatedAt) {
+        await this.db.run('UPDATE incident_registry SET cad_created_at = ? WHERE id = ? AND cad_created_at IS NULL', [cadCreatedAt, id]);
+    }
+    /** استكمال بيانات الموقع إن وصلت متأخرة — الموجود لا يُمس أبدًا */
+    async updateIncidentLocation(id, address, region, district, street = null, city = null, lat = null, lng = null) {
+        await this.db.run(
+            `UPDATE incident_registry SET
+               address = COALESCE(address, ?),
+               region = COALESCE(region, ?),
+               district = COALESCE(district, ?),
+               street = COALESCE(street, ?),
+               city = COALESCE(city, ?),
+               lat = COALESCE(lat, ?),
+               lng = COALESCE(lng, ?)
+             WHERE id = ?`,
+            [address, region, district, street, city, lat, lng, id]);
+    }
+    /** تصحيح موقع CAD (قرار المالك 2026-08-21): يكتب فوق الإحداثيات فقط — بقية الحقول لا تُمس */
+    async updateIncidentCoords(id, lat, lng) {
+        await this.db.run('UPDATE incident_registry SET lat = ?, lng = ? WHERE id = ?', [lat, lng, id]);
+    }
+    /** هل شاركت هذه الفرقة في هذا البلاغ داخل هذه المناوبة؟ (القاعدة ③) */
+    async findParticipation(shiftId, unit, incidentNumber) {
+        return this.db.get(
+            `SELECT t.id, t.phases FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE r.shift_id = ? AND r.unit = ? AND t.incident_number = ? LIMIT 1`,
+            [shiftId, unit, incidentNumber]
+        );
+    }
+    /**
+     * دمج الأزمنة التصاعدي (قاعدة العدالة 2026-08-20): لقطة CAD تتطور مع الوقت،
+     * فعند تكرار نفس الفرقة على نفس البلاغ نستكمل مفاتيح phases الناقصة فقط —
+     * القيم الموجودة لا تُمس أبدًا، ولا يُنشأ سجل جديد (لا تضاعف للعدّاد).
+     * يعيد phases النهائية بعد الدمج لإعادة حساب زمني الاستجابة.
+     */
+    async mergeParticipationPhases(id, incomingPhases) {
+        const row = await this.db.get('SELECT phases FROM report_times WHERE id = ?', [id]);
+        if (!row) return { merged: 0, phases: null };
+        let current = {};
+        try { current = row.phases ? JSON.parse(row.phases) : {}; } catch (_) { current = {}; }
+        let merged = 0;
+        for (const k of Object.keys(incomingPhases || {})) {
+            if (current[k] === undefined || current[k] === null || current[k] === '') {
+                current[k] = incomingPhases[k];
+                merged++;
+            }
+        }
+        if (merged > 0) {
+            await this.db.run('UPDATE report_times SET phases = ? WHERE id = ?', [JSON.stringify(current), id]);
+        }
+        return { merged, phases: current };
+    }
+    /** يحفظ زمني الاستجابة المحسوبين مع المشاركة (قابلان للتتبع إلى phases الخام) */
+    async updateParticipationResponse(id, arrivalMin, mubasharaMin) {
+        await this.db.run('UPDATE report_times SET resp_arrival_min = ?, resp_mubashara_min = ? WHERE id = ?', [arrivalMin, mubasharaMin, id]);
+    }
+    /** حالة المشاركة الحالية (قرار المالك 2026-08-21 — §4): سحب/إلغاء الفرقة من البلاغ
+        يُعلَّم على السجل نفسه — لا حذف ولا إخفاء واجهة، بل مصدر قرار واحد */
+    async setParticipationWithdrawn(shiftId, unit, incidentNumber, withdrawn) {
+        await this.db.run(
+            `UPDATE report_times SET withdrawn = ?
+             WHERE incident_number = ? AND report_id IN
+               (SELECT id FROM reports WHERE shift_id = ? AND unit = ?)`,
+            [withdrawn ? 1 : 0, incidentNumber, shiftId, unit]);
+    }
+    /** كل مشاركات بلاغ (لإعادة حساب الأزمنة عند وصول وقت إنشائه متأخرًا) */
+    async getIncidentParticipations(shiftId, number) {
+        return this.db.all(
+            `SELECT t.id, t.phases FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE r.shift_id = ? AND t.incident_number = ?`, [shiftId, number]);
+    }
+    /** إحصائية المحرك: الإجمالي بأرقام البلاغات الفريدة + اليدوي، والنوع مرة لكل بلاغ */
+    async getIncidentSummary(shiftId) {
+        const incidents = await this.db.all(
+            'SELECT * FROM incident_registry WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
+        // مشاركات البلاغات المرقّمة (لكل فرقة أزمنتها وأزمنة استجابتها المحسوبة وحالة مشاركتها)
+        const parts = await this.db.all(
+            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn
+             FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE r.shift_id = ? AND t.incident_number IS NOT NULL`, [shiftId]);
+        // الضغطات اليدوية (بلا رقم) — كل واحدة بلاغ مستقل كما هو معتاد
+        const manual = await this.db.all(
+            `SELECT t.id, t.timestamp, t.type, r.unit
+             FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE r.shift_id = ? AND t.incident_number IS NULL`, [shiftId]);
+        return { incidents, parts, manual };
     }
 
     async deleteLastReportTime(reportId) {

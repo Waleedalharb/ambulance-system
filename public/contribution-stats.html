@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مؤشر المساهمة التشغيلية — إحصائيات شهرية</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
 <style>
     /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي — نفس وصفة السطوح الزجاجية في الثيم التنفيذي للمنصة */
     :root {
@@ -86,6 +86,28 @@
     .error-box { color: var(--coral); }
     .meta { color: var(--muted); font-size: 0.78rem; margin-bottom: 14px; }
 </style>
+<!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+<style>
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* الصفحة داكنة أصلًا بهوية قديمة؛ نجسر رموزها إلى قيم التكميل دون
+   إرجاع أي تعديل سابق. بصري فقط — لا منطق ولا id. */
+:root {
+    --teal-id: var(--pi-green); --gold-id: var(--pi-gold);
+    --lead-hi: var(--pi-green); --emerald: var(--pi-green); --coral: var(--pi-red);
+}
+body::before {
+    background:
+        radial-gradient(ellipse 60% 40% at 50% -10%, rgba(52,211,153,0.08), transparent 70%),
+        radial-gradient(ellipse 45% 32% at 50% 110%, rgba(245,198,107,0.04), transparent 70%),
+        linear-gradient(180deg, #0B1226 0%, #0A1220 55%, #070B18 100%);
+}
+/* زر «عرض» الزمردي المصمت → التدرج الأزرق التنفيذي */
+.controls button {
+    background: linear-gradient(150deg, #2F6BF0, #1D4FD7);
+    box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+</style>
 </head>
 <body>
 <div class="container">
@@ -143,15 +165,55 @@ function n(v) {
     return '<span class="num">' + v + '</span>';
 }
 
-function empRow(e) {
-    var w = e.works;
+function nameCell(e) {
     var flags = '';
     if (!e.hasUserAccount) flags += '<span class="noaccount"><i class="fas fa-triangle-exclamation"></i> بلا حساب دخول</span>';
+    return '<td class="name">' + e.name + '<span class="jt">' + e.jobTitle + ' · ' + e.employeeCode + '</span>' + flags + '</td>';
+}
+
+// صف التفصيل: أنواع النماذج فقط (اعتماد المالك — لا drill-down)
+function detailRow(e, colspan) {
+    var detailId = 'd-' + e.employeeCode;
+    var ft = Object.keys(e.works.forms.byType || {}).map(function (k) { return k + ': ' + e.works.forms.byType[k]; });
+    return '<tr class="detail-row" id="' + detailId + '" style="display:none"><td colspan="' + colspan + '">' +
+        (ft.length ? 'النماذج حسب النوع — ' + ft.join(' · ') : 'لا نماذج مسجلة هذا الشهر') + '</td></tr>';
+}
+
+// جدول العمليات (تحديث المواصفة 2026-08-15): المؤشرات التسعة المعتمدة فقط —
+// إجمالي الأعمال = مجموعها سيرفريًا، ولا تظهر هنا سلال لا تخص طبيعة عملهم.
+function opsRow(e) {
+    var w = e.works;
+    var detailId = 'd-' + e.employeeCode;
+    var html = '<tr>' +
+        nameCell(e) +
+        '<td>' + n(e.scheduledHours) + '</td>' +
+        '<td>' + n(e.shifts) + '</td>' +
+        '<td>' + n(e.uncountedRosterDays) + '</td>' +
+        '<td class="total-cell">' + n(e.totalWorks) + '</td>' +
+        '<td>' + n(w.completions) + '</td>' +
+        '<td>' + n(w.dispatchActions) + '</td>' +
+        '<td>' + n(w.reports) + '</td>' +
+        '<td>' + n(w.dispatchUndo) + '</td>' +
+        '<td>' + n(w.detailedReports) + '</td>' +
+        '<td>' + n(w.positioning.created) + '</td>' +
+        '<td>' + n(w.positioning.updated) + '</td>' +
+        '<td>' + n(w.positioning.ended) + '</td>' +
+        '<td>' + n(w.signouts) + '</td>' +
+        '<td>' + n(w.forms.total) + '</td>' +
+        '<td>' + n(w.workflowActions.total) + '</td>' +
+        '<td><span class="detail-toggle" onclick="toggleDetail(\'' + detailId + '\')"><i class="fas fa-ellipsis"></i></span></td>' +
+        '</tr>';
+    return html + detailRow(e, 17);
+}
+
+// جدول القيادة الميدانية: يبقى بالسلال الشاملة كما هو حتى تُضبط مؤشراته لاحقًا (§6)
+function leadRow(e) {
+    var w = e.works;
     var detailId = 'd-' + e.employeeCode;
     // دمج عرضي لسلتين موثقتين مستقلتين (لوجستية + مراكز) — عرض فقط بلا اشتقاق
     var logiCenter = (w.logisticsEvents || 0) + (w.centerEvents || 0);
     var html = '<tr>' +
-        '<td class="name">' + e.name + '<span class="jt">' + e.jobTitle + ' · ' + e.employeeCode + '</span>' + flags + '</td>' +
+        nameCell(e) +
         '<td>' + n(e.scheduledHours) + '</td>' +
         '<td>' + n(e.shifts) + '</td>' +
         '<td>' + n(e.uncountedRosterDays) + '</td>' +
@@ -159,7 +221,7 @@ function empRow(e) {
         '<td>' + n(w.completions) + '</td>' +
         '<td>' + n(w.dispatchActions) + '</td>' +
         '<td>' + n(w.dispatchUndo) + '</td>' +
-        '<td>' + n(w.reportEntries) + '</td>' +
+        '<td>' + n(w.detailedReports) + '</td>' +
         '<td>' + n(w.positioning.created) + '</td>' +
         '<td>' + n(w.positioning.updated) + '</td>' +
         '<td>' + n(w.positioning.ended) + '</td>' +
@@ -174,11 +236,7 @@ function empRow(e) {
         '<td>' + n(w.alertsAcked) + '</td>' +
         '<td><span class="detail-toggle" onclick="toggleDetail(\'' + detailId + '\')"><i class="fas fa-ellipsis"></i></span></td>' +
         '</tr>';
-    // صف التفصيل: أنواع النماذج فقط (اعتماد المالك — لا drill-down)
-    var ft = Object.keys(w.forms.byType || {}).map(function (k) { return k + ': ' + w.forms.byType[k]; });
-    html += '<tr class="detail-row" id="' + detailId + '" style="display:none"><td colspan="22">' +
-        (ft.length ? 'النماذج حسب النوع — ' + ft.join(' · ') : 'لا نماذج مسجلة هذا الشهر') + '</td></tr>';
-    return html;
+    return html + detailRow(e, 22);
 }
 
 function toggleDetail(id) {
@@ -186,23 +244,38 @@ function toggleDetail(id) {
     el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
+var OPS_HEAD =
+    '<tr class="grp">' +
+    '<th rowspan="2">الموظف</th><th rowspan="2">الساعات<br>المجدولة</th><th rowspan="2">المناوبات</th>' +
+    '<th rowspan="2">أيام بلا<br>اشتقاق</th><th rowspan="2">إجمالي<br>الأعمال</th>' +
+    '<th rowspan="2">التكميل</th><th rowspan="2">توزيع<br>البلاغات*</th><th rowspan="2">البلاغات</th>' +
+    '<th rowspan="2">التراجع<br>عن بلاغ</th><th rowspan="2">بلاغات<br>تفصيلية</th><th colspan="3">التمركزات</th>' +
+    '<th rowspan="2">خروج<br>الفرق</th><th rowspan="2">النماذج</th>' +
+    '<th rowspan="2">سير<br>العمل</th><th rowspan="2"></th>' +
+    '</tr>' +
+    '<tr><th>إنشاء</th><th>تعديل</th><th>إنهاء</th></tr>';
+
+var LEAD_HEAD =
+    '<tr class="grp">' +
+    '<th rowspan="2">الموظف</th><th rowspan="2">الساعات<br>المجدولة</th><th rowspan="2">المناوبات</th>' +
+    '<th rowspan="2">أيام بلا<br>اشتقاق</th><th rowspan="2">إجمالي<br>الأعمال</th>' +
+    '<th rowspan="2">التكميل</th><th rowspan="2">توزيع<br>البلاغات*</th><th rowspan="2">التراجع<br>عن بلاغ</th>' +
+    '<th rowspan="2">بلاغات<br>تفصيلية</th><th colspan="3">التمركزات</th>' +
+    '<th rowspan="2">خروج<br>الفرق</th><th rowspan="2">النماذج</th>' +
+    '<th rowspan="2">قوى<br>بشرية</th><th rowspan="2">مركبات</th><th rowspan="2">لوجستية<br>ومراكز</th>' +
+    '<th rowspan="2">سير<br>العمل</th><th rowspan="2">تعديلات<br>الجداول</th><th rowspan="2">ملفات</th>' +
+    '<th rowspan="2">تنبيهات</th><th rowspan="2"></th>' +
+    '</tr>' +
+    '<tr><th>إنشاء</th><th>تعديل</th><th>إنهاء</th></tr>';
+
 function groupCard(title, icon, cls, employees) {
-    var rows = employees.map(empRow).join('');
+    var isOps = cls === 'ops';
+    var rows = employees.map(isOps ? opsRow : leadRow).join('');
     return '<div class="group-card">' +
         '<div class="group-header ' + cls + '"><i class="fas ' + icon + '"></i>' + title +
         '<span class="count">' + employees.length + ' موظفًا</span></div>' +
         '<div class="table-wrap"><table><thead>' +
-        '<tr class="grp">' +
-        '<th rowspan="2">الموظف</th><th rowspan="2">الساعات<br>المجدولة</th><th rowspan="2">المناوبات</th>' +
-        '<th rowspan="2">أيام بلا<br>اشتقاق</th><th rowspan="2">إجمالي<br>الأعمال</th>' +
-        '<th rowspan="2">التكميل</th><th rowspan="2">توزيع<br>البلاغات*</th><th rowspan="2">التراجع<br>عن بلاغ</th>' +
-        '<th rowspan="2">بلاغات<br>تفصيلية</th><th colspan="3">التمركزات</th>' +
-        '<th rowspan="2">خروج<br>الفرق</th><th rowspan="2">النماذج</th>' +
-        '<th rowspan="2">قوى<br>بشرية</th><th rowspan="2">مركبات</th><th rowspan="2">لوجستية<br>ومراكز</th>' +
-        '<th rowspan="2">سير<br>العمل</th><th rowspan="2">تعديلات<br>الجداول</th><th rowspan="2">ملفات</th>' +
-        '<th rowspan="2">تنبيهات</th><th rowspan="2"></th>' +
-        '</tr>' +
-        '<tr><th>إنشاء</th><th>تعديل</th><th>إنهاء</th></tr>' +
+        (isOps ? OPS_HEAD : LEAD_HEAD) +
         '</thead><tbody>' + rows + '</tbody></table></div></div>';
 }
 

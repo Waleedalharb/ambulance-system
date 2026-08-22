@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype — تسجيل البلاغ برقم البلاغ (غير مربوط بالمنصة)</title>
+<style>
+:root{
+  --bg:#0B1E33; --surface:#1A3A5C; --surface2:#14293F; --teal:#2E8B7A; --gold:#E8C84A;
+  --text:#EAF1F8; --muted:#9DB2C6; --danger:#EF4444; --ok:#10B981;
+}
+*{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:var(--bg); color:var(--text); min-height:100vh; padding:24px;}
+.wrap{max-width:720px; margin:0 auto;}
+.proto-banner{background:#3a2f10; border:1px solid var(--gold); color:var(--gold);
+  border-radius:10px; padding:10px 14px; font-size:.85rem; margin-bottom:18px; line-height:1.8;}
+h1{font-size:1.25rem; margin-bottom:4px; color:var(--gold);}
+.sub{color:var(--muted); font-size:.85rem; margin-bottom:18px; line-height:1.9;}
+.card{background:var(--surface2); border:1px solid rgba(255,255,255,.08);
+  border-radius:12px; padding:16px; margin-bottom:14px;}
+.card h2{font-size:.95rem; color:var(--gold); margin-bottom:12px;}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+input[type=text]{background:var(--surface); border:1px solid rgba(255,255,255,.15);
+  color:var(--text); border-radius:8px; padding:10px 12px; font-size:1.05rem; width:170px;
+  letter-spacing:1px; direction:ltr; text-align:center;}
+input[type=text]:focus{outline:2px solid var(--teal);}
+textarea{background:var(--surface); border:1px solid rgba(255,255,255,.15); color:var(--text);
+  border-radius:8px; padding:10px 12px; width:100%; min-height:84px; font-size:.9rem; resize:vertical;}
+.chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+.chip{background:var(--surface); border:1px solid rgba(255,255,255,.18); color:var(--text);
+  border-radius:20px; padding:7px 14px; font-size:.88rem; cursor:pointer; user-select:none;
+  transition:all .15s;}
+.chip:hover{border-color:var(--teal);}
+.chip.on{background:var(--teal); border-color:var(--teal); color:#fff; font-weight:700;}
+.chip.type.on{background:var(--gold); border-color:var(--gold); color:#1a1a1a;}
+.btn{background:var(--teal); color:#fff; border:none; border-radius:8px;
+  padding:11px 26px; font-size:1rem; font-weight:700; cursor:pointer;}
+.btn:hover{filter:brightness(1.1);}
+.btn.ghost{background:transparent; border:1px solid rgba(255,255,255,.25); color:var(--muted);
+  font-weight:400; padding:9px 16px; font-size:.85rem;}
+.btn.gold{background:var(--gold); color:#1a1a1a;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.lbl{font-size:.8rem; color:var(--muted); margin-bottom:4px; display:block;}
+.field{margin-bottom:14px;}
+.notice{border-radius:8px; padding:10px 14px; font-size:.9rem; line-height:1.9; margin-bottom:12px; display:none;}
+.notice.exists{background:rgba(232,200,74,.12); border:1px solid var(--gold); color:var(--gold); display:block;}
+.notice.new{background:rgba(46,139,122,.15); border:1px solid var(--teal); color:#7fd8c4; display:block;}
+.notice.recognized{background:rgba(59,130,246,.12); border:1px solid #3B82F6; color:#93c5fd; display:block;}
+table{width:100%; border-collapse:collapse; font-size:.9rem;}
+th,td{padding:8px 10px; text-align:right; border-bottom:1px solid rgba(255,255,255,.07);}
+th{color:var(--gold); font-size:.8rem;}
+td.num{text-align:center; font-weight:700; font-size:1.05rem;}
+.caption{font-size:.78rem; color:var(--muted); margin-top:10px; line-height:1.8;}
+.crew-list{display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;}
+.crew-tag{background:rgba(46,139,122,.2); border:1px solid var(--teal); border-radius:6px;
+  padding:3px 10px; font-size:.82rem;}
+.report-line{display:flex; justify-content:space-between; align-items:center;
+  padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.07); font-size:.88rem; flex-wrap:wrap; gap:6px;}
+.mono{direction:ltr; display:inline-block; font-family:Consolas,monospace;}
+.derived{color:var(--teal); font-size:.8rem; margin-top:4px; min-height:18px;}
+hr{border:none; border-top:1px dashed rgba(255,255,255,.12); margin:14px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="proto-banner">
+⚠️ <b>Prototype تجريبي مستقل</b> — غير مربوط بالمنصة ولا بقاعدة البيانات.
+الغرض: تجربة آلية «تسجيل البلاغ برقم البلاغ» فقط. البيانات محلية في هذا المتصفح وتُمسح بزر «تصفير اليوم».<br>
+📌 قاموس اشتقاق النوع من رمز البلاغ <b>تجريبي مؤقت</b> — يُثبَّت لاحقًا من واقع تصنيف القطاع التشغيلي، وليس من تفسير MPDS النظري.
+</div>
+
+<h1>＋ تسجيل بلاغ — طبقة إحصائية فوق الـCAD</h1>
+<div class="sub">
+رقم البلاغ هو مفتاح العملية (Incident ID). البلاغ الواحد قد تخرج له عدة فرق — ويظل <b>بلاغًا واحدًا</b>.
+</div>
+
+<!-- ═══ الطريقة (ب): اللصق الذكي ═══ -->
+<div class="card">
+  <h2>الطريقة الأسرع — الصق بطاقة البلاغ من شاشة CAD مرة واحدة</h2>
+  <div class="field">
+    <textarea id="pasteBox" placeholder="حدّد بيانات البلاغ في شاشة CAD وانسخها ثم الصقها هنا…
+مثال: رقم البلاغ: 1300370 — رمز البلاغ: 29B03 — الفرقة: سريع جنوب 1"></textarea>
+  </div>
+  <div class="row">
+    <button class="btn gold" onclick="analyzePaste()">🔍 تحليل النص</button>
+    <button class="btn ghost" onclick="document.getElementById('pasteBox').value=''">مسح</button>
+  </div>
+  <div id="recognizeNotice" class="notice recognized"></div>
+</div>
+
+<hr>
+
+<!-- ═══ الطريقة (أ): الإدخال السريع ═══ -->
+<div class="card">
+  <h2>بيانات البلاغ</h2>
+
+  <div class="field">
+    <span class="lbl">رقم البلاغ (من شاشة CAD)</span>
+    <div class="row">
+      <input type="text" id="reportNumber" inputmode="numeric" placeholder="1300370"
+             oninput="onNumberChange()">
+    </div>
+    <div id="lookupNotice"></div>
+  </div>
+
+  <div class="field">
+    <span class="lbl">رمز البلاغ MPDS (اختياري — يشتق النوع تلقائيًا)</span>
+    <div class="row">
+      <input type="text" id="mpdsCode" placeholder="32B01" style="width:120px"
+             oninput="onCodeChange()">
+    </div>
+    <div class="derived" id="derivedType"></div>
+  </div>
+
+  <div class="field">
+    <span class="lbl">نوع البلاغ</span>
+    <div class="chips" id="typeChips"></div>
+  </div>
+
+  <div class="field">
+    <span class="lbl">الفرقة / الفرق المستجيبة (ضغطة واحدة — يمكن أكثر من فرقة)</span>
+    <div class="chips" id="crewChips"></div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="saveBtn" onclick="saveReport()">✔ تسجيل</button>
+    <button class="btn ghost" onclick="resetForm()">بلاغ جديد</button>
+    <button class="btn ghost" onclick="runDemoScenario()" title="يشغّل سيناريو الاعتماد: 1300370 مرضية جنوب1 ← 1300371 مروري جنوب2 ← إضافة جنوب3 لـ1300370">▶ سيناريو التجربة</button>
+  </div>
+</div>
+
+<!-- ═══ النتيجة للمشغل ═══ -->
+<div class="card">
+  <h2>📊 بلاغات اليوم <span id="todayLabel" style="color:var(--muted); font-size:.75rem;"></span></h2>
+  <table>
+    <tr><th>المؤشر</th><th style="text-align:center;">العدد</th></tr>
+    <tr><td>إجمالي البلاغات</td><td class="num" id="stTotal">0</td></tr>
+    <tr><td>🤒 حالات مرضية</td><td class="num" id="stMedical">0</td></tr>
+    <tr><td>🚗 حوادث مرورية</td><td class="num" id="stTraffic">0</td></tr>
+    <tr><td>🚨 إصابات</td><td class="num" id="stInjury">0</td></tr>
+    <tr><td>🔥 حرائق</td><td class="num" id="stFire">0</td></tr>
+    <tr><td>📦 أخرى</td><td class="num" id="stOther">0</td></tr>
+  </table>
+
+  <h2 style="margin-top:16px;">🚑 توزيع البلاغات على الفرق</h2>
+  <div id="crewStats" class="crew-list"><span class="lbl">لا بلاغات بعد</span></div>
+
+  <div class="caption">
+    ℹ️ <b>البلاغات تُحسب برقم البلاغ وليس بعدد الفرق الخارجة عليه.</b>
+    البلاغ الذي خرجت له 3 فرق = بلاغ واحد في الإجمالي، ومشاركة واحدة في رصيد كل فرقة.
+  </div>
+
+  <h2 style="margin-top:16px;">سجل اليوم</h2>
+  <div id="reportLog"><span class="lbl">لا بلاغات بعد</span></div>
+
+  <div class="row" style="margin-top:12px;">
+    <button class="btn ghost" onclick="resetDay()" style="border-color:var(--danger); color:var(--danger);">🗑 تصفير اليوم</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+'use strict';
+/* ═══════════ Prototype — طبقة إحصائية برقم البلاغ ═══════════
+   القواعد:
+   - رقم البلاغ = Incident ID = مفتاح المنع من التكرار.
+   - النوع يُشتق من رمز MPDS (أول رقمين) ويُعدَّل بضغطة.
+   - الفرقة تُختار برقاقة بضغطة واحدة، وتعدد الفرق مسموح لنفس البلاغ.
+   - الإجمالي = عدد أرقام البلاغات الفريدة، لا عدد الفرق.
+*/
+
+var TYPES = [
+  { key:'medical', emoji:'🤒', label:'حالة مرضية' },
+  { key:'traffic', emoji:'🚗', label:'حادث مروري' },
+  { key:'injury',  emoji:'🚨', label:'إصابة' },
+  { key:'fire',    emoji:'🔥', label:'حريق' },
+  { key:'other',   emoji:'📦', label:'أخرى' }
+];
+
+/* فرق القطاع (في النسخة النهائية تُجلب من تكميل المناوبة الجاهزة — هنا قائمة ثابتة للتجربة) */
+var CREWS = ['جنوب 1','جنوب 2','جنوب 3','جنوب 4','جنوب 5','جنوب 6','جنوب 7','جنوب 8',
+             'سريع 1','سريع 2','سريع 3'];
+
+/* اشتقاق النوع من بروتوكول MPDS (أول رقمين من رمز البلاغ) */
+var MPDS_MAP = {
+  traffic: [29],
+  injury:  [30, 17, 21, 27, 22],
+  fire:    [7]
+};
+function typeFromMpds(code){
+  var m = /^(\d{1,2})/.exec((code||'').trim());
+  if(!m) return null;
+  var card = parseInt(m[1],10);
+  if(card === 32 || card === 23) return 'other'; // بروتوكول «غير معروف» — يُستخدم لسرعة إنشاء البلاغ
+                                                  // وتوجيه الفرقة، ويُصحَّح لاحقًا بعد ترحيل الفرقة
+  for(var t in MPDS_MAP){ if(MPDS_MAP[t].indexOf(card) !== -1) return t; }
+  return 'medical';                          // بقية البروتوكولات حالات طبية
+}
+
+/* ─── الحالة المحلية (تجريبية — لكل يوم) ─── */
+function todayKey(){
+  return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD محلي
+}
+function loadDay(){
+  try{ return JSON.parse(localStorage.getItem('cadProto:' + todayKey()) || '{}'); }
+  catch(e){ return {}; }
+}
+function saveDay(d){ localStorage.setItem('cadProto:' + todayKey(), JSON.stringify(d)); }
+
+var selectedType = 'medical';
+var selectedCrews = [];
+
+/* ─── بناء الرقاقات ─── */
+function buildChips(){
+  var tc = document.getElementById('typeChips'); tc.innerHTML = '';
+  TYPES.forEach(function(t){
+    var el = document.createElement('div');
+    el.className = 'chip type' + (t.key === selectedType ? ' on' : '');
+    el.textContent = t.emoji + ' ' + t.label;
+    el.onclick = function(){ selectedType = t.key; buildChips(); };
+    tc.appendChild(el);
+  });
+  var cc = document.getElementById('crewChips'); cc.innerHTML = '';
+  CREWS.forEach(function(c){
+    var el = document.createElement('div');
+    el.className = 'chip' + (selectedCrews.indexOf(c) !== -1 ? ' on' : '');
+    el.textContent = c;
+    el.onclick = function(){
+      var i = selectedCrews.indexOf(c);
+      if(i === -1) selectedCrews.push(c); else selectedCrews.splice(i,1);
+      buildChips();
+    };
+    cc.appendChild(el);
+  });
+}
+
+/* ─── البحث برقم البلاغ: موجود ← فتح للإضافة، غير موجود ← بلاغ جديد ─── */
+function normalizeNumber(v){ return (v||'').replace(/[^\d]/g,''); }
+
+function onNumberChange(){
+  var num = normalizeNumber(document.getElementById('reportNumber').value);
+  var box = document.getElementById('lookupNotice');
+  if(num.length < 4){ box.innerHTML = ''; return; }
+  var day = loadDay();
+  var rep = day[num];
+  if(rep){
+    var crewsTxt = rep.crews.map(function(c){ return c.team; }).join(' · ');
+    var tdef = TYPES.filter(function(t){ return t.key === rep.type; })[0];
+    box.innerHTML = '<div class="notice exists">📌 <b>البلاغ <span class="mono">' + num +
+      '</span> مسجل مسبقًا</b><br>النوع الحالي: ' + tdef.emoji + ' ' + tdef.label +
+      '<br>الفرق المرتبطة به: ' + (crewsTxt || 'لا فرق بعد') +
+      '<br>أضف فرقة أخرى أو عدّل النوع ثم اضغط «تسجيل» — <b>لن يُنشأ بلاغ جديد</b>.</div>';
+    selectedType = rep.type; buildChips();
+  } else {
+    box.innerHTML = '<div class="notice new">✨ بلاغ جديد — سيُنشأ السجل <span class="mono">' + num + '</span></div>';
+  }
+}
+
+function onCodeChange(){
+  var code = document.getElementById('mpdsCode').value;
+  var t = typeFromMpds(code);
+  var el = document.getElementById('derivedType');
+  if(t){
+    selectedType = t; buildChips();
+    var tdef = TYPES.filter(function(x){ return x.key === t; })[0];
+    el.textContent = '⤷ اشتُق النوع من الرمز: ' + tdef.emoji + ' ' + tdef.label + ' (قابل للتعديل بضغطة)';
+  } else el.textContent = '';
+}
+
+/* ─── اللصق الذكي: استخراج رقم البلاغ + الرمز + الفرقة — بثقة أو لا شيء ─── */
+/* بطاقة CAD الحقيقية مليئة بالأرقام (جوال المبلّغ، تاريخ، عنوان وطني، رمز بريدي) —
+   لذلك الارتكاز على كلمة «البلاغ» أولًا، واستبعاد الجوالات والسلاسل الطويلة احتياطيًا.
+   (تصحيح ميداني 2026-08-20: المحلل أمسك جوال المبلّغ 0576753763 بدل البلاغ 1300370) */
+function extractReportNumber(txt){
+  /* أولوية 1: الرقم الظاهر مباشرة بعد كلمة «البلاغ» («البلاغ 1300370» / «رقم البلاغ: 1300370») */
+  var m = /(?:رقم\s+)?البلاغ\s*[:#]?\s*(\d{4,})/.exec(txt);
+  if(m) return m[1];
+  /* أولوية 2 (احتياطي): سلسلة أرقام مستقلة من 5-8 خانات، ليست جوالًا (05xxxxxxxx) */
+  var best = null;
+  (txt.match(/\d+/g) || []).forEach(function(s){
+    if(s.length < 5 || s.length > 8) return;       // يستبعد الجوال (10) والسنة (4) والرمز البريدي (5 أرقام داخل العنوان تُراجع يدويًا)
+    if(/^05\d{8}$/.test(s)) return;                 // جوال سعودي صريح
+    if(!best || s.length > best.length) best = s;
+  });
+  return best;
+}
+
+function analyzePaste(){
+  var txt = document.getElementById('pasteBox').value || '';
+  var notice = document.getElementById('recognizeNotice');
+  if(!txt.trim()){ notice.style.display='none'; return; }
+
+  /* رقم البلاغ: مرتكز على كلمة «البلاغ» — لا «أطول رقم» */
+  var num = extractReportNumber(txt);
+
+  /* رمز MPDS: نمط مثل 32B01 */
+  var codeM = /(\b\d{1,2}[A-Ea-e]\d{2}\b)/.exec(txt);
+  var code = codeM ? codeM[1].toUpperCase() : null;
+
+  /* الفرقة: ما بعد كلمة «الفرقة» إن ظهر */
+  var crew = null;
+  var cm = /الفرقة[:\s]+([^\n،,]+)/.exec(txt);
+  if(cm){
+    var raw = cm[1].trim();
+    for(var i=0;i<CREWS.length;i++){ if(raw.indexOf(CREWS[i]) !== -1){ crew = CREWS[i]; break; } }
+  }
+
+  if(!num){
+    notice.className = 'notice exists';
+    notice.textContent = '⚠️ لم يُتعرف على رقم بلاغ واضح — أكمل الإدخال يدويًا بالأسفل (الدقة قبل الذكاء).';
+    return;
+  }
+
+  document.getElementById('reportNumber').value = num;
+  if(code){ document.getElementById('mpdsCode').value = code; onCodeChange(); }
+  if(crew && selectedCrews.indexOf(crew) === -1){ selectedCrews.push(crew); buildChips(); }
+  onNumberChange();
+
+  var tdef = TYPES.filter(function(t){ return t.key === selectedType; })[0];
+  /* إن جاء الرقم من المسار الاحتياطي (بدون كلمة «البلاغ») نطلب تحققًا صريحًا — الدقة قبل الذكاء */
+  var anchored = new RegExp('(?:رقم\\s+)?البلاغ\\s*[:#]?\\s*' + num).test(txt);
+  notice.className = 'notice recognized';
+  notice.innerHTML = '✅ <b>تم التعرف على البلاغ <span class="mono">' + num + '</span></b>' +
+    '<br>النوع: ' + tdef.emoji + ' ' + tdef.label + (code ? ' (من الرمز ' + code + ')' : '') +
+    '<br>الفرقة: ' + (crew || '— اخترها برقاقة بالأسفل') +
+    (anchored ? '' : '<br>⚠️ الرقم استُخرج دون مرساة «البلاغ» — <b>تحقق منه بعينك</b> قبل التسجيل.') +
+    '<br>راجع ثم اضغط «تسجيل» — ضغطة واحدة.';
+  notice.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ─── الحفظ: إنشاء أو إلحاق — بلا تكرار ─── */
+function saveReport(){
+  var num = normalizeNumber(document.getElementById('reportNumber').value);
+  if(num.length < 4){ alert('⚠️ أدخل رقم البلاغ من شاشة CAD'); return; }
+  if(!selectedCrews.length){ alert('⚠️ اختر فرقة واحدة على الأقل'); return; }
+
+  var day = loadDay();
+  var rep = day[num];
+  var created = !rep;
+  if(!rep){
+    rep = { number:num, type:selectedType, crews:[], createdAt:new Date().toISOString() };
+    day[num] = rep;
+  }
+  rep.type = selectedType; // تعديل النوع مسموح للبلاغ الموجود
+  var now = new Date().toISOString();
+  selectedCrews.forEach(function(c){
+    if(!rep.crews.some(function(x){ return x.team === c; }))
+      rep.crews.push({ team:c, at:now });
+  });
+  saveDay(day);
+
+  selectedCrews = [];
+  buildChips(); onNumberChange(); renderStats();
+
+  /* بقاء الرقم ظاهرًا يسهّل إضافة فرقة ثانية فورًا؛ زر «بلاغ جديد» يصفّر */
+}
+
+/* ─── الإحصائية: برقم البلاغ لا بعدد الفرق ─── */
+function renderStats(){
+  var day = loadDay();
+  var nums = Object.keys(day);
+  var byType = { medical:0, traffic:0, injury:0, fire:0, other:0 };
+  var byCrew = {};
+  nums.forEach(function(n){
+    var r = day[n];
+    if(byType[r.type] != null) byType[r.type]++; else byType.other++;
+    r.crews.forEach(function(c){ byCrew[c.team] = (byCrew[c.team]||0) + 1; });
+  });
+
+  document.getElementById('stTotal').textContent   = nums.length;
+  document.getElementById('stMedical').textContent = byType.medical;
+  document.getElementById('stTraffic').textContent = byType.traffic;
+  document.getElementById('stInjury').textContent  = byType.injury;
+  document.getElementById('stFire').textContent    = byType.fire;
+  document.getElementById('stOther').textContent   = byType.other;
+  document.getElementById('todayLabel').textContent = '— ' + todayKey();
+
+  var cs = document.getElementById('crewStats');
+  var crewsSorted = Object.keys(byCrew).sort(function(a,b){ return byCrew[b]-byCrew[a] || (a<b?-1:1); });
+  cs.innerHTML = crewsSorted.length
+    ? crewsSorted.map(function(c){ return '<span class="crew-tag">' + c + ' — <b>' + byCrew[c] + '</b></span>'; }).join('')
+    : '<span class="lbl">لا بلاغات بعد</span>';
+
+  var log = document.getElementById('reportLog');
+  log.innerHTML = nums.length ? '' : '<span class="lbl">لا بلاغات بعد</span>';
+  nums.sort().forEach(function(n){
+    var r = day[n];
+    var tdef = TYPES.filter(function(t){ return t.key === r.type; })[0];
+    var line = document.createElement('div');
+    line.className = 'report-line';
+    line.style.cursor = 'pointer';
+    line.title = 'اضغط لفتح البلاغ — إضافة فرقة أو تصحيح النوع (رمز «غير معروف» يُصحَّح بعد ترحيل الفرقة)';
+    var pending = (r.type === 'other') ? ' <span style="color:var(--gold); font-size:.78rem;">⏳ بانتظار التصنيف</span>' : '';
+    line.innerHTML = '<span><span class="mono">' + n + '</span> — ' + tdef.emoji + ' ' + tdef.label + pending + '</span>' +
+      '<span>' + r.crews.map(function(c){ return '<span class="crew-tag">' + c.team + '</span>'; }).join(' ') + '</span>';
+    /* ضغطة واحدة على سطر البلاغ = فتحه للتصحيح/الإضافة (رحلة «صحّح الرمز بعد ترحيل الفرقة») */
+    line.onclick = function(){
+      document.getElementById('reportNumber').value = n;
+      selectedType = r.type; selectedCrews = []; buildChips(); onNumberChange();
+      document.getElementById('reportNumber').scrollIntoView({behavior:'smooth', block:'center'});
+    };
+    log.appendChild(line);
+  });
+}
+
+/* ─── سيناريو الاعتماد (من وثيقة القرار) ─── */
+function runDemoScenario(){
+  resetDay(true);
+  var day = loadDay();
+  function reg(num, type, crews){
+    var r = day[num] || { number:num, type:type, crews:[], createdAt:new Date().toISOString() };
+    r.type = type;
+    crews.forEach(function(c){ if(!r.crews.some(function(x){return x.team===c;})) r.crews.push({team:c, at:new Date().toISOString()}); });
+    day[num] = r;
+  }
+  reg('1300370', 'medical', ['جنوب 1']);   // البلاغ الأول
+  reg('1300371', 'traffic', ['جنوب 2']);   // البلاغ الثاني
+  reg('1300370', 'medical', ['جنوب 3']);   // عودة للأول وإضافة فرقة — لا بلاغ جديد
+  saveDay(day); renderStats();
+  alert('✅ سيناريو التجربة اكتمل:\nإجمالي البلاغات = 2 (وليس 3)\nمرضية=1 · مرورية=1\nجنوب 1=1 · جنوب 2=1 · جنوب 3=1');
+}
+
+function resetForm(){
+  document.getElementById('reportNumber').value = '';
+  document.getElementById('mpdsCode').value = '';
+  document.getElementById('derivedType').textContent = '';
+  document.getElementById('lookupNotice').innerHTML = '';
+  selectedType = 'medical'; selectedCrews = []; buildChips();
+}
+function resetDay(silent){
+  localStorage.removeItem('cadProto:' + todayKey());
+  if(!silent){ resetForm(); renderStats(); }
+}
+
+buildChips(); renderStats();
+</script>
+</body>
+</html>

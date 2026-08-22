@@ -364,6 +364,22 @@
             .header-bar h1 { font-size: 1.1rem; }
         }
     </style>
+    <!-- Google Fonts: Tajawal (هوية التكميل) — رابط مستقل لأن خطوط الصفحة عبر @import في app.css -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
+    <style>
+    /* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+    /* جسر الزمردي القديم إلى لغة التكميل. بصري فقط — لا منطق ولا id. */
+    :root { --teal: var(--pi-green); --teal-50: rgba(52,211,153,0.12); }
+    body::after { background: radial-gradient(1200px 500px at 50% 110%, rgba(52,211,153,0.05), transparent 65%); }
+    :focus-visible { outline-color: rgba(96,165,250,0.55) !important; }
+    ::selection { background: rgba(96,165,250,0.35); color: var(--pi-ink); }
+    .btn-primary, .btn-primary:hover {
+        background: linear-gradient(150deg, #2F6BF0, #1D4FD7) !important; border: none !important; color: #fff !important;
+        border-radius: 12px; box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    </style>
 </head>
 <body>
     <div class="page-container">

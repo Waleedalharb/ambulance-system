@@ -111,6 +111,12 @@ class OperationsEngine {
             safeBroadcast({ type: 'report_undone', center: e.center, unit: e.unit, shiftId: e.shift_id });
         });
 
+        // بلاغ CAD قائم أُثري (مراحل/موقع/وقت إنشاء) → نفس رسالة 'new_report'
+        // حتى تنعكس الخريطة والمؤشرات فورًا (قرار المالك 2026-08-20)
+        this.bus.on('IncidentEnriched', (e) => {
+            safeBroadcast({ type: 'new_report', center: e.center, unit: e.unit, shiftId: e.shift_id });
+        });
+
         // Completion saved → existing 'completion_updated' message type
         this.bus.on('CompletionUpdated', (e) => {
             safeBroadcast({

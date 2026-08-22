@@ -258,6 +258,75 @@ tbody tr:hover { background: var(--g100); }
     .report-header h2 { font-size: 18px; }
 }
 </style>
+<!-- Google Fonts: Tajawal (هوية التكميل) — رابط مستقل لأن خطوط الصفحة عبر @import -->
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+<style>
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* هذه الصفحة وُلدت فاتحة وهي «مستند» بطبيعتها: محتوى التقرير
+   (#reportContent) يُصدَّر PDF عبر html2pdf ويُطبع — لذلك يبقى أبيض
+   عمدًا (نمط workflow-prototype)، بينما يكتسب إطار الصفحة (الخلفية
+   والشريط العلوي) هوية التكميل الداكنة. بصري فقط — لا منطق ولا id. */
+
+/* ① إطار الصفحة: الشريط العلوي الأزرق المصمت → كحلي زجاجي بلغة التكميل */
+.topbar {
+    background: linear-gradient(170deg, rgba(17,25,48,0.94), rgba(9,14,28,0.94)) !important;
+    border-bottom: 1px solid var(--pi-line);
+    box-shadow: var(--pi-shadow-soft);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+/* نصوص التحميل/الخطأ (خارج نطاق المستند) على الخلفية الداكنة */
+.loader { color: var(--pi-ink-dim) !important; }
+#errorState { color: var(--pi-ink-faint) !important; }
+
+/* ② نطاق المستند الأبيض — لوحة فاتحة واحدة فوق الخلفية الداكنة؛
+   خلفية صريحة أيضًا تمنع فراغات شفافة في لقطة html2canvas */
+#reportContent {
+    background: #F8FAFC !important;
+    border: 1px solid var(--g200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+}
+
+/* ③ حماية داخل المستند من قواعد الهوية الداكنة (!important المركزية) */
+#reportContent .stat-card {
+    background: #FFFFFF !important;
+    border: 1px solid var(--g200) !important;
+    border-right: 4px solid var(--teal) !important;
+    box-shadow: var(--shadow-sm) !important;
+    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+#reportContent .stat-card:nth-child(2) { border-right-color: var(--p500) !important; }
+#reportContent .stat-card:nth-child(3) { border-right-color: var(--gold) !important; }
+#reportContent .stat-card:nth-child(4) { border-right-color: var(--coral) !important; }
+#reportContent .stat-value { color: var(--p900) !important; }
+#reportContent .stat-label { color: var(--g600) !important; }
+#reportContent .stat-sub { color: var(--g400) !important; }
+#reportContent .card-title { color: var(--g800) !important; }
+#reportContent thead th { background: var(--p100) !important; color: var(--g700) !important; border-bottom-color: var(--g200) !important; }
+#reportContent tbody td { color: var(--g800) !important; border-bottom-color: var(--g100) !important; }
+#reportContent tbody tr:nth-child(even) { background: var(--g50) !important; }
+#reportContent tbody tr:hover { background: var(--g100) !important; }
+#reportContent tbody tr:hover td { background: transparent !important; }
+#reportContent .badge-gold { background: #FFFBEB !important; color: #B45309 !important; }
+#reportContent .badge-teal { background: #ECFDF5 !important; color: #047857 !important; }
+#reportContent .badge-coral { background: #FEF2F2 !important; color: #B91C1C !important; }
+#reportContent .badge-blue { background: #EFF6FF !important; color: #1D4ED8 !important; }
+#reportContent select {
+    background: #fff !important; color: var(--g800) !important;
+    border-color: var(--g200) !important; box-shadow: none !important;
+}
+#reportContent .empty-state { color: var(--g400) !important; }
+#reportContent .section-badge { background: var(--g100) !important; color: var(--g600) !important; }
+
+/* ④ الطباعة: إعادة فرض الورق الأبيض فوق خلفية الهوية (!important) */
+@media print {
+    body { background: #fff !important; color: #000 !important; }
+    .topbar { background: #1E3A5F !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #reportContent { background: #fff !important; border: none !important; padding: 0 !important; }
+}
+</style>
 </head>
 <body>
 

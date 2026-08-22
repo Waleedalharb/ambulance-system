@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سير العمل الرسمي — نموذج تجريبي W-0</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
 <style>
 :root {
     --primary:#2563eb; --primary-dark:#1d4ed8; --green:#16a34a; --green-light:#dcfce7;
@@ -135,6 +137,48 @@ tr:last-child td { border-bottom:none; }
 
 .view { display:none; } .view.active { display:block; }
 .mock-banner { background:var(--yellow-light); border:1px solid #fde68a; color:#92400e; text-align:center; font-size:0.75rem; font-weight:700; padding:6px; border-radius:8px; margin-bottom:14px; }
+
+/* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+/* هذه الصفحة وُلدت فاتحة؛ نجسر رموزها إلى هوية التكميل الداكنة
+   دون لمس أي بنية أو منطق. معاينة PDF الحكومية (.pdf-page) تبقى
+   بيضاء عمدًا لأنها محاكاة لمستند رسمي مطبوع. */
+:root {
+    --primary:#2F6BF0; --primary-dark:#93C5FD;
+    --green:#34D399;  --green-light:rgba(52,211,153,0.12);
+    --yellow:#FBBF24; --yellow-light:rgba(251,191,36,0.12);
+    --red:#F87171;    --red-light:rgba(248,113,113,0.12);
+    --bg:rgba(255,255,255,0.03);
+    --card:rgba(255,255,255,0.04);
+    --border:rgba(255,255,255,0.09);
+    --text:#E8EDF8; --muted:#9AA7C4; --gray:#A9BACD;
+    --gray-light:rgba(255,255,255,0.05);
+}
+* { font-family:'Tajawal','IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif !important; }
+
+/* الرأس الأزرق الفاتح → كحلي تنفيذي بلمسة إشارية (مطابق workflow.html) */
+.page-header { background:linear-gradient(135deg,#0B1424,#101B30); border-bottom:2px solid rgba(52,211,153,0.35); }
+
+/* عناصر كانت تحمل ألوانًا فاتحة مضمّنة */
+.mock-banner { background:rgba(251,191,36,0.12) !important; border-color:rgba(251,191,36,0.35) !important; color:var(--pi-amber) !important; }
+.person.support { background:rgba(96,165,250,0.12) !important; border-color:rgba(96,165,250,0.30) !important; color:#93C5FD !important; }
+.person.absent { border-color:rgba(248,113,113,0.30) !important; }
+.person.late { border-color:rgba(251,191,36,0.30) !important; }
+.ver-status.sent { background:rgba(96,165,250,0.12) !important; color:#93C5FD !important; }
+.step.current .dot { box-shadow:0 0 0 4px rgba(47,107,240,0.28); }
+
+/* أزرار الإجراءات — لغة التكميل */
+.btn.primary { background:linear-gradient(150deg,#2F6BF0,#1D4FD7) !important; color:#fff !important; box-shadow:0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2); }
+.btn.primary:hover { background:linear-gradient(150deg,#2F6BF0,#1D4FD7) !important; filter:brightness(1.1); }
+.btn.green { background:rgba(52,211,153,0.16) !important; color:var(--pi-green) !important; border:1px solid rgba(52,211,153,0.4) !important; }
+.btn.outline, .btn.red-outline { background:rgba(255,255,255,0.04) !important; }
+.btn.outline { border:1px solid var(--pi-line) !important; color:var(--pi-ink-dim) !important; }
+.btn.red-outline { border:1px solid rgba(248,113,113,0.4) !important; color:var(--pi-red) !important; }
+
+/* معاينة PDF الحكومية — تبقى فاتحة: نعيد نطاق الرموز محليًا داخلها فقط */
+.pdf-page { --bg:#f1f5f9; --border:#e2e8f0; --muted:#64748b; --gray:#475569; --text:#0f172a; color:#0f172a; }
+.pdf-page td { color:#0f172a; }
+.pdf-page tbody td { color:#0f172a !important; }
+.pdf-page tbody tr:hover { background:transparent !important; }
 </style>
 </head>
 <body>

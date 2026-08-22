@@ -737,11 +737,20 @@ app.use(compression({
 }));
 
 // 3. CORS
+// (قرار المالك 2026-08-20) إصلاح مقصور لربط PoC من شاشة CAD (نطاق عام https)
+// إلى بيئة التطوير المحلية: كروم يفرض Private Network Access ← نرد
+// Access-Control-Allow-Private-Network عندما يطلبه المتصفح في الـpreflight،
+// ونسمح بترويسة X-Integration-Key. لا تغيير في الصلاحيات أو أي API قائم.
+app.use((req, res, next) => {
+    if (req.headers['access-control-request-private-network'])
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    next();
+});
 app.use(cors({
     origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
     credentials: false,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Integration-Key']
 }));
 
 // 3.5 Trust proxy (required for Render and other reverse proxies)
@@ -4523,6 +4532,170 @@ app.post('/api/undo', authenticate, authorizePerm('ops.report_revert'), async (r
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: 'فشل في حذف البلاغ' });
+    }
+});
+
+// ============================================
+// API: بلاغات CAD «الضغطة الواحدة» — مدخل لمحرك التوزيع نفسه (2026-08-20)
+// رقم البلاغ = المفتاح: بلاغ واحد × فرق متعددة؛ الإحصائية برقم البلاغ لا بعدد الفرق.
+// CAD يكتب في reports/report_times/incident_registry عبر ReportService — لا مخزن موازٍ.
+// قراءة: أي مستخدم موثّق · كتابة: ops.dispatch أو مفتاح التكامل المقصور
+// ============================================
+// مفتاح تكامل مخصص للـPoC (قرار المالك 2026-08-20): Credential مقصور على
+// POST /api/cad-reports فقط — لا يمنح دخولًا ولا أي صلاحية أخرى، ويُلغى بعد التجربة.
+// التخزين: data/integration-keys.json (خارج أي Commit — يحوي سرًا)
+const INTEGRATION_KEYS_PATH = path.join(STORAGE_PATH, 'integration-keys.json');
+function loadIntegrationKeys() {
+    try { const k = JSON.parse(require('fs').readFileSync(INTEGRATION_KEYS_PATH, 'utf8')); return Array.isArray(k) ? k : []; } // fs هنا = promises — نستخدم الأصيل مباشرة
+    catch (_) { return []; }
+}
+function cadIntegrationAuth(req, res, next) {
+    const key = req.headers['x-integration-key'];
+    if (!key) return next(); // لا مفتاح ← نكمل بمسار JWT الطبيعي
+    const kb = Buffer.from(String(key));
+    const rec = loadIntegrationKeys().find(k => k.active && k.scope === 'cad-reports'
+        && Buffer.byteLength(k.key) === kb.length && crypto.timingSafeEqual(Buffer.from(k.key), kb));
+    if (!rec) return res.status(401).json({ error: 'مفتاح التكامل غير صالح أو ملغى' });
+    req.user = { id: 'integration-cad', name: 'CAD Connector (مفتاح تكامل)', role: 'integration' };
+    req.integrationAuth = true;
+    next();
+}
+const CAD_NUMBER_RE = /^\d{4,12}$/;
+const CAD_VALID_TYPES = ['medical', 'traffic', 'injury', 'fire', 'other'];
+
+app.get('/api/cad-reports', authenticate, async (req, res) => {
+    try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const shiftId = await opsEngine.shifts.resolveShiftId(req);
+        if (!shiftId) return res.json({ success: true, total: 0, incidentsCount: 0, manualCount: 0, byType: {}, byCrew: {}, incidents: [], responseTime: null, lastReportTs: null });
+        const summary = await reportService.getIncidentSummary(shiftId);
+        res.json({ success: true, ...summary });
+    } catch (error) {
+        console.error('[CadReports] GET error:', error);
+        res.status(500).json({ error: 'فشل في جلب إحصائية البلاغات' });
+    }
+});
+
+// فرق الجنوب الفعلية من تكميل المناوبة (قرار المالك 2026-08-21 — §5): قراءة فقط —
+// مفتاح التكامل (scope=cad-reports) أو جلسة المنصة. الـOverlay يبني قائمته من هنا
+// بدل قائمة ثابتة: أي فرقة في التكميل يمكن اختيارها من CAD.
+app.get('/api/cad-reports/south-teams', cadIntegrationAuth, (req, res, next) => {
+    if (req.integrationAuth) return next();
+    authenticate(req, res, next);
+}, async (req, res) => {
+    try {
+        if (!opsEngine || !staffingEventsService) return res.status(503).json({ error: 'Engine unavailable' });
+        const shiftId = await opsEngine.shifts.resolveShiftId(req);
+        if (!shiftId) return res.json({ success: true, teams: [] });
+        const state = await staffingEventsService.getState(shiftId);
+        const teamsObj = (state && state.teams) || {};
+        const teams = Object.keys(teamsObj).map(name => ({
+            name, status: teamsObj[name] && teamsObj[name].status || null
+        })).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        res.json({ success: true, teams });
+    } catch (error) {
+        console.error('[CadReports] south-teams error:', error);
+        res.status(500).json({ error: 'فشل في جلب فرق الجنوب' });
+    }
+});
+
+app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
+    if (req.integrationAuth) return next(); // مفتاح التكامل مقصور على هذا المسار فقط
+    authenticate(req, res, () => authorizePerm('ops.dispatch')(req, res, next));
+}, validateBody({
+    number: { required: true, type: 'string', minLength: 4, maxLength: 12 },
+    crews: { required: true, type: 'array' }
+}), async (req, res) => {
+    try {
+        const { number, code, type, crews, createdAt, address, region, lat, lng } = req.body;
+        if (!CAD_NUMBER_RE.test(number.trim()))
+            return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
+        if (type && !CAD_VALID_TYPES.includes(type))
+            return res.status(400).json({ error: 'نوع البلاغ غير معروف' });
+        // وقت إنشاء البلاغ في CAD (نقطة بداية مؤشر زمن الاستجابة) — اختياري، بصيغة CAD الخام
+        const CAD_CREATED_RE = /^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|ص|م)?$/i;
+        if (createdAt && !CAD_CREATED_RE.test(String(createdAt).trim()))
+            return res.status(400).json({ error: 'وقت إنشاء البلاغ غير صالح' });
+        // موقع البلاغ الخام من CAD — نصوص اختيارية محدودة الطول (الحي يُشتق سيرفريًا)
+        const cleanAddress = address ? String(address).trim().slice(0, 200) : null;
+        const cleanRegion = region ? String(region).trim().slice(0, 100) : null;
+        // إحداثيات CAD الأصلية فقط (اعتماد المالك 2026-08-20): رقمان ضمن النطاق الجغرافي
+        // الصحيح أو يُهمَلان تمامًا — لا يُقبل نص ولا قيمة خارج النطاق ولا تُخترع قيمة
+        const numLat = parseFloat(lat), numLng = parseFloat(lng);
+        const validGeo = isFinite(numLat) && isFinite(numLng) &&
+            numLat >= -90 && numLat <= 90 && numLng >= -180 && numLng <= 180;
+        const cleanLat = validGeo ? numLat : null, cleanLng = validGeo ? numLng : null;
+        const cleanCrews = (crews || [])
+            .filter(c => c && typeof c.team === 'string' && c.team.trim())
+            .slice(0, 10)
+            .map(c => ({ team: c.team.trim().slice(0, 100), phases: (c.phases && typeof c.phases === 'object') ? c.phases : {},
+                         withdrawn: c.withdrawn === true ? true : (c.withdrawn === false ? false : undefined) }));
+        if (!cleanCrews.length)
+            return res.status(400).json({ error: 'لا توجد فرقة صالحة في الطلب' });
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+
+        // نفس قاعدة توزيع البلاغات اليدوي: لا تسجيل بلا مناوبة نشطة (الختم سيرفري فقط)
+        const shiftId = await opsEngine.shifts.resolveShiftId(req);
+        if (!shiftId) return res.status(400).json({ error: 'لا توجد مناوبة نشطة - ابدأ مناوبة أولاً' });
+
+        const result = await reportService.createIncidentEntries(
+            { shiftId, number: number.trim(), code: code || null, type: type || null, crews: cleanCrews,
+              createdAt: createdAt ? String(createdAt).trim().slice(0, 40) : null,
+              address: cleanAddress, region: cleanRegion, lat: cleanLat, lng: cleanLng }, req.user);
+
+        await addAuditLogEntry(result.created ? 'cad_report_created' : 'cad_report_crew_added',
+            'بلاغ CAD ' + number.trim() + (result.created ? ' (جديد)' : ' (إلحاق فرقة)') +
+            ' — فرق: +' + result.addedCrews.length + (result.skippedCrews.length ? ' / متكررة: ' + result.skippedCrews.length : ''),
+            'reports', req.user.name, req.user.role, req.user.id);
+
+        res.json({ ...result, number: number.trim() });
+    } catch (error) {
+        console.error('[CadReports] POST error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل بلاغ CAD' });
+    }
+});
+
+// ============================================
+// تثبيت أداة CAD Overlay من المنصة (قرار المالك 2026-08-21)
+// المنصة المنشورة هي نقطة التوزيع: الحزمة تُولَّد من الخادم لحظة الطلب
+// بعنوان المنصة الفعلي (وليس localhost) — ونفس بناء الـOverlay المختبَر حيًا.
+// الحزمة تحمل مفتاح التكامل (في background.js فقط) ← التنزيل محمي بجلسة المنصة.
+// ============================================
+const { buildExtensionFiles } = require('./scripts/extension-builder');
+const JSZip = require('jszip');
+
+function platformPublicBase(req) {
+    const forced = (process.env.PLATFORM_PUBLIC_BASE || '').trim();
+    if (forced) return forced.replace(/\/+$/, '');
+    return req.protocol + '://' + req.get('host'); // trust proxy مفعّل — خلف Render يصل النطاق المنشور
+}
+
+app.get('/cad-overlay', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'cad-overlay-install.html'));
+});
+
+app.get('/api/cad-overlay/package', authenticate, async (req, res) => {
+    try {
+        const files = buildExtensionFiles(platformPublicBase(req), { dataDir: STORAGE_PATH });
+        const zip = new JSZip();
+        zip.file('manifest.json', files.manifest);
+        zip.file('cad-overlay-content.js', files.content);
+        zip.file('bridge.js', files.bridge);
+        zip.file('platform-marker.js', files.marker);
+        zip.file('background.js', files.background);
+        zip.file('اقرأني-التثبيت.txt', files.readme);
+        const buf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+        await addAuditLogEntry('cad_overlay_package_downloaded',
+            'تنزيل حزمة CAD Overlay ← ' + files.base, 'reports', req.user.name, req.user.role, req.user.id);
+        res.set({
+            'Content-Type': 'application/zip',
+            'Content-Disposition': 'attachment; filename="south-cad-overlay-extension.zip"',
+            'Cache-Control': 'no-store'
+        });
+        res.send(buf);
+    } catch (error) {
+        console.error('[CadOverlay] package error:', error);
+        res.status(500).json({ error: 'تعذّر توليد حزمة التثبيت' });
     }
 });
 

@@ -616,9 +616,11 @@ function handleSSEEvent(data) {
         case 'new_report':
             showNotification('بلاغ جديد', data.message, 'info', 5000);
             refreshReports();
+            refreshIncidentMapFromServer(); // طبقة البلاغات على الخريطة — فوري عبر نفس القناة
             break;
         case 'report_undone':
             refreshReports();
+            refreshIncidentMapFromServer();
             break;
         case 'theme_updated':
             showNotification('تم التحديث', 'تم تحديث الثيم من قبل مشرف آخر', 'info', 3000);
@@ -637,6 +639,7 @@ function handleSSEEvent(data) {
             loadCurrentShift();
             loadShifts();
             loadAllData();
+            refreshIncidentMapFromServer(); // خريطة المناوبة الجديدة (تصفير صادق إن لا بلاغات)
             break;
         case 'shift_updated':
         case 'shift_deleted':
@@ -759,6 +762,19 @@ function handleSSEEvent(data) {
 
 function refreshReports() {
     loadAllData();
+}
+
+// الخريطة التشغيلية الذكية: تحديث طبقة البلاغات فور وصول الأحداث عبر قناة SSE
+// الموجودة (تشخيص المالك 2026-08-20: الطبقة كانت بلا فرع تحديث ولا ترسم إلا
+// كأثر جانبي لفتح أقسام أخرى). debounced بنمط refreshWorkforceFromServer
+// حتى دفعة أحداث بلاغ واحد متعدد الفرق تولّد جلبًا واحدًا — لا polling إطلاقًا.
+var _smapRefreshTimer = null;
+function refreshIncidentMapFromServer() {
+    if (_smapRefreshTimer) clearTimeout(_smapRefreshTimer);
+    _smapRefreshTimer = setTimeout(function () {
+        _smapRefreshTimer = null;
+        fetchIncidentSummarySafe(); // تجلب /api/cad-reports ثم renderSmartMap داخليًا
+    }, 400);
 }
 
 // ============================================
@@ -1890,6 +1906,29 @@ function getShiftTypeBreakdown() {
     }
     return totals;
 }
+// جلب ملخص محرك البلاغات برقم البلاغ — قراءة تكميلية لا تعطّل العرض عند الفشل
+async function fetchIncidentSummarySafe() {
+    if (!AuthManager.isLoggedIn()) return null;
+    try {
+        var res = await AuthManager.apiRequest('/api/cad-reports');
+        var data = await res.json();
+        if (data && data.success) { renderSmartMap(data); return data; }
+    } catch (e) { /* تجاهل — تبقى الإحصائية القديمة */ }
+    return null;
+}
+// إحصائية المواقع بالحي المشتق من عنوان CAD بدل المركز الخام «CAD» (قرار المالك 2026-08-20):
+// كل بلاغ CAD يُحسب مرة واحدة تحت حيّه، ومراكز الإدخال اليدوي تبقى كما هي
+function mergeDistrictStats(sectorStats, byDistrict) {
+    if (!byDistrict) return sectorStats;
+    var merged = {};
+    for (var c in sectorStats) {
+        if (c !== 'CAD') merged[c] = sectorStats[c];
+    }
+    for (var d in byDistrict) {
+        merged[d] = (merged[d] || 0) + byDistrict[d];
+    }
+    return merged;
+}
 function getSmartColorClass(count) {
     if (count < 5) return 'smart-color-green';
     if (count <= 10) return 'smart-color-yellow';
@@ -2029,6 +2068,19 @@ async function renderAdvancedDistribution() {
         }
     }
     
+    // محرك التوزيع برقم البلاغ (2026-08-20): الإجمالي والأنواع من ملخص المحرك —
+    // الإجمالي = أرقام بلاغات فريدة + ضغطات يدوية · النوع مرة واحدة لكل بلاغ ·
+    // وعدّادات الفرق أدناه تبقى «مشاركات» كما هي
+    var incidentSummary = await fetchIncidentSummarySafe();
+    if (incidentSummary) {
+        totalReports = incidentSummary.total;
+        typeBreakdown = incidentSummary.byType || typeBreakdown;
+        // «آخر بلاغ» يعكس وقت الإنشاء الفعلي في CAD لا وقت الإدخال المتأخر (قرار المالك 2026-08-20)
+        if (incidentSummary.lastReportTs) lastTime = new Date(incidentSummary.lastReportTs);
+        // إحصائية المواقع بالحي المشتق بدل مركز «CAD» الخام (قرار المالك 2026-08-20)
+        sectorStats = mergeDistrictStats(sectorStats, incidentSummary.byDistrict);
+    }
+    
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
     var mostActiveTeamCount = sortedUnits.length > 0 ? sortedUnits[0][1] : 0;
@@ -2063,6 +2115,22 @@ async function renderAdvancedDistribution() {
                 '<div class="stat-card-value">' + (lastTime ? TimeRiyadh.formatTime(lastTime) : '-') + '</div>' +
                 '<div class="stat-card-label">آخر بلاغ</div>' +
             '</div>';
+
+    // مؤشر زمن الاستجابة للقطاع (تعريف المالك 2026-08-20): من إنشاء البلاغ في CAD ← الوصول/المباشرة
+    if (incidentSummary && incidentSummary.responseTime) {
+        var rtA = incidentSummary.responseTime.arrival || { avg: null, count: 0 };
+        var rtM = incidentSummary.responseTime.mubashara || { avg: null, count: 0 };
+        statsHtml += '<div class="stat-card">' +
+                '<div class="stat-card-icon">⏱️</div>' +
+                '<div class="stat-card-value">' + (rtA.count ? rtA.avg + ' د' : '—') + '</div>' +
+                '<div class="stat-card-label">زمن الاستجابة حتى الوصول (من ' + rtA.count + ' بلاغ)</div>' +
+            '</div>' +
+            '<div class="stat-card">' +
+                '<div class="stat-card-icon">🩺</div>' +
+                '<div class="stat-card-value">' + (rtM.count ? rtM.avg + ' د' : '—') + '</div>' +
+                '<div class="stat-card-label">زمن البلاغ حتى المباشرة (من ' + rtM.count + ' بلاغ)</div>' +
+            '</div>';
+    }
     
     // Add type counts
     for (var t in REPORT_TYPE_DEFS) {
@@ -2080,6 +2148,44 @@ async function renderAdvancedDistribution() {
     var statsDiv = document.createElement('div');
     statsDiv.innerHTML = statsHtml;
     container.appendChild(statsDiv.firstElementChild);
+    
+    // سجل البلاغات المرقمة من CAD: كل بلاغ برقمه ونوعه وفرقه وأزمنتها الخام
+    // (أسماء الأزمنة كما في CAD؛ وزمن الاستجابة المحسوب من إنشاء البلاغ ← الوصول/المباشرة)
+    if (incidentSummary && incidentSummary.incidents && incidentSummary.incidents.length) {
+        var phaseMap = [['التحرك','تحرك'],['البحث','وصول'],['العلاج','مباشرة']];
+        var logHtml = '<div style="margin-top:14px; background:rgba(46,139,122,.08); border:1px solid rgba(46,139,122,.35); border-radius:12px; padding:12px 14px;">' +
+            '<div style="font-weight:700; color:#2E8B7A; margin-bottom:8px;">🧾 سجل البلاغات برقم البلاغ: <b>' + incidentSummary.incidentsCount + '</b>' +
+            ' <span style="font-weight:400; font-size:.75rem; opacity:.7;">(كل رقم يُحسب مرة واحدة مهما تعددت فرقه · المشاركة اليدوية تُحسب بلاغًا مستقلًا · الفرقة التي لم تتحرك لا تدخل عدّادها ولا مؤشر الزمن)</span></div>' +
+            incidentSummary.incidents.map(function(ic) {
+                var td = (typeof REPORT_TYPE_DEFS !== 'undefined' && REPORT_TYPE_DEFS[ic.type]) ? REPORT_TYPE_DEFS[ic.type].emoji + ' ' + REPORT_TYPE_DEFS[ic.type].label : ic.type;
+                var crews = ic.crews.map(function(c) {
+                    var ph = c.phases || {};
+                    var times = Object.keys(ph).filter(function(k) { return ph[k]; }).map(function(k) {
+                        var m = phaseMap.find(function(p) { return p[0] === k; });
+                        return k + ' ' + ph[k] + (m ? ' ← ' + m[1] : '');
+                    }).join(' · ');
+                    var respTxt = (c.respArrivalMin != null ? ' ⏱' + c.respArrivalMin + ' د للوصول' : '') +
+                                  (c.respMubasharaMin != null ? ' · ' + c.respMubasharaMin + ' د للمباشرة' : '');
+                    var notCounted = c.counted === false; // مُسندة وأُلغيت قبل التحرك — تبقى موثقة ولا تدخل العدّاد
+                    var chipStyle = notCounted
+                        ? 'display:inline-block; background:rgba(148,163,184,.08); border:1px dashed rgba(148,163,184,.45); border-radius:6px; padding:2px 9px; margin:2px; font-size:.8rem; opacity:.75;'
+                        : 'display:inline-block; background:rgba(46,139,122,.15); border:1px solid rgba(46,139,122,.4); border-radius:6px; padding:2px 9px; margin:2px; font-size:.8rem;';
+                    return '<span style="' + chipStyle + '">🚑 ' + c.unit +
+                        (notCounted ? ' <small style="opacity:.9;">(مُسندة — لم تتحرك)</small>' : '') +
+                        (times ? ' <small style="opacity:.75;">(' + times + ')</small>' : '') +
+                        (respTxt ? ' <small style="color:#2E8B7A; font-weight:700;">' + respTxt + '</small>' : '') + '</span>';
+                }).join('');
+                return '<div style="padding:6px 4px; border-top:1px solid rgba(255,255,255,.06); font-size:.86rem;">' +
+                    '<b style="direction:ltr; display:inline-block;">' + ic.number + '</b> — ' + td +
+                    (ic.code ? ' <small style="opacity:.7;">(' + ic.code + ')</small>' : '') +
+                    (ic.district ? ' <small style="color:#2E8B7A;">📍 ' + ic.district + '</small>' : '') +
+                    (ic.cadCreatedAt ? ' <small style="opacity:.7;">· أُنشئ ' + ic.cadCreatedAt + '</small>' : '') +
+                    '<div style="margin-top:4px;">' + crews + '</div></div>';
+            }).join('') + '</div>';
+        var logDiv = document.createElement('div');
+        logDiv.innerHTML = logHtml;
+        container.appendChild(logDiv.firstElementChild);
+    }
     
     // ─── Sector cards: ONLY ready teams ───
     for (var center in centersData) {
@@ -2204,10 +2310,14 @@ async function renderAdvancedDistribution() {
             });
         });
     }
+
 }
 
 // ============================================
 // دوال الخريطة
+// ============================================
+
+
 // ============================================
 // عناوين الفرق (للعرض النصي)
 var unitLocationAddresses = {
@@ -3568,126 +3678,29 @@ function renderOperationalFocus() {
 }
 
 // ============================================================
-// الخريطة التشغيلية الذكية — امتداد مركز القرار على الجغرافيا.
-// علامات الفرق من مرآة workforceStateTeams (حالة سيرفرية حرفية)
-// وإحداثيات unitLocations الموجودة. التصنيف اللوني عرضي بحت
-// ومطابق لمركز القرار: أحمر (ناقصة/خارج الخدمة/مركبة غير جاهزة)،
-// أصفر (بانتظار التكميل)، أخضر (جاهزة). لا حساب محلي إطلاقًا.
+// الخريطة التشغيلية الذكية — أعيد بناؤها بالكامل في js/smart-map.js
+// (قرار المالك 2026-08-20 ليلًا). هذه مفوّضات رفيعة تحافظ على
+// الأسلاك القائمة: SSE (new_report/IncidentEnriched/shift_started)
+// ← refreshIncidentMapFromServer ← fetchIncidentSummarySafe ← renderSmartMap
+// وتحديث حالة الفرق ← updateWorkforceStats ← updateOperationalMap.
 // ============================================================
-var opsMap = null;
-var opsMapLayer = null;
-var opsMapFitted = false;
-
-function initOperationalMap() {
-    if (opsMap) return true;
-    var el = document.getElementById('opsMap');
-    if (!el) return false;
-    if (typeof L === 'undefined') {
-        var note0 = document.getElementById('opsMapTileNote');
-        if (note0) { note0.style.display = 'block'; note0.innerHTML = '<i class="fas fa-triangle-exclamation"></i> تعذّر تحميل مكتبة الخرائط'; }
-        return false;
-    }
-    opsMap = L.map('opsMap', { scrollWheelZoom: false, attributionControl: true }).setView([24.7136, 46.6753], 12);
-    // تكبير العجلة يُفعَّل عند النقر فقط — الصفحة تُمرَّر بحرية أثناء المناوبة
-    opsMap.on('click', function () { opsMap.scrollWheelZoom.enable(); });
-    opsMap.on('mouseout', function () { opsMap.scrollWheelZoom.disable(); });
-    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19
-    });
-    tiles.on('tileerror', function () {
-        var note = document.getElementById('opsMapTileNote');
-        if (note) note.style.display = 'block';
-    });
-    tiles.addTo(opsMap);
-    opsMapLayer = L.layerGroup().addTo(opsMap);
-    return true;
-}
+var _incidentLayerBooted = false; // إقلاع طبقة البلاغات عند فتح الصفحة (لا تنتظر SSE)
 
 function updateOperationalMap() {
-    if (!initOperationalMap() || !opsMapLayer) return;
-    opsMapLayer.clearLayers();
-
-    var teams = workforceStateTeams;
-    if (!teams) return; // الحالة الصادقة: لا بيانات ⇒ خريطة بلا علامات (مركز القرار يعرض «—»)
-
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    if (window.SmartMap) SmartMap.renderTeams(workforceStateTeams);
+    if (!_incidentLayerBooted) {
+        fetchIncidentSummarySafe().then(function (d) { if (d) _incidentLayerBooted = true; });
     }
-
-    // تجميع فرق المناوبة الحالية حسب مركزها التشغيلي (وراثة التموضع)
-    var byCenter = {};
-    for (var unit in teams) {
-        if (!teams.hasOwnProperty(unit)) continue;
-        var c = teamCenterMap[unit];
-        if (!c || !operationalCenters[c]) continue; // بلا مركز معروف (قيادة/تحكم/احتياط) — مغطاة في مركز القرار
-        (byCenter[c] = byCenter[c] || []).push(unit);
-    }
-
-    var bounds = [];
-    for (var center in byCenter) {
-        if (!byCenter.hasOwnProperty(center)) continue;
-        var list = byCenter[center];
-        var base = operationalCenters[center];
-        for (var i = 0; i < list.length; i++) {
-            var unit = list[i];
-            var t = teams[unit];
-            // فرق المركز الواحد تتموضع على حلقة صغيرة (~110م) حول موقع المركز
-            // حتى لا تتكدس العلامات فوق بعضها — تموضع عرضي بحت بلا منطق تشغيلي
-            var loc = base;
-            if (list.length > 1) {
-                var ang = (2 * Math.PI * i) / list.length;
-                loc = [base[0] + 0.0011 * Math.cos(ang), base[1] + 0.0011 * Math.sin(ang)];
-            }
-
-            var sev = (t.status === 'missing' || t.status === 'offline' || t.vehicleOk === false) ? 'red'
-                    : (t.status === 'pending' ? 'yellow' : 'green');
-
-            var statusText, details = [];
-            if (t.status === 'ready') {
-                statusText = 'جاهزة';
-                details.push((t.activeCount || 0) + '/' + (t.requiredPersonnel || 0) + ' حاضر');
-            } else if (t.status === 'missing') {
-                statusText = 'ناقصة';
-                if (t.reason) details.push(t.reason);
-                if (t.vacant > 0) details.push('ينقصها ' + t.vacant);
-            } else if (t.status === 'offline') {
-                statusText = 'خارج الخدمة';
-                if (t.reason) details.push(t.reason);
-            } else {
-                statusText = 'بانتظار قرار التكميل';
-                details.push((t.activeCount || 0) + '/' + (t.requiredPersonnel || 0) + ' حاضر');
-            }
-            if (t.vehicleOk === false) details.push('المركبة: ' + (t.vehicleStatus || 'غير جاهزة'));
-
-            var icon = L.divIcon({
-                className: 'ops-marker ops-marker-' + sev,
-                html: '<span class="ops-marker-dot"></span>',
-                iconSize: [18, 18],
-                iconAnchor: [9, 9],
-                popupAnchor: [0, -11]
-            });
-            var popup = '<div class="ops-popup">'
-                + '<div class="ops-popup-head"><span class="ops-popup-dot ' + sev + '"></span><b>' + esc(unit) + '</b></div>'
-                + '<div class="ops-popup-status">' + esc(statusText) + '</div>'
-                + (details.length ? '<div class="ops-popup-detail">' + esc(details.join(' — ')) + '</div>' : '')
-                + '<div class="ops-popup-center"><i class="fas fa-location-dot"></i> ' + esc(center) + '</div>'
-                + '<button class="ops-popup-action" onclick="navigateToPage(\'radio-completion.html?v=41\')">فتح الإجراء <i class="fas fa-chevron-left"></i></button>'
-                + '</div>';
-            L.marker(loc, { icon: icon }).bindPopup(popup, { closeButton: false }).addTo(opsMapLayer);
-            bounds.push(loc);
-        }
-    }
-
-    if (bounds.length && !opsMapFitted) {
-        opsMap.fitBounds(bounds, { padding: [42, 42] });
-        opsMapFitted = true;
-    }
-    setTimeout(function () { if (opsMap) opsMap.invalidateSize(); }, 250);
 }
+
+function renderSmartMap(summary) {
+    if (window.SmartMap) SmartMap.renderIncidents(summary);
+}
+
+function toggleSmapExpanded() {
+    if (window.SmartMap) SmartMap.toggleExpand();
+}
+
 
 function animateValue(elementId, value) {
     var el = document.getElementById(elementId);
@@ -4137,7 +4150,7 @@ async function undoLastReport(center, unit) {
 // ============================================
 // تقرير المناوبة التلقائي
 // ============================================
-function generateShiftReport() {
+async function generateShiftReport() {
     var allReports = reports || {};
     var totalReports = 0;
     var typeBreakdown = getShiftTypeBreakdown();
@@ -4157,6 +4170,10 @@ function generateShiftReport() {
             if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
         }
     }
+    
+    // إحصائية المواقع بالحي المشتق من محرك البلاغات بدل مركز «CAD» الخام (قرار المالك 2026-08-20)
+    var incidentSummary = await fetchIncidentSummarySafe();
+    sectorStats = mergeDistrictStats(sectorStats, incidentSummary && incidentSummary.byDistrict);
     
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
@@ -4223,7 +4240,7 @@ function generateShiftReport() {
     openModalById('shiftReportModal');
 }
 
-function downloadShiftReport() {
+async function downloadShiftReport() {
     var allReports = reports || {};
     var totalReports = 0;
     var typeBreakdown = getShiftTypeBreakdown();
@@ -4243,6 +4260,10 @@ function downloadShiftReport() {
             if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
         }
     }
+    
+    // إحصائية المواقع بالحي المشتق من محرك البلاغات بدل مركز «CAD» الخام (قرار المالك 2026-08-20)
+    var incidentSummary = await fetchIncidentSummarySafe();
+    sectorStats = mergeDistrictStats(sectorStats, incidentSummary && incidentSummary.byDistrict);
     
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';
@@ -4289,7 +4310,7 @@ function downloadShiftReport() {
     showNotification('تم التحميل', 'تم تحميل التقرير بنجاح', 'success', 3000);
 }
 
-function saveShiftReportToArchive() {
+async function saveShiftReportToArchive() {
     var allReports = reports || {};
     var totalReports = 0;
     var typeBreakdown = getShiftTypeBreakdown();
@@ -4309,6 +4330,10 @@ function saveShiftReportToArchive() {
             if (center) sectorStats[center] = (sectorStats[center] || 0) + r.count;
         }
     }
+    
+    // إحصائية المواقع بالحي المشتق من محرك البلاغات بدل مركز «CAD» الخام (قرار المالك 2026-08-20)
+    var incidentSummary = await fetchIncidentSummarySafe();
+    sectorStats = mergeDistrictStats(sectorStats, incidentSummary && incidentSummary.byDistrict);
     
     var sortedUnits = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     var mostActiveTeam = sortedUnits.length > 0 ? sortedUnits[0][0] : '-';

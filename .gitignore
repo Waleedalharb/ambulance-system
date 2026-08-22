@@ -71,3 +71,8 @@ desktop.ini
 
 # Render specific
 .render/
+
+# CAD Overlay extension — الملف المولّد يحوي مفتاح التكامل (يُولَّد بـ scripts/build-extension.js)
+extension/cad-overlay-content.js
+extension/background.js
+dist/

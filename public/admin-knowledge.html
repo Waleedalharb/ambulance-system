@@ -120,6 +120,45 @@
         .reindex-btn.spinning i { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
+    <!-- Google Fonts: Tajawal (هوية التكميل) — رابط مستقل لأن خطوط الصفحة عبر @import في app.css -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- الهوية البصرية الموحدة (شاشة التكميل) — تُحمَّل بعد أنماط الصفحة -->
+    <link rel="stylesheet" href="/css/platform-identity.css?v=1">
+    <style>
+    /* ═══ PLATFORM IDENTITY — هوية التكميل الموحدة ═══ */
+    /* الصفحة وُلدت فاتحة فوق رموز app.css؛ نجسر الرموز إلى هوية التكميل
+       الداكنة (نمط admin-dashboard) ونعالج الألوان الفاتحة المضمّنة.
+       بصري فقط — لا منطق ولا id ولا بنية. */
+    :root {
+        --white:   rgba(255,255,255,0.035);
+        --gray-50: rgba(255,255,255,0.045);
+        --gray-100:rgba(255,255,255,0.06);
+        --gray-200:rgba(255,255,255,0.09);
+        --gray-300:rgba(255,255,255,0.14);
+        --gray-400:#6B7899;
+        --gray-500:#9AA7C4;
+        --gray-600:#A9BACD;
+        --gray-700:#C2CFDD;
+        --gray-800:#D5DEE9;
+        --gray-900:#E8EDF8;
+        --primary: #60A5FA; --primary-700: #3B82F6; --primary-300: rgba(96,165,250,0.45);
+        --primary-50: rgba(96,165,250,0.10);
+        --teal: #34D399; --gold: #FBBF24; --coral: #F87171;
+        --shadow: var(--pi-shadow-soft); --shadow-sm: 0 4px 14px rgba(2,6,18,0.30);
+    }
+    /* حبوب الحالة ورسائل النتيجة الفاتحة المضمّنة → شفافية التكميل الإشارية */
+    .status-badge.active, .result-message.success, .status-pill.resolved { background: rgba(52,211,153,0.14) !important; color: var(--pi-green) !important; }
+    .status-badge.processing, .status-pill.reviewing { background: rgba(251,191,36,0.14) !important; color: var(--pi-amber) !important; }
+    .status-badge.error, .result-message.error, .status-pill.new, .status-pill.pending { background: rgba(248,113,113,0.14) !important; color: var(--pi-red) !important; }
+    .status-badge.archived, .status-pill.dismissed { background: rgba(154,167,196,0.12) !important; color: var(--pi-ink-dim) !important; }
+    .result-message.info { background: rgba(96,165,250,0.14) !important; color: var(--pi-blue) !important; }
+    /* زر إعادة الفهرسة البنفسجي المصمت → تدرج بلغة التكميل */
+    .reindex-btn { box-shadow: 0 8px 18px rgba(124,58,237,0.30), inset 0 1px 0 rgba(255,255,255,0.18); }
+    /* البطاقات واللوحات — زجاج التكميل */
+    .stat-card, .panel, .document-item, .file-upload-zone {
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    </style>
 </head>
 <body>
     <div class="knowledge-container">
