@@ -352,9 +352,9 @@ async function waitReady(tries = 60) {
         check('⑮ بلا وصول وتجاوز متوسط القطاع ← severity=red', ic22.severity === 'red', ic22.severity + ' avg=' + s.responseTime.arrival.avg);
         check('⑮ mapStatus.sectorStatus=red (أسوأ حالة قائمة) + topDistrict محسوب سيرفريًا',
             s.mapStatus && s.mapStatus.sectorStatus === 'red' && s.mapStatus.topDistrict && s.mapStatus.topDistrict.count >= 1, JSON.stringify(s.mapStatus));
-        check('⑮ mapStatus: positioned + noLocation = عدد البلاغات الفريدة',
-            s.mapStatus.positionedCount + s.mapStatus.noLocationCount === s.incidentsCount,
-            s.mapStatus.positionedCount + '+' + s.mapStatus.noLocationCount + ' vs ' + s.incidentsCount);
+        check('⑮ mapStatus: positioned + noLocation = عدد البلاغات النشطة (قرار 2026-08-22: المؤشرات التشغيلية من النشطة فقط)',
+            s.mapStatus.positionedCount + s.mapStatus.noLocationCount === s.activeCount,
+            s.mapStatus.positionedCount + '+' + s.mapStatus.noLocationCount + ' vs ' + s.activeCount);
         check('⑮ mapStatus.peakHour من أوقات إنشاء CAD الفعلية', s.mapStatus.peakHour && typeof s.mapStatus.peakHour.hour === 'number' && s.mapStatus.peakHour.count >= 1, JSON.stringify(s.mapStatus.peakHour));
         check('⑮ mapStatus.topStreets مرتبة تنازليًا وبلا اختراع', Array.isArray(s.mapStatus.topStreets) && (!s.mapStatus.topStreets.length || (typeof s.mapStatus.topStreets[0].name === 'string' && s.mapStatus.topStreets[0].count >= 1)));
         check('⑮ mapStatus.noLocation يسرد غير الموقَّعة بصدق (1401019 بلا إحداثيات)', s.mapStatus.noLocation.some(x => x.number === '1401019'));

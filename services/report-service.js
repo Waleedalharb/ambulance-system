@@ -292,7 +292,7 @@ class ReportService {
      *  ⑥ موقع البلاغ (عنوان خام + منطقة + حي مشتق) يُحفظ مع السجل — يُستكمل إن وصل متأخرًا
      * يبث DispatchLogCreated لكل فرقة مضافة ← نفس قناة new_report الحية.
      */
-    async createIncidentEntries({ shiftId, number, code, type, crews, createdAt = null, address = null, region = null, lat = null, lng = null }, actor = null) {
+    async createIncidentEntries({ shiftId, number, code, type, crews, createdAt = null, address = null, region = null, lat = null, lng = null, status = null, source = 'cad-oneclick' }, actor = null) {
         const loc = this._parseLocationParts(address);
         const district = loc.district;
         // إحداثيات CAD الأصلية فقط (اعتماد المالك 2026-08-20): تُقبل رقمًا ضمن النطاق الجغرافي
@@ -314,7 +314,7 @@ class ReportService {
             let cadTimeFilled = false;
             let incidentEnriched = false; // أي إثراء لاحق على بلاغ قائم (موقع/مراحل) — لبث التحديث الحي
             if (!incident) {
-                const id = await this.engine.storage.createIncident(shiftId, number, code, type, 'cad-oneclick', createdAt, address, region, district, loc.street, loc.city, cLat, cLng);
+                const id = await this.engine.storage.createIncident(shiftId, number, code, type, source, createdAt, address, region, district, loc.street, loc.city, cLat, cLng);
                 incident = { id, number, code: code || null, type: type || null, cad_created_at: createdAt || null, address, region, district, street: loc.street, city: loc.city, lat: cLat, lng: cLng };
                 incidentCreated = true;
             } else {
@@ -350,37 +350,50 @@ class ReportService {
                     incidentEnriched = true;
                 }
             }
+            // حالة دورة حياة البلاغ (قرار المالك 2026-08-22): CAD مصدر الحقيقة.
+            // القيم المقبولة داخليًا فقط: active/closed/cancelled (التطبيع من صيغ CAD
+            // المتعددة يحدث في طبقة الـOverlay). النهائية لاصقة: لا ترتد إلى active
+            // إلا بإشارة active صريحة من CAD، وغياب الحالة لا يغيّر المخزنة أبدًا.
+            if (status === 'active' || status === 'closed' || status === 'cancelled') {
+                const prevStatus = incident.status || 'active'; // NULL التاريخي = active
+                if (prevStatus !== status) {
+                    await this.engine.storage.updateIncidentStatus(incident.id, status);
+                    incident.status = status;
+                    incidentEnriched = true; // تغيّر الحالة يغيّر الخريطة والتنبيهات فورًا — يستحق البث
+                }
+            }
             // إن وصل وقت إنشاء البلاغ متأخرًا: أعد حساب أزمنة استجابة المشاركات السابقة
             if (cadTimeFilled) await this._recomputeIncidentResponses(effShiftId, number, incident.cad_created_at);
 
-            const addedCrews = [], skippedCrews = [], withdrawnCrews = [];
+            const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [];
             for (const c of crews) {
-                const dup = await this.engine.storage.findParticipation(effShiftId, c.team, number);
-                // حالة المشاركة الحالية (§4 — 2026-08-21): سحب/إلغاء الفرقة يُعلَّم على
-                // سجلها القائم؛ إن لم يوجد سجل يُنشأ مُعلَّمًا — التاريخ يبقى كاملًا ولا تُحتسب
-                if (c.withdrawn === true) {
-                    if (dup) {
-                        if (c.phases && Object.keys(c.phases).length) {
-                            const m0 = await this.engine.storage.mergeParticipationPhases(dup.id, c.phases);
-                            if (m0.merged > 0) {
-                                const resp0 = this._responseFor(m0.phases, incident.cad_created_at);
-                                await this.engine.storage.updateParticipationResponse(dup.id, resp0.arrival, resp0.mubashara);
-                            }
-                        }
-                        await this.engine.storage.setParticipationWithdrawn(effShiftId, c.team, number, true);
-                    } else {
-                        const phasesJsonW = (c.phases && Object.keys(c.phases).length) ? JSON.stringify(c.phases) : null;
-                        const respW = this._responseFor(c.phases, incident.cad_created_at);
-                        await this.engine.reports.addReport(effShiftId, 'CAD', c.team, type, number, phasesJsonW, respW.arrival, respW.mubashara);
-                        await this.engine.storage.setParticipationWithdrawn(effShiftId, c.team, number, true);
-                    }
-                    withdrawnCrews.push(c.team);
-                    incidentEnriched = true; // تغيّر حالة المشاركة يغيّر التنبيهات والخريطة فورًا
-                    continue;
+                // المطابقة بهوية الوحدة الثابتة أولًا (قرار المالك 2026-08-23):
+                // eventId + cad_run_unit_id = نفس المشاركة مهما تغيّر المسمى —
+                // فرقة سُجّلت من CAD ثم ظهرت لاحقًا في التكميل تُربط بسجلها
+                // القائم ولا يُنشأ لها سجل ثانٍ أبدًا
+                let dup = null, matchedByAlias = false;
+                if (Number.isInteger(c.cadRunUnitId) || Number.isInteger(c.cadUnitId)) {
+                    dup = await this.engine.storage.findParticipationByCadUnit(effShiftId, number, c.cadRunUnitId, c.cadUnitId);
+                    if (dup && dup.unit && dup.unit !== c.team) matchedByAlias = true;
                 }
-                if (dup) {
-                    // القاعدة ③: لا تضاعف العدّاد — لكن لقطة الأزمنة تتطور، فنستكمل الناقص فقط
-                    // (فرقة سُجّلت بـ«قبول» ثم تحركت لاحقًا ترتقي إلى «محتسبة» دون سجل جديد)
+                if (!dup) dup = await this.engine.storage.findParticipation(effShiftId, c.team, number);
+                // التحديثات الموجهة بالاسم تستهدف الاسم المخزن عند المطابقة بالهوية
+                const effUnit = (dup && dup.unit) ? dup.unit : c.team;
+                if (matchedByAlias) { linkedCrews.push({ from: dup.unit, to: c.team }); incidentEnriched = true; }
+                // استكمال/تصحيح أزمنة مشاركة قائمة — القاعدة (2026-08-23):
+                // phases مصدرها journeys الوحدة (cad-detail) تستبدل اللقطة بالكامل
+                // (تصحيح موثق للّقطات المشتركة الخاطئة)، وغيرها يملأ الفراغات فقط
+                const applyPhases = async () => {
+                    if (c.phasesSource === 'cad-detail') {
+                        const rp = await this.engine.storage.replaceParticipationPhases(dup.id, c.phases || {});
+                        if (rp.replaced) {
+                            const respC = this._responseFor(c.phases, incident.cad_created_at);
+                            await this.engine.storage.updateParticipationResponse(dup.id, respC.arrival, respC.mubashara);
+                            correctedCrews.push({ team: c.team, oldPhases: rp.oldPhases });
+                            incidentEnriched = true;
+                        }
+                        return;
+                    }
                     if (c.phases && Object.keys(c.phases).length) {
                         const m = await this.engine.storage.mergeParticipationPhases(dup.id, c.phases);
                         if (m.merged > 0) {
@@ -389,20 +402,65 @@ class ReportService {
                             incidentEnriched = true; // تطور المراحل يغيّر الخطورة والأزمنة — يستحق بثًا حيًا
                         }
                     }
+                };
+                // قاعدة المشاركة الفعلية (قرار المالك 2026-08-22 — معتمدة حرفيًا):
+                // السؤال ليس «هل الوحدة ملغاة؟» بل «هل أصبحت مشاركة تشغيلية فعلية؟».
+                // المصدر: unitRequestStatus (A/B/C/R) + journeys[] (وصول/مباشرة بوقت
+                // حقيقي) — لا نص «وحدة ملغاة» ولا تخمين من الغياب:
+                //  • A                          → مشاركة قائمة (تُحسب)
+                //  • B/C/R + لا وصول فعلي       → ملغاة قبل المباشرة: لا تُحسب ولا تُحذف
+                //  • B/C/R + وصول/مباشرة فعلية  → مشاركة فعلية تُحسب + تُعلَّم «أُلغيت
+                //    لاحقًا» وتُسجَّل للمراجعة (مثال 1305710: سريع جنوب 1-1 باشرت فعلًا)
+                // غياب cadUrs ← السلوك القائم (علم withdrawn من صفحة CAD) لا يتغير إطلاقًا
+                const urs = typeof c.cadUrs === 'string' ? c.cadUrs : null;
+                let effWithdrawn = c.withdrawn; // undefined = لا تغيير على المخزَّن
+                let afterArrival = false;
+                if (urs) {
+                    if (urs === 'A') effWithdrawn = false;
+                    else if (c.cadReached === true) { effWithdrawn = false; afterArrival = true; }
+                    else effWithdrawn = true;
+                }
+                // حالة المشاركة الحالية (§4 — 2026-08-21): سحب/إلغاء الفرقة يُعلَّم على
+                // سجلها القائم؛ إن لم يوجد سجل يُنشأ مُعلَّمًا — التاريخ يبقى كاملًا ولا تُحتسب
+                if (effWithdrawn === true) {
+                    if (dup) {
+                        await applyPhases();
+                        await this.engine.storage.setParticipationWithdrawn(effShiftId, effUnit, number, true);
+                    } else {
+                        const phasesJsonW = (c.phases && Object.keys(c.phases).length) ? JSON.stringify(c.phases) : null;
+                        const respW = this._responseFor(c.phases, incident.cad_created_at);
+                        await this.engine.reports.addReport(effShiftId, 'CAD', c.team, type, number, phasesJsonW, respW.arrival, respW.mubashara);
+                        await this.engine.storage.setParticipationWithdrawn(effShiftId, c.team, number, true);
+                    }
+                    if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, effUnit, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
+                    withdrawnCrews.push(c.team);
+                    incidentEnriched = true; // تغيّر حالة المشاركة يغيّر التنبيهات والخريطة فورًا
+                    continue;
+                }
+                if (dup) {
+                    // القاعدة ③: لا تضاعف العدّاد — لقطة الأزمنة تُستكمل أو تُصحَّح في نفس السجل
+                    await applyPhases();
                     // عودة فرقة سُحبت خطأً: withdrawn=false الصريح فقط يزيل العلامة (لا استنتاج)
-                    if (c.withdrawn === false) {
-                        await this.engine.storage.setParticipationWithdrawn(effShiftId, c.team, number, false);
+                    // — ومعه A الصريح من CAD: الوحدة ليست ملغاة في مصدر الحقيقة
+                    if (effWithdrawn === false) {
+                        await this.engine.storage.setParticipationWithdrawn(effShiftId, effUnit, number, false);
                         incidentEnriched = true;
                     }
+                    if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, effUnit, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
+                    if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
                     skippedCrews.push(c.team);
                     continue;
                 }
                 const phasesJson = (c.phases && Object.keys(c.phases).length) ? JSON.stringify(c.phases) : null;
                 const resp = this._responseFor(c.phases, incident.cad_created_at);
                 const r = await this.engine.reports.addReport(effShiftId, 'CAD', c.team, type, number, phasesJson, resp.arrival, resp.mubashara);
-                if (r && r.success) addedCrews.push(c.team); else skippedCrews.push(c.team);
+                if (r && r.success) {
+                    addedCrews.push(c.team);
+                    if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, c.team, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
+                    if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
+                } else skippedCrews.push(c.team);
             }
-            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, incidentEnriched, effShiftId };
+            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, cancelAfterArrivalCrews, correctedCrews, linkedCrews, incidentEnriched, effShiftId };
         });
 
         for (const team of result.addedCrews) {
@@ -426,7 +484,16 @@ class ReportService {
             created: result.incidentCreated,
             addedCrews: result.addedCrews,
             skippedCrews: result.skippedCrews,
-            withdrawnCrews: result.withdrawnCrews
+            withdrawnCrews: result.withdrawnCrews,
+            // إلغاء بعد المباشرة (قرار المالك 2026-08-22): مشاركات محتسبة أُلغيت لاحقًا —
+            // تُعاد للمسار ليُسجَّل كل واحدة للمراجعة (لا تخمين صامت عند تعارض الظاهر)
+            cancelAfterArrivalCrews: result.cancelAfterArrivalCrews,
+            // التصحيح من Journey الوحدة الموثوقة (قرار المالك 2026-08-23): كل مشاركة
+            // استُبدلت أوقاتها تُعاد مع لقطة القديم لسجل التدقيق — تصحيح موثق لا حذف صامت
+            correctedCrews: result.correctedCrews,
+            // ربط بهوية الوحدة: مشاركة وُجدت بـcad_run_unit_id تحت مسمى مختلف (ظهور
+            // الفرقة في التكميل لاحقًا) — نفس السجل حُدّث ولم يُنشأ ثانٍ
+            linkedCrews: result.linkedCrews
         };
     }
 
@@ -460,6 +527,9 @@ class ReportService {
         const byCrew = {};
         const byDistrict = {}; // تجميع المواقع بالحي المشتق من عنوان CAD — مرة واحدة لكل بلاغ (قرار المالك 2026-08-20)
         const rtArrival = [], rtMubashara = [];
+        // فصل الإلغاءات (قرار المالك 2026-08-22): قبل المباشرة = محفوظة تاريخيًا ولا
+        // تدخل المشاركات · بعد المباشرة = تبقى محسوبة مشاركة فعلية وتُعلَّم
+        let cancBeforeArrival = 0, cancAfterArrival = 0;
         const detail = incidents.map(ic => {
             const t = ic.type || 'other';
             byType[t] = (byType[t] || 0) + 1; // مرة واحدة لكل بلاغ (القاعدة ④)
@@ -471,8 +541,22 @@ class ReportService {
                 const withdrawn = !!p.withdrawn; // الحالة الحالية للمشاركة (§4): المسحوبة لا تُحتسب إطلاقًا
                 const counted = !withdrawn && this.isCountedParticipation(phases);
                 if (counted) byCrew[p.unit] = (byCrew[p.unit] || 0) + 1; // مشاركة محتسبة واحدة لكل فرقة (②)
+                // حالة الوحدة في CAD (قابلة للتتبع): B/C/R + لا وصول = قبل المباشرة ·
+                // B/C/R + وصول فعلي = بعد المباشرة (محتسبة) — A أو غياب الحقل = لا إلغاء
+                const cadUrs = p.cad_unit_status || null;
+                const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
+                let cancelKind = null;
+                if (cadUrs && cadUrs !== 'A') {
+                    cancelKind = cadReached === true ? 'after-arrival' : 'before-arrival';
+                    if (cancelKind === 'after-arrival') cancAfterArrival++; else cancBeforeArrival++;
+                }
                 return {
                     unit: p.unit, at: p.timestamp, phases, counted, withdrawn,
+                    cadUrs, cadReached, cancelKind,
+                    // هوية الوحدة الثابتة في CAD (2026-08-23): ربط المشاركة بالوحدة
+                    // الفعلية لا بترتيب الظهور — null بصدق للمشاركات اليدوية/القديمة
+                    cadUnitId: p.cad_unit_id != null ? p.cad_unit_id : null,
+                    cadRunUnitId: p.cad_run_unit_id != null ? p.cad_run_unit_id : null,
                     respArrivalMin: p.resp_arrival_min != null ? p.resp_arrival_min : null,
                     respMubasharaMin: p.resp_mubashara_min != null ? p.resp_mubashara_min : null
                 };
@@ -483,7 +567,7 @@ class ReportService {
             const mubVals = countedCrews.map(c => c.respMubasharaMin).filter(v => v !== null);
             if (arrVals.length) rtArrival.push(Math.min(...arrVals));
             if (mubVals.length) rtMubashara.push(Math.min(...mubVals));
-            return { number: ic.number, code: ic.code, type: t, source: ic.source, createdAt: ic.created_at, cadCreatedAt: ic.cad_created_at || null, address: ic.address || null, region: ic.region || null, district: ic.district || null, street: ic.street || null, city: ic.city || null, lat: ic.lat != null ? ic.lat : null, lng: ic.lng != null ? ic.lng : null, crews,
+            return { number: ic.number, code: ic.code, type: t, source: ic.source, status: ic.status || 'active', createdAt: ic.created_at, cadCreatedAt: ic.cad_created_at || null, address: ic.address || null, region: ic.region || null, district: ic.district || null, street: ic.street || null, city: ic.city || null, lat: ic.lat != null ? ic.lat : null, lng: ic.lng != null ? ic.lng : null, crews,
                 bestArrivalMin: arrVals.length ? Math.min(...arrVals) : null,
                 bestMubasharaMin: mubVals.length ? Math.min(...mubVals) : null };
         });
@@ -511,20 +595,27 @@ class ReportService {
         //  🔴 لا وصول لأي فرقة وانقضى منذ إنشاء البلاغ أكثر من متوسط وصول القطاع
         //  🟡 غير ذلك (قيد الانتظار/الطريق ضمن الحد) — ولا حمراء بلا خط أساس للمتوسط (صدق)
         for (const d of detail) {
+            // البلاغ النهائي (قرار المالك 2026-08-22): خارج الحالة التشغيلية تمامًا —
+            // لا خطورة ولا ضغط ولا «نشط»، ويبقى محفوظًا في الإحصائيات التاريخية
+            if (d.status !== 'active') { d.severity = null; continue; }
             const arrived = d.crews.some(c => c.counted && c.phases && (c.phases['البحث'] || c.phases['العلاج']));
             const createdTs = this._cadDateTimeTs(d.cadCreatedAt);
             const elapsedMin = createdTs !== null ? (Date.now() - createdTs) / 60000 : null;
             d.severity = arrived ? 'green'
                 : (avgArrival !== null && elapsedMin !== null && elapsedMin > avgArrival ? 'red' : 'yellow');
         }
-        // حالة القطاع للشريط العلوي: أسوأ خطورة قائمة — وnull بلا بلاغات («—» الصادقة)
-        const sectorStatus = !detail.length ? null
-            : detail.some(d => d.severity === 'red') ? 'red'
-            : detail.some(d => d.severity === 'yellow') ? 'yellow' : 'green';
+        // حالة القطاع للشريط العلوي: أسوأ خطورة بين البلاغات النشطة فقط — وnull بلا نشطة («—» الصادقة)
+        const activeDetail = detail.filter(d => d.status === 'active');
+        const sectorStatus = !activeDetail.length ? null
+            : activeDetail.some(d => d.severity === 'red') ? 'red'
+            : activeDetail.some(d => d.severity === 'yellow') ? 'yellow' : 'green';
+        // «أكثر حي ضغطًا» مؤشر تشغيلي: من النشطة فقط — byDistrict نفسه يبقى تاريخيًا شاملًا
+        const activeByDistrict = {};
+        for (const d of activeDetail) { const dn = d.district || 'غير محدد'; activeByDistrict[dn] = (activeByDistrict[dn] || 0) + 1; }
         let topDistrict = null;
-        for (const dName of Object.keys(byDistrict)) {
+        for (const dName of Object.keys(activeByDistrict)) {
             if (dName === 'غير محدد') continue;
-            if (!topDistrict || byDistrict[dName] > topDistrict.count) topDistrict = { name: dName, count: byDistrict[dName] };
+            if (!topDistrict || activeByDistrict[dName] > topDistrict.count) topDistrict = { name: dName, count: activeByDistrict[dName] };
         }
         // إثراء لوحة التحليل الجانبية للخريطة الذكية — كلها من بيانات المناوبة الحالية نفسها
         // (قراءة مشتقة في الخدمة، لا منطق جديد ولا تخزين؛ تتراكم دلالتها مع تراكم البلاغات):
@@ -543,12 +634,17 @@ class ReportService {
         for (const d of detail) { if (d.street) streetCount[d.street] = (streetCount[d.street] || 0) + 1; }
         const topStreets = Object.entries(streetCount).sort((a, b) => b[1] - a[1]).slice(0, 3)
             .map(([name, count]) => ({ name, count }));
-        const noLocationList = detail.filter(d => d.lat === null || d.lng === null)
+        // «بلا موقع دقيق» قائمة تشغيلية (تتطلب اكتمال موقعها الآن) ← النشطة فقط (قرار 2026-08-22)
+        const noLocationList = activeDetail.filter(d => d.lat === null || d.lng === null)
             .map(d => ({ number: d.number, district: d.district }));
         return {
-            total: incidents.length + manual.length, // ① بلاغات فريدة + يدوي
+            total: incidents.length + manual.length, // ① بلاغات فريدة + يدوي — تاريخي شامل (المنتهي حدث فعلًا)
             incidentsCount: incidents.length,
+            activeCount: activeDetail.length, // النشطة فقط — أساس الخريطة والتنبيهات والضغط
             manualCount: manual.length,
+            // فصل الإلغاءات (قرار المالك 2026-08-22): قبل المباشرة لا تدخل المشاركات،
+            // وبعد المباشرة تبقى محسوبة — العدّان تاريخيان قابلان للتتبع لكل مشاركة
+            unitCancels: { beforeArrival: cancBeforeArrival, afterArrival: cancAfterArrival },
             byType, byCrew, byDistrict,
             incidents: detail,
             lastReportTs,
@@ -558,7 +654,7 @@ class ReportService {
                 peakHour,
                 topStreets,
                 noLocation: noLocationList,
-                positionedCount: detail.filter(d => d.lat !== null && d.lng !== null).length,
+                positionedCount: activeDetail.filter(d => d.lat !== null && d.lng !== null).length,
                 noLocationCount: noLocationList.length
             },
             responseTime: {

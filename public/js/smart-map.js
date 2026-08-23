@@ -233,6 +233,9 @@
     function hasCoords(ic) {
         return ic && ic.lat !== null && ic.lat !== undefined && ic.lng !== null && ic.lng !== undefined;
     }
+    // البلاغ النهائي (مغلق/ملغى) خارج الخريطة النشطة تمامًا (قرار المالك 2026-08-22):
+    // لا علامة ولا كثافة ولا موقع ساخن ولا ارتباط بفرقة — يبقى تاريخيًا في الإحصائيات
+    function isFinalInc(ic) { return (AR && AR.isFinal) ? AR.isFinal(ic && ic.status) : false; }
     // موقع عرض الفرقة = حلقة صغيرة حول مركزها (تموضع عرضي بحت — لا GPS للفرق)
     function teamPosition(unit, centerName) {
         var base = operationalCenters[centerName];
@@ -260,6 +263,7 @@
         if (!state.summary || !state.summary.incidents) return null;
         var incs = state.summary.incidents;
         for (var i = incs.length - 1; i >= 0; i--) { // الأحدث أولًا
+            if (isFinalInc(incs[i])) continue; // البلاغ النهائي لا يُظهر فرقة كأنها ما زالت مرتبطة به
             var crews = incs[i].crews || [];
             for (var j = 0; j < crews.length; j++) {
                 if (crews[j].unit === unit && crews[j].counted !== false) return incs[i];
@@ -373,7 +377,12 @@
             stEl.className = 'smap-kpi-v sev-' + (ms.sectorStatus || 'none');
         }
         var cntEl = document.getElementById('smapKpiCount');
-        if (cntEl) cntEl.textContent = (state.summary && typeof state.summary.total === 'number') ? String(state.summary.total) : '—';
+        if (cntEl) {
+            // عداد الخريطة تشغيلي: البلاغات النشطة فقط (المنتهية تبقى في الإحصائيات التاريخية)
+            var actN = state.summary && typeof state.summary.activeCount === 'number' ? state.summary.activeCount
+                : (state.summary && typeof state.summary.total === 'number' ? state.summary.total : null);
+            cntEl.textContent = actN !== null ? String(actN) : '—';
+        }
         var rdEl = document.getElementById('smapKpiReady');
         if (rdEl) {
             if (!state.teams) rdEl.textContent = '—';
@@ -484,7 +493,7 @@
         if (layers.streets) layers.streets.clearLayers();
         markerIndex.incidents = {};
 
-        var incs = summary.incidents || [];
+        var incs = (summary.incidents || []).filter(function (ic) { return !isFinalInc(ic); }); // النشطة فقط على الخريطة
         var pts = [];
         incs.forEach(function (ic) {
             if (!hasCoords(ic)) return; // بلا إحداثيات ← لا موقع مختلق إطلاقًا

@@ -1912,7 +1912,13 @@ async function fetchIncidentSummarySafe() {
     try {
         var res = await AuthManager.apiRequest('/api/cad-reports');
         var data = await res.json();
-        if (data && data.success) { renderSmartMap(data); return data; }
+        if (data && data.success) {
+            // العداد الرئيسي وشريط الأحداث = البلاغات الفريدة من المحرك (قرار 2026-08-22)
+            cadReportsTotal = (typeof data.total === 'number') ? data.total : null;
+            updateTotal();
+            if (cadReportsTotal !== null) { lastReportsTotal = cadReportsTotal; if (typeof renderEventsStrip === 'function') renderEventsStrip(); }
+            renderSmartMap(data); return data;
+        }
     } catch (e) { /* تجاهل — تبقى الإحصائية القديمة */ }
     return null;
 }
@@ -2723,11 +2729,16 @@ async function loadAllData() {
     }
 }
 
+// إجمالي البلاغات الفريدة من ملخص المحرك (قرار المالك 2026-08-22): بلاغ واحد بأربع
+// فرق = بلاغ واحد. يُملأ من /api/cad-reports؛ وNULL قبل وصوله = السقوط للسلوك القديم
+var cadReportsTotal = null;
+
 function updateTotal() {
     var total = 0;
     for (var key in reports) { if (reports[key] && reports[key].count) total += reports[key].count; }
     var grandTotalEl = document.getElementById("grandTotal");
-    if (grandTotalEl) grandTotalEl.innerText = total;
+    // مجموع reports.count = «مشاركات الفرق» — مقام توزيع الفرق فقط، لا يُعرض عددَ بلاغات.
+    if (grandTotalEl) grandTotalEl.innerText = (cadReportsTotal !== null) ? cadReportsTotal : total;
 }
 
 function updateShiftStatus() {
@@ -3743,7 +3754,8 @@ function updateDistributionIndicator() {
     }
     var el_distTotal = document.getElementById('distTotal'); if (el_distTotal) el_distTotal.innerText = total + ' بلاغ';
     updateSidebarReportsBadge(total);
-    lastReportsTotal = total;
+    // شريط الأحداث «البلاغات» = الفريدة من المحرك إن وصلت، وإلا مشاركات الفرق كسقوط مؤقت
+    lastReportsTotal = (cadReportsTotal !== null) ? cadReportsTotal : total;
     renderEventsStrip();
     var sorted = Object.entries(unitStats).sort(function(a, b) { return b[1] - a[1]; });
     if (sorted.length === 0) {

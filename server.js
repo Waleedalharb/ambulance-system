@@ -4604,14 +4604,23 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
     authenticate(req, res, () => authorizePerm('ops.dispatch')(req, res, next));
 }, validateBody({
     number: { required: true, type: 'string', minLength: 4, maxLength: 12 },
-    crews: { required: true, type: 'array' }
+    crews: { required: true, type: 'array' },
+    status: { required: false, type: 'string', maxLength: 20 }
 }), async (req, res) => {
     try {
-        const { number, code, type, crews, createdAt, address, region, lat, lng } = req.body;
+        const { number, code, type, crews, createdAt, address, region, lat, lng, status, source } = req.body;
+        // وسم المصدر (قرار المالك 2026-08-23 — المرحلة A): cad-auto = اكتشاف تلقائي من
+        // قائمة CAD، cad-oneclick = الزر اليدوي — القيمة غير المعروفة تعود للافتراضي بصدق
+        const srcTag = source === 'cad-auto' ? 'cad-auto' : 'cad-oneclick';
         if (!CAD_NUMBER_RE.test(number.trim()))
             return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
         if (type && !CAD_VALID_TYPES.includes(type))
             return res.status(400).json({ error: 'نوع البلاغ غير معروف' });
+        // حالة دورة الحياة (قرار المالك 2026-08-22): enum داخلي صارم — التطبيع من صيغ
+        // CAD المتعددة (عربي/إنجليزي) يحدث في طبقة الـOverlay القابلة للتمديد
+        const CAD_VALID_STATUS = ['active', 'closed', 'cancelled'];
+        if (status && !CAD_VALID_STATUS.includes(status))
+            return res.status(400).json({ error: 'حالة البلاغ غير معروفة' });
         // وقت إنشاء البلاغ في CAD (نقطة بداية مؤشر زمن الاستجابة) — اختياري، بصيغة CAD الخام
         const CAD_CREATED_RE = /^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|ص|م)?$/i;
         if (createdAt && !CAD_CREATED_RE.test(String(createdAt).trim()))
@@ -4625,11 +4634,27 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
         const validGeo = isFinite(numLat) && isFinite(numLng) &&
             numLat >= -90 && numLat <= 90 && numLng >= -180 && numLng <= 180;
         const cleanLat = validGeo ? numLat : null, cleanLng = validGeo ? numLng : null;
+        // طبقة تطبيع حالة الوحدة (قرار المالك 2026-08-22): القيم المعروفة من كود CAD
+        // A=مقبولة B=ملغاة(aborted) C=ملغاة(cancelled) R=مرفوضة — قابلة للتمديد بإضافة
+        // حرف هنا فقط. القيمة غير المعروفة تُهمَل (undefined) ← لا تخمين ولا تغيير سلوك
+        const CAD_VALID_URS = ['A', 'B', 'C', 'R'];
         const cleanCrews = (crews || [])
             .filter(c => c && typeof c.team === 'string' && c.team.trim())
             .slice(0, 10)
-            .map(c => ({ team: c.team.trim().slice(0, 100), phases: (c.phases && typeof c.phases === 'object') ? c.phases : {},
-                         withdrawn: c.withdrawn === true ? true : (c.withdrawn === false ? false : undefined) }));
+            .map(c => {
+                const urs = String(c.cadUrs || '').trim().toUpperCase();
+                const uid = parseInt(c.cadUnitId, 10), rid = parseInt(c.cadRunUnitId, 10);
+                return { team: c.team.trim().slice(0, 100), phases: (c.phases && typeof c.phases === 'object') ? c.phases : {},
+                         // مصدر الأزمنة (قرار المالك 2026-08-23): cad-detail = من journeys
+                         // الوحدة نفسها ← تصحيح بالاستبدال؛ غيرها ← استكمال الفراغات فقط
+                         phasesSource: c.phasesSource === 'cad-detail' ? 'cad-detail' : undefined,
+                         withdrawn: c.withdrawn === true ? true : (c.withdrawn === false ? false : undefined),
+                         cadUrs: CAD_VALID_URS.includes(urs) ? urs : undefined,
+                         cadReached: c.cadReached === true ? true : (c.cadReached === false ? false : undefined),
+                         // هوية الوحدة الثابتة في CAD (2026-08-23) — أعداد صحيحة فقط أو تُهمَل
+                         cadUnitId: Number.isInteger(uid) ? uid : undefined,
+                         cadRunUnitId: Number.isInteger(rid) ? rid : undefined };
+            });
         if (!cleanCrews.length)
             return res.status(400).json({ error: 'لا توجد فرقة صالحة في الطلب' });
         if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
@@ -4641,12 +4666,37 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
         const result = await reportService.createIncidentEntries(
             { shiftId, number: number.trim(), code: code || null, type: type || null, crews: cleanCrews,
               createdAt: createdAt ? String(createdAt).trim().slice(0, 40) : null,
-              address: cleanAddress, region: cleanRegion, lat: cleanLat, lng: cleanLng }, req.user);
+              address: cleanAddress, region: cleanRegion, lat: cleanLat, lng: cleanLng,
+              status: status || null, source: srcTag }, req.user);
 
         await addAuditLogEntry(result.created ? 'cad_report_created' : 'cad_report_crew_added',
             'بلاغ CAD ' + number.trim() + (result.created ? ' (جديد)' : ' (إلحاق فرقة)') +
             ' — فرق: +' + result.addedCrews.length + (result.skippedCrews.length ? ' / متكررة: ' + result.skippedCrews.length : ''),
             'reports', req.user.name, req.user.role, req.user.id);
+
+        // مراجعة تعارض الظاهر (قرار المالك 2026-08-22): وحدة ألغاها CAD (B/C/R) لكن
+        // مسارها يثبت وصولًا/مباشرة فعلية ← القاعدة تحتسبها مشاركة، وهنا تُسجَّل
+        // صراحةً للمراجعة اليدوية — لا تخمين صامت ولا حذف
+        for (const team of (result.cancelAfterArrivalCrews || [])) {
+            await addAuditLogEntry('cad_unit_cancel_after_arrival',
+                'بلاغ CAD ' + number.trim() + ' — الوحدة «' + team + '» أُلغيت في CAD بعد وصول/مباشرة فعلية — احتُسبت مشاركة وتُركت للمراجعة',
+                'reports', req.user.name, req.user.role, req.user.id);
+        }
+
+        // سجل التصحيح (قرار المالك 2026-08-23): أوقات مشاركة استُبدلت بـJourney
+        // الوحدة الموثوقة من CAD — القيمة القديمة تُوثَّق في السجل ولا تُحذف بصمت
+        for (const corr of (result.correctedCrews || [])) {
+            await addAuditLogEntry('cad_participation_corrected',
+                'بلاغ CAD ' + number.trim() + ' — فرقة «' + corr.team + '» صُحّحت أوقاتها من Journey الوحدة في CAD — اللقطة السابقة: ' + String(corr.oldPhases || 'فارغة').slice(0, 300),
+                'reports', req.user.name, req.user.role, req.user.id);
+        }
+        // ربط بهوية الوحدة: فرقة وصلت بمسمى مختلف عن سجلها القائم (ظهورها اللاحق
+        // في التكميل) — حُدّث نفس السجل ولم يُنشأ ثانٍ
+        for (const lnk of (result.linkedCrews || [])) {
+            await addAuditLogEntry('cad_participation_linked',
+                'بلاغ CAD ' + number.trim() + ' — الفرقة وصلت بمسمى «' + lnk.to + '» ورُبطت بسجلها القائم «' + lnk.from + '» بهوية الوحدة (runUnitId) — بلا سجل مكرر',
+                'reports', req.user.name, req.user.role, req.user.id);
+        }
 
         res.json({ ...result, number: number.trim() });
     } catch (error) {

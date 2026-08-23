@@ -76,14 +76,29 @@
     }
 
     /**
+     * حالة دورة حياة البلاغ (قرار المالك 2026-08-22): «النهائي يخرج فورًا من التشغيل».
+     * القاعدة: NULL/غير المعروف/'active' ← نشط (السجلات القديمة والبلاغات الجارية)،
+     * وأي حالة نهائية معتمدة ('closed'/'cancelled' — قابلة للتمديد) ← نهائي.
+     * البلاغ النهائي: لا تنبيه ولا مؤقت إطلاقًا — يبقى في السجل التاريخي فقط.
+     */
+    var FINAL_STATUSES = { closed: true, cancelled: true };
+    function isFinal(status) {
+        if (status === null || status === undefined || status === '' || status === 'active') return false;
+        return FINAL_STATUSES[status] !== false; // أي قيمة غير active تُعامل نهائية — توسعة القاموس لا تكسر البوابة
+    }
+
+    /**
      * حساب تنبيهات مناوبة من ملخص المحرك: لكل (بلاغ × فرقة مؤهلة) مدخل واحد كحد أقصى.
      * الفرقة الملغاة/التي لم تتحرك لا تنتج شيئًا — والبلاغ بلا وقت إنشاء يُستثنى بصدق.
+     * والبلاغ النهائي (مغلق/ملغى) يخرج كاملًا من التنبيهات فورًا — التنبيه حالة تشغيلية
+     * حالية، لا سجل تاريخي (قرار المالك 2026-08-22).
      * مرتبة: المتجاوز أولًا (بالأكثر تجاوزًا) ثم القريب.
      */
     function computeAlerts(summary, nowMinutes) {
         var out = [];
         if (!summary || !summary.incidents) return out;
         summary.incidents.forEach(function (ic) {
+            if (isFinal(ic.status)) return; // انتهى البلاغ ← تنتهي تنبيهاته ومؤقتاته معه فورًا
             (ic.crews || []).forEach(function (c) {
                 if (c.withdrawn) return; // الفرقة المسحوبة من البلاغ: ينتهي كل ما يتعلق بها فورًا (§4)
                 var t = crewTimer(c.phases, ic.cadCreatedAt, nowMinutes);
@@ -99,8 +114,8 @@
     }
 
     return {
-        LIMITS: LIMITS, STAGE_TXT: STAGE_TXT,
-        cadMin: cadMin, cadDiff: cadDiff,
+        LIMITS: LIMITS, STAGE_TXT: STAGE_TXT, FINAL_STATUSES: FINAL_STATUSES,
+        cadMin: cadMin, cadDiff: cadDiff, isFinal: isFinal,
         crewStage: crewStage, crewTimer: crewTimer, computeAlerts: computeAlerts
     };
 });

@@ -130,13 +130,39 @@ class StorageAdapter {
     async updateIncidentCoords(id, lat, lng) {
         await this.db.run('UPDATE incident_registry SET lat = ?, lng = ? WHERE id = ?', [lat, lng, id]);
     }
+    /** حالة دورة حياة البلاغ (قرار المالك 2026-08-22): active/closed/cancelled —
+        القرار (لصق النهائي ومنع الارتداد) في ReportService، هنا كتابة صرفة */
+    async updateIncidentStatus(id, status) {
+        await this.db.run('UPDATE incident_registry SET status = ? WHERE id = ?', [status, id]);
+    }
     /** هل شاركت هذه الفرقة في هذا البلاغ داخل هذه المناوبة؟ (القاعدة ③) */
     async findParticipation(shiftId, unit, incidentNumber) {
         return this.db.get(
-            `SELECT t.id, t.phases FROM report_times t JOIN reports r ON r.id = t.report_id
+            `SELECT t.id, t.phases, r.unit FROM report_times t JOIN reports r ON r.id = t.report_id
              WHERE r.shift_id = ? AND r.unit = ? AND t.incident_number = ? LIMIT 1`,
             [shiftId, unit, incidentNumber]
         );
+    }
+    /** مطابقة المشاركة بهوية الوحدة الثابتة في CAD (قرار المالك 2026-08-23):
+        eventId + cad_run_unit_id (الأقوى — فريد لكل إسناد) ثم cad_unit_id.
+        تسبق مطابقة الاسم حتى لا تتكرر المشاركة إذا تغيّر المسمى (ظهور الفرقة
+        في التكميل لاحقًا بصيغة مختلفة) — نفس المشاركة تُحدَّث ولا تُنشأ ثانية. */
+    async findParticipationByCadUnit(shiftId, incidentNumber, runUnitId, unitId) {
+        if (Number.isInteger(runUnitId)) {
+            const row = await this.db.get(
+                `SELECT t.id, t.phases, r.unit FROM report_times t JOIN reports r ON r.id = t.report_id
+                 WHERE r.shift_id = ? AND t.incident_number = ? AND t.cad_run_unit_id = ? LIMIT 1`,
+                [shiftId, incidentNumber, runUnitId]);
+            if (row) return row;
+        }
+        if (Number.isInteger(unitId)) {
+            const row = await this.db.get(
+                `SELECT t.id, t.phases, r.unit FROM report_times t JOIN reports r ON r.id = t.report_id
+                 WHERE r.shift_id = ? AND t.incident_number = ? AND t.cad_unit_id = ? LIMIT 1`,
+                [shiftId, incidentNumber, unitId]);
+            if (row) return row;
+        }
+        return null;
     }
     /**
      * دمج الأزمنة التصاعدي (قاعدة العدالة 2026-08-20): لقطة CAD تتطور مع الوقت،
@@ -161,6 +187,20 @@ class StorageAdapter {
         }
         return { merged, phases: current };
     }
+    /** تصحيح الأزمنة من Journey الوحدة الموثوقة (قرار المالك 2026-08-23):
+        عندما تصل phases مصدرها journeys الخاصة بالوحدة (phasesSource='cad-detail')
+        تستبدل اللقطة المخزنة بالكامل — بما فيها إزالة الأوقات الخاطئة التي نُسخت
+        سابقًا من وحدات أخرى (أصل خلل 1307875). القيمة القديمة تُعاد لسجل التدقيق —
+        تصحيح موثق، لا حذف صامت للتاريخ. */
+    async replaceParticipationPhases(id, newPhases) {
+        const row = await this.db.get('SELECT phases FROM report_times WHERE id = ?', [id]);
+        if (!row) return { replaced: false, oldPhases: null };
+        const oldPhases = row.phases;
+        const n = (newPhases && Object.keys(newPhases).length) ? JSON.stringify(newPhases) : null;
+        if (oldPhases === n) return { replaced: false, oldPhases };
+        await this.db.run('UPDATE report_times SET phases = ? WHERE id = ?', [n, id]);
+        return { replaced: true, oldPhases };
+    }
     /** يحفظ زمني الاستجابة المحسوبين مع المشاركة (قابلان للتتبع إلى phases الخام) */
     async updateParticipationResponse(id, arrivalMin, mubasharaMin) {
         await this.db.run('UPDATE report_times SET resp_arrival_min = ?, resp_mubashara_min = ? WHERE id = ?', [arrivalMin, mubasharaMin, id]);
@@ -174,6 +214,18 @@ class StorageAdapter {
                (SELECT id FROM reports WHERE shift_id = ? AND unit = ?)`,
             [withdrawn ? 1 : 0, incidentNumber, shiftId, unit]);
     }
+    /** حالة الوحدة في CAD (قرار المالك 2026-08-22): تُحفظ خامًا ومطبَّعة للتتبع —
+        cad_unit_status = حرف unitRequestStatus (A/B/C/R)، cad_reached = وصول/مباشرة
+        فعلية من journeys (1/0). لا قرار هنا — القرار في ReportService، هنا تتبع فقط */
+    async setParticipationCadUnitState(shiftId, unit, incidentNumber, urs, reached, unitId, runUnitId) {
+        await this.db.run(
+            `UPDATE report_times SET cad_unit_status = ?, cad_reached = ?, cad_unit_id = ?, cad_run_unit_id = ?
+             WHERE incident_number = ? AND report_id IN
+               (SELECT id FROM reports WHERE shift_id = ? AND unit = ?)`,
+            [urs, reached === true ? 1 : (reached === false ? 0 : null),
+             Number.isInteger(unitId) ? unitId : null, Number.isInteger(runUnitId) ? runUnitId : null,
+             incidentNumber, shiftId, unit]);
+    }
     /** كل مشاركات بلاغ (لإعادة حساب الأزمنة عند وصول وقت إنشائه متأخرًا) */
     async getIncidentParticipations(shiftId, number) {
         return this.db.all(
@@ -186,7 +238,7 @@ class StorageAdapter {
             'SELECT * FROM incident_registry WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
         // مشاركات البلاغات المرقّمة (لكل فرقة أزمنتها وأزمنة استجابتها المحسوبة وحالة مشاركتها)
         const parts = await this.db.all(
-            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn
+            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id
              FROM report_times t JOIN reports r ON r.id = t.report_id
              WHERE r.shift_id = ? AND t.incident_number IS NOT NULL`, [shiftId]);
         // الضغطات اليدوية (بلا رقم) — كل واحدة بلاغ مستقل كما هو معتاد

@@ -1039,6 +1039,17 @@ async function runMigrations() {
   // تُعلَّم withdrawn=1 فتُستبعد من العدّادات والمؤقتات والتنبيهات والخريطة فورًا،
   // ويبقى سجلها في التفاصيل للتاريخ — additive وبقيمة افتراضية 0: السلوك القائم لا يتغير
   await ensureColumn('report_times', 'withdrawn', 'INTEGER DEFAULT 0');
+  // حالة الوحدة في CAD (قرار المالك 2026-08-22 — قاعدة المشاركة الفعلية): حرف
+  // unitRequestStatus المطبَّع (A/B/C/R) + علم الوصول/المباشرة الفعلية المشتق من
+  // journeys[] بوقت حقيقي — قابلان للتتبع إلى استجابة event-dispatched/detail.
+  // additive وnullable: المشاركات اليدوية والقديمة تبقى NULL وسلوكها لا يتغير إطلاقًا
+  await ensureColumn('report_times', 'cad_unit_status', 'TEXT');
+  await ensureColumn('report_times', 'cad_reached', 'INTEGER');
+  // هوية الوحدة الثابتة في CAD (قرار المالك 2026-08-23 — Journey مستقلة لكل وحدة):
+  // unitId/runUnitId يربطان المشاركة بالوحدة الفعلية لا بترتيب الظهور — الربط بين
+  // incident-list.lastJourneys و event-dispatched/detail.units مثبت حيًا عليهما
+  await ensureColumn('report_times', 'cad_unit_id', 'INTEGER');
+  await ensureColumn('report_times', 'cad_run_unit_id', 'INTEGER');
   // طبقة التقاط الموقع (قرار المالك 2026-08-20): عنوان CAD الخام + المنطقة + الحي المشتق —
   // أساس مستقبلي لأكثر الأحياء وكثافة البلاغات وساعات الذروة (لا خرائط/تحليلات في هذه المرحلة)
   await ensureColumn('incident_registry', 'address', 'TEXT');
@@ -1052,6 +1063,10 @@ async function runMigrations() {
   // التطبيق نفسه إن مرّت — لا Geocoding ولا تخمين؛ إن لم تتوفر تبقى NULL بصدق
   await ensureColumn('incident_registry', 'lat', 'REAL');
   await ensureColumn('incident_registry', 'lng', 'REAL');
+  // دورة حياة البلاغ (قرار المالك 2026-08-22): status = active (افتراضي/NULL للسجلات
+  // القائمة) أو حالة نهائية closed/cancelled — المصدر الوحيد الذي تعتمد عليه
+  // المؤشرات والتنبيهات والخريطة النشطة. additive وNULL للقديم = سلوك قائم لا يتغير
+  await ensureColumn('incident_registry', 'status', 'TEXT');
   // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
   await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
   // مرحلة بدايات الفرق التشغيلية: JSON nullable لكل فريق {"day":"HH:MM","night":"HH:MM"} —

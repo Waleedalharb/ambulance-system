@@ -25,6 +25,11 @@
     });
   }
   window.__SOUTH_POC__ = true;
+  /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
+     (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
+     يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
+  const OVERLAY_BUILD = '2026-08-23.c — Journey لكل وحدة إلزاميًا (لا نسخ أوقات بين الفرق) + تصحيح موثق';
+  window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
      لا نطلق أي طلب ولا نقرأ ترويسة ولا نلمس الجلسة: نراقب فقط الاستجابات التي
@@ -32,6 +37,9 @@
      الربط صارم: الإحداثيات تُنسب للبلاغ فقط إن جاءت من استجابة تحمل رقمه أو
      location_id المرتبط به — وإلا تبقى null بصدق (لا اختراع ولا نقل بين بلاغات). */
   const geo = window.__southGeo = window.__southGeo || { byIncident: {}, locOfIncident: {}, byLocId: {} };
+  // حالات الوحدات الملتقطة من event-dispatched/detail (قرار المالك 2026-08-22) —
+  // تنجو من إعادة الحقن مثل geo، وتُقاد بصمةً حتى لا يُعاد إرسال لقطة بلا تغيّر
+  const unitsByIncident = window.__southUnits = window.__southUnits || {};
   // CAD يعيد الإحداثيات نصوصًا ("24.490789") لا أرقامًا — نقبل الاثنين مع تحقق صارم
   // بالنطاق، ونرفض الفراغ والقيم غير الرقمية (لا اختراع إحداثيات).
   function numOrNull(v){
@@ -54,6 +62,25 @@
   function handleCadResponse(url, j){
     try{
       if(!j || typeof j !== 'object') return;
+      // ══ مصدر الحقيقة الموثق بالرصد الحي (2026-08-22): CAD نفسه يستطلع كل ~10ث
+      // dispatch-manager/api/cfs/v2/{operation-controller|response-coordinator}/incident-list
+      // ويعتمد data.items[].eventId في بناء قائمتي «البلاغات المرحلة» و«تنسيق
+      // الاستجابة». نقرأ نفس الاستجابات سلبيًا: الحضور يصفّر الغياب دائمًا،
+      // والغياب يُحسب فقط من لقطة مكتملة الصفحات (last=true) — لا حكم من صفحة جزئية.
+      const lm = url.match(/dispatch-manager\/api\/cfs\/v2\/(operation-controller|response-coordinator)\/(incident-list|awaiting-list)/);
+      if(lm){
+        const d = j.data;
+        if(d && Array.isArray(d.items)){
+          const ids = d.items.map(it => it && it.eventId != null ? String(it.eventId) : null).filter(Boolean);
+          // awaiting-list = بانتظار الترحيل: وجود البلاغ فيها دليل وجود (تصفير)،
+          // وغيابه منها لا يعني شيئًا (قد يكون مرحّلًا) ← presence-only
+          const complete = lm[2] === 'awaiting-list' ? false : d.last === true;
+          recordListSnapshot(ids, complete);
+          // الاكتشاف التلقائي (المرحلة A): من لقطات incident-list المكتملة فقط —
+          // القائمة تكتشف والتفاصيل تؤكد (لا اكتشاف من صفحة جزئية ولا من awaiting)
+          if(lm[2] === 'incident-list' && d.last === true) autoDiscoverFromItems(d.items);
+        }
+      }
       // مورد الحدث بصورتيه (events/{id} وevents/edit/{id}): يحمل location_id
       // وكائن location الكامل — منه نأخذ latitude/longitude الأصليين فقط
       let m = url.match(/event-manager\/api\/events\/(?:edit\/)?(\d+)/);
@@ -77,6 +104,51 @@
       }
       m = url.match(/location-manager\/api\/locations\/(\d+)/);
       if(m){ const g = scanGeo(j, 0); if(g) geo.byLocId[m[1]] = g; }
+      // ══ حالة الوحدة داخل البلاغ (قرار المالك 2026-08-22 — مصدر موثق بالرصد الحي):
+      // صفحة تفاصيل البلاغ في CAD تطلب event-manager/api/v2/event-dispatched/detail
+      //?eventId=…&showAbortedCancelledUnits=true ← data.units[] وفيها لكل وحدة
+      // unitRequestStatus (A=مقبولة B=ملغاة C=ملغاة R=مرفوضة) وjourneys[] كاملة.
+      // شارة «وحدة ملغاة» في واجهة CAD ترسمها الواجهة من هذه القيمة — لا نص في الحمولة.
+      // الالتقاط سلبي خالص: نقرأ فقط الاستجابة التي حمّلها تطبيق CAD نفسه.
+      // «المباشرة الفعلية» = وقت فعلي في AT_PATIENT (العلاج) فقط — أثبت الاختبار الحي
+      // (1306598/جنوب 9-2) أن PATIENT_REACH «البحث» قد يحمل وقتًا لوحدة أُلغيت قبل
+      // المباشرة: الوصول للموقع والبحث عن المريض ≠ مباشرة المريض. ولا يُعتمد
+      // currentStep دليلًا — المرحلة الجارية وقتها null ولا تُثبت إتمامًا.
+      if(/event-manager\/api\/v\d*\/event-dispatched\/detail/.test(url)){
+        const d = j.data;
+        const evId = (d && d.id != null) ? String(d.id) : ((url.match(/eventId=(\d+)/) || [])[1] || null);
+        if(d && evId && Array.isArray(d.units)){
+          const ARRIVAL_STEPS = { AT_PATIENT: 1 };
+          const list = d.units.map(u => {
+            if(!u || !u.unitCode) return null;
+            const jr = Array.isArray(u.journeys) ? u.journeys : [];
+            let lastTimed = null;
+            jr.forEach(s => {
+              if(s && s.journeyStepTime && (!lastTimed || (s.stepSeq || 0) > (lastTimed.stepSeq || 0))) lastTimed = s;
+            });
+            return {
+              unit: String(u.unitCode),
+              urs: u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null,
+              reached: jr.some(s => s && ARRIVAL_STEPS[s.journeyStepCode] && !!s.journeyStepTime),
+              lastStep: lastTimed ? lastTimed.journeyStepCode : null,
+              // Journey الوحدة الخاصة (قرار المالك 2026-08-23): أزمنة كل وحدة من
+              // journeys[] الخاصة بها فقط — لا لقطة مدمجة على مستوى البلاغ إطلاقًا
+              phases: phasesFromJourneys(jr),
+              unitId: u.unitId != null ? u.unitId : null,        // هوية الوحدة الثابتة (2026-08-23)
+              runUnitId: u.runUnitId != null ? u.runUnitId : null // مثبت حيًا: يطابق lastJourneys
+            };
+          }).filter(Boolean);
+          if(list.length){
+            // البصمة تشمل الأزمنة: تطوّر Journey أي وحدة (وقت جديد) = لقطة جديدة تستحق الإرسال
+            const sig = JSON.stringify(list.map(x => x.unit + ':' + (x.urs || '') + ':' + (x.reached ? 1 : 0) + ':' + JSON.stringify(x.phases || {})).sort());
+            const prev = unitsByIncident[evId];
+            if(!prev || prev.sig !== sig){
+              unitsByIncident[evId] = { at: Date.now(), sig, units: list };
+              lifeLog('units', { incident: evId, units: list });
+            }
+          }
+        }
+      }
       m = url.match(/\/incidents\/(\d+)/);
       if(m){
         const g = scanGeo(j, 0); if(g) geo.byIncident[m[1]] = g;
@@ -120,7 +192,7 @@
       this.addEventListener('load', function(){
         try{
           const u = String(this.__southUrl || '');
-          if(!/(event-manager|location-manager)\/api|cad-proxy/.test(u)) return;
+          if(!/(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/.test(u)) return;
           if(typeof this.responseText === 'string' && this.responseText.charAt(0) !== '<')
             window.__southHandleCadResponse(u, JSON.parse(this.responseText));
         }catch(e){}
@@ -132,7 +204,7 @@
       const res = await OF.apply(null, arguments);
       try{
         const u = String(res.url || '');
-        if(/(event-manager|location-manager)\/api|cad-proxy/.test(u))
+        if(/(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/.test(u))
           res.clone().json().then(j => window.__southHandleCadResponse(u, j)).catch(() => {});
       }catch(e){}
       return res;
@@ -164,12 +236,27 @@
       window.postMessage({ source: 'south-cad-overlay', kind, reqId, payload }, '*');
     });
   }
-  async function apiPost(number, code, type, crews, phases, createdAt, address, region, coords){
+  async function apiPost(number, code, type, crews, phases, createdAt, address, region, coords, status, source){
     return sendToPlatform('cad-report', { number, code, type, createdAt: createdAt || null, address: address || null, region: region || null,
       lat: coords ? coords.lat : null, lng: coords ? coords.lng : null,
+      status: status || null, // الحالة النهائية إن ظهرت صراحة في CAD — غيابها لا يعني شيئًا
+      source: source === 'cad-auto' ? 'cad-auto' : undefined, // وسم الاكتشاف التلقائي (المرحلة A)
       crews: crews.map(c => {
-        const o = { team: (typeof c === 'string' ? c : c.team), phases };
+        // القاعدة الجذرية (قرار المالك 2026-08-23): أوقات كل فرقة من Journey الخاصة
+        // بها فقط. اللقطة المشتركة من الصفحة تُعطى فقط عندما تكون الفرقة الوحيدة
+        // في البلاغ (حينها هي فعليًا رحلتها) — مع تعدد الفرق، من لا Journey لها
+        // تُرسل phases فارغة ولا تُنسخ لها أوقات فرقة أخرى أبدًا
+        const own = (typeof c === 'object' && c && c.phases) ? c.phases : null;
+        const o = { team: (typeof c === 'string' ? c : c.team),
+          phases: own || (crews.length === 1 ? (phases || {}) : {}) };
+        if (own && typeof c === 'object' && c.phasesSource === 'cad-detail') o.phasesSource = 'cad-detail';
         if (typeof c === 'object' && c && c.withdrawn === true) o.withdrawn = true;
+        // حالة الوحدة من CAD (قرار المالك 2026-08-22): تُمرَّر خامًا — قاعدة
+        // الاحتساب (A/B/C/R × الوصول الفعلي) سيرفرية، لا قرار عدّ في الـOverlay
+        if (typeof c === 'object' && c && c.cadUrs) o.cadUrs = c.cadUrs;
+        if (typeof c === 'object' && c && (c.cadReached === true || c.cadReached === false)) o.cadReached = c.cadReached;
+        if (typeof c === 'object' && c && c.cadUnitId != null) o.cadUnitId = c.cadUnitId;
+        if (typeof c === 'object' && c && c.cadRunUnitId != null) o.cadRunUnitId = c.cadRunUnitId;
         return o;
       }) });
   }
@@ -227,8 +314,9 @@
   }
   /* الحالة الحالية للمشاركة (§4 — 2026-08-21): سطر الفرقة في متتبع CAD قد يحمل
      كلمة سحب/إلغاء صريحة — عندها تُرسَل مسحوبة فتُستبعد فورًا من العدّادات
-     والمؤقتات والتنبيهات والخريطة. لا استنتاج من الغياب — علامة صريحة فقط. */
-  const WITHDRAWN_RE = /(سحب|مسحوب|ألغي|أُلغي|إلغاء)/;
+     والمؤقتات والتنبيهات والخريطة. لا استنتاج من الغياب — علامة صريحة فقط.
+     (2026-08-22): وُسّعت الصيغ — عربي وإنجليزي — لأن CAD لا يلتزم مسمى واحدًا */
+  const WITHDRAWN_RE = /(سحب|مسحوب|منسحب|مُلغ[ىية]|ألغي|أُلغي|إلغاء|cancel(l)?ed|withdrawn|removed)/i;
   function crewStatesFromTracker(){
     const out = []; const seen = new Set();
     (document.body.innerText||'').split('\n').forEach(line => {
@@ -241,17 +329,268 @@
     });
     return out;
   }
+
+  /* ─── مصدر الحقيقة لحالة البلاغ: قائمة البلاغات في CAD (قرار المالك 2026-08-22) ───
+     أثبتت التجربة الحية أن قراءة «كلمات الحالة» (مغلق/ملغي/Closed…) من تفاصيل
+     البلاغ غير موثوقة في CAD لدينا — أُزيلت تلك الطبقة كلها. المعيار التشغيلي
+     الحقيقي: طالما رقم البلاغ موجود في قائمة البلاغات الرئيسية فهو نشط،
+     واختفاؤه المؤكد منها = انتهاء تشغيلي (إغلاقًا كان أو إلغاءً — القائمة لا
+     تميّز بينهما). الالتقاط سلبي خالص: نقرأ فقط استجابات القائمة التي يحمّلها
+     تطبيق CAD نفسه أثناء عمل الموظف الطبيعي — لا طلب إضافي إطلاقًا.
+     حارس الاستقرار (نص قرار المالك): لا إنهاء بغياب لحظي (إعادة تحميل القائمة/
+     انتقال صفحة/بطء عرض) — يُشترط الغياب في ٣ لقطات مكتملة متتالية + انقضاء
+     ٦٠ ثانية منذ آخر رؤية في أي قائمة (CAD يستطلع كل ~10ث ← ٦ دورات كاملة)،
+     أو مضي 15 دقيقة على تسجيل بلاغ لم يُرَ في أي قائمة بعد. */
+  const LIST_ABSENT_CONFIRM = 3;
+  const LIST_GRACE_MS = 15 * 60 * 1000;
+  const LIST_SEEN_TIMEOUT_MS = 60 * 1000;
+  const listTrack = window.__southListTrack = window.__southListTrack || {};
+  /* لقطة قائمة منظمة (items[].eventId من dispatch-manager): الحاضر يصفّر عدّاد
+     غيابه ويُحدَّث آخر وقت رؤية دائمًا، والغائب يتصاعد عدّاده فقط إن كانت
+     اللقطة مكتملة الصفحات (last=true) — اللقطات الجزئية وawaiting-list لا
+     تُثبت غيابًا إطلاقًا */
+  function recordListSnapshot(ids, complete){
+    const present = new Set(ids);
+    for(const num of Object.keys(listTrack)){
+      const t = listTrack[num];
+      if(present.has(num)){ t.everListed = true; t.absentStreak = 0; t.lastSeenAt = Date.now(); }
+      else if(complete) t.absentStreak = (t.absentStreak || 0) + 1;
+    }
+    watchSave();
+  }
+  /* تسمية الفرقة من مسمى CAD (قرار المالك 2026-08-23): الاسم يُشتق من نمط الوحدة
+     نفسه (جنوب N / سريع N) سواء كانت في التكميل أم لا — المنصة تراقب التشغيل
+     الفعلي وليست نسخة من التكميل. فرقة غير مدرجة في التكميل تُسجَّل باسمها المشتق،
+     وعند ظهورها لاحقًا في التكميل يطابقها الخادم بسجلها القائم بهوية الوحدة
+     (runUnitId) فلا يُنشأ سجل ثانٍ. وحدات القطاعات الأخرى (شرق/غرب/شمال…) لا
+     تطابق النمط أصلًا ← null ← لا تسجيل. */
   function mapToSouthTeam(cadCrew){
     const name = (cadCrew || '').trim();
     let m = name.match(/سريع\s*جنوب\s*(\d+)/);
-    if(m && teamsList.includes('سريع ' + m[1])) return 'سريع ' + m[1];
+    if(m) return 'سريع ' + m[1];
     m = name.match(/سريع\s*(\d+)/);
-    if(m && teamsList.includes('سريع ' + m[1])) return 'سريع ' + m[1];
+    if(m) return 'سريع ' + m[1];
     m = name.match(/جنوب\s*(\d+)/);
-    if(m && teamsList.includes('جنوب ' + m[1])) return 'جنوب ' + m[1];
+    if(m) return 'جنوب ' + m[1];
     // تطابق تام مع أي اسم في تكميل المناوبة — يغطي الأسماء غير النمطية (§5)
     const exact = teamsList.find(t => t === name);
     return exact || null; // قطاع آخر ← null ← لا تسجيل تلقائي
+  }
+
+  /* ─── فرق البلاغ من مصدر CAD الحقيقي (قرار المالك 2026-08-22) ───
+     crewsFromCadUnits: وحدات event-dispatched/detail الملتقطة سلبيًا، مربوطة بفرق
+     الجنوب — تحمل urs (حرف unitRequestStatus) وreached (وقت فعلي في العلاج
+     AT_PATIENT فقط — البحث ليس مباشرة، إثبات حي 2026-08-22). لا قرار عدّ هنا: الخادم يطبق قاعدة المشاركة الفعلية المعتمدة.
+     mergeCrewSources: دمج بلا فقدان — كل فرقة معروفة من أي مصدر تبقى، ومن لها
+     لقطة وحدة من CAD تُرقَّى إليها (مصدر الحقيقة)، والباقي يبقى على علم الصفحة
+     (withdrawn من نص المتتبع) كما كان — لا استنتاج إلغاء من مجرد غياب وحدة. */
+  function crewsFromCadUnits(num){
+    const rec = unitsByIncident[num];
+    if(!rec || !Array.isArray(rec.units)) return [];
+    const out = []; const seen = new Set();
+    for(const u of rec.units){
+      const team = mapToSouthTeam(u.unit);
+      if(!team || seen.has(team)) continue;
+      seen.add(team);
+      const c = { team, cadReached: u.reached === true };
+      if(u.urs) c.cadUrs = u.urs;
+      // Journey الوحدة الخاصة الملتقطة من التفاصيل — مصدرها journeys[] نفسها
+      if(u.phases && Object.keys(u.phases).length){ c.phases = u.phases; c.phasesSource = 'cad-detail'; }
+      if(u.unitId != null) c.cadUnitId = u.unitId;
+      if(u.runUnitId != null) c.cadRunUnitId = u.runUnitId;
+      out.push(c);
+    }
+    return out;
+  }
+  function mergeCrewSources(){
+    const map = new Map(); // team ← أفضل لقطة معروفة
+    const put = (c, upgradeOnly) => {
+      if(!c || !c.team) return;
+      const prev = map.get(c.team);
+      if(!prev){ map.set(c.team, Object.assign({}, c)); return; }
+      // لقطة الوحدة (cadUrs) ترقّي السابقة؛ لقطة الصفحة لا تطغى على لقطة وحدة قائمة
+      if(c.cadUrs){
+        const merged = Object.assign({}, prev, c);
+        map.set(c.team, merged);
+      } else if(!prev.cadUrs){
+        map.set(c.team, Object.assign({}, prev, c));
+      }
+    };
+    for(const list of arguments){ (list || []).forEach(c => put(c)); }
+    return Array.from(map.values());
+  }
+
+  /* ═══ المرحلة A — الاكتشاف التشغيلي التلقائي (قرار المالك 2026-08-23) ═══
+     «القائمة تكتشف، والتفاصيل تؤكد»: incident-list (التي يستطلعها CAD نفسه كل
+     ~10ث) تكشف البلاغ الجديد ووحداته عبر items[].lastJourneys[] — بلا أي طلب
+     إضافي. عند اكتشاف بلاغ عليه وحدة جنوبية نجلب event-dispatched/detail مرة
+     واحدة من سياق الصفحة (نفس قناة location_id المعتمدة 2026-08-21) لتأكيد
+     حالة الوحدات (unitRequestStatus) وأوقات الرحلة، ثم نسجّل بوسم cad-auto.
+     بعدها: تغيّر lastJourneys (وحدة جديدة/مرحلة تقدمت) = إشارة تستحق التحقق ←
+     إعادة قراءة التفاصيل بخنق زمني ٣٠ ثانية. لا طلب مستمر لكل البلاغات إطلاقًا.
+     الضوابط الثابتة: وحدات جنوبية فقط (بلاغ بلا وحدة جنوبية لا يدخل) · eventId
+     مانع التكرار (الخادم يحدّث نفس الهوية ولا ينشئ) · الزر اليدوي يبقى احتياطيًا
+     · سقف ٦٠ بلاغًا تلقائيًا للجلسة · CAD قراءة فقط. */
+  const auto = window.__southAuto = window.__southAuto || { seen: {}, queue: [], pumping: false, count: 0, lastItems: {} };
+  const AUTO_MAX_PER_SESSION = 60;
+  const DETAIL_REFETCH_MS = 30000;
+  const JOURNEY_PHASES = { ACCEPTANCE: 'قبول', TURNOUT: 'التحرك', IN_ROUTE: 'الاستجابة', PATIENT_REACH: 'البحث',
+    AT_PATIENT: 'العلاج', TO_HOSPITAL: 'النقل', AT_HOSPITAL: 'بدء التسليم', HANDOVER: 'انتهاء التسليم', BACK_TO_SERVICE: 'الجاهزية' };
+  function fmtCadTime(iso){
+    try{ return new Date(iso).toLocaleTimeString('en-US', { timeZone: 'Asia/Riyadh', hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' }); }catch(e){ return null; }
+  }
+  function fmtCadDateTime(iso){
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { timeZone: 'Asia/Riyadh' }) + ' ' + fmtCadTime(iso); // M/D/YYYY h:mm:ss AM — صيغة CAD الخام المعتمدة سيرفريًا
+    }catch(e){ return null; }
+  }
+  function phasesFromJourneys(jr){
+    const o = {};
+    (Array.isArray(jr) ? jr : []).forEach(s => {
+      if(!s || !s.journeyStepTime) return;
+      const name = s.journeyStepName ? String(s.journeyStepName).trim() : (JOURNEY_PHASES[s.journeyStepCode] || null);
+      if(!name) return;
+      const t = fmtCadTime(s.journeyStepTime);
+      if(t && !o[name]) o[name] = t; // أقدم وقت موثق للمرحلة — لا استبدال
+    });
+    return o;
+  }
+  function crewsFromDetail(d){
+    const out = []; const seenT = new Set();
+    const ARRIVAL = { AT_PATIENT: 1 }; // المباشرة الفعلية = وقت العلاج فقط (إثبات 1306598)
+    for(const u of ((d && d.units) || [])){
+      if(!u || !u.unitCode) continue;
+      const team = mapToSouthTeam(String(u.unitCode));
+      if(!team || seenT.has(team)) continue;
+      seenT.add(team);
+      const jr = Array.isArray(u.journeys) ? u.journeys : [];
+      const c = { team, phases: phasesFromJourneys(jr), phasesSource: 'cad-detail',
+                  cadReached: jr.some(s => s && ARRIVAL[s.journeyStepCode] && !!s.journeyStepTime) };
+      if(u.unitRequestStatus) c.cadUrs = String(u.unitRequestStatus).toUpperCase();
+      if(u.unitId != null) c.cadUnitId = u.unitId;         // هوية الوحدة الثابتة — لا اعتماد على ترتيب units[]
+      if(u.runUnitId != null) c.cadRunUnitId = u.runUnitId;
+      out.push(c);
+    }
+    return out;
+  }
+  /* جلب محدود من سياق الصفحة (بلا توكن ولا استخراج جلسة) — نفس نمط
+     fetchCoordsByLocId المعتمد: نفس الأصل + كوكيز الصفحة. الفشل ← null بصدق */
+  async function fetchIncidentDetail(num){
+    try{
+      const res = await window.fetch(location.origin + '/event-manager/api/v2/event-dispatched/detail?eventId=' + encodeURIComponent(num) + '&showAbortedCancelledUnits=true', { credentials: 'same-origin' });
+      if(!res || !res.ok) return null;
+      const j = await res.json().catch(() => null);
+      return (j && j.data) ? j.data : null;
+    }catch(e){ return null; }
+  }
+  async function fetchEventLocId(num){
+    try{
+      const res = await window.fetch(location.origin + '/event-manager/api/events/' + encodeURIComponent(num), { credentials: 'same-origin' });
+      if(!res || !res.ok) return;
+      const j = await res.json().catch(() => null);
+      const lid = j && (j.location_id || (j.data && j.data.location_id));
+      if(lid){ geo.locOfIncident[num] = String(lid); lifeLog('location_id', { incident: num, locationId: String(lid) }); }
+    }catch(e){}
+  }
+  function queueAuto(num, proqa, isUpdate){
+    if(auto.queue.some(q => q.num === num)) return;
+    auto.queue.push({ num, proqa: proqa || null, isUpdate: !!isUpdate });
+  }
+  async function pumpAutoQueue(){
+    if(auto.pumping) return;
+    auto.pumping = true;
+    try{
+      while(auto.queue.length){
+        const q = auto.queue.shift();
+        try{ if(q.isUpdate) await autoRefresh(q.num); else await autoRegister(q.num, q.proqa); }catch(e){}
+      }
+    } finally { auto.pumping = false; }
+  }
+  /* الاكتشاف من لقطة القائمة المكتملة: بلاغ جديد عليه وحدة جنوبية ← تسجيل تلقائي.
+     بلاغ معروف تغيّرت lastJourneys له (وحدة ظهرت/مرحلة تقدمت) ← تحديث مخنوق.
+     بلاغ بلا وحدة جنوبية يبقى مرصودًا صامتًا — قد تنضم له وحدة جنوبية لاحقًا */
+  function autoDiscoverFromItems(items){
+    const now = Date.now();
+    for(const it of items){
+      const num = it && it.eventId != null ? String(it.eventId) : null;
+      if(!num) continue;
+      auto.lastItems[num] = it;
+      const lj = Array.isArray(it.lastJourneys) ? it.lastJourneys : [];
+      const ljSig = JSON.stringify(lj.map(u => String(u.unitCode || '') + ':' + String(u.journeyStepCode || '')).sort());
+      const hasSouth = lj.some(u => !!mapToSouthTeam(String(u.unitCode || u.unitNameAr || '')));
+      const prev = auto.seen[num];
+      if(!prev){
+        auto.seen[num] = { ljSig, at: now };
+        if(hasSouth && !watch.list[num]) queueAuto(num, it.proQACode);
+      } else if(prev.ljSig !== ljSig){
+        prev.ljSig = ljSig;
+        if(watch.list[num]) queueAuto(num, null, true);         // إشارة تغيّر ← تحقق
+        else if(hasSouth) queueAuto(num, it.proQACode);         // انضمت وحدة جنوبية لاحقًا
+      }
+    }
+    pumpAutoQueue();
+  }
+  async function autoRegister(num, proqa){
+    if(watch.list[num]) return; // مسجل (يدويًا أو تلقائيًا) — التحديث مساره autoRefresh
+    if(auto.count >= AUTO_MAX_PER_SESSION){ lifeLog('auto-cap', { incident: num }); return; }
+    const code = proqa || null;
+    const type = typeFromCode(code);
+    let crews = [], createdAt = null, address = null, region = null;
+    const d = await fetchIncidentDetail(num); // تأكيد مرة واحدة عند الاكتشاف
+    if(d){
+      crews = crewsFromDetail(d);
+      createdAt = d.createdDate ? fmtCadDateTime(d.createdDate) : null;
+      address = d.address || null;
+      region = d.zoneName || null;
+    }
+    if(!crews.length){
+      // fallback صادق: الوحدات الجنوبية الظاهرة في القائمة بلا تفاصيل (لا اختلاق حالة)
+      const it = auto.lastItems[num];
+      const lj = it && Array.isArray(it.lastJourneys) ? it.lastJourneys : [];
+      const seenT = new Set();
+      for(const u of lj){
+        const team = mapToSouthTeam(String((u && u.unitCode) || ''));
+        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team }); }
+      }
+    }
+    if(!crews.length){ lifeLog('auto-skip-nonsouth', { incident: num }); return; } // ⓒ لا وحدة جنوبية
+    let coords = coordsFor(num);
+    if(!coords && !geo.locOfIncident[num]) await fetchEventLocId(num); // مرة واحدة — قناة الموقع المعتمدة
+    if(!coords && geo.locOfIncident[num]) coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
+    const r = await apiPost(num, code, type, crews, null, createdAt, address, region, coords, null, 'cad-auto');
+    if(r.data && r.data.success){
+      auto.count++;
+      watchAdd(num, { code, type, crews, phases: {}, createdAt, address, region, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null });
+      lifeLog('auto-register', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')), confirmed: !!d });
+      showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>🚑 ' +
+        crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>', 6000);
+    }
+  }
+  /* تحديث بلاغ قائم عند إشارة تغيّر lastJourneys: إعادة قراءة التفاصيل مخنوقة —
+     إضافة فرقة ظهرت لاحقًا / استبعاد فرقة ثبت إلغاؤها / ترقية أوقات الرحلة.
+     Registered ≠ Final: نفس eventId يُحدَّث ولا يتكرر (قرار المالك 2026-08-23) */
+  async function autoRefresh(num){
+    const w = watch.list[num];
+    if(!w) return;
+    const now = Date.now();
+    if(now - (w.lastDetailAt || 0) < DETAIL_REFETCH_MS) return;
+    const d = await fetchIncidentDetail(num);
+    if(!d) return;
+    const crews = mergeCrewSources(crewsFromDetail(d), w.crews);
+    if(!crews.length) return;
+    const sig = JSON.stringify(crews.map(c => c.team + (c.cadUrs || '') + (c.cadReached ? 'R' : '') + JSON.stringify(c.phases || {})).sort());
+    if(sig === w.autoSig) return; // لا جديد فعلي — لا إرسال
+    const createdAt = w.createdAt || (d.createdDate ? fmtCadDateTime(d.createdDate) : null);
+    const address = w.address || d.address || null;
+    const region = w.region || d.zoneName || null;
+    const r = await apiPost(num, w.code, w.type, crews, null, createdAt, address, region,
+      (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, null, 'cad-auto');
+    if(r.data && r.data.success){
+      watchAdd(num, { code: w.code, type: w.type, crews, phases: w.phases, createdAt, address, region, lat: w.lat, lng: w.lng });
+      const ww = watch.list[num]; if(ww){ ww.lastDetailAt = now; ww.autoSig = sig; watchSave(); }
+      lifeLog('auto-refresh', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')) });
+    }
   }
 
   /* ─── أزمنة المراحل: اسم المرحلة في سطر ووقتها في السطر الذي يليه ─── */
@@ -363,7 +702,7 @@
   const panel = document.createElement('div'); panel.id = 'southPocPanel';
   const dock = document.createElement('div'); dock.id = 'southPocDock';
   const grip = document.createElement('div'); grip.id = 'southPocGrip';
-  grip.title = 'اسحب لتحريك لوحة منصة الجنوب إلى أي مكان مناسب';
+  grip.title = 'اسحب لتحريك لوحة منصة الجنوب إلى أي مكان مناسب' + '\n' + OVERLAY_BUILD;
   const gripLabel = document.createElement('span'); gripLabel.textContent = '⠿ منصة الجنوب';
   const closeBtn = document.createElement('button'); closeBtn.id = 'southPocClose';
   closeBtn.textContent = '✕'; closeBtn.title = 'طيّ اللوحة — تبقى شارة صغيرة لإعادة فتحها';
@@ -475,7 +814,10 @@
     const code = proqaFromPage();
     const type = typeFromCode(code);
     const cadCrews = crewStatesFromTracker();
-    const southCrews = cadCrews.map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team);
+    const pageCrews = cadCrews.map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team);
+    // مصدر الحقيقة لحالة الوحدة (قرار المالك 2026-08-22): وحدات event-dispatched/detail
+    // الملتقطة سلبيًا ترقّي لقطة الصفحة — ولا تُسقط فرقة ظاهرة في الصفحة ولا وحداتها
+    const southCrews = mergeCrewSources(crewsFromCadUnits(number), pageCrews);
 
     if(!southCrews.length){
       if(cadCrews.length) blockOtherSector(number, code, cadCrews.map(c => c.name));
@@ -500,7 +842,12 @@
             '</b> مسجل مسبقًا — <b>لم يتضاعف</b>' + total +
             (coords ? '<br>🌐 استُكملت الإحداثيات إن كانت غائبة: <b style="direction:ltr;display:inline-block">' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6) + '</b>' : ''));
         } else {
-          successToast(number, type, southCrews.map(c => c.team + (c.withdrawn ? ' (مسحوبة)' : '')), coords);
+          // وسم صادق لحالة كل فرقة: مسحوبة (نص الصفحة) أو ملغاة قبل المباشرة
+          // (unitRequestStatus= B/C/R بلا وصول فعلي — قاعدة 2026-08-22)
+          const tag = c => c.team + (c.withdrawn ? ' (مسحوبة)' :
+            (c.cadUrs && c.cadUrs !== 'A' && !c.cadReached ? ' (ملغاة قبل المباشرة)' :
+            (c.cadUrs && c.cadUrs !== 'A' && c.cadReached ? ' (أُلغيت بعد المباشرة — محتسبة)' : '')));
+          successToast(number, type, southCrews.map(tag), coords);
         }
       } else {
         showToast('❌ فشل التسجيل: ' + ((r.data && r.data.error) || ('HTTP ' + r.status)), 7000);
@@ -543,14 +890,18 @@
   const watch = window.__southWatch = window.__southWatch || { list: {}, order: [] };
   try{
     const savedW = JSON.parse(sessionStorage.getItem('__southWatch') || 'null');
-    if(savedW && savedW.list && !watch.order.length){ watch.list = savedW.list; watch.order = savedW.order || []; }
+    if(savedW && savedW.list && !watch.order.length){
+      watch.list = savedW.list; watch.order = savedW.order || [];
+      if(savedW.listTrack) Object.assign(listTrack, savedW.listTrack); // عدّادات الغياب تنجو من تحديث الصفحة
+    }
   }catch(e){}
-  function watchSave(){ try{ sessionStorage.setItem('__southWatch', JSON.stringify({ list: watch.list, order: watch.order.slice(-30) })); }catch(e){} }
-  function snapSig(o){ return JSON.stringify([o.lat != null ? o.lat : null, o.lng != null ? o.lng : null, o.address || null, o.region || null, o.createdAt || null, o.phases || {}, (o.crews || []).map(c => c.team + (c.withdrawn ? '!W' : ''))]); }
+  function watchSave(){ try{ sessionStorage.setItem('__southWatch', JSON.stringify({ list: watch.list, order: watch.order.slice(-30), listTrack })); }catch(e){} }
+  function snapSig(o){ return JSON.stringify([o.lat != null ? o.lat : null, o.lng != null ? o.lng : null, o.address || null, o.region || null, o.createdAt || null, o.phases || {}, (o.crews || []).map(c => c.team + (c.withdrawn ? '!W' : '') + (c.cadUrs ? '#' + c.cadUrs + (c.cadReached ? '+R' : '-R') : '') + JSON.stringify(c.phases || {}))]); }
   function watchAdd(number, sent){
     if(!number) return;
     if(!watch.list[number]) watch.order.push(number);
     watch.order = watch.order.slice(-30);
+    if(!listTrack[number]) listTrack[number] = { everListed: false, absentStreak: 0, lastSeenAt: 0 };
     const prev = watch.list[number] || {};
     watch.list[number] = {
       code: sent.code || prev.code || null,
@@ -565,6 +916,9 @@
       lastSig: snapSig(sent),
       fetchTries: prev.fetchTries || 0,
       lastFetch: prev.lastFetch || 0,
+      lastDetailAt: prev.lastDetailAt || 0, // خنق إعادة قراءة التفاصيل (المرحلة A)
+      autoSig: prev.autoSig || null,        // بصمة آخر تأكيد تلقائي — لا إرسال بلا جديد
+      firstAt: prev.firstAt || Date.now(), // مرساة فترة السماح — لا تتقدم مع الإثراءات
       at: Date.now()
     };
     watchSave();
@@ -578,6 +932,27 @@
       if(now - w.at > 6 * 3600 * 1000){ // دورة مراقبة 6 ساعات كحد أقصى لكل بلاغ
         delete watch.list[num]; watch.order = watch.order.filter(x => x !== num); watchSave(); continue;
       }
+      // ⓪ مصدر الحقيقة — قائمة بلاغات CAD (قرار المالك 2026-08-22): الغياب المؤكد
+      // (٣ لقطات متتالية + رؤية سابقة أو مضي 15 د على التسجيل) = انتهاء تشغيلي.
+      // نرسل التحديث الأخير بنفس رقم البلاغ ثم نوقف المراقبة — يخرج فورًا من
+      // التشغيل النشط (خريطة/تنبيهات/مؤشرات) ويبقى محفوظًا تاريخيًا بكل بياناته.
+      const onPage = current === num;
+      if(!listTrack[num]) listTrack[num] = { everListed: false, absentStreak: 0, lastSeenAt: 0 };
+      const lt = listTrack[num];
+      const goneLong = lt.everListed
+        ? (now - (lt.lastSeenAt || 0) > LIST_SEEN_TIMEOUT_MS)   // ٦٠ ثانية بلا ظهور في أي قائمة (٦ دورات استطلاع)
+        : (now - (w.firstAt || w.at) > LIST_GRACE_MS);           // لم يُرَ أبدًا: مهلة 15 د من التسجيل
+      if(lt.absentStreak >= LIST_ABSENT_CONFIRM && goneLong){
+        if(w.crews && w.crews.length){
+          await apiPost(num, w.code, w.type, w.crews, w.phases, w.createdAt, w.address, w.region,
+            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled');
+        }
+        delete watch.list[num]; watch.order = watch.order.filter(x => x !== num);
+        delete listTrack[num]; watchSave();
+        lifeLog('final', { incident: num, status: 'cancelled', reason: 'list-absence', streak: lt.absentStreak });
+        showToast('⛔ البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> اختفى من قائمة بلاغات CAD — <b>أُخرج من التشغيل النشط وأُوقفت مراقبته</b>', 9000);
+        continue;
+      }
       // ① الإحداثيات — الالتقاط السلبي أولًا
       let coords = coordsFor(num);
       // ② جلب محدود بـlocation_id إن عُرف متأخرًا ولم تصل الإحداثيات سلبيًا
@@ -586,9 +961,10 @@
         coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
       }
       // ③ لقطة الصفحة — فقط إن كان هذا البلاغ مفتوحًا أمام الموظف الآن
-      const onPage = current === num;
       const pageCrews = onPage ? crewStatesFromTracker().map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team) : [];
-      const effCrews = pageCrews.length ? pageCrews : w.crews;
+      // حالة الوحدة من CAD (قرار المالك 2026-08-22): إلغاء/عودة الوحدة يُرسل تلقائيًا
+      // فور تغيّر لقطة event-dispatched/detail — بلا ضغطة ثانية، ودمج بلا فقدان
+      const effCrews = mergeCrewSources(crewsFromCadUnits(num), pageCrews, w.crews);
       if(!effCrews.length) continue; // لا إرسال بلا فرقة معروفة — نبقى نراقب
       const snap = {
         lat: coords ? coords.lat : w.lat,
