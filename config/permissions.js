@@ -64,7 +64,12 @@ const PERMISSIONS = {
     'admin.tech':           { label: 'الأدوات التقنية الحساسة (مراقبة/إصلاح/تدمير)', domain: 'admin' },
     'data.delete':          { label: 'حذف البيانات الحساسة', domain: 'admin' },
     // الأرشيف الحساس (بند عاشرًا): لا يُمنح لـ viewer تلقائيًا
-    'archive.sensitive':    { label: 'لقطات المناوبات الحساسة وسلامة الأرشيف', domain: 'archive' }
+    'archive.sensitive':    { label: 'لقطات المناوبات الحساسة وسلامة الأرشيف', domain: 'archive' },
+    // العهد والأصول (المرحلة 2 — معتمدة 2026-08-23): الاستيراد عبر Staging ثم اعتماد
+    // assets.inventory منح فردي حصرًا (موظف الجرد) — لا يُمنح لأي دور تلقائيًا
+    'assets.view':          { label: 'عرض العهد والأصول والبحث وبطاقة الجهاز', domain: 'assets' },
+    'assets.inventory':     { label: 'تنفيذ جلسات الجرد (منح فردي فقط — لا دور يحملها)', domain: 'assets' },
+    'assets.manage':        { label: 'إدارة العهد: اعتماد الاستيراد/الجرد والنقل والاستبدال والأرشفة', domain: 'assets' }
 };
 
 const PERMISSION_KEYS = Object.keys(PERMISSIONS);
@@ -102,7 +107,8 @@ const ROLES_PERMISSIONS = {
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'indicators.contribution',
         'employees.manage',
-        'archive.sensitive'
+        'archive.sensitive',
+        'assets.view', 'assets.manage'   // العهد والأصول: الإدارة تعتمد وتراجع (2026-08-23)
     ],
     field_leadership: [
         ...OPS_ALL,             // نفس حزمة operator التشغيلية
@@ -122,7 +128,8 @@ const ROLES_PERMISSIONS = {
         'workflow.view', 'workflow.manage', 'workflow.approve',
         'indicators.contribution',
         'employees.manage',
-        'archive.sensitive'
+        'archive.sensitive',
+        'assets.view', 'assets.manage'   // العهد والأصول: الإدارة تعتمد وتراجع (2026-08-23)
     ],
     user: ['ops.execute']          // المفتاح الشامل القديم — توافق فقط، بلا schedule.*
 };

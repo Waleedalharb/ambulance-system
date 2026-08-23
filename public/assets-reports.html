@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>التقارير والمخرجات — مركز العهد والأجهزة</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; font-size: 0.82rem; }
+    .nav a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); text-decoration: none; }
+    .nav a:hover, .nav a.on { border-color: var(--teal-id); color: var(--text); }
+    .pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .pcard { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 16px 14px; cursor: pointer; box-shadow: var(--shadow-card); transition: border-color 0.15s ease; }
+    .pcard:hover, .pcard.on { border-color: var(--teal-id); }
+    .pcard .t { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .pcard .d { font-size: 0.78rem; color: var(--text-2); line-height: 1.7; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px; box-shadow: var(--shadow-card); }
+    .toolbar select { font-family: inherit; font-size: 0.88rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); }
+    .toolbar button { font-family: inherit; padding: 9px 18px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-size: 0.85rem; }
+    .toolbar .go { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; }
+    .toolbar .csv { background: linear-gradient(135deg, var(--gold-id), #D4A017); color: #1a1a1a; }
+    .toolbar .print { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); }
+    .panel h2 { font-size: 0.95rem; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+    .panel h2 i { color: var(--teal-id); margin-left: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    thead th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 9px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+    tbody tr:hover { background: var(--surface-2); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .tag.working { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .tag.damaged { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tag.missing { background: rgba(239,68,68,0.22); color: #FECACA; }
+    .tag.unknown { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.recalled, .tag.replaced { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .tag.high { background: rgba(239,68,68,0.18); color: #FCA5A5; }
+    .tag.medium { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .serial { font-family: 'Consolas', monospace; font-size: 0.76rem; direction: ltr; display: inline-block; }
+    .muted { color: var(--muted); } .small { font-size: 0.75rem; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .msg.info { display: block; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.35); color: #BFDBFE; }
+    .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+    a { color: var(--blue); }
+    .rhead { padding: 12px 16px; font-size: 0.85rem; color: var(--text-2); border-bottom: 1px solid var(--border-soft); }
+    @media print {
+        body { background: #fff; color: #000; padding: 10mm; }
+        body::before { display: none; }
+        .nav, .pick, .toolbar, #msg, #diag, .header { display: none !important; }
+        .panel { border: 1px solid #999; box-shadow: none; background: #fff; }
+        .panel h2 { color: #000; border-color: #999; }
+        .rhead { color: #333; border-color: #999; }
+        thead th { background: #eee; color: #000; border-color: #999; }
+        tbody td { border-color: #ccc; color: #000; }
+        .tag { border: 1px solid #666; color: #000 !important; background: none !important; }
+        .print-title { display: block !important; text-align: center; margin-bottom: 8px; }
+    }
+    .print-title { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-file-lines"></i> التقارير والمخرجات</h1>
+            <div class="subtitle">تقارير مشتقة لحظيًا من قاعدة العهد — قابلة للطباعة والتصدير وإرسالها للإدارة</div>
+        </div>
+    </div>
+    <div class="nav">
+        <a href="/assets-center">مركز العهد</a>
+        <a href="/assets/discrepancies">يحتاج انتباهك</a>
+        <a href="/assets/inventory">دورات الجرد</a>
+        <a href="/assets/reports" class="on">التقارير</a>
+        <a href="/assets/import">الاستيراد التأسيسي</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div class="pick">
+        <div class="pcard" id="p-custody" onclick="pickReport('custody')">
+            <div class="t">📋 تقرير العهدة</div>
+            <div class="d">أجهزة فرقة أو مركز كاملة: النوع · Serial · الحالة · آخر جرد — مناسب للطباعة والتحقق الميداني والتوقيع.</div>
+        </div>
+        <div class="pcard" id="p-cycle" onclick="pickReport('cycle')">
+            <div class="t">🧾 تقرير دورة جرد</div>
+            <div class="d">نتائج دورة كاملة: كل فرقة، من جرّد، النتائج، فروقات السيريال، والأجهزة المكتشفة.</div>
+        </div>
+        <div class="pcard" id="p-disc" onclick="pickReport('disc')">
+            <div class="t">🧠 تقرير الفروقات الحالي</div>
+            <div class="d">لقطة «يحتاج انتباهك» الحالية: كل حالة مفتوحة مع شرحها والإجراء المقترح — لإرسالها للإدارة.</div>
+        </div>
+    </div>
+
+    <div class="toolbar" id="toolbar" style="display:none">
+        <select id="fTeam" style="display:none"></select>
+        <select id="fCenter" style="display:none"></select>
+        <select id="fCycle" style="display:none"></select>
+        <button class="go" onclick="runReport()"><i class="fa-solid fa-play"></i> توليد التقرير</button>
+        <button class="csv" onclick="downloadCsv()"><i class="fa-solid fa-file-csv"></i> تنزيل CSV</button>
+        <button class="print" onclick="window.print()"><i class="fa-solid fa-print"></i> طباعة / PDF</button>
+    </div>
+
+    <div class="print-title" id="printTitle"></div>
+    <div class="panel" id="panel" style="display:none">
+        <h2 id="repTitle"></h2>
+        <div class="rhead" id="repMeta"></div>
+        <div style="overflow-x:auto"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+        <div id="resEmpty" class="empty" style="display:none">لا بيانات لهذا التقرير</div>
+    </div>
+    <div id="diag" class="muted small" style="margin-top:18px; text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var STATUS_LABELS = {};
+var CURRENT = null; // {type, qs, title}
+var CYCLES = [];
+
+window.onerror = function (msg, src, line) { showMsg('⚠️ خطأ في الصفحة: ' + msg + ' (سطر ' + line + ')', 'err'); };
+function setDiag(t) { document.getElementById('diag').textContent = t; }
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(text, kind) { var m = document.getElementById('msg'); m.className = 'msg ' + kind; m.textContent = text; window.scrollTo(0, 0); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmtDate(s) { if (!s) return '—'; return String(s).slice(0, 10); }
+function statusTag(st) { return '<span class="tag ' + st + '">' + (STATUS_LABELS[st] || st) + '</span>'; }
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل — حدّث الصفحة', 'err'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    try {
+        var meRes = await fetch('/api/auth/me', { headers: authHeaders() });
+        var me = await meRes.json();
+        if (!meRes.ok) { showMsg('⚠️ تعذر التحقق من هويتك (كود ' + meRes.status + ')', 'err'); return; }
+        var perms = me.permissions || [];
+        if (!me.permissions_star && perms.indexOf('assets.view') === -1 && perms.indexOf('assets.manage') === -1) {
+            showMsg('حسابك لا يملك صلاحية عرض العهد (assets.view) — اطلب المنحة من مدير النظام', 'err'); return;
+        }
+        setDiag('الهوية: ' + (me.user && me.user.name || '') + ' ✓');
+    } catch (e) { showMsg('⚠️ فشل الاتصال بالخادم: ' + e.message, 'err'); return; }
+    // قوائم الفلاتر
+    try {
+        var d = await (await fetch('/api/assets/dashboard', { headers: authHeaders() })).json();
+        var fTeam = document.getElementById('fTeam');
+        fTeam.innerHTML = '<option value="">كل الفرق</option>' + (d.byTeam || []).map(function (t) { return '<option>' + esc(t.team_name || '') + '</option>'; }).join('');
+        var cycRes = await fetch('/api/assets/inventory/cycles', { headers: authHeaders() });
+        if (cycRes.ok) {
+            var cd = await cycRes.json();
+            CYCLES = cd.cycles || [];
+            document.getElementById('fCycle').innerHTML = CYCLES.map(function (c) { return '<option value="' + c.id + '">' + esc(c.label) + ' (' + c.status + ')</option>'; }).join('');
+        }
+    } catch (_) { /* الفلاتر مساعدة */ }
+}
+
+function pickReport(type) {
+    ['custody', 'cycle', 'disc'].forEach(function (t) { document.getElementById('p-' + t).className = 'pcard' + (t === type ? ' on' : ''); });
+    document.getElementById('toolbar').style.display = '';
+    document.getElementById('fTeam').style.display = type === 'custody' ? '' : 'none';
+    document.getElementById('fCenter').style.display = 'none';
+    document.getElementById('fCycle').style.display = type === 'cycle' ? '' : 'none';
+    CURRENT = { type: type };
+}
+
+function reportUrl(format) {
+    if (CURRENT.type === 'custody') {
+        var t = document.getElementById('fTeam').value;
+        return '/api/assets/reports/custody' + (t ? '?team_name=' + encodeURIComponent(t) + (format ? '&format=csv' : '') : (format ? '?format=csv' : ''));
+    }
+    if (CURRENT.type === 'cycle') return '/api/assets/reports/cycle/' + document.getElementById('fCycle').value + (format ? '?format=csv' : '');
+    return '/api/assets/reports/discrepancies' + (format ? '?format=csv' : '');
+}
+
+async function runReport() {
+    if (!CURRENT) { showMsg('اختر نوع التقرير أولًا', 'err'); return; }
+    var res = await fetch(reportUrl(false), { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل توليد التقرير', 'err'); return; }
+    STATUS_LABELS = d.status_labels || STATUS_LABELS;
+    document.getElementById('panel').style.display = '';
+    var th = document.getElementById('thead'), tb = document.getElementById('tbody');
+    if (CURRENT.type === 'custody') {
+        var team = document.getElementById('fTeam').value;
+        document.getElementById('repTitle').innerHTML = '<i class="fa-solid fa-clipboard-list"></i> تقرير العهدة' + (team ? ' — ' + esc(team) : ' — كامل القاعدة');
+        document.getElementById('repMeta').textContent = 'عدد الأجهزة: ' + d.total + ' · وُلّد الآن من قاعدة العهد مباشرة';
+        document.getElementById('printTitle').textContent = 'تقرير العهدة' + (team ? ' — ' + team : '') + ' · ' + new Date().toLocaleDateString('ar-SA');
+        th.innerHTML = '<tr><th>ASSET-ID</th><th>النوع</th><th>Serial</th><th>الحالة</th><th>الفرقة</th><th>المركز</th><th>آخر جرد</th><th>مراجعة</th></tr>';
+        tb.innerHTML = (d.rows || []).map(function (r) {
+            return '<tr><td class="serial">' + esc(r.asset_code) + '</td><td><strong>' + esc(r.type_name) + '</strong>' + (r.original_name && r.original_name !== r.type_name ? '<div class="muted small">' + esc(r.original_name) + '</div>' : '') + '</td>' +
+                '<td>' + (r.serial_number ? '<span class="serial">' + esc(r.serial_number) + '</span>' : '<span class="muted">—</span>') + '</td>' +
+                '<td>' + statusTag(r.status) + '</td><td>' + esc(r.team_name || '—') + '</td><td>' + esc(r.center_name || '—') + '</td>' +
+                '<td class="small">' + fmtDate(r.last_inventory_at) + '</td><td>' + (r.needs_review ? '<span class="tag unknown">⚠️</span>' : '') + '</td></tr>';
+        }).join('');
+        document.getElementById('resEmpty').style.display = (d.rows || []).length ? 'none' : '';
+    } else if (CURRENT.type === 'cycle') {
+        document.getElementById('repTitle').innerHTML = '<i class="fa-solid fa-clipboard-check"></i> تقرير دورة: ' + esc(d.cycle.label);
+        document.getElementById('repMeta').textContent = 'الحالة: ' + d.cycle.status + ' · الجلسات: ' + d.sessions.length + ' · وُلّد الآن من قاعدة العهد مباشرة';
+        document.getElementById('printTitle').textContent = 'تقرير دورة جرد: ' + d.cycle.label + ' · ' + new Date().toLocaleDateString('ar-SA');
+        th.innerHTML = '<tr><th>الفرقة</th><th>الجلسة</th><th>المجرى</th><th>الأجهزة</th><th>سليم</th><th>تالف</th><th>مفقود</th><th>مستبدل</th><th>مراجعة</th><th>مكتشف</th><th>الاعتماد</th></tr>';
+        tb.innerHTML = (d.sessions || []).map(function (s) {
+            var br = s.byResult || {};
+            var disc = s.items.filter(function (i) { return i.discovered; }).length;
+            return '<tr><td><strong>' + esc(s.team_name) + '</strong></td><td>' + esc(s.status) + '</td><td>' + esc(s.conductor_name || '—') + '</td>' +
+                '<td>' + s.total + '</td><td>' + (br.ok || 0) + '</td><td>' + (br.damaged || 0) + '</td><td>' + (br.missing || 0) + '</td>' +
+                '<td>' + (br.replaced || 0) + '</td><td>' + (br.needs_review || 0) + '</td><td>' + disc + '</td>' +
+                '<td class="small">' + (s.approved_by ? esc(s.approved_by) + ' · ' + fmtDate(s.approved_at) : '—') + '</td></tr>';
+        }).join('');
+        document.getElementById('resEmpty').style.display = (d.sessions || []).length ? 'none' : '';
+    } else {
+        document.getElementById('repTitle').innerHTML = '<i class="fa-solid fa-brain"></i> تقرير الفروقات الحالي — ' + d.summary.needs_decision + ' حالة تحتاج قرارًا';
+        document.getElementById('repMeta').textContent = 'مفقودة ' + d.summary.missing + ' · موقع مختلف ' + d.summary.moved + ' · سيريال بموقعين ' + d.summary.duplicate_serial + ' · Serial متغير ' + d.summary.serial_changed + ' · لم تُتحقق ' + d.summary.unchecked + ' · متعطلة ' + d.summary.damaged;
+        document.getElementById('printTitle').textContent = 'تقرير الفروقات — يحتاج انتباهك · ' + new Date().toLocaleDateString('ar-SA');
+        th.innerHTML = '<tr><th>الفئة</th><th>الأولوية</th><th>الجهاز</th><th>Serial</th><th>العهدة</th><th>الحالة</th><th>الإجراء المقترح</th><th>الشرح</th></tr>';
+        tb.innerHTML = (d.cases || []).map(function (c) {
+            return '<tr><td><strong>' + esc((d.category_labels || {})[c.category] || c.category) + '</strong></td>' +
+                '<td><span class="tag ' + c.priority + '">' + (c.priority === 'high' ? 'عالية' : 'متوسطة') + '</span></td>' +
+                '<td><span class="serial">' + esc(c.asset_code) + '</span><div class="muted small">' + esc(c.type_name) + '</div></td>' +
+                '<td>' + (c.serial_number ? '<span class="serial">' + esc(c.serial_number) + '</span>' : '—') + '</td>' +
+                '<td>' + esc(c.team_name || '—') + (c.found_team ? '<div class="muted small">ظهر لدى: ' + esc(c.found_team) + '</div>' : '') + '</td>' +
+                '<td>' + statusTag(c.status) + '</td><td class="small">' + esc((d.action_labels || {})[c.suggested_action] || '') + '</td>' +
+                '<td class="small">' + esc(c.explanation) + '</td></tr>';
+        }).join('');
+        document.getElementById('resEmpty').style.display = (d.cases || []).length ? 'none' : '';
+    }
+}
+
+async function downloadCsv() {
+    if (!CURRENT) { showMsg('اختر نوع التقرير أولًا', 'err'); return; }
+    var res = await fetch(reportUrl(true), { headers: authHeaders() });
+    if (!res.ok) { showMsg('فشل تنزيل CSV', 'err'); return; }
+    var blob = await res.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'assets-report-' + CURRENT.type + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -68,7 +68,7 @@ async function login(u, p) {
     const { PERMISSIONS, PERMISSION_KEYS, ROLES_PERMISSIONS } = require(path.join(ROOT, 'config', 'permissions.js'));
     console.log('\n🧪 الكتالوج بعد التفكيك:');
     const OPS10 = ['ops.completion', 'ops.dispatch', 'ops.reports', 'ops.report_revert', 'ops.report_detail', 'ops.deployments', 'ops.forms', 'ops.team_exit', 'ops.volunteers', 'ops.vehicles'];
-    check('الكتالوج 37 مفتاحًا (34 + 3 ربط العمليات: vehicles/files/alerts)', PERMISSION_KEYS.length === 37, 'keys=' + PERMISSION_KEYS.length);
+    check('الكتالوج 40 مفتاحًا (34 + 3 ربط العمليات + 3 العهد والأصول 2026-08-23)', PERMISSION_KEYS.length === 40, 'keys=' + PERMISSION_KEYS.length);
     check('مفاتيح التشغيل العشرة الدقيقة موجودة', OPS10.every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('مفاتيح ربط العمليات الجديدة موجودة (vehicles/files/alerts)', ['ops.vehicles', 'ops.files', 'ops.alerts'].every(k => PERMISSION_KEYS.indexOf(k) !== -1));
     check('ops.files وops.alerts فرديتان — لا دور يحملهما إطلاقًا', Object.keys(ROLES_PERMISSIONS).every(r => ROLES_PERMISSIONS[r].indexOf('ops.files') === -1 && ROLES_PERMISSIONS[r].indexOf('ops.alerts') === -1));

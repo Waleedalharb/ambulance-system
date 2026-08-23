@@ -4724,6 +4724,930 @@ app.get('/cad-overlay', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'cad-overlay-install.html'));
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// نظام العهد والأصول — المرحلة 2 (اعتماد المالك 2026-08-23)
+// Data Model + Import Staging + Migration Preview فقط. الاستيراد قراءة-أولًا:
+// الحمولة (ناتج محلل الجرد المعتمد) تدخل asset_import_staging للمراجعة، ولا
+// تُكتب assets/asset_events إلا عبر /approve بصلاحية assets.manage. لا يُعدَّل
+// أي مصدر بيانات قائم، وملف Excel الأصلي لا يُمس — المنصة تصبح مصدر الحقيقة
+// بعد الاعتماد فقط.
+// ════════════════════════════════════════════════════════════════════════════
+const ASSET_PAYLOAD_PATH = path.join(STORAGE_PATH, 'asset-import-payload.json');
+// نسخة بذرة داخل المستودع — يقرؤها الإنتاج إذا لم تكن الحمولة في مجلد البيانات (النشر لا يحمل /data)
+const SEED_ASSET_PAYLOAD_PATH = path.join(__dirname, 'seed', 'asset-import-payload.json');
+const ASSET_STATUS_LABELS = {
+    working: 'يعمل', damaged: 'متعطل', missing: 'مفقود', replaced: 'مُستبدَل',
+    recalled: 'مسحوب', out_of_service: 'خارج الخدمة', unknown: '⚠️ غير مؤكدة'
+};
+
+app.get('/assets/import', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'asset-import.html'));
+});
+
+// توليد دفعة staging من حمولة المحلل (تُقرأ من مجلد البيانات — لا رفع من المتصفح)
+app.post('/api/assets/import/stage', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        let payload;
+        let payloadSource = 'data';
+        try { payload = JSON.parse(await fs.readFile(ASSET_PAYLOAD_PATH, 'utf8')); }
+        catch (e) {
+            // fallback: نسخة البذرة داخل المستودع (للإنتاج حيث /data لا يُنشر)
+            payloadSource = 'seed';
+            try { payload = JSON.parse(await fs.readFile(SEED_ASSET_PAYLOAD_PATH, 'utf8')); }
+            catch (e2) { return res.status(404).json({ error: 'ملف حمولة الاستيراد غير موجود في مجلد البيانات (asset-import-payload.json)' }); }
+        }
+        if (!payload || !Array.isArray(payload.assets) || !payload.assets.length) {
+            return res.status(400).json({ error: 'حمولة الاستيراد غير صالحة أو فارغة' });
+        }
+        const batch = await db.AssetImportStaging.startBatch(payload);
+        const summary = await db.AssetImportStaging.summary(batch);
+        await addAuditLogEntry('assets_import_staged',
+            `دفعة استيراد العهد #${batch}: ${payload.assets.length} سجلًا من «${payload.source_file}»`,
+            'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, batch, payload_source: payloadSource, source_file: payload.source_file, generated_at: payload.generated_at, summary });
+    } catch (error) {
+        console.error('assets/import/stage error:', error);
+        res.status(500).json({ error: 'فشل توليد دفعة الاستيراد' });
+    }
+});
+
+// معاينة الدفعة: Excel Row → Asset → Team → Center → Status → Serial → Warnings
+app.get('/api/assets/import/preview', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const batch = await db.AssetImportStaging.currentBatch();
+        if (!batch) return res.json({ success: true, batch: 0, summary: null, rows: [], total: 0 });
+        const summary = await db.AssetImportStaging.summary(batch);
+        const { rows, total } = await db.AssetImportStaging.list(batch, {
+            team: req.query.team, status: req.query.status, q: req.query.q,
+            needs_review: req.query.needs_review === '1' ? 1 : 0,
+            import_status: req.query.import_status,
+            limit: req.query.limit, offset: req.query.offset
+        });
+        res.json({ success: true, batch, summary, rows, total, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('assets/import/preview error:', error);
+        res.status(500).json({ error: 'فشل جلب معاينة الاستيراد' });
+    }
+});
+
+// اعتماد الدفعة: pending → assets + أول حدث registered لكل أصل — معاملة واحدة
+app.post('/api/assets/import/approve', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const batch = await db.AssetImportStaging.currentBatch();
+        if (!batch) return res.status(404).json({ error: 'لا توجد دفعة استيراد — نفّذ توليد الدفعة أولًا' });
+        const pending = await db.AssetImportStaging.pendingRows(batch);
+        if (!pending.length) return res.status(409).json({ error: 'كل صفوف هذه الدفعة معتمدة مسبقًا — لا شيء جديدًا للاعتماد' });
+        let created = 0;
+        db.beginTransaction();
+        try {
+            for (const r of pending) {
+                const typeId = r.type_name
+                    ? await db.AssetTypes.upsert(r.type_name, r.type_category, [r.original_name].filter(Boolean))
+                    : null;
+                const { id: assetId, asset_code } = await db.Assets.create({
+                    type_id: typeId, type_name: r.type_name || 'غير مصنّف',
+                    original_name: r.original_name, serial_number: r.serial_number,
+                    status: r.status, team_name: r.team_name, center_name: r.center_name,
+                    custody: r.custody, is_new: r.is_new, needs_review: r.needs_review,
+                    notes: r.notes, source: r.source, import_batch: batch
+                });
+                await db.AssetEvents.create({
+                    asset_id: assetId, event_type: 'registered',
+                    to_value: JSON.stringify({
+                        asset_code, status: r.status, team: r.team_name,
+                        center: r.center_name, serial: r.serial_number
+                    }),
+                    actor_id: String(req.user.id), actor_name: req.user.name,
+                    reason: `استيراد أولي من Excel (دفعة ${batch}) — ${r.sheet_name} صف ${r.excel_row}`
+                });
+                await db.AssetImportStaging.markApproved(r.id, assetId);
+                created++;
+            }
+            // ── دورة الجرد التأسيسية (الوثيقة المعتمدة §12-③): تمثل ملف Excel
+            // كأول لقطة جرد — مغلقة من لحظتها، بجلسة معتمدة لكل فرقة، وتُربط
+            // بها أحداث التسجيل حتى يكون «آخر جرد» ذا معنى من اليوم الأول ──
+            const cycleId = await db.InventoryCycles.create({
+                label: 'الجرد التأسيسي — الربع الثاني 2026 (استيراد ملف Excel)',
+                period_start: '2026-06-19', period_end: '2026-06-20',
+                created_by: req.user.name
+            });
+            await db.run(`UPDATE inventory_cycles SET status = 'closed', closed_at = CURRENT_TIMESTAMP WHERE id = ?`, [cycleId]);
+            const teamNames = [...new Set(pending.map(r => r.team_name || 'غير محدد'))];
+            for (const tn of teamNames) {
+                const sessionId = await db.InventorySessions.create({
+                    cycle_id: cycleId, team_name: tn,
+                    conductor_id: 'excel-import', conductor_name: 'الاستيراد التأسيسي من ملف الجرد 19-20 يونيو 2026'
+                });
+                await db.run(`UPDATE inventory_sessions SET status = 'approved', submitted_at = CURRENT_TIMESTAMP,
+                    approved_at = CURRENT_TIMESTAMP, approved_by = ? WHERE id = ?`, [req.user.name, sessionId]);
+                await db.run(
+                    `UPDATE asset_events SET session_id = ?
+                     WHERE event_type = 'registered' AND session_id IS NULL AND asset_id IN
+                       (SELECT id FROM assets WHERE import_batch = ? AND COALESCE(team_name, 'غير محدد') = ?)`,
+                    [sessionId, batch, tn]);
+            }
+            db.commitTransaction();
+        } catch (txErr) {
+            db.rollbackTransaction();
+            throw txErr;
+        }
+        await addAuditLogEntry('assets_import_approved',
+            `اعتماد دفعة العهد #${batch}: أُنشئ ${created} أصلًا (ASSET-ID داخلي لكل جهاز)`,
+            'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, batch, created });
+    } catch (error) {
+        console.error('assets/import/approve error:', error);
+        res.status(500).json({ error: 'فشل اعتماد الاستيراد: ' + error.message });
+    }
+});
+
+// قراءة الأصول المعتمدة (بحث/فلترة) — عرض فقط، لا Business Logic في الواجهة
+app.get('/api/assets', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const { rows, total } = await db.Assets.list({
+            team: req.query.team, center: req.query.center, status: req.query.status,
+            type: req.query.type, q: req.query.q, needs_review: req.query.needs_review === '1' ? 1 : 0,
+            limit: req.query.limit, offset: req.query.offset
+        });
+        const summary = await db.Assets.summary();
+        res.json({ success: true, rows, total, summary, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('assets list error:', error);
+        res.status(500).json({ error: 'فشل جلب الأصول' });
+    }
+});
+
+// بطاقة جهاز: بياناته + سجل asset_events الكامل + علاقات الاستبدال — قراءة فقط
+app.get('/api/assets/:id(\\d+)', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const asset = await db.Assets.getById(req.params.id);
+        if (!asset) return res.status(404).json({ error: 'الجهاز غير موجود' });
+        const events = await db.AssetEvents.getByAsset(asset.id);
+        const replacements = await db.AssetReplacements.getByAsset(asset.id);
+        // إثراء الاستبدالات بأكواد الجهازين (الأصل ↔ البديل) لتعرضها البطاقة مباشرة
+        const enriched = [];
+        for (const r of replacements) {
+            const oldA = await db.Assets.getById(r.old_asset_id);
+            const newA = await db.Assets.getById(r.new_asset_id);
+            enriched.push({ ...r, old_asset: oldA || null, new_asset: newA || null });
+        }
+        res.json({ success: true, asset, events, replacements: enriched, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('assets get error:', error);
+        res.status(500).json({ error: 'فشل جلب بطاقة الجهاز' });
+    }
+});
+
+// لوحة مركز العهد والأجهزة — كل الأرقام مشتقة لحظيًا من القاعدة (قراءة فقط)
+app.get('/api/assets/dashboard', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const data = await db.Assets.dashboard();
+        res.json({ success: true, ...data, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('assets dashboard error:', error);
+        res.status(500).json({ error: 'فشل جلب لوحة العهد' });
+    }
+});
+
+// صفحتا المرحلة 3: مركز العهد والأجهزة + بطاقة الجهاز
+// ملاحظة توجيهية: «/assets» بالضبط لا يصل إلينا أبدًا — مجلد public/assets/ (صور
+// المنصة) يعترضه express.static ويحوّله 301. لذلك المركز على «/assets-center».
+app.get('/assets-center', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'assets-center.html'));
+});
+app.get('/assets/asset', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'asset-card.html'));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// المرحلة 4: دورة الجرد الفعلية (اعتماد المالك 2026-08-23)
+// الموظف يجرد فرقته من المنصة (لا Excel) ← الإدارة تراجع الفروقات ← الاعتماد
+// يطبق التغييرات بأحداث موثقة. فصل ثابت: assets.inventory تنفذ،
+// assets.manage تعتمد — لا أحد يعتمد جرده بنفسه. لا إجراء حساس تلقائيًا.
+// ════════════════════════════════════════════════════════════════════════════
+function authorizeAnyPerm(...keys) {
+    return async (req, res, next) => {
+        if (!req.user) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
+        try {
+            const svc = getPermissionService();
+            for (const k of keys) {
+                if (await svc.hasPermission(req.user.id, req.user.role, k)) return next();
+            }
+            return res.status(403).json({ error: 'ليس لديك الصلاحية', code: 'PERMISSION_DENIED', permission: keys.join(' | ') });
+        } catch (e) {
+            console.error('authorizeAnyPerm error:', e.message);
+            return res.status(500).json({ error: 'فشل فحص الصلاحية' });
+        }
+    };
+}
+const INV_EXEC = authorizeAnyPerm('assets.inventory', 'assets.manage'); // تنفيذ الجرد
+
+app.get('/assets/inventory', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'assets-inventory.html'));
+});
+app.get('/assets/inventory/session', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'assets-inventory-session.html'));
+});
+
+// إنشاء دورة جرد (مسودة)
+app.post('/api/assets/inventory/cycles', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const label = String((req.body || {}).label || '').trim();
+        if (!label) return res.status(400).json({ error: 'اسم الدورة مطلوب' });
+        const id = await db.InventoryCycles.create({
+            label, period_start: req.body.period_start || null,
+            period_end: req.body.period_end || null, created_by: req.user.name
+        });
+        await addAuditLogEntry('inventory_cycle_created', `إنشاء دورة جرد: «${label}»`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('inventory cycle create error:', error);
+        res.status(500).json({ error: 'فشل إنشاء الدورة' });
+    }
+});
+
+// تفعيل الدورة: جلسة لكل فرقة لها أجهزة غير مؤرشفة
+app.post('/api/assets/inventory/cycles/:id/activate', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const cycle = await db.InventoryCycles.getById(req.params.id);
+        if (!cycle) return res.status(404).json({ error: 'الدورة غير موجودة' });
+        if (cycle.status !== 'draft') return res.status(409).json({ error: 'الدورة ليست مسودة — حالتها: ' + cycle.status });
+        const teams = await db.all(`SELECT DISTINCT team_name FROM assets WHERE archived_at IS NULL AND team_name IS NOT NULL ORDER BY ${db.teamOrderSql('team_name')}`);
+        if (!teams.length) return res.status(409).json({ error: 'لا أجهزة في القاعدة — اعتمد الاستيراد التأسيسي أولًا' });
+        for (const t of teams) {
+            await db.InventorySessions.create({ cycle_id: cycle.id, team_name: t.team_name });
+        }
+        await db.run(`UPDATE inventory_cycles SET status = 'active' WHERE id = ?`, [cycle.id]);
+        await addAuditLogEntry('inventory_cycle_activated', `تفعيل «${cycle.label}» — ${teams.length} جلسة فرق`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, sessions: teams.length });
+    } catch (error) {
+        console.error('inventory cycle activate error:', error);
+        res.status(500).json({ error: 'فشل تفعيل الدورة' });
+    }
+});
+
+// قائمة الدورات مع تقدم الجلسات
+app.get('/api/assets/inventory/cycles', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const cycles = await db.InventoryCycles.getAll();
+        const out = [];
+        for (const c of cycles) {
+            const sessions = await db.InventorySessions.getByCycle(c.id);
+            out.push({
+                ...c,
+                sessions_total: sessions.length,
+                sessions_submitted: sessions.filter(s => s.status === 'submitted').length,
+                sessions_approved: sessions.filter(s => s.status === 'approved').length,
+                sessions: sessions.map(s => ({ id: s.id, team_name: s.team_name, status: s.status, conductor_name: s.conductor_name, submitted_at: s.submitted_at, approved_at: s.approved_at }))
+            });
+        }
+        res.json({ success: true, cycles: out });
+    } catch (error) {
+        console.error('inventory cycles list error:', error);
+        res.status(500).json({ error: 'فشل جلب الدورات' });
+    }
+});
+
+// إغلاق الدورة — يتطلب اعتماد كل الجلسات (لا جرد مفتوحًا يُطوى صامتًا)
+app.post('/api/assets/inventory/cycles/:id/close', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const cycle = await db.InventoryCycles.getById(req.params.id);
+        if (!cycle) return res.status(404).json({ error: 'الدورة غير موجودة' });
+        if (cycle.status !== 'active') return res.status(409).json({ error: 'الدورة ليست نشطة' });
+        const sessions = await db.InventorySessions.getByCycle(cycle.id);
+        const pending = sessions.filter(s => s.status !== 'approved');
+        if (pending.length) {
+            return res.status(409).json({ error: 'لا يمكن الإغلاق — جلسات غير معتمدة: ' + pending.map(s => s.team_name).join('، ') });
+        }
+        await db.run(`UPDATE inventory_cycles SET status = 'closed', closed_at = CURRENT_TIMESTAMP WHERE id = ?`, [cycle.id]);
+        await addAuditLogEntry('inventory_cycle_closed', `إغلاق «${cycle.label}» — ${sessions.length} جلسة معتمدة`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('inventory cycle close error:', error);
+        res.status(500).json({ error: 'فشل إغلاق الدورة' });
+    }
+});
+
+// عرض جلسة: الفرقة + الأجهزة المتوقعة + ما سُجّل — للمنفذ والإدارة معًا
+app.get('/api/assets/inventory/sessions/:id', authenticate, INV_EXEC, async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        const cycle = await db.InventoryCycles.getById(session.cycle_id);
+        const expected = await db.all(
+            `SELECT a.*,
+               (SELECT e.created_at FROM asset_events e WHERE e.asset_id = a.id AND e.session_id IS NOT NULL ORDER BY e.created_at DESC LIMIT 1) AS last_inventory_at
+             FROM assets a WHERE a.team_name = ? AND a.archived_at IS NULL ORDER BY a.type_name, a.asset_code`,
+            [session.team_name]);
+        const items = await db.InventoryItems.getBySession(session.id);
+        res.json({ success: true, session, cycle, expected, items, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('inventory session get error:', error);
+        res.status(500).json({ error: 'فشل جلب الجلسة' });
+    }
+});
+
+// تسجيل نتيجة جهاز في الجلسة (تحديث إن سبق تسجيله)
+app.post('/api/assets/inventory/sessions/:id/items', authenticate, INV_EXEC, async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        if (session.status !== 'open') return res.status(409).json({ error: 'الجلسة ليست مفتوحة — حالتها: ' + session.status });
+        const b = req.body || {};
+        const asset = await db.Assets.getById(b.asset_id);
+        if (!asset) return res.status(404).json({ error: 'الجهاز غير موجود' });
+        if (asset.team_name !== session.team_name && !b.discovered) {
+            return res.status(409).json({ error: 'الجهاز ' + asset.asset_code + ' ليس في عهدة ' + session.team_name + ' — سجّله «جهازًا مكتشفًا» إن وُجد ميدانيًا' });
+        }
+        // 🔴 الفقد بلا سبب مرفوض — سبب إلزامي (الوثيقة المعتمدة §3)
+        if (b.result === 'missing' && !String(b.reason || '').trim()) {
+            return res.status(400).json({ error: 'تسجيل الفقد يتطلب سببًا إلزاميًا (متى/أين فُقد)' });
+        }
+        if (!session.conductor_id) {
+            await db.run(`UPDATE inventory_sessions SET conductor_id = ?, conductor_name = ? WHERE id = ?`,
+                [String(req.user.id), req.user.name, session.id]);
+        }
+        const itemId = await db.InventoryItems.upsert({
+            session_id: session.id, asset_id: asset.id, result: b.result,
+            reason: b.reason || null, serial_seen: b.serial_seen || null,
+            location_note: b.location_note || null,
+            replacement_asset_id: b.replacement_asset_id || null,
+            discovered: b.discovered ? 1 : 0
+        });
+        res.json({ success: true, item_id: itemId });
+    } catch (error) {
+        console.error('inventory item error:', error);
+        res.status(400).json({ error: error.message || 'فشل تسجيل النتيجة' });
+    }
+});
+
+// جهاز مكتشف ميدانيًا غير مسجل بالقاعدة — هوية جديدة معلّمة للمراجعة
+app.post('/api/assets/inventory/sessions/:id/discovered', authenticate, INV_EXEC, async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        if (session.status !== 'open') return res.status(409).json({ error: 'الجلسة ليست مفتوحة' });
+        const b = req.body || {};
+        const typeName = String(b.type_name || '').trim();
+        if (!typeName) return res.status(400).json({ error: 'نوع الجهاز مطلوب' });
+        // إن كان السيريال مسجلًا لجهاز آخر ← لا ننشئ مكررًا صامتًا: نربط العنصر بالجهاز
+        // القائم ونعلّمه needs_review («موجود في مكان غير متوقع») والحسم للإدارة
+        let serial = String(b.serial_number || '').trim() || null;
+        let existing = null;
+        if (serial) existing = await db.get('SELECT * FROM assets WHERE serial_number = ? AND archived_at IS NULL', [serial]);
+        if (existing) {
+            const itemId = await db.InventoryItems.upsert({
+                session_id: session.id, asset_id: existing.id, result: 'needs_review',
+                reason: 'وُجد ميدانيًا لدى ' + session.team_name + ' بينما عهدته المسجلة: ' + (existing.team_name || '—') + (b.reason ? ' · ' + b.reason : ''),
+                serial_seen: serial, location_note: b.location_note || null, discovered: 1
+            });
+            await db.run('UPDATE assets SET needs_review = 1 WHERE id = ?', [existing.id]);
+            return res.json({ success: true, item_id: itemId, matched_existing: existing.asset_code, warning: 'السيريال مسجل لجهاز آخر (' + existing.asset_code + ' — ' + (existing.team_name || '—') + ') — عُلّم للمراجعة' });
+        }
+        const { id: assetId, asset_code } = await db.Assets.create({
+            type_name: typeName, original_name: b.original_name || typeName,
+            serial_number: serial, status: ['working', 'damaged'].includes(b.status) ? b.status : 'working',
+            team_name: session.team_name, center_name: b.center_name || null,
+            needs_review: 1, notes: b.notes || null, source: 'inventory-discovery'
+        });
+        await db.AssetEvents.create({
+            asset_id: assetId, event_type: 'registered',
+            to_value: JSON.stringify({ asset_code, status: 'working', team: session.team_name, serial }),
+            actor_id: String(req.user.id), actor_name: req.user.name,
+            reason: 'اكتُشف ميدانيًا أثناء جرد ' + session.team_name + ' — بانتظار اعتماد الإدارة',
+            session_id: session.id
+        });
+        const itemId = await db.InventoryItems.upsert({
+            session_id: session.id, asset_id: assetId, result: 'ok',
+            serial_seen: serial, location_note: b.location_note || null, discovered: 1
+        });
+        res.json({ success: true, item_id: itemId, asset_code, needs_review: true });
+    } catch (error) {
+        console.error('inventory discovered error:', error);
+        res.status(400).json({ error: error.message || 'فشل تسجيل الجهاز المكتشف' });
+    }
+});
+
+// إرسال الجلسة للإدارة
+app.post('/api/assets/inventory/sessions/:id/submit', authenticate, INV_EXEC, async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        if (session.status !== 'open') return res.status(409).json({ error: 'الجلسة ليست مفتوحة' });
+        await db.InventorySessions.setStatus(session.id, 'submitted');
+        const items = await db.InventoryItems.getBySession(session.id);
+        await addAuditLogEntry('inventory_session_submitted',
+            `جرد ${session.team_name}: ${items.length} جهازًا — أُرسل للاعتماد`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, items: items.length });
+    } catch (error) {
+        console.error('inventory submit error:', error);
+        res.status(500).json({ error: 'فشل إرسال الجلسة' });
+    }
+});
+
+// مراجعة الإدارة: الفروقات مقابل الخط الأساسي قبل الاعتماد
+app.get('/api/assets/inventory/sessions/:id/review', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        const items = await db.InventoryItems.getBySession(session.id);
+        const expected = await db.all('SELECT id, asset_code, type_name, serial_number, status FROM assets WHERE team_name = ? AND archived_at IS NULL', [session.team_name]);
+        const itemAssetIds = new Set(items.map(i => i.asset_id));
+        const unchecked = expected.filter(a => !itemAssetIds.has(a.id));
+        const byResult = {};
+        items.forEach(i => { byResult[i.result] = (byResult[i.result] || 0) + 1; });
+        const serialChanges = items.filter(i => i.serial_seen && i.serial_seen !== (i.serial_number || ''))
+            .map(i => ({ asset_code: i.asset_code, from: i.serial_number || 'فارغ', to: i.serial_seen }));
+        res.json({
+            success: true, session, items, byResult,
+            unchecked, discovered: items.filter(i => i.discovered), serialChanges,
+            status_labels: ASSET_STATUS_LABELS
+        });
+    } catch (error) {
+        console.error('inventory review error:', error);
+        res.status(500).json({ error: 'فشل جلب المراجعة' });
+    }
+});
+
+// اعتماد الجلسة: تطبيق التغييرات بأحداث موثقة — معاملة واحدة
+app.post('/api/assets/inventory/sessions/:id/approve', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        if (session.status !== 'submitted') return res.status(409).json({ error: 'الجلسة ليست بانتظار الاعتماد — حالتها: ' + session.status });
+        const items = await db.InventoryItems.getBySession(session.id);
+        const actor = { id: String(req.user.id), name: req.user.name };
+        let changed = 0, serialFixed = 0, replacedCount = 0;
+        db.beginTransaction();
+        try {
+            for (const item of items) {
+                const asset = await db.Assets.getById(item.asset_id);
+                if (!asset) continue;
+                // حدث «تم جرده» لكل جهاز مُتحقق منه — يحدّث «آخر جرد» ويوثق النتيجة
+                await db.AssetEvents.create({
+                    asset_id: asset.id, event_type: 'inventoried',
+                    to_value: item.result, actor_id: actor.id, actor_name: actor.name,
+                    reason: item.reason || ('جرد ' + session.team_name), session_id: session.id
+                });
+                // تصحيح/استكمال السيريال الميداني — حدث مستقل موثق
+                if (item.serial_seen && item.serial_seen !== (asset.serial_number || '')) {
+                    await db.AssetEvents.create({
+                        asset_id: asset.id, event_type: 'serial_corrected',
+                        from_value: asset.serial_number || 'فارغ', to_value: item.serial_seen,
+                        actor_id: actor.id, actor_name: actor.name,
+                        reason: 'تأكيد/تصحيح أثناء جرد ' + session.team_name, session_id: session.id
+                    });
+                    await db.run('UPDATE assets SET serial_number = ? WHERE id = ?', [item.serial_seen, asset.id]);
+                    serialFixed++;
+                }
+                // تغيير الحالة حسب نتيجة الجرد
+                let newStatus = null, eventType = 'status_changed';
+                if (item.result === 'ok' && asset.status !== 'working') newStatus = 'working';
+                if (item.result === 'damaged' && asset.status !== 'damaged') newStatus = 'damaged';
+                if (item.result === 'missing' && asset.status !== 'missing') { newStatus = 'missing'; eventType = 'reported_missing'; }
+                if (item.result === 'replaced' && asset.status !== 'replaced') { newStatus = 'replaced'; eventType = 'replaced'; }
+                if (newStatus) {
+                    await db.AssetEvents.create({
+                        asset_id: asset.id, event_type: eventType,
+                        from_value: asset.status, to_value: newStatus,
+                        actor_id: actor.id, actor_name: actor.name,
+                        reason: item.reason || ('جرد ' + session.team_name), session_id: session.id
+                    });
+                    await db.run('UPDATE assets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newStatus, asset.id]);
+                    changed++;
+                }
+                if (item.result === 'needs_review') {
+                    await db.run('UPDATE assets SET needs_review = 1 WHERE id = ?', [asset.id]);
+                }
+                // علاقة الاستبدال: البديل جهاز قائم مختار أو يُنشأ بالسيريال المدخل
+                if (item.result === 'replaced') {
+                    let replId = item.replacement_asset_id || null;
+                    if (!replId && item.serial_seen_replacement) { /* احتياط مستقبلي */ }
+                    if (replId) {
+                        await db.AssetReplacements.create({
+                            old_asset_id: asset.id, new_asset_id: replId,
+                            reason: item.reason || 'استبدال أثناء جرد ' + session.team_name,
+                            actor_id: actor.id, actor_name: actor.name
+                        });
+                        replacedCount++;
+                    }
+                }
+            }
+            // الأجهزة التي لم تُتحقق — تُعلَّم للمراجعة (لا تُخمَّن حالتها)
+            const itemAssetIds = items.map(i => i.asset_id);
+            const unchecked = await db.all(
+                `SELECT id FROM assets WHERE team_name = ? AND archived_at IS NULL AND id NOT IN (${itemAssetIds.length ? itemAssetIds.join(',') : 'NULL'})`,
+                [session.team_name]);
+            for (const u of unchecked) {
+                await db.run('UPDATE assets SET needs_review = 1 WHERE id = ?', [u.id]);
+            }
+            await db.InventorySessions.setStatus(session.id, 'approved', actor.name);
+            db.commitTransaction();
+        } catch (txErr) {
+            db.rollbackTransaction();
+            throw txErr;
+        }
+        await addAuditLogEntry('inventory_session_approved',
+            `اعتماد جرد ${session.team_name}: ${items.length} جهازًا · ${changed} تغيير حالة · ${serialFixed} تصحيح سيريال · ${replacedCount} استبدال`,
+            'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, items: items.length, changed, serialFixed, replaced: replacedCount });
+    } catch (error) {
+        console.error('inventory approve error:', error);
+        res.status(500).json({ error: 'فشل اعتماد الجلسة: ' + error.message });
+    }
+});
+
+// إرجاع الجلسة للموظف بملاحظة (لا اعتماد صامت ولا رفض بلا سبب)
+app.post('/api/assets/inventory/sessions/:id/reopen', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const session = await db.InventorySessions.getById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+        if (session.status !== 'submitted') return res.status(409).json({ error: 'فقط الجلسات المرسلة يمكن إرجاعها' });
+        const note = String((req.body || {}).note || '').trim();
+        if (!note) return res.status(400).json({ error: 'ملاحظة الإرجاع إلزامية' });
+        await db.InventorySessions.setStatus(session.id, 'open');
+        await db.run('UPDATE inventory_sessions SET notes = ? WHERE id = ?', [note, session.id]);
+        await addAuditLogEntry('inventory_session_reopened', `إرجاع جرد ${session.team_name}: ${note}`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('inventory reopen error:', error);
+        res.status(500).json({ error: 'فشل إرجاع الجلسة' });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// المرحلة 5: مركز الفروقات والقرارات — «Needs Attention Engine» (اعتماد المالك 2026-08-23)
+// Agent يكتشف ويقترح، المسؤول يقرر. لا نقل/حسم/حذف/دمج تلقائيًا أبدًا —
+// كل قرار: ضغطة زر + تأكيد + assets.manage + حدث في Timeline الجهاز + audit_log.
+// Single Source of Truth: assets / inventory_items / asset_events / audit_log فقط.
+// قاعدة الحسم: الحالة «محسومة» إذا وُجد حدث review_resolved/transferred بعد raised_at.
+// ════════════════════════════════════════════════════════════════════════════
+app.get('/assets/discrepancies', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'assets-discrepancies.html'));
+});
+
+const ASSET_COLS = 'a.id, a.asset_code, a.type_name, a.serial_number, a.status, a.team_name, a.center_name';
+const UNRESOLVED = `NOT EXISTS (SELECT 1 FROM asset_events r WHERE r.asset_id = x.id AND r.event_type IN ('review_resolved','transferred') AND r.created_at >= x.raised_at)`;
+
+async function computeDiscrepancies() {
+    // أحدث دورة جرد فعلية (فيها عناصر مسجلة — الدورة التأسيسية بلا عناصر لا تُعتبر)
+    const rc = await db.get(
+        `SELECT MAX(c.id) AS id FROM inventory_cycles c
+         WHERE EXISTS (SELECT 1 FROM inventory_sessions s JOIN inventory_items i ON i.session_id = s.id WHERE s.cycle_id = c.id)`);
+    let realCycle = null;
+    if (rc && rc.id) {
+        const lbl = await db.get('SELECT label FROM inventory_cycles WHERE id = ?', [rc.id]);
+        realCycle = { id: rc.id, label: lbl ? lbl.label : null };
+    }
+    const realCycleId = realCycle ? realCycle.id : null;
+
+    // 🔴 مفقودة — بانتظار توثيق القرار الإداري
+    const missing = await db.all(
+        `SELECT * FROM (
+           SELECT ${ASSET_COLS}, COALESCE((SELECT MAX(e.created_at) FROM asset_events e WHERE e.asset_id = a.id AND e.event_type = 'reported_missing'), a.created_at) AS raised_at
+           FROM assets a WHERE a.status = 'missing' AND a.archived_at IS NULL
+         ) x WHERE ${UNRESOLVED}`);
+
+    // 🔴 موقع مختلف — اكتُشف ميدانيًا لدى فرقة غير فرقة العهدة ولا نقل موثق بعده
+    const moved = await db.all(
+        `SELECT * FROM (
+           SELECT ${ASSET_COLS}, MAX(i.created_at) AS raised_at, s.team_name AS found_team, i.location_note AS found_note, i.serial_seen
+           FROM inventory_items i
+           JOIN inventory_sessions s ON s.id = i.session_id
+           JOIN assets a ON a.id = i.asset_id
+           WHERE i.discovered = 1 AND a.team_name != s.team_name AND a.archived_at IS NULL
+           GROUP BY a.id
+         ) x WHERE ${UNRESOLVED}`);
+
+    // 🟠 Serial متغير — صُحّح أثناء الجرد ولم تُراجَع التصحيحات
+    const serialChanged = await db.all(
+        `SELECT * FROM (
+           SELECT ${ASSET_COLS}, MAX(e.created_at) AS raised_at,
+                  (SELECT e2.from_value FROM asset_events e2 WHERE e2.asset_id = a.id AND e2.event_type = 'serial_corrected' ORDER BY e2.created_at DESC LIMIT 1) AS serial_from,
+                  (SELECT e3.to_value FROM asset_events e3 WHERE e3.asset_id = a.id AND e3.event_type = 'serial_corrected' ORDER BY e3.created_at DESC LIMIT 1) AS serial_seen
+           FROM asset_events e JOIN assets a ON a.id = e.asset_id
+           WHERE e.event_type = 'serial_corrected' AND a.archived_at IS NULL
+           GROUP BY e.asset_id
+         ) x WHERE ${UNRESOLVED}`);
+
+    // 🟡 لم تُتحقق — أجهزة فرقة اعتُمدت جلستها في أحدث دورة فعلية ولم تُسجَّل فيها
+    let unchecked = [];
+    if (realCycleId) {
+        unchecked = await db.all(
+            `SELECT * FROM (
+               SELECT ${ASSET_COLS}, s.approved_at AS raised_at
+               FROM assets a
+               JOIN inventory_sessions s ON s.team_name = a.team_name AND s.status = 'approved' AND s.cycle_id = ?
+               WHERE a.archived_at IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM inventory_items i WHERE i.session_id = s.id AND i.asset_id = a.id)
+             ) x WHERE ${UNRESOLVED}`, [realCycleId]);
+    }
+
+    // 🟡 متعطلة — بانتظار قرار (إصلاح/استبدال/إبقاء)
+    const damaged = await db.all(
+        `SELECT * FROM (
+           SELECT ${ASSET_COLS}, COALESCE((SELECT MAX(e.created_at) FROM asset_events e WHERE e.asset_id = a.id AND e.event_type = 'status_changed' AND e.to_value = 'damaged'), a.created_at) AS raised_at
+           FROM assets a WHERE a.status = 'damaged' AND a.archived_at IS NULL
+         ) x WHERE ${UNRESOLVED}`);
+
+    // 🔴 Serial مسجل في موقعين — تكرار من المصدر، لا دمج صامت؛ الحسم بشري
+    const dupSerials = await db.all(
+        `SELECT serial_number FROM assets
+         WHERE serial_number IS NOT NULL AND serial_number != '' AND archived_at IS NULL
+         GROUP BY serial_number HAVING COUNT(*) > 1`);
+    const dupCases = [];
+    for (const d of dupSerials) {
+        const members = await db.all(
+            `SELECT ${ASSET_COLS}, a.created_at AS raised_at FROM assets a
+             WHERE a.serial_number = ? AND a.archived_at IS NULL`, [d.serial_number]);
+        const openMembers = [];
+        for (const m of members) {
+            const res = await db.get(
+                `SELECT COUNT(*) c FROM asset_events r WHERE r.asset_id = ? AND r.event_type = 'review_resolved' AND r.created_at >= ?`,
+                [m.id, m.raised_at]);
+            if (res.c === 0) openMembers.push(m);
+        }
+        if (openMembers.length > 1 || (openMembers.length === 1 && members.length > 1)) {
+            dupCases.push({ serial_number: d.serial_number, members, raised_at: members[0].raised_at });
+        }
+    }
+
+    // 🟢 معلومات: مطابقة في أحدث دورة فعلية + فروقات حُسمت
+    let matched = 0;
+    if (realCycleId) {
+        matched = (await db.get(
+            `SELECT COUNT(DISTINCT i.asset_id) c FROM inventory_items i
+             JOIN inventory_sessions s ON s.id = i.session_id
+             WHERE i.result = 'ok' AND s.cycle_id = ?`, [realCycleId])).c;
+    }
+    const resolvedCount = (await db.get(
+        `SELECT COUNT(*) c FROM asset_events WHERE event_type IN ('review_resolved','transferred')`)).c;
+
+    // تجميع الحالات بأولوياتها + شرح «لماذا ظهرت» + الإجراء المقترح
+    const lastEvent = async (id) => db.get(
+        `SELECT event_type, created_at, actor_name FROM asset_events WHERE asset_id = ? ORDER BY created_at DESC LIMIT 1`, [id]);
+    const lastInventory = async (id) => (await db.get(
+        `SELECT MAX(created_at) AS at FROM asset_events WHERE asset_id = ? AND session_id IS NOT NULL`, [id])).at;
+
+    const cases = [];
+    const push = async (rows, category, priority, suggested, explain) => {
+        for (const r of rows) {
+            cases.push({
+                key: category + '-' + r.id, category, priority, suggested_action: suggested,
+                asset_id: r.id, asset_code: r.asset_code, type_name: r.type_name,
+                serial_number: r.serial_number, status: r.status,
+                team_name: r.team_name, center_name: r.center_name,
+                serial_seen: r.serial_seen || null, serial_from: r.serial_from || null,
+                found_team: r.found_team || null, found_note: r.found_note || null,
+                raised_at: r.raised_at, last_inventory_at: await lastInventory(r.id),
+                last_event: await lastEvent(r.id),
+                explanation: explain(r)
+            });
+        }
+    };
+    await push(missing, 'missing', 'high', 'document_missing',
+        r => `الجهاز مسجل «مفقود»${r.team_name ? ' على ' + r.team_name : ''} ولا يوجد قرار إداري موثق بعد آخر بلاغ فقد. الإجراء المقترح: توثيق الفقد رسميًا أو مراجعة الحالة.`);
+    await push(moved, 'moved', 'high', 'transfer',
+        r => `الجهاز مسجل في عهدة ${r.team_name || '—'}${r.center_name ? ' / ' + r.center_name : ''}، وظهر ميدانيًا أثناء الجرد لدى ${r.found_team}${r.found_note ? ' (' + r.found_note + ')' : ''} دون حركة نقل موثقة. الإجراء المقترح: مراجعة النقل واعتماد موقعه الحالي أو إعادته لعهدة الأصل.`);
+    await push(dupCases.map(d => ({ id: d.members[0].id, asset_code: d.members.map(m => m.asset_code).join(' + '), type_name: d.members[0].type_name, serial_number: d.serial_number, status: d.members[0].status, team_name: d.members.map(m => m.team_name || '—').join(' / '), center_name: null, raised_at: d.raised_at })),
+        'duplicate_serial', 'high', 'review_group',
+        r => `السيريال ${r.serial_number} مسجل على أكثر من جهاز في مواقع مختلفة (${r.team_name}). لا يُدمَج الجهازان تلقائيًا — الإجراء المقترح: مراجعة ميدانية وحسم أيّهما الصحيح.`);
+    await push(serialChanged, 'serial_changed', 'medium', 'review',
+        r => `سيريال الجهاز كان «${r.serial_from || 'فارغ'}» وسُجّل في الجرد «${r.serial_seen}». صُحّحت البيانات — الإجراء المقترح: مراجعة سبب الاختلاف وحسمه.`);
+    await push(damaged, 'damaged', 'medium', 'review',
+        r => `الجهاز بحالة «تالف»${r.team_name ? ' لدى ' + r.team_name : ''} ولا يوجد قرار موثق (إصلاح/استبدال/إبقاء). الإجراء المقترح: مراجعة الحالة واتخاذ قرار.`);
+    await push(unchecked, 'unchecked', 'medium', 'review',
+        r => `الجهاز لم يُتحقق منه في أحدث جرد لفرقة ${r.team_name || '—'} — عُلّم للمراجعة ولم تُخمَّن حالته. الإجراء المقترح: تحقق ميداني أو تسجيل قرار.`);
+
+    // ترتيب: عالية أولًا ثم متوسطة، وداخلها الأحدث أولًا
+    const rank = { high: 0, medium: 1 };
+    cases.sort((a, b) => rank[a.priority] - rank[b.priority] || String(b.raised_at).localeCompare(String(a.raised_at)));
+
+    return {
+        summary: {
+            needs_decision: cases.length,
+            missing: missing.length, moved: moved.length, duplicate_serial: dupCases.length,
+            serial_changed: serialChanged.length, unchecked: unchecked.length, damaged: damaged.length,
+            matched, resolved: resolvedCount
+        },
+        cycle: realCycleId ? { id: realCycleId, label: realCycle.label } : null,
+        cases
+    };
+}
+
+// قائمة الفروقات (أو الملخص فقط للشريط) — قراءة لكل من يملك assets.view
+app.get('/api/assets/discrepancies', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const data = await computeDiscrepancies();
+        if (req.query.summary === '1') return res.json({ success: true, summary: data.summary, cycle: data.cycle });
+        res.json({ success: true, ...data });
+    } catch (error) {
+        console.error('discrepancies error:', error);
+        res.status(500).json({ error: 'فشل حساب الفروقات' });
+    }
+});
+
+// ① تأكيد النقل — يحدّث العهدة ويكتب transferred (من ← إلى · المعتمد · الوقت)
+app.post('/api/assets/:id(\\d+)/transfer', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const asset = await db.Assets.getById(req.params.id);
+        if (!asset) return res.status(404).json({ error: 'الجهاز غير موجود' });
+        const toTeam = String((req.body || {}).to_team || '').trim();
+        const toCenter = String((req.body || {}).to_center || '').trim() || null;
+        const reason = String((req.body || {}).reason || '').trim();
+        if (!toTeam) return res.status(400).json({ error: 'الفرقة/الموقع الجديد مطلوب' });
+        if (!reason) return res.status(400).json({ error: 'سبب النقل إلزامي' });
+        if (toTeam === asset.team_name && (toCenter || null) === (asset.center_name || null)) {
+            return res.status(409).json({ error: 'الوجهة identical للعهدة الحالية — لا نقل' });
+        }
+        await db.AssetEvents.create({
+            asset_id: asset.id, event_type: 'transferred',
+            from_value: JSON.stringify({ team: asset.team_name || null, center: asset.center_name || null }),
+            to_value: JSON.stringify({ team: toTeam, center: toCenter }),
+            actor_id: String(req.user.id), actor_name: req.user.name, reason
+        });
+        await db.run('UPDATE assets SET team_name = ?, center_name = ?, needs_review = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [toTeam, toCenter, asset.id]);
+        await addAuditLogEntry('asset_transferred',
+            `نقل ${asset.asset_code}: ${asset.team_name || '—'} ← ${toTeam} · ${reason}`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('asset transfer error:', error);
+        res.status(500).json({ error: 'فشل تأكيد النقل' });
+    }
+});
+
+// ② مراجعة وحسم — ملاحظة إلزامية، يرفع علم المراجعة ويكتب review_resolved
+app.post('/api/assets/:id(\\d+)/resolve-review', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const asset = await db.Assets.getById(req.params.id);
+        if (!asset) return res.status(404).json({ error: 'الجهاز غير موجود' });
+        const note = String((req.body || {}).note || '').trim();
+        if (!note) return res.status(400).json({ error: 'ملاحظة الحسم إلزامية' });
+        const outcome = String((req.body || {}).outcome || 'resolved').trim();
+        await db.AssetEvents.create({
+            asset_id: asset.id, event_type: 'review_resolved',
+            from_value: 'needs_review', to_value: outcome,
+            actor_id: String(req.user.id), actor_name: req.user.name, reason: note
+        });
+        await db.run('UPDATE assets SET needs_review = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [asset.id]);
+        await addAuditLogEntry('asset_review_resolved',
+            `حسم مراجعة ${asset.asset_code}: ${outcome} · ${note}`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('asset resolve error:', error);
+        res.status(500).json({ error: 'فشل حسم المراجعة' });
+    }
+});
+
+// ③ توثيق الفقد — يبقى missing ولا يُحذف الأصل؛ يُسجَّل القرار الإداري فقط
+app.post('/api/assets/:id(\\d+)/document-missing', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const asset = await db.Assets.getById(req.params.id);
+        if (!asset) return res.status(404).json({ error: 'الجهاز غير موجود' });
+        if (asset.status !== 'missing') return res.status(409).json({ error: 'الجهاز ليس بحالة مفقود — حالته: ' + asset.status });
+        const reason = String((req.body || {}).reason || '').trim();
+        if (!reason) return res.status(400).json({ error: 'سبب/ملاحظة توثيق الفقد إلزامية' });
+        await db.AssetEvents.create({
+            asset_id: asset.id, event_type: 'review_resolved',
+            from_value: 'missing', to_value: 'missing_confirmed',
+            actor_id: String(req.user.id), actor_name: req.user.name, reason
+        });
+        await db.run('UPDATE assets SET needs_review = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [asset.id]);
+        await addAuditLogEntry('asset_missing_documented',
+            `توثيق فقد ${asset.asset_code} (${asset.team_name || '—'}): ${reason}`, 'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('document missing error:', error);
+        res.status(500).json({ error: 'فشل توثيق الفقد' });
+    }
+});
+
+// ④ حسم مجموعة سيريال مكرر — حسم بشري موثق على كل الأجهزة المعنية (لا دمج)
+app.post('/api/assets/resolve-serial-group', authenticate, authorizePerm('assets.manage'), async (req, res) => {
+    try {
+        const serial = String((req.body || {}).serial || '').trim();
+        const note = String((req.body || {}).note || '').trim();
+        if (!serial) return res.status(400).json({ error: 'السيريال مطلوب' });
+        if (!note) return res.status(400).json({ error: 'ملاحظة الحسم إلزامية' });
+        const members = await db.all('SELECT id, asset_code FROM assets WHERE serial_number = ? AND archived_at IS NULL', [serial]);
+        if (!members.length) return res.status(404).json({ error: 'لا أجهزة بهذا السيريال' });
+        for (const m of members) {
+            await db.AssetEvents.create({
+                asset_id: m.id, event_type: 'review_resolved',
+                from_value: 'duplicate_serial', to_value: 'resolved',
+                actor_id: String(req.user.id), actor_name: req.user.name,
+                reason: `حسم تكرار السيريال ${serial}: ${note}`
+            });
+            await db.run('UPDATE assets SET needs_review = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [m.id]);
+        }
+        await addAuditLogEntry('asset_serial_group_resolved',
+            `حسم تكرار السيريال ${serial} على ${members.length} جهازًا (${members.map(m => m.asset_code).join('، ')}): ${note}`,
+            'assets', req.user.name, req.user.role, req.user.id);
+        res.json({ success: true, resolved: members.length });
+    } catch (error) {
+        console.error('serial group resolve error:', error);
+        res.status(500).json({ error: 'فشل حسم المجموعة' });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// المرحلة 6: التقارير والمخرجات (اعتماد المالك 2026-08-23 — «معلومات تُرسل عند طلب الإدارة»)
+// كل التقارير مشتقة لحظيًا من مصدر الحقيقة (assets/asset_events/inventory_*) —
+// قراءة فقط بصلاحية assets.view · CSV بـBOM عربي · لا بيانات موازية.
+// ════════════════════════════════════════════════════════════════════════════
+app.get('/assets/reports', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'assets-reports.html'));
+});
+
+function sendCsv(res, filename, header, rows) {
+    const escCsv = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = String.fromCharCode(0xFEFF) + [header, ...rows].map(r => r.map(escCsv).join(String.fromCharCode(44))).join(String.fromCharCode(13,10));
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${filename}"` });
+    res.send(csv);
+}
+
+// ① تقرير العهدة — لفرقة/مركز أو كامل القاعدة (قابل للطباعة والتوقيع الميداني)
+app.get('/api/assets/reports/custody', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const where = ['a.archived_at IS NULL'];
+        const params = [];
+        if (req.query.team_name) { where.push('a.team_name = ?'); params.push(req.query.team_name); }
+        if (req.query.center_name) { where.push('a.center_name = ?'); params.push(req.query.center_name); }
+        const rows = await db.all(
+            `SELECT a.asset_code, a.type_name, a.original_name, a.serial_number, a.status, a.team_name, a.center_name, a.needs_review,
+                    (SELECT MAX(e.created_at) FROM asset_events e WHERE e.asset_id = a.id AND e.session_id IS NOT NULL) AS last_inventory_at
+             FROM assets a WHERE ${where.join(' AND ')}
+             ORDER BY ${db.teamOrderSql('a.team_name')}, a.type_name, a.asset_code`, params);
+        if (req.query.format === 'csv') {
+            return sendCsv(res, 'custody-report.csv',
+                ['ASSET-ID', 'النوع', 'الاسم الأصلي', 'Serial', 'الحالة', 'الفرقة', 'المركز', 'آخر جرد', 'يحتاج مراجعة'],
+                rows.map(r => [r.asset_code, r.type_name, r.original_name, r.serial_number, ASSET_STATUS_LABELS[r.status] || r.status, r.team_name, r.center_name, r.last_inventory_at, r.needs_review ? 'نعم' : '']));
+        }
+        res.json({ success: true, rows, total: rows.length, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('custody report error:', error);
+        res.status(500).json({ error: 'فشل توليد تقرير العهدة' });
+    }
+});
+
+// ② تقرير دورة جرد — نتائج كل فرقة وقراراتها
+app.get('/api/assets/reports/cycle/:id(\\d+)', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const cycle = await db.InventoryCycles.getById(req.params.id);
+        if (!cycle) return res.status(404).json({ error: 'الدورة غير موجودة' });
+        const sessions = await db.InventorySessions.getByCycle(cycle.id);
+        const out = [];
+        for (const s of sessions) {
+            const items = await db.InventoryItems.getBySession(s.id);
+            const byResult = {};
+            items.forEach(i => { byResult[i.result] = (byResult[i.result] || 0) + 1; });
+            out.push({
+                team_name: s.team_name, status: s.status, conductor_name: s.conductor_name,
+                submitted_at: s.submitted_at, approved_at: s.approved_at, approved_by: s.approved_by,
+                total: items.length, byResult,
+                items: items.map(i => ({
+                    asset_code: i.asset_code, type_name: i.type_name, result: i.result,
+                    serial_before: i.serial_number, serial_seen: i.serial_seen,
+                    reason: i.reason, discovered: !!i.discovered
+                }))
+            });
+        }
+        if (req.query.format === 'csv') {
+            const rows = [];
+            for (const s of out) for (const i of s.items) {
+                rows.push([cycle.label, s.team_name, s.status, s.conductor_name, i.asset_code, i.type_name, i.result, i.serial_before, i.serial_seen, i.reason, i.discovered ? 'مكتشف' : '']);
+            }
+            return sendCsv(res, 'cycle-report.csv',
+                ['الدورة', 'الفرقة', 'حالة الجلسة', 'المجرى', 'ASSET-ID', 'النوع', 'النتيجة', 'Serial المسجل', 'Serial الجرد', 'السبب/ملاحظة', 'اكتشاف'],
+                rows);
+        }
+        res.json({ success: true, cycle, sessions: out, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('cycle report error:', error);
+        res.status(500).json({ error: 'فشل توليد تقرير الدورة' });
+    }
+});
+
+// ③ تقرير الفروقات الحالي — لقطة «يحتاج انتباهك» قابلة للإرسال
+app.get('/api/assets/reports/discrepancies', authenticate, authorizePerm('assets.view'), async (req, res) => {
+    try {
+        const data = await computeDiscrepancies();
+        const CAT = { missing: 'مفقود', moved: 'موقع مختلف', duplicate_serial: 'سيريال بموقعين', serial_changed: 'Serial متغير', unchecked: 'لم يُتحقق', damaged: 'متعطل' };
+        const ACT = { document_missing: 'توثيق الفقد', transfer: 'تأكيد النقل', review: 'مراجعة وحسم', review_group: 'حسم المجموعة' };
+        if (req.query.format === 'csv') {
+            return sendCsv(res, 'discrepancies-report.csv',
+                ['الفئة', 'الأولوية', 'ASSET-ID', 'النوع', 'Serial', 'الفرقة/العهدة', 'الحالة', 'ظهر منذ', 'الإجراء المقترح', 'الشرح'],
+                data.cases.map(c => [CAT[c.category] || c.category, c.priority === 'high' ? 'عالية' : 'متوسطة', c.asset_code, c.type_name,
+                    c.serial_number, c.team_name, ASSET_STATUS_LABELS[c.status] || c.status, c.raised_at, ACT[c.suggested_action] || '', c.explanation]));
+        }
+        res.json({ success: true, generated_at: new Date().toISOString(), ...data, category_labels: CAT, action_labels: ACT, status_labels: ASSET_STATUS_LABELS });
+    } catch (error) {
+        console.error('discrepancies report error:', error);
+        res.status(500).json({ error: 'فشل توليد تقرير الفروقات' });
+    }
+});
+
 app.get('/api/cad-overlay/package', authenticate, async (req, res) => {
     try {
         const files = buildExtensionFiles(platformPublicBase(req), { dataDir: STORAGE_PATH });

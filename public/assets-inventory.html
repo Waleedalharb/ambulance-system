@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دورات الجرد — مركز العهد والأجهزة</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .header { margin-bottom: 16px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+    .panel h2 { font-size: 0.95rem; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+    .panel h2 i { color: var(--teal-id); margin-left: 6px; }
+    .pad { padding: 14px 16px; }
+    input, button { font-family: inherit; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.9rem; }
+    button { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border: none; cursor: pointer; font-weight: 600; }
+    button:hover { filter: brightness(1.1); }
+    button.ghost { background: var(--th-bg); border: 1px solid var(--border); }
+    button.warn { background: linear-gradient(135deg, #B8912A, var(--gold-id)); color: #10233C; }
+    .cycle-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+    .cycle-head .title { font-weight: 700; }
+    .sessions { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; }
+    .sess { padding: 6px 12px; border-radius: 9px; font-size: 0.8rem; border: 1px solid var(--border-soft); background: var(--surface-2); cursor: pointer; text-decoration: none; color: var(--text); }
+    .sess:hover { border-color: var(--teal-id); }
+    .sess.open { border-right: 3px solid var(--muted); }
+    .sess.submitted { border-right: 3px solid var(--amber); }
+    .sess.approved { border-right: 3px solid var(--emerald); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .tag.draft { background: rgba(138,155,176,0.15); color: var(--text-2); }
+    .tag.active { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .tag.closed { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .msg.info { display: block; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.35); color: #BFDBFE; }
+    .muted { color: var(--muted); } .small { font-size: 0.78rem; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1><i class="fa-solid fa-clipboard-check"></i> دورات الجرد</h1>
+        <div class="subtitle">دورة جرد ← جلسة لكل فرقة ← الموظف ينفذ ← الإدارة تعتمد · <a href="/assets-center">مركز العهد والأجهزة</a></div>
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(232,200,74,0.35); background:rgba(255,255,255,0.05); color:#F1F5F9; text-decoration:none; font-weight:700">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+        <a href="/assets/import" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📥 الاستيراد التأسيسي</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div class="panel" id="createPanel" style="display:none">
+        <h2><i class="fa-solid fa-plus"></i> دورة جرد جديدة</h2>
+        <div class="pad row">
+            <input id="cLabel" placeholder="مثال: جرد الربع الثالث 2026" style="min-width:260px">
+            <input id="cStart" type="date">
+            <input id="cEnd" type="date">
+            <button onclick="createCycle()">إنشاء مسودة</button>
+        </div>
+    </div>
+
+    <div id="cycles"></div>
+    <div id="diag" class="muted small" style="text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var canManage = false, canExec = false;
+window.onerror = function (m, s, l) { showMsg('⚠️ خطأ في الصفحة: ' + m + ' (سطر ' + l + ')', 'err'); };
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(t, k) { var m = document.getElementById('msg'); m.className = 'msg ' + k; m.textContent = t; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmt(s) { return s ? String(s).slice(0, 10) : ''; }
+var CYCLE_LABELS = { draft: 'مسودة', active: 'نشطة', closed: 'مغلقة' };
+var SESS_LABELS = { open: 'لم تبدأ/قيد التنفيذ', submitted: 'بانتظار الاعتماد', approved: 'معتمدة' };
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل', 'err'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    try {
+        var meRes = await fetch('/api/auth/me', { headers: authHeaders() });
+        var me = await meRes.json();
+        if (!meRes.ok) { showMsg('⚠️ تعذر التحقق من هويتك (كود ' + meRes.status + ')', 'err'); return; }
+        var p = me.permissions || [];
+        canManage = !!me.permissions_star || p.indexOf('assets.manage') !== -1;
+        canExec = canManage || p.indexOf('assets.inventory') !== -1;
+        if (canManage) document.getElementById('createPanel').style.display = '';
+        if (!canExec && p.indexOf('assets.view') === -1 && !me.permissions_star) { showMsg('لا تملك صلاحية عرض الجرد', 'err'); return; }
+        document.getElementById('diag').textContent = 'الهوية: ' + (me.user && me.user.name || '') + ' ✓';
+    } catch (e) { showMsg('⚠️ فشل الاتصال: ' + e.message, 'err'); return; }
+    await load();
+}
+
+async function load() {
+    var res = await fetch('/api/assets/inventory/cycles', { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الجلب', 'err'); return; }
+    var box = document.getElementById('cycles');
+    box.innerHTML = '';
+    if (!d.cycles.length) {
+        box.innerHTML = '<div class="panel"><div class="pad muted">لا دورات جرد بعد. ' + (canManage ? 'أنشئ أول دورة من الأعلى.' : '') + '</div></div>';
+        return;
+    }
+    d.cycles.forEach(function (c) {
+        var div = document.createElement('div');
+        div.className = 'panel';
+        var actions = '';
+        if (canManage && c.status === 'draft') actions += '<button onclick="activateCycle(' + c.id + ')">تفعيل الدورة (فتح جلسات الفرق)</button>';
+        if (canManage && c.status === 'active') actions += '<button class="warn" onclick="closeCycle(' + c.id + ')">إغلاق الدورة</button>';
+        div.innerHTML =
+            '<div class="cycle-head"><div><span class="title">' + esc(c.label) + '</span> <span class="tag ' + c.status + '">' + (CYCLE_LABELS[c.status] || c.status) + '</span>' +
+            '<div class="muted small">' + (c.period_start ? fmt(c.period_start) + ' → ' + fmt(c.period_end) : '') +
+            (c.status !== 'draft' ? ' · معتمدة: ' + c.sessions_approved + '/' + c.sessions_total + (c.sessions_submitted ? ' · بانتظار الاعتماد: ' + c.sessions_submitted : '') : '') + '</div></div>' +
+            '<div class="row">' + actions + '</div></div>' +
+            '<div class="sessions">' + c.sessions.map(function (s) {
+                return '<a class="sess ' + s.status + '" href="/assets/inventory/session?id=' + s.id + '">' + esc(s.team_name) +
+                    ' <span class="muted small">· ' + (SESS_LABELS[s.status] || s.status) + '</span></a>';
+            }).join('') + '</div>';
+        box.appendChild(div);
+    });
+}
+
+async function createCycle() {
+    var label = document.getElementById('cLabel').value.trim();
+    if (!label) { showMsg('أدخل اسم الدورة', 'err'); return; }
+    var res = await fetch('/api/assets/inventory/cycles', { method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ label: label, period_start: document.getElementById('cStart').value || null, period_end: document.getElementById('cEnd').value || null }) });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الإنشاء', 'err'); return; }
+    showMsg('✅ أُنشئت المسودة — فعّلها لفتح جلسات الفرق', 'ok');
+    await load();
+}
+
+async function activateCycle(id) {
+    if (!confirm('تفعيل الدورة يفتح جلسة جرد لكل فرقة لها أجهزة. متابعة؟')) return;
+    var res = await fetch('/api/assets/inventory/cycles/' + id + '/activate', { method: 'POST', headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل التفعيل', 'err'); return; }
+    showMsg('✅ الدورة نشطة — فُتحت ' + d.sessions + ' جلسة فرق', 'ok');
+    await load();
+}
+
+async function closeCycle(id) {
+    if (!confirm('إغلاق الدورة يتطلب اعتماد كل الجلسات. متابعة؟')) return;
+    var res = await fetch('/api/assets/inventory/cycles/' + id + '/close', { method: 'POST', headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الإغلاق', 'err'); return; }
+    showMsg('✅ أُغلقت الدورة', 'ok');
+    await load();
+}
+
+init();
+</script>
+</body>
+</html>

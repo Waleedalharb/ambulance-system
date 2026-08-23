@@ -1594,6 +1594,10 @@ async function runMigrations() {
   // مرحلة بدايات الفرق التشغيلية: بذر فرق التدخل السريع — idempotent (عند NULL فقط)
   await migrateTeamOperationalStarts();
 
+  // نظام العهد والأصول (اعتماد المالك 2026-08-23 — المرحلة 2): جداول additive
+  // بالكامل، لا تعديل على أي جدول قائم، والبيانات تدخل عبر Import Staging فقط.
+  await migrateAssetRegistry();
+
   logger.info('Migrations complete');
 }
 
@@ -4009,6 +4013,463 @@ const ShiftChangeRequests = {
 };
 
 // ============================================
+// نظام العهد والأصول (اعتماد المالك 2026-08-23 — المرحلة 2)
+// Data Model كامل + Import Staging. كل الجداول additive جديدة؛ لا يُعدَّل أي
+// جدول قائم. مصدر الاستيراد الأولي: حمولة JSON المولدة من محلل الجرد المعتمد
+// (المرحلة 1) — لا تُكتب assets/asset_events إلا بعد اعتماد المالك للمعاينة.
+// المبادئ الثابتة: asset_code هوية داخلية ثابتة مدى الحياة · الجهاز مرتبط
+// بالفرقة/المركز كنص من مصدر الاستيراد (الربط بجداول الفرق مرحلة لاحقة) ·
+// لا حذف — archived_at فقط · كل تغيير يُسجَّل في asset_events بقيمة قديمة
+// وجديدة · البيانات المشتبهة تُعلَّم needs_review ولا تُخمَّن.
+// ============================================
+const ASSET_STATUSES = ['working', 'damaged', 'missing', 'replaced', 'recalled', 'out_of_service', 'unknown'];
+const ASSET_EVENT_TYPES = ['registered', 'moved', 'status_changed', 'serial_corrected', 'replaced', 'recalled', 'reported_missing', 'found', 'note_added', 'archived', 'inventoried', 'transferred', 'review_resolved'];
+
+/**
+ * ترتيب عرض الفرق المعتمد من المالك (2026-08-23) — ترتيب عرض فقط، لا يغيّر
+ * الأسماء المخزنة: جنوب رقميًا ← سريع رقميًا ← «جنوب N» رقميًا ← مقر القطاع
+ * ← أي اسم آخر أبجديًا في النهاية. يُستخدم في كل قائمة فرق (مركز/جرد/تقارير).
+ * مواضع SUBSTR (أحرف، 1-based): «جنوب »=5 ← الرقم من 6 · «سريع »=5 ← 6 · «جنوب N »=7 ← 8
+ */
+function teamOrderSql(col) {
+  const c = col || 'team_name';
+  return `CASE
+    WHEN ${c} GLOB 'جنوب [0-9]*' THEN 1
+    WHEN ${c} GLOB 'سريع [0-9]*' THEN 2
+    WHEN ${c} GLOB 'جنوب N [0-9]*' THEN 3
+    WHEN ${c} = 'مقر القطاع' THEN 4
+    ELSE 5 END,
+  CAST(CASE
+    WHEN ${c} GLOB 'جنوب N [0-9]*' THEN SUBSTR(${c}, 8)
+    WHEN ${c} GLOB 'جنوب [0-9]*' THEN SUBSTR(${c}, 6)
+    WHEN ${c} GLOB 'سريع [0-9]*' THEN SUBSTR(${c}, 6)
+    ELSE '0' END AS INTEGER),
+  ${c}`;
+}
+
+async function migrateAssetRegistry() {
+  await exec(`CREATE TABLE IF NOT EXISTS asset_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    category TEXT,
+    aliases TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_code TEXT UNIQUE NOT NULL,
+    type_id INTEGER REFERENCES asset_types(id),
+    type_name TEXT NOT NULL,
+    original_name TEXT,
+    serial_number TEXT,
+    status TEXT NOT NULL DEFAULT 'unknown' CHECK(status IN ('working','damaged','missing','replaced','recalled','out_of_service','unknown')),
+    team_name TEXT,
+    center_name TEXT,
+    team_id INTEGER,
+    center_id TEXT,
+    custody TEXT NOT NULL DEFAULT 'exclusive' CHECK(custody IN ('exclusive','shared')),
+    is_new INTEGER NOT NULL DEFAULT 0,
+    needs_review INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    source TEXT NOT NULL DEFAULT 'excel-import',
+    import_batch INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    archived_at DATETIME
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_assets_serial ON assets(serial_number)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_assets_team ON assets(team_name)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_assets_center ON assets(center_name)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status)`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_assets_type ON assets(type_name)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS asset_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL REFERENCES assets(id),
+    event_type TEXT NOT NULL,
+    from_value TEXT,
+    to_value TEXT,
+    actor_id TEXT,
+    actor_name TEXT,
+    reason TEXT,
+    session_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_asset_events_asset ON asset_events(asset_id)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS asset_replacements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    old_asset_id INTEGER NOT NULL REFERENCES assets(id),
+    new_asset_id INTEGER NOT NULL REFERENCES assets(id),
+    reason TEXT,
+    actor_id TEXT,
+    actor_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS inventory_cycles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    period_start TEXT,
+    period_end TEXT,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','active','closed')),
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    closed_at DATETIME
+  )`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS inventory_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_id INTEGER NOT NULL REFERENCES inventory_cycles(id),
+    team_name TEXT NOT NULL,
+    conductor_id TEXT,
+    conductor_name TEXT,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','submitted','approved')),
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    submitted_at DATETIME,
+    approved_at DATETIME,
+    approved_by TEXT,
+    notes TEXT
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_inventory_sessions_cycle ON inventory_sessions(cycle_id)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS inventory_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+    asset_id INTEGER NOT NULL REFERENCES assets(id),
+    result TEXT CHECK(result IN ('ok','damaged','missing','replaced','needs_review')),
+    reason TEXT,
+    replacement_asset_id INTEGER REFERENCES assets(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_inventory_items_session ON inventory_items(session_id)`);
+
+  await exec(`CREATE TABLE IF NOT EXISTS asset_import_staging (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_no INTEGER NOT NULL,
+    row_seq INTEGER,
+    sheet_name TEXT,
+    excel_row INTEGER,
+    unit_kind TEXT,
+    team_name TEXT,
+    center_name TEXT,
+    center_raw TEXT,
+    original_name TEXT,
+    type_name TEXT,
+    type_category TEXT,
+    serial_number TEXT,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    custody TEXT NOT NULL DEFAULT 'exclusive',
+    is_new INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    flags TEXT,
+    warnings TEXT,
+    needs_review INTEGER NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'excel-import',
+    import_status TEXT NOT NULL DEFAULT 'pending' CHECK(import_status IN ('pending','approved','skipped')),
+    asset_id INTEGER REFERENCES assets(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await exec(`CREATE INDEX IF NOT EXISTS idx_asset_import_staging_batch ON asset_import_staging(batch_no, import_status)`);
+  // المرحلة 4 (دورة الجرد الفعلية — اعتماد المالك 2026-08-23): حقول الجلسة على
+  // عنصر الجرد — additive عبر ensureColumn (آمن على القواعد القائمة والجديدة)
+  await ensureColumn('inventory_items', 'serial_seen', 'TEXT');
+  await ensureColumn('inventory_items', 'location_note', 'TEXT');
+  await ensureColumn('inventory_items', 'discovered', 'INTEGER DEFAULT 0');
+  logger.info('asset registry tables ready (8 tables, additive)');
+}
+
+const AssetTypes = {
+  async upsert(name, category, aliases) {
+    if (!name) throw new Error('AssetTypes.upsert: name مطلوب');
+    await run('INSERT OR IGNORE INTO asset_types (name, category, aliases) VALUES (?, ?, ?)',
+      [name, category || null, JSON.stringify(aliases || [])]);
+    const row = await get('SELECT * FROM asset_types WHERE name = ?', [name]);
+    if (aliases && aliases.length) {
+      const cur = new Set(JSON.parse(row.aliases || '[]'));
+      for (const a of aliases) cur.add(a);
+      await run('UPDATE asset_types SET aliases = ?, category = COALESCE(?, category) WHERE id = ?',
+        [JSON.stringify([...cur]), category || null, row.id]);
+    }
+    return row.id;
+  },
+  async getAll() { return all('SELECT * FROM asset_types ORDER BY name'); }
+};
+
+const Assets = {
+  async nextCode() {
+    const row = await get(`SELECT asset_code FROM assets ORDER BY id DESC LIMIT 1`);
+    const n = row ? (parseInt(String(row.asset_code).replace(/\D/g, ''), 10) || 0) + 1 : 1;
+    return 'ASSET-' + String(n).padStart(6, '0');
+  },
+  async create(data) {
+    if (!data.type_name) throw new Error('Assets.create: type_name مطلوب');
+    if (!ASSET_STATUSES.includes(data.status)) throw new Error('Assets.create: status غير صالحة: ' + data.status);
+    const code = data.asset_code || await Assets.nextCode();
+    const result = await run(
+      `INSERT INTO assets (asset_code, type_id, type_name, original_name, serial_number, status,
+        team_name, center_name, custody, is_new, needs_review, notes, source, import_batch)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [code, data.type_id || null, data.type_name, data.original_name || null, data.serial_number || null,
+       data.status, data.team_name || null, data.center_name || null,
+       data.custody === 'shared' ? 'shared' : 'exclusive', data.is_new ? 1 : 0,
+       data.needs_review ? 1 : 0, data.notes || null, data.source || 'excel-import', data.import_batch || null]
+    );
+    return { id: result.id, asset_code: code };
+  },
+  async getById(id) { return get('SELECT * FROM assets WHERE id = ?', [id]); },
+  async list(filters = {}) {
+    const where = ['a.archived_at IS NULL'];
+    const params = [];
+    if (filters.team) { where.push('a.team_name = ?'); params.push(filters.team); }
+    if (filters.center) { where.push('a.center_name = ?'); params.push(filters.center); }
+    if (filters.status) { where.push('a.status = ?'); params.push(filters.status); }
+    if (filters.type) { where.push('a.type_name = ?'); params.push(filters.type); }
+    if (filters.needs_review) { where.push('a.needs_review = 1'); }
+    if (filters.q) {
+      where.push('(a.original_name LIKE ? OR a.type_name LIKE ? OR a.serial_number LIKE ? OR a.asset_code LIKE ? OR a.team_name LIKE ? OR a.center_name LIKE ?)');
+      const q = '%' + filters.q + '%';
+      params.push(q, q, q, q, q, q);
+    }
+    const limit = Math.min(parseInt(filters.limit, 10) || 200, 1000);
+    const offset = parseInt(filters.offset, 10) || 0;
+    // آخر حركة + آخر جرد يُشتقان لحظيًا من asset_events (مصدر الحقيقة التاريخي):
+    // «آخر جرد» = آخر حدث مرتبط بجلسة جرد — أحداث الاستيراد التأسيسي تحمل جلسة دورة التأسيس
+    const rows = await all(
+      `SELECT a.*,
+        (SELECT e.event_type FROM asset_events e WHERE e.asset_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS last_event_type,
+        (SELECT e.created_at FROM asset_events e WHERE e.asset_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS last_event_at,
+        (SELECT MAX(e.created_at) FROM asset_events e WHERE e.asset_id = a.id AND e.session_id IS NOT NULL) AS last_inventory_at
+       FROM assets a WHERE ${where.join(' AND ')} ORDER BY a.asset_code LIMIT ? OFFSET ?`,
+      [...params, limit, offset]);
+    const total = await get(`SELECT COUNT(*) AS c FROM assets a WHERE ${where.join(' AND ')}`, params);
+    return { rows, total: total.c };
+  },
+  async summary() {
+    const byStatus = await all('SELECT status, COUNT(*) AS c FROM assets WHERE archived_at IS NULL GROUP BY status');
+    const byTeam = await all(`SELECT team_name, COUNT(*) AS c FROM assets WHERE archived_at IS NULL GROUP BY team_name ORDER BY ${teamOrderSql('team_name')}`);
+    const totals = await get(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN serial_number IS NULL THEN 1 ELSE 0 END) AS no_serial,
+      SUM(needs_review) AS needs_review FROM assets WHERE archived_at IS NULL`);
+    return { byStatus, byTeam, ...totals };
+  },
+  /** لوحة مركز العهد والأجهزة — كل الأرقام تُشتق لحظيًا من القاعدة (لا جداول يدوية). */
+  async dashboard() {
+    const byStatus = await all('SELECT status, COUNT(*) AS c FROM assets WHERE archived_at IS NULL GROUP BY status');
+    const byCenter = await all('SELECT center_name, COUNT(*) AS c FROM assets WHERE archived_at IS NULL GROUP BY center_name ORDER BY c DESC');
+    const byTeam = await all(`SELECT team_name, center_name, COUNT(*) AS c FROM assets WHERE archived_at IS NULL GROUP BY team_name ORDER BY ${teamOrderSql('team_name')}`);
+    const byType = await all('SELECT type_name, COUNT(*) AS c, SUM(needs_review) AS review FROM assets WHERE archived_at IS NULL GROUP BY type_name ORDER BY c DESC');
+    const totals = await get(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN serial_number IS NULL THEN 1 ELSE 0 END) AS no_serial,
+      SUM(needs_review) AS needs_review,
+      SUM(CASE WHEN custody = 'shared' THEN 1 ELSE 0 END) AS shared,
+      SUM(is_new) AS is_new
+      FROM assets WHERE archived_at IS NULL`);
+    const replacements = await get('SELECT COUNT(*) AS c FROM asset_replacements');
+    const recentEvents = await all(
+      `SELECT e.id, e.asset_id, e.event_type, e.from_value, e.to_value, e.actor_name, e.reason, e.created_at,
+              a.asset_code, a.type_name, a.team_name
+       FROM asset_events e JOIN assets a ON a.id = e.asset_id
+       ORDER BY e.created_at DESC, e.id DESC LIMIT 25`);
+    // دورة الجرد النشطة (إن وجدت) ونسبة اكتمالها — قبل أول دورة حقيقية تكون null
+    const activeCycle = await get(`SELECT * FROM inventory_cycles WHERE status = 'active' ORDER BY id DESC LIMIT 1`);
+    let cycleProgress = null;
+    if (activeCycle) {
+      const sess = await get(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
+        SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) AS submitted
+        FROM inventory_sessions WHERE cycle_id = ?`, [activeCycle.id]);
+      cycleProgress = { cycle: activeCycle, ...sess };
+    }
+    const lastCycle = await get(`SELECT id, label, status, closed_at FROM inventory_cycles ORDER BY id DESC LIMIT 1`);
+    return { byStatus, byCenter, byTeam, byType, ...totals,
+      replacements: replacements.c, recentEvents, activeCycle: cycleProgress, lastCycle };
+  }
+};
+
+const AssetEvents = {
+  async create(data) {
+    if (!data.asset_id || !data.event_type) throw new Error('AssetEvents.create: asset_id/event_type مطلوبان');
+    if (!ASSET_EVENT_TYPES.includes(data.event_type)) throw new Error('AssetEvents.create: event_type غير صالح: ' + data.event_type);
+    const result = await run(
+      `INSERT INTO asset_events (asset_id, event_type, from_value, to_value, actor_id, actor_name, reason, session_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.asset_id, data.event_type, data.from_value || null, data.to_value || null,
+       data.actor_id || null, data.actor_name || null, data.reason || null, data.session_id || null]
+    );
+    return result.id;
+  },
+  async getByAsset(assetId) {
+    return all('SELECT * FROM asset_events WHERE asset_id = ? ORDER BY created_at, id', [assetId]);
+  }
+};
+
+const AssetReplacements = {
+  async create(data) {
+    if (!data.old_asset_id || !data.new_asset_id) throw new Error('AssetReplacements.create: old/new asset_id مطلوبان');
+    const result = await run(
+      `INSERT INTO asset_replacements (old_asset_id, new_asset_id, reason, actor_id, actor_name) VALUES (?, ?, ?, ?, ?)`,
+      [data.old_asset_id, data.new_asset_id, data.reason || null, data.actor_id || null, data.actor_name || null]
+    );
+    return result.id;
+  },
+  async getByAsset(assetId) {
+    return all('SELECT * FROM asset_replacements WHERE old_asset_id = ? OR new_asset_id = ?', [assetId, assetId]);
+  }
+};
+
+const InventoryCycles = {
+  async create(data) {
+    if (!data.label) throw new Error('InventoryCycles.create: label مطلوب');
+    const result = await run(
+      `INSERT INTO inventory_cycles (label, period_start, period_end, status, created_by) VALUES (?, ?, ?, 'draft', ?)`,
+      [data.label, data.period_start || null, data.period_end || null, data.created_by || null]
+    );
+    return result.id;
+  },
+  async getAll() { return all('SELECT * FROM inventory_cycles ORDER BY id DESC'); },
+  async getById(id) { return get('SELECT * FROM inventory_cycles WHERE id = ?', [id]); }
+};
+
+const InventorySessions = {
+  async create(data) {
+    if (!data.cycle_id || !data.team_name) throw new Error('InventorySessions.create: cycle_id/team_name مطلوبان');
+    const result = await run(
+      `INSERT INTO inventory_sessions (cycle_id, team_name, conductor_id, conductor_name) VALUES (?, ?, ?, ?)`,
+      [data.cycle_id, data.team_name, data.conductor_id || null, data.conductor_name || null]
+    );
+    return result.id;
+  },
+  async getById(id) { return get('SELECT * FROM inventory_sessions WHERE id = ?', [id]); },
+  async getByCycle(cycleId) { return all(`SELECT * FROM inventory_sessions WHERE cycle_id = ? ORDER BY ${teamOrderSql('team_name')}`, [cycleId]); },
+  /** تغيير حالة الجلسة مع ختم الوقت/المعتمد عند الاعتماد. */
+  async setStatus(id, status, approvedBy) {
+    const allowed = ['open', 'submitted', 'approved'];
+    if (!allowed.includes(status)) throw new Error('InventorySessions.setStatus: حالة غير صالحة: ' + status);
+    if (status === 'submitted') {
+      return run(`UPDATE inventory_sessions SET status = 'submitted', submitted_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+    }
+    if (status === 'approved') {
+      return run(`UPDATE inventory_sessions SET status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ? WHERE id = ?`, [approvedBy || null, id]);
+    }
+    return run(`UPDATE inventory_sessions SET status = 'open', submitted_at = NULL, approved_at = NULL, approved_by = NULL WHERE id = ?`, [id]);
+  }
+};
+
+const InventoryItems = {
+  /** صف واحد لكل جهاز في الجلسة: تحديث إن وُجد وإدراج إن لم يوجد. */
+  async upsert(data) {
+    if (!data.session_id || !data.asset_id) throw new Error('InventoryItems.upsert: session_id/asset_id مطلوبان');
+    const valid = ['ok', 'damaged', 'missing', 'replaced', 'needs_review'];
+    if (!valid.includes(data.result)) throw new Error('InventoryItems.upsert: result غير صالحة: ' + data.result);
+    const existing = await get('SELECT id FROM inventory_items WHERE session_id = ? AND asset_id = ?', [data.session_id, data.asset_id]);
+    if (existing) {
+      await run(
+        `UPDATE inventory_items SET result = ?, reason = ?, replacement_asset_id = ?, serial_seen = ?, location_note = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [data.result, data.reason || null, data.replacement_asset_id || null,
+         data.serial_seen || null, data.location_note || null, existing.id]
+      );
+      return existing.id;
+    }
+    const result = await run(
+      `INSERT INTO inventory_items (session_id, asset_id, result, reason, replacement_asset_id, serial_seen, location_note, discovered)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.session_id, data.asset_id, data.result, data.reason || null, data.replacement_asset_id || null,
+       data.serial_seen || null, data.location_note || null, data.discovered ? 1 : 0]
+    );
+    return result.id;
+  },
+  async getBySession(sessionId) {
+    return all(
+      `SELECT i.*, a.asset_code, a.type_name, a.original_name, a.serial_number, a.status AS baseline_status,
+              a.team_name, a.center_name, a.needs_review AS baseline_needs_review
+       FROM inventory_items i JOIN assets a ON a.id = i.asset_id
+       WHERE i.session_id = ? ORDER BY i.id`, [sessionId]);
+  },
+  async create(data) {
+    if (!data.session_id || !data.asset_id) throw new Error('InventoryItems.create: session_id/asset_id مطلوبان');
+    const result = await run(
+      `INSERT INTO inventory_items (session_id, asset_id, result, reason, replacement_asset_id) VALUES (?, ?, ?, ?, ?)`,
+      [data.session_id, data.asset_id, data.result || null, data.reason || null, data.replacement_asset_id || null]
+    );
+    return result.id;
+  }
+};
+
+const AssetImportStaging = {
+  /** الدفعة النشطة الحالية (آخر batch_no) أو 0 إن لم توجد. */
+  async currentBatch() {
+    const row = await get('SELECT MAX(batch_no) AS b FROM asset_import_staging');
+    return (row && row.b) || 0;
+  },
+  /**
+   * بدء دفعة استيراد جديدة من الحمولة: يحذف صفوف pending القديمة فقط
+   * (الـstaging سطح مراجعة مؤقت — السجل التاريخي الحقيقي هو assets/asset_events
+   * ولا يُكتب إلا بالاعتماد). الصفوف المعتمدة تبقى كأثر مراجعة.
+   */
+  async startBatch(payload) {
+    const prev = await AssetImportStaging.currentBatch();
+    const batch = prev + 1;
+    await run(`DELETE FROM asset_import_staging WHERE import_status = 'pending'`);
+    for (const a of (payload.assets || [])) {
+      const warns = a.warnings || [];
+      await run(
+        `INSERT INTO asset_import_staging
+         (batch_no, row_seq, sheet_name, excel_row, unit_kind, team_name, center_name, center_raw,
+          original_name, type_name, type_category, serial_number, status, custody, is_new,
+          notes, flags, warnings, needs_review, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'excel-import')`,
+        [batch, a.row_seq, a.sheet_name, a.excel_row, a.unit_kind || null, a.team_name || null,
+         a.center_name || null, a.center_raw || null, a.original_name || null, a.type_name || null,
+         a.type_category || null, a.serial_number || null,
+         ASSET_STATUSES.includes(a.status) ? a.status : 'unknown',
+         a.custody === 'shared' ? 'shared' : 'exclusive', a.is_new ? 1 : 0,
+         a.notes || null, JSON.stringify(a.flags || []), JSON.stringify(warns),
+         warns.length || !a.type_name ? 1 : 0]
+      );
+    }
+    return batch;
+  },
+  async summary(batch) {
+    const rows = await all(
+      `SELECT status, COUNT(*) AS c FROM asset_import_staging WHERE batch_no = ? AND import_status = 'pending' GROUP BY status`, [batch]);
+    const totals = await get(
+      `SELECT COUNT(*) AS total,
+        SUM(CASE WHEN serial_number IS NULL THEN 1 ELSE 0 END) AS no_serial,
+        SUM(needs_review) AS needs_review,
+        SUM(CASE WHEN import_status = 'approved' THEN 1 ELSE 0 END) AS approved
+       FROM asset_import_staging WHERE batch_no = ?`, [batch]);
+    const teams = await all(
+      `SELECT team_name, COUNT(*) AS c FROM asset_import_staging WHERE batch_no = ? AND import_status = 'pending' GROUP BY team_name ORDER BY c DESC`, [batch]);
+    return { batch, byStatus: rows, byTeam: teams, ...totals };
+  },
+  async list(batch, filters = {}) {
+    const where = ['batch_no = ?'];
+    const params = [batch];
+    if (filters.import_status) { where.push('import_status = ?'); params.push(filters.import_status); }
+    if (filters.team) { where.push('team_name = ?'); params.push(filters.team); }
+    if (filters.status) { where.push('status = ?'); params.push(filters.status); }
+    if (filters.needs_review) { where.push('needs_review = 1'); }
+    if (filters.q) {
+      where.push('(original_name LIKE ? OR serial_number LIKE ? OR sheet_name LIKE ?)');
+      const q = '%' + filters.q + '%'; params.push(q, q, q);
+    }
+    const limit = Math.min(parseInt(filters.limit, 10) || 100, 1000);
+    const offset = parseInt(filters.offset, 10) || 0;
+    const rows = await all(`SELECT * FROM asset_import_staging WHERE ${where.join(' AND ')} ORDER BY row_seq LIMIT ? OFFSET ?`, [...params, limit, offset]);
+    const total = await get(`SELECT COUNT(*) AS c FROM asset_import_staging WHERE ${where.join(' AND ')}`, params);
+    return { rows, total: total.c };
+  },
+  async pendingRows(batch) {
+    return all(`SELECT * FROM asset_import_staging WHERE batch_no = ? AND import_status = 'pending' ORDER BY row_seq`, [batch]);
+  },
+  async markApproved(id, assetId) {
+    return run(`UPDATE asset_import_staging SET import_status = 'approved', asset_id = ? WHERE id = ?`, [assetId, id]);
+  }
+};
+
+// ============================================
 // EXPORTS
 // ============================================
 module.exports = {
@@ -4084,6 +4545,17 @@ module.exports = {
   ShiftRosterDrafts,
   NotificationLog,
   ShiftChangeRequests,
+
+  // نظام العهد والأصول (المرحلة 2 — 2026-08-23)
+  AssetTypes,
+  Assets,
+  AssetEvents,
+  AssetReplacements,
+  InventoryCycles,
+  InventorySessions,
+  InventoryItems,
+  AssetImportStaging,
+  teamOrderSql,
 
   // Migration
   migrateAll,

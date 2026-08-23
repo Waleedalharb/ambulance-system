@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>يحتاج انتباهك — مركز الفروقات والقرارات</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .exec { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+    .exec .sentence { font-size: 1.02rem; font-weight: 700; line-height: 1.9; }
+    .exec .sentence .n { color: var(--gold-id); }
+    .exec .info-line { color: var(--muted); font-size: 0.82rem; margin-top: 6px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip { padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; }
+    .chip.coral { color: #FCA5A5; border-color: rgba(239,68,68,0.35); }
+    .chip.amber { color: #FCD34D; border-color: rgba(245,158,11,0.35); }
+    .chip.green { color: #5EEAD4; border-color: rgba(14,164,122,0.35); }
+    .prio { font-size: 0.95rem; font-weight: 800; margin: 20px 0 10px; }
+    .prio.high { color: #FCA5A5; } .prio.med { color: #FCD34D; }
+    .case { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+    .case.high { border-right: 3px solid var(--coral); }
+    .case.medium { border-right: 3px solid var(--amber); }
+    .case .head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .case .title { font-weight: 700; font-size: 0.98rem; }
+    .case .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 6px 14px; margin: 10px 0; font-size: 0.8rem; color: var(--text-2); }
+    .case .meta b { color: var(--text); font-weight: 600; }
+    .case .why { background: rgba(96,165,250,0.07); border: 1px solid rgba(96,165,250,0.25); border-radius: 10px; padding: 10px 12px; font-size: 0.83rem; line-height: 1.8; color: #BFDBFE; margin-bottom: 10px; }
+    .case .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button.act { font-family: inherit; padding: 8px 16px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-size: 0.82rem; }
+    button.act.transfer { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; }
+    button.act.missing { background: linear-gradient(135deg, #B91C1C, var(--coral)); color: #fff; }
+    button.act.review { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    a.cardlink { font-size: 0.78rem; align-self: center; }
+    .form { display: none; margin-top: 12px; background: var(--th-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+    .form.open { display: block; }
+    .form label { display: block; font-size: 0.78rem; color: var(--text-2); margin: 8px 0 4px; }
+    .form input, .form select { width: 100%; font-family: inherit; font-size: 0.88rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    .form input:focus, .form select:focus { outline: none; border-color: var(--teal-id); }
+    .form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form button.go { margin-top: 12px; font-family: inherit; padding: 9px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: 800; background: linear-gradient(135deg, var(--gold-id), #D4A017); color: #1a1a1a; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .tag.working { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .tag.damaged { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tag.missing { background: rgba(239,68,68,0.22); color: #FECACA; }
+    .tag.unknown { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.recalled, .tag.replaced { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .serial { font-family: 'Consolas', monospace; font-size: 0.78rem; direction: ltr; display: inline-block; }
+    .muted { color: var(--muted); } .small { font-size: 0.75rem; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .msg.info { display: block; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.35); color: #BFDBFE; }
+    .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+    a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-brain"></i> يحتاج انتباهك — مركز الفروقات والقرارات</h1>
+            <div class="subtitle">الـAgent يكتشف ويقترح — وأنت تقرر · لا نقل أو حسم أو دمج تلقائيًا · <a href="/assets-center">مركز العهد</a></div>
+        </div>
+        <button class="act review" onclick="loadAll()" style="padding:10px 18px"><i class="fa-solid fa-rotate"></i> تحديث</button>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(232,200,74,0.35); background:rgba(255,255,255,0.05); color:#F1F5F9; text-decoration:none; font-weight:700">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+        <a href="/assets/import" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📥 الاستيراد التأسيسي</a>
+    </div>
+    <div id="msg" class="msg"></div>
+    <div class="exec" id="execBox" style="display:none">
+        <div class="sentence" id="execSentence"></div>
+        <div class="info-line" id="execInfo"></div>
+        <div class="chips" id="execChips"></div>
+    </div>
+    <div id="highBox"></div>
+    <div id="medBox"></div>
+    <div id="emptyBox" class="empty" style="display:none">🟢 لا فروقات تحتاج قرارًا — كل الحالات محسومة أو لم يبدأ جرد فعلي بعد.</div>
+    <div id="diag" class="muted small" style="margin-top:18px; text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var STATUS_LABELS = { working: 'يعمل', damaged: 'تالف', missing: 'مفقود', replaced: 'مستبدل', recalled: 'مسحوب', out_of_service: 'خارج الخدمة', unknown: 'غير مؤكد' };
+var EVENT_LABELS = { registered: 'تسجيل', moved: 'نقل', status_changed: 'تغيير حالة', serial_corrected: 'تصحيح سيريال', replaced: 'استبدال', recalled: 'سحب', reported_missing: 'بلاغ فقد', found: 'عثور', note_added: 'ملاحظة', archived: 'أرشفة', inventoried: 'جرد', transferred: 'نقل معتمد', review_resolved: 'حسم مراجعة' };
+var CAN_MANAGE = false;
+
+window.onerror = function (msg, src, line) { showMsg('⚠️ خطأ في الصفحة: ' + msg + ' (سطر ' + line + ')', 'err'); };
+function setDiag(t) { document.getElementById('diag').textContent = t; }
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(text, kind) { var m = document.getElementById('msg'); m.className = 'msg ' + kind; m.textContent = text; window.scrollTo(0, 0); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmtDate(s) { if (!s) return '—'; return String(s).slice(0, 10); }
+function statusTag(st) { return '<span class="tag ' + st + '">' + (STATUS_LABELS[st] || st) + '</span>'; }
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل — حدّث الصفحة', 'err'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    setDiag('جارٍ التحقق من الصلاحيات…');
+    try {
+        var meRes = await fetch('/api/auth/me', { headers: authHeaders() });
+        var me = await meRes.json();
+        if (!meRes.ok) { showMsg('⚠️ تعذر التحقق من هويتك (كود ' + meRes.status + ') — حدّث بـ Ctrl+F5', 'err'); return; }
+        var perms = me.permissions || [];
+        var canView = !!me.permissions_star || perms.indexOf('assets.view') !== -1 || perms.indexOf('assets.manage') !== -1;
+        if (!canView) { showMsg('حسابك لا يملك صلاحية عرض العهد (assets.view) — اطلب المنحة من مدير النظام', 'err'); return; }
+        CAN_MANAGE = !!me.permissions_star || perms.indexOf('assets.manage') !== -1;
+        setDiag('الهوية: ' + (me.user && me.user.name || '') + (CAN_MANAGE ? ' · صلاحية قرارات ✓' : ' · عرض فقط'));
+    } catch (e) { showMsg('⚠️ فشل الاتصال بالخادم: ' + e.message, 'err'); return; }
+    await loadAll();
+}
+
+async function loadAll() {
+    var res = await fetch('/api/assets/discrepancies', { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل جلب الفروقات', 'err'); return; }
+    renderSummary(d.summary, d.cycle);
+    renderCases(d.cases || []);
+}
+
+function renderSummary(s, cycle) {
+    var box = document.getElementById('execBox');
+    box.style.display = '';
+    var parts = [];
+    if (s.missing) parts.push(s.missing + ' مفقودة');
+    if (s.moved) parts.push(s.moved + ' انتقلت من مواقعها');
+    if (s.duplicate_serial) parts.push(s.duplicate_serial + ' بسيريال مسجل في موقعين');
+    if (s.serial_changed) parts.push(s.serial_changed + ' تغيّر Serial');
+    if (s.unchecked) parts.push(s.unchecked + ' لم تُتحقق');
+    if (s.damaged) parts.push(s.damaged + ' متعطلة');
+    document.getElementById('execSentence').innerHTML = s.needs_decision
+        ? 'هناك <span class="n">' + s.needs_decision + '</span> حالة تحتاج قرارًا — ' + parts.join('، ') + '.'
+        : '🟢 لا حالات تحتاج قرارًا حاليًا.';
+    document.getElementById('execInfo').textContent =
+        'معلومات: ' + s.matched + ' جهازًا مطابقًا' + (cycle ? ' في «' + cycle.label + '»' : '') + ' · ' + s.resolved + ' فروقات حُسمت وموثقة في سجلات الأجهزة.';
+    var chips = [];
+    if (s.missing) chips.push(['coral', '🔴 مفقودة: ' + s.missing]);
+    if (s.moved) chips.push(['coral', '🟠 موقع مختلف: ' + s.moved]);
+    if (s.duplicate_serial) chips.push(['coral', '🔴 سيريال بموقعين: ' + s.duplicate_serial]);
+    if (s.serial_changed) chips.push(['amber', '🟠 Serial متغير: ' + s.serial_changed]);
+    if (s.unchecked) chips.push(['amber', '🟡 لم تُتحقق: ' + s.unchecked]);
+    if (s.damaged) chips.push(['amber', '🟡 متعطلة: ' + s.damaged]);
+    chips.push(['green', '🟢 مطابقة: ' + s.matched]);
+    document.getElementById('execChips').innerHTML = chips.map(function (c) { return '<span class="chip ' + c[0] + '">' + c[1] + '</span>'; }).join('');
+}
+
+function metaRow(label, val) { return '<div>' + label + ': <b>' + val + '</b></div>'; }
+
+function caseHtml(c) {
+    var meta = metaRow('الجهاز', esc(c.asset_code)) + metaRow('النوع', esc(c.type_name));
+    if (c.category === 'duplicate_serial') {
+        meta += metaRow('السيريال المكرر', '<span class="serial">' + esc(c.serial_number) + '</span>');
+        meta += metaRow('المواقع', esc(c.team_name));
+    } else {
+        meta += metaRow('Serial المسجل', c.serial_number ? '<span class="serial">' + esc(c.serial_number) + '</span>' : 'فارغ');
+        if (c.serial_seen) meta += metaRow('Serial في الجرد', '<span class="serial">' + esc(c.serial_seen) + '</span>');
+        meta += metaRow('العهدة المسجلة', esc(c.team_name || '—') + (c.center_name ? ' / ' + esc(c.center_name) : ''));
+        if (c.found_team) meta += metaRow('ظهر لدى', esc(c.found_team) + (c.found_note ? ' (' + esc(c.found_note) + ')' : ''));
+    }
+    meta += metaRow('الحالة', statusTag(c.status));
+    meta += metaRow('آخر جرد', fmtDate(c.last_inventory_at));
+    meta += metaRow('آخر حركة', c.last_event ? (EVENT_LABELS[c.last_event.event_type] || c.last_event.event_type) + ' · ' + fmtDate(c.last_event.created_at) + ' · ' + esc(c.last_event.actor_name || '') : '—');
+    var actions = '';
+    if (CAN_MANAGE) {
+        if (c.suggested_action === 'transfer') actions += '<button class="act transfer" onclick="toggleForm(\'f-' + c.key + '\')">🚚 تأكيد النقل</button>';
+        if (c.suggested_action === 'document_missing') actions += '<button class="act missing" onclick="toggleForm(\'m-' + c.key + '\')">🔴 توثيق الفقد</button>';
+        if (c.suggested_action === 'review_group') actions += '<button class="act review" onclick="toggleForm(\'g-' + c.key + '\')">✅ مراجعة وحسم المجموعة</button>';
+        if (c.suggested_action !== 'review_group') actions += '<button class="act review" onclick="toggleForm(\'r-' + c.key + '\')">✅ مراجعة وحسم</button>';
+    }
+    actions += ' <a class="cardlink" href="/assets/asset?id=' + c.asset_id + '">🔗 بطاقة الجهاز ←</a>';
+    var forms = '';
+    if (CAN_MANAGE && c.suggested_action === 'transfer') forms +=
+        '<div class="form" id="f-' + c.key + '"><b>تأكيد النقل — يُحدَّث سجل العهدة ويُوثَّق في Timeline الجهاز</b>' +
+        '<div class="row"><div><label>إلى الفرقة/الموقع *</label><input id="f-team-' + c.key + '" value="' + esc(c.found_team || '') + '"></div>' +
+        '<div><label>المركز</label><input id="f-center-' + c.key + '"></div></div>' +
+        '<label>سبب النقل *</label><input id="f-reason-' + c.key + '" placeholder="مثال: ظهر فعليًا لدى الفرقة في جرد الربع الثالث">' +
+        '<button class="go" onclick="doTransfer(\'' + c.key + '\',' + c.asset_id + ')">اعتماد النقل وتوثيقه</button></div>';
+    if (CAN_MANAGE && c.suggested_action === 'document_missing') forms +=
+        '<div class="form" id="m-' + c.key + '"><b>توثيق الفقد — يبقى الجهاز «مفقودًا» ولا يُحذف؛ يُسجَّل قرارك الإداري فقط</b>' +
+        '<label>سبب/ملاحظة التوثيق *</label><input id="m-reason-' + c.key + '" placeholder="مثال: تأكد الفقد بعد البحث — جارٍ إجراء رسمي">' +
+        '<button class="go" onclick="doDocumentMissing(\'' + c.key + '\',' + c.asset_id + ')">توثيق القرار</button></div>';
+    if (CAN_MANAGE && c.suggested_action === 'review_group') forms +=
+        '<div class="form" id="g-' + c.key + '"><b>حسم تكرار السيريال — يُوثَّق الحسم على كل أجهزة المجموعة (لا دمج ولا حذف)</b>' +
+        '<label>نتيجة المراجعة *</label><input id="g-note-' + c.key + '" placeholder="مثال: تحقق ميداني — الجهازان منفصلان فعلًا والسيريال متطابق مصنعيًا">' +
+        '<button class="go" onclick="doResolveGroup(\'' + c.key + '\',\'' + esc(c.serial_number || '') + '\')">حسم المجموعة</button></div>';
+    if (CAN_MANAGE && c.suggested_action !== 'review_group') forms +=
+        '<div class="form" id="r-' + c.key + '"><b>مراجعة وحسم — ملاحظتك إلزامية وتُوثَّق في Timeline الجهاز</b>' +
+        '<label>ملاحظة الحسم *</label><input id="r-note-' + c.key + '" placeholder="مثال: رُوجع ميدانيًا — الوضع صحيح">' +
+        '<label>نتيجة القرار</label><select id="r-out-' + c.key + '"><option value="resolved">محسوم — الوضع صحيح</option><option value="follow_up">متابعة لاحقًا</option><option value="no_action">لا إجراء مطلوب</option></select>' +
+        '<button class="go" onclick="doResolve(\'' + c.key + '\',' + c.asset_id + ')">حسم وتوثيق</button></div>';
+    return '<div class="case ' + c.priority + '"><div class="head"><div class="title">' + esc(c.asset_code) + ' — ' + esc(c.type_name) + '</div>' + statusTag(c.status) + '</div>' +
+        '<div class="meta">' + meta + '</div>' +
+        '<div class="why"><b>لماذا ظهرت هذه الحالة؟</b><br>' + esc(c.explanation) + '</div>' +
+        '<div class="actions">' + actions + '</div>' + forms + '</div>';
+}
+
+function renderCases(cases) {
+    var high = cases.filter(function (c) { return c.priority === 'high'; });
+    var med = cases.filter(function (c) { return c.priority === 'medium'; });
+    document.getElementById('emptyBox').style.display = cases.length ? 'none' : '';
+    document.getElementById('highBox').innerHTML = high.length
+        ? '<div class="prio high">🚨 أولوية عالية (' + high.length + ')</div>' + high.map(caseHtml).join('') : '';
+    document.getElementById('medBox').innerHTML = med.length
+        ? '<div class="prio med">🟠 أولوية متوسطة (' + med.length + ')</div>' + med.map(caseHtml).join('') : '';
+}
+
+function toggleForm(id) {
+    var f = document.getElementById(id);
+    if (f) f.classList.toggle('open');
+}
+function val(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
+
+async function postAction(url, body, doneText) {
+    var res = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    var d = await res.json().catch(function () { return {}; });
+    if (!res.ok) { showMsg('❌ ' + (d.error || 'فشل الإجراء'), 'err'); return false; }
+    showMsg('✅ ' + doneText + ' — وُثّق في Timeline الجهاز وسجل التدقيق.', 'ok');
+    await loadAll();
+    return true;
+}
+function doTransfer(key, assetId) {
+    var toTeam = val('f-team-' + key), toCenter = val('f-center-' + key), reason = val('f-reason-' + key);
+    if (!toTeam || !reason) { showMsg('❌ الفرقة الجديدة وسبب النقل إلزاميان', 'err'); return; }
+    if (!confirm('تأكيد نقل الجهاز إلى «' + toTeam + '»؟ سيُحدَّث سجل العهدة ويُوثَّق القرار باسمك.')) return;
+    postAction('/api/assets/' + assetId + '/transfer', { to_team: toTeam, to_center: toCenter, reason: reason }, 'تم اعتماد النقل');
+}
+function doDocumentMissing(key, assetId) {
+    var reason = val('m-reason-' + key);
+    if (!reason) { showMsg('❌ سبب/ملاحظة التوثيق إلزامية', 'err'); return; }
+    if (!confirm('توثيق الفقد رسميًا؟ الجهاز يبقى «مفقودًا» في النظام ولا يُحذف.')) return;
+    postAction('/api/assets/' + assetId + '/document-missing', { reason: reason }, 'تم توثيق الفقد');
+}
+function doResolve(key, assetId) {
+    var note = val('r-note-' + key), out = val('r-out-' + key);
+    if (!note) { showMsg('❌ ملاحظة الحسم إلزامية', 'err'); return; }
+    postAction('/api/assets/' + assetId + '/resolve-review', { note: note, outcome: out }, 'تم الحسم');
+}
+function doResolveGroup(key, serial) {
+    var note = val('g-note-' + key);
+    if (!note) { showMsg('❌ نتيجة المراجعة إلزامية', 'err'); return; }
+    if (!confirm('حسم تكرار السيريال «' + serial + '» على كل أجهزة المجموعة؟ لا دمج ولا حذف — توثيق فقط.')) return;
+    postAction('/api/assets/resolve-serial-group', { serial: serial, note: note }, 'تم حسم المجموعة');
+}
+
+init();
+</script>
+</body>
+</html>

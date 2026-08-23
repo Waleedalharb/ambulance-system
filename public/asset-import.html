@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استيراد الجرد — معاينة واعتماد العهد</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* هوية منصة الجنوب المعتمدة: كحلي داكن + زمردي + ذهبي */
+    :root {
+        --navy-900: #0B1E33; --navy-700: #1A3A5C;
+        --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46, 139, 122, 0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232, 200, 74, 0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%);
+    }
+    .container { max-width: 1500px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--surface); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-soft); box-shadow: var(--shadow-card); }
+    .controls select, .controls input, .controls button { font-family: inherit; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.9rem; }
+    .controls button { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border: none; cursor: pointer; font-weight: 600; transition: filter 0.2s ease; }
+    .controls button:hover { filter: brightness(1.1); }
+    .controls button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-approve { background: linear-gradient(135deg, #B8912A, var(--gold-id)) !important; color: #10233C !important; }
+    .caveats { background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.28); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; font-size: 0.82rem; color: #EADDA8; }
+    .caveats strong { color: var(--gold-id); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 14px; text-align: center; box-shadow: var(--shadow-card); }
+    .card .num { font-size: 1.6rem; font-weight: 800; color: var(--gold-id); }
+    .card .lbl { font-size: 0.78rem; color: var(--text-2); margin-top: 4px; }
+    .card.warn .num { color: var(--amber); }
+    .card.ok .num { color: var(--emerald); }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+    tbody td { padding: 8px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+    tbody tr:hover { background: var(--surface-2); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .tag.working { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .tag.damaged { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tag.missing { background: rgba(239,68,68,0.22); color: #FECACA; }
+    .tag.unknown { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.recalled, .tag.replaced { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .warns { color: var(--amber); font-size: 0.75rem; }
+    .muted { color: var(--muted); }
+    .serial { font-family: 'Consolas', monospace; font-size: 0.78rem; direction: ltr; display: inline-block; }
+    .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .pager { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 12px; }
+    .pager button { font-family: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); cursor: pointer; }
+    .review-row { background: rgba(245,158,11,0.05); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-boxes-stacked"></i> استيراد الجرد الربع سنوي — معاينة واعتماد</h1>
+            <div class="subtitle">المرحلة 2: طبقة مراجعة (Import Staging) — لا تدخل البيانات سجلات العهد إلا بعد الاعتماد · ملف Excel الأصلي لا يُمس</div>
+        </div>
+        <div class="controls">
+            <button id="btnStage" onclick="doStage()" style="display:none"><i class="fa-solid fa-cloud-arrow-down"></i> توليد/تحديث دفعة الاستيراد</button>
+            <button id="btnApprove" class="btn-approve" onclick="doApprove()" style="display:none"><i class="fa-solid fa-check-double"></i> اعتماد الاستيراد وإنشاء الأصول</button>
+        </div>
+    </div>
+
+    <div class="caveats">
+        <strong>تحفظات معتمدة:</strong>
+        البيانات التاريخية غير مثالية وتُعرض كما فُسِّرت بلا تجميل · السيريالات المكررة والأجهزة بلا سيريال تبقى معلّمة للمراجعة ولا تُدمج ولا تُخمَّن ·
+        «بلا حالة» تعني أن الملف لم يذكر حالة صريحة وليس أن الجهاز تالف ·
+        الاعتماد ينشئ هوية داخلية ثابتة (ASSET-XXXXXX) لكل جهاز ويسجّل حدث «تسجيل» في سجل حركته — ولا يحذف أي شيء.
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+        <a href="/assets/import" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(232,200,74,0.35); background:rgba(255,255,255,0.05); color:#F1F5F9; text-decoration:none; font-weight:700">📥 الاستيراد التأسيسي</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div class="cards" id="cards" style="display:none">
+        <div class="card"><div class="num" id="cTotal">—</div><div class="lbl">إجمالي السجلات</div></div>
+        <div class="card ok"><div class="num" id="cWorking">—</div><div class="lbl">يعمل</div></div>
+        <div class="card warn"><div class="num" id="cDamaged">—</div><div class="lbl">متعطل</div></div>
+        <div class="card warn"><div class="num" id="cMissing">—</div><div class="lbl">مفقود</div></div>
+        <div class="card warn"><div class="num" id="cUnknown">—</div><div class="lbl">بلا حالة بالملف</div></div>
+        <div class="card warn"><div class="num" id="cNoSerial">—</div><div class="lbl">بلا سيريال</div></div>
+        <div class="card warn"><div class="num" id="cReview">—</div><div class="lbl">تحتاج مراجعة</div></div>
+        <div class="card ok"><div class="num" id="cApproved">—</div><div class="lbl">اعتُمدت فعليًا</div></div>
+    </div>
+
+    <div class="controls" id="filters" style="display:none; margin-bottom:14px">
+        <select id="fTeam"><option value="">كل الفرق</option></select>
+        <select id="fStatus">
+            <option value="">كل الحالات</option>
+            <option value="working">يعمل</option>
+            <option value="damaged">متعطل</option>
+            <option value="missing">مفقود</option>
+            <option value="recalled">مسحوب</option>
+            <option value="replaced">مُستبدَل</option>
+            <option value="unknown">بلا حالة</option>
+        </select>
+        <label style="font-size:0.85rem; color:var(--text-2)"><input type="checkbox" id="fReview"> تحتاج مراجعة فقط</label>
+        <input id="fQ" placeholder="بحث: اسم / سيريال / ورقة" style="min-width:220px">
+        <button onclick="loadRows(0)"><i class="fa-solid fa-magnifying-glass"></i> تطبيق</button>
+    </div>
+
+    <div class="panel" id="panel" style="display:none">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th><th>مصدر Excel</th><th>الفرقة</th><th>المركز</th>
+                    <th>التسمية الأصلية</th><th>النوع الموحد</th><th>Serial</th>
+                    <th>الحالة</th><th>الملاحظات</th><th>التنبيهات</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+        <div class="pager">
+            <button onclick="loadRows(offset - LIMIT)">‹ السابق</button>
+            <span id="pgInfo" class="muted"></span>
+            <button onclick="loadRows(offset + LIMIT)">› التالي</button>
+        </div>
+    </div>
+    <div class="empty" id="emptyState" style="display:none">
+        <i class="fa-solid fa-file-import" style="font-size:2.4rem; color:var(--teal-id)"></i>
+        <p style="margin-top:12px">لا توجد دفعة استيراد بعد. اضغط «توليد/تحديث دفعة الاستيراد» لقراءة حمولة الجرد المفسَّرة إلى طبقة المراجعة.</p>
+    </div>
+    <div id="diag" class="muted" style="margin-top:18px; font-size:0.75rem; text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var LIMIT = 100, offset = 0, currentBatch = 0, canManage = false;
+var STATUS_LABELS = { working:'يعمل', damaged:'متعطل', missing:'مفقود', replaced:'مُستبدَل', recalled:'مسحوب', out_of_service:'خارج الخدمة', unknown:'⚠️ بلا حالة' };
+
+// أي خطأ غير ملتقط يظهر في البانر بدل الفشل الصامت
+window.onerror = function (msg, src, line) {
+    showMsg('⚠️ خطأ في الصفحة: ' + msg + ' (سطر ' + line + ')', false);
+    setDiag('توقف التنفيذ: ' + msg);
+};
+
+function setDiag(t) { document.getElementById('diag').textContent = t; }
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+
+function showMsg(text, ok) {
+    var m = document.getElementById('msg');
+    m.className = 'msg ' + (ok ? 'ok' : 'err');
+    m.textContent = text;
+}
+
+async function init() {
+    // الخطوة 1: مكتبة المصادقة
+    if (typeof window.AuthCore === 'undefined') {
+        showMsg('⚠️ مكتبة المصادقة (core-auth.js) لم تُحمَّل — تحقق من الاتصال بالخادم ثم حدّث الصفحة', false);
+        setDiag('فشل: تحميل core-auth.js');
+        return;
+    }
+    // الخطوة 2: وجود جلسة
+    if (!AuthCore.requireAuth('/index.html')) { setDiag('لا جلسة — تم التحويل لتسجيل الدخول'); return; }
+    setDiag('الجلسة موجودة ✓ — جارٍ التحقق من الصلاحيات…');
+
+    // الخطوة 3: الصلاحيات
+    try {
+        var meRes = await fetch('/api/auth/me', { headers: authHeaders() });
+        var me = await meRes.json();
+        if (!meRes.ok) {
+            showMsg('⚠️ تعذر التحقق من هويتك (كود ' + meRes.status + ') — حدّث الصفحة بـ Ctrl+F5 أو سجّل الدخول من جديد', false);
+            setDiag('فشل /api/auth/me: HTTP ' + meRes.status);
+            return;
+        }
+        var perms = (me && me.permissions) || [];
+        canManage = !!me.permissions_star || perms.indexOf('assets.manage') !== -1;
+        var canView = !!me.permissions_star || perms.indexOf('assets.view') !== -1 || canManage;
+        if (canManage) {
+            document.getElementById('btnStage').style.display = '';
+            document.getElementById('btnApprove').style.display = '';
+        }
+        setDiag('الهوية: ' + (me.user && me.user.name ? me.user.name : '') + ' ✓ · صلاحية الإدارة: ' + (canManage ? 'نعم' : 'لا') + ' · صلاحية العرض: ' + (canView ? 'نعم' : 'لا'));
+        if (!canView) {
+            showMsg('حسابك لا يملك صلاحية عرض العهد (assets.view) — اطلب المنحة من مدير النظام', false);
+            return;
+        }
+    } catch (e) {
+        showMsg('⚠️ فشل الاتصال بالخادم أثناء التحقق من الصلاحيات: ' + e.message, false);
+        setDiag('استثناء أثناء /api/auth/me: ' + e.message);
+        return;
+    }
+
+    // الخطوة 4: تحميل المعاينة
+    await loadSummary();
+}
+
+async function doStage() {
+    if (!confirm('توليد دفعة استيراد جديدة من حمولة الجرد؟\nصفوف المراجعة غير المعتمدة السابقة تُستبدل، والمعتمدة تبقى.')) return;
+    var res = await fetch('/api/assets/import/stage', { method: 'POST', headers: authHeaders() });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || 'فشل توليد الدفعة', false); return; }
+    showMsg('✅ دفعة #' + data.batch + ' جاهزة للمراجعة — المصدر: ' + data.source_file, true);
+    await loadSummary();
+}
+
+async function doApprove() {
+    var c = document.getElementById('cTotal').textContent;
+    if (!confirm('⚠️ اعتماد نهائي:\nسيتم إنشاء الأصول في سجلات العهد مع هوية داخلية ثابتة لكل جهاز وتسجيل حدث «تسجيل» لكل منها.\nهل راجعت الصفوف المعلّمة وتريد المتابعة؟')) return;
+    var res = await fetch('/api/assets/import/approve', { method: 'POST', headers: authHeaders() });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || 'فشل الاعتماد', false); return; }
+    showMsg('✅ اعتُمدت الدفعة #' + data.batch + ' — أُنشئ ' + data.created + ' أصلًا في سجلات العهد', true);
+    await loadSummary();
+}
+
+async function loadSummary() {
+    var res = await fetch('/api/assets/import/preview?limit=1', { headers: authHeaders() });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || 'فشل الجلب', false); return; }
+    if (!data.batch) { document.getElementById('emptyState').style.display = ''; return; }
+    currentBatch = data.batch;
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('cards').style.display = '';
+    document.getElementById('filters').style.display = '';
+    document.getElementById('panel').style.display = '';
+    var s = data.summary || {};
+    var byStatus = {};
+    (s.byStatus || []).forEach(function (r) { byStatus[r.status] = r.c; });
+    document.getElementById('cTotal').textContent = s.total || 0;
+    document.getElementById('cWorking').textContent = byStatus.working || 0;
+    document.getElementById('cDamaged').textContent = byStatus.damaged || 0;
+    document.getElementById('cMissing').textContent = byStatus.missing || 0;
+    document.getElementById('cUnknown').textContent = byStatus.unknown || 0;
+    document.getElementById('cNoSerial').textContent = s.no_serial || 0;
+    document.getElementById('cReview').textContent = s.needs_review || 0;
+    document.getElementById('cApproved').textContent = s.approved || 0;
+    var teamSel = document.getElementById('fTeam');
+    if (teamSel.options.length <= 1) {
+        (s.byTeam || []).forEach(function (t) {
+            var o = document.createElement('option');
+            o.value = t.team_name || ''; o.textContent = (t.team_name || '—') + ' (' + t.c + ')';
+            teamSel.appendChild(o);
+        });
+    }
+    await loadRows(0);
+}
+
+async function loadRows(off) {
+    offset = Math.max(0, off || 0);
+    var params = new URLSearchParams({ limit: LIMIT, offset: offset });
+    var team = document.getElementById('fTeam').value;
+    var st = document.getElementById('fStatus').value;
+    var q = document.getElementById('fQ').value.trim();
+    if (team) params.set('team', team);
+    if (st) params.set('status', st);
+    if (q) params.set('q', q);
+    if (document.getElementById('fReview').checked) params.set('needs_review', '1');
+    var res = await fetch('/api/assets/import/preview?' + params, { headers: authHeaders() });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || 'فشل الجلب', false); return; }
+    var tb = document.getElementById('tbody');
+    tb.innerHTML = '';
+    (data.rows || []).forEach(function (r) {
+        var warns = [];
+        try { warns = JSON.parse(r.warnings || '[]'); } catch (e) {}
+        var tr = document.createElement('tr');
+        if (r.needs_review) tr.className = 'review-row';
+        var approvedBadge = r.import_status === 'approved' ? ' <span class="tag working">اعتُمد ✓</span>' : '';
+        tr.innerHTML =
+            '<td class="muted">' + r.row_seq + '</td>' +
+            '<td class="muted">' + esc(r.sheet_name) + ' · صف ' + r.excel_row + '</td>' +
+            '<td>' + esc(r.team_name || '—') + '</td>' +
+            '<td>' + esc(r.center_name || r.center_raw || '—') + '</td>' +
+            '<td>' + esc(r.original_name || '') + '</td>' +
+            '<td>' + esc(r.type_name || '⚠️ غير مصنّف') + '</td>' +
+            '<td>' + (r.serial_number ? '<span class="serial">' + esc(r.serial_number) + '</span>' : '<span class="muted">بلا سيريال</span>') + '</td>' +
+            '<td><span class="tag ' + r.status + '">' + (STATUS_LABELS[r.status] || r.status) + '</span>' + approvedBadge + '</td>' +
+            '<td class="muted">' + esc(r.notes || '') + '</td>' +
+            '<td class="warns">' + warns.map(esc).join('<br>') + '</td>';
+        tb.appendChild(tr);
+    });
+    document.getElementById('pgInfo').textContent = 'عرض ' + (offset + 1) + '–' + Math.min(offset + LIMIT, data.total) + ' من ' + data.total;
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+init();
+</script>
+</body>
+</html>

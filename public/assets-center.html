@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مركز العهد والأجهزة — منصة الجنوب</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232,200,74,0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1500px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .searchbar { display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 14px; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+    .searchbar input { flex: 1; font-family: inherit; font-size: 1.05rem; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); }
+    .searchbar input:focus { outline: none; border-color: var(--teal-id); }
+    .searchbar button { font-family: inherit; padding: 10px 22px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 14px 10px; text-align: center; box-shadow: var(--shadow-card); cursor: pointer; transition: border-color 0.15s ease; }
+    .card:hover { border-color: var(--teal-id); }
+    .card .num { font-size: 1.55rem; font-weight: 800; color: var(--gold-id); }
+    .card .lbl { font-size: 0.75rem; color: var(--text-2); margin-top: 4px; }
+    .card.ok .num { color: var(--emerald); } .card.warn .num { color: var(--amber); } .card.bad .num { color: var(--coral); } .card.info .num { color: var(--blue); }
+    .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 16px; }
+    @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); }
+    .panel h2 { font-size: 0.95rem; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); color: var(--text); }
+    .panel h2 i { color: var(--teal-id); margin-left: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th { background: var(--th-bg); color: var(--text-2); font-weight: 600; padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+    tbody td { padding: 8px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+    tbody tr { cursor: pointer; } tbody tr:hover { background: var(--surface-2); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .tag.working { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .tag.damaged { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tag.missing { background: rgba(239,68,68,0.22); color: #FECACA; }
+    .tag.unknown { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.recalled, .tag.replaced { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .serial { font-family: 'Consolas', monospace; font-size: 0.78rem; direction: ltr; display: inline-block; }
+    .muted { color: var(--muted); } .small { font-size: 0.75rem; }
+    .evt { padding: 8px 16px; border-bottom: 1px solid var(--border-soft); font-size: 0.8rem; }
+    .evt:last-child { border-bottom: none; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .msg.info { display: block; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.35); color: #BFDBFE; }
+    .teamchip { display: inline-block; margin: 3px; padding: 5px 10px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border-soft); font-size: 0.78rem; cursor: pointer; }
+    .teamchip:hover { border-color: var(--teal-id); }
+    .cyclebar { padding: 12px 16px; font-size: 0.85rem; }
+    .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+    a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fa-solid fa-boxes-stacked"></i> مركز العهد والأجهزة</h1>
+            <div class="subtitle">كل الأرقام تُشتق لحظيًا من قاعدة العهد — المنصة هي مصدر الحقيقة · <a href="/assets/import">أداة الاستيراد التأسيسي</a></div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(232,200,74,0.35); background:rgba(255,255,255,0.05); color:#F1F5F9; text-decoration:none; font-weight:700">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+        <a href="/assets/import" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📥 الاستيراد التأسيسي</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div id="attentionBar" style="display:none; padding:12px 16px; border-radius:12px; margin-bottom:14px; font-size:0.92rem; font-weight:700; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); color:#FECACA; cursor:pointer" onclick="location.href='/assets/discrepancies'"></div>
+
+    <div class="searchbar">
+        <input id="q" placeholder="ابحث: نوع الجهاز (تترا…) / Serial / ASSET-ID / فرقة / مركز" onkeydown="if(event.key==='Enter')doSearch()">
+        <button onclick="doSearch()"><i class="fa-solid fa-magnifying-glass"></i> بحث</button>
+    </div>
+
+    <div class="cards" id="cards" style="display:none">
+        <div class="card" onclick="doFilter('')"><div class="num" id="cTotal">—</div><div class="lbl">إجمالي الأجهزة</div></div>
+        <div class="card ok" onclick="doFilter('working')"><div class="num" id="cWorking">—</div><div class="lbl">يعمل</div></div>
+        <div class="card bad" onclick="doFilter('damaged')"><div class="num" id="cDamaged">—</div><div class="lbl">متعطل</div></div>
+        <div class="card bad" onclick="doFilter('missing')"><div class="num" id="cMissing">—</div><div class="lbl">مفقود</div></div>
+        <div class="card info" onclick="doFilter('replaced')"><div class="num" id="cReplaced">—</div><div class="lbl">مُستبدَل</div></div>
+        <div class="card info" onclick="doFilter('recalled')"><div class="num" id="cRecalled">—</div><div class="lbl">مسحوب (مستودع/للأعلى)</div></div>
+        <div class="card warn" onclick="doFilter('unknown')"><div class="num" id="cUnknown">—</div><div class="lbl">حالة غير مؤكدة</div></div>
+        <div class="card warn" onclick="doReview()"><div class="num" id="cReview">—</div><div class="lbl">⚠️ يحتاج مراجعة</div></div>
+        <div class="card warn" onclick=""><div class="num" id="cNoSerial">—</div><div class="lbl">بلا سيريال</div></div>
+    </div>
+
+    <div id="cycleBox" style="display:none" class="panel">
+        <div class="cyclebar" id="cycleInfo"></div>
+    </div>
+
+    <div class="grid2" id="mainGrid" style="display:none; margin-top:16px">
+        <div class="panel">
+            <h2><i class="fa-solid fa-list"></i> <span id="resTitle">نتائج البحث</span> <span class="muted small" id="resCount"></span></h2>
+            <table>
+                <thead><tr>
+                    <th>المركز</th><th>الفرقة</th><th>الجهاز</th><th>Serial</th>
+                    <th>الحالة</th><th>آخر جرد</th><th>آخر حركة</th>
+                </tr></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+            <div id="resEmpty" class="empty" style="display:none">لا نتائج مطابقة</div>
+        </div>
+        <div>
+            <div class="panel" style="margin-bottom:14px">
+                <h2><i class="fa-solid fa-users"></i> العهدة حسب الفرقة</h2>
+                <div style="padding:10px 14px" id="teamsBox"></div>
+            </div>
+            <div class="panel">
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> آخر الحركات</h2>
+                <div id="eventsBox" style="max-height:420px; overflow-y:auto"></div>
+            </div>
+        </div>
+    </div>
+    <div id="diag" class="muted small" style="margin-top:18px; text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var EVENT_LABELS = { registered:'تسجيل', moved:'نقل', status_changed:'تغيير حالة', serial_corrected:'تصحيح سيريال', replaced:'استبدال', recalled:'سحب', reported_missing:'بلاغ فقد', found:'عثور', note_added:'ملاحظة', archived:'أرشفة', inventoried:'جرد', transferred:'نقل معتمد', review_resolved:'حسم مراجعة' };
+var STATUS_LABELS = {};
+
+window.onerror = function (msg, src, line) { showMsg('⚠️ خطأ في الصفحة: ' + msg + ' (سطر ' + line + ')', false); };
+function setDiag(t) { document.getElementById('diag').textContent = t; }
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(text, kind) { var m = document.getElementById('msg'); m.className = 'msg ' + kind; m.textContent = text; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmtDate(s) { if (!s) return '—'; return String(s).slice(0, 10); }
+function statusTag(st) { return '<span class="tag ' + st + '">' + (STATUS_LABELS[st] || st) + '</span>'; }
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل — حدّث الصفحة', 'err'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    setDiag('جارٍ التحقق من الصلاحيات…');
+    try {
+        var meRes = await fetch('/api/auth/me', { headers: authHeaders() });
+        var me = await meRes.json();
+        if (!meRes.ok) { showMsg('⚠️ تعذر التحقق من هويتك (كود ' + meRes.status + ') — حدّث بـ Ctrl+F5 أو سجّل الدخول من جديد', 'err'); setDiag('فشل /api/auth/me: HTTP ' + meRes.status); return; }
+        var perms = me.permissions || [];
+        var canView = !!me.permissions_star || perms.indexOf('assets.view') !== -1 || perms.indexOf('assets.manage') !== -1;
+        if (!canView) { showMsg('حسابك لا يملك صلاحية عرض العهد (assets.view) — اطلب المنحة من مدير النظام', 'err'); setDiag('بلا صلاحية assets.view'); return; }
+        setDiag('الهوية: ' + (me.user && me.user.name || '') + ' ✓');
+    } catch (e) { showMsg('⚠️ فشل الاتصال بالخادم: ' + e.message, 'err'); return; }
+    await loadDashboard();
+    await doSearch();
+    loadAttention();
+}
+
+// شريط «يحتاج انتباهك» — الـAgent يطرح نفسه، لا تنتظر البحث (المرحلة 5)
+async function loadAttention() {
+    try {
+        var res = await fetch('/api/assets/discrepancies?summary=1', { headers: authHeaders() });
+        if (!res.ok) return;
+        var d = await res.json();
+        var s = d.summary || {};
+        if (s.needs_decision > 0) {
+            var bar = document.getElementById('attentionBar');
+            bar.style.display = 'block';
+            bar.innerHTML = '🚨 <strong>يحتاج انتباهك: ' + s.needs_decision + ' حالة تحتاج قرارًا</strong>' +
+                ' — مفقودة ' + s.missing + ' · موقع مختلف ' + s.moved + ' · سيريال بموقعين ' + s.duplicate_serial +
+                ' · Serial متغير ' + s.serial_changed + ' · لم تُتحقق ' + s.unchecked + ' · متعطلة ' + s.damaged +
+                ' — <u>افتح مركز الفروقات والقرارات ←</u>';
+        }
+    } catch (_) { /* الشريط مساعد — فشله لا يعطل المركز */ }
+}
+
+async function loadDashboard() {
+    var res = await fetch('/api/assets/dashboard', { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل جلب اللوحة', 'err'); return; }
+    STATUS_LABELS = d.status_labels || {};
+    if (!d.total) {
+        showMsg('قاعدة العهد فارغة بعد — تُبنى من «أداة الاستيراد التأسيسي» بعد مراجعة دفعة الـ607 واعتمادها.', 'info');
+        return;
+    }
+    document.getElementById('cards').style.display = '';
+    document.getElementById('mainGrid').style.display = '';
+    var bs = {}; (d.byStatus || []).forEach(function (r) { bs[r.status] = r.c; });
+    document.getElementById('cTotal').textContent = d.total || 0;
+    document.getElementById('cWorking').textContent = bs.working || 0;
+    document.getElementById('cDamaged').textContent = bs.damaged || 0;
+    document.getElementById('cMissing').textContent = bs.missing || 0;
+    document.getElementById('cReplaced').textContent = bs.replaced || 0;
+    document.getElementById('cRecalled').textContent = bs.recalled || 0;
+    document.getElementById('cUnknown').textContent = bs.unknown || 0;
+    document.getElementById('cReview').textContent = d.needs_review || 0;
+    document.getElementById('cNoSerial').textContent = d.no_serial || 0;
+    // دورة الجرد
+    if (d.activeCycle) {
+        document.getElementById('cycleBox').style.display = '';
+        var c = d.activeCycle;
+        document.getElementById('cycleInfo').innerHTML = '<i class="fa-solid fa-clipboard-check" style="color:var(--gold-id)"></i> <strong>' + esc(c.cycle.label) + '</strong> — اكتملت ' + (c.approved || 0) + ' من ' + (c.total || 0) + ' فرقة' + (c.submitted ? ' · بانتظار الاعتماد: ' + c.submitted : '');
+    } else if (d.lastCycle) {
+        document.getElementById('cycleBox').style.display = '';
+        document.getElementById('cycleInfo').innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--emerald)"></i> ' + esc(d.lastCycle.label) + ' — <span class="muted">لا توجد دورة نشطة حاليًا</span>';
+    }
+    // الفرق
+    var tb = document.getElementById('teamsBox');
+    tb.innerHTML = '';
+    (d.byTeam || []).forEach(function (t) {
+        var s = document.createElement('span');
+        s.className = 'teamchip';
+        s.textContent = (t.team_name || '—') + ' · ' + t.c;
+        s.onclick = function () { document.getElementById('q').value = ''; searchParams('team=' + encodeURIComponent(t.team_name || ''), 'عهدة ' + t.team_name); };
+        tb.appendChild(s);
+    });
+    // آخر الحركات
+    var eb = document.getElementById('eventsBox');
+    eb.innerHTML = '';
+    (d.recentEvents || []).forEach(function (e) {
+        var div = document.createElement('div');
+        div.className = 'evt';
+        div.innerHTML = '<a href="/assets/asset?id=' + e.asset_id + '"><span class="serial">' + esc(e.asset_code) + '</span></a> ' +
+            '<span class="tag recalled">' + (EVENT_LABELS[e.event_type] || e.event_type) + '</span> ' +
+            esc(e.type_name || '') + ' · ' + esc(e.team_name || '') +
+            '<div class="muted small">' + fmtDate(e.created_at) + (e.actor_name ? ' · ' + esc(e.actor_name) : '') + (e.reason ? ' · ' + esc(e.reason).slice(0, 60) : '') + '</div>';
+        eb.appendChild(div);
+    });
+    if (!(d.recentEvents || []).length) eb.innerHTML = '<div class="empty">لا حركات بعد</div>';
+}
+
+function doSearch() { searchParams('q=' + encodeURIComponent(document.getElementById('q').value.trim()), 'نتائج البحث'); }
+function doFilter(st) { searchParams(st ? 'status=' + st : '', st ? 'الحالة: ' + (STATUS_LABELS[st] || st) : 'كل الأجهزة'); }
+function doReview() { searchParams('needs_review=1', '⚠️ تحتاج مراجعة'); }
+
+async function searchParams(qs, title) {
+    var res = await fetch('/api/assets?limit=300&' + qs, { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل البحث', 'err'); return; }
+    STATUS_LABELS = d.status_labels || STATUS_LABELS;
+    document.getElementById('resTitle').textContent = title;
+    document.getElementById('resCount').textContent = '(' + d.total + ')';
+    var tb = document.getElementById('tbody');
+    tb.innerHTML = '';
+    (d.rows || []).forEach(function (a) {
+        var tr = document.createElement('tr');
+        tr.onclick = function () { location.href = '/assets/asset?id=' + a.id; };
+        tr.innerHTML =
+            '<td>' + esc(a.center_name || '—') + '</td>' +
+            '<td>' + esc(a.team_name || '—') + '</td>' +
+            '<td><strong>' + esc(a.type_name) + '</strong>' + (a.original_name && a.original_name !== a.type_name ? '<div class="muted small">' + esc(a.original_name) + '</div>' : '') +
+              (a.needs_review ? ' <span class="tag unknown">⚠️ مراجعة</span>' : '') +
+              '<div class="muted small serial">' + esc(a.asset_code) + '</div></td>' +
+            '<td>' + (a.serial_number ? '<span class="serial">' + esc(a.serial_number) + '</span>' : '<span class="muted">بلا سيريال</span>') + '</td>' +
+            '<td>' + statusTag(a.status) + '</td>' +
+            '<td class="small">' + fmtDate(a.last_inventory_at) + '</td>' +
+            '<td class="small">' + (a.last_event_type ? (EVENT_LABELS[a.last_event_type] || a.last_event_type) + ' · ' + fmtDate(a.last_event_at) : '—') + '</td>';
+        tb.appendChild(tr);
+    });
+    document.getElementById('resEmpty').style.display = (d.rows || []).length ? 'none' : '';
+}
+
+init();
+</script>
+</body>
+</html>

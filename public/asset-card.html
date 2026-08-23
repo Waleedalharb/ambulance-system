@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بطاقة الجهاز — مركز العهد والأجهزة</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .back { color: var(--blue); text-decoration: none; font-size: 0.85rem; }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+    .panel h2 { font-size: 0.95rem; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+    .panel h2 i { color: var(--teal-id); margin-left: 6px; }
+    .head { padding: 18px; }
+    .head h1 { font-size: 1.3rem; font-weight: 800; margin-bottom: 4px; }
+    .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; padding: 14px 18px; }
+    .kv div { font-size: 0.85rem; }
+    .kv .k { color: var(--muted); font-size: 0.75rem; display: block; margin-bottom: 2px; }
+    .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .tag.working { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .tag.damaged { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tag.missing { background: rgba(239,68,68,0.22); color: #FECACA; }
+    .tag.unknown { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.recalled, .tag.replaced { background: rgba(96,165,250,0.15); color: #93C5FD; }
+    .serial { font-family: 'Consolas', monospace; direction: ltr; display: inline-block; }
+    .muted { color: var(--muted); } .small { font-size: 0.78rem; }
+    .timeline { padding: 6px 18px 16px; }
+    .tl-item { position: relative; padding: 10px 28px 10px 0; border-right: 2px solid var(--border); margin-right: 8px; }
+    .tl-item::before { content: ''; position: absolute; right: -7px; top: 14px; width: 12px; height: 12px; border-radius: 50%; background: var(--teal-id); border: 2px solid var(--bg); }
+    .tl-item.warn::before { background: var(--amber); }
+    .tl-item.bad::before { background: var(--coral); }
+    .tl-item .t { font-weight: 700; font-size: 0.88rem; }
+    .tl-item .d { color: var(--text-2); font-size: 0.78rem; margin-top: 2px; }
+    .rel { padding: 14px 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.88rem; }
+    .rel .box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div class="panel" id="card" style="display:none">
+        <div class="head">
+            <h1 id="aType"></h1>
+            <div class="muted" id="aOriginal"></div>
+        </div>
+        <div class="kv" id="kv"></div>
+    </div>
+
+    <div class="panel" id="relPanel" style="display:none">
+        <h2><i class="fa-solid fa-arrows-rotate"></i> علاقة الاستبدال</h2>
+        <div class="rel" id="relBox"></div>
+    </div>
+
+    <div class="panel" id="tlPanel" style="display:none">
+        <h2><i class="fa-solid fa-timeline"></i> سجل الجهاز الكامل (Timeline) — لا يُعدَّل ولا يُحذف</h2>
+        <div class="timeline" id="tl"></div>
+    </div>
+    <div id="diag" class="muted small" style="text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var EVENT_LABELS = { registered:'📥 تسجيل الجهاز', moved:'🚚 نقل', status_changed:'🔁 تغيير حالة', serial_corrected:'✏️ تصحيح سيريال', replaced:'🔄 استبدال', recalled:'📦 سحب', reported_missing:'🔴 بلاغ فقد', found:'🟢 عثور', note_added:'📝 ملاحظة', archived:'🗄️ أرشفة', inventoried:'🧾 تم جرده', transferred:'🚚 نقل معتمد', review_resolved:'✅ حسم مراجعة' };
+var STATUS_LABELS = {};
+
+window.onerror = function (m, s, l) { showMsg('⚠️ خطأ في الصفحة: ' + m + ' (سطر ' + l + ')'); };
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(t) { var m = document.getElementById('msg'); m.className = 'msg err'; m.textContent = t; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmt(s) { return s ? String(s).replace('T', ' ').slice(0, 16) : '—'; }
+function statusTag(st) { return '<span class="tag ' + st + '">' + (STATUS_LABELS[st] || st) + '</span>'; }
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    var id = new URLSearchParams(location.search).get('id');
+    if (!id) { showMsg('⚠️ لم يُحدد جهاز — افتح البطاقة من مركز العهد'); return; }
+    var res = await fetch('/api/assets/' + encodeURIComponent(id), { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل جلب البطاقة (كود ' + res.status + ')'); return; }
+    STATUS_LABELS = d.status_labels || {};
+    var a = d.asset;
+    document.getElementById('card').style.display = '';
+    document.getElementById('aType').textContent = a.type_name;
+    document.getElementById('aOriginal').textContent = a.original_name && a.original_name !== a.type_name ? 'التسمية الأصلية: ' + a.original_name : '';
+    var kv = [
+        ['الهوية الداخلية', '<span class="serial"><strong>' + esc(a.asset_code) + '</strong></span>'],
+        ['Serial', a.serial_number ? '<span class="serial">' + esc(a.serial_number) + '</span>' : '⚠️ بلا سيريال'],
+        ['الحالة الحالية', statusTag(a.status) + (a.is_new ? ' <span class="tag working">جديد</span>' : '')],
+        ['الفرقة (صاحبة العهدة)', esc(a.team_name || '—')],
+        ['المركز', esc(a.center_name || '—')],
+        ['العهدة', a.custody === 'shared' ? '🤝 مشتركة' : 'خاصة'],
+        ['يحتاج مراجعة', a.needs_review ? '⚠️ نعم — راجع التنبيهات' : 'لا'],
+        ['المصدر', esc(a.source || '—')],
+        ['ملاحظات', esc(a.notes || '—')]
+    ];
+    document.getElementById('kv').innerHTML = kv.map(function (p) {
+        return '<div><span class="k">' + p[0] + '</span>' + p[1] + '</div>';
+    }).join('');
+
+    // الاستبدالات
+    if ((d.replacements || []).length) {
+        document.getElementById('relPanel').style.display = '';
+        var rb = document.getElementById('relBox');
+        rb.innerHTML = '';
+        d.replacements.forEach(function (r) {
+            var isOld = r.old_asset_id === a.id;
+            var other = isOld ? r.new_asset : r.old_asset;
+            var div = document.createElement('div');
+            div.style.width = '100%';
+            div.innerHTML = (isOld
+                ? '🔄 هذا الجهاز <strong>استُبدل</strong> ← البديل: '
+                : '🔄 هذا الجهاز <strong>بديل</strong> عن: ') +
+                (other ? '<a href="/assets/asset?id=' + other.id + '"><span class="serial">' + esc(other.asset_code) + '</span> ' + esc(other.type_name) + '</a> · موقعه: ' + esc(other.team_name || '—') + ' · ' + statusTag(other.status) : '—') +
+                '<div class="muted small" style="margin-top:4px">' + fmt(r.created_at) + (r.actor_name ? ' · ' + esc(r.actor_name) : '') + (r.reason ? ' · السبب: ' + esc(r.reason) : '') + '</div>';
+            rb.appendChild(div);
+        });
+    }
+
+    // الـTimeline
+    document.getElementById('tlPanel').style.display = '';
+    var tl = document.getElementById('tl');
+    tl.innerHTML = '';
+    (d.events || []).slice().reverse().forEach(function (e) {
+        var cls = e.event_type === 'reported_missing' || e.event_type === 'archived' ? 'bad' : (e.event_type === 'serial_corrected' || e.event_type === 'replaced' ? 'warn' : '');
+        var detail = '';
+        try {
+            var tv = e.to_value ? JSON.parse(e.to_value) : null;
+            if (tv && typeof tv === 'object') detail = Object.keys(tv).map(function (k) { return k + ': ' + tv[k]; }).join(' · ');
+            else if (e.to_value) detail = e.from_value ? (e.from_value + ' ← ' + e.to_value) : e.to_value;
+        } catch (_) { detail = e.from_value ? (e.from_value + ' ← ' + e.to_value) : (e.to_value || ''); }
+        var div = document.createElement('div');
+        div.className = 'tl-item ' + cls;
+        div.innerHTML = '<div class="t">' + (EVENT_LABELS[e.event_type] || e.event_type) + '</div>' +
+            '<div class="d">' + fmt(e.created_at) + (e.actor_name ? ' · ' + esc(e.actor_name) : '') + '</div>' +
+            (detail ? '<div class="d">' + esc(detail) + '</div>' : '') +
+            (e.reason ? '<div class="d muted">' + esc(e.reason) + '</div>' : '');
+        tl.appendChild(div);
+    });
+    if (!(d.events || []).length) tl.innerHTML = '<div class="muted" style="padding:10px 0">لا أحداث مسجلة بعد</div>';
+    document.title = a.asset_code + ' — بطاقة الجهاز';
+}
+
+init();
+</script>
+</body>
+</html>

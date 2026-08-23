@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>جلسة جرد — مركز العهد والأجهزة</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728; --surface: rgba(255,255,255,0.035); --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08); --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --emerald: #0EA47A; --coral: #EF4444; --amber: #F59E0B; --blue: #60A5FA;
+        --th-bg: #0E2038; --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46,139,122,0.10), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%); }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+    .panel h2 { font-size: 0.95rem; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); }
+    .panel h2 i { color: var(--teal-id); margin-left: 6px; }
+    .pad { padding: 14px 16px; }
+    input { font-family: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.85rem; }
+    button { font-family: inherit; cursor: pointer; font-weight: 600; }
+    .dev { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px 14px; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); align-items: start; }
+    .dev.done { background: rgba(14,164,122,0.04); }
+    .dev .name { font-weight: 700; font-size: 0.92rem; }
+    .dev .meta { color: var(--muted); font-size: 0.75rem; margin-top: 3px; }
+    .acts { display: flex; gap: 5px; flex-wrap: wrap; }
+    .rbtn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text-2); font-size: 0.78rem; }
+    .rbtn.sel-ok { background: rgba(14,164,122,0.25); color: #5EEAD4; border-color: var(--emerald); }
+    .rbtn.sel-damaged { background: rgba(245,158,11,0.2); color: #FCD34D; border-color: var(--amber); }
+    .rbtn.sel-missing { background: rgba(239,68,68,0.22); color: #FECACA; border-color: var(--coral); }
+    .rbtn.sel-replaced { background: rgba(96,165,250,0.2); color: #93C5FD; border-color: var(--blue); }
+    .rbtn.sel-needs_review { background: rgba(245,158,11,0.12); color: #FDE68A; border-color: var(--amber); }
+    .serial { font-family: 'Consolas', monospace; direction: ltr; display: inline-block; }
+    .row-inputs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .row-inputs input { flex: 1; min-width: 140px; }
+    .saved { color: var(--emerald); font-size: 0.75rem; }
+    .big { padding: 10px 22px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; font-size: 0.95rem; }
+    .big.warn { background: linear-gradient(135deg, #B8912A, var(--gold-id)); color: #10233C; }
+    .big.ghost { background: var(--th-bg); border: 1px solid var(--border); color: var(--text); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .tag.open { background: rgba(138,155,176,0.15); color: var(--text-2); }
+    .tag.submitted { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tag.approved { background: rgba(14,164,122,0.15); color: #5EEAD4; }
+    .msg { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 0.88rem; display: none; }
+    .msg.ok { display: block; background: rgba(14,164,122,0.12); border: 1px solid rgba(14,164,122,0.4); color: #A7F3D0; }
+    .msg.err { display: block; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #FECACA; }
+    .msg.info { display: block; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.35); color: #BFDBFE; }
+    .muted { color: var(--muted); } .small { font-size: 0.78rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { background: var(--th-bg); color: var(--text-2); padding: 8px; text-align: right; }
+    td { padding: 8px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+    .prog { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal-id), var(--emerald)); }
+    a { color: var(--blue); }
+    .rep-sug { cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+    .rep-sug:hover { background: var(--surface-2); }
+</style>
+</head>
+<body>
+<div class="container">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:0.82rem">
+        <a href="/assets-center" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🏠 مركز العهد</a>
+        <a href="/assets/discrepancies" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧠 يحتاج انتباهك</a>
+        <a href="/assets/inventory" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">🧾 دورات الجرد</a>
+        <a href="/assets/reports" style="padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.035); color:#A9BACD; text-decoration:none">📊 التقارير</a>
+    </div>
+    <div id="msg" class="msg"></div>
+
+    <div class="panel" id="head" style="display:none">
+        <div class="pad">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:center">
+                <div>
+                    <strong id="sTitle" style="font-size:1.15rem"></strong>
+                    <span id="sStatus" class="tag"></span>
+                    <div class="muted small" id="sMeta"></div>
+                </div>
+                <div id="sActions"></div>
+            </div>
+            <div class="prog"><i id="progBar" style="width:0%"></i></div>
+            <div class="muted small" id="progText" style="margin-top:4px"></div>
+        </div>
+    </div>
+
+    <div id="devices"></div>
+
+    <div class="panel" id="discPanel" style="display:none">
+        <h2><i class="fa-solid fa-plus"></i> جهاز موجود ميدانيًا وغير مسجل في القاعدة</h2>
+        <div class="pad">
+            <div class="row-inputs">
+                <input id="dType" placeholder="نوع الجهاز (مثال: لاسلكي تترا يدوي)">
+                <input id="dSerial" placeholder="Serial إن وُجد">
+                <input id="dNotes" placeholder="ملاحظة">
+                <button class="big ghost" onclick="addDiscovered()">تسجيل كمكتشف</button>
+            </div>
+            <div class="muted small" style="margin-top:6px">الجهاز المكتشف يأخذ هوية ASSET جديدة معلّمة للمراجعة — وإن كان سيرياله مسجلًا لجهاز آخر يُربط ويُعلَّم «مكان غير متوقع» بدل إنشاء مكرر.</div>
+        </div>
+    </div>
+
+    <div class="panel" id="reviewPanel" style="display:none">
+        <h2><i class="fa-solid fa-magnifying-glass-chart"></i> مراجعة الإدارة — الفروقات مقابل الخط الأساسي</h2>
+        <div class="pad" id="reviewBody"></div>
+    </div>
+    <div id="diag" class="muted small" style="text-align:center"></div>
+</div>
+
+<script src="/js/core/core-auth.js"></script>
+<script>
+var SESSION = null, EXPECTED = [], ITEMS = {}, CYCLE = null, STATUS_LABELS = {}, canManage = false;
+var RESULTS = [
+    ['ok', '🟢 موجود ويعمل'], ['damaged', '🟡 موجود ومتعطل'], ['missing', '🔴 غير موجود'],
+    ['replaced', '🔄 تم استبداله'], ['needs_review', '⚠️ يحتاج مراجعة']
+];
+var RES_LABELS = { ok: 'موجود ويعمل', damaged: 'متعطل', missing: 'غير موجود', replaced: 'مستبدل', needs_review: 'يحتاج مراجعة' };
+
+window.onerror = function (m, s, l) { showMsg('⚠️ خطأ في الصفحة: ' + m + ' (سطر ' + l + ')', 'err'); };
+function authHeaders() { return AuthCore.authHeaders({ 'Content-Type': 'application/json' }); }
+function showMsg(t, k) { var m = document.getElementById('msg'); m.className = 'msg ' + k; m.textContent = t; window.scrollTo(0, 0); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function fmt(s) { return s ? String(s).slice(0, 10) : '—'; }
+
+async function init() {
+    if (typeof window.AuthCore === 'undefined') { showMsg('⚠️ مكتبة المصادقة لم تُحمَّل', 'err'); return; }
+    if (!AuthCore.requireAuth('/index.html')) return;
+    var id = new URLSearchParams(location.search).get('id');
+    if (!id) { showMsg('⚠️ لم تُحدد جلسة — افتحها من صفحة دورات الجرد', 'err'); return; }
+    try {
+        var me = await (await fetch('/api/auth/me', { headers: authHeaders() })).json();
+        var p = me.permissions || [];
+        canManage = !!me.permissions_star || p.indexOf('assets.manage') !== -1;
+        document.getElementById('diag').textContent = 'الهوية: ' + (me.user && me.user.name || '') + ' ✓';
+    } catch (e) { showMsg('⚠️ فشل الاتصال: ' + e.message, 'err'); return; }
+    await load(id);
+}
+
+async function load(id) {
+    var res = await fetch('/api/assets/inventory/sessions/' + id, { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل جلب الجلسة (كود ' + res.status + ')', 'err'); return; }
+    SESSION = d.session; EXPECTED = d.expected; CYCLE = d.cycle; STATUS_LABELS = d.status_labels || {};
+    ITEMS = {}; (d.items || []).forEach(function (i) { ITEMS[i.asset_id] = i; });
+    renderHead(); renderDevices();
+    if (SESSION.status === 'submitted' && canManage) loadReview(id);
+    if (SESSION.status === 'submitted' && !canManage) showMsg('أُرسلت الجلسة — بانتظار اعتماد الإدارة', 'info');
+    if (SESSION.status === 'approved') showMsg('✅ جلسة معتمدة — التغييرات طُبقت ووُثقت في سجل الأجهزة', 'ok');
+}
+
+function renderHead() {
+    document.getElementById('head').style.display = '';
+    document.getElementById('sTitle').textContent = 'جرد ' + SESSION.team_name;
+    var st = document.getElementById('sStatus');
+    st.className = 'tag ' + SESSION.status;
+    st.textContent = SESSION.status === 'open' ? 'قيد التنفيذ' : SESSION.status === 'submitted' ? 'بانتظار الاعتماد' : 'معتمدة';
+    document.getElementById('sMeta').textContent = (CYCLE ? CYCLE.label : '') + (SESSION.conductor_name ? ' · المنفذ: ' + SESSION.conductor_name : '');
+    var total = EXPECTED.length, done = EXPECTED.filter(function (a) { return ITEMS[a.id]; }).length;
+    document.getElementById('progBar').style.width = total ? Math.round(done / total * 100) + '%' : '0%';
+    document.getElementById('progText').textContent = 'تم التحقق من ' + done + ' من ' + total + ' جهازًا' + (done < total ? ' — غير المُتحقق منها تُعلَّم للمراجعة عند الاعتماد' : '');
+    var act = document.getElementById('sActions');
+    act.innerHTML = '';
+    if (SESSION.status === 'open') {
+        var b = document.createElement('button');
+        b.className = 'big'; b.textContent = 'إنهاء الجرد وإرساله للاعتماد';
+        b.onclick = submitSession;
+        act.appendChild(b);
+        document.getElementById('discPanel').style.display = '';
+    } else { document.getElementById('discPanel').style.display = 'none'; }
+}
+
+function renderDevices() {
+    var box = document.getElementById('devices');
+    box.innerHTML = '';
+    var editable = SESSION.status === 'open';
+    EXPECTED.forEach(function (a) {
+        var item = ITEMS[a.id];
+        var div = document.createElement('div');
+        div.className = 'dev' + (item ? ' done' : '');
+        var right = '<div><div class="name">' + esc(a.type_name) + (a.needs_review ? ' <span class="tag needs_review" style="background:rgba(245,158,11,0.15);color:#FCD34D">⚠️</span>' : '') + '</div>' +
+            '<div class="meta"><span class="serial">' + esc(a.asset_code) + '</span>' +
+            (a.serial_number ? ' · Serial: <span class="serial">' + esc(a.serial_number) + '</span>' : ' · بلا سيريال') +
+            ' · الخط الأساسي: ' + (STATUS_LABELS[a.status] || a.status) +
+            (a.last_inventory_at ? ' · آخر جرد: ' + fmt(a.last_inventory_at) : '') + '</div>' +
+            (a.notes ? '<div class="meta">ملاحظة سابقة: ' + esc(a.notes) + '</div>' : '') + '</div>';
+        var left = '<div>';
+        if (editable) {
+            left += '<div class="acts">' + RESULTS.map(function (r) {
+                var sel = item && item.result === r[0] ? ' sel-' + r[0] : '';
+                return '<button class="rbtn' + sel + '" onclick="pickResult(' + a.id + ',\'' + r[0] + '\',this)">' + r[1] + '</button>';
+            }).join('') + '</div>';
+            left += '<div class="row-inputs">' +
+                '<input id="ser-' + a.id + '" placeholder="Serial المؤكد ميدانيًا" value="' + esc(a.serial_number || '') + '">' +
+                '<input id="rsn-' + a.id + '" placeholder="سبب/ملاحظة (إلزامي للفقد)" value="' + esc(item && item.reason || '') + '">' +
+                '</div>' +
+                '<div class="row-inputs" id="rep-' + a.id + '" style="display:' + (item && item.result === 'replaced' ? 'flex' : 'none') + '">' +
+                '<input id="repq-' + a.id + '" placeholder="البديل: ابحث بسيريال أو ASSET-ID ثم اختر" oninput="suggestRepl(' + a.id + ')">' +
+                '<input id="repsel-' + a.id + '" type="hidden" value="' + (item && item.replacement_asset_id || '') + '">' +
+                '<div id="replist-' + a.id + '" style="width:100%"></div></div>' +
+                '<div class="saved" id="sv-' + a.id + '">' + (item ? '✓ محفوظ: ' + RES_LABELS[item.result] : '') + '</div>';
+        } else {
+            left += item ? '<span class="tag submitted">' + (RES_LABELS[item.result] || item.result) + '</span>' +
+                (item.reason ? '<div class="meta">' + esc(item.reason) + '</div>' : '') +
+                (item.serial_seen && item.serial_seen !== (a.serial_number || '') ? '<div class="meta">سيريال ميداني: <span class="serial">' + esc(item.serial_seen) + '</span></div>' : '')
+                : '<span class="muted small">لم يُتحقق منه</span>';
+        }
+        left += '</div>';
+        div.innerHTML = right + left;
+        box.appendChild(div);
+    });
+    // المكتشفون
+    var discovered = Object.keys(ITEMS).map(function (k) { return ITEMS[k]; }).filter(function (i) { return i.discovered; });
+    if (discovered.length) {
+        var dd = document.createElement('div');
+        dd.className = 'panel';
+        dd.innerHTML = '<h2><i class="fa-solid fa-magnifying-glass-plus"></i> أجهزة مكتشفة أثناء الجرد (' + discovered.length + ')</h2>' +
+            discovered.map(function (i) {
+                return '<div class="pad small">' + esc(i.type_name) + ' · <span class="serial">' + esc(i.serial_seen || i.serial_number || 'بلا سيريال') + '</span> · ' + (RES_LABELS[i.result] || i.result) + (i.reason ? ' · ' + esc(i.reason) : '') + '</div>';
+            }).join('');
+        box.appendChild(dd);
+    }
+}
+
+async function pickResult(assetId, result, btn) {
+    var serial = document.getElementById('ser-' + assetId).value.trim();
+    var reason = document.getElementById('rsn-' + assetId).value.trim();
+    if (result === 'missing' && !reason) { showMsg('🔴 تسجيل الفقد يتطلب سببًا إلزاميًا (متى/أين فُقد)', 'err'); return; }
+    var repl = null;
+    if (result === 'replaced') {
+        document.getElementById('rep-' + assetId).style.display = 'flex';
+        repl = document.getElementById('repsel-' + assetId).value || null;
+    }
+    var res = await fetch('/api/assets/inventory/sessions/' + SESSION.id + '/items', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ asset_id: assetId, result: result, serial_seen: serial || null, reason: reason || null, replacement_asset_id: repl ? parseInt(repl, 10) : null })
+    });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الحفظ', 'err'); return; }
+    ITEMS[assetId] = { asset_id: assetId, result: result, reason: reason, serial_seen: serial, replacement_asset_id: repl };
+    renderHead(); renderDevices();
+    document.getElementById('sv-' + assetId) && (document.getElementById('sv-' + assetId).textContent = '✓ محفوظ: ' + RES_LABELS[result]);
+}
+
+async function suggestRepl(assetId) {
+    var q = document.getElementById('repq-' + assetId).value.trim();
+    var list = document.getElementById('replist-' + assetId);
+    if (q.length < 2) { list.innerHTML = ''; return; }
+    var res = await fetch('/api/assets?q=' + encodeURIComponent(q) + '&limit=6', { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) return;
+    list.innerHTML = (d.rows || []).map(function (r) {
+        return '<div class="rep-sug" onclick="pickRepl(' + assetId + ',' + r.id + ',\'' + esc(r.asset_code) + '\')"><span class="serial">' + esc(r.asset_code) + '</span> ' + esc(r.type_name) + ' · ' + esc(r.team_name || '—') + ' · ' + (STATUS_LABELS[r.status] || r.status) + '</div>';
+    }).join('') || '<div class="muted small">لا نتائج</div>';
+}
+function pickRepl(assetId, replId, code) {
+    document.getElementById('repsel-' + assetId).value = replId;
+    document.getElementById('repq-' + assetId).value = code;
+    document.getElementById('replist-' + assetId).innerHTML = '';
+}
+
+async function addDiscovered() {
+    var type = document.getElementById('dType').value.trim();
+    if (!type) { showMsg('أدخل نوع الجهاز المكتشف', 'err'); return; }
+    var res = await fetch('/api/assets/inventory/sessions/' + SESSION.id + '/discovered', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ type_name: type, serial_number: document.getElementById('dSerial').value.trim() || null, notes: document.getElementById('dNotes').value.trim() || null })
+    });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل التسجيل', 'err'); return; }
+    showMsg(d.warning || ('✅ سُجّل الجهاز المكتشف بهوية ' + (d.asset_code || d.matched_existing) + ' (معلّم للمراجعة)'), d.warning ? 'info' : 'ok');
+    document.getElementById('dType').value = ''; document.getElementById('dSerial').value = ''; document.getElementById('dNotes').value = '';
+    await load(SESSION.id);
+}
+
+async function submitSession() {
+    var done = EXPECTED.filter(function (a) { return ITEMS[a.id]; }).length;
+    if (!confirm('إرسال الجرد للإدارة؟\nتحققت من ' + done + ' من ' + EXPECTED.length + ' — غير المُتحقق منها تُعلَّم للمراجعة.')) return;
+    var res = await fetch('/api/assets/inventory/sessions/' + SESSION.id + '/submit', { method: 'POST', headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الإرسال', 'err'); return; }
+    showMsg('✅ أُرسل الجرد — بانتظار اعتماد الإدارة', 'ok');
+    await load(SESSION.id);
+}
+
+async function loadReview(id) {
+    var res = await fetch('/api/assets/inventory/sessions/' + id + '/review', { headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل جلب المراجعة', 'err'); return; }
+    document.getElementById('reviewPanel').style.display = '';
+    var b = document.getElementById('reviewBody');
+    var rows = '';
+    rows += '<p><strong>النتائج:</strong> ' + Object.keys(d.byResult).map(function (k) { return (RES_LABELS[k] || k) + ': ' + d.byResult[k]; }).join(' · ') + '</p>';
+    if (d.serialChanges.length) rows += '<p><strong>✏️ تصحيحات سيريال (' + d.serialChanges.length + '):</strong><br>' + d.serialChanges.map(function (s) { return esc(s.asset_code) + ': <span class="serial">' + esc(s.from) + '</span> ← <span class="serial">' + esc(s.to) + '</span>'; }).join('<br>') + '</p>';
+    var noRepl = d.items.filter(function (i) { return i.result === 'replaced' && !i.replacement_asset_id; });
+    if (noRepl.length) rows += '<p style="color:#FCD34D"><strong>🔄 استبدالات بلا بديل محدد (' + noRepl.length + '):</strong> ' + noRepl.map(function (i) { return esc(i.asset_code); }).join('، ') + ' — ستُسجَّل مستبدلة وتبقى معلّمة لتحديد البديل</p>';
+    if (d.discovered.length) rows += '<p><strong>🔍 مكتشفة أثناء الجرد (' + d.discovered.length + '):</strong> ' + d.discovered.map(function (i) { return esc(i.type_name) + ' (' + esc(i.serial_seen || 'بلا سيريال') + ')'; }).join(' · ') + '</p>';
+    if (d.unchecked.length) rows += '<p style="color:#FCD34D"><strong>⚠️ لم يُتحقق منها (' + d.unchecked.length + '):</strong> ' + d.unchecked.map(function (u) { return '<span class="serial">' + esc(u.asset_code) + '</span>'; }).join(' ') + ' — تُعلَّم needs_review</p>';
+    rows += '<div class="row-inputs" style="margin-top:10px"><button class="big warn" onclick="approveSession()">اعتماد الجرد وتطبيق التغييرات</button>' +
+        '<input id="reopenNote" placeholder="سبب الإرجاع (إلزامي)"><button class="big ghost" onclick="reopenSession()">إرجاع للموظف</button></div>';
+    b.innerHTML = rows;
+}
+
+async function approveSession() {
+    if (!confirm('اعتماد نهائي: ستُطبق التغييرات على الأجهزة وتُوثق في سجلها. متابعة؟')) return;
+    var res = await fetch('/api/assets/inventory/sessions/' + SESSION.id + '/approve', { method: 'POST', headers: authHeaders() });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الاعتماد', 'err'); return; }
+    showMsg('✅ اعتُمد الجرد — ' + d.items + ' جهازًا · ' + d.changed + ' تغيير حالة · ' + d.serialFixed + ' تصحيح سيريال · ' + d.replaced + ' استبدال', 'ok');
+    await load(SESSION.id);
+}
+
+async function reopenSession() {
+    var note = document.getElementById('reopenNote').value.trim();
+    if (!note) { showMsg('سبب الإرجاع إلزامي', 'err'); return; }
+    var res = await fetch('/api/assets/inventory/sessions/' + SESSION.id + '/reopen', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ note: note }) });
+    var d = await res.json();
+    if (!res.ok) { showMsg(d.error || 'فشل الإرجاع', 'err'); return; }
+    showMsg('أُعيدت الجلسة للموظف مع ملاحظتك', 'info');
+    await load(SESSION.id);
+}
+
+init();
+</script>
+</body>
+</html>
