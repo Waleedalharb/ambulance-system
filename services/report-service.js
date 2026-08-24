@@ -15,6 +15,12 @@
  * instead of data/ambulance-data.json.
  */
 
+// H3/H4 (اعتماد المالك 2026-08-24 — الطبقة التاريخية التحليلية): تحليل الطلب ×
+// التمركز يقرأ نوافذ التمركز من سجل positioning_events؛ تحليل startTime/endTime
+// يمر عبر محلل PositioningService المركزي نفسه (parseRiyadhWall) — لا نسخ لمنطق
+// التوقيت، والحمولات القديمة الـnaive تُفسَّر جداريةَ الرياض كما في كل المنصة.
+const PositioningService = require('./positioning-service');
+
 class ReportService {
     /**
      * @param {Object} deps
@@ -721,6 +727,39 @@ class ReportService {
     }
 
     /**
+     * الذاكرة التاريخية للخريطة (H1 — اعتماد المالك 2026-08-24، وثيقة
+     * DECISION-HISTORICAL-ANALYTICS): نفس اشتقاقات getIncidentSummary لكن على
+     * نطاق زمني حر عبر كل المناوبات. قواعد ملزمة:
+     *  - الترشيح على وقت الإنشاء الفعلي cad_created_at عبر محلل CAD المركزي
+     *    (_cadDateTimeTs)، وcreated_at بديلًا صادقًا عند غيابه — صف بلا أي وقت
+     *    قابل للقراءة يُحسب في unresolvedTimeCount ولا يتسلل إلى النطاق.
+     *  - الخريطة التاريخية تعرض كل بلاغات النطاق (المنتهي حدث فعلًا) —
+     *    severity=null دائمًا: لا خطورة حية ولا «الآن» في ذاكرة تاريخية.
+     *  - byCrew وأزمنة الاستجابة من المشاركات المحتسبة فقط (isParticipationCounted):
+     *    Available Units ليست مشاركة، ولا نسخ أوقات بين الوحدات.
+     *  - الضغطات اليدوية (بلا رقم CAD) خارج هذه الطبقة — لا موقع لها بنيويًا
+     *    ولا تُخترع لها إحداثيات؛ تُوثَّق في notes.
+     * قراءة مشتقة صرفة: لا تخزين ولا كتابة ولا جداول موازية.
+     */
+    /**
+     * ترشيح البلاغات على نطاق زمني (قاعدة واحدة لكل طبقات H1–H4):
+     * cad_created_at عبر محلل CAD المركزي، وcreated_at بديلًا صادقًا عند غيابه؛
+     * صف بلا أي وقت قابل للقراءة يُحسب في unresolvedTimeCount ولا يتسلل للنطاق.
+     */
+    _incidentsInRange(incidents, fromTs, toTs) {
+        const inRange = [];
+        let unresolvedTimeCount = 0;
+        for (const ic of incidents) {
+            let ts = this._cadDateTimeTs(ic.cad_created_at);
+            if (ts === null && ic.created_at) { const p = Date.parse(ic.created_at); ts = isNaN(p) ? null : p; }
+            if (ts === null) { unresolvedTimeCount++; continue; }
+            if (ts < fromTs || ts > toTs) continue;
+            inRange.push({ ic, ts });
+        }
+        return { inRange, unresolvedTimeCount };
+    }
+
+    /**
      * نوع إلغاء الوحدة من CAD (قاعدة واحدة لكل الطبقات): حالة غير 'A' +
      * وصول/مباشرة فعلية (cad_reached) = بعد المباشرة (محتسبة) · وإلا قبلها.
      * null إن لم تُلغَ. قابل للتتبع إلى cad_unit_status/cad_reached الخام.
@@ -730,6 +769,442 @@ class ReportService {
         if (!cadUrs || cadUrs === 'A') return null;
         const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
         return cadReached === true ? 'after-arrival' : 'before-arrival';
+    }
+
+    /** مسافة هافرساين كم (مشتركة بين H3/H4 — حساب واحد لا تكرار) */
+    _haversineKm(lat1, lng1, lat2, lng2) {
+        const R = 6371, rad = Math.PI / 180;
+        const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+            + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    async getHistoricalSummary(fromTs, toTs) {
+        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData();
+        const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
+        const partsByKey = {};
+        for (const p of parts) {
+            const k = p.shift_id + '|' + p.incident_number;
+            (partsByKey[k] = partsByKey[k] || []).push(p);
+        }
+        const byType = {}, byCrew = {}, byDistrict = {}, byStatus = {};
+        const rtArrival = [], rtMubashara = [];
+        let cancBeforeArrival = 0, cancAfterArrival = 0;
+        const detail = inRange.map(({ ic }) => {
+            const t = ic.type || 'other';
+            byType[t] = (byType[t] || 0) + 1; // مرة واحدة لكل بلاغ — مثل الملخص الشيفتي
+            const dName = ic.district || 'غير محدد';
+            byDistrict[dName] = (byDistrict[dName] || 0) + 1; // الحي لا يتكرر بتعدد الفرق
+            const st = ic.status || 'active';
+            byStatus[st] = (byStatus[st] || 0) + 1;
+            const crews = (partsByKey[ic.shift_id + '|' + ic.number] || []).map(p => {
+                let phases = null;
+                try { phases = p.phases ? JSON.parse(p.phases) : null; } catch (_) { phases = null; }
+                // قاعدة الاحتساب الواحدة المشتركة مع كل أسطح المنصة (2026-08-24)
+                const counted = this.isParticipationCounted(p);
+                if (counted) byCrew[p.unit] = (byCrew[p.unit] || 0) + 1;
+                const cadUrs = p.cad_unit_status || null;
+                const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
+                const cancelKind = this._cancelKind(p);
+                if (cancelKind === 'after-arrival') cancAfterArrival++;
+                else if (cancelKind === 'before-arrival') cancBeforeArrival++;
+                return {
+                    unit: p.unit, at: p.timestamp, phases, counted,
+                    withdrawn: !!p.withdrawn, manualCancelled: !!p.manual_cancelled,
+                    cadUrs, cadReached, cancelKind,
+                    cadUnitId: p.cad_unit_id != null ? p.cad_unit_id : null,
+                    cadRunUnitId: p.cad_run_unit_id != null ? p.cad_run_unit_id : null,
+                    respArrivalMin: p.resp_arrival_min != null ? p.resp_arrival_min : null,
+                    respMubasharaMin: p.resp_mubashara_min != null ? p.resp_mubashara_min : null
+                };
+            });
+            // مؤشر البلاغ: أسرع وصول/مباشرة بين الفرق المحتسبة فقط — تعدد الفرق لا يكرر البلاغ
+            const countedCrews = crews.filter(c => c.counted);
+            const arrVals = countedCrews.map(c => c.respArrivalMin).filter(v => v !== null);
+            const mubVals = countedCrews.map(c => c.respMubasharaMin).filter(v => v !== null);
+            if (arrVals.length) rtArrival.push(Math.min(...arrVals));
+            if (mubVals.length) rtMubashara.push(Math.min(...mubVals));
+            return {
+                number: ic.number, code: ic.code, type: t, source: ic.source,
+                status: st, severity: null, // ذاكرة تاريخية: لا خطورة حية إطلاقًا
+                shiftId: ic.shift_id != null ? ic.shift_id : null,
+                createdAt: ic.created_at, cadCreatedAt: ic.cad_created_at || null,
+                address: ic.address || null, region: ic.region || null, district: ic.district || null,
+                street: ic.street || null, city: ic.city || null,
+                lat: ic.lat != null ? ic.lat : null, lng: ic.lng != null ? ic.lng : null,
+                crews,
+                bestArrivalMin: arrVals.length ? Math.min(...arrVals) : null,
+                bestMubasharaMin: mubVals.length ? Math.min(...mubVals) : null
+            };
+        });
+        const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+        // مؤشرات النطاق التاريخية — على كامل النطاق (المنتهي حدث فعلًا)، لا على النشط فقط
+        const hourCount = {};
+        for (const { ts } of inRange) { const h = new Date(ts).getHours(); hourCount[h] = (hourCount[h] || 0) + 1; }
+        let peakHour = null;
+        for (const h of Object.keys(hourCount)) {
+            if (!peakHour || hourCount[h] > peakHour.count) peakHour = { hour: +h, count: hourCount[h] };
+        }
+        let topDistrict = null;
+        for (const dName of Object.keys(byDistrict)) {
+            if (dName === 'غير محدد') continue;
+            if (!topDistrict || byDistrict[dName] > topDistrict.count) topDistrict = { name: dName, count: byDistrict[dName] };
+        }
+        const streetCount = {};
+        for (const d of detail) { if (d.street) streetCount[d.street] = (streetCount[d.street] || 0) + 1; }
+        const topStreets = Object.entries(streetCount).sort((a, b) => b[1] - a[1]).slice(0, 3)
+            .map(([name, count]) => ({ name, count }));
+        // «بلا موقع دقيق» هنا تاريخية: كل بلاغات النطاق بلا إحداثيات — بصدق وبلا اختراع مواقع
+        const positioned = detail.filter(d => d.lat !== null && d.lng !== null);
+        const noLocationList = detail.filter(d => d.lat === null || d.lng === null)
+            .map(d => ({ number: d.number, district: d.district, cadCreatedAt: d.cadCreatedAt }));
+        return {
+            range: { from: new Date(fromTs).toISOString(), to: new Date(toTs).toISOString() },
+            total: detail.length,
+            incidentsCount: detail.length,
+            activeCount: detail.filter(d => d.status === 'active').length, // معلومة صدق — ليست أساس العرض هنا
+            byStatus, byType, byCrew, byDistrict,
+            unitCancels: { beforeArrival: cancBeforeArrival, afterArrival: cancAfterArrival },
+            incidents: detail,
+            unresolvedTimeCount,
+            mapStatus: {
+                sectorStatus: null, // لا حالة ضغط «الآن» في الذاكرة التاريخية
+                topDistrict, peakHour, topStreets,
+                noLocation: noLocationList,
+                positionedCount: positioned.length,
+                noLocationCount: noLocationList.length
+            },
+            responseTime: {
+                arrival: { avg: avg(rtArrival), count: rtArrival.length },
+                mubashara: { avg: avg(rtMubashara), count: rtMubashara.length },
+                definition: 'من إنشاء البلاغ في CAD حتى الوصول (مرحلة البحث)/المباشرة (مرحلة العلاج) — الفرق التي لم تتحرك خارج المؤشر'
+            },
+            notes: [
+                'الضغطات اليدوية بلا رقم CAD خارج هذه الطبقة — لا موقع لها بنيويًا ولا تُخترع لها إحداثيات',
+                'Available Units (اقتراحات خطة الاستجابة) ليست مشاركة — لا تدخل أي عدّاد',
+                'حدود النطاق وساعة الذروة بنفس أساس توقيت محلل CAD المركزي المستخدم في الخريطة التشغيلية'
+            ]
+        };
+    }
+
+    // ═══════════════ H2 — الأنماط الزمنية (اعتماد المالك 2026-08-24) ═══════════════
+    // ثوابت الاشتقاق موثقة هنا ومصدرها الوحيد هذه الخدمة (لا منطق في الواجهة):
+    // الفترات: صباح 07–15 · مساء 15–23 · ليل 23–07 (أساس توقيت محلل CAD المركزي).
+    static get PERIODS() {
+        return [
+            { key: 'morning', label: 'صباح', from: 7, to: 15 },
+            { key: 'evening', label: 'مساء', from: 15, to: 23 },
+            { key: 'night', label: 'ليل', from: 23, to: 31 } // 23–24 و0–7
+        ];
+    }
+    static _periodOf(hour) { return hour >= 7 && hour < 15 ? 'morning' : (hour >= 15 && hour < 23 ? 'evening' : 'night'); }
+
+    /**
+     * H2 — الأنماط: الساعة/اليوم/الفترة/الذروة/الأحياء/الشوارع + مقارنة بالفترة
+     * السابقة المماثلة (نفس الطول قبل النطاق مباشرة). اشتقاق صرف من
+     * incident_registry — لا تخزين ولا جداول موازية.
+     */
+    async getPatterns(fromTs, toTs) {
+        const { incidents } = await this.engine.storage.getIncidentHistoryData();
+        const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
+        const span = toTs - fromTs + 1;
+        const prev = this._incidentsInRange(incidents, fromTs - span, fromTs - 1);
+        const build = (list) => {
+            const byHour = new Array(24).fill(0);
+            const byWeekday = new Array(7).fill(0); // 0=الأحد … 6=السبت (ترقيم JS)
+            const byPeriod = { morning: 0, evening: 0, night: 0 };
+            const matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
+            const byDate = {}, byDistrict = {}, byStreet = {}, byType = {};
+            for (const { ic, ts } of list) {
+                const d = new Date(ts);
+                const h = d.getHours(), w = d.getDay();
+                byHour[h]++; byWeekday[w]++; byPeriod[ReportService._periodOf(h)]++; matrix[w][h]++;
+                const dk = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                byDate[dk] = (byDate[dk] || 0) + 1;
+                const dn = ic.district || 'غير محدد';
+                byDistrict[dn] = (byDistrict[dn] || 0) + 1;
+                if (ic.street) byStreet[ic.street] = (byStreet[ic.street] || 0) + 1;
+                const t = ic.type || 'other';
+                byType[t] = (byType[t] || 0) + 1;
+            }
+            return { byHour, byWeekday, byPeriod, matrix, byDate, byDistrict, byStreet, byType, total: list.length };
+        };
+        const cur = build(inRange);
+        const prv = build(prev.inRange);
+        const top = (obj, n) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => ({ name, count }));
+        // الذروة: أول الأعلى — byHour/byWeekday مصفوفات فالتعادل يفوز الأصغر ترقيمًا (حتمي)
+        const peakHourIdx = cur.byHour.indexOf(Math.max(...cur.byHour));
+        const peakWeekdayIdx = cur.byWeekday.indexOf(Math.max(...cur.byWeekday));
+        const round1 = v => Math.round(v * 10) / 10;
+        const days = Math.max(1, Math.round(span / 86400000));
+        return {
+            range: { from: new Date(fromTs).toISOString(), to: new Date(toTs).toISOString() },
+            total: cur.total,
+            byHour: cur.byHour,
+            byWeekday: cur.byWeekday,
+            byPeriod: cur.byPeriod,
+            byDate: cur.byDate,
+            byType: cur.byType,
+            districts: top(cur.byDistrict, 10),
+            streets: top(cur.byStreet, 10),
+            peakHour: cur.total ? { hour: peakHourIdx, count: cur.byHour[peakHourIdx] } : null,
+            peakWeekday: cur.total ? { day: peakWeekdayIdx, count: cur.byWeekday[peakWeekdayIdx] } : null,
+            unresolvedTimeCount,
+            comparison: {
+                label: 'الفترة السابقة المماثلة (' + days + (days === 1 ? ' يوم' : ' أيام') + ' قبل النطاق مباشرة)',
+                range: { from: new Date(fromTs - span).toISOString(), to: new Date(fromTs - 1).toISOString() },
+                total: prv.total,
+                perDay: { current: round1(cur.total / days), previous: round1(prv.total / days) },
+                delta: cur.total - prv.total,
+                byType: { current: cur.byType, previous: prv.byType }
+            },
+            periodRule: 'صباح 07:00–15:00 · مساء 15:00–23:00 · ليل 23:00–07:00 — على أساس توقيت محلل CAD المركزي',
+            notes: [
+                'كل الأنماط مشتقة من cad_created_at الفعلي (أو created_at بديلًا صادقًا) — لا تخزين مسبق لأي نمط',
+                'الفترات قاعدة اشتقاق موثقة قابلة للضبط بقرار — ليست تعريفًا تشغيليًا ملزمًا'
+            ],
+            _matrix: cur.matrix // لدعم القرار (H4) — نوافذ الذروة يوم×ساعة
+        };
+    }
+
+    // ═══════════════ H3 — الطلب × التمركز (اعتماد المالك 2026-08-24) ═══════════════
+    // ثوابت موثقة: خلية الطلب ≈ 0.01° (~1.1كم) بثلاثة بلاغات فأكثر · «بعيد» = 3كم ·
+    // «تغطية ضعيفة» = متوسط أقرب تمركز وقت البلاغ > 3كم أو متوسط وصول أعلى من متوسط النطاق.
+    static get ANALYTICS_RULES() {
+        return { DEMAND_ZONE_MIN: 3, COVERAGE_FAR_KM: 3, SIM_RADIUS_KM: 3, CELL_DECIMALS: 2 };
+    }
+
+    /**
+     * H3 — الطلب × التمركز: كل بلاغ محدد الموقع يُربط بنوافذ التمركز الفعلية من
+     * سجل positioning_events (append-only — الحمولة كاملة عند كل حدث):
+     * أقرب تمركز نشط وقت البلاغ (أي فرقة) + تمركز الفرقة المباشرة نفسها إن وُجد.
+     * من لا تمركز معروف له وقت البلاغ يُعرض «بلا تمركز معروف» بصدق — لا تخمين.
+     */
+    async getCoverage(fromTs, toTs) {
+        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData();
+        const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
+        const posEvents = await this.engine.storage.getPositioningHistory();
+        // نوافذ التمركز من لقطات الأحداث — parseRiyadhWall المركزي يفسّر القديم والجديد
+        const windows = [];
+        for (const ev of posEvents) {
+            let pl = null;
+            try { pl = ev.payload ? JSON.parse(ev.payload) : null; } catch (_) { pl = null; }
+            if (!pl) continue;
+            const lat = parseFloat(pl.lat), lng = parseFloat(pl.lng);
+            if (!isFinite(lat) || !isFinite(lng)) continue; // بلا إحداثية ← لا موقع مختلق
+            const s = PositioningService.parseRiyadhWall(pl.startTime);
+            const e = PositioningService.parseRiyadhWall(pl.endTime);
+            windows.push({
+                planId: String(ev.plan_id), unit: pl.unit || null, location: pl.location || null,
+                lat, lng,
+                startTs: s ? s.getTime() : null,
+                endTs: e ? e.getTime() : null,
+                eventType: ev.event_type, at: ev.created_at
+            });
+        }
+        const partsByKey = {};
+        for (const p of parts) {
+            const k = p.shift_id + '|' + p.incident_number;
+            (partsByKey[k] = partsByKey[k] || []).push(p);
+        }
+        // النوافذ المرتبطة بالنطاق فقط (تداخل زمني معه) — تمركزات خارج النطاق لا
+        // تخص هذا التحليل ولا تُعرض على خريطته ولا تدخل «أقرب تمركز تاريخي»
+        const windowsInRange = windows.filter(w =>
+            (w.startTs === null || w.startTs <= toTs) && (w.endTs === null || w.endTs >= fromTs));
+        const activeAt = (ts) => windowsInRange.filter(w =>
+            (w.startTs === null || w.startTs <= ts) && (w.endTs === null || w.endTs >= ts));
+        // نقاط تمركز فريدة للعرض على الخريطة (الأحداث مرتبة زمنيًا — الأحدث يطغى)
+        const posPoints = {};
+        for (const w of windowsInRange) {
+            posPoints[(w.unit || '?') + '|' + w.lat + '|' + w.lng] =
+                { unit: w.unit, location: w.location, lat: w.lat, lng: w.lng };
+        }
+        const nearestOf = (lat, lng, cands) => {
+            let best = null;
+            for (const w of cands) {
+                const km = this._haversineKm(lat, lng, w.lat, w.lng);
+                if (!best || km < best.km) best = { km: Math.round(km * 10) / 10, unit: w.unit, location: w.location, planId: w.planId };
+            }
+            return best;
+        };
+        const detail = [];
+        const respAll = [];
+        let noCoords = 0;
+        for (const { ic, ts } of inRange) {
+            const crewsList = partsByKey[ic.shift_id + '|' + ic.number] || [];
+            const counted = crewsList.filter(p => this.isParticipationCounted(p));
+            const countedUnits = counted.map(p => p.unit);
+            const arrVals = counted.map(p => p.resp_arrival_min).filter(v => v !== null && v !== undefined);
+            const bestArrivalMin = arrVals.length ? Math.min(...arrVals) : null;
+            if (bestArrivalMin !== null) respAll.push(bestArrivalMin);
+            if (ic.lat === null || ic.lat === undefined || ic.lng === null || ic.lng === undefined) {
+                noCoords++;
+                detail.push({
+                    number: ic.number, district: ic.district || null, street: ic.street || null,
+                    cadCreatedAt: ic.cad_created_at || null, lat: null, lng: null,
+                    countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
+                    nearestPositioningAtTime: null, crewPositioning: null, noCoords: true
+                });
+                continue;
+            }
+            const act = activeAt(ts);
+            const nearestAny = nearestOf(ic.lat, ic.lng, act);
+            let crewPos = null;
+            for (const u of countedUnits) {
+                const own = nearestOf(ic.lat, ic.lng, act.filter(w => w.unit === u));
+                if (own && (!crewPos || own.km < crewPos.km)) { crewPos = own; break; } // أقرب تمركز لفرقة مباشرة
+            }
+            detail.push({
+                number: ic.number, district: ic.district || null, street: ic.street || null,
+                cadCreatedAt: ic.cad_created_at || null, lat: ic.lat, lng: ic.lng,
+                countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
+                nearestPositioningAtTime: nearestAny, // null = بلا تمركز معروف وقت البلاغ (صدق)
+                crewPositioning: crewPos,
+                noCoords: false
+            });
+        }
+        const avgOf = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+        const overallAvgArrival = avgOf(respAll);
+        // مناطق الطلب: خلايا ~0.01° بثلاثة بلاغات محددة الموقع فأكثر
+        const R = ReportService.ANALYTICS_RULES;
+        const cells = {};
+        for (const d of detail) {
+            if (d.noCoords) continue;
+            const key = d.lat.toFixed(R.CELL_DECIMALS) + ',' + d.lng.toFixed(R.CELL_DECIMALS);
+            (cells[key] = cells[key] || []).push(d);
+        }
+        const zones = Object.entries(cells).filter(([, l]) => l.length >= R.DEMAND_ZONE_MIN).map(([key, list]) => {
+            const clat = list.reduce((s, x) => s + x.lat, 0) / list.length;
+            const clng = list.reduce((s, x) => s + x.lng, 0) / list.length;
+            const respVals = list.map(x => x.bestArrivalMin).filter(v => v !== null);
+            const nearVals = list.map(x => x.nearestPositioningAtTime ? x.nearestPositioningAtTime.km : null).filter(v => v !== null);
+            const avgArrivalMin = avgOf(respVals);
+            const avgNearestAtTimeKm = nearVals.length ? avgOf(nearVals) : null;
+            // ذروة المنطقة الزمنية (اعتماد المالك 2026-08-24 — نافذة المنطقة الساخنة):
+            // أعلى نافذة 3 ساعات متتالية طلبًا من cadHour الفعلي لبلاغات الخلية؛
+            // التعادل يُحسم لأبكر بداية — اشتقاق صرف بلا تخمين
+            const hourHist = new Array(24).fill(0);
+            for (const x of list) { if (x.cadHour !== null && x.cadHour !== undefined) hourHist[x.cadHour]++; }
+            let peakWindow = null, bestWinSum = -1;
+            for (let s = 0; s <= 21; s++) {
+                const sum = hourHist[s] + hourHist[s + 1] + hourHist[s + 2];
+                if (sum > bestWinSum) { bestWinSum = sum; peakWindow = { startHour: s, endHour: s + 3, count: sum }; }
+            }
+            if (peakWindow && peakWindow.count === 0) peakWindow = null;
+            // أقرب تمركز تاريخي للمنطقة ضمن النوافذ المتداخلة مع النطاق
+            const nearestAnytime = nearestOf(clat, clng, windowsInRange);
+            const weakReasons = [];
+            if (avgNearestAtTimeKm !== null && avgNearestAtTimeKm > R.COVERAGE_FAR_KM) weakReasons.push('أقرب تمركز وقت البلاغات بعيد (>' + R.COVERAGE_FAR_KM + 'كم)');
+            if (nearVals.length < list.length) weakReasons.push('بعض البلاغات بلا تمركز معروف وقتها');
+            if (avgArrivalMin !== null && overallAvgArrival !== null && avgArrivalMin > overallAvgArrival) weakReasons.push('متوسط الوصول أعلى من متوسط النطاق');
+            return {
+                key,
+                centroid: { lat: Math.round(clat * 10000) / 10000, lng: Math.round(clng * 10000) / 10000 },
+                count: list.length,
+                avgArrivalMin,
+                avgNearestAtTimeKm,
+                withoutPositioningAtTime: list.length - nearVals.length,
+                nearestAnytimeKm: nearestAnytime ? nearestAnytime.km : null,
+                peakWindow,
+                weak: weakReasons.length > 0,
+                weakReasons
+            };
+        }).sort((a, b) => b.count - a.count);
+        return {
+            range: { from: new Date(fromTs).toISOString(), to: new Date(toTs).toISOString() },
+            totals: {
+                incidents: inRange.length,
+                positioned: inRange.length - noCoords,
+                noCoords,
+                unresolvedTimeCount
+            },
+            positioning: {
+                windowsCount: windowsInRange.length, // المتداخلة مع النطاق فقط
+                units: [...new Set(windowsInRange.map(w => w.unit).filter(Boolean))].sort()
+            },
+            positioningUnits: Object.values(posPoints), // نقاط فريدة للعرض — من السجل الفعلي فقط
+            responseAvgArrival: overallAvgArrival,
+            incidents: detail,
+            zones,
+            constants: { demandZoneMin: R.DEMAND_ZONE_MIN, coverageFarKm: R.COVERAGE_FAR_KM, cellDegrees: '0.01° (~1.1كم)' },
+            notes: [
+                'التمركز المعروف = ما سُجّل فعلًا في positioning_events فقط — الفرقة بلا تمركز مسجل وقت البلاغ تُعرض «بلا تمركز معروف» ولا يُخمَّن مكانها',
+                'نوافذ التمركز الداخلة في التحليل = المتداخلة زمنيًا مع النطاق المحدد فقط',
+                'منطقة الطلب = خلية شبكية ~1.1كم بثلاثة بلاغات فأكثر — قاعدة موثقة قابلة للضبط بقرار',
+                'البلاغات بلا إحداثيات تُحسب في الإجماليات ولا تدخل الخريطة ولا المناطق — لا تخمين مواقع'
+            ]
+        };
+    }
+
+    // ═══════════════ H4 — دعم القرار (اعتماد المالك 2026-08-24) ═══════════════
+    /**
+     * H4 — توصيات تمركز مرشحة + نوافذ تستحق إعادة التوزيع + محاكاة أثر افتراضية
+     * على البلاغات التاريخية. **دعم قرار فقط: لا ينفذ أي إجراء تشغيلي ولا ينقل
+     * فرقة ولا يغيّر تمركزًا** — القرار لصاحبه البشري. يبني على getCoverage و
+     * getPatterns (إعادة استخدام كاملة — لا اشتقاق موازٍ).
+     */
+    async getRecommendations(fromTs, toTs) {
+        const coverage = await this.getCoverage(fromTs, toTs);
+        const patterns = await this.getPatterns(fromTs, toTs);
+        const R = ReportService.ANALYTICS_RULES;
+        const overallAvg = coverage.responseAvgArrival;
+        // محاكاة: بلاغات النطاق الواقعة ضمن نصف قطر المرشح (اشتقاق من الخام مباشرة)
+        const simulate = (lat, lng) => {
+            const near = coverage.incidents.filter(d => !d.noCoords &&
+                this._haversineKm(lat, lng, d.lat, d.lng) <= R.SIM_RADIUS_KM);
+            const respVals = near.map(d => d.bestArrivalMin).filter(v => v !== null);
+            const avg = respVals.length ? Math.round(respVals.reduce((a, b) => a + b, 0) / respVals.length * 10) / 10 : null;
+            return {
+                radiusKm: R.SIM_RADIUS_KM,
+                incidentsWithin: near.length,
+                sharePct: coverage.totals.positioned ? Math.round(near.length / coverage.totals.positioned * 1000) / 10 : null,
+                avgArrivalMin: avg,
+                rangeAvgArrivalMin: overallAvg,
+                comparison: avg === null || overallAvg === null ? 'unknown'
+                    : (avg < overallAvg ? 'lower' : (avg > overallAvg ? 'higher' : 'equal'))
+            };
+        };
+        const candidates = coverage.zones.map(z => ({
+            lat: z.centroid.lat, lng: z.centroid.lng,
+            basedOnIncidents: z.count,
+            avgArrivalMin: z.avgArrivalMin,
+            nearestHistoricalPositioningKm: z.nearestAnytimeKm,
+            weakCoverage: z.weak,
+            weakReasons: z.weakReasons,
+            score: Math.round(z.count * (z.avgArrivalMin !== null && overallAvg ? z.avgArrivalMin / overallAvg : 1) * 100) / 100,
+            simulation: simulate(z.centroid.lat, z.centroid.lng)
+        })).sort((a, b) => b.score - a.score);
+        // نوافذ تستحق إعادة توزيع التمركز: أعلى خلايا يوم×ساعة طلبًا في النطاق
+        const matrix = patterns._matrix || [];
+        const cellsList = [];
+        for (let w = 0; w < 7; w++) for (let h = 0; h < 24; h++) {
+            if (matrix[w] && matrix[w][h] > 0) cellsList.push({ weekday: w, hour: h, count: matrix[w][h] });
+        }
+        cellsList.sort((a, b) => b.count - a.count);
+        return {
+            range: coverage.range,
+            candidates,
+            suggestedWindows: cellsList.slice(0, 5),
+            coverageSummary: {
+                zonesCount: coverage.zones.length,
+                weakZonesCount: coverage.zones.filter(z => z.weak).length,
+                responseAvgArrival: overallAvg,
+                positioningWindows: coverage.positioning.windowsCount
+            },
+            patternsSummary: {
+                total: patterns.total,
+                peakHour: patterns.peakHour,
+                peakWeekday: patterns.peakWeekday,
+                comparison: patterns.comparison
+            },
+            disclaimer: 'دعم قرار فقط — هذه الطبقة لا تنفذ أي إجراء تشغيلي: لا نقل فرق، لا تغيير تمركز، لا إنشاء خطط. القرار النهائي لصاحبه البشري.',
+            notes: [
+                'المرشحون = مراكز مناطق الطلب التاريخية (خلايا ~1.1كم بثلاثة بلاغات فأكثر) مرتبة بالطلب مضروبًا في معامل زمن الاستجابة',
+                'المحاكاة تقيس فقط: كم بلاغًا تاريخيًا يقع ضمن ' + R.SIM_RADIUS_KM + 'كم من المرشح وما متوسط استجابته الفعلي مقابل متوسط النطاق — اشتقاق من الخام وليس تقديرًا نظريًا',
+                'النوافذ المقترحة = أعلى خلايا (يوم × ساعة) طلبًا في النطاق من cad_created_at الفعلي'
+            ]
+        };
     }
 }
 

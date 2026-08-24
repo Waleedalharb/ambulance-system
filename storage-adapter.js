@@ -266,6 +266,30 @@ class StorageAdapter {
         return { incidents, parts, manual };
     }
 
+    /** بيانات الذاكرة التاريخية للخريطة (H1 — اعتماد المالك 2026-08-24، وثيقة
+        DECISION-HISTORICAL-ANALYTICS): كل البلاغات المسجلة في incident_registry
+        عبر كل المناوبات + مشاركاتها المرقّمة (مع shift_id لأن تفرد الرقم مضمون
+        داخل المناوبة فقط). قراءة صرفة بلا قرار — الترشيح الزمني وقواعد الاحتساب
+        (لا Journey = لا مشاركة · لا withdrawn/manual_cancelled) كلها في
+        ReportService.getHistoricalSummary حتى تبقى قاعدة الاحتساب واحدة. */
+    async getIncidentHistoryData() {
+        const incidents = await this.db.all(
+            'SELECT * FROM incident_registry ORDER BY created_at ASC, id ASC');
+        const parts = await this.db.all(
+            `SELECT r.shift_id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
+             FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE t.incident_number IS NOT NULL`);
+        return { incidents, parts };
+    }
+
+    /** سجل التمركز التاريخي كاملًا (H3/H4 — اعتماد المالك 2026-08-24): كل أحداث
+        positioning_events (append-only) بحمولاتها — لقطة الخطة وقت كل حدث.
+        قراءة صرفة: تفسير الحمولة والنوافذ الزمنية في ReportService.getCoverage. */
+    async getPositioningHistory() {
+        return this.db.all(
+            'SELECT id, shift_id, plan_id, event_type, changed_fields, payload, actor_id, actor_name, created_at FROM positioning_events ORDER BY created_at ASC, id ASC');
+    }
+
     async deleteLastReportTime(reportId) {
         await this.db.run(
             'DELETE FROM report_times WHERE id = (SELECT id FROM report_times WHERE report_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1)',

@@ -1446,6 +1446,7 @@ window.addEventListener('load', function() {
                         <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiPeak">—</span><span class="smap-kpi-l">ذروة المناوبة</span></div>
                         <div class="smap-kpi"><span class="smap-kpi-v sev-green" id="smapKpiAlerts">0</span><span class="smap-kpi-l">حالات حرجة</span></div>
                     </div>
+                    <button type="button" class="smap-expand-btn smap-history-btn" id="smapHistoryBtn" title="ذاكرة الخريطة — التحليل التاريخي (H1–H4) فوق نفس الخريطة"><i class="fas fa-clock-rotate-left"></i><span>ذاكرة الخريطة</span></button>
                     <button type="button" class="smap-expand-btn" id="smapExpandBtn" title="تكبير الخريطة — وضع التشغيل المتقدم"><i class="fas fa-expand"></i></button>
                 </div>
                 <div class="smap-layerbar">
@@ -1458,10 +1459,31 @@ window.addEventListener('load', function() {
                     <button type="button" class="smap-chip" id="smapLayerPeak" title="ذروة البلاغات في المناوبة الحالية حسب وقت الإنشاء"><i class="fas fa-chart-line"></i> الذروة</button>
                     <button type="button" class="smap-chip" id="smapLayerStreets" title="شارات أكثر الشوارع بلاغًا — على مواقع بلاغات حقيقية فقط"><i class="fas fa-road"></i> الشوارع الأكثر بلاغًا</button>
                 </div>
+                <!-- ذاكرة الخريطة — شريط الوضع التاريخي (اعتماد المالك 2026-08-24): يظهر فقط في الوضع التاريخي -->
+                <div class="smap-histbar" id="smapHistBar">
+                    <span class="smap-layerbar-lbl"><i class="fas fa-clock-rotate-left"></i> النطاق:</span>
+                    <input type="date" id="histFrom" class="smap-hist-date">
+                    <span class="smap-hist-arrow">←</span>
+                    <input type="date" id="histTo" class="smap-hist-date">
+                    <button type="button" class="smap-chip" id="histApply" title="إعادة تحميل التحليل للنطاق المحدد"><i class="fas fa-rotate"></i> تحديث</button>
+                    <span class="smap-hist-sep"></span>
+                    <button type="button" class="smap-chip smap-hist-tab active" data-tab="density" title="كثافة البلاغات الموقَّعة في النطاق"><i class="fas fa-fire"></i> الكثافة</button>
+                    <button type="button" class="smap-chip smap-hist-tab" data-tab="zones" title="خلايا الطلب المرتفع — اضغط أي منطقة لتفاصيلها"><i class="fas fa-bullseye"></i> المناطق الساخنة</button>
+                    <button type="button" class="smap-chip smap-hist-tab" data-tab="patterns" title="الساعة/اليوم/الفترة/الذروة + مقارنة بالفترة السابقة"><i class="fas fa-chart-line"></i> الأنماط الزمنية</button>
+                    <button type="button" class="smap-chip smap-hist-tab" data-tab="positioning" title="أين كانت الفرق متمركزة فعلًا في النطاق"><i class="fas fa-truck-medical"></i> التمركزات التاريخية</button>
+                    <button type="button" class="smap-chip smap-hist-tab" data-tab="gaps" title="مناطق طلب مرتفع + تغطية ضعيفة مع سبب التصنيف"><i class="fas fa-triangle-exclamation"></i> فجوات التغطية</button>
+                    <button type="button" class="smap-chip smap-hist-tab" data-tab="decision" title="مرشحو تمركز ونوافذ مقترحة — دعم قرار فقط بلا تنفيذ تلقائي"><i class="fas fa-lightbulb"></i> دعم القرار</button>
+                </div>
                 <div class="smap-map-grid">
                 <div class="smap-maincol">
                 <div class="ops-map-wrap">
                     <div id="opsMap"></div>
+                    <!-- ذاكرة الخريطة: خريطة تاريخية خاصة فوق نفس المساحة + لوحة تحليلية — لا تلمس الخريطة الحية -->
+                    <div id="histMap"></div>
+                    <div class="smap-hist-dock" id="histDock">
+                        <div class="smap-hist-dock-head"><i class="fas fa-clock-rotate-left"></i> ذاكرة الخريطة <span class="rng" id="histDockRange"></span></div>
+                        <div class="smap-hist-dock-body" id="histDockBody"><div class="smap-empty">—</div></div>
+                    </div>
                     <div class="smk-alertbar" id="smkAlertBar" style="display:none;"></div>
                     <div class="ops-map-tile-note" id="opsMapTileNote" style="display:none;">
                         <i class="fas fa-triangle-exclamation"></i> تعذّر تحميل خلفية الخريطة — العلامات تعمل من بيانات الخادم
@@ -2597,6 +2619,7 @@ window.addEventListener('load', function() {
 <script src="js/app.js?v=47" defer></script>
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
 <script src="js/smart-map.js?v=4" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
+<script src="js/map-history.js?v=1" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
 <script src="js/smart-toolbar.js?v=3" defer></script>

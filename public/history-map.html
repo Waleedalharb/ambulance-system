@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الذاكرة التشغيلية — التحليل التاريخي للبلاغات</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+    /* هوية منصة الجنوب المعتمدة */
+    :root {
+        --navy-900: #0B1E33; --teal-id: #2E8B7A; --gold-id: #E8C84A;
+        --bg: #0A1728;
+        --surface: rgba(255,255,255,0.035);
+        --surface-2: rgba(255,255,255,0.05);
+        --border: rgba(255,255,255,0.08);
+        --border-soft: rgba(255,255,255,0.06);
+        --text: #F1F5F9; --text-2: #A9BACD; --muted: #8A9BB0;
+        --ops: #60A5FA; --emerald: #0EA47A; --coral: #EF4444;
+        --th-bg: #0E2038;
+        --radius: 16px; --radius-md: 12px;
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,0.045), 0 10px 30px rgba(0,0,0,0.30);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px 20px 48px; min-height: 100vh; }
+    body::before {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(ellipse 60% 40% at 50% -10%, rgba(46, 139, 122, 0.10), transparent 70%),
+            radial-gradient(ellipse 45% 32% at 50% 110%, rgba(232, 200, 74, 0.05), transparent 70%),
+            linear-gradient(180deg, #0B1E33 0%, #0A1728 55%, #081220 100%);
+    }
+    .container { max-width: 1500px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .header h1 { font-size: 1.45rem; font-weight: 700; }
+    .header h1 i { color: var(--gold-id); margin-left: 8px; }
+    .subtitle { color: var(--text-2); font-size: 0.85rem; margin-top: 4px; }
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--surface); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-soft); box-shadow: var(--shadow-card); }
+    .controls input[type="date"] { font-family: inherit; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text); font-size: 0.88rem; }
+    .controls input[type="date"]:disabled { opacity: 0.45; }
+    .preset { font-family: inherit; padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text-2); font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
+    .preset.active { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border-color: transparent; font-weight: 600; }
+    #loadBtn { font-family: inherit; background: linear-gradient(150deg, #2F6BF0, #1D4FD7); color: #fff; border: none; cursor: pointer; font-weight: 600; padding: 9px 18px; border-radius: 9px; box-shadow: 0 10px 24px rgba(30,90,220,0.4), inset 0 1px 0 rgba(255,255,255,0.2); }
+    #loadBtn:hover { filter: brightness(1.1); }
+    .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .tab { font-family: inherit; padding: 10px 20px; border-radius: 12px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--text-2); font-size: 0.92rem; cursor: pointer; font-weight: 600; transition: all 0.15s ease; }
+    .tab.active { background: linear-gradient(135deg, var(--teal-id), var(--emerald)); color: #fff; border-color: transparent; box-shadow: 0 8px 20px rgba(14,164,122,0.3); }
+    .tab i { margin-left: 6px; }
+    .caveats { background: rgba(232,200,74,0.07); border: 1px solid rgba(232,200,74,0.28); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; font-size: 0.82rem; color: #EADDA8; }
+    .caveats strong { color: var(--gold-id); }
+    .caveats li { margin: 2px 0; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 14px; box-shadow: var(--shadow-card); }
+    .kpi .k { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+    .kpi .v { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi .v.gold { color: var(--gold-id); } .kpi .v.blue { color: var(--ops); }
+    .kpi .v.green { color: #34D399; } .kpi .v.red { color: var(--coral); }
+    .kpi .sub { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+    .layout { display: grid; grid-template-columns: 1fr 320px; gap: 14px; }
+    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+    .map-card, .panel { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
+    .map-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); }
+    .lchip { font-family: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 20px; border: 1px solid var(--border); background: var(--th-bg); color: var(--text-2); font-size: 0.8rem; cursor: pointer; transition: all 0.15s ease; }
+    .lchip.active { background: rgba(96,165,250,0.16); border-color: rgba(96,165,250,0.45); color: #BFD9FE; font-weight: 600; }
+    .legend { margin-right: auto; display: flex; gap: 10px; font-size: 0.75rem; color: var(--muted); align-items: center; flex-wrap: wrap; }
+    .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-left: 4px; }
+    #hMap, #cMap { height: 560px; width: 100%; background: #0B1220; }
+    .side { display: flex; flex-direction: column; gap: 14px; }
+    .panel h3 { font-size: 0.92rem; padding: 12px 16px; border-bottom: 1px solid var(--border-soft); color: var(--text-2); }
+    .panel h3 i { color: var(--gold-id); margin-left: 6px; }
+    .panel .body { padding: 12px 16px; font-size: 0.82rem; max-height: 260px; overflow-y: auto; }
+    .panel .body.tall { max-height: none; }
+    .srow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .srow .nm { min-width: 100px; }
+    .srow .bar { height: 8px; border-radius: 6px; background: linear-gradient(90deg, var(--teal-id), var(--gold-id)); }
+    .srow .c { margin-right: auto; font-weight: 700; color: var(--gold-id); font-variant-numeric: tabular-nums; }
+    .tchip { display: inline-block; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 20px; padding: 4px 12px; margin: 3px; font-size: 0.8rem; color: var(--text-2); }
+    .tchip b { color: var(--text); }
+    .nlrow { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--border-soft); font-size: 0.8rem; }
+    .nlrow .n { font-weight: 700; color: var(--ops); font-variant-numeric: tabular-nums; }
+    .nlrow .t { color: var(--muted); font-size: 0.72rem; }
+    .empty { color: var(--muted); text-align: center; padding: 14px 0; }
+    .loading, .error-box { text-align: center; padding: 40px; color: var(--muted); }
+    .error-box { color: var(--coral); }
+    .meta { color: var(--muted); font-size: 0.78rem; margin-bottom: 12px; }
+    /* دبابيس البلاغات التاريخية */
+    .hmk { background: none; border: none; }
+    .hmk-pin { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
+    .hmk-pin i { transform: rotate(45deg); font-size: 11px; color: #fff; }
+    .hmk.st-active .hmk-pin { background: #2563EB; }
+    .hmk.st-closed .hmk-pin { background: #059669; }
+    .hmk.st-cancelled .hmk-pin { background: #6B7280; }
+    .hmk.st-pos .hmk-pin { background: #B8860B; border-radius: 6px; transform: none; width: 24px; height: 24px; }
+    .hmk.st-pos .hmk-pin i { transform: none; }
+    .hpop { font-family: 'IBM Plex Sans Arabic', sans-serif; direction: rtl; font-size: 0.82rem; min-width: 220px; }
+    .hpop .h { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
+    .hpop .row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-top: 1px dashed rgba(0,0,0,0.08); }
+    .hpop .row .k { color: #64748B; }
+    .hpop .crew { padding: 3px 0; border-top: 1px dashed rgba(0,0,0,0.08); }
+    .hpop .crew .u { font-weight: 600; }
+    .hpop .ex { color: #9CA3AF; font-size: 0.76rem; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; }
+    /* H2 — الرسوم الشريطية */
+    .chart { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 8px 4px 0; }
+    .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+    .chart .cb { width: 100%; max-width: 34px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, var(--ops), #1D4FD7); min-height: 2px; }
+    .chart .cb.peak { background: linear-gradient(180deg, var(--gold-id), #B8860B); }
+    .chart .cl { font-size: 0.66rem; color: var(--muted); }
+    .chart .cv { font-size: 0.64rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+    .cmp .cell { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 10px 14px; }
+    .cmp .cell .k { font-size: 0.74rem; color: var(--muted); }
+    .cmp .cell .v { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+    .delta-up { color: var(--coral); } .delta-down { color: #34D399; } .delta-eq { color: var(--muted); }
+    /* H3/H4 */
+    .zrow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--border-soft); font-size: 0.8rem; }
+    .zrow .zname { font-weight: 600; }
+    .zrow .zmeta { color: var(--muted); font-size: 0.72rem; }
+    .zrow .badge { margin-right: auto; font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; font-weight: 700; }
+    .badge.weak { background: rgba(239,68,68,0.15); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.35); }
+    .badge.ok { background: rgba(52,211,153,0.12); color: #6EE7B7; border: 1px solid rgba(52,211,153,0.3); }
+    .cand { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; }
+    .cand .chead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .cand .rank { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--gold-id), #B8860B); color: #1A1A1A; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+    .cand .coords { font-variant-numeric: tabular-nums; color: var(--ops); font-size: 0.85rem; direction: ltr; }
+    .cand .cstats { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-2); }
+    .cand .cstats b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .cand .sim { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-soft); font-size: 0.78rem; color: var(--muted); }
+    .cand .sim b { color: var(--gold-id); }
+    .disc { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.3); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; font-size: 0.84rem; color: #BFD9FE; }
+    .disc i { color: var(--ops); margin-left: 6px; }
+</style>
+<link rel="stylesheet" href="/css/platform-identity.css?v=1">
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-clock-rotate-left"></i>الذاكرة التشغيلية — التحليل التاريخي</h1>
+            <div class="subtitle">الطبقة التاريخية التحليلية H1–H4 · عرض وتحليل فقط · انتهاء البلاغ ينهي حالته التشغيلية فقط ولا ينهي أثره التحليلي</div>
+        </div>
+        <div class="controls">
+            <button class="preset" data-days="0">اليوم</button>
+            <button class="preset active" data-days="7">7 أيام</button>
+            <button class="preset" data-days="30">30 يومًا</button>
+            <button class="preset" data-days="custom">مخصص</button>
+            <input type="date" id="fromDate" disabled>
+            <input type="date" id="toDate" disabled>
+            <button id="loadBtn" onclick="reloadActive()"><i class="fas fa-rotate"></i> عرض</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="map" onclick="switchTab('map')"><i class="fas fa-map-location-dot"></i>الخريطة التاريخية</button>
+        <button class="tab" data-tab="patterns" onclick="switchTab('patterns')"><i class="fas fa-chart-column"></i>الأنماط الزمنية</button>
+        <button class="tab" data-tab="coverage" onclick="switchTab('coverage')"><i class="fas fa-crosshairs"></i>الطلب × التمركز</button>
+        <button class="tab" data-tab="decision" onclick="switchTab('decision')"><i class="fas fa-lightbulb"></i>دعم القرار</button>
+    </div>
+
+    <div class="meta" id="metaLine"></div>
+    <div id="tabContent"><div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري التحميل…</div></div>
+</div>
+
+<script src="js/core/core-auth.js"></script>
+<script src="/js/time-riyadh.js"></script>
+<script>
+/* ═══ عرض وتحليل فقط — كل الاشتقاقات سيرفية في ReportService
+       (getHistoricalSummary/getPatterns/getCoverage/getRecommendations).
+       قاعدة Zero Business Logic · لا تنفيذ أي إجراء تشغيلي من هنا. ═══ */
+if (!AuthCore.requireAuth('/')) throw new Error('auth');
+
+var TYPE_DEFS = {
+    traffic:   { emoji: '🚗', label: 'حوادث مرورية', color: '#EF4444' },
+    medical:   { emoji: '🤒', label: 'حالات مرضية', color: '#3B82F6' },
+    injury:    { emoji: '🚨', label: 'إصابات', color: '#F97316' },
+    cardiac:   { emoji: '❤️', label: 'توقف قلب', color: '#DC2626' },
+    birth:     { emoji: '👶', label: 'ولادة', color: '#EC4899' },
+    fire:      { emoji: '🔥', label: 'حريق', color: '#F59E0B' },
+    death:     { emoji: '⚰️', label: 'وفاة', color: '#6B7280' },
+    transport: { emoji: '🚑', label: 'نقل مريض', color: '#10B981' },
+    other:     { emoji: '📦', label: 'حالات أخرى', color: '#8B5CF6' }
+};
+function tDef(t) { return TYPE_DEFS[t] || TYPE_DEFS.other; }
+var STATUS_LBL = { active: 'نشط', closed: 'مغلق', cancelled: 'ملغى' };
+var WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+var PERIOD_LBL = { morning: 'صباح (07–15)', evening: 'مساء (15–23)', night: 'ليل (23–07)' };
+
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function riyadhTodayStr() {
+    var p = TimeRiyadh.riyadhParts(new Date());
+    return p.year + '-' + pad2(parseInt(p.month, 10)) + '-' + pad2(parseInt(p.day, 10));
+}
+function shiftDayStr(dateStr, deltaDays) {
+    var d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + deltaDays);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+function fmtKm(v) { return v === null || v === undefined ? '—' : v + ' كم'; }
+function fmtMin(v) { return v === null || v === undefined ? '—' : v + ' د'; }
+
+/* ── النطاق الزمني المشترك ── */
+var mode = 7;
+document.querySelectorAll('.preset').forEach(function (b) {
+    b.addEventListener('click', function () {
+        document.querySelectorAll('.preset').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        var v = b.getAttribute('data-days');
+        var custom = v === 'custom';
+        document.getElementById('fromDate').disabled = !custom;
+        document.getElementById('toDate').disabled = !custom;
+        if (!custom) { mode = parseInt(v, 10); reloadActive(); }
+        else {
+            mode = 'custom';
+            var today = riyadhTodayStr();
+            if (!document.getElementById('fromDate').value) document.getElementById('fromDate').value = shiftDayStr(today, -6);
+            if (!document.getElementById('toDate').value) document.getElementById('toDate').value = today;
+        }
+    });
+});
+function currentRange() {
+    if (mode === 'custom') return { from: document.getElementById('fromDate').value, to: document.getElementById('toDate').value };
+    var to = riyadhTodayStr();
+    return { from: mode === 0 ? to : shiftDayStr(to, -(mode - 1)), to: to };
+}
+
+/* ── إدارة التبويبات والجلب ── */
+var activeTab = 'map';
+var cache = {}; // tab|from|to → payload
+function switchTab(t) {
+    activeTab = t;
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-tab') === t); });
+    loadTab();
+}
+function reloadActive() { cache = {}; loadTab(); }
+
+async function loadTab() {
+    var r = currentRange();
+    if (!r.from || !r.to) { document.getElementById('metaLine').textContent = 'حدد تاريخي البداية والنهاية'; return; }
+    document.getElementById('metaLine').textContent = 'النطاق: ' + r.from + ' ← ' + r.to;
+    var key = activeTab + '|' + r.from + '|' + r.to;
+    if (cache[key]) { renderTab(activeTab, cache[key]); return; }
+    document.getElementById('tabContent').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> جاري التحميل…</div>';
+    var url = { map: '/api/analytics/incidents', patterns: '/api/analytics/patterns', coverage: '/api/analytics/coverage', decision: '/api/analytics/recommendations' }[activeTab];
+    try {
+        var res = await AuthCore.apiRequest(url + '?from=' + r.from + '&to=' + r.to);
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+            document.getElementById('tabContent').innerHTML = '<div class="error-box"><i class="fas fa-triangle-exclamation"></i> ' + esc(data.error || 'تعذر الجلب') + '</div>';
+            return;
+        }
+        cache[key] = data;
+        renderTab(activeTab, data);
+    } catch (e) {
+        document.getElementById('tabContent').innerHTML = '<div class="error-box"><i class="fas fa-triangle-exclamation"></i> خطأ في الاتصال</div>';
+    }
+}
+function renderTab(tab, data) {
+    if (tab === 'map') renderMapTab(data);
+    else if (tab === 'patterns') renderPatternsTab(data);
+    else if (tab === 'coverage') renderCoverageTab(data);
+    else renderDecisionTab(data);
+}
+function caveatsHtml(notes, extraCount) {
+    var list = (notes || []).slice();
+    if (extraCount) list.push(extraCount + ' سجلًا بلا وقت قابل للقراءة — خارج النطاق بصدق');
+    if (!list.length) return '';
+    return '<div class="caveats"><strong><i class="fas fa-circle-info"></i> ملاحظات القراءة:</strong><ul style="padding-right:18px;">'
+        + list.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></div>';
+}
+function kpi(k, v, cls, sub) {
+    return '<div class="kpi"><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
+}
+
+/* ═══════════ التبويب 1: الخريطة التاريخية (H1) ═══════════ */
+var map1 = null, layers1 = null, layersOn1 = { incidents: true, heat: false, hot: false, streets: true };
+function initMap1() {
+    if (map1) return true;
+    if (typeof L === 'undefined') return false;
+    map1 = L.map('hMap', { scrollWheelZoom: false, attributionControl: true }).setView([24.7136, 46.6753], 11);
+    map1.on('click', function () { map1.scrollWheelZoom.enable(); });
+    map1.on('mouseout', function () { map1.scrollWheelZoom.disable(); });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19
+    }).addTo(map1);
+    layers1 = {
+        incidents: L.layerGroup().addTo(map1),
+        streets: L.layerGroup().addTo(map1),
+        hot: L.layerGroup(),
+        heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 28, blur: 22, maxZoom: 16, minOpacity: 0.25 }) : null
+    };
+    [150, 600, 1500].forEach(function (ms) { setTimeout(function () { if (map1) map1.invalidateSize(); }, ms); });
+    return true;
+}
+function toggleLayer1(which, btn) {
+    if (!map1 || !layers1 || !layers1[which]) return;
+    layersOn1[which] = !layersOn1[which];
+    btn.classList.toggle('active', layersOn1[which]);
+    if (layersOn1[which]) layers1[which].addTo(map1); else map1.removeLayer(layers1[which]);
+}
+function crewHtml(c) {
+    var t = [];
+    if (c.respArrivalMin !== null && c.respArrivalMin !== undefined) t.push('وصول ' + c.respArrivalMin + ' د');
+    if (c.respMubasharaMin !== null && c.respMubasharaMin !== undefined) t.push('مباشرة ' + c.respMubasharaMin + ' د');
+    if (c.manualCancelled) return '<div class="crew"><span class="u">' + esc(c.unit) + '</span> <span class="ex">أُلغيت يدويًا — خارج الاحتساب</span></div>';
+    if (c.withdrawn) return '<div class="crew"><span class="u">' + esc(c.unit) + '</span> <span class="ex">مسحوبة — خارج الاحتساب</span></div>';
+    if (c.cancelKind === 'before-arrival') return '<div class="crew"><span class="u">' + esc(c.unit) + '</span> <span class="ex">أُلغيت قبل المباشرة — خارج الاحتساب</span></div>';
+    if (c.cancelKind === 'after-arrival') return '<div class="crew"><span class="u">' + esc(c.unit) + '</span> — باشرت ثم أُلغيت (محتسبة)' + (t.length ? ' · ' + t.join(' · ') : '') + '</div>';
+    if (!c.counted) return '<div class="crew"><span class="u">' + esc(c.unit) + '</span> <span class="ex">لم تتحرك — خارج الاحتساب</span></div>';
+    return '<div class="crew"><span class="u">' + esc(c.unit) + '</span>' + (t.length ? ' · ' + t.join(' · ') : '') + '</div>';
+}
+function popupHtml(ic) {
+    var td = tDef(ic.type);
+    var loc = [ic.district, ic.street, ic.city].filter(Boolean).join(' · ') || 'بلا موقع محدد';
+    var crews = (ic.crews || []).map(crewHtml).join('');
+    return '<div class="hpop">'
+        + '<div class="h">' + td.emoji + ' بلاغ ' + esc(ic.number) + ' — ' + esc(td.label) + '</div>'
+        + '<div class="row"><span class="k">الحالة</span><span>' + esc(STATUS_LBL[ic.status] || ic.status || 'نشط') + '</span></div>'
+        + '<div class="row"><span class="k">الإنشاء (CAD)</span><span>' + esc(ic.cadCreatedAt || '—') + '</span></div>'
+        + '<div class="row"><span class="k">الموقع</span><span>' + esc(loc) + '</span></div>'
+        + (ic.bestArrivalMin !== null ? '<div class="row"><span class="k">أسرع وصول</span><span>' + ic.bestArrivalMin + ' د</span></div>' : '')
+        + (ic.bestMubasharaMin !== null ? '<div class="row"><span class="k">أسرع مباشرة</span><span>' + ic.bestMubasharaMin + ' د</span></div>' : '')
+        + (crews || '<div class="crew ex">لا مشاركات مسجلة</div>')
+        + '</div>';
+}
+function renderMapTab(data) {
+    var ms = data.mapStatus || {};
+    var rt = data.responseTime || {};
+    var uc = data.unitCancels || {};
+    if (!data.total) {
+        document.getElementById('tabContent').innerHTML = caveatsHtml(data.notes, data.unresolvedTimeCount) + '<div class="empty">لا بلاغات مسجلة في هذا النطاق</div>';
+        return;
+    }
+    document.getElementById('tabContent').innerHTML =
+        caveatsHtml(data.notes, data.unresolvedTimeCount)
+        + '<div class="kpis">'
+        + kpi('إجمالي البلاغات', data.total, 'gold')
+        + kpi('محددة الموقع', ms.positionedCount, 'green')
+        + kpi('بلا موقع دقيق', ms.noLocationCount, ms.noLocationCount ? 'red' : '')
+        + kpi('متوسط الوصول (د)', rt.arrival && rt.arrival.avg !== null ? rt.arrival.avg : '—', 'blue')
+        + kpi('متوسط المباشرة (د)', rt.mubashara && rt.mubashara.avg !== null ? rt.mubashara.avg : '—', 'blue')
+        + kpi('ساعة الذروة', ms.peakHour ? ms.peakHour.hour + ':00 (' + ms.peakHour.count + ')' : '—', 'gold')
+        + kpi('أكثر حي', ms.topDistrict ? ms.topDistrict.name + ' (' + ms.topDistrict.count + ')' : '—', '')
+        + kpi('إلغاء وحدات قبل/بعد المباشرة', (uc.beforeArrival || 0) + ' / ' + (uc.afterArrival || 0), '')
+        + '</div>'
+        + '<div class="layout">'
+        + '  <div class="map-card">'
+        + '    <div class="map-toolbar">'
+        +        lchip1('incidents', 'fa-location-dot', 'البلاغات')
+        +        lchip1('heat', 'fa-fire-flame-curved', 'الكثافة')
+        +        lchip1('hot', 'fa-fire', 'المواقع الساخنة')
+        +        lchip1('streets', 'fa-road', 'شارات الشوارع')
+        + '      <div class="legend">'
+        + '        <span><span class="dot" style="background:#2563EB"></span>نشط</span>'
+        + '        <span><span class="dot" style="background:#059669"></span>مغلق</span>'
+        + '        <span><span class="dot" style="background:#6B7280"></span>ملغى</span>'
+        + '      </div>'
+        + '    </div>'
+        + '    <div id="hMap"></div>'
+        + '  </div>'
+        + '  <div class="side">'
+        + '    <div class="panel"><h3><i class="fas fa-road"></i>أكثر الشوارع</h3><div class="body" id="pStreets"></div></div>'
+        + '    <div class="panel"><h3><i class="fas fa-layer-group"></i>الأنواع</h3><div class="body" id="pTypes"></div></div>'
+        + '    <div class="panel"><h3><i class="fas fa-location-crosshairs"></i>بلا موقع دقيق</h3><div class="body" id="pNoLoc"></div></div>'
+        + '  </div>'
+        + '</div>';
+    function lchip1(which, icon, lbl) {
+        return '<button class="lchip' + (layersOn1[which] ? ' active' : '') + '" onclick="toggleLayer1(\'' + which + '\', this)"><i class="fas ' + icon + '"></i> ' + lbl + '</button>';
+    }
+    var streets = ms.topStreets || [];
+    document.getElementById('pStreets').innerHTML = streets.length ? streets.map(function (t) {
+        var w = Math.max(24, Math.round(140 * t.count / streets[0].count));
+        return '<div class="srow"><span class="nm">' + esc(t.name) + '</span><span class="bar" style="width:' + w + 'px"></span><span class="c">' + t.count + '</span></div>';
+    }).join('') : '<div class="empty">—</div>';
+    var types = Object.keys(data.byType || {});
+    document.getElementById('pTypes').innerHTML = types.length ? types.map(function (k) {
+        var td = tDef(k);
+        return '<span class="tchip">' + td.emoji + ' ' + esc(td.label) + ' <b>' + data.byType[k] + '</b></span>';
+    }).join('') : '<div class="empty">—</div>';
+    var nl = ms.noLocation || [];
+    document.getElementById('pNoLoc').innerHTML = nl.length ? nl.map(function (x) {
+        return '<div class="nlrow"><span class="n">' + esc(x.number) + '</span><span>' + esc(x.district || 'بلا حي') + '</span><span class="t">' + esc(x.cadCreatedAt || '') + '</span></div>';
+    }).join('') : '<div class="empty">كل البلاغات محددة الموقع ✅</div>';
+
+    if (!initMap1()) return;
+    layers1.incidents.clearLayers(); layers1.hot.clearLayers(); layers1.streets.clearLayers();
+    var incs = data.incidents || [];
+    var pts = [];
+    incs.forEach(function (ic) {
+        if (ic.lat === null || ic.lat === undefined || ic.lng === null || ic.lng === undefined) return;
+        var st = ic.status === 'closed' ? 'closed' : (ic.status === 'cancelled' ? 'cancelled' : 'active');
+        var icon = L.divIcon({
+            className: 'hmk st-' + st,
+            html: '<span class="hmk-pin"><i class="fas fa-location-dot"></i></span>',
+            iconSize: [26, 26], iconAnchor: [13, 24]
+        });
+        var mk = L.marker([ic.lat, ic.lng], { icon: icon });
+        mk.bindPopup(popupHtml(ic), { closeButton: false });
+        mk.addTo(layers1.incidents);
+        pts.push([ic.lat, ic.lng]);
+    });
+    if (pts.length === 1) map1.setView(pts[0], 13);
+    else if (pts.length > 1) map1.fitBounds(pts, { padding: [42, 42], maxZoom: 13 });
+    if (layers1.heat) layers1.heat.setLatLngs(pts.map(function (p) { return [p[0], p[1], 1]; }));
+    var byStreet = {};
+    incs.forEach(function (ic) {
+        if (ic.lat === null || ic.lat === undefined || ic.lng === null || ic.lng === undefined) return;
+        var key = ic.street || ic.district;
+        if (!key) return;
+        (byStreet[key] = byStreet[key] || []).push(ic);
+    });
+    for (var st2 in byStreet) {
+        if (!byStreet.hasOwnProperty(st2)) continue;
+        var list = byStreet[st2];
+        if (list.length < 2) continue;
+        var sx = 0, sy = 0;
+        list.forEach(function (ic) { sx += ic.lat; sy += ic.lng; });
+        var circle = L.circle([sx / list.length, sy / list.length], {
+            radius: 120 + list.length * 30,
+            color: '#E8C84A', weight: 1.5, fillColor: '#E8C84A', fillOpacity: 0.10, opacity: 0.55
+        });
+        var typesTxt = {};
+        list.forEach(function (ic) { var l = tDef(ic.type).label; typesTxt[l] = (typesTxt[l] || 0) + 1; });
+        var tHtml = Object.keys(typesTxt).map(function (k) { return esc(k) + ' ×' + typesTxt[k]; }).join(' · ');
+        circle.bindPopup('<div class="hpop"><b><i class="fas fa-fire"></i> ' + esc(st2) + '</b><br>' + list.length + ' بلاغات في النطاق<br><span>' + tHtml + '</span></div>', { closeButton: false });
+        circle.addTo(layers1.hot);
+    }
+    (ms.topStreets || []).forEach(function (t) {
+        var anchor = null;
+        for (var i = 0; i < incs.length; i++) {
+            if (incs[i].street === t.name && incs[i].lat !== null && incs[i].lat !== undefined) { anchor = incs[i]; break; }
+        }
+        if (!anchor) return;
+        var badge = L.divIcon({
+            className: 'hmk',
+            html: '<span style="display:inline-block;background:rgba(14,32,56,0.92);border:1px solid rgba(232,200,74,0.5);color:#EADDA8;border-radius:14px;padding:3px 10px;font-size:11px;white-space:nowrap;"><i class="fas fa-road"></i> ' + esc(t.name) + ' · ' + t.count + '</span>',
+            iconSize: null, iconAnchor: [0, 40]
+        });
+        L.marker([anchor.lat, anchor.lng], { icon: badge, interactive: false, zIndexOffset: 300 }).addTo(layers1.streets);
+    });
+    setTimeout(function () { if (map1) map1.invalidateSize(); }, 250);
+}
+
+/* ═══════════ التبويب 2: الأنماط الزمنية (H2) ═══════════ */
+function barsHtml(arr, labels, peakIdx) {
+    var max = Math.max.apply(null, arr.concat([1]));
+    return '<div class="chart">' + arr.map(function (v, i) {
+        var h = Math.round(v / max * 100);
+        return '<div class="col" title="' + esc(labels[i]) + ': ' + v + '">'
+            + '<span class="cv">' + (v || '') + '</span>'
+            + '<div class="cb' + (i === peakIdx && v > 0 ? ' peak' : '') + '" style="height:' + h + '%"></div>'
+            + '<span class="cl">' + esc(labels[i]) + '</span></div>';
+    }).join('') + '</div>';
+}
+function renderPatternsTab(d) {
+    if (!d.total) {
+        document.getElementById('tabContent').innerHTML = caveatsHtml(d.notes, d.unresolvedTimeCount) + '<div class="empty">لا بلاغات مسجلة في هذا النطاق</div>';
+        return;
+    }
+    var cmp = d.comparison || {};
+    var delta = cmp.delta || 0;
+    var deltaCls = delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : 'delta-eq');
+    var deltaTxt = (delta > 0 ? '▲ +' : (delta < 0 ? '▼ ' : '')) + delta;
+    var hourLabels = []; for (var h = 0; h < 24; h++) hourLabels.push(String(h));
+    var hourArr = d.byHour || [];
+    var peakHourIdx = d.peakHour ? d.peakHour.hour : -1;
+    var dayArr = d.byWeekday || [];
+    var peakDayIdx = d.peakWeekday ? d.peakWeekday.day : -1;
+    var dateKeys = Object.keys(d.byDate || {}).sort();
+    var dateArr = dateKeys.map(function (k) { return d.byDate[k]; });
+    var dateLabels = dateKeys.map(function (k) { return k.slice(5); });
+    var bp = d.byPeriod || {};
+    var typeKeys = Object.keys(d.byType || {});
+    var cmpTypes = '';
+    if (cmp.byType) {
+        var allT = {};
+        Object.keys(cmp.byType.current || {}).forEach(function (k) { allT[k] = 1; });
+        Object.keys(cmp.byType.previous || {}).forEach(function (k) { allT[k] = 1; });
+        cmpTypes = Object.keys(allT).map(function (k) {
+            var c = (cmp.byType.current || {})[k] || 0, p = (cmp.byType.previous || {})[k] || 0;
+            var dd = c - p;
+            return '<span class="tchip">' + tDef(k).emoji + ' ' + esc(tDef(k).label) + ': <b>' + c + '</b> مقابل ' + p
+                + ' <b class="' + (dd > 0 ? 'delta-up' : (dd < 0 ? 'delta-down' : 'delta-eq')) + '">(' + (dd > 0 ? '+' : '') + dd + ')</b></span>';
+        }).join('');
+    }
+    document.getElementById('tabContent').innerHTML =
+        caveatsHtml(d.notes, d.unresolvedTimeCount)
+        + '<div class="kpis">'
+        + kpi('إجمالي البلاغات', d.total, 'gold', esc(cmp.label || ''))
+        + kpi('الفترة السابقة المماثلة', cmp.total !== undefined ? cmp.total : '—', '', 'نفس الطول قبل النطاق مباشرة')
+        + kpi('الفرق', deltaTxt, deltaCls, 'الحالية − السابقة')
+        + kpi('متوسط يومي (حالية/سابقة)', (cmp.perDay ? cmp.perDay.current + ' / ' + cmp.perDay.previous : '—'), 'blue')
+        + kpi('ساعة الذروة', d.peakHour ? d.peakHour.hour + ':00 (' + d.peakHour.count + ')' : '—', 'gold')
+        + kpi('يوم الذروة', d.peakWeekday ? WEEKDAYS[d.peakWeekday.day] + ' (' + d.peakWeekday.count + ')' : '—', 'gold')
+        + '</div>'
+        + '<div class="layout" style="grid-template-columns:1fr 1fr;">'
+        + '  <div class="panel"><h3><i class="fas fa-clock"></i>التوزيع بالساعة</h3><div class="body tall">' + barsHtml(hourArr, hourLabels, peakHourIdx) + '</div></div>'
+        + '  <div class="panel"><h3><i class="fas fa-calendar-week"></i>التوزيع باليوم</h3><div class="body tall">' + barsHtml(dayArr, WEEKDAYS, peakDayIdx) + '</div></div>'
+        + '</div>'
+        + '<div style="height:14px"></div>'
+        + '<div class="layout" style="grid-template-columns:1fr 1fr;">'
+        + '  <div class="panel"><h3><i class="fas fa-sun"></i>الفترات</h3><div class="body tall">'
+        +     ['morning', 'evening', 'night'].map(function (pk) {
+                var v = bp[pk] || 0;
+                var pct = d.total ? Math.round(v / d.total * 100) : 0;
+                return '<div class="srow"><span class="nm">' + PERIOD_LBL[pk] + '</span><span class="bar" style="width:' + Math.max(6, Math.round(pct * 1.6)) + 'px"></span><span class="c">' + v + ' (' + pct + '%)</span></div>';
+            }).join('')
+        +     '<div class="meta" style="margin-top:8px">' + esc(d.periodRule || '') + '</div>'
+        + '  </div></div>'
+        + '  <div class="panel"><h3><i class="fas fa-calendar-day"></i>اليومي عبر النطاق</h3><div class="body tall">' + (dateArr.length ? barsHtml(dateArr, dateLabels, -1) : '<div class="empty">—</div>') + '</div></div>'
+        + '</div>'
+        + '<div style="height:14px"></div>'
+        + '<div class="layout" style="grid-template-columns:1fr 1fr;">'
+        + '  <div class="panel"><h3><i class="fas fa-map"></i>أكثر الأحياء</h3><div class="body">'
+        +     (d.districts || []).map(function (t, i) {
+                var w = Math.max(24, Math.round(140 * t.count / (d.districts[0] ? d.districts[0].count : 1)));
+                return '<div class="srow"><span class="nm">' + esc(t.name) + '</span><span class="bar" style="width:' + w + 'px"></span><span class="c">' + t.count + '</span></div>';
+            }).join('') + '</div></div>'
+        + '  <div class="panel"><h3><i class="fas fa-road"></i>أكثر الشوارع</h3><div class="body">'
+        +     (d.streets || []).map(function (t) {
+                var w = Math.max(24, Math.round(140 * t.count / (d.streets[0] ? d.streets[0].count : 1)));
+                return '<div class="srow"><span class="nm">' + esc(t.name) + '</span><span class="bar" style="width:' + w + 'px"></span><span class="c">' + t.count + '</span></div>';
+            }).join('') + '</div></div>'
+        + '</div>'
+        + '<div style="height:14px"></div>'
+        + '<div class="panel"><h3><i class="fas fa-code-compare"></i>مقارنة الأنواع بالفترة السابقة</h3><div class="body tall">' + (cmpTypes || '<div class="empty">—</div>') + '</div></div>';
+}
+
+/* ═══════════ التبويب 3: الطلب × التمركز (H3) ═══════════ */
+var map2 = null, layers2 = null, layersOn2 = { demand: true, positioning: true, zones: true, heat: true };
+function initMap2() {
+    if (map2) return true;
+    if (typeof L === 'undefined') return false;
+    map2 = L.map('cMap', { scrollWheelZoom: false, attributionControl: true }).setView([24.7136, 46.6753], 11);
+    map2.on('click', function () { map2.scrollWheelZoom.enable(); });
+    map2.on('mouseout', function () { map2.scrollWheelZoom.disable(); });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19
+    }).addTo(map2);
+    layers2 = {
+        heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 30, blur: 24, maxZoom: 16, minOpacity: 0.3 }).addTo(map2) : null,
+        zones: L.layerGroup().addTo(map2),
+        demand: L.layerGroup().addTo(map2),
+        positioning: L.layerGroup().addTo(map2)
+    };
+    [150, 600, 1500].forEach(function (ms) { setTimeout(function () { if (map2) map2.invalidateSize(); }, ms); });
+    return true;
+}
+function toggleLayer2(which, btn) {
+    if (!map2 || !layers2 || !layers2[which]) return;
+    layersOn2[which] = !layersOn2[which];
+    btn.classList.toggle('active', layersOn2[which]);
+    if (layersOn2[which]) layers2[which].addTo(map2); else map2.removeLayer(layers2[which]);
+}
+function renderCoverageTab(d) {
+    var t = d.totals || {};
+    if (!t.incidents) {
+        document.getElementById('tabContent').innerHTML = caveatsHtml(d.notes, t.unresolvedTimeCount) + '<div class="empty">لا بلاغات مسجلة في هذا النطاق</div>';
+        return;
+    }
+    var zones = d.zones || [];
+    var weakCount = zones.filter(function (z) { return z.weak; }).length;
+    document.getElementById('tabContent').innerHTML =
+        caveatsHtml(d.notes, t.unresolvedTimeCount)
+        + '<div class="kpis">'
+        + kpi('بلاغات النطاق', t.incidents, 'gold')
+        + kpi('محددة الموقع', t.positioned, 'green')
+        + kpi('بلا إحداثيات', t.noCoords, t.noCoords ? 'red' : '', 'تُحسب ولا تُرسم — لا تخمين')
+        + kpi('نوافذ تمركز تاريخية', d.positioning ? d.positioning.windowsCount : 0, 'blue', (d.positioning && d.positioning.units.length ? d.positioning.units.length + ' فرقة' : 'لا تمركزات مسجلة'))
+        + kpi('متوسط وصول النطاق (د)', d.responseAvgArrival !== null ? d.responseAvgArrival : '—', 'blue')
+        + kpi('مناطق طلب (≥' + (d.constants ? d.constants.demandZoneMin : 3) + ' بلاغات)', zones.length, 'gold')
+        + kpi('مناطق تغطية ضعيفة', weakCount, weakCount ? 'red' : 'green')
+        + '</div>'
+        + '<div class="layout">'
+        + '  <div class="map-card">'
+        + '    <div class="map-toolbar">'
+        +        lchip2('demand', 'fa-location-dot', 'الطلب')
+        +        lchip2('heat', 'fa-fire-flame-curved', 'كثافة الطلب')
+        +        lchip2('positioning', 'fa-truck-medical', 'التمركزات التاريخية')
+        +        lchip2('zones', 'fa-draw-polygon', 'مناطق الطلب')
+        + '      <div class="legend">'
+        + '        <span><span class="dot" style="background:#EF4444"></span>منطقة ضعيفة التغطية</span>'
+        + '        <span><span class="dot" style="background:#E8C84A"></span>منطقة طلب مغطاة</span>'
+        + '        <span><span class="dot" style="background:#B8860B"></span>تمركز تاريخي</span>'
+        + '      </div>'
+        + '    </div>'
+        + '    <div id="cMap"></div>'
+        + '  </div>'
+        + '  <div class="side">'
+        + '    <div class="panel"><h3><i class="fas fa-draw-polygon"></i>مناطق الطلب والتغطية</h3><div class="body" id="zList"></div></div>'
+        + '    <div class="panel"><h3><i class="fas fa-circle-info"></i>القواعد المطبقة</h3><div class="body" id="zRules"></div></div>'
+        + '  </div>'
+        + '</div>';
+    function lchip2(which, icon, lbl) {
+        return '<button class="lchip' + (layersOn2[which] ? ' active' : '') + '" onclick="toggleLayer2(\'' + which + '\', this)"><i class="fas ' + icon + '"></i> ' + lbl + '</button>';
+    }
+    document.getElementById('zList').innerHTML = zones.length ? zones.map(function (z, i) {
+        return '<div class="zrow"><div><div class="zname">منطقة ' + (i + 1) + ' — ' + z.count + ' بلاغات</div>'
+            + '<div class="zmeta">متوسط الوصول: ' + fmtMin(z.avgArrivalMin) + ' · أقرب تمركز وقت البلاغ: ' + fmtKm(z.avgNearestAtTimeKm)
+            + ' · أقرب تمركز تاريخي: ' + fmtKm(z.nearestAnytimeKm)
+            + (z.withoutPositioningAtTime ? ' · بلا تمركز معروف: ' + z.withoutPositioningAtTime : '')
+            + (z.weakReasons && z.weakReasons.length ? '<br>' + z.weakReasons.map(esc).join(' · ') : '')
+            + '</div></div>'
+            + '<span class="badge ' + (z.weak ? 'weak' : 'ok') + '">' + (z.weak ? '⚠️ تغطية ضعيفة' : 'مغطاة') + '</span></div>';
+    }).join('') : '<div class="empty">لا مناطق طلب مكتملة الشروط في النطاق</div>';
+    document.getElementById('zRules').innerHTML =
+        '<div class="zmeta" style="line-height:1.9">خلية الطلب: ' + esc(d.constants ? d.constants.cellDegrees : '') + ' · حد المنطقة: ' + (d.constants ? d.constants.demandZoneMin : 3) + ' بلاغات+'
+        + '<br>«بعيد» = أقرب تمركز > ' + (d.constants ? d.constants.coverageFarKm : 3) + 'كم'
+        + '<br>«ضعيفة» = بعيدة أو وصولها أعلى من متوسط النطاق أو فيها بلاغات بلا تمركز معروف'
+        + '<br>التمركز المعروف = المسجل في positioning_events فقط</div>';
+
+    if (!initMap2()) return;
+    layers2.demand.clearLayers(); layers2.positioning.clearLayers(); layers2.zones.clearLayers();
+    var pts = [];
+    (d.incidents || []).forEach(function (ic) {
+        if (ic.noCoords) return;
+        pts.push([ic.lat, ic.lng]);
+        var near = ic.nearestPositioningAtTime;
+        var icon = L.divIcon({
+            className: 'hmk st-closed',
+            html: '<span class="hmk-pin"><i class="fas fa-location-dot"></i></span>',
+            iconSize: [22, 22], iconAnchor: [11, 20]
+        });
+        var mk = L.marker([ic.lat, ic.lng], { icon: icon });
+        mk.bindPopup('<div class="hpop"><div class="h">📍 بلاغ ' + esc(ic.number) + '</div>'
+            + '<div class="row"><span class="k">الإنشاء</span><span>' + esc(ic.cadCreatedAt || '—') + '</span></div>'
+            + '<div class="row"><span class="k">الموقع</span><span>' + esc([ic.district, ic.street].filter(Boolean).join(' · ') || '—') + '</span></div>'
+            + '<div class="row"><span class="k">الفرق المباشرة</span><span>' + esc(ic.countedUnits.join(' · ') || 'لا محتسبة') + '</span></div>'
+            + '<div class="row"><span class="k">أسرع وصول</span><span>' + fmtMin(ic.bestArrivalMin) + '</span></div>'
+            + '<div class="row"><span class="k">أقرب تمركز وقتها</span><span>' + (near ? esc(near.unit || near.location || 'تمركز') + ' (' + near.km + ' كم)' : 'بلا تمركز معروف') + '</span></div>'
+            + (ic.crewPositioning ? '<div class="row"><span class="k">تمركز الفرقة المباشرة</span><span>' + esc(ic.crewPositioning.unit || '') + ' (' + ic.crewPositioning.km + ' كم)</span></div>' : '')
+            + '</div>', { closeButton: false });
+        mk.addTo(layers2.demand);
+    });
+    if (layers2.heat) layers2.heat.setLatLngs(pts.map(function (p) { return [p[0], p[1], 1]; }));
+    /* التمركزات التاريخية — من سجل الأحداث الفعلي فقط */
+    var posUnits = {};
+    (d.positioningUnits || []).forEach(function (p) {
+        var icon = L.divIcon({
+            className: 'hmk st-pos',
+            html: '<span class="hmk-pin"><i class="fas fa-truck-medical"></i></span>',
+            iconSize: [24, 24], iconAnchor: [12, 12]
+        });
+        var mk = L.marker([p.lat, p.lng], { icon: icon });
+        mk.bindPopup('<div class="hpop"><div class="h">🚑 تمركز تاريخي</div>'
+            + '<div class="row"><span class="k">الفرقة</span><span>' + esc(p.unit || '—') + '</span></div>'
+            + '<div class="row"><span class="k">الموقع</span><span>' + esc(p.location || '—') + '</span></div></div>', { closeButton: false });
+        mk.addTo(layers2.positioning);
+        posUnits[p.unit + '|' + p.lat + '|' + p.lng] = 1;
+    });
+    /* مناطق الطلب */
+    zones.forEach(function (z) {
+        var circle = L.circle([z.centroid.lat, z.centroid.lng], {
+            radius: 350 + z.count * 60,
+            color: z.weak ? '#EF4444' : '#E8C84A', weight: 2,
+            fillColor: z.weak ? '#EF4444' : '#E8C84A', fillOpacity: z.weak ? 0.12 : 0.08, opacity: 0.7
+        });
+        circle.bindPopup('<div class="hpop"><div class="h">' + (z.weak ? '⚠️' : '✅') + ' منطقة طلب — ' + z.count + ' بلاغات</div>'
+            + '<div class="row"><span class="k">متوسط الوصول</span><span>' + fmtMin(z.avgArrivalMin) + '</span></div>'
+            + '<div class="row"><span class="k">أقرب تمركز وقت البلاغ</span><span>' + fmtKm(z.avgNearestAtTimeKm) + '</span></div>'
+            + '<div class="row"><span class="k">أقرب تمركز تاريخي</span><span>' + fmtKm(z.nearestAnytimeKm) + '</span></div>'
+            + (z.weakReasons && z.weakReasons.length ? '<div class="row"><span class="k">الأسباب</span><span>' + z.weakReasons.map(esc).join(' · ') + '</span></div>' : '')
+            + '</div>', { closeButton: false });
+        circle.addTo(layers2.zones);
+    });
+    var allPts = pts.slice();
+    (d.positioningUnits || []).forEach(function (p) { allPts.push([p.lat, p.lng]); });
+    if (allPts.length === 1) map2.setView(allPts[0], 13);
+    else if (allPts.length > 1) map2.fitBounds(allPts, { padding: [42, 42], maxZoom: 13 });
+    setTimeout(function () { if (map2) map2.invalidateSize(); }, 250);
+}
+
+/* ═══════════ التبويب 4: دعم القرار (H4) ═══════════ */
+function renderDecisionTab(d) {
+    var cands = d.candidates || [];
+    var wins = d.suggestedWindows || [];
+    var cs = d.coverageSummary || {};
+    var ps = d.patternsSummary || {};
+    var simCmpTxt = { lower: 'أفضل من متوسط النطاق', higher: 'أعلى من متوسط النطاق', equal: 'مطابق لمتوسط النطاق', unknown: 'لا تكفي بيانات للمقارنة' };
+    var simCmpCls = { lower: 'delta-down', higher: 'delta-up', equal: 'delta-eq', unknown: 'delta-eq' };
+    document.getElementById('tabContent').innerHTML =
+        '<div class="disc"><i class="fas fa-shield-halved"></i><b>دعم قرار فقط:</b> ' + esc(d.disclaimer || '') + '</div>'
+        + caveatsHtml(d.notes, 0)
+        + '<div class="kpis">'
+        + kpi('مناطق الطلب', cs.zonesCount !== undefined ? cs.zonesCount : '—', 'gold')
+        + kpi('ضعيفة التغطية', cs.weakZonesCount !== undefined ? cs.weakZonesCount : '—', (cs.weakZonesCount ? 'red' : 'green'))
+        + kpi('متوسط وصول النطاق (د)', cs.responseAvgArrival !== null && cs.responseAvgArrival !== undefined ? cs.responseAvgArrival : '—', 'blue')
+        + kpi('ساعة الذروة', ps.peakHour ? ps.peakHour.hour + ':00' : '—', 'gold')
+        + kpi('يوم الذروة', ps.peakWeekday ? WEEKDAYS[ps.peakWeekday.day] : '—', 'gold')
+        + '</div>'
+        + '<div class="layout" style="grid-template-columns:1fr 340px;">'
+        + '  <div class="panel"><h3><i class="fas fa-location-crosshairs"></i>مواقع التمركز المرشحة (من مناطق الطلب التاريخية)</h3><div class="body tall" id="candList"></div></div>'
+        + '  <div class="side">'
+        + '    <div class="panel"><h3><i class="fas fa-calendar-week"></i>نوافذ تستحق إعادة توزيع التمركز</h3><div class="body" id="winList"></div></div>'
+        + '    <div class="panel"><h3><i class="fas fa-code-compare"></i>الوضع مقابل الفترة السابقة</h3><div class="body" id="cmpBox"></div></div>'
+        + '  </div>'
+        + '</div>';
+    document.getElementById('candList').innerHTML = cands.length ? cands.map(function (c, i) {
+        var s = c.simulation || {};
+        return '<div class="cand">'
+            + '<div class="chead"><span class="rank">' + (i + 1) + '</span>'
+            + '<span class="coords">' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + '</span>'
+            + (c.weakCoverage ? '<span class="badge weak">⚠️ تغطية ضعيفة</span>' : '<span class="badge ok">مغطاة</span>')
+            + '</div>'
+            + '<div class="cstats">'
+            + '<span>بلاغات المنطقة: <b>' + c.basedOnIncidents + '</b></span>'
+            + '<span>متوسط الوصول فيها: <b>' + fmtMin(c.avgArrivalMin) + '</b></span>'
+            + '<span>أقرب تمركز تاريخي: <b>' + fmtKm(c.nearestHistoricalPositioningKm) + '</b></span>'
+            + '<span>الأولوية: <b>' + c.score + '</b></span>'
+            + '</div>'
+            + (c.weakReasons && c.weakReasons.length ? '<div class="sim">' + c.weakReasons.map(esc).join(' · ') + '</div>' : '')
+            + '<div class="sim">🔬 <b>محاكاة افتراضية:</b> لو وُجد تمركز هنا لغطّى <b>' + s.incidentsWithin + '</b> بلاغًا تاريخيًا ضمن ' + s.radiusKm + 'كم'
+            + ' (' + (s.sharePct !== null ? s.sharePct + '%' : '—') + ' من بلاغات النطاق المحددة)'
+            + ' — متوسط استجابتها الفعلي <b>' + fmtMin(s.avgArrivalMin) + '</b> مقابل متوسط النطاق <b>' + fmtMin(s.rangeAvgArrivalMin) + '</b>'
+            + ' <span class="' + simCmpCls[s.comparison] + '">(' + simCmpTxt[s.comparison] + ')</span></div>'
+            + '</div>';
+    }).join('') : '<div class="empty">لا توجد مناطق طلب كافية في النطاق لاقتراح مرشحين</div>';
+    document.getElementById('winList').innerHTML = wins.length ? wins.map(function (w) {
+        return '<div class="srow"><span class="nm">' + WEEKDAYS[w.weekday] + ' ' + w.hour + ':00</span><span class="bar" style="width:' + Math.max(24, Math.round(140 * w.count / wins[0].count)) + 'px"></span><span class="c">' + w.count + '</span></div>';
+    }).join('') : '<div class="empty">—</div>';
+    var cmp = ps.comparison || {};
+    var delta = cmp.delta || 0;
+    document.getElementById('cmpBox').innerHTML =
+        '<div class="zmeta" style="line-height:2">' + esc(cmp.label || '')
+        + '<br>الحالية: <b style="color:var(--gold-id)">' + (ps.total !== undefined ? ps.total : '—') + '</b> · السابقة: <b>' + (cmp.total !== undefined ? cmp.total : '—') + '</b>'
+        + ' · الفرق: <b class="' + (delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : 'delta-eq')) + '">' + (delta > 0 ? '+' : '') + delta + '</b>'
+        + '<br>المتوسط اليومي: ' + (cmp.perDay ? cmp.perDay.current + ' مقابل ' + cmp.perDay.previous : '—') + '</div>';
+}
+
+loadTab();
+</script>
+</body>
+</html>

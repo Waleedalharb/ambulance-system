@@ -4588,6 +4588,100 @@ app.get('/api/cad-reports', authenticate, async (req, res) => {
     }
 });
 
+// الذاكرة التاريخية للخريطة (H1 — اعتماد المالك 2026-08-24، وثيقة
+// DECISION-HISTORICAL-ANALYTICS): ملخص البلاغات على نطاق زمني حر عبر كل
+// المناوبات — قراءة مشتقة من ReportService.getHistoricalSummary، بلا تخزين
+// ولا جداول موازية. الاشتقاق كله سيرفري (قاعدة Zero Business Logic في الواجهة).
+app.get('/api/analytics/incidents', authenticate, async (req, res) => {
+    try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        // حدود النطاق بنفس أساس توقيت محلل CAD المركزي (_cadDateTimeTs = توقيت
+        // الخادم المحلي) حتى لا تتناقض الحدود مع أزمنة البلاغات المفلترة
+        const parseDay = (s, end) => {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+            if (!m) return null;
+            const d = end ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999)
+                          : new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
+            return isNaN(d.getTime()) ? null : d.getTime();
+        };
+        const now = new Date();
+        const defTo = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+        const defFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0).getTime();
+        const fromTs = req.query.from ? parseDay(req.query.from, false) : defFrom;
+        const toTs = req.query.to ? parseDay(req.query.to, true) : defTo;
+        if (fromTs === null || toTs === null) return res.status(400).json({ error: 'صيغة التاريخ يجب أن تكون YYYY-MM-DD' });
+        if (fromTs > toTs) return res.status(400).json({ error: 'بداية النطاق بعد نهايته' });
+        const summary = await reportService.getHistoricalSummary(fromTs, toTs);
+        res.json({ success: true, ...summary });
+    } catch (error) {
+        console.error('[Analytics] incidents error:', error);
+        res.status(500).json({ error: 'فشل في جلب الذاكرة التاريخية للبلاغات' });
+    }
+});
+
+// ── H2/H3/H4 — الطبقة التاريخية التحليلية (اعتماد المالك 2026-08-24) ──
+// نفس حارس النطاق لكل المسارات: نفس أساس توقيت محلل CAD المركزي (توقيت الخادم
+// المحلي) حتى لا تتناقض الحدود مع أزمنة البلاغات. قراءة مشتقة فقط — لا كتابة.
+function analyticsRange(req, res) {
+    const parseDay = (s, end) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+        if (!m) return null;
+        const d = end ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999)
+                      : new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
+        return isNaN(d.getTime()) ? null : d.getTime();
+    };
+    const now = new Date();
+    const defTo = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    const defFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0).getTime();
+    const fromTs = req.query.from ? parseDay(req.query.from, false) : defFrom;
+    const toTs = req.query.to ? parseDay(req.query.to, true) : defTo;
+    if (fromTs === null || toTs === null) { res.status(400).json({ error: 'صيغة التاريخ يجب أن تكون YYYY-MM-DD' }); return null; }
+    if (fromTs > toTs) { res.status(400).json({ error: 'بداية النطاق بعد نهايته' }); return null; }
+    return { fromTs, toTs };
+}
+
+// H2 — الأنماط الزمنية: الساعة/اليوم/الفترة/الذروة/الأحياء/الشوارع + مقارنة بالفترة السابقة
+app.get('/api/analytics/patterns', authenticate, async (req, res) => {
+    try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const range = analyticsRange(req, res);
+        if (!range) return;
+        const data = await reportService.getPatterns(range.fromTs, range.toTs);
+        res.json({ success: true, ...data });
+    } catch (error) {
+        console.error('[Analytics] patterns error:', error);
+        res.status(500).json({ error: 'فشل في جلب الأنماط الزمنية' });
+    }
+});
+
+// H3 — الطلب × التمركز: أين وقع الطلب مقابل أين كانت الموارد متمركزة
+app.get('/api/analytics/coverage', authenticate, async (req, res) => {
+    try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const range = analyticsRange(req, res);
+        if (!range) return;
+        const data = await reportService.getCoverage(range.fromTs, range.toTs);
+        res.json({ success: true, ...data });
+    } catch (error) {
+        console.error('[Analytics] coverage error:', error);
+        res.status(500).json({ error: 'فشل في جلب تحليل الطلب والتمركز' });
+    }
+});
+
+// H4 — دعم القرار: مرشحو تمركز + نوافذ + محاكاة أثر — تحليل فقط، لا ينفذ أي إجراء
+app.get('/api/analytics/recommendations', authenticate, async (req, res) => {
+    try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const range = analyticsRange(req, res);
+        if (!range) return;
+        const data = await reportService.getRecommendations(range.fromTs, range.toTs);
+        res.json({ success: true, ...data });
+    } catch (error) {
+        console.error('[Analytics] recommendations error:', error);
+        res.status(500).json({ error: 'فشل في جلب توصيات دعم القرار' });
+    }
+});
+
 // فرق الجنوب الفعلية من تكميل المناوبة (قرار المالك 2026-08-21 — §5): قراءة فقط —
 // مفتاح التكامل (scope=cad-reports) أو جلسة المنصة. الـOverlay يبني قائمته من هنا
 // بدل قائمة ثابتة: أي فرقة في التكميل يمكن اختيارها من CAD.
