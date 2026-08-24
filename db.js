@@ -1050,6 +1050,15 @@ async function runMigrations() {
   // incident-list.lastJourneys و event-dispatched/detail.units مثبت حيًا عليهما
   await ensureColumn('report_times', 'cad_unit_id', 'INTEGER');
   await ensureColumn('report_times', 'cad_run_unit_id', 'INTEGER');
+  // الإلغاء اليدوي للمشاركة من توزيع البلاغات (اعتماد المالك 2026-08-24 — جولة
+  // Observer): مشاركة سُجّلت بالخطأ تُعلَّم manual_cancelled=1 فتُستبعد فورًا من
+  // كل العدّادات والمؤشرات التشغيلية (byCrew/أزمنة الاستجابة/الخريطة/نشاط الفرق)،
+  // ولا تُحذف أبدًا — تبقى في التفاصيل والتدقيق مع الفاعل والوقت والسبب.
+  // additive وبقيمة افتراضية 0: كل السلوك القائم لا يتغير إطلاقًا
+  await ensureColumn('report_times', 'manual_cancelled', 'INTEGER DEFAULT 0');
+  await ensureColumn('report_times', 'manual_cancelled_by', 'TEXT');
+  await ensureColumn('report_times', 'manual_cancelled_at', 'TEXT');
+  await ensureColumn('report_times', 'manual_cancel_reason', 'TEXT');
   // طبقة التقاط الموقع (قرار المالك 2026-08-20): عنوان CAD الخام + المنطقة + الحي المشتق —
   // أساس مستقبلي لأكثر الأحياء وكثافة البلاغات وساعات الذروة (لا خرائط/تحليلات في هذه المرحلة)
   await ensureColumn('incident_registry', 'address', 'TEXT');

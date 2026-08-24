@@ -2515,8 +2515,20 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
         // ── 1. Query related data from SQLite (new data) ──
         try {
             if (dbAvailable()) {
-                // Reports
-                if (db.Reports && db.Reports.getByShift) {
+                // Reports — قرار المالك 2026-08-24: من قاعدة الاحتساب الواحدة
+                // (ReportService.isParticipationCounted) حتى لا تظهر الفرق الملغاة
+                // يدويًا في عرض الأرشيف وإحصاءات المناوبة؛ السقوط للقراءة الخام
+                // القديمة فقط عند غياب الخدمة.
+                if (reportService) {
+                    const countedObj = await reportService.getShiftReports(shiftId);
+                    const countedKeys = Object.keys(countedObj || {});
+                    if (countedKeys.length > 0) {
+                        let countedTotal = 0;
+                        countedKeys.forEach(k => { countedTotal += countedObj[k].count || 0; });
+                        response.reports = countedObj;
+                        response.total = countedTotal;
+                    }
+                } else if (db.Reports && db.Reports.getByShift) {
                     const dbReports = await db.Reports.getByShift(shiftId);
                     if (Array.isArray(dbReports) && dbReports.length > 0) {
                         const reportsObj = {};
@@ -4704,6 +4716,38 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
         res.status(500).json({ error: 'فشل في تسجيل بلاغ CAD' });
     }
 });
+
+// ═══ الإلغاء اليدوي لمشاركة فرقة من توزيع البلاغات (اعتماد المالك 2026-08-24) ═══
+// مشاركة سجّلها الـOverlay بالخطأ تُعلَّم manual_cancelled — لا حذف إطلاقًا:
+// تُستبعد فورًا من كل العدّادات والمؤشرات التشغيلية وتبقى في التاريخ والتدقيق.
+// جلسة المنصة + صلاحية ops.dispatch (نفس صلاحية التوزيع اليدوي) — لا مفتاح تكامل هنا.
+async function handleCrewManualCancel(req, res, cancel) {
+    try {
+        const number = String(req.params.number || '').trim();
+        const unit = String(decodeURIComponent(req.params.unit || '')).trim().slice(0, 100);
+        if (!CAD_NUMBER_RE.test(number)) return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
+        if (!unit) return res.status(400).json({ error: 'اسم الفرقة مطلوب' });
+        const reason = req.body && req.body.reason ? String(req.body.reason).trim().slice(0, 200) : null;
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const shiftId = await opsEngine.shifts.resolveShiftId(req);
+        if (!shiftId) return res.status(400).json({ error: 'لا توجد مناوبة نشطة' });
+        const result = await reportService.cancelParticipation({ shiftId, number, unit }, req.user, reason, cancel);
+        if (!result.success) return res.status(result.status || 400).json({ error: result.error });
+        if (!result.already) {
+            await addAuditLogEntry(cancel ? 'cad_crew_manual_cancel' : 'cad_crew_manual_restore',
+                cancel
+                    ? 'تم إلغاء تسجيل الفرقة «' + unit + '» من البلاغ ' + number + ' يدويًا من توزيع البلاغات' + (reason ? ' — السبب: ' + reason : '') + ' — السجل محفوظ تاريخيًا ومستبعد من العدّادات'
+                    : 'استعادة مشاركة الفرقة «' + unit + '» في البلاغ ' + number + ' بعد إلغاء يدوي سابق',
+                'reports', req.user.name, req.user.role, req.user.id);
+        }
+        res.json({ ...result, number });
+    } catch (error) {
+        console.error('[CadReports] manual-cancel error:', error);
+        res.status(500).json({ error: 'فشل في تحديث مشاركة الفرقة' });
+    }
+}
+app.post('/api/cad-reports/:number/crews/:unit/cancel', authenticate, authorizePerm('ops.dispatch'), (req, res) => handleCrewManualCancel(req, res, true));
+app.post('/api/cad-reports/:number/crews/:unit/restore', authenticate, authorizePerm('ops.dispatch'), (req, res) => handleCrewManualCancel(req, res, false));
 
 // ============================================
 // تثبيت أداة CAD Overlay من المنصة (قرار المالك 2026-08-21)

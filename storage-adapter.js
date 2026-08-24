@@ -214,6 +214,23 @@ class StorageAdapter {
                (SELECT id FROM reports WHERE shift_id = ? AND unit = ?)`,
             [withdrawn ? 1 : 0, incidentNumber, shiftId, unit]);
     }
+    /** قراءة حالة الإلغاء اليدوي لمشاركة بمعرّفها (تغليف طبقة التخزين — 2026-08-24) */
+    async getParticipationManualState(id) {
+        return this.db.get(
+            'SELECT id, manual_cancelled, manual_cancelled_by, manual_cancelled_at, manual_cancel_reason FROM report_times WHERE id = ?', [id]);
+    }
+    /** الإلغاء اليدوي للمشاركة من توزيع البلاغات (اعتماد المالك 2026-08-24):
+        تعليم/رفع manual_cancelled على صف المشاركة نفسه بالهوية — لا حذف إطلاقًا.
+        بالفاعل والوقت والسبب عند التعليم، ويحتفظ بها عند الرفع (التاريخ يبقى) */
+    async setParticipationManualCancelled(id, cancelled, by, reason) {
+        if (cancelled) {
+            await this.db.run(
+                `UPDATE report_times SET manual_cancelled = 1, manual_cancelled_by = ?, manual_cancelled_at = ?, manual_cancel_reason = ? WHERE id = ?`,
+                [by || null, new Date().toISOString(), reason || null, id]);
+        } else {
+            await this.db.run('UPDATE report_times SET manual_cancelled = 0 WHERE id = ?', [id]);
+        }
+    }
     /** حالة الوحدة في CAD (قرار المالك 2026-08-22): تُحفظ خامًا ومطبَّعة للتتبع —
         cad_unit_status = حرف unitRequestStatus (A/B/C/R)، cad_reached = وصول/مباشرة
         فعلية من journeys (1/0). لا قرار هنا — القرار في ReportService، هنا تتبع فقط */
@@ -238,7 +255,7 @@ class StorageAdapter {
             'SELECT * FROM incident_registry WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
         // مشاركات البلاغات المرقّمة (لكل فرقة أزمنتها وأزمنة استجابتها المحسوبة وحالة مشاركتها)
         const parts = await this.db.all(
-            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id
+            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
              FROM report_times t JOIN reports r ON r.id = t.report_id
              WHERE r.shift_id = ? AND t.incident_number IS NOT NULL`, [shiftId]);
         // الضغطات اليدوية (بلا رقم) — كل واحدة بلاغ مستقل كما هو معتاد
@@ -263,6 +280,19 @@ class StorageAdapter {
 
     async getReportsByShift(shiftId) {
         return this.db.all('SELECT * FROM reports WHERE shift_id = ?', [shiftId]);
+    }
+
+    /** كل صفوف المشاركات لمناوبة (قرار المالك 2026-08-24 — مصدر واحد للاحتساب):
+        صف report_times + مركز/وحدة reports مع حقول الاستبعاد (withdrawn /
+        manual_cancelled) ولقطة phases الخام. لا قرار هنا — القاعدة الواحدة في
+        ReportService.isParticipationCounted، هنا قراءة صرفة قابلة للتتبع. */
+    async getShiftParticipationRows(shiftId) {
+        return this.db.all(
+            `SELECT r.center, r.unit, t.id, t.timestamp, t.type, t.incident_number, t.phases, t.withdrawn, t.manual_cancelled
+             FROM reports r
+             LEFT JOIN report_times t ON t.report_id = r.id
+             WHERE r.shift_id = ?
+             ORDER BY r.id ASC, t.id ASC`, [shiftId]);
     }
 
     // ─── Shift Completions ───

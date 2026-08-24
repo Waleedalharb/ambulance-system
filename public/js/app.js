@@ -1996,6 +1996,35 @@ function getPeakHour() {
 // ============================================
 // نافذة توزيع البلاغات المتطورة
 // ============================================
+// ═══ الإلغاء اليدوي لمشاركة فرقة من توزيع البلاغات (اعتماد المالك 2026-08-24) ═══
+// مشاركة سُجّلت بالخطأ تُعلَّم manual_cancelled في الخادم — لا حذف: تخرج فورًا
+// من كل العدّادات والمؤشرات وتبقى موثقة في التفاصيل والتدقيق مع السبب والفاعل.
+async function cancelCrewRegistration(number, unit, restore) {
+    if (!restore) {
+        var reason = window.prompt('إلغاء تسجيل «' + unit + '» من البلاغ ' + number + '؟\nستُستبعد الفرقة فورًا من جميع العدّادات والمؤشرات، ويبقى السجل محفوظًا في التاريخ والتدقيق.\n\nسبب الإلغاء (اختياري):', '');
+        if (reason === null) return; // ألغى المستخدم العملية
+    } else if (!window.confirm('استعادة مشاركة «' + unit + '» في البلاغ ' + number + ' ضمن العدّادات؟')) {
+        return;
+    }
+    try {
+        var url = '/api/cad-reports/' + encodeURIComponent(number) + '/crews/' + encodeURIComponent(unit) + (restore ? '/restore' : '/cancel');
+        var res = await AuthManager.apiRequest(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(restore ? {} : { reason: (reason || '').trim() || null })
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (res.ok && data.success) {
+            if (typeof showToast === 'function') showToast(restore ? '↩ استُعيدت مشاركة «' + unit + '»' : '🚫 أُلغي تسجيل «' + unit + '» — مستبعدة من العدّادات ومحفوظة في السجل', 'success');
+            renderAdvancedDistribution(); // إعادة الرسم من المصدر مباشرة
+        } else {
+            if (typeof showToast === 'function') showToast('❌ ' + (data.error || ('HTTP ' + res.status)), 'error'); else alert(data.error || ('HTTP ' + res.status));
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('❌ تعذر الاتصال بالخادم', 'error');
+    }
+}
+
 async function renderAdvancedDistribution() {
     var container = document.getElementById('distributionContainer');
     if (!container) return;
@@ -2173,13 +2202,28 @@ async function renderAdvancedDistribution() {
                     var respTxt = (c.respArrivalMin != null ? ' ⏱' + c.respArrivalMin + ' د للوصول' : '') +
                                   (c.respMubasharaMin != null ? ' · ' + c.respMubasharaMin + ' د للمباشرة' : '');
                     var notCounted = c.counted === false; // مُسندة وأُلغيت قبل التحرك — تبقى موثقة ولا تدخل العدّاد
-                    var chipStyle = notCounted
+                    var manualCancelled = c.manualCancelled === true; // أُلغيت يدويًا من هذه النافذة — مستبعدة ومحفوظة (2026-08-24)
+                    var chipStyle = manualCancelled
+                        ? 'display:inline-block; background:rgba(239,68,68,.07); border:1px dashed rgba(239,68,68,.5); border-radius:6px; padding:2px 9px; margin:2px; font-size:.8rem; opacity:.8;'
+                        : notCounted
                         ? 'display:inline-block; background:rgba(148,163,184,.08); border:1px dashed rgba(148,163,184,.45); border-radius:6px; padding:2px 9px; margin:2px; font-size:.8rem; opacity:.75;'
                         : 'display:inline-block; background:rgba(46,139,122,.15); border:1px solid rgba(46,139,122,.4); border-radius:6px; padding:2px 9px; margin:2px; font-size:.8rem;';
-                    return '<span style="' + chipStyle + '">🚑 ' + c.unit +
-                        (notCounted ? ' <small style="opacity:.9;">(مُسندة — لم تتحرك)</small>' : '') +
+                    var cancelTitle = manualCancelled && c.manualCancelledBy
+                        ? 'أُلغيت يدويًا بواسطة ' + c.manualCancelledBy + (c.manualCancelReason ? ' — ' + c.manualCancelReason : '')
+                        : '';
+                    var _opsSt = window.__opsPermsState;
+                    var canDispatch = !!(_opsSt && _opsSt.loaded && (_opsSt.star || _opsSt.perms.indexOf('ops.dispatch') !== -1));
+                    var actionBtn = canDispatch
+                        ? (manualCancelled
+                            ? ' <button onclick="cancelCrewRegistration(\'' + ic.number + '\', \'' + String(c.unit).replace(/'/g, "\\'") + '\', true)" title="استعادة المشاركة في العدّادات" style="background:none;border:none;color:#2E8B7A;cursor:pointer;font-size:.75rem;padding:0 2px;">↩ استعادة</button>'
+                            : ' <button onclick="cancelCrewRegistration(\'' + ic.number + '\', \'' + String(c.unit).replace(/'/g, "\\'") + '\', false)" title="إلغاء تسجيل الفرقة من هذا البلاغ (تُستبعد من العدّادات وتبقى في السجل)" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:.8rem;padding:0 2px;">✕</button>')
+                        : '';
+                    return '<span style="' + chipStyle + '"' + (cancelTitle ? ' title="' + cancelTitle + '"' : '') + '>🚑 ' + c.unit +
+                        (manualCancelled ? ' <small style="color:#EF4444;">(أُلغيت يدويًا — مستبعدة)</small>' :
+                          notCounted ? ' <small style="opacity:.9;">(مُسندة — لم تتحرك)</small>' : '') +
                         (times ? ' <small style="opacity:.75;">(' + times + ')</small>' : '') +
-                        (respTxt ? ' <small style="color:#2E8B7A; font-weight:700;">' + respTxt + '</small>' : '') + '</span>';
+                        (respTxt ? ' <small style="color:#2E8B7A; font-weight:700;">' + respTxt + '</small>' : '') +
+                        actionBtn + '</span>';
                 }).join('');
                 return '<div style="padding:6px 4px; border-top:1px solid rgba(255,255,255,.06); font-size:.86rem;">' +
                     '<b style="direction:ltr; display:inline-block;">' + ic.number + '</b> — ' + td +

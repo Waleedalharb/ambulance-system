@@ -125,6 +125,7 @@ class CrewActivityService {
                 `SELECT r.shift_id, r.unit, COUNT(rt.id) AS cnt
                  FROM reports r JOIN report_times rt ON rt.report_id = r.id
                  WHERE r.shift_id IN (${shiftIds.map(() => '?').join(',')})
+                   AND COALESCE(rt.manual_cancelled, 0) = 0
                  GROUP BY r.shift_id, r.unit`, shiftIds),
             // أحداث الأشخاص: دليل «عمل» فقط (hasPersonEvents) — الأسماء لا تُؤخذ
             // من هنا إطلاقًا (D.1: الأحداث الخام ليست قائمة أعضاء)

@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-23.c — Journey لكل وحدة إلزاميًا (لا نسخ أوقات بين الفرق) + تصحيح موثق';
+  const OVERLAY_BUILD = '2026-08-24.b — No Journey = No Participation: اقتراحات خطة الاستجابة ليست مشاركة + توحيد قاعدة الاحتساب سيرفريًا';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -58,6 +58,50 @@
     if(lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
     for(const k of Object.keys(o)){ const r = scanGeo(o[k], depth + 1); if(r) return r; }
     return null;
+  }
+  /* هضم وحدات event-dispatched/detail → unitsByIncident (مشترك: الالتقاط السلبي
+     والقراءة النشطة للـObserver — اعتماد المالك 2026-08-24). البصمة تشمل الأزمنة:
+     تطوّر Journey أي وحدة = لقطة جديدة. يعيد true عند تغيّر فعلي فقط. */
+  function ingestDetailUnits(evId, d, via){
+    if(!d || !Array.isArray(d.units)) return false;
+    const ARRIVAL_STEPS = { AT_PATIENT: 1 };
+    // No Journey = No Participation (اعتماد المالك 2026-08-24 — تصحيح دلالي):
+    // وحدات «تغيير خطة الاستجابة» اقتراحات CAD للمشغل (متاحة/جاهزة/قريبة) وليست
+    // مرتبطة بالبلاغ — لا تُهضم إلا وحدة أنشأ لها CAD رحلة فعلية (Journey/Dispatch)
+    const ignored = [];
+    const list = d.units.map(u => {
+      if(!u || !u.unitCode) return null;
+      const jr = Array.isArray(u.journeys) ? u.journeys : [];
+      if(!jr.length){ ignored.push(String(u.unitCode)); return null; }
+      let lastTimed = null;
+      jr.forEach(s => {
+        if(s && s.journeyStepTime && (!lastTimed || (s.stepSeq || 0) > (lastTimed.stepSeq || 0))) lastTimed = s;
+      });
+      return {
+        unit: String(u.unitCode),
+        urs: u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null,
+        reached: jr.some(s => s && ARRIVAL_STEPS[s.journeyStepCode] && !!s.journeyStepTime),
+        lastStep: lastTimed ? lastTimed.journeyStepCode : null,
+        // Journey الوحدة الخاصة (قرار المالك 2026-08-23): أزمنة كل وحدة من
+        // journeys[] الخاصة بها فقط — لا لقطة مدمجة على مستوى البلاغ إطلاقًا
+        phases: phasesFromJourneys(jr),
+        unitId: u.unitId != null ? u.unitId : null,        // هوية الوحدة الثابتة (2026-08-23)
+        runUnitId: u.runUnitId != null ? u.runUnitId : null // مثبت حيًا: يطابق lastJourneys
+      };
+    }).filter(Boolean);
+    // توثيق الاقتراحات المتجاهلة (قابل للتتبع — لا قرار صامت): وحدات ظهرت في
+    // الحمولة بلا Journey = Available Units في نافذة الخطة، ليست مشاركة
+    if(ignored.length) lifeLog('available-ignored', { incident: evId, units: ignored, via: via || 'passive' });
+    // قراءة ناجحة بلا أي وحدة مرتبطة = لقطة فارغة صادقة تُخزَّن (لا تجميد للقطة
+    // قديمة): وحدة فقدت رحلتها أو غابت عن التفاصيل يوثّقها الـObserver «gone»
+    const sig = JSON.stringify(list.map(x => x.unit + ':' + (x.urs || '') + ':' + (x.reached ? 1 : 0) + ':' + JSON.stringify(x.phases || {})).sort());
+    const prev = unitsByIncident[evId];
+    if(!prev || prev.sig !== sig){
+      unitsByIncident[evId] = { at: Date.now(), sig, units: list };
+      lifeLog('units', { incident: evId, units: list, via: via || 'passive' });
+      return true;
+    }
+    return false;
   }
   function handleCadResponse(url, j){
     try{
@@ -117,37 +161,7 @@
       if(/event-manager\/api\/v\d*\/event-dispatched\/detail/.test(url)){
         const d = j.data;
         const evId = (d && d.id != null) ? String(d.id) : ((url.match(/eventId=(\d+)/) || [])[1] || null);
-        if(d && evId && Array.isArray(d.units)){
-          const ARRIVAL_STEPS = { AT_PATIENT: 1 };
-          const list = d.units.map(u => {
-            if(!u || !u.unitCode) return null;
-            const jr = Array.isArray(u.journeys) ? u.journeys : [];
-            let lastTimed = null;
-            jr.forEach(s => {
-              if(s && s.journeyStepTime && (!lastTimed || (s.stepSeq || 0) > (lastTimed.stepSeq || 0))) lastTimed = s;
-            });
-            return {
-              unit: String(u.unitCode),
-              urs: u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null,
-              reached: jr.some(s => s && ARRIVAL_STEPS[s.journeyStepCode] && !!s.journeyStepTime),
-              lastStep: lastTimed ? lastTimed.journeyStepCode : null,
-              // Journey الوحدة الخاصة (قرار المالك 2026-08-23): أزمنة كل وحدة من
-              // journeys[] الخاصة بها فقط — لا لقطة مدمجة على مستوى البلاغ إطلاقًا
-              phases: phasesFromJourneys(jr),
-              unitId: u.unitId != null ? u.unitId : null,        // هوية الوحدة الثابتة (2026-08-23)
-              runUnitId: u.runUnitId != null ? u.runUnitId : null // مثبت حيًا: يطابق lastJourneys
-            };
-          }).filter(Boolean);
-          if(list.length){
-            // البصمة تشمل الأزمنة: تطوّر Journey أي وحدة (وقت جديد) = لقطة جديدة تستحق الإرسال
-            const sig = JSON.stringify(list.map(x => x.unit + ':' + (x.urs || '') + ':' + (x.reached ? 1 : 0) + ':' + JSON.stringify(x.phases || {})).sort());
-            const prev = unitsByIncident[evId];
-            if(!prev || prev.sig !== sig){
-              unitsByIncident[evId] = { at: Date.now(), sig, units: list };
-              lifeLog('units', { incident: evId, units: list });
-            }
-          }
-        }
+        if(d && evId) ingestDetailUnits(evId, d, 'passive');
       }
       m = url.match(/\/incidents\/(\d+)/);
       if(m){
@@ -402,6 +416,10 @@
     }
     return out;
   }
+  /* دمج مصادر الفرق (إصلاح 2026-08-24): الترتيب تصاعدي بالحداثة — المخزَّن أولًا
+     ثم الصفحة ثم لقطة CAD الطازجة أخيرًا. لقطة الوحدة (cadUrs) ترقّي السابقة،
+     ولقطة بلا cadUrs لا تطغى على لقطة وحدة قائمة. الترتيب المعكوس كان يجعل
+     المخزَّن القديم يطغى على الطازج فيجمد التحديثات بعد التسجيل التلقائي. */
   function mergeCrewSources(){
     const map = new Map(); // team ← أفضل لقطة معروفة
     const put = (c, upgradeOnly) => {
@@ -461,10 +479,12 @@
     const ARRIVAL = { AT_PATIENT: 1 }; // المباشرة الفعلية = وقت العلاج فقط (إثبات 1306598)
     for(const u of ((d && d.units) || [])){
       if(!u || !u.unitCode) continue;
+      // No Journey = No Participation (2026-08-24): اقتراحات خطة الاستجابة ليست فرقًا مرتبطة
+      const jr = Array.isArray(u.journeys) ? u.journeys : [];
+      if(!jr.length) continue;
       const team = mapToSouthTeam(String(u.unitCode));
       if(!team || seenT.has(team)) continue;
       seenT.add(team);
-      const jr = Array.isArray(u.journeys) ? u.journeys : [];
       const c = { team, phases: phasesFromJourneys(jr), phasesSource: 'cad-detail',
                   cadReached: jr.some(s => s && ARRIVAL[s.journeyStepCode] && !!s.journeyStepTime) };
       if(u.unitRequestStatus) c.cadUrs = String(u.unitRequestStatus).toUpperCase();
@@ -545,13 +565,14 @@
       region = d.zoneName || null;
     }
     if(!crews.length){
-      // fallback صادق: الوحدات الجنوبية الظاهرة في القائمة بلا تفاصيل (لا اختلاق حالة)
+      // fallback صادق: الوحدات الجنوبية الظاهرة في lastJourneys للقائمة — هي نفسها
+      // دليل Journey (الوحدة ظاهرة بمرحلة رحلة) بلا تفاصيل أوقات (لا اختلاق حالة)
       const it = auto.lastItems[num];
       const lj = it && Array.isArray(it.lastJourneys) ? it.lastJourneys : [];
       const seenT = new Set();
       for(const u of lj){
         const team = mapToSouthTeam(String((u && u.unitCode) || ''));
-        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team }); }
+        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team, phases: {} }); }
       }
     }
     if(!crews.length){ lifeLog('auto-skip-nonsouth', { incident: num }); return; } // ⓒ لا وحدة جنوبية
@@ -560,12 +581,13 @@
     if(!coords && geo.locOfIncident[num]) coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
     const r = await apiPost(num, code, type, crews, null, createdAt, address, region, coords, null, 'cad-auto');
     if(r.data && r.data.success){
+      setObsStatus('synced');
       auto.count++;
       watchAdd(num, { code, type, crews, phases: {}, createdAt, address, region, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null });
       lifeLog('auto-register', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')), confirmed: !!d });
       showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>🚑 ' +
         crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>', 6000);
-    }
+    } else { setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status)); }
   }
   /* تحديث بلاغ قائم عند إشارة تغيّر lastJourneys: إعادة قراءة التفاصيل مخنوقة —
      إضافة فرقة ظهرت لاحقًا / استبعاد فرقة ثبت إلغاؤها / ترقية أوقات الرحلة.
@@ -577,7 +599,7 @@
     if(now - (w.lastDetailAt || 0) < DETAIL_REFETCH_MS) return;
     const d = await fetchIncidentDetail(num);
     if(!d) return;
-    const crews = mergeCrewSources(crewsFromDetail(d), w.crews);
+    const crews = mergeCrewSources(w.crews, crewsFromDetail(d));
     if(!crews.length) return;
     const sig = JSON.stringify(crews.map(c => c.team + (c.cadUrs || '') + (c.cadReached ? 'R' : '') + JSON.stringify(c.phases || {})).sort());
     if(sig === w.autoSig) return; // لا جديد فعلي — لا إرسال
@@ -587,11 +609,75 @@
     const r = await apiPost(num, w.code, w.type, crews, null, createdAt, address, region,
       (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, null, 'cad-auto');
     if(r.data && r.data.success){
+      setObsStatus('synced');
       watchAdd(num, { code: w.code, type: w.type, crews, phases: w.phases, createdAt, address, region, lat: w.lat, lng: w.lng });
       const ww = watch.list[num]; if(ww){ ww.lastDetailAt = now; ww.autoSig = sig; watchSave(); }
       lifeLog('auto-refresh', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')) });
-    }
+    } else { setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status)); }
   }
+
+  /* ═══ Incident Observer (اعتماد المالك 2026-08-24 — جولة Observer) ═══
+     فتح صفحة البلاغ = بدء المراقبة تلقائيًا: بلا ضغط «أوقات الرحلة» ولا فتح أقسام
+     ولا تدخل من المستخدم. كل 12 ثانية (إيقاع استطلاع CAD نفسه للقائمة) نقرأ
+     event-dispatched/detail من سياق الصفحة — نفس المصدر الذي تبني واجهة CAD
+     منه التفاصيل — ونغذّي وحداته في unitsByIncident؛ مسار الإرسال الواحد
+     (watchTick + بصمة اللقطة) يلتقط أي تغيير ويرسله للمنصة تلقائيًا.
+     بصمة لكل وحدة: هوية الوحدة + حالتها (urs) + مرحلتها الأخيرة + أزمنتها —
+     التغيير الحقيقي فقط يُرسَل؛ تكرار نفس البيانات لا يُرسل إطلاقًا (spam-safe).
+     يُراقب: ظهور Journey جديدة، تغيّر Journey، تغيّر phases/التوقيتات، تغيّر
+     حالة الوحدة، انضمام وحدة. وحدة تختفي من التفاصيل تُوثَّق فقط — لا استنتاج
+     إلغاء من الغياب (القاعدة الجذرية). تشخيص obs-gap المضمّن: إن ظهرت أوقات في
+     الصفحة ولم تصل عبر journeys[] يُسجَّل دليلًا صادقًا — بلا تخمين مصدر بديل. */
+  const OBS_POLL_MS = 12000;
+  const obs = window.__southObs = window.__southObs || { fp: {}, gapSig: {} };
+  function unitFp(u){
+    return JSON.stringify([u.unit, u.urs || '', u.reached ? 1 : 0, u.lastStep || '', u.phases || {}, u.unitId || null, u.runUnitId || null]);
+  }
+  async function observerTick(){
+    const num = incidentFromUrl();
+    if(!num) return;
+    const d = await fetchIncidentDetail(num);
+    if(!d){
+      // فشل قراءة متكرر = 🔴 صادق (لا صمت) — فشل عابر واحد يُتحمَّل للدورة القادمة
+      obs.failStreak = (obs.failStreak || 0) + 1;
+      if(obs.failStreak >= 3) setObsStatus('error', 'تعذرت قراءة تفاصيل البلاغ من CAD');
+      return;
+    }
+    obs.failStreak = 0;
+    ingestDetailUnits(num, d, 'observer');
+    const nowUnits = (unitsByIncident[num] && unitsByIncident[num].units) || [];
+    const fpMap = obs.fp[num] = obs.fp[num] || {};
+    for(const u of nowUnits){
+      const key = String(u.runUnitId || u.unitId || u.unit);
+      const fp = unitFp(u);
+      if(fpMap[key] && fpMap[key] !== fp) lifeLog('obs-change', { incident: num, unit: u.unit });
+      else if(!fpMap[key]) lifeLog('obs-unit-seen', { incident: num, unit: u.unit });
+      fpMap[key] = fp;
+    }
+    // وحدة كانت معروفة واختفت من التفاصيل — توثيق فقط (لا استنتاج إلغاء من الغياب)
+    const nowKeys = new Set(nowUnits.map(u => String(u.runUnitId || u.unitId || u.unit)));
+    for(const k of Object.keys(fpMap)){
+      if(!nowKeys.has(k)){ lifeLog('obs-unit-gone', { incident: num, unitKey: k }); delete fpMap[k]; }
+    }
+    // تشخيص الفجوة (تحقق برمجي — اعتماد 2026-08-24): أوقات ظاهرة في الصفحة ولم
+    // تصل عبر journeys[] = القراءة النشطة وحدها لا تكفي لهذا البلاغ — يُسجَّل دليلًا
+    try{
+      const domPhases = phasesObject();
+      const domHas = Object.keys(domPhases).length > 0;
+      const apiHas = nowUnits.some(u => u.phases && Object.keys(u.phases).length > 0);
+      const gapSig = num + '|' + (domHas ? 1 : 0) + '|' + (apiHas ? 1 : 0);
+      if(domHas && !apiHas && obs.gapSig[num] !== gapSig){
+        obs.gapSig[num] = gapSig;
+        lifeLog('obs-gap', { incident: num, domPhases, note: 'أوقات ظاهرة في الصفحة وغائبة عن journeys[] المقروءة نشطًا' });
+      }
+    }catch(e){}
+    setObsStatus('synced');
+  }
+  if(!window.__southObsTimer){
+    window.__southObsTimer = setInterval(() => { try{ const f = window.__southObsTick; if(f) f().catch(() => {}); }catch(e){} }, OBS_POLL_MS);
+  }
+  window.__southObsTick = observerTick;
+  setTimeout(() => { try{ const f = window.__southObsTick; if(f) f().catch(() => {}); }catch(e){} }, 800); // أول قراءة فور فتح الصفحة
 
   /* ─── أزمنة المراحل: اسم المرحلة في سطر ووقتها في السطر الذي يليه ─── */
   const PHASES = ['قبول','الاستجابة','التحرك','الوصول','البحث','العلاج','المباشرة','النقل','بدء التسليم','انتهاء التسليم','الجاهزية'];
@@ -648,6 +734,19 @@
     const o = {};
     probeTimes().forEach(r => { if(r.time) o[r.phase] = r.time; });
     return o;
+  }
+
+  /* حالة المزامنة على المقبض (اعتماد المالك 2026-08-24): 🟢 متزامن · 🟡 جارٍ
+     التحديث · 🔴 خطأ — الـObserver يعمل في الخلفية حتى والواجهة مطوية تمامًا */
+  const obsState = window.__southObsState = window.__southObsState || { state: 'synced', note: '', at: 0, lastOkAt: 0 };
+  function setObsStatus(state, note){
+    obsState.state = state; obsState.note = note || ''; obsState.at = Date.now();
+    if(state === 'synced') obsState.lastOkAt = obsState.at;
+    const dot = document.getElementById('southPocStatus');
+    if(dot) dot.textContent = state === 'error' ? '🔴' : (state === 'updating' ? '🟡' : '🟢');
+    const lc = document.getElementById('southPocLauncher');
+    if(lc) lc.title = (state === 'error' ? '🔴 يوجد خطأ' : state === 'updating' ? '🟡 جارٍ التحديث' : '🟢 متزامن') +
+      (obsState.note ? ' — ' + obsState.note : '') + '\n' + OVERLAY_BUILD;
   }
 
   /* ─── الواجهة العائمة — Dock قابل للسحب (قرار المالك 2026-08-21) ───
@@ -708,7 +807,8 @@
   closeBtn.textContent = '✕'; closeBtn.title = 'طيّ اللوحة — تبقى شارة صغيرة لإعادة فتحها';
   grip.append(gripLabel, closeBtn);
   const launcher = document.createElement('button'); launcher.id = 'southPocLauncher';
-  launcher.textContent = '🚑 الجنوب'; launcher.title = 'إظهار لوحة منصة الجنوب';
+  launcher.innerHTML = '<span id="southPocStatus">🟢</span> الجنوب';
+  launcher.title = '🟢 متزامن\n' + OVERLAY_BUILD;
   dock.append(grip, launcher, btn, statsBtn, timesBtn, toast, panel);
   document.body.appendChild(dock);
   (function makeDockDraggable(){
@@ -732,8 +832,10 @@
     try{
       const saved = JSON.parse(localStorage.getItem('southPocDockPos') || 'null');
       if(saved && isFinite(saved.left) && isFinite(saved.top)) applyPos(saved.left, saved.top);
-      if(saved && saved.collapsed) setCollapsed(true);
-    }catch(e){}
+      // شبه مخفي افتراضيًا (اعتماد المالك 2026-08-24): مقبض صغير + مؤشر حالة فقط —
+      // لا يُفتح إلا بطلب المستخدم، والـObserver يعمل في الخلفية بغض النظر
+      if(!saved || saved.collapsed !== false) setCollapsed(true);
+    }catch(e){ setCollapsed(true); }
     closeBtn.addEventListener('click', e => { e.stopPropagation(); setCollapsed(true); });
     launcher.addEventListener('click', () => setCollapsed(false));
     // تكيّف مع تغيّر حجم الشاشة: لا تخرج اللوحة خارج الحدود إطلاقًا
@@ -964,7 +1066,7 @@
       const pageCrews = onPage ? crewStatesFromTracker().map(c => ({ team: mapToSouthTeam(c.name), withdrawn: c.withdrawn })).filter(c => c.team) : [];
       // حالة الوحدة من CAD (قرار المالك 2026-08-22): إلغاء/عودة الوحدة يُرسل تلقائيًا
       // فور تغيّر لقطة event-dispatched/detail — بلا ضغطة ثانية، ودمج بلا فقدان
-      const effCrews = mergeCrewSources(crewsFromCadUnits(num), pageCrews, w.crews);
+      const effCrews = mergeCrewSources(w.crews, pageCrews, crewsFromCadUnits(num));
       if(!effCrews.length) continue; // لا إرسال بلا فرقة معروفة — نبقى نراقب
       const snap = {
         lat: coords ? coords.lat : w.lat,
@@ -977,12 +1079,16 @@
       };
       if(snapSig(snap) === w.lastSig) continue; // لا جديد — لا إرسال إطلاقًا
       const gotNewCoords = !!(coords && (w.lat !== coords.lat || w.lng !== coords.lng));
+      setObsStatus('updating', 'بلاغ ' + num);
       const r = await apiPost(num, w.code, w.type, effCrews, snap.phases, snap.createdAt, snap.address, snap.region,
         coords || (snap.lat != null && snap.lng != null ? { lat: snap.lat, lng: snap.lng } : null));
       if(r.data && r.data.success){
+        setObsStatus('synced');
         watchAdd(num, { code: w.code, type: w.type, crews: effCrews, phases: snap.phases, createdAt: snap.createdAt, address: snap.address, region: snap.region, lat: snap.lat, lng: snap.lng });
         lifeLog('enrich', { incident: num, newCoords: gotNewCoords ? coords : null });
         if(gotNewCoords) showToast('🌐 اكتمل موقع البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> <b>تلقائيًا</b> — ظهر على خريطة منصة الجنوب<br><b style="direction:ltr;display:inline-block">' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6) + '</b>', 9000);
+      } else {
+        setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status));
       }
     }
   }

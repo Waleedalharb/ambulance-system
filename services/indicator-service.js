@@ -191,7 +191,7 @@ class IndicatorService {
 
         // ── Hourly profile — REAL, from report_times (consumed by F5b later) ──
         const hourlyRows = await this.engine.storage.all(
-            "SELECT strftime('%H', timestamp) AS h, COUNT(*) AS c FROM report_times GROUP BY h"
+            "SELECT strftime('%H', timestamp) AS h, COUNT(*) AS c FROM report_times WHERE COALESCE(manual_cancelled, 0) = 0 GROUP BY h"
         );
         const hourlyProfile = {};
         for (let i = 0; i < 24; i++) hourlyProfile[String(i).padStart(2, '0')] = 0;

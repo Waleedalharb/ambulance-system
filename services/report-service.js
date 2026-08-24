@@ -102,57 +102,38 @@ class ReportService {
      * Shape matches data/ambulance-data.json field-for-field, plus types:
      *   { "<center>|<unit>": { count: <int>, times: [<string>, ...], types: { <type>: <int>, ... } } }
      *
+     * الاشتقاق من صفوف المشاركات بقاعدة الاحتساب الواحدة (قرار المالك
+     * 2026-08-24): الملغاة يدويًا/المسحوبة/بلا «تحرك» لا تدخل العدّ — نفس
+     * تعريف getIncidentSummary حتى يتطابق تقرير المناوبة مع الإنجازات.
+     *
      * @returns {Object} data map ({} when there is no active shift)
      */
     async getCurrentData() {
         const activeShift = await this.engine.shifts.getActiveShift();
         if (!activeShift) return {};
-
-        const rows = await this.engine.storage.all(
-            `SELECT r.id, r.center, r.unit, r.count, t.timestamp AS ts, t.type AS rtype
-             FROM reports r
-             LEFT JOIN report_times t ON t.report_id = r.id
-             WHERE r.shift_id = ?
-             ORDER BY r.id ASC, t.id ASC`,
-            [activeShift.id]
-        );
-
-        const data = {};
-        for (const row of rows) {
-            const key = `${row.center}|${row.unit}`;
-            if (!data[key]) {
-                data[key] = { count: row.count || 0, times: [], types: {} };
-            }
-            if (row.ts) data[key].times.push(row.ts);
-            if (row.rtype) data[key].types[row.rtype] = (data[key].types[row.rtype] || 0) + 1;
-        }
-        return data;
+        const rows = await this.engine.storage.getShiftParticipationRows(activeShift.id);
+        return this._buildCountedDataMap(rows);
     }
 
     /**
      * Read-only: reports for ANY shift (active or archived) as an object map
      *   { "<center>|<unit>": { count: <int>, times: [<string>, ...] } }
-     * Mirrors the archive engine's _getReports logic: the single source
-     * (reports table) first; when the shift predates the single source,
-     * falls back to the frozen migration store (shift_reports — written by
-     * migrateShifts from the legacy savedReports map).
+     * الاشتقاق من صفوف المشاركات بقاعدة الاحتساب الواحدة (قرار المالك
+     * 2026-08-24) — لا من عدّاد reports.count التجميعي، حتى لا تظهر الفرق
+     * الملغاة يدويًا في التقرير اليومي وعرض الأرشيف. يبقى السقوط للمخزن
+     * المجمّد (shift_reports) للمناوبات السابقة على مصدر الحقيقة الواحد.
      *
      * @param {number} shiftId
      * @returns {Object} data map ({} when the shift has no reports anywhere)
      */
     async getShiftReports(shiftId) {
         const live = await this.engine.storage.all(
-            'SELECT center, unit, count FROM reports WHERE shift_id = ? ORDER BY id ASC',
+            'SELECT id FROM reports WHERE shift_id = ? ORDER BY id ASC',
             [shiftId]
         );
         if (Array.isArray(live) && live.length > 0) {
-            const obj = {};
-            for (const r of live) {
-                if (r.center && r.unit) {
-                    obj[`${r.center}|${r.unit}`] = { count: r.count || 0, times: [] };
-                }
-            }
-            return obj;
+            const rows = await this.engine.storage.getShiftParticipationRows(shiftId);
+            return this._buildCountedDataMap(rows);
         }
 
         // Migration fallback: frozen shift_reports store (legacy savedReports)
@@ -498,6 +479,36 @@ class ReportService {
     }
 
     /**
+     * الإلغاء اليدوي لمشاركة فرقة من توزيع البلاغات (اعتماد المالك 2026-08-24 —
+     * جولة Observer): مشاركة سجّلها الـOverlay بالخطأ تُعلَّم manual_cancelled
+     * فتخرج فورًا من كل عدّاد ومؤشر تشغيلي (byCrew/أزمنة الاستجابة/الخريطة/
+     * نشاط الفرق) — بلا حذف إطلاقًا: السجل يبقى في التفاصيل والتدقيق مع
+     * الفاعل والوقت والسبب. idempotent: الملغاة أصلًا تعاد already=true ولا
+     * يتكرر القيد. restore يرفع التعليم فقط ويحتفظ بأثر الإلغاء الأول.
+     */
+    async cancelParticipation({ shiftId, number, unit }, actor, reason, cancel = true) {
+        const dup = await this.engine.storage.findParticipation(shiftId, unit, number);
+        if (!dup) return { success: false, status: 404, error: 'لا توجد مشاركة بهذه الفرقة على هذا البلاغ' };
+        const row = await this.engine.storage.getParticipationManualState(dup.id);
+        if (!row) return { success: false, status: 404, error: 'سجل المشاركة غير موجود' };
+        if (cancel) {
+            if (row.manual_cancelled) return { success: true, already: true, unit }; // لا تكرار للقيد ولا للحالة
+            await this.engine.storage.setParticipationManualCancelled(row.id, true,
+                actor ? (actor.name || actor.username) : null, reason || null);
+            // بث حي بنفس قناة الإثراء: الخريطة والمؤشرات تنعكس فورًا بلا تحديث يدوي
+            this.bus.emit('IncidentEnriched', { shift_id: shiftId, center: 'CAD', unit, number,
+                actor: actor ? { id: actor.id, name: actor.name || actor.username } : null });
+            return { success: true, already: false, unit };
+        }
+        if (!row.manual_cancelled) return { success: true, already: true, unit, restored: false };
+        await this.engine.storage.setParticipationManualCancelled(row.id, false);
+        this.bus.emit('IncidentEnriched', { shift_id: shiftId, center: 'CAD', unit, number,
+            actor: actor ? { id: actor.id, name: actor.name || actor.username } : null });
+        return { success: true, already: false, unit, restored: true,
+            previousCancel: { by: row.manual_cancelled_by, at: row.manual_cancelled_at, reason: row.manual_cancel_reason } };
+    }
+
+    /**
      * قاعدة عدالة الفرق (قرار المالك 2026-08-20):
      *  • فرقة أُسندت وأُلغيت قبل التحرك ← لا تُحسب في عدّادها (counted=false).
      *  • فرقة تحركت ثم أُلغيت لاحقًا ← تُحسب (لا تُظلم).
@@ -508,6 +519,44 @@ class ReportService {
     isCountedParticipation(phases) {
         if (!phases) return true;
         return Boolean(phases['التحرك']);
+    }
+
+    /**
+     * تعريف «المشاركة المحتسبة» الوحيد في المنصة (قرار المالك 2026-08-24 —
+     * لا مصدران للحقيقة): لا مسحوبة (withdrawn) ولا ملغاة يدويًا
+     * (manual_cancelled)، وإن وُجدت لقطة CAD فلا تُحسب إلا بدليل «التحرك».
+     * كل عدّاد مبني على المشاركات (تقرير المناوبة/توزيع البلاغات/التقرير
+     * اليومي/byCrew/الأزمنة) يشتق من هذه القاعدة حتى لا تتباين الشاشات.
+     * @param {Object} row - صف report_times (phases نص JSON أو كائن، withdrawn، manual_cancelled)
+     */
+    isParticipationCounted(row) {
+        if (!row) return false;
+        if (row.withdrawn) return false;
+        if (row.manual_cancelled) return false;
+        let phases = row.phases;
+        if (typeof phases === 'string') { try { phases = JSON.parse(phases); } catch (_) { phases = null; } }
+        return this.isCountedParticipation(phases || null);
+    }
+
+    /**
+     * خريطة «center|unit» من صفوف المشاركات بعد قاعدة الاحتساب الواحدة —
+     * count/times/types تُشتق من الصفوف المحتسبة فقط (لا من عدّاد reports.count
+     * التجميعي الذي لا يُنقَص بالإلغاء). الوحدة التي استُبعدت كل مشاركاتها
+     * تبقى ظاهرة بعدّاد 0 بصدق (الشكل محفوظ، والإحصاء لا يحسبها).
+     */
+    _buildCountedDataMap(rows) {
+        const data = {};
+        for (const row of rows) {
+            if (!row.center || !row.unit) continue;
+            const key = `${row.center}|${row.unit}`;
+            if (!data[key]) data[key] = { count: 0, times: [], types: {} };
+            if (row.id == null) continue; // تقرير بلا صفوف مشاركة إطلاقًا
+            if (!this.isParticipationCounted(row)) continue;
+            data[key].count++;
+            if (row.timestamp) data[key].times.push(row.timestamp);
+            if (row.type) data[key].types[row.type] = (data[key].types[row.type] || 0) + 1;
+        }
+        return data;
     }
 
     /**
@@ -539,19 +588,25 @@ class ReportService {
                 let phases = null;
                 try { phases = p.phases ? JSON.parse(p.phases) : null; } catch (_) { phases = null; }
                 const withdrawn = !!p.withdrawn; // الحالة الحالية للمشاركة (§4): المسحوبة لا تُحتسب إطلاقًا
-                const counted = !withdrawn && this.isCountedParticipation(phases);
+                // الإلغاء اليدوي من توزيع البلاغات (اعتماد المالك 2026-08-24): يُستبعد
+                // فورًا من كل عدّاد ومؤشر — ويبقى موثقًا في التفاصيل والتدقيق
+                const manualCancelled = !!p.manual_cancelled;
+                // قاعدة الاحتساب الواحدة المشتركة مع تقرير المناوبة والتوزيع (2026-08-24)
+                const counted = this.isParticipationCounted(p);
                 if (counted) byCrew[p.unit] = (byCrew[p.unit] || 0) + 1; // مشاركة محتسبة واحدة لكل فرقة (②)
                 // حالة الوحدة في CAD (قابلة للتتبع): B/C/R + لا وصول = قبل المباشرة ·
                 // B/C/R + وصول فعلي = بعد المباشرة (محتسبة) — A أو غياب الحقل = لا إلغاء
                 const cadUrs = p.cad_unit_status || null;
                 const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
-                let cancelKind = null;
-                if (cadUrs && cadUrs !== 'A') {
-                    cancelKind = cadReached === true ? 'after-arrival' : 'before-arrival';
-                    if (cancelKind === 'after-arrival') cancAfterArrival++; else cancBeforeArrival++;
-                }
+                const cancelKind = this._cancelKind(p);
+                if (cancelKind === 'after-arrival') cancAfterArrival++;
+                else if (cancelKind === 'before-arrival') cancBeforeArrival++;
                 return {
                     unit: p.unit, at: p.timestamp, phases, counted, withdrawn,
+                    manualCancelled,
+                    manualCancelledBy: p.manual_cancelled_by || null,
+                    manualCancelledAt: p.manual_cancelled_at || null,
+                    manualCancelReason: p.manual_cancel_reason || null,
                     cadUrs, cadReached, cancelKind,
                     // هوية الوحدة الثابتة في CAD (2026-08-23): ربط المشاركة بالوحدة
                     // الفعلية لا بترتيب الظهور — null بصدق للمشاركات اليدوية/القديمة
@@ -663,6 +718,18 @@ class ReportService {
                 definition: 'من إنشاء البلاغ في CAD حتى الوصول (مرحلة البحث)/المباشرة (مرحلة العلاج) — الفرق التي لم تتحرك خارج المؤشر'
             }
         };
+    }
+
+    /**
+     * نوع إلغاء الوحدة من CAD (قاعدة واحدة لكل الطبقات): حالة غير 'A' +
+     * وصول/مباشرة فعلية (cad_reached) = بعد المباشرة (محتسبة) · وإلا قبلها.
+     * null إن لم تُلغَ. قابل للتتبع إلى cad_unit_status/cad_reached الخام.
+     */
+    _cancelKind(p) {
+        const cadUrs = p.cad_unit_status || null;
+        if (!cadUrs || cadUrs === 'A') return null;
+        const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
+        return cadReached === true ? 'after-arrival' : 'before-arrival';
     }
 }
 
