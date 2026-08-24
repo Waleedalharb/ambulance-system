@@ -98,12 +98,19 @@ class StorageAdapter {
     async findIncidentByNumber(number) {
         return this.db.get('SELECT * FROM incident_registry WHERE number = ? ORDER BY id DESC LIMIT 1', [number]);
     }
-    async createIncident(shiftId, number, code, type, source, cadCreatedAt = null, address = null, region = null, district = null, street = null, city = null, lat = null, lng = null) {
+    async createIncident(shiftId, number, code, type, source, cadCreatedAt = null, address = null, region = null, district = null, street = null, city = null, lat = null, lng = null, callerNumber = null, description = null) {
         const result = await this.db.run(
-            'INSERT INTO incident_registry (shift_id, number, code, type, source, created_at, cad_created_at, address, region, district, street, city, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [shiftId, number, code || null, type || null, source || null, new Date().toISOString(), cadCreatedAt || null, address || null, region || null, district || null, street || null, city || null, lat, lng]
+            'INSERT INTO incident_registry (shift_id, number, code, type, source, created_at, cad_created_at, address, region, district, street, city, lat, lng, caller_number, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [shiftId, number, code || null, type || null, source || null, new Date().toISOString(), cadCreatedAt || null, address || null, region || null, district || null, street || null, city || null, lat, lng, callerNumber || null, description || null]
         );
         return result.id;
+    }
+    /** رقم المبلغ ووصف البلاغ (اعتماد المالك 2026-08-24 — ملحق note-18): يُستكملان
+        إن وصلا متأخرين من تفاصيل CAD — الموجود لا يُمس أبدًا (نمط COALESCE القائم) */
+    async updateIncidentCallerInfo(id, callerNumber, description) {
+        await this.db.run(
+            'UPDATE incident_registry SET caller_number = COALESCE(caller_number, ?), description = COALESCE(description, ?) WHERE id = ?',
+            [callerNumber || null, description || null, id]);
     }
     async updateIncidentCode(id, code) {
         await this.db.run('UPDATE incident_registry SET code = ? WHERE id = ? AND code IS NULL', [code, id]);

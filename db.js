@@ -1076,6 +1076,13 @@ async function runMigrations() {
   // القائمة) أو حالة نهائية closed/cancelled — المصدر الوحيد الذي تعتمد عليه
   // المؤشرات والتنبيهات والخريطة النشطة. additive وNULL للقديم = سلوك قائم لا يتغير
   await ensureColumn('incident_registry', 'status', 'TEXT');
+  // اكتشاف احتمال تكرار البلاغات (اعتماد المالك 2026-08-24 — ملحق note-18):
+  // رقم المبلغ (phoneNumber) ووصف البلاغ (notes النصية) كما يردان خامًا من
+  // event-dispatched/detail — أساس أدلة الاشتباه. رقم المبلغ بيانات شخصية:
+  // يُخزَّن للمطابقة السيرفرية فقط ولا يظهر في أي استجابة (الأدلة مقنّعة).
+  // additive وnullable: البلاغات القديمة تبقى NULL بصدق وتُستكمل إن وصلت لاحقًا
+  await ensureColumn('incident_registry', 'caller_number', 'TEXT');
+  await ensureColumn('incident_registry', 'description', 'TEXT');
   // VA: العدد المطلوب لجاهزية الفرقة — يُشتق منه النقص/الجاهزية سيرفريًا (idempotent)
   await ensureColumn('teams', 'requiredPersonnel', 'INTEGER DEFAULT 2');
   // مرحلة بدايات الفرق التشغيلية: JSON nullable لكل فريق {"day":"HH:MM","night":"HH:MM"} —

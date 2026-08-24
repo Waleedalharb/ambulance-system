@@ -90,6 +90,20 @@
         var over = alertsCache.filter(function (a) { return a.level === 'over'; });
         var near = alertsCache.filter(function (a) { return a.level === 'near'; });
 
+        // تنبيهات احتمال التكرار (اعتماد المالك 2026-08-24 — ملحق note-18): طبقة عرض
+        // مستقلة فوق التنبيه التشغيلي — «احتمال تكرار — يحتاج تحقق» فقط؛ لا دمج
+        // ولا إلغاء ولا سجل مراجعة، والقرار في CAD حصرًا. النشطة فقط تُنبِّه.
+        var dupRows = [];
+        if (state.summary && state.summary.incidents) {
+            state.summary.incidents.forEach(function (ic) {
+                if (isFinalInc(ic) || !ic.duplicates || !ic.duplicates.length) return;
+                var top = ic.duplicates[0]; // مرتبة سيرفريًا: الأعلى نقاطًا ثم الأقرب
+                dupRows.push({ number: String(ic.number), level: top.level, count: ic.duplicates.length });
+            });
+            var lvlRank = { high: 3, medium: 2, low: 1 };
+            dupRows.sort(function (x, y) { return (lvlRank[y.level] || 0) - (lvlRank[x.level] || 0); });
+        }
+
         // KPI الحالات الحرجة
         var kpiEl = document.getElementById('smapKpiAlerts');
         if (kpiEl) {
@@ -100,32 +114,48 @@
         // شريط التنبيه بزاوية الخريطة — قابل للإغلاق؛ الإغلاق يخفي العرض فقط (§11)
         var bar = document.getElementById('smkAlertBar');
         var badge = alertBadgeEl();
+        var totalAlerts = alertsCache.length + dupRows.length;
         if (bar) {
-            if (!alertsCache.length) {
+            if (!totalAlerts) {
                 bar.style.display = 'none'; bar.className = 'smk-alertbar';
                 if (badge) badge.style.display = 'none';
             } else if (alertBarClosed) {
                 // الموظف أغلق العرض — تبقى شارة الزاوية الصغيرة والمؤشرات بحالتها
                 bar.style.display = 'none';
                 if (badge) {
-                    badge.textContent = (over.length ? '🔴 ' : '🟠 ') + alertsCache.length;
+                    badge.textContent = (over.length ? '🔴 ' : (dupRows.length ? '⚠️ ' : '🟠 ')) + totalAlerts;
                     badge.className = 'smk-alertbadge' + (over.length ? '' : ' warn');
                     badge.style.display = 'inline-flex';
                 }
             } else {
                 if (badge) badge.style.display = 'none';
                 var shown = alertsCache.slice(0, 3); // لا إزعاج بعشرات الحالات
-                var html = '<div class="smk-alertbar-head ' + (over.length ? 'crit' : 'warn') + '">'
-                    + (over.length ? '🔴 <b>' + over.length + '</b> ' + (over.length === 1 ? 'حالة تحتاج' : 'حالات تحتاج') + ' تدخلًا' : '🟠 ' + near.length + ' قريبة من تجاوز الحد')
-                    + (alertsCache.length > 3 ? '<span class="more">+' + (alertsCache.length - 3) + '</span>' : '')
-                    + '<button type="button" class="smk-alertbar-close" title="إغلاق العرض — تبقى الحالة في المؤشرات" onclick="SmartMap.dismissAlerts()"><i class="fas fa-xmark"></i></button></div>';
-                html += shown.map(function (a) {
-                    return '<button type="button" class="smk-alert-row ' + a.level + '" onclick="SmartMap.focusOn(\'incident\',\'' + esc(a.number) + '\')">'
-                        + '<span class="u"><i class="fas fa-truck-medical"></i> ' + esc(a.unit) + '</span>'
-                        + '<span class="s">' + ALERT_STAGE_TXT[a.stage] + '</span>'
-                        + '<span class="t" data-alert-timer="' + esc(a.number) + '|' + esc(a.unit) + '">' + fmtTimer(a.elapsed) + '</span>'
-                        + '</button>';
-                }).join('');
+                var html = '';
+                if (alertsCache.length) {
+                    html += '<div class="smk-alertbar-head ' + (over.length ? 'crit' : 'warn') + '">'
+                        + (over.length ? '🔴 <b>' + over.length + '</b> ' + (over.length === 1 ? 'حالة تحتاج' : 'حالات تحتاج') + ' تدخلًا' : '🟠 ' + near.length + ' قريبة من تجاوز الحد')
+                        + (alertsCache.length > 3 ? '<span class="more">+' + (alertsCache.length - 3) + '</span>' : '')
+                        + '<button type="button" class="smk-alertbar-close" title="إغلاق العرض — تبقى الحالة في المؤشرات" onclick="SmartMap.dismissAlerts()"><i class="fas fa-xmark"></i></button></div>';
+                    html += shown.map(function (a) {
+                        return '<button type="button" class="smk-alert-row ' + a.level + '" onclick="SmartMap.focusOn(\'incident\',\'' + esc(a.number) + '\')">'
+                            + '<span class="u"><i class="fas fa-truck-medical"></i> ' + esc(a.unit) + '</span>'
+                            + '<span class="s">' + ALERT_STAGE_TXT[a.stage] + '</span>'
+                            + '<span class="t" data-alert-timer="' + esc(a.number) + '|' + esc(a.unit) + '">' + fmtTimer(a.elapsed) + '</span>'
+                            + '</button>';
+                    }).join('');
+                }
+                if (dupRows.length) {
+                    // رأس القسم يحمل زر الإغلاق عندما لا توجد تنبيهات تشغيلية فوقه
+                    html += '<div class="smk-alertbar-head dup">⚠️ <b>' + dupRows.length + '</b> ' + (dupRows.length === 1 ? 'بلاغ يحتمل' : 'بلاغات يحتمل') + ' أن تكون مكررة — تحتاج تحققًا في CAD'
+                        + (alertsCache.length ? '' : '<button type="button" class="smk-alertbar-close" title="إغلاق العرض — تبقى الحالة في المؤشرات" onclick="SmartMap.dismissAlerts()"><i class="fas fa-xmark"></i></button>')
+                        + '</div>';
+                    html += dupRows.slice(0, 3).map(function (d) {
+                        return '<button type="button" class="smk-alert-row dup" onclick="SmartMap.focusOn(\'incident\',\'' + esc(d.number) + '\')">'
+                            + '<span class="u"><i class="fas fa-clone"></i> بلاغ ' + esc(d.number) + '</span>'
+                            + '<span class="s">' + (d.level === 'high' ? 'اشتباه قوي' : d.level === 'medium' ? 'اشتباه متوسط' : 'اشتباه أولي') + (d.count > 1 ? ' · ' + d.count + ' مرشحين' : '') + '</span>'
+                            + '</button>';
+                    }).join('');
+                }
                 bar.innerHTML = html;
                 bar.style.display = 'block';
                 bar.className = 'smk-alertbar ' + (over.length ? 'has-crit' : 'has-warn');
@@ -303,6 +333,9 @@
             streets: L.layerGroup(),
             heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 28, blur: 22, maxZoom: 16, minOpacity: 0.25 }) : null
         };
+        // اكتشاف احتمال التكرار (اعتماد المالك 2026-08-24 — ملحق note-18): طبقة
+        // خطوط الربط البصري بين البلاغ والمرشحين — عرض فقط فوق البيانات الحالية
+        layers.dupLinks = L.layerGroup().addTo(map);
         focusLines = L.layerGroup().addTo(map);
         markerIndex = { incidents: {}, teams: {}, centers: {} };
 
@@ -498,9 +531,11 @@
         incs.forEach(function (ic) {
             if (!hasCoords(ic)) return; // بلا إحداثيات ← لا موقع مختلق إطلاقًا
             var sev = ic.severity || 'yellow';
+            var hasDup = !!(ic.duplicates && ic.duplicates.length); // note-18: احتمال تكرار — شارة تحقق فوق العلامة
             var icon = L.divIcon({
                 className: 'smk-inc sev-' + sev,
-                html: '<span class="smk-inc-pin"><i class="fas fa-location-dot"></i></span>',
+                html: '<span class="smk-inc-pin"><i class="fas fa-location-dot"></i></span>'
+                    + (hasDup ? '<span class="smk-dup-dot" title="احتمال تكرار — يحتاج تحقق"><i class="fas fa-clone"></i></span>' : ''),
                 iconSize: [30, 38], iconAnchor: [15, 36]
             });
             var mk = L.marker([ic.lat, ic.lng], { icon: icon, zIndexOffset: 400 });
@@ -512,6 +547,25 @@
             markerIndex.incidents[String(ic.number)] = mk;
             pts.push([ic.lat, ic.lng]);
         });
+
+        // اكتشاف احتمال التكرار (ملحق note-18): خط ربط بصري متقطع بين البلاغ
+        // وكل مرشح ظاهر على الخريطة — مرشح بلا علامة ظاهرة (منتهٍ/بلا إحداثيات)
+        // يبقى موثقًا في بطاقة الأدلة ولا يُرسم له خط مختلق
+        if (layers.dupLinks) {
+            layers.dupLinks.clearLayers();
+            incs.forEach(function (ic) {
+                if (!hasCoords(ic) || !ic.duplicates || !ic.duplicates.length) return;
+                ic.duplicates.forEach(function (dup) {
+                    var candMk = markerIndex.incidents[String(dup.candidate.number)];
+                    if (!candMk) return;
+                    var ll = candMk.getLatLng();
+                    L.polyline([[ic.lat, ic.lng], [ll.lat, ll.lng]], {
+                        className: 'smk-dup-line', color: '#F59E0B', weight: 2,
+                        dashArray: '6 6', opacity: 0.8, interactive: false
+                    }).addTo(layers.dupLinks);
+                });
+            });
+        }
 
         if (pts.length && fitMode < 2) {
             if (pts.length === 1) map.setView(pts[0], 14);
@@ -791,6 +845,25 @@
                 + timersHtml
                 + '</div>';
         }).join('') || '<div class="smap-card-crew"><span class="u">لا فرق مسجلة بعد</span></div>';
+        // بطاقة أدلة احتمال التكرار (ملحق note-18): «احتمال تكرار — يحتاج تحقق»
+        // تنبيه فقط — Potential Duplicate ≠ Duplicate. لا «تمت المراجعة» ولا سجل،
+        // والقرار والإلغاء في CAD حصرًا. المرشح الملغى يظهر موسومًا «ملغى في CAD»
+        // وإلغاؤه ليس دليلًا بذاته. رقم المبلغ لا يُعرض — الدليل يقول «متطابق» فقط.
+        var dupHtml = '';
+        if (ic.duplicates && ic.duplicates.length) {
+            dupHtml = '<div class="smap-dup-box"><div class="smap-dup-title">⚠️ احتمال تكرار — يحتاج تحقق</div>'
+                + ic.duplicates.map(function (dup) {
+                    var lvl = { high: '🔴 اشتباه قوي', medium: '🟠 اشتباه متوسط', low: '🟡 اشتباه أولي' }[dup.level] || '🟡';
+                    var ev = (dup.evidence || []).map(function (e) { return '<span class="smap-dup-ev">' + esc(e.label) + '</span>'; }).join('');
+                    return '<div class="smap-dup-row">'
+                        + '<div class="smap-dup-head"><button type="button" class="smap-card-link" onclick="SmartMap.focusOn(\'incident\',\'' + esc(String(dup.candidate.number)) + '\')"><i class="fas fa-location-dot"></i> بلاغ ' + esc(dup.candidate.number) + '</button>'
+                        + '<span class="smap-dup-lvl">' + lvl + '</span>'
+                        + (dup.cancelledInCad ? '<span class="smap-dup-canc">ملغى في CAD</span>' : '') + '</div>'
+                        + '<div class="smap-dup-evs">' + ev + '</div>'
+                        + '</div>';
+                }).join('')
+                + '<div class="smap-dup-note">تنبيه آلي فقط — القرار والإلغاء داخل CAD حصرًا؛ المنصة لا تلغي ولا تدمج أي بلاغ.</div></div>';
+        }
         return '<div class="smap-card-head">'
             + '<span class="smap-card-title"><i class="fas fa-location-dot"></i> بلاغ ' + esc(ic.number) + '</span>'
             + '<span class="smap-card-sev s-' + sev + '">' + sevText(sev) + '</span></div>'
@@ -799,6 +872,7 @@
             + '<div class="smap-card-row"><i class="fas fa-map-pin"></i><span class="k">الموقع</span><span class="v">' + esc(loc) + '</span></div>'
             + '<div class="smap-card-row"><i class="fas fa-clock"></i><span class="k">الإنشاء</span><span class="v">' + esc(ic.cadCreatedAt || '—') + '</span></div>'
             + '<div class="smap-card-crews">' + crewsHtml + '</div>'
+            + dupHtml
             + '<div class="smap-card-times">'
             + '<div class="smap-card-time"><div class="tv">' + ((ic.bestArrivalMin !== null && ic.bestArrivalMin !== undefined) ? ic.bestArrivalMin + ' د' : '—') + '</div><div class="tl">زمن الوصول</div></div>'
             + '<div class="smap-card-time"><div class="tv">' + ((ic.bestMubasharaMin !== null && ic.bestMubasharaMin !== undefined) ? ic.bestMubasharaMin + ' د' : '—') + '</div><div class="tl">زمن المباشرة</div></div>'

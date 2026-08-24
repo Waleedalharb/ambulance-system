@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-24.b — No Journey = No Participation: اقتراحات خطة الاستجابة ليست مشاركة + توحيد قاعدة الاحتساب سيرفريًا';
+  const OVERLAY_BUILD = '2026-08-24.c — اكتشاف احتمال تكرار البلاغات: التقاط phoneNumber/notes من event-dispatched/detail (تنبيه فقط — القرار في CAD)';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -250,8 +250,8 @@
       window.postMessage({ source: 'south-cad-overlay', kind, reqId, payload }, '*');
     });
   }
-  async function apiPost(number, code, type, crews, phases, createdAt, address, region, coords, status, source){
-    return sendToPlatform('cad-report', { number, code, type, createdAt: createdAt || null, address: address || null, region: region || null,
+  async function apiPost(number, code, type, crews, phases, createdAt, address, region, coords, status, source, extra){
+    const payload = { number, code, type, createdAt: createdAt || null, address: address || null, region: region || null,
       lat: coords ? coords.lat : null, lng: coords ? coords.lng : null,
       status: status || null, // الحالة النهائية إن ظهرت صراحة في CAD — غيابها لا يعني شيئًا
       source: source === 'cad-auto' ? 'cad-auto' : undefined, // وسم الاكتشاف التلقائي (المرحلة A)
@@ -272,7 +272,12 @@
         if (typeof c === 'object' && c && c.cadUnitId != null) o.cadUnitId = c.cadUnitId;
         if (typeof c === 'object' && c && c.cadRunUnitId != null) o.cadRunUnitId = c.cadRunUnitId;
         return o;
-      }) });
+      }) };
+    // اكتشاف احتمال التكرار (ملحق note-18): رقم المبلغ/الوصف الملتقطان من
+    // event-dispatched/detail يُرسلان خامًا — للمطابقة السيرفرية فقط، بلا عرض
+    if(extra && extra.callerNumber) payload.callerNumber = extra.callerNumber;
+    if(extra && extra.description) payload.description = extra.description;
+    return sendToPlatform('cad-report', payload);
   }
   /* الإحصائية عبر نفس القناة (GET بلا مفتاح — مقصورة سيرفريًا على نافذة المنصة؛
      عند 401 يظهر التنبيه الصادق المعتمد) */
@@ -513,6 +518,23 @@
       if(lid){ geo.locOfIncident[num] = String(lid); lifeLog('location_id', { incident: num, locationId: String(lid) }); }
     }catch(e){}
   }
+  /* اكتشاف احتمال التكرار (اعتماد المالك 2026-08-24 — ملحق note-18): التقاط رقم
+     المبلغ ووصف البلاغ من حمولة event-dispatched/detail نفسها التي يقرأها الـOverlay
+     أصلًا (تحقق خطوة صفر من لقطات حقيقية: phoneNumber/phoneNumberSecondary/notes[]
+     موجودة في هذا المسار). لا طلب إضافي إطلاقًا — التقاط من نفس الاستجابة.
+     رقم المبلغ بيانات شخصية: يُرسل خامًا للمطابقة السيرفرية فقط ولا يُعرض إطلاقًا. */
+  function callerInfoFromDetail(d){
+    if(!d) return null;
+    const phone = (d.phoneNumber && String(d.phoneNumber).trim()) ||
+                  (d.phoneNumberSecondary && String(d.phoneNumberSecondary).trim()) || null;
+    // ملاحظات CAD النصية = وصف البلاغ المتاح — تُلتقط كما هي (لا استنتاج ولا اختلاق)
+    const descs = (Array.isArray(d.notes) ? d.notes : [])
+      .map(n => n && n.description ? String(n.description).trim() : '')
+      .filter(Boolean);
+    const description = descs.length ? descs.join(' — ').slice(0, 480) : null;
+    if(!phone && !description) return null;
+    return { callerNumber: phone, description };
+  }
   function queueAuto(num, proqa, isUpdate){
     if(auto.queue.some(q => q.num === num)) return;
     auto.queue.push({ num, proqa: proqa || null, isUpdate: !!isUpdate });
@@ -579,11 +601,13 @@
     let coords = coordsFor(num);
     if(!coords && !geo.locOfIncident[num]) await fetchEventLocId(num); // مرة واحدة — قناة الموقع المعتمدة
     if(!coords && geo.locOfIncident[num]) coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
-    const r = await apiPost(num, code, type, crews, null, createdAt, address, region, coords, null, 'cad-auto');
+    const callerInfo = callerInfoFromDetail(d); // note-18: التقاط من نفس الاستجابة — بلا طلب إضافي
+    const r = await apiPost(num, code, type, crews, null, createdAt, address, region, coords, null, 'cad-auto', callerInfo);
     if(r.data && r.data.success){
       setObsStatus('synced');
       auto.count++;
-      watchAdd(num, { code, type, crews, phases: {}, createdAt, address, region, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null });
+      watchAdd(num, { code, type, crews, phases: {}, createdAt, address, region, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null,
+        callerNumber: callerInfo ? callerInfo.callerNumber : null, description: callerInfo ? callerInfo.description : null });
       lifeLog('auto-register', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')), confirmed: !!d });
       showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>🚑 ' +
         crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>', 6000);
@@ -601,16 +625,22 @@
     if(!d) return;
     const crews = mergeCrewSources(w.crews, crewsFromDetail(d));
     if(!crews.length) return;
+    // note-18: معلومات المبلغ تُلتقط من نفس الاستجابة حتى عند ثبات الفرق — وصولها
+    // لأول مرة يستحق الإرسال بذاته (الخادم يستكملها فقط إن كانت غائبة)
+    const freshCaller = callerInfoFromDetail(d);
+    const callerIsNew = !!(freshCaller && ((freshCaller.callerNumber && !w.callerNumber) || (freshCaller.description && !w.description)));
     const sig = JSON.stringify(crews.map(c => c.team + (c.cadUrs || '') + (c.cadReached ? 'R' : '') + JSON.stringify(c.phases || {})).sort());
-    if(sig === w.autoSig) return; // لا جديد فعلي — لا إرسال
+    if(sig === w.autoSig && !callerIsNew) return; // لا جديد فعلي — لا إرسال
     const createdAt = w.createdAt || (d.createdDate ? fmtCadDateTime(d.createdDate) : null);
     const address = w.address || d.address || null;
     const region = w.region || d.zoneName || null;
+    const callerInfo = freshCaller || (w.callerNumber || w.description ? { callerNumber: w.callerNumber, description: w.description } : null);
     const r = await apiPost(num, w.code, w.type, crews, null, createdAt, address, region,
-      (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, null, 'cad-auto');
+      (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, null, 'cad-auto', callerInfo);
     if(r.data && r.data.success){
       setObsStatus('synced');
-      watchAdd(num, { code: w.code, type: w.type, crews, phases: w.phases, createdAt, address, region, lat: w.lat, lng: w.lng });
+      watchAdd(num, { code: w.code, type: w.type, crews, phases: w.phases, createdAt, address, region, lat: w.lat, lng: w.lng,
+        callerNumber: callerInfo ? callerInfo.callerNumber : null, description: callerInfo ? callerInfo.description : null });
       const ww = watch.list[num]; if(ww){ ww.lastDetailAt = now; ww.autoSig = sig; watchSave(); }
       lifeLog('auto-refresh', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')) });
     } else { setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status)); }
@@ -645,6 +675,22 @@
     }
     obs.failStreak = 0;
     ingestDetailUnits(num, d, 'observer');
+    // note-18: معلومات المبلغ (رقم/وصف) من نفس استجابة التفاصيل التي يقرأها
+    // الـObserver أصلًا — بلا طلب إضافي. وصولها لأول مرة يوسم اللقطة «متغيرة»
+    // (lastSig=null) فيرسلها watchTick في دورته القادمة — والخادم يستكملها فقط
+    if(d){
+      try{
+        const ci = callerInfoFromDetail(d);
+        const w0 = watch.list[num];
+        if(ci && w0 && ((ci.callerNumber && !w0.callerNumber) || (ci.description && !w0.description))){
+          if(ci.callerNumber && !w0.callerNumber) w0.callerNumber = ci.callerNumber;
+          if(ci.description && !w0.description) w0.description = ci.description;
+          w0.lastSig = null;
+          watchSave();
+          lifeLog('caller-info', { incident: num, hasPhone: !!ci.callerNumber, hasDesc: !!ci.description });
+        }
+      }catch(e){}
+    }
     const nowUnits = (unitsByIncident[num] && unitsByIncident[num].units) || [];
     const fpMap = obs.fp[num] = obs.fp[num] || {};
     for(const u of nowUnits){
@@ -1015,6 +1061,8 @@
       region: sent.region || prev.region || null,
       lat: sent.lat != null ? sent.lat : (prev.lat != null ? prev.lat : null),
       lng: sent.lng != null ? sent.lng : (prev.lng != null ? prev.lng : null),
+      callerNumber: sent.callerNumber || prev.callerNumber || null, // note-18: معلومات المبلغ تبقى عبر الإثراءات
+      description: sent.description || prev.description || null,
       lastSig: snapSig(sent),
       fetchTries: prev.fetchTries || 0,
       lastFetch: prev.lastFetch || 0,
@@ -1047,7 +1095,8 @@
       if(lt.absentStreak >= LIST_ABSENT_CONFIRM && goneLong){
         if(w.crews && w.crews.length){
           await apiPost(num, w.code, w.type, w.crews, w.phases, w.createdAt, w.address, w.region,
-            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled');
+            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled', undefined,
+            (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
         }
         delete watch.list[num]; watch.order = watch.order.filter(x => x !== num);
         delete listTrack[num]; watchSave();
@@ -1081,10 +1130,12 @@
       const gotNewCoords = !!(coords && (w.lat !== coords.lat || w.lng !== coords.lng));
       setObsStatus('updating', 'بلاغ ' + num);
       const r = await apiPost(num, w.code, w.type, effCrews, snap.phases, snap.createdAt, snap.address, snap.region,
-        coords || (snap.lat != null && snap.lng != null ? { lat: snap.lat, lng: snap.lng } : null));
+        coords || (snap.lat != null && snap.lng != null ? { lat: snap.lat, lng: snap.lng } : null), null, undefined,
+        (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
       if(r.data && r.data.success){
         setObsStatus('synced');
-        watchAdd(num, { code: w.code, type: w.type, crews: effCrews, phases: snap.phases, createdAt: snap.createdAt, address: snap.address, region: snap.region, lat: snap.lat, lng: snap.lng });
+        watchAdd(num, { code: w.code, type: w.type, crews: effCrews, phases: snap.phases, createdAt: snap.createdAt, address: snap.address, region: snap.region, lat: snap.lat, lng: snap.lng,
+          callerNumber: w.callerNumber || null, description: w.description || null });
         lifeLog('enrich', { incident: num, newCoords: gotNewCoords ? coords : null });
         if(gotNewCoords) showToast('🌐 اكتمل موقع البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> <b>تلقائيًا</b> — ظهر على خريطة منصة الجنوب<br><b style="direction:ltr;display:inline-block">' + coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6) + '</b>', 9000);
       } else {

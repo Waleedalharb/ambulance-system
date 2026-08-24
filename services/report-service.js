@@ -21,6 +21,12 @@
 // التوقيت، والحمولات القديمة الـnaive تُفسَّر جداريةَ الرياض كما في كل المنصة.
 const PositioningService = require('./positioning-service');
 
+// اكتشاف احتمال تكرار البلاغات (اعتماد المالك 2026-08-24 — ملحق note-18):
+// محرك نقي يشتق التنبيهات عند القراءة من incident_registry الخام — لا تخزين
+// ولا جداول موازية، ورقم المبلغ يُستخدم سيرفريًا للمطابقة فقط ولا يخرج أبدًا
+// في أي استجابة (الأدلة المعروضة مقنّعة: «متطابق» بلا الرقم نفسه).
+const DuplicateDetection = require('./duplicate-detection');
+
 class ReportService {
     /**
      * @param {Object} deps
@@ -279,7 +285,7 @@ class ReportService {
      *  ⑥ موقع البلاغ (عنوان خام + منطقة + حي مشتق) يُحفظ مع السجل — يُستكمل إن وصل متأخرًا
      * يبث DispatchLogCreated لكل فرقة مضافة ← نفس قناة new_report الحية.
      */
-    async createIncidentEntries({ shiftId, number, code, type, crews, createdAt = null, address = null, region = null, lat = null, lng = null, status = null, source = 'cad-oneclick' }, actor = null) {
+    async createIncidentEntries({ shiftId, number, code, type, crews, createdAt = null, address = null, region = null, lat = null, lng = null, status = null, source = 'cad-oneclick', callerNumber = null, description = null }, actor = null) {
         const loc = this._parseLocationParts(address);
         const district = loc.district;
         // إحداثيات CAD الأصلية فقط (اعتماد المالك 2026-08-20): تُقبل رقمًا ضمن النطاق الجغرافي
@@ -301,8 +307,8 @@ class ReportService {
             let cadTimeFilled = false;
             let incidentEnriched = false; // أي إثراء لاحق على بلاغ قائم (موقع/مراحل) — لبث التحديث الحي
             if (!incident) {
-                const id = await this.engine.storage.createIncident(shiftId, number, code, type, source, createdAt, address, region, district, loc.street, loc.city, cLat, cLng);
-                incident = { id, number, code: code || null, type: type || null, cad_created_at: createdAt || null, address, region, district, street: loc.street, city: loc.city, lat: cLat, lng: cLng };
+                const id = await this.engine.storage.createIncident(shiftId, number, code, type, source, createdAt, address, region, district, loc.street, loc.city, cLat, cLng, callerNumber, description);
+                incident = { id, number, code: code || null, type: type || null, cad_created_at: createdAt || null, address, region, district, street: loc.street, city: loc.city, lat: cLat, lng: cLng, caller_number: callerNumber || null, description: description || null };
                 incidentCreated = true;
             } else {
                 // النوع يُصنف مرة واحدة؛ نستكمل code/وقت الإنشاء/الموقع فقط إن كانت غائبة
@@ -314,6 +320,15 @@ class ReportService {
                     await this.engine.storage.updateIncidentCadCreatedAt(incident.id, createdAt);
                     incident.cad_created_at = createdAt;
                     cadTimeFilled = true;
+                }
+                // رقم المبلغ/الوصف (اعتماد المالك 2026-08-24 — ملحق note-18): يُستكملان
+                // إن وصلا متأخرين (بلاغ سُجّل من القائمة قبل فتح تفاصيله) — الموجود لا يُمس
+                if ((callerNumber && !incident.caller_number) || (description && !incident.description)) {
+                    await this.engine.storage.updateIncidentCallerInfo(incident.id,
+                        incident.caller_number ? null : callerNumber, incident.description ? null : description);
+                    if (callerNumber && !incident.caller_number) incident.caller_number = callerNumber;
+                    if (description && !incident.description) incident.description = description;
+                    incidentEnriched = true; // دليل اشتباه جديد محتمل — التنبيه يظهر فورًا عبر نفس القناة
                 }
                 if ((address && !incident.address) || (region && !incident.region) || (district && !incident.district) || (loc.street && !incident.street) || (loc.city && !incident.city) || (cLat !== null && incident.lat == null) || (cLng !== null && incident.lng == null)) {
                     await this.engine.storage.updateIncidentLocation(incident.id, incident.address ? null : address, incident.region ? null : region, incident.district ? null : district, incident.street ? null : loc.street, incident.city ? null : loc.city, incident.lat != null ? null : cLat, incident.lng != null ? null : cLng);
@@ -698,6 +713,28 @@ class ReportService {
         // «بلا موقع دقيق» قائمة تشغيلية (تتطلب اكتمال موقعها الآن) ← النشطة فقط (قرار 2026-08-22)
         const noLocationList = activeDetail.filter(d => d.lat === null || d.lng === null)
             .map(d => ({ number: d.number, district: d.district }));
+        // ═══ اكتشاف احتمال التكرار (اعتماد المالك 2026-08-24 — ملحق note-18) ═══
+        // اشتقاق صرف عند القراءة من سجل البلاغات الخام نفسه — يُحسب بعد اكتمال كل
+        // العدّادات ولا يلمسها إطلاقًا (total/byCrew/byType/الأزمنة لا تتغير)، ولا
+        // يُخزَّن شيء ولا تُنشأ جداول موازية. «احتمال تكرار — يحتاج تحقق» تنبيه
+        // فقط: القرار والإلغاء في CAD حصرًا، ولا سجل مراجعة هنا. رقم المبلغ
+        // يدخل المطابقة سيرفريًا ولا يُضمَّن في المخرجات إطلاقًا (أدلة مقنّعة).
+        const dupInput = incidents.map(ic => {
+            const tsCad = this._cadDateTimeTs(ic.cad_created_at);
+            const tsFallback = ic.created_at ? new Date(ic.created_at).getTime() : NaN;
+            return { number: ic.number, status: ic.status || 'active',
+                callerNumber: ic.caller_number || null, description: ic.description || null,
+                address: ic.address || null, type: ic.type || null, code: ic.code || null,
+                lat: ic.lat != null ? ic.lat : null, lng: ic.lng != null ? ic.lng : null,
+                createdTs: tsCad !== null ? tsCad : (isFinite(tsFallback) ? tsFallback : null) };
+        });
+        const dupByNumber = {};
+        for (const p of DuplicateDetection.findDuplicates(dupInput)) {
+            if (!dupByNumber[p.number]) dupByNumber[p.number] = [];
+            dupByNumber[p.number].push({ candidate: p.candidate, score: p.score, level: p.level,
+                evidence: p.evidence, cancelledInCad: p.cancelledInCad });
+        }
+        for (const d of detail) d.duplicates = dupByNumber[d.number] || [];
         return {
             total: incidents.length + manual.length, // ① بلاغات فريدة + يدوي — تاريخي شامل (المنتهي حدث فعلًا)
             incidentsCount: incidents.length,

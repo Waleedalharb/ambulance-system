@@ -2542,3 +2542,45 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
 .hist-zone-pop .r .k { color: #64748B; }
 .hist-zone-pop .r .v { font-weight: 700; }
 .hist-zone-pop .why { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #E2E8F0; font-size: .7rem; color: #991B1B; }
+
+/* ═══ اكتشاف احتمال تكرار البلاغات (اعتماد المالك 2026-08-24 — ملحق note-18) ═══
+   «احتمال تكرار — يحتاج تحقق» تنبيه فقط: لا دمج ولا إلغاء ولا سجل مراجعة —
+   القرار في CAD حصرًا. أنماط قسم التنبيه + شارة العلامة + خط الربط + بطاقة الأدلة */
+.smk-alertbar-head.dup { color: #F59E0B; }
+.smk-alert-row.dup { border-color: rgba(245, 158, 11, 0.35); }
+.smk-alert-row.dup .u i { color: #F59E0B; }
+.smk-alert-row.dup:hover { background: rgba(245, 158, 11, 0.14); }
+/* شارة «احتمال تكرار» فوق علامة البلاغ — فوق لون الحالة ولا تغيّره */
+.smk-dup-dot {
+    position: absolute; top: -6px; inset-inline-end: -6px; width: 16px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #F59E0B; color: #1A1005; border-radius: 50%;
+    font-size: 8px; border: 1.5px solid rgba(11, 22, 38, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); animation: smkDupPulse 2.2s ease-in-out infinite;
+}
+@keyframes smkDupPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+}
+.smk-dup-line { pointer-events: none; }
+/* بطاقة أدلة الاشتباه داخل بطاقة البلاغ */
+.smap-dup-box {
+    margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+    background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.smap-dup-title { font-size: 0.78rem; font-weight: 800; color: #F59E0B; margin-bottom: 6px; }
+.smap-dup-row { padding: 6px 0; border-top: 1px dashed rgba(245, 158, 11, 0.25); }
+.smap-dup-row:first-of-type { border-top: none; }
+.smap-dup-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.smap-dup-lvl { font-size: 0.72rem; font-weight: 700; color: #F1F5F9; }
+.smap-dup-canc {
+    font-size: 0.68rem; font-weight: 700; color: #94A3B8;
+    background: rgba(148, 163, 184, 0.15); border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 999px; padding: 1px 8px;
+}
+.smap-dup-evs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.smap-dup-ev {
+    font-size: 0.68rem; color: #FCD34D; background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 2px 7px;
+}
+.smap-dup-note { font-size: 0.66rem; color: #8A9BB0; margin-top: 7px; line-height: 1.6; }

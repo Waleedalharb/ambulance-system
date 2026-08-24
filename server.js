@@ -4714,7 +4714,7 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
     status: { required: false, type: 'string', maxLength: 20 }
 }), async (req, res) => {
     try {
-        const { number, code, type, crews, createdAt, address, region, lat, lng, status, source } = req.body;
+        const { number, code, type, crews, createdAt, address, region, lat, lng, status, source, callerNumber, description } = req.body;
         // وسم المصدر (قرار المالك 2026-08-23 — المرحلة A): cad-auto = اكتشاف تلقائي من
         // قائمة CAD، cad-oneclick = الزر اليدوي — القيمة غير المعروفة تعود للافتراضي بصدق
         const srcTag = source === 'cad-auto' ? 'cad-auto' : 'cad-oneclick';
@@ -4740,6 +4740,11 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
         const validGeo = isFinite(numLat) && isFinite(numLng) &&
             numLat >= -90 && numLat <= 90 && numLng >= -180 && numLng <= 180;
         const cleanLat = validGeo ? numLat : null, cleanLng = validGeo ? numLng : null;
+        // رقم المبلغ ووصف البلاغ (اعتماد المالك 2026-08-24 — ملحق note-18): خام CAD
+        // بعد تعقيم صارم — الرقم أرقام/+ فقط (بلا أحرف)، والوصف نص محدود الطول.
+        // بيانات شخصية: تُخزَّن للمطابقة السيرفرية فقط ولا تظهر في أي استجابة
+        const cleanCaller = callerNumber ? (String(callerNumber).replace(/[^\d+]/g, '').slice(0, 20) || null) : null;
+        const cleanDesc = description ? String(description).trim().slice(0, 500) : null;
         // طبقة تطبيع حالة الوحدة (قرار المالك 2026-08-22): القيم المعروفة من كود CAD
         // A=مقبولة B=ملغاة(aborted) C=ملغاة(cancelled) R=مرفوضة — قابلة للتمديد بإضافة
         // حرف هنا فقط. القيمة غير المعروفة تُهمَل (undefined) ← لا تخمين ولا تغيير سلوك
@@ -4773,7 +4778,8 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
             { shiftId, number: number.trim(), code: code || null, type: type || null, crews: cleanCrews,
               createdAt: createdAt ? String(createdAt).trim().slice(0, 40) : null,
               address: cleanAddress, region: cleanRegion, lat: cleanLat, lng: cleanLng,
-              status: status || null, source: srcTag }, req.user);
+              status: status || null, source: srcTag,
+              callerNumber: cleanCaller, description: cleanDesc }, req.user);
 
         await addAuditLogEntry(result.created ? 'cad_report_created' : 'cad_report_crew_added',
             'بلاغ CAD ' + number.trim() + (result.created ? ' (جديد)' : ' (إلحاق فرقة)') +
