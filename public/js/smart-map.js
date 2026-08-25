@@ -40,14 +40,13 @@
     }
 
     // ============================================================
-    // نظام التنبيه التشغيلي (قرار المالك 2026-08-21)
-    // مصدر القرار: js/alert-rules.js (موديول نقي مختبَر برمجيًا) —
-    // لا تنبيه ولا مؤقت إلا بحدث CAD فعلي (التحرك/البحث/العلاج)
-    // على بلاغ له وقت إنشاء. هذه الطبقة عرض فقط.
+    // نظام التنبيه التشغيلي (قرار المالك 2026-08-21 · إعادة البناء 2026-08-25)
+    // مصدر القرار: js/alert-rules.js (موديول نقي مختبَر برمجيًا) — محرك
+    // الأزمنة الموحد: 4 مراحل مستقلة (وصول/مباشرة/موقع/منشأة) + تصنيف
+    // A/B/C/D/E من proQACode. لا تنبيه ولا مؤقت إلا بحدث CAD فعلي.
+    // هذه الطبقة عرض فقط.
     // ============================================================
     var AR = (typeof AlertRules !== 'undefined') ? AlertRules : null;
-    var ALERT_LIMITS = AR ? AR.LIMITS : { arrival: 10, mubashara: 12, onscene: 15 };
-    var ALERT_STAGE_TXT = AR ? AR.STAGE_TXT : { arrival: 'تأخر وصول', mubashara: 'تأخر مباشرة', onscene: 'بقاء متجاوز للحد' };
     var alertsCache = [];
     var cardTimers = [];        // مؤقتات البطاقة المفتوحة {id, startMin, limit}
     var tickerOn = false;
@@ -61,7 +60,7 @@
         return (neg ? '-' : '') + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
     }
     // بوابة أهلية التنبيه الصارمة: حدث «التحرك» الفعلي من CAD — لا مجرد ارتباط بالبلاغ
-    function crewAlertable(c) { return AR ? AR.crewStage(c.phases) !== null : false; }
+    function crewAlertable(c) { return AR ? AR.hasMovement(c.phases) : false; }
 
     // حساب التنبيهات — القرار كله في AlertRules (مختبَر في scripts/alert-rules-test.js)
     function computeAlerts() {
@@ -137,10 +136,18 @@
                         + (alertsCache.length > 3 ? '<span class="more">+' + (alertsCache.length - 3) + '</span>' : '')
                         + '<button type="button" class="smk-alertbar-close" title="إغلاق العرض — تبقى الحالة في المؤشرات" onclick="SmartMap.dismissAlerts()"><i class="fas fa-xmark"></i></button></div>';
                     html += shown.map(function (a) {
+                        // §9/§10 (اعتماد 2026-08-25): سبب التنبيه كاملًا — المرحلة + التصنيف
+                        // (🚨 Echo — مهدد للحياة) + الهدف + الفعلي + التجاوز. لا تنبيه عام بلا سبب.
+                        var clsTxt = a.classification
+                            ? (a.classification.critical ? '🚨 Echo — مهدد للحياة' : a.classification.name + ' — ' + a.classification.label)
+                            : 'بلا تصنيف CAD';
+                        var key = esc(a.number) + '|' + esc(a.unit);
                         return '<button type="button" class="smk-alert-row ' + a.level + '" onclick="SmartMap.focusOn(\'incident\',\'' + esc(a.number) + '\')">'
                             + '<span class="u"><i class="fas fa-truck-medical"></i> ' + esc(a.unit) + '</span>'
-                            + '<span class="s">' + ALERT_STAGE_TXT[a.stage] + '</span>'
-                            + '<span class="t" data-alert-timer="' + esc(a.number) + '|' + esc(a.unit) + '">' + fmtTimer(a.elapsed) + '</span>'
+                            + '<span class="s">' + AR.STAGE_TXT[a.stage] + ' · <b>' + esc(clsTxt) + '</b></span>'
+                            + '<span class="t" data-alert-timer="' + key + '">' + fmtTimer(a.elapsed) + '</span>'
+                            + '<small class="smk-alert-sub" data-alert-sub="' + key + '">الهدف ' + a.target + ' د'
+                            + (a.level === 'over' ? ' · التجاوز +' + fmtTimer(a.overdue) : '') + '</small>'
                             + '</button>';
                     }).join('');
                 }
@@ -216,21 +223,19 @@
                 if (over) ov.textContent = 'تجاوز +' + fmtTimer(elapsed - ct.limit);
             }
         }
-        // نصوص شريط التنبيه
+        // نصوص شريط التنبيه (الفعلي + التجاوز) — بداية المرحلة من المحرك نفسه (startAt)
         var spans = document.querySelectorAll('[data-alert-timer]');
         for (var s = 0; s < spans.length; s++) {
             var parts = spans[s].getAttribute('data-alert-timer').split('|');
             for (var j = 0; j < alertsCache.length; j++) {
                 var a = alertsCache[j];
                 if (a.number !== parts[0] || a.unit !== parts[1]) continue;
-                var ic = findIncident(a.number);
-                if (!ic) break;
-                var crew = (ic.crews || []).filter(function (c) { return c.unit === a.unit; })[0];
-                if (!crew) break;
-                var ph = crew.phases || {};
-                var startMin = a.stage === 'onscene' ? cadMin(ph['البحث']) : cadMin(ic.cadCreatedAt);
+                var startMin = cadMin(a.startAt);
                 if (startMin === null) break;
-                spans[s].textContent = fmtTimer(cadDiff(startMin, now));
+                var live = cadDiff(startMin, now);
+                spans[s].textContent = fmtTimer(live);
+                var sub = document.querySelector('[data-alert-sub="' + parts[0] + '|' + parts[1] + '"]');
+                if (sub) sub.textContent = 'الهدف ' + a.target + ' د' + (live > a.target ? ' · التجاوز +' + fmtTimer(live - a.target) : '');
                 break;
             }
         }
@@ -249,9 +254,8 @@
         return 'بانتظار قرار التكميل';
     }
     // صف مؤقت مرحلة داخل بطاقة البلاغ: قيمة حية (أو مجمّدة للمرحلة المكتملة) + حد + شارة تجاوز
-    function timerRow(incNum, unit, stage, label, startMin, frozenMin) {
+    function timerRow(incNum, unit, stage, label, startMin, frozenMin, limit) {
         var id = 'smkTm-' + String(incNum).replace(/[^\d]/g, '') + '-' + String(unit).replace(/[^\dA-Za-z\u0600-\u06FF]/g, '') + '-' + stage;
-        var limit = ALERT_LIMITS[stage];
         cardTimers.push({ id: id, startMin: startMin, limit: limit, frozenMin: frozenMin });
         var val = (frozenMin !== null && frozenMin !== undefined) ? frozenMin : cadDiff(startMin, nowMin());
         var cls = val > limit ? 'over' : (val >= limit * 0.8 ? 'near' : '');
@@ -826,16 +830,24 @@
             var times = [];
             if (c.respArrivalMin !== null && c.respArrivalMin !== undefined) times.push('وصول ' + c.respArrivalMin + ' د');
             if (c.respMubasharaMin !== null && c.respMubasharaMin !== undefined) times.push('مباشرة ' + c.respMubasharaMin + ' د');
-            // مؤقتات المراحل الحية — فقط لفرقة لها حدث تحرك CAD فعلي على بلاغ له وقت إنشاء
+            // مؤقتات المراحل الأربع المستقلة (اعتماد المالك 2026-08-25): وصول/مباشرة/موقع/منشأة —
+            // كل مرحلة تظهر عند توفر حدث بدايتها CAD وتُجمَّد عند حدث نهايتها، والحد من
+            // المحرك الموحد (الوصول 10 د · Echo 8 د) والتصنيف من proQACode — لا حساب هنا.
             var timersHtml = '';
             if (createdMin !== null && crewAlertable(c)) {
                 var ph = c.phases || {};
+                var cls4 = AR.classify(ic.code);
                 var searchMin = cadMin(ph['البحث']);
                 var treatMin = cadMin(ph['العلاج']);
+                var transMin = cadMin(ph['النقل']);
+                var hospMin = cadMin(ph['بدء التسليم']);
+                var hoMin = cadMin(ph['انتهاء التسليم']);
                 var rows = [];
-                rows.push(timerRow(ic.number, c.unit, 'arrival', 'زمن الوصول', createdMin, searchMin !== null ? cadDiff(createdMin, searchMin) : null));
-                if (searchMin !== null) rows.push(timerRow(ic.number, c.unit, 'mubashara', 'زمن المباشرة', createdMin, treatMin !== null ? cadDiff(createdMin, treatMin) : null));
-                if (treatMin !== null) rows.push(timerRow(ic.number, c.unit, 'onscene', 'البقاء في الموقع', searchMin, null));
+                var arrLbl = 'زمن الوصول' + (cls4 && cls4.critical ? ' 🚨 Echo' : '');
+                rows.push(timerRow(ic.number, c.unit, 'arrival', arrLbl, createdMin, searchMin !== null ? cadDiff(createdMin, searchMin) : null, AR.stageTarget('arrival', cls4)));
+                if (searchMin !== null) rows.push(timerRow(ic.number, c.unit, 'direct', 'زمن المباشرة', searchMin, treatMin !== null ? cadDiff(searchMin, treatMin) : null, AR.TARGETS.direct));
+                if (treatMin !== null) rows.push(timerRow(ic.number, c.unit, 'scene', 'البقاء في الموقع', treatMin, transMin !== null ? cadDiff(treatMin, transMin) : null, AR.TARGETS.scene));
+                if (hospMin !== null) rows.push(timerRow(ic.number, c.unit, 'facility', 'البقاء في المنشأة', hospMin, hoMin !== null ? cadDiff(hospMin, hoMin) : null, AR.TARGETS.facility));
                 timersHtml = '<div class="smk-timers">' + rows.join('') + '</div>';
             }
             return '<div class="smap-card-crew">'

@@ -205,21 +205,21 @@ async function waitReady(tries = 60) {
         const c11c = s.incidents.find(i => i.number === '1401007').crews[0];
         check('⑨ الدمج لا يكتب فوق وقت التحرك الموجود، ويستكمل الوصول فقط', c11c.phases['التحرك'] === '10:03:00 AM' && c11c.phases['الوصول'] === '10:20:00 AM', JSON.stringify(c11c.phases));
 
-        // ── ⑩ مؤشر زمن الاستجابة (تعريف المالك): من إنشاء البلاغ في CAD ← الوصول/المباشرة ──
+        // ── ⑩ مؤشر زمن الاستجابة (تعريف المالك): الوصول من إنشاء CAD ← البحث · المباشرة: البحث ← العلاج (اعتماد 2026-08-25) ──
         console.log('\n⑩ مؤشر زمن الاستجابة:');
         const rtA0 = (s0.responseTime && s0.responseTime.arrival) ? s0.responseTime.arrival.count : 0;
         const rtM0 = (s0.responseTime && s0.responseTime.mubashara) ? s0.responseTime.mubashara.count : 0;
-        // (أ) مناوبة تعبر منتصف الليل: إنشاء 11:58 PM ← وصول 12:05 AM = 7.0 د · مباشرة 12:07:30 = 9.5 د
+        // (أ) مناوبة تعبر منتصف الليل: إنشاء 11:58 PM ← وصول 12:05 AM = 7.0 د · مباشرة: البحث 12:05 ← العلاج 12:07:30 = 2.5 د
         await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401008', createdAt: '20/08/2026 11:58:00 PM', crews: [{ team: 'جنوب 12', phases: { 'قبول': '11:59:00 PM', 'التحرك': '11:59:30 PM', 'البحث': '12:05:00 AM', 'العلاج': '12:07:30 AM' } }] } });
         s = (await sum()).data;
         const c12 = s.incidents.find(i => i.number === '1401008').crews[0];
-        check('⑩ عبور منتصف الليل: الوصول=7.0 د والمباشرة=9.5 د (وليس سالبًا)', c12.respArrivalMin === 7 && c12.respMubasharaMin === 9.5, JSON.stringify({ a: c12.respArrivalMin, m: c12.respMubasharaMin }));
+        check('⑩ عبور منتصف الليل: الوصول=7.0 د والمباشرة=2.5 د من البحث (وليس سالبًا ولا من الإنشاء)', c12.respArrivalMin === 7 && c12.respMubasharaMin === 2.5, JSON.stringify({ a: c12.respArrivalMin, m: c12.respMubasharaMin }));
         check('⑩ وقت إنشاء البلاغ محفوظ على السجل', s.incidents.find(i => i.number === '1401008').cadCreatedAt === '20/08/2026 11:58:00 PM');
-        // (ب) نفس اليوم: إنشاء 5:00:06 ← وصول 5:09:06 = 9.0 د · مباشرة 5:12:06 = 12.0 د
+        // (ب) نفس اليوم: إنشاء 5:00:06 ← وصول 5:09:06 = 9.0 د · مباشرة: البحث 5:09:06 ← العلاج 5:12:06 = 3.0 د
         await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401009', createdAt: '20/08/2026 5:00:06 AM', crews: [{ team: 'جنوب 13', phases: { 'قبول': '5:00:30 AM', 'التحرك': '5:01:00 AM', 'البحث': '5:09:06 AM', 'العلاج': '5:12:06 AM' } }] } });
         s = (await sum()).data;
         const c13 = s.incidents.find(i => i.number === '1401009').crews[0];
-        check('⑩ نفس اليوم: الوصول=9.0 د والمباشرة=12.0 د', c13.respArrivalMin === 9 && c13.respMubasharaMin === 12, JSON.stringify({ a: c13.respArrivalMin, m: c13.respMubasharaMin }));
+        check('⑩ نفس اليوم: الوصول=9.0 د والمباشرة=3.0 د من البحث', c13.respArrivalMin === 9 && c13.respMubasharaMin === 3, JSON.stringify({ a: c13.respArrivalMin, m: c13.respMubasharaMin }));
         // (ج) وقت الإنشاء يصل متأخرًا ← إعادة حساب المشاركات السابقة (backfill)
         await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401010', crews: [{ team: 'جنوب 14', phases: { 'قبول': '6:00:20 AM', 'التحرك': '6:01:00 AM' } }] } });
         s = (await sum()).data;
@@ -235,12 +235,12 @@ async function waitReady(tries = 60) {
         const ic11 = s.incidents.find(i => i.number === '1401011');
         const c15 = ic11.crews.find(c => c.unit === 'جنوب 15'), c16 = ic11.crews.find(c => c.unit === 'جنوب 16');
         check('⑩ غير المتحركة: counted=false وبلا زمن استجابة', c15.counted === false && c15.respArrivalMin === null);
-        check('⑩ المتحركة الواصلة: الوصول=11 د والمباشرة=14 د', c16.counted === true && c16.respArrivalMin === 11 && c16.respMubasharaMin === 14);
+        check('⑩ المتحركة الواصلة: الوصول=11 د والمباشرة=3 د (البحث 7:11 ← العلاج 7:14)', c16.counted === true && c16.respArrivalMin === 11 && c16.respMubasharaMin === 3);
         // مؤشر القطاع: +4 بلاغات للوصول (1401008/9/10/11) و+3 للمباشرة (1401010 بلا مباشرة)
         const rt = s.responseTime;
         check('⑩ مؤشر القطاع: +4 بلاغات للوصول و+3 للمباشرة (تعدد الفرق لا يكرر)', rt && rt.arrival.count === rtA0 + 4 && rt.mubashara.count === rtM0 + 3, JSON.stringify(rt && { a: rt.arrival.count, m: rt.mubashara.count }));
         if (rtA0 === 0 && rtM0 === 0) {
-            check('⑩ المتوسطات: الوصول 8.8 د · المباشرة 11.8 د', rt.arrival.avg === 8.8 && rt.mubashara.avg === 11.8, JSON.stringify({ a: rt.arrival.avg, m: rt.mubashara.avg }));
+            check('⑩ المتوسطات: الوصول 8.8 د · المباشرة 2.8 د (2.5+3+3)/3 بالتعريف الجديد', rt.arrival.avg === 8.8 && rt.mubashara.avg === 2.8, JSON.stringify({ a: rt.arrival.avg, m: rt.mubashara.avg }));
         }
 
         // ── ⑪ «آخر بلاغ» بوقت الإنشاء الفعلي: إدخال متأخر لا يسرق اللقب ──

@@ -1,18 +1,37 @@
 /**
- * ═══ قواعد التنبيه التشغيلي — alert-rules.js ═══
- * (قرار المالك 2026-08-21): كل تنبيه/مؤقت في الخريطة يجب أن يرتبط بحدث CAD فعلي،
- * لا بمجرد ارتباط الفرقة بالبلاغ.
+ * ═══ محرك الأزمنة التشغيلية — alert-rules.js ═══
+ * (اعتماد المالك 2026-08-25 — إعادة بناء تنبيهات الخريطة حسب مراحل البلاغ وتصنيفه)
  *
- * بوابة الأهلية الصارمة:
- *  • فرقة بلا «التحرك» (phases=null أو {} أو قبول فقط) ← غير مؤهلة: لا Timer ولا Alert.
- *  • تحركت وبلا «البحث»      ← مرحلة الوصول: المنقضي من إنشاء البلاغ (حد 10 د).
- *  • وصلت («البحث») وبلا «العلاج» ← مرحلة المباشرة: المنقضي من الإنشاء (حد 12 د) — الوصول يتجمد.
- *  • باشرت («العلاج»)         ← مرحلة البقاء في الموقع: المنقضي من «البحث» (حد 15 د) — المباشرة تتجمد.
- *  • بلاغ بلا وقت إنشاء CAD   ← بلا مؤقت إطلاقًا (صدق البيانات).
- *  • عبور منتصف الليل +1440 — مطابق حرفيًا لمنطق ReportService (_cadMinutes/_cadDiffMin).
+ * التعريف التشغيلي المعتمد للرحلة (من CAD Journey الفعلية):
+ *   إنشاء البلاغ (createdDate) → قبول → التحرك → الاستجابة
+ *     → البحث (PATIENT_REACH = وصول الفرقة)
+ *     → العلاج (AT_PATIENT = مباشرة الحالة)
+ *     → النقل (TO_HOSPITAL)
+ *     → بدء التسليم (AT_HOSPITAL)
+ *     → انتهاء التسليم (HANDOVER)
  *
- * ملاحظة حدودية: قاعدة «الاحتساب» في محرك التوزيع (isCountedParticipation) تبقى كما هي —
- * هذه القواعد خاصة بطبقة التنبيه/المؤقتات فقط، وأشد: لا تنبيه بلا حدث تحرك فعلي.
+ * أربع مراحل مستقلة تمامًا — كل مرحلة لها Start وEnd وTarget خاص:
+ *   ① arrival  : createdDate → البحث          — الهدف 10 د (Echo = 8 د)
+ *   ② direct   : البحث → العلاج                — الهدف 2 د  (لا تُحسب من الإنشاء إطلاقًا)
+ *   ③ scene    : العلاج → النقل/نهاية البلاغ   — الهدف 10 د
+ *   ④ facility : بدء التسليم → انتهاء التسليم  — الهدف 10 د
+ *
+ * قاعدة الحد (اعتماد المالك): التنبيه عند التجاوز الفعلي فقط —
+ *   10:00 = لا تأخير · 10:01 = تأخير. ومستوى «قريب» (≥80%) مؤشر منفصل وليس تأخيرًا.
+ *
+ * المؤقت ينتقل مع المرحلة ولا تعمل مؤقتان معًا: عند تسجيل حدث نهاية المرحلة
+ * يتوقف مؤقتها تمامًا ولا يستمر في إصدار تنبيهات (لا تنبيهات وهمية).
+ *
+ * تصنيف البلاغ (A/B/C/D/E) مصدره الوحيد: حرف proQACode القادم من CAD —
+ * لا استنتاج من نوع البلاغ أو اسمه أو الرقم الأول. Parser مركزي واحد هنا
+ * تستخدمه الخريطة والتنبيهات وأي مؤشر — لا استخراج موزعًا في الملفات.
+ * (مُثبت من البيانات الفعلية: 140 كودًا في incident_registry كلها تطابق
+ *  ^\d{1,2}[A-E]\d{2}[A-Z]?$ — بما فيها Echo حقيقي: 9E01)
+ *
+ * بوابة الأهلية الصارمة (قرار المالك 2026-08-21 — ما زالت سارية):
+ *   فرقة بلا «التحرك» (phases=null أو {} أو قبول فقط) ← غير مؤهلة: لا Timer ولا Alert.
+ *   بلاغ بلا وقت إنشاء CAD ← بلا مؤقت إطلاقًا (صدق البيانات).
+ *   عبور منتصف الليل +1440 — مطابق حرفيًا لمنطق ReportService (_cadMinutes/_cadDiffMin).
  *
  * موديول نقي بلا DOM: يعمل في المتصفح (window.AlertRules) وفي Node (module.exports)
  * حتى تُختبر القواعد نفسها برمجيًا (scripts/alert-rules-test.js).
@@ -24,8 +43,38 @@
 })(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
 
-    var LIMITS = { arrival: 10, mubashara: 12, onscene: 15 };
-    var STAGE_TXT = { arrival: 'تأخر وصول', mubashara: 'تأخر مباشرة', onscene: 'بقاء متجاوز للحد' };
+    /* ─── التصنيف التشغيلي (proQACode → حرف → تصنيف → سياسة زمنية) ─── */
+    var PRIORITY = {
+        A: { name: 'Alpha',   label: 'بلاغ بارد / غير إسعافي' },
+        B: { name: 'Bravo',   label: 'بلاغ متوسط' },
+        C: { name: 'Charlie', label: 'بلاغ عادي' },
+        D: { name: 'Delta',   label: 'بلاغ خطير' },
+        E: { name: 'Echo',    label: 'مهدد للحياة', critical: true }
+    };
+
+    /**
+     * Parser مركزي وحيد للتصنيف — يتحمل اختلاف شكل الكود المثبت في البيانات:
+     * رقم أو رقمان + حرف A–E + رقمان + لاحقة حرفية اختيارية (9E01 · 31D02 · 25D03V).
+     * يرجع {letter, name, label, critical} أو null إن لم يوجد كود صالح (بلا تخمين).
+     */
+    function classify(code) {
+        if (!code) return null;
+        var m = String(code).trim().match(/^\d{1,2}([A-E])\d{2}[A-Z]?$/i);
+        if (!m) return null;
+        var letter = m[1].toUpperCase();
+        var p = PRIORITY[letter];
+        return { letter: letter, name: p.name, label: p.label, critical: !!p.critical };
+    }
+
+    /* ─── الأهداف الزمنية المعتمدة (دقائق) ─── */
+    var TARGETS = { arrival: 10, arrivalEcho: 8, direct: 2, scene: 10, facility: 10 };
+    var STAGE_TXT = { arrival: 'تأخر وصول', direct: 'تأخر مباشرة', scene: 'تأخر في الموقع', facility: 'تأخر في المنشأة' };
+    var STAGE_LABEL = { arrival: 'زمن الوصول', direct: 'زمن المباشرة', scene: 'البقاء في الموقع', facility: 'البقاء في المنشأة' };
+    /* مفتاح المرحلة في phases الذي يبدأ عنده كل مؤقت (البحث/العلاج/بدء التسليم) */
+    var STAGE_START_KEY = { direct: 'البحث', scene: 'العلاج', facility: 'بدء التسليم' };
+
+    function arrivalTarget(cls) { return (cls && cls.letter === 'E') ? TARGETS.arrivalEcho : TARGETS.arrival; }
+    function stageTarget(stage, cls) { return stage === 'arrival' ? arrivalTarget(cls) : TARGETS[stage]; }
 
     /** «7:11:38 AM» أو «20/08/2026 5:00:06 AM» → دقائق منذ منتصف الليل (null إن تعذر) */
     function cadMin(str) {
@@ -42,44 +91,61 @@
     }
     function cadDiff(fromMin, toMin) { if (toMin < fromMin) toMin += 1440; return toMin - fromMin; }
 
+    /** بوابة الأهلية: حدث «التحرك» الفعلي من CAD — لا مجرد ارتباط بالبلاغ */
+    function hasMovement(phases) { return !!(phases && phases['التحرك']); }
+
     /**
-     * مرحلة الفرقة من أحداث CAD الفعلية فقط.
-     * null = لم تتحرك (بلا تحرك موثق) ← غير مؤهلة لأي مؤقت/تنبيه.
+     * المرحلة النشطة للفرقة من أحداث CAD الفعلية فقط — مؤقت واحد في أي لحظة:
+     *  • بلا «التحرك»            ← null (غير مؤهلة إطلاقًا)
+     *  • «انتهاء التسليم» مسجل   ← null (اكتملت الرحلة — توقفت كل المؤقتات)
+     *  • «بدء التسليم»           ← facility (مؤقت المنشأة يعمل حتى HANDOVER)
+     *  • «النقل» بلا بدء تسليم   ← null (في الطريق للمنشأة — لا مؤقت معتمد بين الحدثين)
+     *  • «العلاج» بلا نقل        ← scene (حتى TO_HOSPITAL أو نهاية البلاغ)
+     *  • «البحث» بلا علاج        ← direct (حتى AT_PATIENT)
+     *  • تحركت بلا بحث           ← arrival (من createdDate حتى PATIENT_REACH)
      */
     function crewStage(phases) {
-        if (!phases || !phases['التحرك']) return null;
-        if (!phases['البحث']) return 'arrival';
-        if (!phases['العلاج']) return 'mubashara';
-        return 'onscene';
+        if (!hasMovement(phases)) return null;
+        if (phases['انتهاء التسليم']) return null;
+        if (phases['بدء التسليم']) return 'facility';
+        if (phases['النقل']) return null;
+        if (phases['العلاج']) return 'scene';
+        if (phases['البحث']) return 'direct';
+        return 'arrival';
     }
 
     /**
-     * مؤقت الفرقة الحالي على بلاغ: {stage, elapsed, limit, level} أو null (غير مؤهلة / بلا وقت إنشاء).
-     * level: 'over' تجاوز الحد · 'near' ≥80% منه · 'ok' ضمنه.
+     * مؤقت الفرقة الحالي على بلاغ:
+     * {stage, classification, target, startAt, elapsed, overdue, level} أو null (غير مؤهلة / بلا وقت إنشاء).
+     * level: 'over' تجاوز الهدف فعليًا (> target فقط — المساواة ليست تأخيرًا) ·
+     *        'near' ≥80% من الهدف (مؤشر منفصل — ليس تأخيرًا) · 'ok' ضمنه.
      */
-    function crewTimer(phases, cadCreatedAt, nowMinutes) {
+    function crewTimer(phases, cadCreatedAt, nowMinutes, cls) {
         var createdMin = cadMin(cadCreatedAt);
         if (createdMin === null) return null;
         var stage = crewStage(phases);
         if (!stage) return null;
-        var startMin;
-        if (stage === 'onscene') {
-            startMin = cadMin(phases['البحث']);
-            if (startMin === null) return null;
+        var startAt, startMin;
+        if (stage === 'arrival') {
+            startAt = cadCreatedAt; startMin = createdMin;
         } else {
-            startMin = createdMin;
+            startAt = phases[STAGE_START_KEY[stage]];
+            startMin = cadMin(startAt);
+            if (startMin === null) return null;
         }
         var elapsed = cadDiff(startMin, nowMinutes);
-        var limit = LIMITS[stage];
-        var level = elapsed > limit ? 'over' : (elapsed >= limit * 0.8 ? 'near' : 'ok');
-        return { stage: stage, elapsed: elapsed, limit: limit, level: level };
+        var target = stageTarget(stage, cls || null);
+        var level = elapsed > target ? 'over' : (elapsed >= target * 0.8 ? 'near' : 'ok');
+        return {
+            stage: stage, classification: cls || null, target: target, startAt: startAt,
+            elapsed: elapsed, overdue: elapsed > target ? elapsed - target : 0, level: level
+        };
     }
 
     /**
      * حالة دورة حياة البلاغ (قرار المالك 2026-08-22): «النهائي يخرج فورًا من التشغيل».
-     * القاعدة: NULL/غير المعروف/'active' ← نشط (السجلات القديمة والبلاغات الجارية)،
-     * وأي حالة نهائية معتمدة ('closed'/'cancelled' — قابلة للتمديد) ← نهائي.
-     * البلاغ النهائي: لا تنبيه ولا مؤقت إطلاقًا — يبقى في السجل التاريخي فقط.
+     * البلاغ النهائي: لا تنبيه ولا مؤقت إطلاقًا — وهو أيضًا حدث نهاية مرحلة الموقع
+     * عند غياب النقل (رفض نقل / إنهاء حالة): لا يستمر أي مؤقت بعد انتهاء البلاغ.
      */
     var FINAL_STATUSES = { closed: true, cancelled: true };
     function isFinal(status) {
@@ -89,9 +155,9 @@
 
     /**
      * حساب تنبيهات مناوبة من ملخص المحرك: لكل (بلاغ × فرقة مؤهلة) مدخل واحد كحد أقصى.
-     * الفرقة الملغاة/التي لم تتحرك لا تنتج شيئًا — والبلاغ بلا وقت إنشاء يُستثنى بصدق.
-     * والبلاغ النهائي (مغلق/ملغى) يخرج كاملًا من التنبيهات فورًا — التنبيه حالة تشغيلية
-     * حالية، لا سجل تاريخي (قرار المالك 2026-08-22).
+     * الفرقة الملغاة/التي لم تتحرك لا تنتج شيئًا — والبلاغ بلا وقت إنشاء يُستثنى بصدق،
+     * والبلاغ النهائي يخرج كاملًا من التنبيهات فورًا (قرار المالك 2026-08-22).
+     * كل مدخل يحمل سبب التنبيه كاملًا (§9): المرحلة + التصنيف + الهدف + الفعلي + التجاوز.
      * مرتبة: المتجاوز أولًا (بالأكثر تجاوزًا) ثم القريب.
      */
     function computeAlerts(summary, nowMinutes) {
@@ -99,23 +165,32 @@
         if (!summary || !summary.incidents) return out;
         summary.incidents.forEach(function (ic) {
             if (isFinal(ic.status)) return; // انتهى البلاغ ← تنتهي تنبيهاته ومؤقتاته معه فورًا
+            var cls = classify(ic.code);    // التصنيف من proQACode — مصدر موحد
             (ic.crews || []).forEach(function (c) {
                 if (c.withdrawn) return; // الفرقة المسحوبة من البلاغ: ينتهي كل ما يتعلق بها فورًا (§4)
-                var t = crewTimer(c.phases, ic.cadCreatedAt, nowMinutes);
+                var t = crewTimer(c.phases, ic.cadCreatedAt, nowMinutes, cls);
                 if (!t || t.level === 'ok') return;
-                out.push({ number: String(ic.number), unit: c.unit, stage: t.stage, elapsed: t.elapsed, limit: t.limit, level: t.level });
+                out.push({
+                    number: String(ic.number), unit: c.unit,
+                    stage: t.stage, classification: t.classification,
+                    target: t.target, startAt: t.startAt,
+                    elapsed: t.elapsed, overdue: t.overdue, level: t.level
+                });
             });
         });
         out.sort(function (a, b) {
             if (a.level !== b.level) return a.level === 'over' ? -1 : 1;
-            return (b.elapsed - b.limit) - (a.elapsed - a.limit);
+            return (b.elapsed - b.target) - (a.elapsed - a.target);
         });
         return out;
     }
 
     return {
-        LIMITS: LIMITS, STAGE_TXT: STAGE_TXT, FINAL_STATUSES: FINAL_STATUSES,
+        PRIORITY: PRIORITY, classify: classify,
+        TARGETS: TARGETS, STAGE_TXT: STAGE_TXT, STAGE_LABEL: STAGE_LABEL,
+        arrivalTarget: arrivalTarget, stageTarget: stageTarget,
+        FINAL_STATUSES: FINAL_STATUSES,
         cadMin: cadMin, cadDiff: cadDiff, isFinal: isFinal,
-        crewStage: crewStage, crewTimer: crewTimer, computeAlerts: computeAlerts
+        hasMovement: hasMovement, crewStage: crewStage, crewTimer: crewTimer, computeAlerts: computeAlerts
     };
 });

@@ -198,7 +198,10 @@ class ReportService {
         return isNaN(ts) ? null : ts;
     }
     /** زمن البلاغ حتى الوصول/المباشرة لهذه المشاركة (null إن تعذر — تبقى خارج المؤشر بصدق)
-     *  قاموس CAD المحسوم (قرار المالك 2026-08-20): «البحث» = وصول الفرقة للموقع · «العلاج» = مباشرة الحالة */
+     *  قاموس CAD المحسوم (قرار المالك 2026-08-20): «البحث» = وصول الفرقة للموقع · «العلاج» = مباشرة الحالة
+     *  (اعتماد المالك 2026-08-25 — توحيد مع محرك الأزمنة): المباشرة = PATIENT_REACH → AT_PATIENT
+     *  (البحث → العلاج) وليست من إنشاء البلاغ. يطبق على الحسابات الجديدة فقط —
+     *  لا إعادة حساب ولا تعديل للسجلات التاريخية المحفوظة بأثر رجعي. */
     _responseFor(phases, cadCreatedAt) {
         const createdMin = this._cadMinutes(cadCreatedAt);
         if (createdMin === null || !phases) return { arrival: null, mubashara: null };
@@ -206,7 +209,7 @@ class ReportService {
         const mub = phases['العلاج'] ? this._cadMinutes(phases['العلاج']) : null;
         return {
             arrival: arr === null ? null : this._cadDiffMin(createdMin, arr),
-            mubashara: mub === null ? null : this._cadDiffMin(createdMin, mub)
+            mubashara: (arr === null || mub === null) ? null : this._cadDiffMin(arr, mub)
         };
     }
     /** إعادة حساب زمني الاستجابة لكل مشاركات بلاغ عند وصول وقت إنشائه متأخرًا (لا قيمة تُفقد) */
