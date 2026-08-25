@@ -367,8 +367,21 @@ class ReportService {
             // إن وصل وقت إنشاء البلاغ متأخرًا: أعد حساب أزمنة استجابة المشاركات السابقة
             if (cadTimeFilled) await this._recomputeIncidentResponses(effShiftId, number, incident.cad_created_at);
 
-            const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [];
+            const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [], planUnitsIgnored = [];
             for (const c of crews) {
+                // دفاع مصدر الحقيقة (اعتماد المالك 2026-08-25): Available ≠ Assigned
+                // ≠ Responding ≠ Positioning ≠ Participating — لقطة CAD صريحة (وحدة
+                // بهوية CAD أو phasesSource=cad-detail) بلا أي وقت رحلة ولا cadUrs
+                // ولا cadReached = وحدة «خطة استجابة» مقترحة ظهرت في units[] بهيكل
+                // journeys فارغ الأوقات (مثبت بالرصد الحي): لا تُنشئ مشاركة إطلاقًا
+                // ولا تُعدّل سجلًا قائمًا بلقطة صفرية — تُوثَّق في planUnitsIgnored.
+                // المسار اليدوي/التكميل (بلا هوية CAD ولا phasesSource) لا يُمس إطلاقًا.
+                const hasCadIdentity = c.phasesSource === 'cad-detail' || Number.isInteger(c.cadRunUnitId) || Number.isInteger(c.cadUnitId);
+                const hasAnyPhaseTime = !!(c.phases && Object.keys(c.phases).length);
+                if (hasCadIdentity && !hasAnyPhaseTime && !c.cadUrs && c.cadReached !== true) {
+                    planUnitsIgnored.push(c.team);
+                    continue;
+                }
                 // المطابقة بهوية الوحدة الثابتة أولًا (قرار المالك 2026-08-23):
                 // eventId + cad_run_unit_id = نفس المشاركة مهما تغيّر المسمى —
                 // فرقة سُجّلت من CAD ثم ظهرت لاحقًا في التكميل تُربط بسجلها
@@ -462,7 +475,7 @@ class ReportService {
                     if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
                 } else skippedCrews.push(c.team);
             }
-            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, cancelAfterArrivalCrews, correctedCrews, linkedCrews, incidentEnriched, effShiftId };
+            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, cancelAfterArrivalCrews, correctedCrews, linkedCrews, planUnitsIgnored, incidentEnriched, effShiftId };
         });
 
         for (const team of result.addedCrews) {
@@ -495,7 +508,10 @@ class ReportService {
             correctedCrews: result.correctedCrews,
             // ربط بهوية الوحدة: مشاركة وُجدت بـcad_run_unit_id تحت مسمى مختلف (ظهور
             // الفرقة في التكميل لاحقًا) — نفس السجل حُدّث ولم يُنشأ ثانٍ
-            linkedCrews: result.linkedCrews
+            linkedCrews: result.linkedCrews,
+            // وحدات خطة الاستجابة المرفوضة (اعتماد المالك 2026-08-25): لقطات CAD
+            // صفرية الدليل لم تُنشئ مشاركة — موثقة بالاسم للتتبع ولا تدخل أي عدّاد
+            planUnitsIgnored: result.planUnitsIgnored
         };
     }
 

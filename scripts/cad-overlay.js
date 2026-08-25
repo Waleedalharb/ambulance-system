@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-24.c — اكتشاف احتمال تكرار البلاغات: التقاط phoneNumber/notes من event-dispatched/detail (تنبيه فقط — القرار في CAD)';
+  const OVERLAY_BUILD = '2026-08-25.a — Available ≠ Participating: وحدات خطة الاستجابة (هيكل Journey بلا أوقات ولا urs) لا تصبح مشاركة إطلاقًا — plan-unit-ignored';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -69,17 +69,24 @@
     // وحدات «تغيير خطة الاستجابة» اقتراحات CAD للمشغل (متاحة/جاهزة/قريبة) وليست
     // مرتبطة بالبلاغ — لا تُهضم إلا وحدة أنشأ لها CAD رحلة فعلية (Journey/Dispatch)
     const ignored = [];
+    const planIgnored = [];
     const list = d.units.map(u => {
       if(!u || !u.unitCode) return null;
       const jr = Array.isArray(u.journeys) ? u.journeys : [];
       if(!jr.length){ ignored.push(String(u.unitCode)); return null; }
+      // Available ≠ Participating (اعتماد المالك 2026-08-25): وحدة «تغيير خطة
+      // الاستجابة» تظهر في units[] بهيكل journeys كامل لكن كل أوقاته null ومعه
+      // unitRequestStatus=null (مثبت بالرصد الحي — لقطة جنوب 10-1) — هيكل بلا أي
+      // حدث رحلة فعلي = اقتراح CAD للمشغل وليس مشاركة: لا تُهضم إطلاقًا وتُوثَّق
+      const urs0 = u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null;
+      if(!urs0 && !jr.some(s => s && s.journeyStepTime)){ planIgnored.push(String(u.unitCode)); return null; }
       let lastTimed = null;
       jr.forEach(s => {
         if(s && s.journeyStepTime && (!lastTimed || (s.stepSeq || 0) > (lastTimed.stepSeq || 0))) lastTimed = s;
       });
       return {
         unit: String(u.unitCode),
-        urs: u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null,
+        urs: urs0,
         reached: jr.some(s => s && ARRIVAL_STEPS[s.journeyStepCode] && !!s.journeyStepTime),
         lastStep: lastTimed ? lastTimed.journeyStepCode : null,
         // Journey الوحدة الخاصة (قرار المالك 2026-08-23): أزمنة كل وحدة من
@@ -92,6 +99,9 @@
     // توثيق الاقتراحات المتجاهلة (قابل للتتبع — لا قرار صامت): وحدات ظهرت في
     // الحمولة بلا Journey = Available Units في نافذة الخطة، ليست مشاركة
     if(ignored.length) lifeLog('available-ignored', { incident: evId, units: ignored, via: via || 'passive' });
+    // توثيق وحدات الخطة المرفوضة (قابل للتتبع — لا قرار صامت): هيكل Journey بلا
+    // أي حدث موقوت ولا urs = اقتراح خطة استجابة، لا يدخل unitsByIncident إطلاقًا
+    if(planIgnored.length) lifeLog('plan-unit-ignored', { incident: evId, units: planIgnored, via: via || 'passive' });
     // قراءة ناجحة بلا أي وحدة مرتبطة = لقطة فارغة صادقة تُخزَّن (لا تجميد للقطة
     // قديمة): وحدة فقدت رحلتها أو غابت عن التفاصيل يوثّقها الـObserver «gone»
     const sig = JSON.stringify(list.map(x => x.unit + ':' + (x.urs || '') + ':' + (x.reached ? 1 : 0) + ':' + JSON.stringify(x.phases || {})).sort());
@@ -487,12 +497,17 @@
       // No Journey = No Participation (2026-08-24): اقتراحات خطة الاستجابة ليست فرقًا مرتبطة
       const jr = Array.isArray(u.journeys) ? u.journeys : [];
       if(!jr.length) continue;
+      // Available ≠ Participating (اعتماد المالك 2026-08-25): هيكل Journey كامل
+      // لكن كل أوقاته null وunitRequestStatus غائب = وحدة خطة مقترحة بلا أي حدث
+      // رحلة فعلي — لا تُبنى منها فرقة إطلاقًا (مثبت بالرصد الحي: جنوب 10-1)
+      const ursC = u.unitRequestStatus ? String(u.unitRequestStatus).toUpperCase() : null;
+      if(!ursC && !jr.some(s => s && s.journeyStepTime)) continue;
       const team = mapToSouthTeam(String(u.unitCode));
       if(!team || seenT.has(team)) continue;
       seenT.add(team);
       const c = { team, phases: phasesFromJourneys(jr), phasesSource: 'cad-detail',
                   cadReached: jr.some(s => s && ARRIVAL[s.journeyStepCode] && !!s.journeyStepTime) };
-      if(u.unitRequestStatus) c.cadUrs = String(u.unitRequestStatus).toUpperCase();
+      if(ursC) c.cadUrs = ursC;
       if(u.unitId != null) c.cadUnitId = u.unitId;         // هوية الوحدة الثابتة — لا اعتماد على ترتيب units[]
       if(u.runUnitId != null) c.cadRunUnitId = u.runUnitId;
       out.push(c);
@@ -587,14 +602,17 @@
       region = d.zoneName || null;
     }
     if(!crews.length){
-      // fallback صادق: الوحدات الجنوبية الظاهرة في lastJourneys للقائمة — هي نفسها
-      // دليل Journey (الوحدة ظاهرة بمرحلة رحلة) بلا تفاصيل أوقات (لا اختلاق حالة)
+      // fallback صادق: الوحدات الجنوبية الظاهرة في lastJourneys للقائمة — ظهورها
+      // بمرحلة رحلة هو نفسه دليل Journey فعلي (وحدات الخطة لا تصل lastJourneys —
+      // مثبت بالرصد 2026-08-25). بلا مرحلة رحلة = لا دليل = لا فرقة (قاعدة المشاركة).
       const it = auto.lastItems[num];
       const lj = it && Array.isArray(it.lastJourneys) ? it.lastJourneys : [];
       const seenT = new Set();
       for(const u of lj){
-        const team = mapToSouthTeam(String((u && u.unitCode) || ''));
-        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team, phases: {} }); }
+        if(!u || !u.journeyStepCode) continue; // لا دليل رحلة فعلي ← لا فرقة
+        const team = mapToSouthTeam(String(u.unitCode || ''));
+        // cadListStep: توثيق دليل القائمة مع الفرقة (قابل للتتبع — لا اختلاق أوقات)
+        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team, phases: {}, cadListStep: String(u.journeyStepCode) }); }
       }
     }
     if(!crews.length){ lifeLog('auto-skip-nonsouth', { incident: num }); return; } // ⓒ لا وحدة جنوبية

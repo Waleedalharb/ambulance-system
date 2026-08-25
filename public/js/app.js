@@ -2218,18 +2218,26 @@ async function renderAdvancedDistribution() {
                             ? ' <button onclick="cancelCrewRegistration(\'' + ic.number + '\', \'' + String(c.unit).replace(/'/g, "\\'") + '\', true)" title="استعادة المشاركة في العدّادات" style="background:none;border:none;color:#2E8B7A;cursor:pointer;font-size:.75rem;padding:0 2px;">↩ استعادة</button>'
                             : ' <button onclick="cancelCrewRegistration(\'' + ic.number + '\', \'' + String(c.unit).replace(/'/g, "\\'") + '\', false)" title="إلغاء تسجيل الفرقة من هذا البلاغ (تُستبعد من العدّادات وتبقى في السجل)" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:.8rem;padding:0 2px;">✕</button>')
                         : '';
-                    return '<span style="' + chipStyle + '"' + (cancelTitle ? ' title="' + cancelTitle + '"' : '') + '>🚑 ' + c.unit +
+                    // الاختيار الجماعي (اعتماد المالك 2026-08-25): checkbox على الشارة
+                    // في وضع التحديد فقط — الملغاة يدويًا أصلًا لا تحتاج إجراء فلا تُحدَّد
+                    var batchCbx = (window.CrewBatchCancel && !manualCancelled)
+                        ? window.CrewBatchCancel.chipCheckboxHtml(ic.number, c.unit) : '';
+                    return '<span style="' + chipStyle + '"' + (cancelTitle ? ' title="' + cancelTitle + '"' : '') + '>' + batchCbx + '🚑 ' + c.unit +
                         (manualCancelled ? ' <small style="color:#EF4444;">(أُلغيت يدويًا — مستبعدة)</small>' :
                           notCounted ? ' <small style="opacity:.9;">(مُسندة — لم تتحرك)</small>' : '') +
                         (times ? ' <small style="opacity:.75;">(' + times + ')</small>' : '') +
                         (respTxt ? ' <small style="color:#2E8B7A; font-weight:700;">' + respTxt + '</small>' : '') +
                         actionBtn + '</span>';
                 }).join('');
+                // شريط أدوات الاختيار الجماعي لبطاقة البلاغ (اعتماد المالك 2026-08-25) —
+                // فارغ بلا صلاحية ops.dispatch أو خارج وضع التحديد (زر ☑ تحديد يبقى)
+                var batchControls = window.CrewBatchCancel ? window.CrewBatchCancel.incidentControlsHtml(ic) : '';
                 return '<div style="padding:6px 4px; border-top:1px solid rgba(255,255,255,.06); font-size:.86rem;">' +
                     '<b style="direction:ltr; display:inline-block;">' + ic.number + '</b> — ' + td +
                     (ic.code ? ' <small style="opacity:.7;">(' + ic.code + ')</small>' : '') +
                     (ic.district ? ' <small style="color:#2E8B7A;">📍 ' + ic.district + '</small>' : '') +
                     (ic.cadCreatedAt ? ' <small style="opacity:.7;">· أُنشئ ' + ic.cadCreatedAt + '</small>' : '') +
+                    batchControls +
                     '<div style="margin-top:4px;">' + crews + '</div></div>';
             }).join('') + '</div>';
         var logDiv = document.createElement('div');
