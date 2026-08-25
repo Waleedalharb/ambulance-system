@@ -17,10 +17,15 @@
 
     var on = false;             // الوضع التاريخي مفعّل؟
     var hmap = null;            // خريطة Leaflet التاريخية الخاصة
-    var layers = null;          // { heat, markers } — طبقات الوضع التاريخي
+    var layers = null;          // { heat, markers, dots } — طبقات الوضع التاريخي
     var tab = 'density';        // density | zones | patterns | positioning | gaps | decision
     var cache = {};             // مفتاح: kind|from|to
     var fittedFor = null;       // النطاق الذي ضُبط العرض عليه
+    // تتبع الرقم إلى مصدره (اعتماد المالك 2026-08-25): آخر حمولة coverage وفهرس
+    // عرض برقم البلاغ — lookup عرضي خالص فوق بيانات الخادم، بلا أي اشتقاق
+    var lastCov = null;
+    var incByNumber = {};
+    var zoneCircles = {};       // مفتاح المنطقة ← دائرتها (فتح نافذتها من صف اللوحة)
 
     var WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
@@ -100,7 +105,8 @@
         }).addTo(hmap);
         layers = {
             heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 28, blur: 22, maxZoom: 16, minOpacity: 0.25 }) : null,
-            markers: L.layerGroup().addTo(hmap)
+            markers: L.layerGroup().addTo(hmap),
+            dots: L.layerGroup().addTo(hmap) // نقاط البلاغات الفعلية القابلة للضغط (تتبع الكثافة)
         };
         // طبقة الكثافة تبقى ملحقة دائمًا وتُصفَّر بالبيانات فقط — إزالتها ثم
         // setLatLngs تضرب سباق إطار داخلي في leaflet-heat (this._map === null)
@@ -110,7 +116,9 @@
     function clearLayers() {
         if (!hmap || !layers) return;
         layers.markers.clearLayers();
+        if (layers.dots) layers.dots.clearLayers();
         if (layers.heat) layers.heat.setLatLngs([]); // ملحقة دائمًا — التصفير آمن
+        zoneCircles = {};
     }
 
     function dockBody(html) { var b = el('histDockBody'); if (b) b.innerHTML = html; }
@@ -145,18 +153,91 @@
         if (pts.length) layers.heat.addTo(hmap);
     }
 
+    // ═══ تتبع الكثافة إلى مصدرها (اعتماد المالك 2026-08-25) ═══
+    // كل نقطة/منطقة تكشف بلاغاتها الفعلية: الضغط على نقطة كثافة ← بطاقة البلاغ
+    // بالحقول المتوفرة فقط («غير متوفر» عند الغياب — لا تخمين إطلاقًا)، والضغط
+    // على منطقة ← قائمة بلاغاتها (رقم/وقت/نوع/حي) وكل بلاغ ← بطاقته.
+    function typeDef(t) {
+        var defs = (typeof REPORT_TYPE_DEFS !== 'undefined') ? REPORT_TYPE_DEFS : null;
+        return (defs && defs[t]) || { emoji: '📦', label: t || 'حالات أخرى' };
+    }
+    function statusTxt(s) { return s === 'closed' ? 'مغلق' : (s === 'cancelled' ? 'ملغى' : 'نشط'); }
+    function indexCoverage(cov) {
+        lastCov = cov;
+        incByNumber = {};
+        (cov && cov.incidents || []).forEach(function (d) { incByNumber[String(d.number)] = d; });
+    }
+    // بطاقة البلاغ التاريخية — بالحقول المتوفرة فقط، والغائب «غير متوفر» بصراحة
+    function incidentCardHtml(d) {
+        if (!d) return '<div class="hist-zone-pop"><div class="t">البلاغ خارج النطاق الحالي</div></div>';
+        var t = typeDef(d.type);
+        var loc = [d.street, d.district].filter(Boolean).join(' — ');
+        var near = d.nearestPositioningAtTime;
+        var arr = (d.bestArrivalMin === null || d.bestArrivalMin === undefined) ? 'غير متوفر' : d.bestArrivalMin + ' د';
+        return '<div class="hist-zone-pop hist-inc-pop">'
+            + '<div class="t">📍 بلاغ ' + esc(d.number) + ' <small>(' + esc(statusTxt(d.status)) + ')</small></div>'
+            + '<div class="r"><span class="k">النوع</span><span class="v">' + t.emoji + ' ' + esc(t.label) + (d.code ? ' · ' + esc(d.code) : '') + '</span></div>'
+            + '<div class="r"><span class="k">وقت الإنشاء (CAD)</span><span class="v">' + esc(d.cadCreatedAt || 'غير متوفر') + '</span></div>'
+            + '<div class="r"><span class="k">الموقع</span><span class="v">' + esc(loc || 'غير متوفر') + '</span></div>'
+            + '<div class="r"><span class="k">الفرق المحتسبة</span><span class="v">' + (d.countedUnits && d.countedUnits.length ? esc(d.countedUnits.join('، ')) : 'غير متوفر') + '</span></div>'
+            + '<div class="r"><span class="k">أفضل زمن وصول</span><span class="v">' + arr + '</span></div>'
+            + '<div class="r"><span class="k">أقرب تمركز وقت البلاغ</span><span class="v">' + (near ? (kmTxt(near.km) + (near.unit ? ' — ' + esc(near.unit) : '')) : 'غير متوفر') + '</span></div>'
+            + '</div>';
+    }
+    // فتح بطاقة بلاغ على موقعه الفعلي — بلا إحداثية لا موقع مختلق إطلاقًا
+    function openIncident(num) {
+        var d = incByNumber[String(num)];
+        if (!d || !hmap) return;
+        if (d.lat === null || d.lat === undefined || d.lng === null || d.lng === undefined) return;
+        if (hmap.getZoom() < 14) hmap.setView([d.lat, d.lng], 14);
+        else hmap.panTo([d.lat, d.lng]);
+        L.popup({ closeButton: true, maxWidth: 320 }).setLatLng([d.lat, d.lng]).setContent(incidentCardHtml(d)).openOn(hmap);
+    }
+    // قائمة بلاغات منطقة: رقم/وقت/نوع/حي — كل زر يفتح بطاقة بلاغه
+    function zoneIncListHtml(z, max) {
+        var nums = z.incidentNumbers || [];
+        var lim = max || 8;
+        var html = nums.slice(0, lim).map(function (n) {
+            var d = incByNumber[String(n)] || null;
+            var t = d ? typeDef(d.type) : null;
+            var sub = d ? [d.cadCreatedAt || 'بلا وقت', t ? t.label : null, d.district].filter(Boolean).join(' · ') : '';
+            return '<button type="button" class="hist-inc-btn" onclick="MapHistory.openIncident(\'' + esc(String(n)) + '\')">'
+                + '📍 ' + esc(String(n)) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</button>';
+        }).join('');
+        if (nums.length > lim) html += '<div class="hist-inc-more">+' + (nums.length - lim) + ' بلاغًا آخر في هذه المنطقة — اضغط صف المنطقة في اللوحة الجانبية لعرض القائمة كاملة</div>';
+        return html;
+    }
+    // نقاط الكثافة التفاعلية: نقطة صغيرة لكل بلاغ محدد الموقع — الضغط يكشف بطاقته.
+    // الحرارية تبقى للمشهد العام، والنقاط هي طبقة التتبع بنفس البيانات حرفيًا
+    function dotsFrom(cov) {
+        if (!layers || !layers.dots || !cov) return;
+        (cov.incidents || []).forEach(function (d) {
+            if (d.noCoords || d.lat === null || d.lat === undefined) return; // بلا إحداثية ← لا نقطة مختلقة
+            var m = L.circleMarker([d.lat, d.lng], {
+                radius: 5, color: '#FBBF24', weight: 1, fillColor: '#F59E0B', fillOpacity: 0.65
+            });
+            m.bindPopup(incidentCardHtml(d), { maxWidth: 320 });
+            m.addTo(layers.dots);
+        });
+    }
+
     // نافذة المنطقة الساخنة — بالحقول التي اعتمدها المالك حرفيًا (2026-08-24)
     function zonePopup(z) {
         var peak = z.peakWindow ? (pad2(z.peakWindow.startHour) + ':00–' + pad2(z.peakWindow.endHour) + ':00') : '—';
+        var r = range();
         return '<div class="hist-zone-pop">'
             + '<div class="t">منطقة ' + (z.weak ? 'مرتفعة الطلب — تغطية ضعيفة' : 'مرتفعة الطلب') + '</div>'
             + '<div class="r"><span class="k">البلاغات</span><span class="v">' + z.count + '</span></div>'
+            + '<div class="r"><span class="k">الفترة</span><span class="v" style="direction:ltr">' + esc((r.from || '—') + ' ← ' + (r.to || '—')) + '</span></div>'
             + '<div class="r"><span class="k">متوسط الوصول</span><span class="v">' + minTxt(z.avgArrivalMin) + '</span></div>'
             + '<div class="r"><span class="k">الذروة</span><span class="v" style="direction:ltr">' + peak + '</span></div>'
             + '<div class="r"><span class="k">أقرب تمركز تاريخي</span><span class="v">' + kmTxt(z.nearestAnytimeKm) + '</span></div>'
             + '<div class="r"><span class="k">التغطية</span><span class="v">' + (z.weak ? 'ضعيفة' : 'جيدة') + '</span></div>'
             + (z.weak && z.weakReasons && z.weakReasons.length
                 ? '<div class="why"><b>سبب التصنيف:</b> ' + esc(z.weakReasons.join(' + ')) + '</div>' : '')
+            // تتبع الرقم إلى مصدره: «N بلاغًا» = هذه البلاغات بالتحديد — كل زر يفتح بطاقة بلاغه
+            + '<div class="hist-inc-list"><b>البلاغات الفعلية (' + (z.incidentNumbers ? z.incidentNumbers.length : 0) + '):</b>'
+            + zoneIncListHtml(z, 8) + '</div>'
             + '</div>';
     }
 
@@ -165,7 +246,8 @@
         loading();
         fetchAnalytics('coverage').then(function (cov) {
             if (!on || tab !== 'density') return;
-            clearLayers(); fitTo(cov); heatFrom(cov); dockHead();
+            indexCoverage(cov);
+            clearLayers(); fitTo(cov); heatFrom(cov); dotsFrom(cov); dockHead();
             var t = cov.totals || {};
             dockBody(
                 '<div class="smap-hist-stat"><span class="k">بلاغات النطاق</span><span class="v">' + (t.incidents != null ? t.incidents : '—') + '</span></div>'
@@ -173,6 +255,7 @@
                 + '<div class="smap-hist-stat"><span class="k">بلا إحداثية (لا تُخمَّن)</span><span class="v">' + (t.noCoords != null ? t.noCoords : '—') + '</span></div>'
                 + (t.unresolvedTimeCount ? '<div class="smap-hist-stat"><span class="k">بلا وقت قابل للقراءة</span><span class="v">' + t.unresolvedTimeCount + '</span></div>' : '')
                 + '<div class="smap-hist-note">الكثافة من مواقع البلاغات الفعلية المسجلة في النطاق فقط — بلا أي تخمين مواقع.</div>'
+                + '<div class="smap-hist-note">🟡 كل نقطة صفراء = بلاغ فعلي — <b>اضغطها لتظهر بطاقته</b> (رقمه ووقته ونوعه وموقعه). الرقم أعلاه = هذه النقاط بالتحديد، ولا نقطة بلا بلاغ ولا بلاغ محدد الموقع بلا نقطة.</div>'
             );
         }).catch(fail);
     }
@@ -182,6 +265,7 @@
         loading();
         fetchAnalytics('coverage').then(function (cov) {
             if (!on || (tab !== 'zones' && tab !== 'gaps')) return;
+            indexCoverage(cov);
             clearLayers(); fitTo(cov); heatFrom(cov); dockHead();
             var zones = (cov.zones || []).filter(function (z) { return !onlyWeak || z.weak; });
             zones.forEach(function (z) {
@@ -191,16 +275,19 @@
                     weight: 2, opacity: .9,
                     fillColor: z.weak ? '#EF4444' : '#F59E0B', fillOpacity: .18
                 });
-                c.bindPopup(zonePopup(z));
+                c.bindPopup(zonePopup(z), { maxWidth: 340 });
                 c.addTo(layers.markers);
+                zoneCircles[z.key] = c; // فتح نفس النافذة من صف اللوحة الجانبية
             });
             var rows = zones.map(function (z, i) {
                 var peak = z.peakWindow ? (pad2(z.peakWindow.startHour) + ':00–' + pad2(z.peakWindow.endHour) + ':00') : '—';
-                return '<div class="smap-hist-zone" data-lat="' + z.centroid.lat + '" data-lng="' + z.centroid.lng + '">'
+                return '<div class="smap-hist-zone" data-lat="' + z.centroid.lat + '" data-lng="' + z.centroid.lng + '" data-key="' + esc(z.key) + '">'
                     + '<div class="z-head"><span>#' + (i + 1) + ' — ' + z.count + ' بلاغًا</span>'
                     + '<span class="smap-hist-badge ' + (z.weak ? 'weak' : 'ok') + '">' + (z.weak ? 'تغطية ضعيفة' : 'جيدة') + '</span></div>'
                     + '<div class="z-sub">وصول ' + minTxt(z.avgArrivalMin) + ' · ذروة <span style="direction:ltr;display:inline-block">' + peak + '</span> · أقرب تمركز ' + kmTxt(z.nearestAnytimeKm) + '</div>'
                     + (z.weak && z.weakReasons && z.weakReasons.length ? '<div class="z-sub" style="color:#FCA5A5">⛔ ' + esc(z.weakReasons.join(' + ')) + '</div>' : '')
+                    // تتبع «N بلاغًا» إلى مصدرها: قائمة البلاغات الفعلية كاملة — كل زر يفتح بطاقة بلاغه
+                    + '<div class="z-incs">' + zoneIncListHtml(z, 1000) + '</div>'
                     + '</div>';
             }).join('');
             dockBody(
@@ -357,15 +444,23 @@
                 });
             })(tabs[i]);
         }
-        // الضغط على صف في اللوحة يقود الخريطة التاريخية لموقعه
+        // الضغط على صف في اللوحة يقود الخريطة التاريخية لموقعه ويفتح نافذة المنطقة
+        // (قائمة بلاغاتها الفعلية)؛ أزرار البلاغات داخل الصف لها معالجها الخاص
         var dock = el('histDockBody');
         if (dock) dock.addEventListener('click', function (e) {
+            if (e.target.closest && e.target.closest('.hist-inc-btn')) return; // زر بلاغ — يفتح بطاقته مباشرة
             var z = e.target.closest ? e.target.closest('.smap-hist-zone') : null;
             if (!z || !hmap) return;
             var lat = parseFloat(z.getAttribute('data-lat')), lng = parseFloat(z.getAttribute('data-lng'));
             if (isFinite(lat) && isFinite(lng)) hmap.setView([lat, lng], 14);
+            var key = z.getAttribute('data-key');
+            var circ = key && zoneCircles[key];
+            if (circ && circ.openPopup) circ.openPopup();
         });
     }
+
+    // الواجهة العامة — أزرار البلاغات داخل النوافذ واللوحة تستدعي فتح البطاقة
+    window.MapHistory = { openIncident: openIncident };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
     else wire();

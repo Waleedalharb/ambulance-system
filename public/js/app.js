@@ -544,6 +544,11 @@ function connectSSE() {
                 wsFallbackInterval = null;
                 console.log('🛑 Fallback polling stopped - SSE active');
             }
+            // دورة حياة الخريطة من مصدر الحالة (اعتماد المالك 2026-08-25): عند كل
+            // اتصال ناجح — وأهمها إعادة الاتصال بعد انقطاع — نعيد جلب ملخص البلاغات
+            // كاملًا من الخادم، فأي إغلاق/إلغاء فُوِّت أثناء الانقطاع يُصحَّح فورًا
+            // من مصدر الحقيقة بدل انتظار أول حدث جديد صدفةً
+            if (typeof fetchIncidentSummarySafe === 'function') fetchIncidentSummarySafe();
         };
         
         sseSource.onmessage = function(event) {
@@ -788,6 +793,11 @@ function startFallbackInterval() {
             console.log('🔄 Fallback: refreshing data...');
             loadAllData();
             applyGlobalTheme();
+            // دورة حياة الخريطة من مصدر الحالة (اعتماد المالك 2026-08-25): بلا SSE
+            // لا تصل أحداث الإغلاق/الإلغاء إطلاقًا — الوضع الاحتياطي يجلب ملخص
+            // البلاغات من الخادم مع كل دورة حتى يختفي المنتهي من الخريطة ولا
+            // تبقى علامته عالقة (الجلب خفيف ومشروط بانقطاع القناة فقط)
+            if (typeof fetchIncidentSummarySafe === 'function') fetchIncidentSummarySafe();
         }
     }, 3000);
 }

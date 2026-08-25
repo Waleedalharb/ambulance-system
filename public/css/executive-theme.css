@@ -903,8 +903,8 @@ body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 }
 
 /* ── الشريط العلوي: مؤشرات كبيرة + زر ⛶ (بعيدًا عن أزرار Zoom) ── */
-.smap-topbar { display: flex; align-items: stretch; gap: 10px; margin-bottom: 8px; }
-.smap-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; flex: 1; min-width: 0; }
+.smap-topbar { display: flex; align-items: stretch; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.smap-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; flex: 1 1 560px; min-width: 0; }
 .smap-kpi {
     background: rgba(11, 30, 51, 0.82); border: 1px solid var(--ex-border); border-radius: 12px;
     padding: 8px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0;
@@ -2542,6 +2542,70 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
 .hist-zone-pop .r .k { color: #64748B; }
 .hist-zone-pop .r .v { font-weight: 700; }
 .hist-zone-pop .why { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #E2E8F0; font-size: .7rem; color: #991B1B; }
+
+/* تتبع الكثافة إلى مصدرها (اعتماد المالك 2026-08-25): أزرار البلاغات الفعلية
+   داخل نوافذ المناطق وقوائم اللوحة + بطاقة البلاغ التاريخية */
+.hist-inc-list { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #E2E8F0; font-size: .72rem; }
+.hist-inc-list b { display: block; margin-bottom: 4px; color: #92400E; }
+.hist-inc-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: start; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 4px 8px; margin: 3px 0; font-family: inherit; font-size: .74rem; font-weight: 700; color: #78350F; cursor: pointer; transition: background .12s; }
+.hist-inc-btn:hover { background: #FEF3C7; }
+.hist-inc-btn small { font-weight: 500; color: #B45309; font-size: .64rem; }
+.hist-inc-more { font-size: .66rem; color: #92400E; margin-top: 3px; }
+.hist-inc-pop .t { color: #1D4ED8; }
+.smap-hist-zone .z-incs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.smap-hist-zone .z-incs .hist-inc-btn { width: auto; flex-direction: row; align-items: center; gap: 6px; margin: 0; padding: 3px 8px; font-size: .68rem; }
+.smap-hist-zone .z-incs .hist-inc-btn small { font-size: .6rem; }
+
+/* ═══ 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) ═══
+   زر الدليل + أزرار ⓘ + نافذة الدليل — مناسبة للجوال والكمبيوتر */
+.smap-guide-btn { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.smap-guide-btn:hover, .smap-guide-btn:focus-visible { border-color: rgba(96,165,250,.6) !important; color: #93C5FD !important; }
+.smap-info { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(148,163,184,.5); background: transparent; color: #94A3B8; font-size: 9px; line-height: 1; cursor: pointer; padding: 0; vertical-align: middle; transition: all .12s; }
+.smap-info:hover, .smap-info:focus-visible { color: #93C5FD; border-color: #60A5FA; background: rgba(96,165,250,.12); }
+
+/* أزرار الشريط العلوي النصية (دليل الخريطة/ذاكرة الخريطة): عرض تلقائي — إصلاح
+   قص النص الذي كان وراثةً عن زر ⛶ الثابت 40px (تزاحم الصورة المرجعية 2026-08-25) */
+.smap-expand-btn.smap-guide-btn, .smap-expand-btn.smap-history-btn { width: auto; padding: 0 12px; gap: 7px; }
+.smap-expand-btn.smap-history-btn { display: inline-flex; align-items: center; }
+
+/* ⓘ Popover الشرح السياقي الفوري (اعتماد المالك 2026-08-25): بطاقة صغيرة بجانب
+   العنصر نفسه — لا تفتح الدليل ولا صفحة، وتُغلق بسهولة */
+.minfo-pop { position: fixed; z-index: 9500; width: 300px; max-width: calc(100vw - 20px); background: #12233C; border: 1px solid rgba(96,165,250,.4); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.55); direction: rtl; }
+.minfo-head { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid rgba(148,163,184,.16); font-size: .8rem; font-weight: 800; color: #93C5FD; }
+.minfo-close { background: none; border: none; color: #8A9BB0; cursor: pointer; font-size: .78rem; padding: 2px 6px; border-radius: 6px; line-height: 1; }
+.minfo-close:hover { color: #F1F5F9; background: rgba(255,255,255,.08); }
+.minfo-body { padding: 10px 13px; font-size: .76rem; line-height: 1.8; color: #CBD5E1; }
+.minfo-body p { margin: 4px 0 8px; }
+.minfo-body b { color: #F1F5F9; }
+
+.mguide-backdrop { position: fixed; inset: 0; z-index: 9000; background: rgba(4,10,22,.72); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 18px; }
+.mguide { background: #0E1A2E; border: 1px solid var(--ex-border-soft, rgba(148,163,184,.25)); border-radius: 16px; width: 760px; max-width: 100%; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.55); overflow: hidden; }
+.mguide-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid rgba(148,163,184,.18); font-size: 1rem; font-weight: 800; color: #F1F5F9; }
+.mguide-close { background: rgba(255,255,255,.06); border: 1px solid rgba(148,163,184,.3); color: #CBD5E1; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: .85rem; }
+.mguide-close:hover { background: rgba(239,68,68,.18); color: #FCA5A5; border-color: rgba(239,68,68,.4); }
+.mguide-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid rgba(148,163,184,.14); }
+.mguide-navbtn { background: rgba(255,255,255,.05); border: 1px solid rgba(148,163,184,.25); color: #CBD5E1; border-radius: 20px; padding: 5px 13px; font-family: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; transition: all .12s; }
+.mguide-navbtn:hover { border-color: #60A5FA; color: #93C5FD; }
+.mguide-navbtn.active { background: rgba(96,165,250,.16); border-color: #60A5FA; color: #93C5FD; }
+.mguide-body { padding: 6px 22px 16px; overflow-y: auto; font-size: .85rem; line-height: 1.9; color: #CBD5E1; }
+.mguide-sec { padding-top: 10px; }
+.mguide-sec h3 { font-size: .95rem; color: #7FD4C3; margin: 8px 0 10px; }
+.mguide-sec h4 { font-size: .82rem; color: #93C5FD; margin: 14px 0 4px; }
+.mguide-sec p { margin: 4px 0 10px; }
+.mguide-sec ul { margin: 4px 18px 10px 0; padding: 0; }
+.mguide-sec li { margin-bottom: 4px; }
+.mguide-sec b { color: #F1F5F9; }
+.mguide-q { font-weight: 800; color: #FBBF24; margin: 14px 0 2px; }
+.mguide-q::before { content: '❓ '; }
+.mguide-foot { padding: 10px 18px; border-top: 1px solid rgba(148,163,184,.14); font-size: .7rem; color: #64748B; text-align: center; }
+
+/* الجوال: الدليل بملء الشاشة تقريبًا */
+@media (max-width: 640px) {
+    .mguide-backdrop { padding: 0; }
+    .mguide { width: 100%; height: 100%; max-height: 100vh; border-radius: 0; border: none; }
+    .mguide-body { font-size: .88rem; }
+    .smap-guide-btn span { display: none; } /* أيقونة الكتاب تكفي في الشريط الضيق */
+}
 
 /* ═══ اكتشاف احتمال تكرار البلاغات (اعتماد المالك 2026-08-24 — ملحق note-18) ═══
    «احتمال تكرار — يحتاج تحقق» تنبيه فقط: لا دمج ولا إلغاء ولا سجل مراجعة —

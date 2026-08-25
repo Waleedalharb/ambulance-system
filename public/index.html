@@ -1439,25 +1439,27 @@ window.addEventListener('load', function() {
         <div class="ops-map-section smap" id="opsMapSection">
                 <div class="smap-topbar">
                     <div class="smap-kpis">
-                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiStatus"><span class="smap-status-dot"></span>—</span><span class="smap-kpi-l">الضغط الحالي</span></div>
-                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiCount">—</span><span class="smap-kpi-l">بلاغات المناوبة</span></div>
-                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiReady">—</span><span class="smap-kpi-l">فرق جاهزة</span></div>
-                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiArrival">—</span><span class="smap-kpi-l">متوسط الوصول <small id="smapKpiArrivalN"></small></span></div>
-                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiPeak">—</span><span class="smap-kpi-l">ذروة المناوبة</span></div>
-                        <div class="smap-kpi"><span class="smap-kpi-v sev-green" id="smapKpiAlerts">0</span><span class="smap-kpi-l">حالات حرجة</span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiStatus"><span class="smap-status-dot"></span>—</span><span class="smap-kpi-l">الضغط الحالي <button type="button" class="smap-info" data-info="kpi-status" title="وش معنى الضغط الحالي؟">ⓘ</button></span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiCount">—</span><span class="smap-kpi-l">بلاغات المناوبة <button type="button" class="smap-info" data-info="kpi-count" title="أي البلاغات تُعد هنا؟">ⓘ</button></span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiReady">—</span><span class="smap-kpi-l">فرق جاهزة <button type="button" class="smap-info" data-info="kpi-ready" title="متى تُعد الفرقة جاهزة؟">ⓘ</button></span></div>
+                        <div class="smap-kpi"><span class="smap-kpi-v" id="smapKpiArrival">—</span><span class="smap-kpi-l">متوسط الوصول <small id="smapKpiArrivalN"></small> <button type="button" class="smap-info" data-info="kpi-arrival" title="كيف يُحسب متوسط الوصول؟">ⓘ</button></span></div>
+                        <!-- KPI «ذروة المناوبة» أُزيل من الحية (اعتماد المالك 2026-08-25):
+                             مؤشر تحليلي زمني مكانه ذاكرة الخريطة ← الأنماط الزمنية -->
+                        <div class="smap-kpi"><span class="smap-kpi-v sev-green" id="smapKpiAlerts">0</span><span class="smap-kpi-l">حالات حرجة <button type="button" class="smap-info" data-info="kpi-alerts" title="متى تُعد الحالة حرجة؟">ⓘ</button></span></div>
                     </div>
+                    <button type="button" class="smap-expand-btn smap-guide-btn" id="mapGuideBtn" title="دليل استخدام الخريطة — وش تشوف؟ ومن وين جاء الرقم؟"><i class="fas fa-book-open"></i><span>دليل الخريطة</span></button>
                     <button type="button" class="smap-expand-btn smap-history-btn" id="smapHistoryBtn" title="ذاكرة الخريطة — التحليل التاريخي (H1–H4) فوق نفس الخريطة"><i class="fas fa-clock-rotate-left"></i><span>ذاكرة الخريطة</span></button>
                     <button type="button" class="smap-expand-btn" id="smapExpandBtn" title="تكبير الخريطة — وضع التشغيل المتقدم"><i class="fas fa-expand"></i></button>
                 </div>
                 <div class="smap-layerbar">
                     <span class="smap-layerbar-lbl">الطبقات:</span>
+                    <!-- الخريطة الحية = «ماذا يحدث الآن؟» فقط (اعتماد المالك 2026-08-25):
+                         بلاغات نشطة + فرق + مراكز. الطبقات التحليلية (الكثافة/الساخنة/
+                         الذروة/الشوارع) تعيش في «ذاكرة الخريطة» التاريخية حصريًا — فصل
+                         عرض لا حذف منطق -->
                     <button type="button" class="smap-chip active" id="smapLayerIncidents" title="البلاغات النشطة في مواقعها الحقيقية"><i class="fas fa-location-dot"></i> البلاغات</button>
                     <button type="button" class="smap-chip active" id="smapLayerTeams" title="فرق المناوبة وحالة جاهزيتها"><i class="fas fa-truck-medical"></i> الفرق</button>
                     <button type="button" class="smap-chip active" id="smapLayerCenters" title="المراكز التشغيلية التسعة"><i class="fas fa-hospital"></i> المراكز</button>
-                    <button type="button" class="smap-chip" id="smapLayerHot" title="تجمعات البلاغات: شارع عليه بلاغان أو أكثر"><i class="fas fa-bullseye"></i> المواقع الساخنة</button>
-                    <button type="button" class="smap-chip" id="smapLayerHeat" title="طبقة كثافة البلاغات الموقَّعة في المناوبة الحالية"><i class="fas fa-fire"></i> الكثافة</button>
-                    <button type="button" class="smap-chip" id="smapLayerPeak" title="ذروة البلاغات في المناوبة الحالية حسب وقت الإنشاء"><i class="fas fa-chart-line"></i> الذروة</button>
-                    <button type="button" class="smap-chip" id="smapLayerStreets" title="شارات أكثر الشوارع بلاغًا — على مواقع بلاغات حقيقية فقط"><i class="fas fa-road"></i> الشوارع الأكثر بلاغًا</button>
                 </div>
                 <!-- ذاكرة الخريطة — شريط الوضع التاريخي (اعتماد المالك 2026-08-24): يظهر فقط في الوضع التاريخي -->
                 <div class="smap-histbar" id="smapHistBar">
@@ -1473,6 +1475,7 @@ window.addEventListener('load', function() {
                     <button type="button" class="smap-chip smap-hist-tab" data-tab="positioning" title="أين كانت الفرق متمركزة فعلًا في النطاق"><i class="fas fa-truck-medical"></i> التمركزات التاريخية</button>
                     <button type="button" class="smap-chip smap-hist-tab" data-tab="gaps" title="مناطق طلب مرتفع + تغطية ضعيفة مع سبب التصنيف"><i class="fas fa-triangle-exclamation"></i> فجوات التغطية</button>
                     <button type="button" class="smap-chip smap-hist-tab" data-tab="decision" title="مرشحو تمركز ونوافذ مقترحة — دعم قرار فقط بلا تنفيذ تلقائي"><i class="fas fa-lightbulb"></i> دعم القرار</button>
+                    <button type="button" class="smap-info" data-info="hist-memory" title="وش هي ذاكرة الخريطة؟">ⓘ</button>
                 </div>
                 <div class="smap-map-grid">
                 <div class="smap-maincol">
@@ -1489,10 +1492,6 @@ window.addEventListener('load', function() {
                         <i class="fas fa-triangle-exclamation"></i> تعذّر تحميل خلفية الخريطة — العلامات تعمل من بيانات الخادم
                     </div>
                     <div class="smap-card" id="smapCard" style="display:none;"></div>
-                    <div class="smap-peak-pop" id="smapPeakPop" style="display:none;">
-                        <div class="smap-peak-pop-head"><i class="fas fa-chart-line"></i> الذروة — المناوبة الحالية</div>
-                        <div class="smap-peak-pop-body" id="smapPeakPopBody">—</div>
-                    </div>
                 </div>
                 <div class="ops-map-legend">
                     <span class="ops-map-legend-item"><i class="fas fa-location-dot lg-inc"></i> بلاغ</span>
@@ -1505,16 +1504,11 @@ window.addEventListener('load', function() {
                 </div>
                 </div>
                 <aside class="smap-side">
+                    <!-- اللوحة الجانبية للحية (اعتماد المالك 2026-08-25): تشغيلية فقط —
+                         «بلا موقع دقيق» تتطلب فعلًا الآن. لوحتا «أكثر المواقع» و«الذروة»
+                         تحليليتان وانتقلتا إلى ذاكرة الخريطة (الأنماط الزمنية/المناطق) -->
                     <div class="smap-panel">
-                        <h4><i class="fas fa-bullseye"></i> أكثر المواقع بلاغًا — المناوبة</h4>
-                        <div class="smap-panel-body" id="smapTopStreets"><div class="smap-empty">—</div></div>
-                    </div>
-                    <div class="smap-panel">
-                        <h4><i class="fas fa-chart-line"></i> الذروة</h4>
-                        <div class="smap-panel-body" id="smapPeakBody"><div class="smap-empty">—</div></div>
-                    </div>
-                    <div class="smap-panel">
-                        <h4><i class="fas fa-circle-question"></i> بلاغات بلا موقع دقيق</h4>
+                        <h4><i class="fas fa-circle-question"></i> بلاغات بلا موقع دقيق <button type="button" class="smap-info" data-info="noloc-panel" title="ليش بلاغ بلا علامة على الخريطة؟">ⓘ</button></h4>
                         <div class="smap-panel-body" id="smapNoLoc"><div class="smap-empty">—</div></div>
                     </div>
                 </aside>
@@ -2621,6 +2615,7 @@ window.addEventListener('load', function() {
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
 <script src="js/smart-map.js?v=5" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
 <script src="js/map-history.js?v=1" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
+<script src="js/map-guide.js?v=1" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
 <script src="js/smart-toolbar.js?v=3" defer></script>

@@ -1094,7 +1094,8 @@ class ReportService {
             if (ic.lat === null || ic.lat === undefined || ic.lng === null || ic.lng === undefined) {
                 noCoords++;
                 detail.push({
-                    number: ic.number, district: ic.district || null, street: ic.street || null,
+                    number: ic.number, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
+                    district: ic.district || null, street: ic.street || null,
                     cadCreatedAt: ic.cad_created_at || null, lat: null, lng: null,
                     countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
                     nearestPositioningAtTime: null, crewPositioning: null, noCoords: true
@@ -1109,7 +1110,8 @@ class ReportService {
                 if (own && (!crewPos || own.km < crewPos.km)) { crewPos = own; break; } // أقرب تمركز لفرقة مباشرة
             }
             detail.push({
-                number: ic.number, district: ic.district || null, street: ic.street || null,
+                number: ic.number, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
+                district: ic.district || null, street: ic.street || null,
                 cadCreatedAt: ic.cad_created_at || null, lat: ic.lat, lng: ic.lng,
                 countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
                 nearestPositioningAtTime: nearestAny, // null = بلا تمركز معروف وقت البلاغ (صدق)
@@ -1155,6 +1157,9 @@ class ReportService {
                 key,
                 centroid: { lat: Math.round(clat * 10000) / 10000, lng: Math.round(clng * 10000) / 10000 },
                 count: list.length,
+                // تتبع الرقم إلى مصدره (اعتماد المالك 2026-08-25): كل منطقة تكشف
+                // أرقام بلاغاتها الفعلية — 8 = هذه البلاغات الثمانية بالتحديد
+                incidentNumbers: list.map(x => x.number),
                 avgArrivalMin,
                 avgNearestAtTimeKm,
                 withoutPositioningAtTime: list.length - nearVals.length,
