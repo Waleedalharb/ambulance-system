@@ -562,9 +562,41 @@ class ReportService {
     }
 
     /**
+     * بصمة «اللقطة المشتركة القديمة» (اعتماد المالك 2026-08-26 — فصل منع
+     * التلوث الجديد عن منع أثر التاريخي): مشاركة سُجلت قبل إغلاق مسار
+     * التسجيل القديم (2026-08-23.c — commit 75af49e) + بلا أي هوية CAD
+     * (unit/runUnit/status) + لديها phases موقوتة = legacy_snapshot /
+     * historical_unverified. التتبع أثبت 149 مشاركة بهذه البصمة على 14 فرقة
+     * (مراحل منسوخة حرفيًا من فرق أخرى أو من زر cad-oneclick القديم)، وصفر
+     * مشاركة بهذه البصمة بعد لحظة الإغلاق.
+     * المحميون من الاستبعاد (الاختبار العكسي): مشاركة قديمة بهوية CAD موثوقة
+     * (10 صفوف في مناوبة 2026-08-23 صباحًا) تُحتسب طبيعيًا، واليدوي القديم
+     * بلا phases (352 صفًا) يبقى على القاعدة القديمة، وأي مشاركة بعد الإغلاق
+     * لا تدخل هذا التصنيف إطلاقًا.
+     * السجل نفسه لا يُحذف ولا تُعدّل phases ولا يُصفَّر أي عداد يدويًا —
+     * التمييز في طبقة الاحتساب فقط، والسجل يبقى للتدقيق بحالته.
+     */
+    static LEGACY_SNAPSHOT_CUTOFF = '2026-08-23 13:00:00';
+
+    isLegacySnapshot(row) {
+        if (!row) return false;
+        const createdAt = row.report_created_at || row.created_at || null;
+        if (!createdAt) return false; // بلا دليل زمني ← لا تصنيف (لا استبعاد بالشك)
+        if (String(createdAt) >= ReportService.LEGACY_SNAPSHOT_CUTOFF) return false;
+        if (row.cad_unit_id != null || row.cad_run_unit_id != null || row.cad_unit_status != null) return false;
+        let phases = row.phases;
+        if (typeof phases === 'string') { try { phases = JSON.parse(phases); } catch (_) { phases = null; } }
+        if (!phases) return false;
+        return Object.keys(phases).some(k => !!phases[k]);
+    }
+
+    /**
      * تعريف «المشاركة المحتسبة» الوحيد في المنصة (قرار المالك 2026-08-24 —
      * لا مصدران للحقيقة): لا مسحوبة (withdrawn) ولا ملغاة يدويًا
      * (manual_cancelled)، وإن وُجدت لقطة CAD فلا تُحسب إلا بدليل «التحرك».
+     * ومن 2026-08-26: اللقطة المشتركة القديمة (legacy_snapshot) لا تُحسب —
+     * تبقى محفوظة للتدقيق ولا تدخل byCrew ولا الإنجازات ولا التوزيع ولا
+     * المؤشرات ولا الذاكرة التحليلية كـ«فرقة باشرت».
      * كل عدّاد مبني على المشاركات (تقرير المناوبة/توزيع البلاغات/التقرير
      * اليومي/byCrew/الأزمنة) يشتق من هذه القاعدة حتى لا تتباين الشاشات.
      * @param {Object} row - صف report_times (phases نص JSON أو كائن، withdrawn، manual_cancelled)
@@ -573,6 +605,7 @@ class ReportService {
         if (!row) return false;
         if (row.withdrawn) return false;
         if (row.manual_cancelled) return false;
+        if (this.isLegacySnapshot(row)) return false;
         let phases = row.phases;
         if (typeof phases === 'string') { try { phases = JSON.parse(phases); } catch (_) { phases = null; } }
         return this.isCountedParticipation(phases || null);
@@ -631,6 +664,9 @@ class ReportService {
                 // الإلغاء اليدوي من توزيع البلاغات (اعتماد المالك 2026-08-24): يُستبعد
                 // فورًا من كل عدّاد ومؤشر — ويبقى موثقًا في التفاصيل والتدقيق
                 const manualCancelled = !!p.manual_cancelled;
+                // لقطة مشتركة قديمة (2026-08-26): لا تُحتسب لكنها تظهر في
+                // التفاصيل مصنفة — تمييز عن المشاركة الحقيقية، لا مسح للتاريخ
+                const legacySnapshot = this.isLegacySnapshot(p);
                 // قاعدة الاحتساب الواحدة المشتركة مع تقرير المناوبة والتوزيع (2026-08-24)
                 const counted = this.isParticipationCounted(p);
                 if (counted) byCrew[p.unit] = (byCrew[p.unit] || 0) + 1; // مشاركة محتسبة واحدة لكل فرقة (②)
@@ -643,7 +679,7 @@ class ReportService {
                 else if (cancelKind === 'before-arrival') cancBeforeArrival++;
                 return {
                     unit: p.unit, at: p.timestamp, phases, counted, withdrawn,
-                    manualCancelled,
+                    manualCancelled, legacySnapshot,
                     manualCancelledBy: p.manual_cancelled_by || null,
                     manualCancelledAt: p.manual_cancelled_at || null,
                     manualCancelReason: p.manual_cancel_reason || null,
@@ -860,6 +896,7 @@ class ReportService {
                 // قاعدة الاحتساب الواحدة المشتركة مع كل أسطح المنصة (2026-08-24)
                 const counted = this.isParticipationCounted(p);
                 if (counted) byCrew[p.unit] = (byCrew[p.unit] || 0) + 1;
+                const legacySnapshot = this.isLegacySnapshot(p); // مصنفة ولا تُحتسب (2026-08-26)
                 const cadUrs = p.cad_unit_status || null;
                 const cadReached = p.cad_reached == null ? null : !!p.cad_reached;
                 const cancelKind = this._cancelKind(p);
@@ -868,6 +905,7 @@ class ReportService {
                 return {
                     unit: p.unit, at: p.timestamp, phases, counted,
                     withdrawn: !!p.withdrawn, manualCancelled: !!p.manual_cancelled,
+                    legacySnapshot,
                     cadUrs, cadReached, cancelKind,
                     cadUnitId: p.cad_unit_id != null ? p.cad_unit_id : null,
                     cadRunUnitId: p.cad_run_unit_id != null ? p.cad_run_unit_id : null,

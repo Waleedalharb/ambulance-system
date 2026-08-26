@@ -262,7 +262,7 @@ class StorageAdapter {
             'SELECT * FROM incident_registry WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
         // مشاركات البلاغات المرقّمة (لكل فرقة أزمنتها وأزمنة استجابتها المحسوبة وحالة مشاركتها)
         const parts = await this.db.all(
-            `SELECT t.id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
+            `SELECT t.id, t.incident_number, t.timestamp, r.unit, r.created_at AS report_created_at, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
              FROM report_times t JOIN reports r ON r.id = t.report_id
              WHERE r.shift_id = ? AND t.incident_number IS NOT NULL`, [shiftId]);
         // الضغطات اليدوية (بلا رقم) — كل واحدة بلاغ مستقل كما هو معتاد
@@ -283,7 +283,7 @@ class StorageAdapter {
         const incidents = await this.db.all(
             'SELECT * FROM incident_registry ORDER BY created_at ASC, id ASC');
         const parts = await this.db.all(
-            `SELECT r.shift_id, t.incident_number, t.timestamp, r.unit, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
+            `SELECT r.shift_id, t.incident_number, t.timestamp, r.unit, r.created_at AS report_created_at, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
              FROM report_times t JOIN reports r ON r.id = t.report_id
              WHERE t.incident_number IS NOT NULL`);
         return { incidents, parts };
@@ -315,11 +315,13 @@ class StorageAdapter {
 
     /** كل صفوف المشاركات لمناوبة (قرار المالك 2026-08-24 — مصدر واحد للاحتساب):
         صف report_times + مركز/وحدة reports مع حقول الاستبعاد (withdrawn /
-        manual_cancelled) ولقطة phases الخام. لا قرار هنا — القاعدة الواحدة في
-        ReportService.isParticipationCounted، هنا قراءة صرفة قابلة للتتبع. */
+        manual_cancelled) ولقطة phases الخام + بصمة اللقطة التاريخية
+        (report_created_at + هوية CAD) حتى تطبّق قاعدة legacy_snapshot نفسها.
+        لا قرار هنا — القاعدة الواحدة في ReportService.isParticipationCounted،
+        هنا قراءة صرفة قابلة للتتبع. */
     async getShiftParticipationRows(shiftId) {
         return this.db.all(
-            `SELECT r.center, r.unit, t.id, t.timestamp, t.type, t.incident_number, t.phases, t.withdrawn, t.manual_cancelled
+            `SELECT r.center, r.unit, r.created_at AS report_created_at, t.id, t.timestamp, t.type, t.incident_number, t.phases, t.withdrawn, t.manual_cancelled, t.cad_unit_status, t.cad_unit_id, t.cad_run_unit_id
              FROM reports r
              LEFT JOIN report_times t ON t.report_id = r.id
              WHERE r.shift_id = ?

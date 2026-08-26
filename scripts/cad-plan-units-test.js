@@ -248,6 +248,16 @@ async function serverSection() {
             { team: 'سريع 2', phases: {}, phasesSource: 'cad-detail', cadReached: false, cadUnitId: 2003, cadRunUnitId: 910003 }] });
         check('B2 Available فقط ← صفر مشاركة وصفر سجلات', r2.data && (r2.data.addedCrews || []).length === 0 && dbCount(N2).length === 0);
         check('B2+ الثلاثة موثقون في planUnitsIgnored', r2.data && (r2.data.planUnitsIgnored || []).length === 3);
+        /* تكرار نفس لقطة الخطة الصفرية (كما يفعل الـOverlay بدورات المراقبة) ← يبقى صفرًا */
+        const r2b = await post({ number: N2, type: 'medical', source: 'cad-auto', crews: [
+            { team: 'جنوب 1', phases: {}, phasesSource: 'cad-detail', cadReached: false, cadUnitId: 2001, cadRunUnitId: 910001 },
+            { team: 'جنوب 2', phases: {}, phasesSource: 'cad-detail', cadReached: false, cadUnitId: 2002, cadRunUnitId: 910002 },
+            { team: 'سريع 2', phases: {}, phasesSource: 'cad-detail', cadReached: false, cadUnitId: 2003, cadRunUnitId: 910003 }] });
+        s = await sum();
+        check('B2b تكرار لقطة الخطة الصفرية ← ما زال صفر مشاركة وصفر إضافة في byCrew',
+            r2b.data && (r2b.data.addedCrews || []).length === 0 && dbCount(N2).length === 0
+            && ['جنوب 1', 'جنوب 2', 'سريع 2'].every(t => ((s.byCrew || {})[t] || 0) === c0(t)),
+            JSON.stringify({ added: r2b.data && r2b.data.addedCrews, rows: dbCount(N2).length }));
 
         /* ── S3: Available ثم Assigned ← تُحسب عند ثبوت الرحلة ── */
         const N3 = '8' + NB + '3';
