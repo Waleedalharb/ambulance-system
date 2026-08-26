@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-25.a — Available ≠ Participating: وحدات خطة الاستجابة (هيكل Journey بلا أوقات ولا urs) لا تصبح مشاركة إطلاقًا — plan-unit-ignored';
+  const OVERLAY_BUILD = '2026-08-26.a — No Journey = No Participation: ممر lastJourneys مغلق — بلاغ بلا Journey يُسجَّل بلا فرق وتنضم المشاركة عند ظهور رحلتها فعليًا';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -602,20 +602,16 @@
       region = d.zoneName || null;
     }
     if(!crews.length){
-      // fallback صادق: الوحدات الجنوبية الظاهرة في lastJourneys للقائمة — ظهورها
-      // بمرحلة رحلة هو نفسه دليل Journey فعلي (وحدات الخطة لا تصل lastJourneys —
-      // مثبت بالرصد 2026-08-25). بلا مرحلة رحلة = لا دليل = لا فرقة (قاعدة المشاركة).
-      const it = auto.lastItems[num];
-      const lj = it && Array.isArray(it.lastJourneys) ? it.lastJourneys : [];
-      const seenT = new Set();
-      for(const u of lj){
-        if(!u || !u.journeyStepCode) continue; // لا دليل رحلة فعلي ← لا فرقة
-        const team = mapToSouthTeam(String(u.unitCode || ''));
-        // cadListStep: توثيق دليل القائمة مع الفرقة (قابل للتتبع — لا اختلاق أوقات)
-        if(team && !seenT.has(team)){ seenT.add(team); crews.push({ team, phases: {}, cadListStep: String(u.journeyStepCode) }); }
-      }
+      // لا Journey = لا مشاركة (اعتماد المالك 2026-08-26 — إصلاح الـphantom):
+      // ممر lastJourneys الاحتياطي أُغلق بالكامل — الرصد الحي أثبت أنه كان
+      // يولّد مشاركات {team, phases:{}} قبل وجود Journey فعلية (بلاغ 1315542:
+      // الميلاد سبق الرحلة بثلاث دقائق، والوحدات الوهمية بقيت بلا رحلة حتى
+      // بعد إغلاق البلاغ). الظهور في القائمة ≠ مشاركة. بدل اختلاق فرقة عارية:
+      // يُسجَّل البلاغ نفسه بلا فرق (crews=[]) فيظهر على الخريطة بموقعه ووقته،
+      // وعند ظهور Journey حقيقية يتغيّر ljSig ← autoRefresh ← crewsFromDetail
+      // يلتقط الفرقة بدليلها الكامل فتُنشأ صحيحة من أول مرة (ترقية ذاتية).
+      lifeLog('auto-register-nojourney', { incident: num });
     }
-    if(!crews.length){ lifeLog('auto-skip-nonsouth', { incident: num }); return; } // ⓒ لا وحدة جنوبية
     let coords = coordsFor(num);
     if(!coords && !geo.locOfIncident[num]) await fetchEventLocId(num); // مرة واحدة — قناة الموقع المعتمدة
     if(!coords && geo.locOfIncident[num]) coords = await fetchCoordsByLocId(geo.locOfIncident[num]);
@@ -627,8 +623,10 @@
       watchAdd(num, { code, type, crews, phases: {}, createdAt, address, region, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null,
         callerNumber: callerInfo ? callerInfo.callerNumber : null, description: callerInfo ? callerInfo.description : null });
       lifeLog('auto-register', { incident: num, crews: crews.map(c => c.team + (c.cadUrs ? '#' + c.cadUrs : '')), confirmed: !!d });
-      showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>🚑 ' +
-        crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>', 6000);
+      showToast('📡 البلاغ <b style="direction:ltr;display:inline-block">' + num + '</b> سُجّل <b>تلقائيًا</b><br>' +
+        (crews.length
+          ? '🚑 ' + crews.map(c => c.team).join(' · ') + '<br><small>الزر اليدوي يبقى متاحًا للتصحيح</small>'
+          : '⏳ بانتظار فرقة فعلية — تُسجَّل مشاركتها تلقائيًا عند بدء رحلتها (لا Journey = لا مشاركة)'), 6000);
     } else { setObsStatus('error', (r.data && r.data.error) || ('HTTP ' + r.status)); }
   }
   /* تحديث بلاغ قائم عند إشارة تغيّر lastJourneys: إعادة قراءة التفاصيل مخنوقة —

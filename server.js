@@ -4766,8 +4766,10 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
                          cadUnitId: Number.isInteger(uid) ? uid : undefined,
                          cadRunUnitId: Number.isInteger(rid) ? rid : undefined };
             });
-        if (!cleanCrews.length)
-            return res.status(400).json({ error: 'لا توجد فرقة صالحة في الطلب' });
+        // بلاغ بلا فرق بعد (اعتماد المالك 2026-08-26 — إصلاح الـphantom): crews=[]
+        // يُقبل ويُسجِّل البلاغ نفسه (يظهر على الخريطة بموقعه ووقته) — المشاركات
+        // تنضم لاحقًا بدليلها (Journey) عبر التحديث التلقائي. القاعدة الجذرية:
+        // لا Journey = لا مشاركة، ولم يعد غياب الفرقة سببًا لرفض البلاغ كله.
         if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
 
         // نفس قاعدة توزيع البلاغات اليدوي: لا تسجيل بلا مناوبة نشطة (الختم سيرفري فقط)
@@ -13716,6 +13718,9 @@ server.listen(PORT, async () => {
             // Phase B: CrewActivityService — «الأكثر نشاطًا» من SSOT (قراءة فقط)
             const CrewActivityService = require('./services/crew-activity-service');
             crewActivityService = new CrewActivityService({ engine: opsEngine });
+            // قاعدة الاحتساب الواحدة (اعتماد المالك 2026-08-26): عدّ البلاغات
+            // يمر عبر ReportService.isParticipationCounted حصرًا
+            crewActivityService.reportService = reportService;
             console.log('✅ CrewActivityService wired (Phase B, read-only)');
 
             // Archive slice: single archive path (Archive Contract §2) —

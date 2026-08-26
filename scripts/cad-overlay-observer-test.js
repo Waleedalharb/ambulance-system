@@ -129,13 +129,16 @@ async function cycle() {
 (async () => {
     console.log('🧪 اختبار Incident Observer — vm sandbox بلا متصفح\n');
     loadOverlay();
-    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-25\.a/.test(ctx.window.__southBuild || ''));
+    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-26\.a/.test(ctx.window.__southBuild || ''));
 
     // ─── التسجيل التلقائي من لقطة القائمة (البلاغ بلا Journey بعد) ───
     listSnapshot(); await drain(); await drain();
     const m0 = cadReportMsgs();
-    check('A اكتُشف البلاغ وسُجّل تلقائيًا من القائمة (بلا فتح تفاصيل ولا أوقات رحلة)', m0.length === 1 && m0[0].payload.crews.length === 2);
-    check('E فرقتان بلا Journey ← phases فارغة لكلتيهما (لا وراثة ولا نسخ)', m0.length === 1 && m0[0].payload.crews.every(c => c.phases && Object.keys(c.phases).length === 0));
+    // لا Journey = لا مشاركة (اعتماد المالك 2026-08-26): البلاغ يُسجَّل بلا فرق —
+    // الظهور في lastJourneys لم يعد ينشئ مشاركة وهمية {team, phases:{}}
+    check('A اكتُشف البلاغ وسُجّل تلقائيًا من القائمة بلا فرق (لا Journey بعد = لا مشاركة)', m0.length === 1 && m0[0].payload.crews.length === 0);
+    check('E لا طاقم عارٍ {team, phases:{}} في أي رسالة إطلاقًا (القاعدة الجذرية ضد الـphantom)',
+        m0.length === 1 && cadReportMsgs().every(m => (m.payload.crews || []).every(c => Object.keys(c.phases || {}).length > 0 || !!c.cadUrs || c.cadReached === true)));
 
     // ─── فتح صفحة البلاغ — الـObserver يبدأ تلقائيًا ───
     locationObj.href = CAD + '/incidents/' + INC;
@@ -173,7 +176,7 @@ async function cycle() {
     const crewB2 = t2.payload.crews.find(c => c.team === 'سريع 1');
     check('D ظهور Journey جديدة لوحدة بعد فتح البلاغ ← اُكتشفت وأُرسلت تلقائيًا', msgs.length >= 2 && crewA2 && crewA2.phases['قبول'] === '11:07:08 AM');
     check('D+ phasesSource = cad-detail (مصدرها journeys الوحدة نفسها)', crewA2 && crewA2.phasesSource === 'cad-detail');
-    check('J أوقات جنوب 6 لم تلمس سريع 1 — phases الأخيرة ما زالت فارغة', crewB2 && Object.keys(crewB2.phases || {}).length === 0);
+    check('J أوقات جنوب 6 لم تلمس سريع 1 — سريع 1 لا تُرسل إطلاقًا بلا Journey (لا مشاركة وهمية)', !crewB2);
     check('سُجّل obs-unit-seen للوحدة عند أول ظهور Journey لها (No Journey = No Participation)', lifeEvents('obs-unit-seen').some(e => e.incident === INC && e.unit === 'جنوب 6'));
     // وحدة بلا Journey تبقى مُتجاهَلة حتى بعد أن صارت أختها مشاركة (لا عدوى مشاركة)
     const av2 = lifeEvents('available-ignored').filter(e => e.incident === INC);
@@ -198,7 +201,7 @@ async function cycle() {
     const crewB4 = t4.payload.crews.find(c => c.team === 'سريع 1');
     check('B تغيّر وقت مرحلة (العلاج 11:20:56 AM) ← وصل تلقائيًا', crewA4 && crewA4.phases['العلاج'] === '11:20:56 AM');
     check('B+ المباشرة الفعلية انعكست: cadReached=true رغم cadUrs=B (مشاركة بعد المباشرة)', crewA4 && crewA4.cadReached === true);
-    check('J2 سريع 1 ما زالت بلا أوقات بعد كل تغييرات جنوب 6', crewB4 && Object.keys(crewB4.phases || {}).length === 0);
+    check('J2 سريع 1 ما زالت غير مرسلة بعد كل تغييرات جنوب 6 (لا Journey لها بعد)', !crewB4);
 
     // ─── T4b: نفس البيانات مجددًا = لا إرسال (بصمة — لا spam) ───
     const before = cadReportMsgs().length;

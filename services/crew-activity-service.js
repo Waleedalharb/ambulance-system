@@ -80,6 +80,12 @@ class CrewActivityService {
         // Phase D.1: ربط متأخر (late binding) — نفس نمط CompletionService.
         // يُسند في server.js بعد إنشاء StaffingEventsService. مرجع الأسماء الوحيد.
         this.staffingEventsService = null;
+        // قاعدة الاحتساب الواحدة (اعتماد المالك 2026-08-26): تُسند في server.js
+        // بعد إنشاء ReportService. عدّ البلاغات يمر عبر
+        // ReportService.isParticipationCounted حصرًا — لا شروط SQL مستقلة:
+        // legacy_snapshot/withdrawn/manual_cancelled/وحدات الخطة كلها مستبعدة
+        // من المصدر المركزي، ولا يُنسخ منطق الاحتساب هنا إطلاقًا.
+        this.reportService = null;
     }
 
     storage() { return this.engine.storage; }
@@ -119,14 +125,23 @@ class CrewActivityService {
         }
 
         const shiftIds = shifts.map(s => s.id);
-        const [reportRows, personRows, statusRows] = await Promise.all([
-            // البلاغ الرسمي: كل صف report_times = بلاغ واحد (managers.js:218)
+        // عدّ البلاغات من قاعدة الاحتساب الواحدة (اعتماد المالك 2026-08-26):
+        // نجلب صفوف المشاركة الخام ونمرّرها على ReportService.isParticipationCounted
+        // — نفس تعريف «المشاركة المحتسبة» في byCrew/التوزيع/تقرير المناوبة/الذاكرة
+        // التحليلية. لا COUNT في SQL ولا شروط مستقلة هنا حتى لا يتباين هذا
+        // العدّاد مع بقية المنصة مرة أخرى.
+        if (!this.reportService || typeof this.reportService.isParticipationCounted !== 'function') {
+            throw Object.assign(new Error('خدمة الاحتساب المركزية غير موصولة — لا عدّ بلا القاعدة الواحدة'), { status: 503 });
+        }
+        const [participationRows, personRows, statusRows] = await Promise.all([
+            // كل صف report_times = مشاركة محتملة (managers.js:218) — والاحتساب
+            // النهائي في JS عبر القاعدة المركزية، لا في SQL
             this.storage().all(
-                `SELECT r.shift_id, r.unit, COUNT(rt.id) AS cnt
+                `SELECT r.shift_id, r.unit, r.created_at AS report_created_at,
+                        rt.id, rt.phases, rt.withdrawn, rt.manual_cancelled,
+                        rt.cad_unit_id, rt.cad_run_unit_id, rt.cad_unit_status
                  FROM reports r JOIN report_times rt ON rt.report_id = r.id
-                 WHERE r.shift_id IN (${shiftIds.map(() => '?').join(',')})
-                   AND COALESCE(rt.manual_cancelled, 0) = 0
-                 GROUP BY r.shift_id, r.unit`, shiftIds),
+                 WHERE r.shift_id IN (${shiftIds.map(() => '?').join(',')})`, shiftIds),
             // أحداث الأشخاص: دليل «عمل» فقط (hasPersonEvents) — الأسماء لا تُؤخذ
             // من هنا إطلاقًا (D.1: الأحداث الخام ليست قائمة أعضاء)
             this.storage().all(
@@ -161,10 +176,13 @@ class CrewActivityService {
             return cells[k];
         };
 
-        for (const r of reportRows) {
+        for (const r of participationRows) {
             const team = canonicalTeam(r.unit);
             if (!team || !shiftById[r.shift_id]) continue;
-            ensureCell(r.shift_id, team).reports_count = r.cnt;
+            // القاعدة الواحدة: لا تُحتسب إلا مشاركة فعلية وفق isParticipationCounted
+            if (!this.reportService.isParticipationCounted(r)) continue;
+            const cell = ensureCell(r.shift_id, team);
+            cell.reports_count = (cell.reports_count || 0) + 1;
         }
         for (const p of personRows) {
             const team = canonicalTeam(p.team_id);

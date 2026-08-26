@@ -103,7 +103,6 @@ async function waitReady(tries = 60) {
         check('المفتاح على /api/report ← 401 (لا صلاحية خارج نطاقه)', (await api('/api/report', { method: 'POST', key: TEST_KEY, body: { center: 'الشفاء', unit: 'جنوب 8' } })).status === 401);
         check('رقم غير صالح ← 400', (await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '12ab56', crews: [{ team: 'جنوب 8' }] } })).status === 400);
         check('نوع غير معروف ← 400', (await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401099', type: 'alien', crews: [{ team: 'جنوب 8' }] } })).status === 400);
-        check('crews فارغة ← 400', (await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401099', crews: [] } })).status === 400);
         check('وقت إنشاء غير صالح ← 400', (await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401099', createdAt: 'بكرة الظهر', crews: [{ team: 'جنوب 8' }] } })).status === 400);
 
         if (!active) { console.log('⚠️ لا مناوبة نشطة — تُخطى سيناريوهات الكتابة'); }
@@ -451,6 +450,19 @@ async function waitReady(tries = 60) {
         s = (await sum()).data;
         const cr94 = s.incidents.find(i => i.number === '1401042').crews.find(c => c.unit === 'جنوب 94');
         check('⑱ سحب بلا مشاركة سابقة ← سجل معلَّم محفوظ ولا يدخل العدّ', !!cr94 && cr94.withdrawn === true && cr94.counted === false && (s.byCrew['جنوب 94'] || 0) === c94pre, JSON.stringify(cr94));
+
+        // ── ⑲ crews=[] (اعتماد المالك 2026-08-26): لم يعد 400 — البلاغ يُسجَّل
+        // بصفر مشاركات (لا Journey = لا مشاركة) ويظهر بالملخص بلا فرق. في نهاية
+        // الاختبار حتى لا يحرك عدّادات السيناريوهات السابقة (بلاغ جديد بلا فرق).
+        console.log('\n⑲ بلاغ بلا فرق بعد (crews=[]):');
+        const r19 = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401099', source: 'cad-auto', createdAt: '21/08/2026 9:30:00 AM', crews: [] } });
+        check('⑲ crews=[] ← 200 والبلاغ أُنشئ (لا Journey = لا مشاركة، ليس 400)',
+            r19.status === 200 && r19.data && r19.data.success === true && r19.data.created === true,
+            'status=' + r19.status + ' ' + JSON.stringify(r19.data && { success: r19.data.success, created: r19.data.created }));
+        s = (await sum()).data;
+        const inc19 = (s.incidents || []).find(i => i.number === '1401099');
+        check('⑲ البلاغ ظهر بالملخص بصفر فرق وصفر أثر في byCrew',
+            !!inc19 && (inc19.crews || []).length === 0);
 
     } finally {
         server.kill();

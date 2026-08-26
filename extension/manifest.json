@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "تسجيل بلاغات CAD في منصة الجنوب بضغطة واحدة — قراءة فقط، مراقبة سلبية، بلا استخراج جلسات وبلا طلبات إضافية إلى CAD. مفتاح التكامل في خلفية الإضافة فقط (خارج سياق الصفحة).",
   "host_permissions": [
-    "http://localhost:3002/*"
+    "https://emsoperations.online/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -32,7 +32,7 @@
     },
     {
       "matches": [
-        "http://localhost/*"
+        "https://emsoperations.online/*"
       ],
       "js": [
         "platform-marker.js"

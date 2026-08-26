@@ -370,7 +370,7 @@ class ReportService {
             // إن وصل وقت إنشاء البلاغ متأخرًا: أعد حساب أزمنة استجابة المشاركات السابقة
             if (cadTimeFilled) await this._recomputeIncidentResponses(effShiftId, number, incident.cad_created_at);
 
-            const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [], planUnitsIgnored = [];
+            const addedCrews = [], skippedCrews = [], withdrawnCrews = [], cancelAfterArrivalCrews = [], correctedCrews = [], linkedCrews = [], planUnitsIgnored = [], evidencelessIgnored = [];
             for (const c of crews) {
                 // دفاع مصدر الحقيقة (اعتماد المالك 2026-08-25): Available ≠ Assigned
                 // ≠ Responding ≠ Positioning ≠ Participating — لقطة CAD صريحة (وحدة
@@ -383,6 +383,22 @@ class ReportService {
                 const hasAnyPhaseTime = !!(c.phases && Object.keys(c.phases).length);
                 if (hasCadIdentity && !hasAnyPhaseTime && !c.cadUrs && c.cadReached !== true) {
                     planUnitsIgnored.push(c.team);
+                    continue;
+                }
+                // حارس المشاركة بلا دليل (اعتماد المالك 2026-08-26 — إصلاح الـphantom):
+                // مسار cad-auto وصل بطاقم عارٍ تمامًا {team, phases:{}} — بلا وقت رحلة
+                // ولا هوية CAD ولا urs ولا cadReached ولا withdrawn صريح = لا دليل
+                // مشاركة إطلاقًا. الرصد الحي أثبت أن ممر lastJourneys في الـOverlay
+                // كان يولّد هذا الشكل قبل وجود Journey فعلية (بلاغ 1315542: الميلاد
+                // سبق الرحلة بثلاث دقائق). القاعدة الجذرية: لا Journey = لا مشاركة —
+                // فلا يُنشأ سجل هنا إطلاقًا، ويُوثَّق الاسم في evidencelessIgnored.
+                // الترقية محفوظة: عند ظهور Journey لاحقًا يصل الطاقم بدليله (أوقات/
+                // هوية/urs) فيُنشأ سجله صحيحًا من أول مرة.
+                // مقصور على cad-auto: اليدوي الحقيقي (الزر/التكميل — cad-oneclick)
+                // يسجّل بلا دليل آلي وهذا مقصود ومحفوظ — لا يُمس إطلاقًا.
+                const hasAnyEvidence = hasAnyPhaseTime || hasCadIdentity || !!c.cadUrs || c.cadReached === true || c.withdrawn === true;
+                if (!hasAnyEvidence && source === 'cad-auto') {
+                    evidencelessIgnored.push(c.team);
                     continue;
                 }
                 // المطابقة بهوية الوحدة الثابتة أولًا (قرار المالك 2026-08-23):
@@ -478,7 +494,7 @@ class ReportService {
                     if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
                 } else skippedCrews.push(c.team);
             }
-            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, cancelAfterArrivalCrews, correctedCrews, linkedCrews, planUnitsIgnored, incidentEnriched, effShiftId };
+            return { incident, incidentCreated, addedCrews, skippedCrews, withdrawnCrews, cancelAfterArrivalCrews, correctedCrews, linkedCrews, planUnitsIgnored, evidencelessIgnored, incidentEnriched, effShiftId };
         });
 
         for (const team of result.addedCrews) {
@@ -514,7 +530,11 @@ class ReportService {
             linkedCrews: result.linkedCrews,
             // وحدات خطة الاستجابة المرفوضة (اعتماد المالك 2026-08-25): لقطات CAD
             // صفرية الدليل لم تُنشئ مشاركة — موثقة بالاسم للتتبع ولا تدخل أي عدّاد
-            planUnitsIgnored: result.planUnitsIgnored
+            planUnitsIgnored: result.planUnitsIgnored,
+            // أطقم بلا أي دليل مشاركة (اعتماد المالك 2026-08-26 — إصلاح الـphantom):
+            // {team, phases:{}} عارية تمامًا لم تُنشئ سجلًا — تُرقَّى لاحقًا عند
+            // ظهور Journey الحقيقية، وتبقى موثقة بالاسم هنا للتتبع
+            evidencelessIgnored: result.evidencelessIgnored
         };
     }
 
