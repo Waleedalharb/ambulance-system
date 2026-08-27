@@ -12,10 +12,14 @@
     if (!d || d.source !== REQ || typeof d.reqId !== 'string' || d.reqId.length > 40) return;
     if (!KINDS[d.kind]) return;
     // تحقق شكلي صارم للحمولة قبل تمريرها (الخادم يتحقق أيضًا — دفاع بالعمق)
+    // crews=[] مقبولة (2026-08-27.b): بلاغ بلا Journey يُسجَّل بلا فرق رسميًا منذ
+    // 0da9cff — الإسقاط الصامت هنا كان يحبس الرد فينتهي بمهلة الـ4ث ورسالة
+    // «الإضافة غير مثبتة» المضللة و🔴 كاذب. الشكل غير الصالح يُرد برسالة صادقة.
     if (d.kind === 'cad-report') {
       const p = d.payload;
-      if (!p || typeof p !== 'object' || !/^\d{4,12}$/.test(String(p.number || ''))) return;
-      if (!Array.isArray(p.crews) || p.crews.length < 1 || p.crews.length > 10) return;
+      const reject = (msg) => window.postMessage({ source: RES, reqId: d.reqId, status: 0, data: { error: msg } }, '*');
+      if (!p || typeof p !== 'object' || !/^\d{4,12}$/.test(String(p.number || ''))) return reject('حمولة مرفوضة عند الجسر: رقم البلاغ غير صالح');
+      if (!Array.isArray(p.crews) || p.crews.length > 10) return reject('حمولة مرفوضة عند الجسر: قائمة الفرق غير صالحة');
     }
     try {
       chrome.runtime.sendMessage({ kind: d.kind, payload: d.payload || null }, (resp) => {

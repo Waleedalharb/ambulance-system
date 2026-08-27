@@ -129,7 +129,7 @@ async function cycle() {
 (async () => {
     console.log('🧪 اختبار Incident Observer — vm sandbox بلا متصفح\n');
     loadOverlay();
-    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-27\.a/.test(ctx.window.__southBuild || ''));
+    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-27\.b/.test(ctx.window.__southBuild || ''));
 
     // ─── التسجيل التلقائي من لقطة القائمة (البلاغ بلا Journey بعد) ───
     listSnapshot(); await drain(); await drain();

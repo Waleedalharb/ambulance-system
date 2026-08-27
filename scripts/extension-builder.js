@@ -66,7 +66,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.kind === 'cad-report') {
     const p = msg.payload;
     if (!p || typeof p !== 'object' || !/^\\d{4,12}$/.test(String(p.number || ''))) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
-    if (!Array.isArray(p.crews) || p.crews.length < 1 || p.crews.length > 10) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
+    // crews=[] مقبولة (2026-08-27.b): بلاغ بلا Journey يُسجَّل بلا فرق رسميًا منذ 0da9cff
+    if (!Array.isArray(p.crews) || p.crews.length > 10) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
   }
   (async () => {
     try {

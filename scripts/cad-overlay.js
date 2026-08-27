@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-27.a — وسم صارم: كل مسار آلي cad-auto وكل ضغطة يدوية cad-manual — والعاري غير الموسوم يُحجب سيرفريًا';
+  const OVERLAY_BUILD = '2026-08-27.b — قبول بلاغ بلا فرق عبر الجسر (crews=[]) ورد صادق بدل الإسقاط الصامت — لا 🔴 كاذب';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -248,7 +248,7 @@
       const reqId = 'sr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       const timer = setTimeout(() => {
         window.removeEventListener('message', onMsg);
-        resolve({ status: 0, data: { error: 'إضافة منصة الجنوب غير مثبتة أو لا تستجيب — ثبّتها من مجلد extension/ (دليل CAD-OVERLAY-RUNBOOK)' } });
+        resolve({ status: 0, data: { error: 'لم يصل رد من جسر الإضافة خلال 4 ثوانٍ — أعد تحميل صفحة CAD، وإن تكرر فتحقق من تثبيت إضافة منصة الجنوب وتحديثها' } });
       }, 4000);
       function onMsg(e){
         const d = e.data;
