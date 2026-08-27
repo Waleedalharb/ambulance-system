@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-27.b — قبول بلاغ بلا فرق عبر الجسر (crews=[]) ورد صادق بدل الإسقاط الصامت — لا 🔴 كاذب';
+  const OVERLAY_BUILD = '2026-08-27.d — 1B: قراءة hospitalName من lastJourneys (معرفة المنشأة فقط — بلا استنتاج وصول/تسليم) + إرسال hospital-sighting عند التغيّر فقط';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -133,6 +133,10 @@
           // الاكتشاف التلقائي (المرحلة A): من لقطات incident-list المكتملة فقط —
           // القائمة تكتشف والتفاصيل تؤكد (لا اكتشاف من صفحة جزئية ولا من awaiting)
           if(lm[2] === 'incident-list' && d.last === true) autoDiscoverFromItems(d.items);
+          // Hospital Monitor 1B: قراءة hospitalName من كل صفحة incident-list تصل
+          // (حتى الجزئية — القيمة مرتبطة برحلة محددة بالمعرفات الثابتة وليست حكمًا
+          // على غياب/حضور بلاغ). إرسال عند تغيّر القيمة فقط — صفر حمولة مستقرة.
+          if(lm[2] === 'incident-list') hospitalSightingsFromItems(d.items);
         }
       }
       // مورد الحدث بصورتيه (events/{id} وevents/edit/{id}): يحمل location_id
@@ -216,9 +220,13 @@
       this.addEventListener('load', function(){
         try{
           const u = String(this.__southUrl || '');
+          if(typeof this.responseText !== 'string' || this.responseText.charAt(0) === '<') return;
+          let j; try{ j = JSON.parse(this.responseText); }catch(_){ j = null; }
+          if(!j) return;
+          // مسبار 1A: كل استجابة JSON تُوثَّق خامًا — المسارات المعروفة مقصوصة
+          try{ if(window.__southProbeRecord) window.__southProbeRecord(u, 'xhr', j); }catch(_){}
           if(!/(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/.test(u)) return;
-          if(typeof this.responseText === 'string' && this.responseText.charAt(0) !== '<')
-            window.__southHandleCadResponse(u, JSON.parse(this.responseText));
+          window.__southHandleCadResponse(u, j);
         }catch(e){}
       });
       return XS.apply(this, arguments);
@@ -228,8 +236,13 @@
       const res = await OF.apply(null, arguments);
       try{
         const u = String(res.url || '');
-        if(/(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/.test(u))
-          res.clone().json().then(j => window.__southHandleCadResponse(u, j)).catch(() => {});
+        const known = /(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/.test(u);
+        const jsonish = known || /json/i.test(String(res.headers && res.headers.get('content-type') || ''));
+        if(jsonish)
+          res.clone().json().then(j => {
+            try{ if(window.__southProbeRecord) window.__southProbeRecord(u, 'fetch', j); }catch(_){}
+            if(known) window.__southHandleCadResponse(u, j);
+          }).catch(() => {});
       }catch(e){}
       return res;
     };
@@ -237,6 +250,67 @@
   /* المعالج يُحدَّث عند كل إعادة حقن (الخطاف يستدعيه بالمرجع — إعادة الحقن بلا تحديث
      كانت تبقي النسخة القديمة وتفوّت الالتقاط) */
   window.__southHandleCadResponse = handleCadResponse;
+
+  /* ═══ مسبار 1A — اكتشاف مصدر CAD الثاني (اعتماد المالك 2026-08-27) ═══
+     قراءة فقط بالكامل: يسجّل عينات خام من استجابات CAD كما هي — بلا احتساب،
+     بلا إرسال للمنصة، بلا تغيير سلوك. الهدف: تحديد endpoint صفحة المستشفيات
+     وحقولها (الفرقة/البلاغ/المنشأة/الحالة/الأزمنة) وإيقاع التحديث، وتتبع حالة
+     واحدة كاملة عبر الصفحات. العينات تبقى على جهاز المستخدم ويصدّرها يدويًا.
+     المسارات المعروفة (تفاصيل/قوائم/مواقع) تُخزَّن مقصوصة (بنيتها موثقة)،
+     والمسارات غير المعروفة تُخزَّن بسعة أكبر — فيها الذهب. */
+  const probe = window.__southProbe = window.__southProbe || { buf: [], calls: {}, max: 600 };
+  const PROBE_KNOWN_RE = /(event-manager|location-manager|dispatch-manager)\/api|cad-proxy/;
+  const PROBE_DETAIL_RE = /event-manager\/api\/v\d*\/event-dispatched\/detail/;
+  const PROBE_HIT_RE = /hospital|facility|handover|destination|receiving|dwell|مستشفى|منشأة|تسليم/i;
+  const PROBE_UNIT_RE = /(جنوب|سريع)\s*\d+|"unitCode"\s*:\s*"[^"]+"/g;
+  function probeRecord(url, via, j){
+    try{
+      if(!j || typeof j !== 'object') return;
+      const known = PROBE_KNOWN_RE.test(url);
+      // سعة القوائم 24KB (2026-08-27 — لقطة شاشة تنسيق الاستجابة أثبتت أن اسم
+      // المنشأة يظهر في القائمة نفسها؛ قصّ 4KB كان قد يفقد الدليل المطلوب)
+      const cap = PROBE_DETAIL_RE.test(url) ? 250000 : (known ? 24000 : 120000);
+      let txt; try{ txt = JSON.stringify(j); }catch(_){ return; }
+      if(txt == null) return;
+      const head = txt.slice(0, 6000);
+      const units = (head.match(PROBE_UNIT_RE) || []).slice(0, 12);
+      const evId = (url.match(/eventId=(\d+)/) || url.match(/\/events\/(?:edit\/)?(\d+)/) || [])[1]
+        || (j.data && j.data.id != null && /event-dispatched/.test(url) ? String(j.data.id) : null)
+        || (j.eventId != null ? String(j.eventId) : null);
+      probe.buf.push({
+        t: new Date().toISOString(), via, url: String(url).slice(0, 300),
+        hit: PROBE_HIT_RE.test(url) || PROBE_HIT_RE.test(head),
+        eventId: evId || null, units: units.length ? units : undefined,
+        size: txt.length, truncated: txt.length > cap || undefined,
+        sample: txt.length > cap ? txt.slice(0, cap) : txt
+      });
+      const key = String(url).split('?')[0].replace(/\/\d+/g, '/{id}');
+      probe.calls[key] = (probe.calls[key] || 0) + 1;
+      while(probe.buf.length > probe.max) probe.buf.shift();
+      const b = document.getElementById('southProbeBtn');
+      if(b) b.textContent = '🧪 مسبار 1A (' + probe.buf.length + ')';
+    }catch(e){}
+  }
+  window.__southProbeRecord = probeRecord;
+  window.__southProbeExportJson = probeExportJson; // المُنشئ الصافي — للاختبار وللوحدة الطرفية
+  function probeExportJson(){
+    return JSON.stringify({
+      meta: { build: OVERLAY_BUILD, generatedAt: new Date().toISOString(),
+              note: 'عينات خام من مسبار 1A — قد تحمل بيانات مرضى/مبلغين؛ للتحليل الداخلي فقط',
+              samples: probe.buf.length, callsByEndpoint: probe.calls },
+      buf: probe.buf
+    }, null, 1);
+  }
+  window.__southProbeExport = function(){
+    try{
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([probeExportJson()], { type: 'application/json' }));
+      a.download = 'south-probe-1a-' + Date.now() + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      lifeLog('probe-export', { samples: probe.buf.length });
+      showToast('🧪 صُدّرت <b>' + probe.buf.length + '</b> عينة خام — أرسل الملف للتحليل', 6000);
+    }catch(e){ showToast('❌ تعذر تصدير العينات: ' + e.message, 6000); }
+  };
 
   /* ─── قناة المنصة — فصل أمني (قرار المالك 2026-08-20) ───
      هذا السياق (صفحة CAD) لا يحمل أي مفتاح أو سر. الإرسال يمر برسالة
@@ -465,6 +539,70 @@
      مانع التكرار (الخادم يحدّث نفس الهوية ولا ينشئ) · الزر اليدوي يبقى احتياطيًا
      · سقف ٦٠ بلاغًا تلقائيًا للجلسة · CAD قراءة فقط. */
   const auto = window.__southAuto = window.__southAuto || { seen: {}, queue: [], pumping: false, count: 0, lastItems: {} };
+
+  /* ─── Hospital Monitor 1B (اعتماد المالك 2026-08-27 — 12 قاعدة + تثبيت ما قبل النشر) ───
+     hospitalName = معرفة المنشأة التي يورّدها CAD حاليًا في بيانات الرحلة — فقط.
+     ممنوع استنتاج وصول/بدء تسليم/انتهاء تسليم من وجوده؛ journeyStepCode يُرسل
+     للتتبع فقط ولا يُبنى عليه منطق. الهوية الثابتة: eventId + runUnitId
+     (وunitId احتياطي)؛ unitCode وhospitalName حقول Mutable. null = غياب قيمة
+     جديدة في اللقطة — لا يُرسل ولا يمسح شيئًا. لا طلبات جديدة على CAD: نقرأ
+     من نفس استجابة incident-list التي يطلبها CAD أصلًا.
+     نطاق القطاع (تثبيت المالك): لا تُرسل إلا وحدات قطاع الجنوب — نفس مصدر
+     الحقيقة mapToSouthTeam المستخدم في التسجيل التلقائي (وحدة لا تطابق ← لا مشاهدة).
+     الفصل الدلالي (تثبيت المالك): BACK_TO_SERVICE مع غياب الاسم = إشارة إغلاق
+     «الحالة الحالية» (تُرسل episodeClose مرة واحدة لكل رحلة) — والاسم يبقى
+     محفوظًا سيرفريًا كآخر منشأة معروفة، لا يُمسح. */
+  const hospMon = window.__southHospMon = window.__southHospMon || { seen: {}, closed: {} };
+  function hospitalSightingsFromItems(items){
+    const nowIso = new Date().toISOString();
+    const presentKeys = {};
+    for(const it of (Array.isArray(items) ? items : [])){
+      const evId = it && it.eventId != null ? String(it.eventId) : null;
+      if(!evId) continue;
+      for(const u of (Array.isArray(it.lastJourneys) ? it.lastJourneys : [])){
+        if(!u) continue;
+        // نطاق القطاع أولًا — وحدة غير جنوبية لا تدخل المؤشر إطلاقًا
+        const team = mapToSouthTeam(String(u.unitCode || u.unitNameAr || ''));
+        if(!team) continue;
+        const runId = u.runUnitId != null ? String(u.runUnitId) : null;
+        const unId = u.unitId != null ? String(u.unitId) : null;
+        if(!runId && !unId){ if(u.hospitalName) lifeLog('hospital-noid', { incident: evId, unit: String(u.unitCode || '') }); continue; } // بلا هوية ثابتة = لا حالة
+        const key = evId + ':' + (runId || ('u' + unId));
+        presentKeys[key] = 1;
+        const code = u.unitCode != null ? String(u.unitCode) : null;
+        const step = u.journeyStepCode ? String(u.journeyStepCode) : null;
+        const hn = u.hospitalName != null ? String(u.hospitalName).trim() : '';
+        if(hn && hn.length <= 200){
+          const sig = hn + '|' + (code || '');
+          const wasClosed = hospMon.closed[key] === true;
+          // dedupe — لا إرسال إلا عند التغيّر؛ إلا بعد إغلاق سابق: إعادة ظهور الاسم
+          // (حتى بنفس القيمة) = إعادة فتح حالة يجب أن تصل السيرفر
+          if(hospMon.seen[key] === sig && !wasClosed) continue;
+          hospMon.seen[key] = sig;
+          hospMon.closed[key] = false; // قيمة جديدة تلغي علامة الإغلاق (رحلة عادت لقيمة)
+          const payload = { eventId: evId, unitId: unId, runUnitId: runId, unitCode: code, southTeam: team,
+            hospitalName: hn, journeyStepCode: step, observedAt: nowIso };
+          lifeLog('hospital-sighting', { incident: evId, unit: code, hospital: hn });
+          sendToPlatform('hospital-sighting', payload).then(r => {
+            if(!r || !r.status || r.status >= 400) lifeLog('hospital-sighting-fail', { incident: evId, status: r ? r.status : 0 });
+          });
+          continue;
+        }
+        // إشارة إغلاق الحالة الحالية: عودة للخدمة + غياب الاسم، لرحلة لها مشاهدة سابقة — مرة واحدة فقط
+        if(step === 'BACK_TO_SERVICE' && hospMon.seen[key] && !hospMon.closed[key]){
+          hospMon.closed[key] = true;
+          lifeLog('hospital-episode-close', { incident: evId, unit: code });
+          sendToPlatform('hospital-sighting', { eventId: evId, unitId: unId, runUnitId: runId, unitCode: code,
+            southTeam: team, episodeClose: true, journeyStepCode: step, observedAt: nowIso }).then(r => {
+            if(!r || !r.status || r.status >= 400){ hospMon.closed[key] = false; lifeLog('hospital-close-fail', { incident: evId, status: r ? r.status : 0 }); }
+          });
+        }
+      }
+    }
+    // تنظيف الذاكرة: مفاتيح غابت عن اللقطات الحالية ولا داعي لبقائها (سقف 2000)
+    const keys = Object.keys(hospMon.seen);
+    if(keys.length > 2000) for(const k of keys) if(!presentKeys[k]){ delete hospMon.seen[k]; delete hospMon.closed[k]; }
+  }
   const AUTO_MAX_PER_SESSION = 60;
   const DETAIL_REFETCH_MS = 30000;
   const JOURNEY_PHASES = { ACCEPTANCE: 'قبول', TURNOUT: 'التحرك', IN_ROUTE: 'الاستجابة', PATIENT_REACH: 'البحث',
@@ -829,8 +967,8 @@
       box-shadow:0 4px 16px rgba(0,0,0,.35)}
     #southPocDock.collapsed #southPocLauncher{display:block}
     #southPocDock.collapsed #southPocBtn,#southPocDock.collapsed #southPocStatsBtn,
-    #southPocDock.collapsed #southPocTimesBtn,#southPocDock.collapsed #southPocToast,
-    #southPocDock.collapsed #southPocPanel{display:none!important}
+    #southPocDock.collapsed #southPocTimesBtn,#southPocDock.collapsed #southProbeBtn,
+    #southPocDock.collapsed #southPocToast,#southPocDock.collapsed #southPocPanel{display:none!important}
     #southPocBtn{background:#2E8B7A;color:#fff;
       border:none;border-radius:12px;padding:13px 18px;font:700 15px Tahoma;cursor:pointer;
       box-shadow:0 4px 16px rgba(0,0,0,.35);direction:rtl}
@@ -859,6 +997,9 @@
   statsBtn.id = 'southPocStatsBtn'; statsBtn.textContent = '📊 إحصائية المنصة';
   const timesBtn = document.createElement('button');
   timesBtn.id = 'southPocTimesBtn'; timesBtn.textContent = '⏱ أوقات الرحلة (قراءة فقط)';
+  const probeBtn = document.createElement('button');
+  probeBtn.id = 'southProbeBtn'; probeBtn.textContent = '🧪 مسبار 1A (0)';
+  probeBtn.title = 'تصدير العينات الخام الملتقطة (قراءة فقط — لا تُرسل أي بيانات تلقائيًا)';
   const toast = document.createElement('div'); toast.id = 'southPocToast';
   const panel = document.createElement('div'); panel.id = 'southPocPanel';
   const dock = document.createElement('div'); dock.id = 'southPocDock';
@@ -871,7 +1012,8 @@
   const launcher = document.createElement('button'); launcher.id = 'southPocLauncher';
   launcher.innerHTML = '<span id="southPocStatus">🟢</span> الجنوب';
   launcher.title = '🟢 متزامن\n' + OVERLAY_BUILD;
-  dock.append(grip, launcher, btn, statsBtn, timesBtn, toast, panel);
+  dock.append(grip, launcher, btn, statsBtn, timesBtn, probeBtn, toast, panel);
+  probeBtn.addEventListener('click', () => window.__southProbeExport());
   document.body.appendChild(dock);
   (function makeDockDraggable(){
     let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false, collapsed = false;

@@ -121,7 +121,7 @@ async function cycle() { await ctx.window.__southObsTick(); await drain(); await
 async function overlaySection() {
     console.log('🧪 القسم أ — Overlay: ممر lastJourneys مغلق\n');
     const srcText = fs.readFileSync(OVERLAY_SRC, 'utf8');
-    check('A0 ختم البناء الجديد 2026-08-27.b ظاهر', /2026-08-27\.b/.test(srcText.match(/OVERLAY_BUILD = '([^']+)'/) ? srcText : ''));
+    check('A0 ختم البناء الجديد 2026-08-27.d ظاهر', /2026-08-27\.d/.test(srcText.match(/OVERLAY_BUILD = '([^']+)'/) ? srcText : ''));
     check('A0+ لا أثر لـcadListStep في المصدر إطلاقًا (الممر أُزيل لا عُطّل)', !/cadListStep/.test(srcText));
 
     loadOverlay();

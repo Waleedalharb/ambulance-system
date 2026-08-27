@@ -61,7 +61,7 @@ const PLATFORM_BASE = ${JSON.stringify(base)};
 const INTEGRATION_KEY = ${JSON.stringify(keyValue)};
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg || (msg.kind !== 'cad-report' && msg.kind !== 'cad-stats' && msg.kind !== 'south-teams')) return false;
+  if (!msg || (msg.kind !== 'cad-report' && msg.kind !== 'cad-stats' && msg.kind !== 'south-teams' && msg.kind !== 'hospital-sighting')) return false;
   // تحقق شكلي إضافي (دفاع بالعمق — التحقق الكامل في الخادم)
   if (msg.kind === 'cad-report') {
     const p = msg.payload;
@@ -69,11 +69,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // crews=[] مقبولة (2026-08-27.b): بلاغ بلا Journey يُسجَّل بلا فرق رسميًا منذ 0da9cff
     if (!Array.isArray(p.crews) || p.crews.length > 10) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
   }
+  if (msg.kind === 'hospital-sighting') {
+    const p = msg.payload;
+    if (!p || typeof p !== 'object' || !/^\\d{4,12}$/.test(String(p.eventId || ''))) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
+    if (!p.runUnitId && !p.unitId) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
+    if (p.episodeClose !== true && (typeof p.hospitalName !== 'string' || !p.hospitalName.trim() || p.hospitalName.length > 200)) { sendResponse({ status: 0, data: { error: 'حمولة غير صالحة' } }); return false; }
+  }
   (async () => {
     try {
-      const isPost = msg.kind === 'cad-report';
+      const isPost = msg.kind === 'cad-report' || msg.kind === 'hospital-sighting';
       // فرق الجنوب من التكميل (§5): GET بنفس المفتاح على مساره المقصور — قراءة فقط
-      const url = PLATFORM_BASE + (msg.kind === 'south-teams' ? '/api/cad-reports/south-teams' : '/api/cad-reports');
+      // Hospital Monitor 1B: مسار مستقل مقصور — لا يمر عبر محرك البلاغات إطلاقًا
+      const url = PLATFORM_BASE + (msg.kind === 'south-teams' ? '/api/cad-reports/south-teams'
+        : msg.kind === 'hospital-sighting' ? '/api/cad-reports/hospital-sighting' : '/api/cad-reports');
       const res = await fetch(url, {
         method: isPost ? 'POST' : 'GET',
         headers: Object.assign({ 'Content-Type': 'application/json' },

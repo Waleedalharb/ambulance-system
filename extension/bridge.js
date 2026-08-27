@@ -4,7 +4,7 @@
    لا يحمل مفتاحًا ولا يتصل بأي خادم — مجرد مرحّل رسائل بتحقق صارم من الشكل. */
 (() => {
   const REQ = 'south-cad-overlay', RES = 'south-ext-bridge';
-  const KINDS = { 'cad-report': true, 'cad-stats': true, 'south-teams': true };
+  const KINDS = { 'cad-report': true, 'cad-stats': true, 'south-teams': true, 'hospital-sighting': true };
 
   window.addEventListener('message', (e) => {
     if (e.source !== window) return;
@@ -20,6 +20,16 @@
       const reject = (msg) => window.postMessage({ source: RES, reqId: d.reqId, status: 0, data: { error: msg } }, '*');
       if (!p || typeof p !== 'object' || !/^\d{4,12}$/.test(String(p.number || ''))) return reject('حمولة مرفوضة عند الجسر: رقم البلاغ غير صالح');
       if (!Array.isArray(p.crews) || p.crews.length > 10) return reject('حمولة مرفوضة عند الجسر: قائمة الفرق غير صالحة');
+    }
+    // Hospital Monitor 1B (2026-08-27.d): قراءة اسم المنشأة فقط — هوية ثابتة
+    // (eventId + runUnitId أو unitId) إلزامية. episodeClose (عودة للخدمة) إشارة
+    // إغلاق بلا اسم؛ وغيرها يلزمها hospitalName غير فارغ.
+    if (d.kind === 'hospital-sighting') {
+      const p = d.payload;
+      const reject = (msg) => window.postMessage({ source: RES, reqId: d.reqId, status: 0, data: { error: msg } }, '*');
+      if (!p || typeof p !== 'object' || !/^\d{4,12}$/.test(String(p.eventId || ''))) return reject('حمولة مرفوضة عند الجسر: رقم البلاغ غير صالح');
+      if (!p.runUnitId && !p.unitId) return reject('حمولة مرفوضة عند الجسر: لا هوية ثابتة للرحلة');
+      if (p.episodeClose !== true && (typeof p.hospitalName !== 'string' || !p.hospitalName.trim() || p.hospitalName.length > 200)) return reject('حمولة مرفوضة عند الجسر: اسم المنشأة غير صالح');
     }
     try {
       chrome.runtime.sendMessage({ kind: d.kind, payload: d.payload || null }, (resp) => {

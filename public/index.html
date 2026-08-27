@@ -833,11 +833,13 @@ window.addEventListener('load', function() {
     .hc-kpi-amber  { --hc-accent: var(--pi-amber);  background: linear-gradient(168deg, rgba(251,191,36,0.10), rgba(255,255,255,0.02));  border-color: rgba(251,191,36,0.28); }
     .hc-kpi-red    { --hc-accent: var(--pi-red);    background: linear-gradient(168deg, rgba(248,113,113,0.10), rgba(255,255,255,0.02)); border-color: rgba(248,113,113,0.28); }
     .hc-kpi-purple { --hc-accent: var(--pi-purple); background: linear-gradient(168deg, rgba(192,132,252,0.10), rgba(255,255,255,0.02)); border-color: rgba(192,132,252,0.28); }
+    .hc-kpi-teal   { --hc-accent: #2dd4bf; background: linear-gradient(168deg, rgba(45,212,191,0.10), rgba(255,255,255,0.02)); border-color: rgba(45,212,191,0.28); }
     .hc-kpi-blue   .hc-kpi-icon { background: rgba(96,165,250,0.14);   color: var(--pi-blue);   box-shadow: inset 0 0 0 1px rgba(96,165,250,0.30); }
     .hc-kpi-green  .hc-kpi-icon { background: rgba(52,211,153,0.14);   color: var(--pi-green);  box-shadow: inset 0 0 0 1px rgba(52,211,153,0.30); }
     .hc-kpi-amber  .hc-kpi-icon { background: rgba(251,191,36,0.14);   color: var(--pi-amber);  box-shadow: inset 0 0 0 1px rgba(251,191,36,0.30); }
     .hc-kpi-red    .hc-kpi-icon { background: rgba(248,113,113,0.14);  color: var(--pi-red);    box-shadow: inset 0 0 0 1px rgba(248,113,113,0.30); }
     .hc-kpi-purple .hc-kpi-icon { background: rgba(192,132,252,0.14);  color: var(--pi-purple); box-shadow: inset 0 0 0 1px rgba(192,132,252,0.30); }
+    .hc-kpi-teal   .hc-kpi-icon { background: rgba(45,212,191,0.14);   color: #2dd4bf;          box-shadow: inset 0 0 0 1px rgba(45,212,191,0.30); }
     .hc-kpi-red.hc-alert-on { animation: hcCardPulse 3.2s ease-in-out infinite; }
     @keyframes hcCardPulse {
         0%, 100% { box-shadow: var(--pi-shadow-soft), 0 0 0 0 rgba(248,113,113,0.0); }
@@ -1079,6 +1081,17 @@ window.addEventListener('load', function() {
             </span>
             <span class="hc-kpi-icon"><i class="fas fa-ambulance"></i></span>
         </div>
+        <!-- Hospital Monitor 1B (اعتماد المالك 2026-08-27): هوية المنشأة كما يوردها CAD
+             لكل رحلة (eventId+runUnitId) — قراءة فقط، بلا استنتاج وصول من الاسم -->
+        <button type="button" class="hc-kpi hc-kpi-teal" id="hcKpiHospCard" onclick="openModalById('hospitalModal'); if (typeof renderHospitalModal === 'function') renderHospitalModal();"
+                title="الحالات المنقولة إلى المنشآت في المناوبة الحالية — اسم المنشأة كما يورده CAD حاليًا لكل رحلة (قراءة فقط من بيانات CAD، بلا استنتاج وصول أو تسليم من الاسم)">
+            <span class="hc-kpi-text">
+                <span class="hc-kpi-label">🏥 المستشفيات</span>
+                <span class="hc-kpi-value" id="hcKpiHosp">—</span>
+                <span class="hc-kpi-sub" id="hcKpiHospSub">حالة منقولة</span>
+            </span>
+            <span class="hc-kpi-icon"><i class="fas fa-hospital"></i></span>
+        </button>
     </div>
 
     <!-- الصف الثاني (قرار المالك 2026-08-21): الحالة التشغيلية الآن (يمين) + إنجاز الفرق (يسار) -->
@@ -1728,6 +1741,29 @@ window.addEventListener('load', function() {
         </div>
         <div class="modal-buttons">
             <button onclick="closeModalById('wfInfoOpsModal')" class="btn btn-primary"><i class="fas fa-check"></i> فهمت</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Hospital Monitor 1B: تفصيل المستشفيات (اعتماد المالك 2026-08-27) ===== -->
+<div id="hospitalModal" class="modal">
+    <div class="modal-content" style="max-width:720px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0; color:var(--primary-700);"><i class="fas fa-hospital"></i> المستشفيات — المناوبة الحالية</h2>
+            <button onclick="closeModalById('hospitalModal')" class="btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="hospitalModalSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:12px; font-size:0.95rem;"></div>
+        <div id="hospitalModalBody" style="max-height:55vh; overflow:auto;"></div>
+        <div style="font-size:0.78rem; color:var(--gray-500); margin-top:12px; line-height:1.9; border-top:1px solid var(--gray-200, #e5e7eb); padding-top:10px;">
+            <i class="fas fa-circle-info"></i>
+            اسم المنشأة يُقرأ من بيانات رحلة CAD كما يوردها حاليًا (قراءة فقط — لا نعدّل CAD ولا نستنتج «الوصول» أو «التسليم» من الاسم)،
+            ويُقصى على رحلات فرق قطاع الجنوب فقط. <b>«في المستشفى الآن»</b> = حالة حالية لم تُغلق بعودة الفرقة للخدمة؛
+            وعند العودة للخدمة يبقى الاسم محفوظًا كـ<b>«آخر منشأة معروفة»</b> ولا يُمسح.
+            زمن البقاء يُحسب من أزمنة الرحلة المسجلة («بدء التسليم» ← «انتهاء التسليم») — الرحلات بلا أزمنة تسليم تُحتسب في العدد وتُستبعد من المتوسط.
+            إذا غيّر CAD المنشأة أثناء الرحلة تُحدَّث نفس الرحلة وتُحفظ القيمة السابقة في سجل التدقيق.
+        </div>
+        <div class="modal-buttons">
+            <button onclick="closeModalById('hospitalModal')" class="btn btn-primary"><i class="fas fa-check"></i> إغلاق</button>
         </div>
     </div>
 </div>
@@ -2618,6 +2654,7 @@ window.addEventListener('load', function() {
 <script src="js/map-guide.js?v=1" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
+<script src="js/hospital-monitor.js?v=1" defer></script><!-- Hospital Monitor 1B: مؤشر المستشفيات + تفصيل المنشآت — مشترك في ops:sse، بلا قناة جديدة -->
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">

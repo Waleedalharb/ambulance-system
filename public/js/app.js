@@ -8787,7 +8787,7 @@ function closeModalById(id) { var m = document.getElementById(id); if (m) m.styl
 window.onclick = function(e) {
     // P1-S6: المعرفات الحية فقط — أُسقطت المعدومة (shiftModal, monthlyTableModal, uploadDocsModal, docPreviewModal, themeModal) لأنها no-op أصلاً
     // P1-S9: أُسقط achievementsModal مع إزالة منظومة الجاميفيكيشن كاملة
-    var modals = ['controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'peakTimeModal', 'peakMapModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal'];
+    var modals = ['controlModal', 'passwordModal', 'changePasswordModal', 'seniorShiftModal', 'peakTimeModal', 'peakMapModal', 'distributionModal', 'mapModal', 'peakAlertModal', 'formsModal', 'operationsRoomModal', 'analyticsModal', 'chartsModal', 'hospitalModal'];
     modals.forEach(function(id) {
         if (e.target === document.getElementById(id)) { closeModalById(id); }
     });

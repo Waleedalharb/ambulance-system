@@ -4705,6 +4705,168 @@ app.get('/api/cad-reports/south-teams', cadIntegrationAuth, (req, res, next) => 
     }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Hospital Monitor 1B (اعتماد المالك 2026-08-27 — 12 قاعدة): مخزن مستقل تمامًا
+// لمراقبة «اسم المنشأة الذي يورّده CAD حاليًا» لكل رحلة. ممنوع أن يمس
+// report_times أو isParticipationCounted أو أي احتساب قائم — قراءة أزمنة
+// Journey (بدء/انتهاء التسليم) لحساب زمن البقاء هي قراءة فقط (معرفة الزمن
+// المستقلة، قاعدة ③)، ولا يُستنتج أي وصول من hospitalName (قاعدة ②).
+// ════════════════════════════════════════════════════════════════════════════
+const { HospitalMonitorService } = require('./services/hospital-monitor-service');
+const hospitalMonitor = new HospitalMonitorService(path.join(STORAGE_PATH, 'hospital-monitor.json'));
+
+// كتابة: مفتاح التكامل فقط (الـOverlay عبر الإضافة) — لا JWT ولا مسار يدوي
+app.post('/api/cad-reports/hospital-sighting', cadIntegrationAuth, (req, res, next) => {
+    if (req.integrationAuth) return next();
+    return res.status(401).json({ error: 'هذا المسار مقصور على مفتاح التكامل (الإضافة)' });
+}, async (req, res) => {
+    try {
+        const b = req.body || {};
+        const eventId = String(b.eventId || '').trim();
+        if (!CAD_NUMBER_RE.test(eventId))
+            return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
+        // قاعدة ④: لا حالة بلا هوية ثابتة (runUnitId أساسي، unitId احتياطي)
+        const rid = parseInt(b.runUnitId, 10), uid = parseInt(b.unitId, 10);
+        if (!Number.isInteger(rid) && !Number.isInteger(uid))
+            return res.status(400).json({ error: 'لا هوية ثابتة للرحلة (runUnitId/unitId)' });
+        const base = {
+            eventId,
+            unitId: Number.isInteger(uid) ? uid : null,
+            runUnitId: Number.isInteger(rid) ? rid : null,
+            unitCode: b.unitCode != null ? String(b.unitCode).slice(0, 50) : null,
+            journeyStepCode: b.journeyStepCode ? String(b.journeyStepCode).slice(0, 40) : null // تتبع فقط — قاعدة ③
+        };
+        const seenAt = (typeof b.observedAt === 'string' && !isNaN(Date.parse(b.observedAt))) ? b.observedAt : new Date().toISOString();
+        // إشارة إغلاق (عودة للخدمة): تُغلق «الحالة الحالية» فقط — الاسم يبقى آخر
+        // منشأة معروفة ولا يُمسح (الفصل الدلالي — اعتماد المالك 2026-08-27)
+        if (b.episodeClose === true) {
+            const rc = hospitalMonitor.closeEpisode(base, seenAt);
+            if (rc.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+            return res.json({ success: true, changed: rc.changed, kind: rc.kind });
+        }
+        // قاعدة ⑦ عند الحدود: hospitalName الفارغ/null لا يُقبل ولا يمسح شيئًا
+        const hospitalName = typeof b.hospitalName === 'string' ? b.hospitalName.trim().slice(0, 200) : '';
+        if (!hospitalName)
+            return res.status(400).json({ error: 'اسم المنشأة غير صالح' });
+        // نطاق القطاع (تثبيت المالك ما قبل النشر): المشاهدات تصل مفلترة من
+        // الـOverlay عبر mapToSouthTeam — الحقل إلزامي سيرفريًا دفاعًا بالعمق
+        const southTeam = typeof b.southTeam === 'string' ? b.southTeam.trim().slice(0, 100) : '';
+        if (!southTeam)
+            return res.status(400).json({ error: 'المشاهدة خارج نطاق قطاع الجنوب' });
+        const r = hospitalMonitor.applySighting({ ...base, southTeam, hospitalName }, seenAt);
+        // بث لحظي عبر قناة SSE القائمة فقط عند تغيّر فعلي — لا قناة جديدة ولا بث عند الثبات
+        if (r.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+        res.json({ success: true, changed: r.changed, kind: r.kind });
+    } catch (error) {
+        console.error('[HospitalMonitor] sighting error:', error);
+        res.status(500).json({ error: 'فشل في تسجيل مشاهدة المنشأة' });
+    }
+});
+
+// «h:mm:ss AM» الرياض → دقائق منذ منتصف الليل (نفس دلالة محلل CAD المركزي في report-service)
+function hmCadMinutes(str) {
+    if (!str || typeof str !== 'string') return null;
+    const m = str.trim().match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|ص|م)/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10), sec = m[3] ? parseInt(m[3], 10) : 0;
+    const mer = m[4];
+    if (/pm|م/i.test(mer) && h < 12) h += 12;
+    if (/am|ص/i.test(mer) && h === 12) h = 0;
+    if (h > 23 || min > 59 || sec > 59) return null;
+    return h * 60 + min + sec / 60;
+}
+function hmDiffMin(fromMin, toMin) { if (toMin < fromMin) toMin += 1440; return Math.round((toMin - fromMin) * 10) / 10; }
+function hmNowMinutesRiyadh() {
+    try {
+        return hmCadMinutes(new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Riyadh', hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' }));
+    } catch (_) { return null; }
+}
+// زمن بقاء الرحلة في المنشأة = «انتهاء التسليم» − «بدء التسليم» من أزمنة Journey
+// المخزنة أصلًا في report_times (قراءة فقط — قاعدة ⑧). بلا «بدء تسليم» ← بلا قياس
+// (تُستبعد من المتوسط بصدق). بدء بلا انتهاء ← رحلة جارية: البقاء حتى الآن (ongoing).
+function hmDwellFromPhases(phases, nowMin) {
+    if (!phases || typeof phases !== 'object') return null;
+    const s = hmCadMinutes(phases['بدء التسليم']);
+    if (s === null) return null;
+    const e = hmCadMinutes(phases['انتهاء التسليم']);
+    if (e !== null) return { dwellMin: hmDiffMin(s, e), ongoing: false };
+    if (nowMin === null) return null;
+    return { dwellMin: hmDiffMin(s, nowMin), ongoing: true };
+}
+
+// قراءة المؤشر: أي مستخدم موثّق — النافذة = المناوبة الحالية (أو from/to صريحان)
+app.get('/api/hospital-monitor/summary', authenticate, async (req, res) => {
+    try {
+        if (!opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        let fromTs = null, windowLabel = 'current-shift';
+        const parseDay = (s, end) => {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+            if (!m) return null;
+            const d = end ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999)
+                          : new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0);
+            return isNaN(d.getTime()) ? null : d.getTime();
+        };
+        let toTs = null;
+        if (req.query.from) { fromTs = parseDay(req.query.from, false); windowLabel = 'custom'; }
+        if (req.query.to) { toTs = parseDay(req.query.to, true); windowLabel = 'custom'; }
+        const shiftId = await opsEngine.shifts.resolveShiftId(req);
+        if (fromTs == null && shiftId && opsEngine.storage) {
+            const sh = await opsEngine.storage.getShiftById(shiftId);
+            const st = sh && (sh.start_time || sh.startTime);
+            const parsed = st ? Date.parse(String(st).replace(' ', 'T')) : NaN;
+            if (!isNaN(parsed)) fromTs = parsed;
+            else { // احتياط صادق: تاريخ المناوبة من بداية يومها
+                fromTs = parseDay(sh && sh.shift_date, false);
+            }
+        }
+        if (fromTs == null) { fromTs = parseDay(new Date().toISOString().slice(0, 10), false); windowLabel = 'today-fallback'; }
+
+        // أزمنة Journey المخزنة (قراءة فقط) لمفاتيح الرحلات — لحساب زمن البقاء
+        const dwellByKey = {};
+        if (shiftId && opsEngine.storage) {
+            const rows = await opsEngine.storage.all(
+                `SELECT t.incident_number, t.cad_run_unit_id, t.cad_unit_id, t.phases
+                 FROM report_times t JOIN reports r ON r.id = t.report_id
+                 WHERE r.shift_id = ? AND (t.withdrawn IS NULL OR t.withdrawn = 0)
+                   AND (t.manual_cancelled IS NULL OR t.manual_cancelled = 0)`, [shiftId]);
+            const nowMin = hmNowMinutesRiyadh();
+            for (const row of rows || []) {
+                let phases = null;
+                try { phases = row.phases ? JSON.parse(row.phases) : null; } catch (_) { phases = null; }
+                const d = hmDwellFromPhases(phases, nowMin);
+                if (!d) continue;
+                const key = row.cad_run_unit_id != null
+                    ? String(row.incident_number) + ':' + String(row.cad_run_unit_id)
+                    : (row.cad_unit_id != null ? String(row.incident_number) + ':u' + String(row.cad_unit_id) : null);
+                if (!key) continue;
+                // مشاركة واحدة لكل رحلة غالبًا؛ عند التعدد: الأفضل = المكتمل (بلا
+                // ongoing) ثم الأطول زمنًا — لا فقدان صامت لقياس أقوى
+                const prev = dwellByKey[key];
+                if (!prev || (prev.ongoing && !d.ongoing) ||
+                    (!!prev.ongoing === !!d.ongoing && d.dwellMin > prev.dwellMin)) dwellByKey[key] = d;
+            }
+        }
+        const summary = hospitalMonitor.summarize(fromTs, toTs, dwellByKey);
+        res.json({ success: true, window: { label: windowLabel, from: new Date(fromTs).toISOString(), to: toTs ? new Date(toTs).toISOString() : null }, ...summary });
+    } catch (error) {
+        console.error('[HospitalMonitor] summary error:', error);
+        res.status(500).json({ error: 'فشل في جلب مؤشر المستشفيات' });
+    }
+});
+
+// تدقيق: تاريخ تغيّرات رحلة محددة (append-only — قابل للتتبع)
+app.get('/api/hospital-monitor/history', authenticate, (req, res) => {
+    try {
+        const key = String(req.query.key || '');
+        if (!key) return res.status(400).json({ error: 'مفتاح الرحلة مطلوب' });
+        res.json({ success: true, key, history: hospitalMonitor.historyFor(key) });
+    } catch (error) {
+        console.error('[HospitalMonitor] history error:', error);
+        res.status(500).json({ error: 'فشل في جلب تاريخ الرحلة' });
+    }
+});
+
 app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
     if (req.integrationAuth) return next(); // مفتاح التكامل مقصور على هذا المسار فقط
     authenticate(req, res, () => authorizePerm('ops.dispatch')(req, res, next));

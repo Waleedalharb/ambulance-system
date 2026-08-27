@@ -76,3 +76,6 @@ desktop.ini
 extension/cad-overlay-content.js
 extension/background.js
 dist/
+
+# حزم هجينة محلية (تحمل مفتاح الإنتاج المستخرج — لا تُرفع أبدًا)
+dist-probe-*/
