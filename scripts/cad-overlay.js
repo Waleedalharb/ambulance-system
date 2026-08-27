@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-26.a — No Journey = No Participation: ممر lastJourneys مغلق — بلاغ بلا Journey يُسجَّل بلا فرق وتنضم المشاركة عند ظهور رحلتها فعليًا';
+  const OVERLAY_BUILD = '2026-08-27.a — وسم صارم: كل مسار آلي cad-auto وكل ضغطة يدوية cad-manual — والعاري غير الموسوم يُحجب سيرفريًا';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -264,7 +264,7 @@
     const payload = { number, code, type, createdAt: createdAt || null, address: address || null, region: region || null,
       lat: coords ? coords.lat : null, lng: coords ? coords.lng : null,
       status: status || null, // الحالة النهائية إن ظهرت صراحة في CAD — غيابها لا يعني شيئًا
-      source: source === 'cad-auto' ? 'cad-auto' : undefined, // وسم الاكتشاف التلقائي (المرحلة A)
+      source: (source === 'cad-auto' || source === 'cad-manual') ? source : undefined, // وسم صارم (2026-08-27): الآلي cad-auto واليدوي الصريح cad-manual — غياب الوسم = cad-oneclick سيرفريًا والعاري فيه يُحجب
       crews: crews.map(c => {
         // القاعدة الجذرية (قرار المالك 2026-08-23): أوقات كل فرقة من Journey الخاصة
         // بها فقط. اللقطة المشتركة من الصفحة تُعطى فقط عندما تكون الفرقة الوحيدة
@@ -944,7 +944,7 @@
       if(t === '__cancel'){ showToast('🚫 أُلغي — لم يُسجَّل أي بلاغ.', 3000); return; }
       const coords = await coordsEnsured(number);
       const phasesNow = phasesObject(), createdNow = incidentCreatedAt(), addrNow = addressFromPage(), regionNow = regionFromPage();
-      const r = await apiPost(number, code, type, [t], phasesNow, createdNow, addrNow, regionNow, coords);
+      const r = await apiPost(number, code, type, [t], phasesNow, createdNow, addrNow, regionNow, coords, null, 'cad-manual');
       if(r.data && r.data.success){
         watchAdd(number, { code, type, crews: [{ team: t }], phases: phasesNow, createdAt: createdNow, address: addrNow, region: regionNow, lat: coords ? coords.lat : null, lng: coords ? coords.lng : null }); // مراقبة + إثراء تلقائي بعد التسجيل
         successToast(number, type, [t], coords);
@@ -993,7 +993,7 @@
     try {
       const coords = await coordsEnsured(number); // الالتقاط السلبي ثم جلب location_id المعتمد عند الحاجة
       const phasesNow = phasesObject(), createdNow = incidentCreatedAt(), addrNow = addressFromPage(), regionNow = regionFromPage();
-      const r = await apiPost(number, code, type, southCrews, phasesNow, createdNow, addrNow, regionNow, coords);
+      const r = await apiPost(number, code, type, southCrews, phasesNow, createdNow, addrNow, regionNow, coords, null, 'cad-manual');
       if(r.data && r.data.success){
         // ضغطة واحدة = تسجيل + مراقبة + إثراء تلقائي (قرار المالك 2026-08-21):
         // البلاغ يدخل قائمة المراقبة فورًا — أي موقع/إحداثيات/مرحلة تصل لاحقًا تُرسل تلقائيًا
@@ -1111,7 +1111,7 @@
       if(lt.absentStreak >= LIST_ABSENT_CONFIRM && goneLong){
         if(w.crews && w.crews.length){
           await apiPost(num, w.code, w.type, w.crews, w.phases, w.createdAt, w.address, w.region,
-            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled', undefined,
+            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled', 'cad-auto',
             (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
         }
         delete watch.list[num]; watch.order = watch.order.filter(x => x !== num);
@@ -1146,7 +1146,7 @@
       const gotNewCoords = !!(coords && (w.lat !== coords.lat || w.lng !== coords.lng));
       setObsStatus('updating', 'بلاغ ' + num);
       const r = await apiPost(num, w.code, w.type, effCrews, snap.phases, snap.createdAt, snap.address, snap.region,
-        coords || (snap.lat != null && snap.lng != null ? { lat: snap.lat, lng: snap.lng } : null), null, undefined,
+        coords || (snap.lat != null && snap.lng != null ? { lat: snap.lat, lng: snap.lng } : null), null, 'cad-auto',
         (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
       if(r.data && r.data.success){
         setObsStatus('synced');

@@ -121,7 +121,7 @@ async function cycle() { await ctx.window.__southObsTick(); await drain(); await
 async function overlaySection() {
     console.log('🧪 القسم أ — Overlay: الفلتر الدلالي لوحدات الخطة\n');
     loadOverlay();
-    check('A0 ختم البناء الجديد 2026-08-26.a ظاهر', /2026-08-26\.a/.test(ctx.window.__southBuild || ''));
+    check('A0 ختم البناء الجديد 2026-08-27.a ظاهر', /2026-08-27\.a/.test(ctx.window.__southBuild || ''));
 
     listSnapshot(); await drain(); await drain();
     locationObj.href = CAD + '/incidents/' + INC;
@@ -303,11 +303,15 @@ async function serverSection() {
             && !!cw6 && cw6.counted === true && cw6.cancelKind === 'after-arrival'
             && ((s.byCrew || {})['جنوب 7'] || 0) === c0('جنوب 7') + 1, JSON.stringify(cw6));
 
-        /* ── S7: المسار اليدوي لا يتأثر إطلاقًا (بلا هوية CAD وبلا phasesSource) ── */
+        /* ── S7: اليدوي الصريح (cad-manual) لا يتأثر إطلاقًا — والعارٍ بلا وسم يُحجب ── */
         const N7 = '8' + NB + '7';
-        const r7 = await post({ number: N7, type: 'medical', crews: [{ team: 'جنوب 8' }] });
+        const r7u = await post({ number: N7, type: 'medical', crews: [{ team: 'جنوب 8' }] });
+        check('B7- عارٍ بلا وسم (cad-oneclick) ← يُحجب (سد ثغرة سقوط الوسم 2026-08-27)',
+            r7u.data && (r7u.data.addedCrews || []).length === 0 && (r7u.data.evidencelessIgnored || []).indexOf('جنوب 8') !== -1
+            && dbCount(N7).length === 0, JSON.stringify(r7u.data));
+        const r7 = await post({ number: N7, type: 'medical', source: 'cad-manual', crews: [{ team: 'جنوب 8' }] });
         s = await sum();
-        check('B7 يدوي بلا phases ولا هوية CAD ← يُنشأ ويُحسب كما كان (القاعدة القديمة محفوظة)',
+        check('B7 يدوي صريح (cad-manual) بلا phases ولا هوية CAD ← يُنشأ ويُحسب (الإدخال اليدوي الحقيقي محفوظ)',
             r7.data && (r7.data.addedCrews || []).indexOf('جنوب 8') !== -1 && (r7.data.planUnitsIgnored || []).length === 0
             && ((s.byCrew || {})['جنوب 8'] || 0) === c0('جنوب 8') + 1, JSON.stringify(r7.data));
 

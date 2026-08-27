@@ -82,7 +82,7 @@ const incOf = (sum, num) => (sum.incidents || []).filter(i => i.number === num);
 
         // ── S1: بلاغ واحد بأربع فرق ──
         console.log('\nS1 — بلاغ بأربع فرق (فريد مقابل مشاركات):');
-        const r1 = await post(TK, { number: '990090', type: 'medical', crews: [{ team: 'جنوب 1' }, { team: 'جنوب 2' }, { team: 'جنوب 3' }, { team: 'جنوب 4' }] });
+        const r1 = await post(TK, { number: '990090', type: 'medical', source: 'cad-manual', crews: [{ team: 'جنوب 1' }, { team: 'جنوب 2' }, { team: 'جنوب 3' }, { team: 'جنوب 4' }] });
         check('S1 التسجيل نجح', r1.status === 200 && r1.data.success === true, JSON.stringify(r1.data).slice(0, 120));
         let s = await sum();
         check('S1 الإجمالي +1 فقط (رقم فريد لا مشاركات)', s.total === s0.total + 1, 'total=' + s.total);
@@ -135,7 +135,7 @@ const incOf = (sum, num) => (sum.incidents || []).filter(i => i.number === num);
 
         // ── S5: تسجيل ← إثراء بالموقع ← إغلاق (الدورة الكاملة) ──
         console.log('\nS5 — الدورة الكاملة: تسجيل بلا موقع ← إثراء ← إغلاق:');
-        await post(TK, { number: '990093', crews: [{ team: 'جنوب 7' }] });
+        await post(TK, { number: '990093', source: 'cad-manual', crews: [{ team: 'جنوب 7' }] });
         s = await sum();
         check('S5 سُجل بلا إحداثيات بصدق (null)', incOf(s, '990093').length === 1 && incOf(s, '990093')[0].lat === null);
         await post(TK, { number: '990093', lat: 24.63, lng: 46.73, crews: [{ team: 'جنوب 7' }] });

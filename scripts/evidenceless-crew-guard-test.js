@@ -9,7 +9,9 @@
  *             بلا فرق (يظهر على الخريطة)، وتنضم المشاركة عند ظهور رحلتها فعليًا.
  *   القسم ب — الخادم (قاعدة معزولة): حارس createIncidentEntries لمسار cad-auto —
  *             طاقم بلا أي دليل (وقت/هوية/urs/cadReached/withdrawn) ← لا سجل إطلاقًا.
- * الضوابط الثابتة: اليدوي الحقيقي (cad-oneclick) لا يُمس · isParticipationCounted
+ * الضوابط الثابتة: اليدوي الصريح الموسوم cad-manual لا يُمس (توسعة 2026-08-27: العاري
+ * بلا وسم — cad-oneclick — يُحجب مثل cad-auto لسد ثغرة سقوط الوسم عبر watchTick) ·
+ * الحارس على الإنشاء فقط (تحديث السجلات القائمة لا يُحجب) · isParticipationCounted
  * لم يُعدَّل · لا حذف ولا تعديل لأي سجل تاريخي.
  * التشغيل: node scripts/evidenceless-crew-guard-test.js
  */
@@ -119,7 +121,7 @@ async function cycle() { await ctx.window.__southObsTick(); await drain(); await
 async function overlaySection() {
     console.log('🧪 القسم أ — Overlay: ممر lastJourneys مغلق\n');
     const srcText = fs.readFileSync(OVERLAY_SRC, 'utf8');
-    check('A0 ختم البناء الجديد 2026-08-26.a ظاهر', /2026-08-26\.a/.test(srcText.match(/OVERLAY_BUILD = '([^']+)'/) ? srcText : ''));
+    check('A0 ختم البناء الجديد 2026-08-27.a ظاهر', /2026-08-27\.a/.test(srcText.match(/OVERLAY_BUILD = '([^']+)'/) ? srcText : ''));
     check('A0+ لا أثر لـcadListStep في المصدر إطلاقًا (الممر أُزيل لا عُطّل)', !/cadListStep/.test(srcText));
 
     loadOverlay();
@@ -222,14 +224,14 @@ async function serverSection() {
             && rows2.length === 1 && !!rows2[0].phases && rows2[0].phases.indexOf('التحرك') !== -1
             && ((s.byCrew || {})['جنوب 7'] || 0) === c0('جنوب 7') + 1, JSON.stringify({ added: r2.data && r2.data.addedCrews, rows: rows2.length }));
 
-        /* ── S3: تكرار الطاقم العاري بعد الترقية ← لا يسحبها ولا يعدّلها ── */
+        /* ── S3: طاقم عارٍ لاحق على مشاركة قائمة ← لا يسحبها ولا يعدّلها ولا ينشئ ثانية ── */
         const r3 = await post({ number: N1, type: 'medical', source: 'cad-auto', crews: [{ team: 'جنوب 7', phases: {} }] });
         const rows3 = dbCount(N1);
         s = await sum();
-        check('B3 طاقم عارٍ لاحق على مشاركة قائمة ← يُحجب والمشاركة محفوظة محتسبة',
-            r3.data && (r3.data.evidencelessIgnored || []).indexOf('جنوب 7') !== -1
-            && rows3.length === 1 && rows3[0].phases.indexOf('التحرك') !== -1
-            && ((s.byCrew || {})['جنوب 7'] || 0) === c0('جنوب 7') + 1);
+        check('B3 طاقم عارٍ لاحق على مشاركة قائمة ← لا سجل ثانٍ والمشاركة محفوظة بأوقاتها محتسبة',
+            rows3.length === 1 && rows3[0].phases.indexOf('التحرك') !== -1
+            && ((s.byCrew || {})['جنوب 7'] || 0) === c0('جنوب 7') + 1,
+            JSON.stringify({ rows: rows3.length, ev: r3.data && r3.data.evidencelessIgnored, sk: r3.data && r3.data.skippedCrews }));
 
         /* ── S4: cad-auto بـurs=A بلا أوقات ← سلوك قائم محفوظ (قبول صريح = دليل) ── */
         const N4 = '9' + NB + '4';
@@ -247,14 +249,27 @@ async function serverSection() {
             rows5.length === 1 && rows5[0].withdrawn === 1 && ((s.byCrew || {})['جنوب 8'] || 0) === c0('جنوب 8'),
             JSON.stringify(rows5));
 
-        /* ── S6: اليدوي الحقيقي (cad-oneclick بلا دليل) ← لا يُمس إطلاقًا ── */
+        /* ── S6: سد ثغرة سقوط الوسم (2026-08-27): العاري بلا وسم ← يُحجب — اليدوي
+           الصريح وحده (cad-manual) يمر ── */
         const N6 = '9' + NB + '6';
         const r6 = await post({ number: N6, type: 'medical', crews: [{ team: 'جنوب 10' }] });
+        check('B6 عارٍ بلا وسم إطلاقًا (cad-oneclick افتراضي) ← يُحجب كالموسوم cad-auto (لا ثغرة سقوط وسم)',
+            r6.data && (r6.data.addedCrews || []).length === 0
+            && (r6.data.evidencelessIgnored || []).indexOf('جنوب 10') !== -1
+            && dbCount(N6).length === 0, JSON.stringify(r6.data));
+        const r6b = await post({ number: N6, type: 'medical', source: 'cad-manual', crews: [{ team: 'جنوب 10' }] });
         s = await sum();
-        check('B6 يدوي حقيقي عارٍ (بلا source=cad-auto) ← يُنشأ ويُحتسب كما كان',
-            r6.data && (r6.data.addedCrews || []).indexOf('جنوب 10') !== -1
-            && (r6.data.evidencelessIgnored || []).length === 0
-            && ((s.byCrew || {})['جنوب 10'] || 0) === c0('جنوب 10') + 1, JSON.stringify(r6.data));
+        check('B6b الضغطة اليدوية الصريحة (cad-manual) عارية ← تُنشأ وتُحتسب (الإدخال اليدوي الحقيقي محفوظ)',
+            r6b.data && (r6b.data.addedCrews || []).indexOf('جنوب 10') !== -1
+            && dbCount(N6).length === 1
+            && ((s.byCrew || {})['جنوب 10'] || 0) === c0('جنوب 10') + 1, JSON.stringify(r6b.data));
+
+        /* ── S6c: العاري على سجل قائم ← تحديث لا يُحجب (موضع الحارس بعد المطابقة) ── */
+        const r6c = await post({ number: N6, type: 'medical', crews: [{ team: 'جنوب 10', withdrawn: false }] });
+        check('B6c عارٍ (withdrawn=false) على سجل قائم ← لا يدخل evidencelessIgnored ولا ينشئ ثانيًا',
+            r6c.data && (r6c.data.evidencelessIgnored || []).indexOf('جنوب 10') === -1
+            && (r6c.data.skippedCrews || []).indexOf('جنوب 10') !== -1
+            && dbCount(N6).length === 1, JSON.stringify(r6c.data));
 
         /* ── S7: crews=[] ← البلاغ يُسجَّل بصفر مشاركات (لا 400) ── */
         const N7 = '9' + NB + '7';

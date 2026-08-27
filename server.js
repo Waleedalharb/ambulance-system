@@ -4716,8 +4716,9 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
     try {
         const { number, code, type, crews, createdAt, address, region, lat, lng, status, source, callerNumber, description } = req.body;
         // وسم المصدر (قرار المالك 2026-08-23 — المرحلة A): cad-auto = اكتشاف تلقائي من
-        // قائمة CAD، cad-oneclick = الزر اليدوي — القيمة غير المعروفة تعود للافتراضي بصدق
-        const srcTag = source === 'cad-auto' ? 'cad-auto' : 'cad-oneclick';
+        // قائمة CAD، cad-manual = ضغطة يدوية صريحة في الـOverlay (توسعة 2026-08-27)،
+        // cad-oneclick = الافتراضي بصدق لكل ما لم يُوسم (قيم قديمة/غير معروفة)
+        const srcTag = source === 'cad-auto' ? 'cad-auto' : (source === 'cad-manual' ? 'cad-manual' : 'cad-oneclick');
         if (!CAD_NUMBER_RE.test(number.trim()))
             return res.status(400).json({ error: 'رقم البلاغ غير صالح' });
         if (type && !CAD_VALID_TYPES.includes(type))

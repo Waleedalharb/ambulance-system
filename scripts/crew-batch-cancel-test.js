@@ -189,7 +189,7 @@ async function serverSection() {
         const c0 = u => (s0.byCrew && s0.byCrew[u]) || 0;
         const crewOf = (s, unit) => { const inc = (s.incidents || []).find(i => i.number === N); return inc ? (inc.crews || []).find(c => c.unit === unit) : null; };
         // بلاغ بأربع فرق (مسار يدوي — كلها محتسبة بالقاعدة القائمة)
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: N, type: 'medical', crews: [{ team: 'جنوب 1' }, { team: 'جنوب 4' }, { team: 'جنوب 5' }, { team: 'جنوب 6' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: N, type: 'medical', source: 'cad-manual', crews: [{ team: 'جنوب 1' }, { team: 'جنوب 4' }, { team: 'جنوب 5' }, { team: 'جنوب 6' }] } });
 
         // ب1: دفعة ثلاث فرق عبر نفس endpoint الفردي (محاكاة حرفية لتنفيذ الواجهة)
         const batch = ['جنوب 1', 'جنوب 4', 'جنوب 6'];

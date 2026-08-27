@@ -122,7 +122,7 @@ async function waitReady(tries = 60) {
 
         // ── ② بلاغ بفرقتين ──
         console.log('\n② بلاغ بفرقتين:');
-        const r2 = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401002', type: 'injury', crews: [{ team: 'جنوب 4' }, { team: 'جنوب 5' }] } });
+        const r2 = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401002', type: 'injury', source: 'cad-manual', crews: [{ team: 'جنوب 4' }, { team: 'جنوب 5' }] } });
         s = (await sum()).data;
         check('② الإجمالي +1 فقط (وليس +2)', r2.data.created === true && s.total === s0.total + 2, 'total=' + s.total);
         check('② byType.injury=+1 مرة واحدة رغم فرقتين', s.byType.injury === t0('injury') + 1);
@@ -130,7 +130,7 @@ async function waitReady(tries = 60) {
 
         // ── ③ بلاغ بثلاث فرق ──
         console.log('\n③ بلاغ بثلاث فرق:');
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401003', type: 'medical', crews: [{ team: 'جنوب 1' }, { team: 'سريع 1' }, { team: 'جنوب 8' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401003', type: 'medical', source: 'cad-manual', crews: [{ team: 'جنوب 1' }, { team: 'سريع 1' }, { team: 'جنوب 8' }] } });
         s = (await sum()).data;
         check('③ الإجمالي +1 فقط (وليس +3)', s.total === s0.total + 3, 'total=' + s.total);
         check('③ byType.medical=+1', s.byType.medical === t0('medical') + 1);
@@ -145,13 +145,13 @@ async function waitReady(tries = 60) {
         s = (await sum()).data;
         check('④ الإجمالي لم يتغير وعدّاد جنوب 8 لم يتضاعف', s.total === s0.total + 3 && (s.byCrew['جنوب 8'] || 0) === c0('جنوب 8') + 2, JSON.stringify({ t: s.total, c: s.byCrew['جنوب 8'] }));
         // فرقة جديدة تُلحق بنفس البلاغ دون إنشاء بلاغ جديد
-        const r4b = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401001', crews: [{ team: 'جنوب 2' }] } });
+        const r4b = await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401001', source: 'cad-manual', crews: [{ team: 'جنوب 2' }] } });
         s = (await sum()).data;
         check('④ إلحاق فرقة جديدة: created=false والإجمالي ثابت وعدّاد جنوب 2 = +1', r4b.data.created === false && s.total === s0.total + 3 && (s.byCrew['جنوب 2'] || 0) === c0('جنوب 2') + 1);
 
         // ── ⑥ أنواع مختلفة ──
         console.log('\n⑥ نوع مختلف:');
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401004', type: 'fire', crews: [{ team: 'سريع 2' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401004', type: 'fire', source: 'cad-manual', crews: [{ team: 'سريع 2' }] } });
         s = (await sum()).data;
         check('⑥ byType.fire=+1 والإجمالي +4', s.byType.fire === t0('fire') + 1 && s.total === s0.total + 4, JSON.stringify({ f: s.byType.fire, t: s.total }));
 
@@ -259,12 +259,12 @@ async function waitReady(tries = 60) {
 
         // ── ⑫ طبقة التقاط الموقع: العنوان الخام + الحي المشتق + الاستكمال بلا كتابة فوق ──
         console.log('\n⑫ التقاط الموقع والحي:');
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401014', address: 'RLFA7348، 7348 طريق ابن تيمية، 4788، حي الشفا، الرياض 14721، السعودية', region: 'South Riyadh city Sector', crews: [{ team: 'جنوب 3' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401014', source: 'cad-manual', address: 'RLFA7348، 7348 طريق ابن تيمية، 4788، حي الشفا، الرياض 14721، السعودية', region: 'South Riyadh city Sector', crews: [{ team: 'جنوب 3' }] } });
         s = (await sum()).data;
         const ic14 = s.incidents.find(i => i.number === '1401014');
         check('⑫ «حي الشفا» ← district=الشفا مع حفظ العنوان الخام والمنطقة', ic14.district === 'الشفا' && ic14.address.includes('طريق ابن تيمية') && ic14.region === 'South Riyadh city Sector', JSON.stringify({ d: ic14.district }));
         // نمط بلا بادئة «حي»: الجزء الذي يسبق «الرياض …»
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401015', address: '7616 الخليل بن أحمد، بدر، الرياض 14724، السعودية', crews: [{ team: 'جنوب 3' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401015', source: 'cad-manual', address: '7616 الخليل بن أحمد، بدر، الرياض 14724، السعودية', crews: [{ team: 'جنوب 3' }] } });
         s = (await sum()).data;
         check('⑫ بلا بادئة «حي» ← district=بدر (ما قبل الرياض)', s.incidents.find(i => i.number === '1401015').district === 'بدر');
         // الاستكمال بلا كتابة فوق: إعادة إرسال بعنوان مختلف لا يغيّر المخزن
@@ -273,7 +273,7 @@ async function waitReady(tries = 60) {
         const ic14b = s.incidents.find(i => i.number === '1401014');
         check('⑫ العنوان/الحي المخزنان لا يُكتب فوقهما', ic14b.district === 'الشفا' && ic14b.address.includes('ابن تيمية'), JSON.stringify({ d: ic14b.district }));
         // استكمال لاحق لبلاغ حُفظ بلا عنوان
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401016', crews: [{ team: 'جنوب 3' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401016', source: 'cad-manual', crews: [{ team: 'جنوب 3' }] } });
         await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401016', address: 'طريق الملك فهد، حي العليا، الرياض 12212، السعودية', crews: [{ team: 'جنوب 3' }] } });
         s = (await sum()).data;
         check('⑫ بلاغ بلا عنوان ثم وصل متأخرًا ← district=العليا', s.incidents.find(i => i.number === '1401016').district === 'العليا');
@@ -285,7 +285,7 @@ async function waitReady(tries = 60) {
         const ic16 = s.incidents.find(i => i.number === '1401016');
         check('⑫ شارع بكلمة «طريق»: street=«طريق الملك فهد» وcity=الرياض', ic16.street === 'طريق الملك فهد' && ic16.city === 'الرياض', JSON.stringify({ st: ic16.street }));
         // عنوان بلا اسم شارع (رقم فقط) ← street=null بصدق
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401017', address: '8372، منفوحة، الرياض 12681، السعودية', crews: [{ team: 'جنوب 3' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401017', source: 'cad-manual', address: '8372، منفوحة، الرياض 12681، السعودية', crews: [{ team: 'جنوب 3' }] } });
         s = (await sum()).data;
         const ic17 = s.incidents.find(i => i.number === '1401017');
         check('⑫ بلا اسم شارع ← street=null بصدق مع district=منفوحة وcity=الرياض', ic17.street === null && ic17.district === 'منفوحة' && ic17.city === 'الرياض', JSON.stringify({ st: ic17.street, d: ic17.district }));
@@ -306,7 +306,7 @@ async function waitReady(tries = 60) {
 
         // ── ⑭ إحداثيات CAD الأصلية: تُحفظ كما هي، وتصحيح CAD يُطاع، ولا تُخترع ──
         console.log('\n⑭ إحداثيات البلاغ الأصلية:');
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401018', lat: 24.713551, lng: 46.675295, crews: [{ team: 'جنوب 4' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401018', source: 'cad-manual', lat: 24.713551, lng: 46.675295, crews: [{ team: 'جنوب 4' }] } });
         s = (await sum()).data;
         const ic18 = s.incidents.find(i => i.number === '1401018');
         check('⑭ إحداثيات صحيحة تُحفظ وتظهر في الملخص كما هي', ic18.lat === 24.713551 && ic18.lng === 46.675295, JSON.stringify({ lat: ic18.lat, lng: ic18.lng }));
@@ -322,7 +322,7 @@ async function waitReady(tries = 60) {
         const ic18c = s.incidents.find(i => i.number === '1401018');
         check('⑭ قيم غير صالحة تُهمَل ولا تمس الإحداثيات المخزنة', ic18c.lat === 24.9 && ic18c.lng === 46.9);
         // بلاغ جديد بقيم غير صالحة ← يُسجل بلا إحداثيات بصدق
-        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401019', lat: 91.5, lng: 'abc', crews: [{ team: 'جنوب 4' }] } });
+        await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: '1401019', source: 'cad-manual', lat: 91.5, lng: 'abc', crews: [{ team: 'جنوب 4' }] } });
         s = (await sum()).data;
         const ic19 = s.incidents.find(i => i.number === '1401019');
         check('⑭ بلاغ جديد بقيم غير صالحة ← lat/lng=null بصدق ويُسجل طبيعيًا', !!ic19 && ic19.lat === null && ic19.lng === null);
@@ -367,7 +367,7 @@ async function waitReady(tries = 60) {
             { number: '1401032', lat: 24.530303, lng: 46.630303, district: 'حي ج', address: 'موقع ج' }
         ];
         for (const g of GEO) {
-            await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: g.number, lat: g.lat, lng: g.lng, address: g.address, crews: [{ team: 'جنوب 4' }] } });
+            await api('/api/cad-reports', { method: 'POST', token: TK, body: { number: g.number, lat: g.lat, lng: g.lng, address: g.address, source: 'cad-manual', crews: [{ team: 'جنوب 4' }] } });
         }
         s = (await sum()).data;
         const geoDb = new Database(TMP_DB, { readonly: true });

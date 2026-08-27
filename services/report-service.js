@@ -385,22 +385,10 @@ class ReportService {
                     planUnitsIgnored.push(c.team);
                     continue;
                 }
-                // حارس المشاركة بلا دليل (اعتماد المالك 2026-08-26 — إصلاح الـphantom):
-                // مسار cad-auto وصل بطاقم عارٍ تمامًا {team, phases:{}} — بلا وقت رحلة
-                // ولا هوية CAD ولا urs ولا cadReached ولا withdrawn صريح = لا دليل
-                // مشاركة إطلاقًا. الرصد الحي أثبت أن ممر lastJourneys في الـOverlay
-                // كان يولّد هذا الشكل قبل وجود Journey فعلية (بلاغ 1315542: الميلاد
-                // سبق الرحلة بثلاث دقائق). القاعدة الجذرية: لا Journey = لا مشاركة —
-                // فلا يُنشأ سجل هنا إطلاقًا، ويُوثَّق الاسم في evidencelessIgnored.
-                // الترقية محفوظة: عند ظهور Journey لاحقًا يصل الطاقم بدليله (أوقات/
-                // هوية/urs) فيُنشأ سجله صحيحًا من أول مرة.
-                // مقصور على cad-auto: اليدوي الحقيقي (الزر/التكميل — cad-oneclick)
-                // يسجّل بلا دليل آلي وهذا مقصود ومحفوظ — لا يُمس إطلاقًا.
+                // تعريف الدليل (اعتماد المالك 2026-08-26): وقت رحلة/هوية CAD/urs/
+                // cadReached صريح/withdrawn صريح. الحارس نفسه يعمل لاحقًا — عند
+                // نقطة الإنشاء فقط، بعد مطابقة السجلات القائمة (انظر الأسفل).
                 const hasAnyEvidence = hasAnyPhaseTime || hasCadIdentity || !!c.cadUrs || c.cadReached === true || c.withdrawn === true;
-                if (!hasAnyEvidence && source === 'cad-auto') {
-                    evidencelessIgnored.push(c.team);
-                    continue;
-                }
                 // المطابقة بهوية الوحدة الثابتة أولًا (قرار المالك 2026-08-23):
                 // eventId + cad_run_unit_id = نفس المشاركة مهما تغيّر المسمى —
                 // فرقة سُجّلت من CAD ثم ظهرت لاحقًا في التكميل تُربط بسجلها
@@ -483,6 +471,20 @@ class ReportService {
                     if (urs) await this.engine.storage.setParticipationCadUnitState(effShiftId, effUnit, number, urs, c.cadReached, c.cadUnitId, c.cadRunUnitId);
                     if (afterArrival) { cancelAfterArrivalCrews.push(c.team); incidentEnriched = true; }
                     skippedCrews.push(c.team);
+                    continue;
+                }
+                // حارس الإنشاء بلا دليل (اعتماد المالك 2026-08-26 ثم توسيعه 2026-08-27
+                // بعد provenance المواليد الجديدة): طاقم عارٍ تمامًا {team, phases:{}}
+                // بلا سجل قائم ولا أي دليل = لا مشاركة إطلاقًا — في كل المسارات إلا
+                // اليدوي الموسوم صراحةً cad-manual. سبب التوسيع: مسارات الـOverlay
+                // الآلية غير الموسومة (watchTick) كانت تسقط وسم cad-auto فتصل
+                // cad-oneclick وتتجاوز الحارس القديم — 247 مولودة phantom بذلك.
+                // موضع الحارس هنا (بعد المطابقة) مقصود: التحديثات على سجل قائم
+                // (استكمال أوقات/عودة مسحوبة بـwithdrawn=false الصريح) لا تُحجب
+                // أبدًا — المحظور هو إنشاء مشاركة جديدة بلا دليل فقط.
+                // الترقية محفوظة: عند ظهور Journey يصل الطاقم بدليله فيُنشأ صحيحًا.
+                if (!hasAnyEvidence && source !== 'cad-manual') {
+                    evidencelessIgnored.push(c.team);
                     continue;
                 }
                 const phasesJson = (c.phases && Object.keys(c.phases).length) ? JSON.stringify(c.phases) : null;

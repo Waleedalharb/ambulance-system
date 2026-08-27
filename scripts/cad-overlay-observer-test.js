@@ -129,7 +129,7 @@ async function cycle() {
 (async () => {
     console.log('🧪 اختبار Incident Observer — vm sandbox بلا متصفح\n');
     loadOverlay();
-    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-26\.a/.test(ctx.window.__southBuild || ''));
+    check('T0 الـOverlay انحقن وختم البناء الجديد ظاهر', /2026-08-27\.a/.test(ctx.window.__southBuild || ''));
 
     // ─── التسجيل التلقائي من لقطة القائمة (البلاغ بلا Journey بعد) ───
     listSnapshot(); await drain(); await drain();
@@ -225,6 +225,11 @@ async function cycle() {
 
     // ─── مؤشر الحالة ───
     check('مؤشر المقبض 🟢 متزامن بعد نجاح الدورات', ctx.window.__southObsState && ctx.window.__southObsState.state === 'synced');
+
+    // ─── الوسم الصارم (اعتماد المالك 2026-08-27): لا مسار آلي غير موسوم ───
+    check('TAG كل رسالة آلية في السيناريو كله تحمل source=cad-auto (لا سقوط وسم إطلاقًا)',
+        cadReportMsgs().length > 0 && cadReportMsgs().every(m => m.payload.source === 'cad-auto'),
+        JSON.stringify(cadReportMsgs().map(m => m.payload.source || null)));
 
     console.log('\n═══ النتيجة: ' + passed + ' ✅ / ' + failed + ' ❌ ═══');
     if (failed) { console.log('الفاشلة:'); failures.forEach(f => console.log('  ❌ ' + f)); process.exit(1); }
