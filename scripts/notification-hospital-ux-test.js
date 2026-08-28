@@ -70,12 +70,19 @@ check('SSE يمرر النوع الحقيقي (_n.type) بدل info الثابت
 check('الحرج/التحذيري 8ث والمعلوماتي 4ث', appJs.includes("? 8000 : 4000"));
 check('app.css?v=35 في كل الصفحات الخمس', ['index.html', 'admin-dashboard.html', 'admin-knowledge.html', 'admin-shift-codes.html', 'admin-vehicles.html'].every(f => fs.readFileSync(path.join(root, 'public', f), 'utf8').includes('app.css?v=35')));
 
-console.log('\n═══ ④ Mapbox Light في الإنتاج ═══');
-check('map-config.js: provider=mapbox', mapConfig.includes("provider: 'mapbox'"));
-check('map-config.js: التوكن العام المقيّد موجود', mapConfig.includes('pk.eyJ'));
-check('map-config.js: النمط light-v11', mapConfig.includes('light-v11'));
-check('index.html يرفع map-config.js', /map-config\.js\?v=\d+/.test(indexHtml));
-check('ملاحظة: تفعيل الإنتاج ينتظر قرار تجاوز GitHub Push Protection', true);
+console.log('\n═══ ④ Mapbox Light — المسار «ب» (متغير بيئة Render، لا توكن في Git) ═══');
+const serverJs = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+check('مسار الحقن /js/map-config.runtime.js موجود', serverJs.includes("app.get('/js/map-config.runtime.js'"));
+check('المسار يقرأ MAPBOX_PUBLIC_TOKEN من البيئة', serverJs.includes('process.env.MAPBOX_PUBLIC_TOKEN'));
+check('يقبل صيغة pk. فقط ويمنع أي قيمة أخرى', serverJs.includes('/^pk\\.[A-Za-z0-9._-]+$/'));
+check('no-store (لا تخزين للاستجابة الحاملة للإعداد)', /map-config\.runtime[\s\S]{0,400}no-store/.test(serverJs));
+check('غياب المتغير = no-op (الافتراضي/المحلي يبقى حرفيًا)', serverJs.includes('غير مضبوط في بيئة الخادم'));
+check('index.html يرفع map-config.runtime.js', indexHtml.includes('js/map-config.runtime.js'));
+check('map-config.js في Git بلا توكن (الافتراضي leaflet)', !/pk\.eyJ[A-Za-z0-9._-]*/.test(mapConfig) && mapConfig.includes("provider: 'leaflet'"));
+// حارس عدم التسريب: لا توكن Mapbox في أي ملف متتبع تحت public/ أو الجذور الحساسة
+const tracked = ['public/index.html', 'public/js/map-config.js', 'public/js/app.js', 'public/css/app.css', 'server.js', 'public/operations-dashboard.html']
+    .map(f => fs.readFileSync(path.join(root, f), 'utf8'));
+check('صفر توكن pk.eyJ في الملفات المتتبعة', tracked.every(t => !t.includes('pk.eyJ')));
 
 console.log('\n═══ ⑤ سلامة الصياغة — JS المضمّن ═══');
 function checkInlineScripts(html, fileLabel) {

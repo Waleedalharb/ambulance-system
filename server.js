@@ -781,6 +781,27 @@ app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
     lastModified: true,
     setHeaders: staticCacheHeaders
 }));
+
+// (اعتماد المالك 2026-08-28 — المسار «ب»): توكن Mapbox العام يُحقن من متغير
+// البيئة MAPBOX_PUBLIC_TOKEN في Render فقط — لا يدخل Git إطلاقًا (Push
+// Protection رفضه، والمالك منع تجاوز الحماية). هذا المسار يقدّم ملف إعداد
+// JavaScript تشغيليًا: إن ضُبط المتغير (وكان pk.) فعّل Mapbox Light v11،
+// وإلا أعاد no-op فيبقى الإعداد الافتراضي/المحلي كما هو حرفيًا.
+// صفر منطق تشغيلي هنا — مجرد إعداد مزود الرسم. التوكن لا يُسجَّل في logs
+// ولا يظهر إلا في هذه الاستجابة (مكانه الطبيعي: المتصفح يحتاجه للرسم،
+// وحمايته المعتمدة هي تقييد النطاق من لوحة Mapbox على emsoperations.online).
+app.get('/js/map-config.runtime.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    const token = process.env.MAPBOX_PUBLIC_TOKEN;
+    if (token && /^pk\.[A-Za-z0-9._-]+$/.test(token)) {
+        res.send('/* إعداد خريطة الإنتاج — مفعّل من متغير البيئة (لا شيء في Git) */\n' +
+            'window.SMAP_MAP_CONFIG = { provider: "mapbox", accessToken: ' + JSON.stringify(token) +
+            ', style: "mapbox://styles/mapbox/light-v11" };\n');
+    } else {
+        res.send('/* MAPBOX_PUBLIC_TOKEN غير مضبوط في بيئة الخادم — يبقى الإعداد الافتراضي/المحلي كما هو */\n');
+    }
+});
 // ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
 // REMOVED: Static /uploads route — files must be downloaded via authenticated /api/download-operational/:id only
 // app.use('/uploads', express.static(path.join(STORAGE_PATH, 'uploads'), { maxAge: ONE_YEAR }));
