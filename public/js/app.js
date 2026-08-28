@@ -65,21 +65,80 @@ function getCurrentUserName() {
     return (currentUser && currentUser.name) || (currentUser && currentUser.username) || 'غير معروف';
 }
 
+// سجل إجراءات الـToast — يُملأ عند الإنشاء ويُستدعى من onclick
+var TOAST_ACTIONS = {};
+var TOAST_ACTION_SEQ = 0;
+function toastActionRun(key) {
+    var fn = TOAST_ACTIONS[key];
+    if (fn) { try { fn(); } catch (e) {} }
+}
+
+// (شكل التنبيه الجديد — اعتماد المالك 2026-08-28): الـToast السفلي يبقى في
+// مكانه ووظيفته؛ تغيّر الشكل فقط. كل تنبيه: وسم نوع + أيقونة + عنوان + وصف +
+// وقت + إجراء مرتبط (إن وُجدت وجهة آمنة في هذه الصفحة) + إغلاق يدوي.
+// التوقيع لم يتغير (title, message, type, duration) — كل المواضع القائمة تعمل.
 function showNotification(title, message, type, duration) {
     var container = document.getElementById('toastContainer');
     if (!container) { console.log('[' + type + '] ' + title + ': ' + message); return; }
+    // تطبيع النوع: danger/urgent/error → error، alert → warning
+    var t = String(type || 'info');
+    if (t === 'danger' || t === 'urgent') t = 'error';
+    if (t === 'alert') t = 'warning';
+    if (['success', 'error', 'warning', 'info'].indexOf(t) < 0) t = 'info';
+    var esc = (typeof nc2Esc === 'function') ? nc2Esc : function (v) { return (v === null || v === undefined) ? '' : String(v); };
+    title = (title === null || title === undefined) ? '' : String(title);
+    message = (message === null || message === undefined) ? '' : String(message);
+    // النوع التشغيلي من النص — بنفسجي=بلاغ، برتقالي=مستشفى، أخضر=تكميل، أزرق=حالة
+    var src = (typeof notifSourceOf === 'function') ? notifSourceOf({ title: title, message: message }) : 'النظام';
+    var kindMap = {
+        'البلاغات':   { cls: 'tk-report',     icon: 'fa-file-medical-alt', label: 'بلاغ جديد' },
+        'المستشفيات': { cls: 'tk-hospital',   icon: 'fa-hospital',         label: 'تنبيه مستشفى' },
+        'التكميل':    { cls: 'tk-completion', icon: 'fa-users',            label: 'تحديث تكميل' },
+        'سير العمل':  { cls: 'tk-status',     icon: 'fa-sync-alt',         label: 'تحديث حالة' },
+        'المناوبات':  { cls: 'tk-status',     icon: 'fa-sync-alt',         label: 'تحديث حالة' },
+        'المركبات':   { cls: 'tk-status',     icon: 'fa-sync-alt',         label: 'تحديث حالة' },
+        'التمركزات':  { cls: 'tk-status',     icon: 'fa-map-marker-alt',   label: 'تحديث تمركز' }
+    };
+    var kind = kindMap[src] || null;
+    var typeIcon = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' }[t];
+    var kindLabel = kind ? kind.label : { success: 'تم بنجاح', error: 'تنبيه مهم', warning: 'تنبيه تشغيلي', info: 'تنبيه تشغيلي' }[t];
+    // الإجراء المرتبط — فقط إن كانت دوال الوجهة موجودة فعلًا في هذه الصفحة
+    var actionsHtml = '';
+    if (kind && typeof notifActionFor === 'function') {
+        var act = notifActionFor(src);
+        if (act) {
+            var depsOk = true;
+            if (src === 'البلاغات') depsOk = (typeof openModalById === 'function') && (typeof renderAdvancedDistribution === 'function');
+            else if (src === 'التمركزات') depsOk = !!document.querySelector('.ops-map-section');
+            else depsOk = (typeof navigateToPage === 'function');
+            if (depsOk) {
+                var key = 'ta' + (++TOAST_ACTION_SEQ);
+                TOAST_ACTIONS[key] = act.run;
+                actionsHtml = '<div class="toast-actions"><button class="toast-action-btn primary" onclick="toastActionRun(\'' + key + '\')"><i class="fas fa-external-link-alt"></i>' + act.label + '</button></div>';
+            }
+        }
+    }
     var toast = document.createElement('div');
-    toast.className = 'toast-notification ' + (type || 'info');
-    var iconMap = { success: '\u2713', error: '\u2715', warning: '\u26a0', info: '\u2139' };
-    var icon = iconMap[type] || iconMap.info;
-    toast.innerHTML = '<div class="toast-icon">' + icon + '</div><div class="toast-content"><div class="toast-title">' + (title || '') + '</div><div class="toast-message">' + message + '</div></div>';
+    toast.className = 'toast-notification ' + t + (kind ? ' ' + kind.cls : '');
+    toast.innerHTML = '<div class="toast-icon"><i class="fas ' + (kind ? kind.icon : typeIcon) + '"></i></div>' +
+        '<div class="toast-body">' +
+            '<div class="toast-head"><span class="toast-kind">' + kindLabel + '</span><span class="toast-time">الآن</span></div>' +
+            '<div class="toast-title">' + (esc(title) || 'تنبيه') + '</div>' +
+            (message ? '<div class="toast-message">' + esc(message) + '</div>' : '') +
+            actionsHtml +
+        '</div>' +
+        '<button class="toast-close" title="إغلاق"><i class="fas fa-times"></i></button>';
+    toast.querySelector('.toast-close').addEventListener('click', function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+    });
     container.appendChild(toast);
-    setTimeout(function() { toast.classList.add('toast-exit'); setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); }, duration || 3000);
-    if (type === 'success' && typeof playSuccessSound === 'function') playSuccessSound();
-    else if (type === 'error' && typeof playErrorSound === 'function') playErrorSound();
+    // الحرج/التحذيري يبقى أطول (8ث)، والمعلوماتي يختفي سريعًا — وكلها تبقى في مركز الإشعارات
+    var ttl = duration || ((t === 'error' || t === 'warning') ? 8000 : 4000);
+    setTimeout(function() { toast.classList.add('toast-exit'); setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); }, ttl);
+    if (t === 'success' && typeof playSuccessSound === 'function') playSuccessSound();
+    else if (t === 'error' && typeof playErrorSound === 'function') playErrorSound();
     else if (typeof playAlertSound === 'function') playAlertSound();
 }
-
 // ============================================
 // Online Status System — Real-time connection status
 // ============================================
@@ -751,7 +810,9 @@ function handleSSEEvent(data) {
             // soundSettings.master. الصوت يمر عبر دوال play* التي تحترم
             // master/toggles، فلا صوت إلا بموافقة المستخدم.
             var _n = data.notification || data.payload || {};
-            showNotification(_n.title || 'إشعار جديد', _n.message || data.message || '', 'info', 4000);
+            // النوع الحقيقي يصل مع الحمولة (danger/warning/success/info) —
+            // كان يُرمى ويُعرض info دائمًا (تشخيص جولة شكل التنبيه 2026-08-28)
+            showNotification(_n.title || 'إشعار جديد', _n.message || data.message || '', _n.type || 'info', 0);
             break;
         case 'connected':
             console.log('SSE:', data.message);

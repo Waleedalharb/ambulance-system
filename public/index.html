@@ -52,7 +52,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
-    <link rel="stylesheet" href="css/app.css?v=41">
+    <link rel="stylesheet" href="css/app.css?v=35">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
     <link rel="stylesheet" href="css/executive-theme.css?v=5"><!-- v=5 (2026-08-28): الملف تغيّر (+ثيم الخريطة Light Ops) برقم قديم — رُفع لكسر الكاش السنوي
     <!-- طبقة الهوية الموحدة (هوية التكميل المعتمدة FROZEN) — تُحمَّل بعد كل ملفات CSS -->
@@ -2668,7 +2668,7 @@ window.addEventListener('load', function() {
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
 <script src="https://unpkg.com/mapbox-gl@2.15.0/dist/mapbox-gl.js" defer></script><!-- محرك Mapbox GL — يُستخدم فقط عند تفعيله في map-config.local.js -->
-<script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — آمن بلا مفاتيح -->
+<script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — تفعيل Mapbox إنتاجيًا ينتظر قرار تجاوز حماية GitHub للتوكن -->
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-adapter.js?v=1" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js -->
 <script src="js/smart-map.js?v=6" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
@@ -2987,6 +2987,7 @@ input[type="search"], textarea, select {
     .notif-strip-time { display: none; }
 }
 @media (max-width: 640px) {
-    .notif-strip { max-width: 120px; padding: 4px 8px; }
+    /* الجوال: الـTopbar مزدحم — الشريط يُخفى كليًا والـToast السفلي يغطي التنبيه */
+    .notif-strip { display: none !important; }
 }
 </style>

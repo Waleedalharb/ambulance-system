@@ -32,7 +32,7 @@ check('زرّا التذييل (تعليم الكل/مسح الكل)', indexHtml
 check('لوحة داكنة زجاجية (لا بطاقات بيضاء)', /\.notification-panel \{[^}]*rgba\(10,18,34|rgba\(17,28,48/.test(indexHtml));
 check('أنماط التبويبات والبطاقات والشريط', ['.nc2-tab', '.nc-item', '.notif-strip', '.nc2-footer-btn'].every(c => indexHtml.includes(c)));
 check('ألوان الأولوية الأربعة على البطاقات', ['.nc-danger', '.nc-warning', '.nc-success', '.nc-info'].every(c => indexHtml.includes(c)));
-check('تجاوب الجوال للشريط (@media)', /@media \(max-width: 640px\)[^{]*\{[^}]*\.notif-strip|\.notif-strip \{[^}]*\}[^]*@media \(max-width: 640px\)/.test(indexHtml) && indexHtml.includes('max-width: 120px'));
+check('تجاوب الجوال للشريط (يُخفى <640px والـToast يغطي)', /@media \(max-width: 640px\)[^}]*\{[^}]*\.notif-strip \{ display: none !important; \}/.test(indexHtml.replace(/\n/g, ' ')) || indexHtml.includes('.notif-strip { display: none !important; }'));
 // المنطق
 check('منع التكرار (dedupeNotifications)', appJs.includes('function dedupeNotifications('));
 check('الأولوية من النوع (notifPriorityOf)', appJs.includes('function notifPriorityOf('));
@@ -56,7 +56,28 @@ check('بطاقات الرحلات: الحالية أولًا', opsDash.includes
 check('تهريب HTML في القسم (esc)', /var esc = function \(v\)/.test(opsDash));
 check('عرض فقط: لا كتابة fetch/POST جديدة في القسم', !/renderHospitalTab[\s\S]*?fetch\(/.test(opsDash.split('function renderHospitalTab')[1].split('function ')[1] || ''));
 
-console.log('\n═══ ③ سلامة الصياغة — JS المضمّن ═══');
+console.log('\n═══ ③ الـToast السفلي — الشكل الجديد (يبقى بمكانه ووظيفته) ═══');
+const appCss = fs.readFileSync(path.join(root, 'public', 'css', 'app.css'), 'utf8');
+const mapConfig = fs.readFileSync(path.join(root, 'public', 'js', 'map-config.js'), 'utf8');
+check('الحاوية والموضع لم يتغيرا (toast-container أسفل يسار)', appCss.includes('.toast-container') && /bottom:\s*24px/.test(appCss));
+check('التوست داكن زجاجي (لا خلفيات *-50 الفاتحة)', appCss.includes('rgba(10,18,34,0.98)') && !/toast-notification\.(success|error|warning|info) \{ background: var\(--(teal|coral|gold|info)-50/.test(appCss));
+check('ألوان الأنواع التشغيلية (بنفسجي/برتقالي/أخضر)', ['tk-report', 'tk-hospital', 'tk-completion'].every(c => appCss.includes(c)));
+check('بنية التوست الجديدة (kind/time/close/actions)', ['toast-kind', 'toast-time', 'toast-close', 'toast-action-btn'].every(c => appCss.includes(c)));
+check('showNotification يبقي التوقيع والأصوات', /function showNotification\(title, message, type, duration\)/.test(appJs) && appJs.includes('playSuccessSound'));
+check('وسم النوع التشغيلي + تهريب + إغلاق يدوي', appJs.includes('toastActionRun') && appJs.includes('kindMap') && appJs.includes('toast-close'));
+check('الإجراء لا يُعرض إلا بدوال وجهة موجودة (depsOk)', appJs.includes('depsOk'));
+check('SSE يمرر النوع الحقيقي (_n.type) بدل info الثابتة', appJs.includes("_n.type || 'info'"));
+check('الحرج/التحذيري 8ث والمعلوماتي 4ث', appJs.includes("? 8000 : 4000"));
+check('app.css?v=35 في كل الصفحات الخمس', ['index.html', 'admin-dashboard.html', 'admin-knowledge.html', 'admin-shift-codes.html', 'admin-vehicles.html'].every(f => fs.readFileSync(path.join(root, 'public', f), 'utf8').includes('app.css?v=35')));
+
+console.log('\n═══ ④ Mapbox Light في الإنتاج ═══');
+check('map-config.js: provider=mapbox', mapConfig.includes("provider: 'mapbox'"));
+check('map-config.js: التوكن العام المقيّد موجود', mapConfig.includes('pk.eyJ'));
+check('map-config.js: النمط light-v11', mapConfig.includes('light-v11'));
+check('index.html يرفع map-config.js', /map-config\.js\?v=\d+/.test(indexHtml));
+check('ملاحظة: تفعيل الإنتاج ينتظر قرار تجاوز GitHub Push Protection', true);
+
+console.log('\n═══ ⑤ سلامة الصياغة — JS المضمّن ═══');
 function checkInlineScripts(html, fileLabel) {
     const blocks = [];
     const re = /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi;

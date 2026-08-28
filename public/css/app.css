@@ -2537,29 +2537,82 @@ input[type="search"], textarea, select {
     pointer-events: none;
 }
 
+/* ===== Toast Notifications — الهوية المعتمدة 2026-08-28 (شكل التنبيه الجديد) =====
+   الـToast السفلي يبقى في مكانه ووظيفته — تغيّر الشكل فقط: داكن/زجاجي،
+   شريط لوني يساري حسب النوع، أيقونة دائرية، وسم النوع + الوقت + إغلاق يدوي،
+   وإجراء مرتبط عند توفر وجهة آمنة. الألوان: بنفسجي=بلاغ جديد، برتقالي=مستشفى،
+   أخضر=تكميل، أزرق=تحديث حالة، أحمر=عاجل، كهرماني=تنبيه. */
 .toast-notification {
-    border-radius: var(--radius-lg) !important;
-    box-shadow: var(--shadow-lg) !important;
-    border: 1px solid var(--gray-200) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.45) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-left: 3px solid #60A5FA !important;
     animation: toastSlideIn 0.3s ease-out !important;
     pointer-events: all;
-    padding: 14px 20px;
-    min-width: 280px;
-    max-width: 360px;
+    padding: 11px 13px;
+    min-width: 300px;
+    max-width: 380px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
+    background: linear-gradient(168deg, rgba(17,28,48,0.97), rgba(10,18,34,0.98)) !important;
+    color: #E8EEF6 !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+.toast-notification.toast-exit { opacity: 0; transform: translateX(-20px); transition: opacity 0.3s ease, transform 0.3s ease; }
+
+.toast-notification .toast-icon {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+    background: rgba(96,165,250,0.14); color: #60A5FA;
+}
+.toast-notification .toast-body { flex: 1; min-width: 0; }
+.toast-notification .toast-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.toast-notification .toast-kind { font-size: 0.68rem; font-weight: 700; color: #9FB3C8; }
+.toast-notification .toast-time { font-size: 0.62rem; color: #7C8DA6; margin-inline-start: auto; white-space: nowrap; }
+.toast-notification .toast-title { font-weight: 700; font-size: 0.86rem; color: #F1F5F9; line-height: 1.45; }
+.toast-notification .toast-message { font-size: 0.76rem; color: #B7C5D6; margin-top: 3px; line-height: 1.55; word-break: break-word; }
+.toast-notification .toast-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.toast-notification .toast-action-btn {
+    font-size: 0.7rem; font-weight: 700; font-family: inherit; cursor: pointer;
+    padding: 4px 11px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px;
+    color: #93C5FD; background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.30);
+}
+.toast-notification .toast-action-btn:hover { background: rgba(96,165,250,0.22); }
+.toast-notification .toast-action-btn.primary { color: #fff; background: rgba(96,165,250,0.32); }
+.toast-notification .toast-close {
+    background: none; border: none; color: #7C8DA6; cursor: pointer;
+    font-size: 0.85rem; padding: 2px 5px; border-radius: 6px; flex-shrink: 0;
+}
+.toast-notification .toast-close:hover { color: #F1F5F9; background: rgba(255,255,255,0.08); }
+
+.toast-notification.success { border-left-color: #34D399 !important; }
+.toast-notification.success .toast-icon { background: rgba(52,211,153,0.14); color: #34D399; }
+.toast-notification.error   { border-left-color: #F87171 !important; }
+.toast-notification.error .toast-icon { background: rgba(248,113,113,0.14); color: #F87171; }
+.toast-notification.warning { border-left-color: #FBBF24 !important; }
+.toast-notification.warning .toast-icon { background: rgba(251,191,36,0.14); color: #FBBF24; }
+.toast-notification.info    { border-left-color: #60A5FA !important; }
+/* أنواع تشغيلية مميزة (تتقدم على لون النوع العام) */
+.toast-notification.tk-report     { border-left-color: #A78BFA !important; }
+.toast-notification.tk-report .toast-icon { background: rgba(167,139,250,0.16); color: #A78BFA; }
+.toast-notification.tk-report .toast-kind { color: #C4B5FD; }
+.toast-notification.tk-hospital   { border-left-color: #FB923C !important; }
+.toast-notification.tk-hospital .toast-icon { background: rgba(251,146,60,0.16); color: #FB923C; }
+.toast-notification.tk-hospital .toast-kind { color: #FDBA74; }
+.toast-notification.tk-completion { border-left-color: #34D399 !important; }
+.toast-notification.tk-completion .toast-icon { background: rgba(52,211,153,0.14); color: #34D399; }
+.toast-notification.tk-completion .toast-kind { color: #6EE7B7; }
+@media (max-width: 640px) {
+    .toast-container { left: 12px; right: 12px; bottom: 12px; }
+    .toast-notification { min-width: 0; max-width: none; width: 100%; }
 }
 
 @keyframes toastSlideIn {
     from { opacity: 0; transform: translateX(-20px); }
     to   { opacity: 1; transform: translateX(0); }
 }
-
-.toast-notification.success { background: var(--teal-50) !important; color: #059669 !important; border-left: 4px solid var(--teal) !important; }
-.toast-notification.error { background: var(--coral-50) !important; color: #DC2626 !important; border-left: 4px solid var(--coral) !important; }
-.toast-notification.warning { background: var(--gold-50) !important; color: #D97706 !important; border-left: 4px solid var(--gold) !important; }
-.toast-notification.info { background: var(--info-50) !important; color: var(--primary-700) !important; border-left: 4px solid var(--info) !important; }
 
 /* ===== Sound Settings Panel ===== */
 .sound-settings-panel {
