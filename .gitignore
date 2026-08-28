@@ -79,3 +79,4 @@ dist/
 
 # حزم هجينة محلية (تحمل مفتاح الإنتاج المستخرج — لا تُرفع أبدًا)
 dist-probe-*/
+public/js/map-config.local.js

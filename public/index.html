@@ -39,6 +39,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <!-- Mapbox GL — مزود رسم قابل للاستبدال عبر MapAdapter (اعتماد المالك 2026-08-28): لا يُفعَّل إلا من map-config.local.js -->
+    <link rel="stylesheet" href="https://unpkg.com/mapbox-gl@2.15.0/dist/mapbox-gl.css" />
     
     <!-- QRCode.js لإنشاء QR Codes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -230,12 +232,6 @@ window.addEventListener('load', function() {
     .page-loading-overlay .spinner { width: 50px; height: 50px; border: 4px solid #E2E8F0; border-top-color: #2563EB; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .page-loading-overlay .loading-text { color: #64748B; font-size: 1rem; font-weight: 600; }
-    </style>
-        color: var(--gray-400);
-        font-size: 0.65rem;
-        text-align: center;
-        padding: 4px 0;
-    }
     </style>
     <!-- Skeleton Loading CSS -->
     <style>
@@ -818,7 +814,11 @@ window.addEventListener('load', function() {
 
     /* ── شريط المؤشرات التنفيذية — 8 مؤشرات بأرقام كبيرة جدًا ── */
     .hc-kpi-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }
-    .hc-kpi { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--pi-r-md); border: 1px solid var(--pi-line); background: var(--pi-glass); box-shadow: var(--pi-shadow-soft); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-family: inherit; cursor: default; text-align: right; overflow: hidden; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    /* بلا backdrop-filter (اعتماد المالك 2026-08-28): البطاقة الزجاجية المجاورة لخريطة WebGL (Mapbox) كانت تُعاد
+       إعادةَ تركيبها مع كل إطار رسم أثناء تحريك الماوس فوق الخريطة ← توهج/وميض متحرك على محيط البطاقة.
+       ما خلف البطاقات هو تدرج خلفية الصفحة الداكنة الثابتة، فإزالة الـblur لا تغيّر الشكل عمليًا لكنها تقطع
+       اقتران إعادة الرسم من جذره — إصلاح السبب لا إخفاء الأثر، و:hover الشرعي للبطاقات يبقى كما هو */
+    .hc-kpi { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--pi-r-md); border: 1px solid var(--pi-line); background: var(--pi-glass); box-shadow: var(--pi-shadow-soft); font-family: inherit; cursor: default; text-align: right; overflow: hidden; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
     button.hc-kpi { cursor: pointer; }
     .hc-kpi:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.17); }
     .hc-kpi::before { content: ''; position: absolute; inset-inline-start: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--hc-accent, var(--pi-blue)); box-shadow: 0 0 10px var(--hc-accent, var(--pi-blue)); opacity: .9; }
@@ -2649,12 +2649,16 @@ window.addEventListener('load', function() {
 <script src="js/app.js?v=47" defer></script>
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
-<script src="js/smart-map.js?v=5" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
-<script src="js/map-history.js?v=1" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
+<script src="https://unpkg.com/mapbox-gl@2.15.0/dist/mapbox-gl.js" defer></script><!-- محرك Mapbox GL — يُستخدم فقط عند تفعيله في map-config.local.js -->
+<script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — آمن بلا مفاتيح -->
+<script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
+<script src="js/map-adapter.js?v=1" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js -->
+<script src="js/smart-map.js?v=6" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
+<script src="js/map-history.js?v=2" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
 <script src="js/map-guide.js?v=1" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
-<script src="js/hospital-monitor.js?v=1" defer></script><!-- Hospital Monitor 1B: مؤشر المستشفيات + تفصيل المنشآت — مشترك في ops:sse، بلا قناة جديدة -->
+<script src="js/hospital-monitor.js?v=2" defer></script><!-- Hospital Monitor 1B + دورة التنبيهات: مؤشر المستشفيات + تفصيل المنشآت + ACK — مشترك في ops:sse، بصمة skip-if-unchanged -->
 <script src="js/smart-toolbar.js?v=3" defer></script>
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
@@ -2725,6 +2729,19 @@ body::before, body::after { display: none !important; }
     box-shadow: none !important;
     backdrop-filter: blur(6px) !important;
     -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* ③ب حصر رسم الخريطة داخل حاويتها (اعتماد المالك 2026-08-28 — خلل الوهج):
+   .ops-map-section تحتضن canvas بخريطة WebGL (Mapbox) يعيد الرسم مع كل حركة مؤشر،
+   وكانت تحمل backdrop-filter: blur(14px) !important في executive-theme.css —
+   في Chromium يُعاد تركيب أي سطح زجاجي (backdrop-filter) مع كل إطار رسم للـcanvas،
+   فيتسرب توهج/وميض متحرك إلى شريط المؤشرات المجاور (بطاقة «المستشفيات»).
+   الإصلاح من السبب: إزالة الـblur الخلفي عن حاوية الخريطة نفسها (لا معنى له أصلًا —
+   الحاوية معتمة بخلفيتها والـcanvas يغطيها)، ولا مساس بأي تأثير داخل الخريطة.
+   التجاوز هنا لأن executive-theme.css مختلط النهايات ولا يقبل التحرير السطري الآمن */
+.ops-map-section {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 /* ④ بطاقات مؤشرات القوى العاملة — صبغ زجاجي بلون الحالة كما في شرائح

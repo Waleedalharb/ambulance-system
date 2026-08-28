@@ -8,6 +8,12 @@
 (function () {
     'use strict';
 
+    // طبقة الرسم الموحدة (اعتماد المالك 2026-08-28 — MapAdapter): كل
+    // استدعاءات L.* أدناه تمر عبر الواجهة الموحدة — الافتراضي Leaflet،
+    // وعند تفعيل Mapbox من map-config.local.js يتبدّل المزود بلا أي
+    // تغيير هنا. لا بيانات ولا منطق تشغيلي في طبقة الرسم إطلاقًا.
+    var L = (window.MapAdapter && window.MapAdapter.L) || window.L;
+
     var map = null;
     var layers = null;          // layerGroups لكل نوع
     var markerIndex = null;     // { incidents:{num:mk}, teams:{name:mk}, centers:{name:mk} }
@@ -19,6 +25,9 @@
     var focus = null;           // { kind:'incident'|'team'|'center', key:string }
     var focusLines = null;      // layerGroup لخطوط التركيز
     var layersOn = { incidents: true, teams: true, centers: true, hot: false, heat: false, streets: false, peak: false };
+    // بصمات آخر رسم (اعتماد المالك 2026-08-28 — Diff + Skip-if-unchanged):
+    // تحديث SSE مطابق للبيانات = صفر إنشاء/إزالة/إعادة رسم، والمتغيّر وحده يُحدَّث
+    var lastRender = { incidentsFp: null, teamsFp: null, heatFp: null, hotFp: null, streetsFp: null, dupFp: null };
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -311,7 +320,7 @@
         if (map) return true;
         var el = document.getElementById('opsMap');
         if (!el) return false;
-        if (typeof L === 'undefined') {
+        if (typeof L === 'undefined' || (L.__ready && !L.__ready())) {
             var note0 = document.getElementById('opsMapTileNote');
             if (note0) { note0.style.display = 'block'; note0.innerHTML = '<i class="fas fa-triangle-exclamation"></i> تعذّر تحميل مكتبة الخرائط'; }
             return false;
@@ -446,17 +455,47 @@
     }
 
     // ---------- الفرق والمراكز ----------
+    // إزالة عضو واحد من مجموعة — تعمل في Leaflet وMapbox عبر الواجهة الموحدة
+    function removeFromGroup(grp, mk) {
+        if (!grp || !mk) return;
+        if (typeof grp.removeLayer === 'function') { grp.removeLayer(mk); return; }
+        if (mk.__unmount) { mk.__unmount(); return; }
+        if (typeof mk.remove === 'function') mk.remove();
+    }
+    // مزامنة تفاضلية (اعتماد المالك 2026-08-28): لا مسح كلي للطبقة — المطابق
+    // لبصمته يبقى بلا لمس، المتغيّر يُستبدل وحده، والغائب يُزال وحده.
+    function syncMarkers(grp, index, sigs, create) {
+        var next = {};
+        for (var key in sigs) {
+            if (!sigs.hasOwnProperty(key)) continue;
+            var old = index[key];
+            if (old && old.__sig === sigs[key]) { next[key] = old; continue; }
+            if (old) removeFromGroup(grp, old);
+            var mk = create(key);
+            mk.__sig = sigs[key];
+            mk.addTo(grp);
+            next[key] = mk;
+        }
+        for (var k in index) {
+            if (index.hasOwnProperty(k) && !next[k]) removeFromGroup(grp, index[k]);
+        }
+        return next;
+    }
+
     function renderTeams(teams) {
         state.teams = teams || null;
         renderKpis();
         if (!init()) return;
-        layers.teams.clearLayers();
-        layers.centers.clearLayers();
-        markerIndex.teams = {};
-        markerIndex.centers = {};
-        if (!state.teams) { refit(); return; }
+        if (!state.teams) {
+            // لا بيانات — إخلاء فعلي للعلامات مرة واحدة (تفاضليًا أيضًا)
+            markerIndex.centers = syncMarkers(layers.centers, markerIndex.centers, {}, function () { return null; });
+            markerIndex.teams = syncMarkers(layers.teams, markerIndex.teams, {}, function () { return null; });
+            lastRender.teamsFp = '';
+            refit(); return;
+        }
 
-        // المراكز — 🏥 درع ثابت باسم المركز
+        // بصمات العرض: مركز ← شدته · فرقة ← موقعها + شدتها (كل ما يؤثر بصريًا)
+        var cSigs = {}, tSigs = {}, fpParts = [];
         for (var cName in operationalCenters) {
             if (!operationalCenters.hasOwnProperty(cName)) continue;
             var cTeams = centerTeams(cName);
@@ -467,23 +506,9 @@
                 if (sv === 'yellow') cSev = 'yellow';
             }
             if (!cTeams.length) cSev = 'none';
-            var cIcon = L.divIcon({
-                className: 'smk-center sev-' + cSev,
-                html: '<span class="smk-center-shield"><i class="fas fa-hospital"></i></span><span class="smk-center-name">' + esc(cName) + '</span>',
-                iconSize: null, iconAnchor: [18, 18]
-            });
-            (function (name) {
-                var mk = L.marker(operationalCenters[name], { icon: cIcon, zIndexOffset: 100 });
-                mk.on('click', function (e) {
-                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-                    focusOn('center', name);
-                });
-                mk.addTo(layers.centers);
-                markerIndex.centers[name] = mk;
-            })(cName);
+            cSigs[cName] = cSev;
+            fpParts.push('c:' + cName + '=' + cSev);
         }
-
-        // الفرق — 🚑 شريحة ملوّنة بالحالة + وسم الاسم
         var bounds = [];
         for (var unit in state.teams) {
             if (!state.teams.hasOwnProperty(unit)) continue;
@@ -491,23 +516,44 @@
             if (!cName2 || !operationalCenters[cName2]) continue; // قيادة/تحكم/احتياط — مغطاة في مركز القرار
             var pos = teamPosition(unit, cName2);
             if (!pos) continue;
-            var sev = teamSev(state.teams[unit]);
+            tSigs[unit] = pos[0] + ',' + pos[1] + ',' + teamSev(state.teams[unit]);
+            fpParts.push('t:' + unit + '=' + tSigs[unit]);
+            bounds.push(pos);
+        }
+        fpParts.sort();
+        var fp = fpParts.join('|');
+        if (fp === lastRender.teamsFp) return; // تحديث مطابق — صفر عمليات رسم
+        lastRender.teamsFp = fp;
+
+        // المراكز — 🏥 درع ثابت باسم المركز (تفاضلي: المتغيّر فقط)
+        markerIndex.centers = syncMarkers(layers.centers, markerIndex.centers, cSigs, function (name) {
+            var cIcon = L.divIcon({
+                className: 'smk-center sev-' + cSigs[name],
+                html: '<span class="smk-center-shield"><i class="fas fa-hospital"></i></span><span class="smk-center-name">' + esc(name) + '</span>',
+                iconSize: null, iconAnchor: [18, 18]
+            });
+            var mk = L.marker(operationalCenters[name], { icon: cIcon, zIndexOffset: 100 });
+            mk.on('click', function (e) {
+                if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                focusOn('center', name);
+            });
+            return mk;
+        });
+
+        // الفرق — 🚑 شريحة ملوّنة بالحالة + وسم الاسم (تفاضلي: المتغيّرة فقط)
+        markerIndex.teams = syncMarkers(layers.teams, markerIndex.teams, tSigs, function (u) {
             var tIcon = L.divIcon({
-                className: 'smk-team sev-' + sev,
-                html: '<span class="smk-team-chip"><i class="fas fa-truck-medical"></i></span><span class="smk-team-name">' + esc(unit) + '</span>',
+                className: 'smk-team sev-' + teamSev(state.teams[u]),
+                html: '<span class="smk-team-chip"><i class="fas fa-truck-medical"></i></span><span class="smk-team-name">' + esc(u) + '</span>',
                 iconSize: null, iconAnchor: [17, 17]
             });
-            (function (u, p) {
-                var mk = L.marker(p, { icon: tIcon, zIndexOffset: 200 });
-                mk.on('click', function (e) {
-                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-                    focusOn('team', u);
-                });
-                mk.addTo(layers.teams);
-                markerIndex.teams[u] = mk;
-                bounds.push(p);
-            })(unit, pos);
-        }
+            var mk = L.marker(teamPosition(u, teamCenter(u)), { icon: tIcon, zIndexOffset: 200 });
+            mk.on('click', function (e) {
+                if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                focusOn('team', u);
+            });
+            return mk;
+        });
         if (bounds.length && fitMode === 0) {
             if (bounds.length === 1) map.setView(bounds[0], 14);
             else map.fitBounds(bounds, { padding: [42, 42], maxZoom: 15 });
@@ -525,17 +571,35 @@
         renderKpis();
         renderSidePanels();
         if (!init()) return;
-        layers.incidents.clearLayers();
-        if (layers.hot) layers.hot.clearLayers();
-        if (layers.streets) layers.streets.clearLayers();
-        markerIndex.incidents = {};
-
         var incs = (summary.incidents || []).filter(function (ic) { return !isFinalInc(ic); }); // النشطة فقط على الخريطة
-        var pts = [];
+        var ms = summary.mapStatus || {};
+
+        // بصمات الرسم: كل ما تتوقف عليه الطبقات — تحديث مطابق = صفر عمليات رسم
+        var sigs = {}, byNum = {}, fpParts = [], pts = [], heatFp = [], dupFp = [], hotGroups = {};
         incs.forEach(function (ic) {
             if (!hasCoords(ic)) return; // بلا إحداثيات ← لا موقع مختلق إطلاقًا
+            var num = String(ic.number);
+            var dups = (ic.duplicates || []).map(function (d) { return String(d.candidate && d.candidate.number); }).join(',');
+            sigs[num] = [ic.lat, ic.lng, ic.severity || 'yellow', ic.street || ic.district || '', ic.type || '', dups].join('~');
+            byNum[num] = ic;
+            fpParts.push(num + '=' + sigs[num]);
+            pts.push([ic.lat, ic.lng]);
+            heatFp.push(ic.lat + ',' + ic.lng);
+            if (dups) dupFp.push(num + '>' + dups);
+            var key = ic.street || ic.district;
+            if (key) (hotGroups[key] = hotGroups[key] || []).push(ic);
+        });
+        var streetsFp = (ms.topStreets || []).map(function (t) { return t.name + ':' + t.count; }).join('|');
+        fpParts.sort();
+        var fp = fpParts.join('|') + '#' + streetsFp;
+        if (fp === lastRender.incidentsFp) { renderAlerts(); return; } // تحديث مطابق — لا إعادة رسم إطلاقًا
+        lastRender.incidentsFp = fp;
+
+        // علامات البلاغات — تفاضلي: المطابق يبقى، المتغيّر يُستبدل وحده، المختفي يُزال وحده
+        markerIndex.incidents = syncMarkers(layers.incidents, markerIndex.incidents, sigs, function (num) {
+            var ic = byNum[num];
             var sev = ic.severity || 'yellow';
-            var hasDup = !!(ic.duplicates && ic.duplicates.length); // note-18: احتمال تكرار — شارة تحقق فوق العلامة
+            var hasDup = !!(ic.duplicates && ic.duplicates.length); // note-18: شارة تحقق فوق العلامة
             var icon = L.divIcon({
                 className: 'smk-inc sev-' + sev,
                 html: '<span class="smk-inc-pin"><i class="fas fa-location-dot"></i></span>'
@@ -547,15 +611,17 @@
                 if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
                 focusOn('incident', String(ic.number));
             });
-            mk.addTo(layers.incidents);
-            markerIndex.incidents[String(ic.number)] = mk;
-            pts.push([ic.lat, ic.lng]);
+            return mk;
         });
 
         // اكتشاف احتمال التكرار (ملحق note-18): خط ربط بصري متقطع بين البلاغ
         // وكل مرشح ظاهر على الخريطة — مرشح بلا علامة ظاهرة (منتهٍ/بلا إحداثيات)
-        // يبقى موثقًا في بطاقة الأدلة ولا يُرسم له خط مختلق
-        if (layers.dupLinks) {
+        // يبقى موثقًا في بطاقة الأدلة ولا يُرسم له خط مختلق.
+        // بصمة مستقلة: لا يُعاد بناء الخطوط إلا عند تغيّر الارتباطات فعلًا
+        dupFp.sort();
+        var dupStr = dupFp.join('|');
+        if (layers.dupLinks && dupStr !== lastRender.dupFp) {
+            lastRender.dupFp = dupStr;
             layers.dupLinks.clearLayers();
             incs.forEach(function (ic) {
                 if (!hasCoords(ic) || !ic.duplicates || !ic.duplicates.length) return;
@@ -578,21 +644,34 @@
             lastFit = pts.slice();
         }
 
-        // الكثافة — نقاط حقيقية موقَّعة فقط بوزن متساوٍ
-        if (layers.heat) layers.heat.setLatLngs(pts.map(function (p) { return [p[0], p[1], 1]; }));
+        // الكثافة — نقاط حقيقية موقَّعة فقط بوزن متساوٍ (لا setData بلا تغيير إحداثيات)
+        heatFp.sort();
+        var heatStr = heatFp.join(';');
+        if (layers.heat && heatStr !== lastRender.heatFp) {
+            lastRender.heatFp = heatStr;
+            layers.heat.setLatLngs(pts.map(function (p) { return [p[0], p[1], 1]; }));
+        }
 
         // المواقع الساخنة — تجميع بصري من نقاط حقيقية فقط: بلاغان+ على نفس الشارع
-        var byStreet = {};
-        incs.forEach(function (ic) {
-            if (!hasCoords(ic)) return;
-            var key = ic.street || ic.district;
-            if (!key) return;
-            (byStreet[key] = byStreet[key] || []).push(ic);
-        });
-        if (layers.hot) {
-            for (var st in byStreet) {
-                if (!byStreet.hasOwnProperty(st)) continue;
-                var list = byStreet[st];
+        // بصمة مستقلة: الشارع + عدده + مركزه + أنواعه
+        var hotFp = [];
+        for (var stK in hotGroups) {
+            if (!hotGroups.hasOwnProperty(stK)) continue;
+            var gList = hotGroups[stK];
+            if (gList.length < 2) continue;
+            var gsx = 0, gsy = 0, gTypes = [];
+            gList.forEach(function (ic) { gsx += ic.lat; gsy += ic.lng; gTypes.push(ic.type || ''); });
+            gTypes.sort();
+            hotFp.push(stK + ':' + gList.length + ':' + (gsx / gList.length).toFixed(6) + ',' + (gsy / gList.length).toFixed(6) + ':' + gTypes.join('+'));
+        }
+        hotFp.sort();
+        var hotStr = hotFp.join('|');
+        if (layers.hot && hotStr !== lastRender.hotFp) {
+            lastRender.hotFp = hotStr;
+            layers.hot.clearLayers();
+            for (var st in hotGroups) {
+                if (!hotGroups.hasOwnProperty(st)) continue;
+                var list = hotGroups[st];
                 if (list.length < 2) continue;
                 var sx = 0, sy = 0;
                 list.forEach(function (ic) { sx += ic.lat; sy += ic.lng; });
@@ -611,20 +690,28 @@
         }
 
         // شارات الشوارع الأكثر بلاغًا — تُثبَّت على بلاغ حقيقي من الشارع
-        var ms = summary.mapStatus || {};
-        if (layers.streets) {
-            (ms.topStreets || []).forEach(function (t) {
-                var anchor = null;
-                for (var i = 0; i < incs.length; i++) {
-                    if (incs[i].street === t.name && hasCoords(incs[i])) { anchor = incs[i]; break; }
-                }
-                if (!anchor) return;
+        // بصمة مستقلة: الاسم + العدد + إحداثية المثبَّت
+        var stFp = [], stBadges = [];
+        (ms.topStreets || []).forEach(function (t) {
+            var anchor = null;
+            for (var i = 0; i < incs.length; i++) {
+                if (incs[i].street === t.name && hasCoords(incs[i])) { anchor = incs[i]; break; }
+            }
+            if (!anchor) return;
+            stFp.push(t.name + ':' + t.count + ':' + anchor.lat + ',' + anchor.lng);
+            stBadges.push({ t: t, anchor: anchor });
+        });
+        var stStr = stFp.join('|');
+        if (layers.streets && stStr !== lastRender.streetsFp) {
+            lastRender.streetsFp = stStr;
+            layers.streets.clearLayers();
+            stBadges.forEach(function (b) {
                 var badge = L.divIcon({
                     className: 'smk-street-badge',
-                    html: '<span class="smk-street-pill"><i class="fas fa-road"></i> ' + esc(t.name) + ' · ' + t.count + '</span>',
+                    html: '<span class="smk-street-pill"><i class="fas fa-road"></i> ' + esc(b.t.name) + ' · ' + b.t.count + '</span>',
                     iconSize: null, iconAnchor: [0, 46]
                 });
-                L.marker([anchor.lat, anchor.lng], { icon: badge, interactive: false, zIndexOffset: 300 }).addTo(layers.streets);
+                L.marker([b.anchor.lat, b.anchor.lng], { icon: badge, interactive: false, zIndexOffset: 300 }).addTo(layers.streets);
             });
         }
 
@@ -651,7 +738,9 @@
         resizeTimer = setTimeout(function () {
             if (!map) return;
             map.invalidateSize();
-            if (lastFit && lastFit.length) {
+            // __keepViewport (MapAdapter/Mapbox — اعتماد المالك 2026-08-28):
+            // resize يحفظ المركز والزوم أصلًا — لا نعيد fitBounds فوق تفاعل المستخدم
+            if (lastFit && lastFit.length && !map.__keepViewport) {
                 if (lastFit.length === 1) map.setView(lastFit[0], 14);
                 else map.fitBounds(lastFit, { padding: [42, 42], maxZoom: 15 });
             }

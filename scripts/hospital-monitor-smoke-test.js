@@ -1,11 +1,15 @@
 // اختبار دخان حي لنقاط Hospital Monitor على خادم محلي مؤقت (يُقتل تلقائيًا)
+// العزل (اعتماد المالك 2026-08-28): مخزن المستشفيات مؤقت عبر HOSPITAL_MONITOR_FILE —
+// لا كتابة على data/hospital-monitor.json الحقيقي ولا بقايا رحلات بعد الاختبار.
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const PORT = 3999;
 const BASE = 'http://127.0.0.1:' + PORT;
 const ROOT = path.resolve(__dirname, '..');
+const TMP_STORE = path.join(os.tmpdir(), 'hm-smoke-' + Date.now() + '.json');
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 let passed = 0, failed = 0;
@@ -16,8 +20,8 @@ const check = (n, c, x) => { if (c) { passed++; console.log('  ✅ ' + n); } els
     .find(k => k.active && k.scope === 'cad-reports');
   if (!key) { console.error('لا مفتاح تكامل محلي نشط'); process.exit(1); }
 
-  const srv = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
-  const kill = () => { try { srv.kill('SIGTERM'); } catch (_) { } };
+  const srv = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), HOSPITAL_MONITOR_FILE: TMP_STORE }, stdio: 'ignore' });
+  const kill = () => { try { srv.kill('SIGTERM'); } catch (_) { } try { fs.unlinkSync(TMP_STORE); } catch (_) { } };
   process.on('exit', kill);
 
   let up = false;

@@ -2629,6 +2629,10 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         response.positioning_events = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
                         // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
                         response.signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
+                        // دورة المستشفيات (اعتماد المالك 2026-08-28): اللقطة المختومة
+                        // هي المرجع التاريخي الثابت — لا إعادة حساب من CAD ولا من
+                        // الحالة الحالية. أرشيف ما قبل الدورة (بلا قسم) ← null بصدق.
+                        response.hospital = sealed.hospital || null;
                     } else {
                         const PositioningService = require('./services/positioning-service');
                         const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
@@ -2661,6 +2665,14 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                             try { members = r.members ? JSON.parse(r.members) : []; } catch (e) {}
                             return { id: r.id, team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
                         });
+                        }
+                        // دورة المستشفيات الحية (المناوبة النشطة/بلا لقطة) — نفس
+                        // تجميع الختم لكن من مخزن 1B الحي + المزوّد الوحيد للبقاء
+                        try {
+                            response.hospital = await buildHospitalLive(shiftId, normalizedShift);
+                        } catch (hErr) {
+                            console.warn('[ShiftDetail] hospital live read failed:', hErr.message);
+                            response.hospital = null;
                         }
                     }
                 } catch (posErr) {
@@ -2755,7 +2767,7 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
         const sStatus = shift.status === 'active' ? 'نشطة' : shift.status === 'pending_handover' ? 'بانتظار التسليم' : shift.status === 'archived' ? 'مؤرشفة' : (shift.status || '—');
 
         // ── نفس منطق التفاصيل: اللقطة المختومة للمؤرشفة، الحيّة لغيرها ──
-        let positioning = [], positioningEvents = [], signouts = [];
+        let positioning = [], positioningEvents = [], signouts = [], hospital = null;
         try {
             let sealed = null;
             if (shift.status === 'archived') {
@@ -2771,6 +2783,8 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                 positioningEvents = Array.isArray(sealed.positioningEvents) ? sealed.positioningEvents : [];
                 // المرحلة ب: سجل تسجيلات الخروج من اللقطة المختومة نفسها
                 signouts = Array.isArray(sealed.signouts) ? sealed.signouts : [];
+                // دورة المستشفيات: القسم المختوم من اللقطة (تاريخ ثابت)
+                hospital = sealed.hospital || null;
             } else {
                 const PositioningService = require('./services/positioning-service');
                 const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
@@ -2801,6 +2815,8 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                     return { team: r.team, members, notes: r.notes || '', recordedByName: r.actor_name, createdAt: r.created_at };
                 });
                 }
+                // دورة المستشفيات الحية — نفس تجميع الختم من المصدر الحي
+                hospital = await buildHospitalLive(shiftId, shift);
             }
         } catch (e) { /* قسم التمركزات يُصدَّر فارغًا عند الفشل — بقية السجل تكتمل */ }
 
@@ -2865,6 +2881,75 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
                 if (so.notes) L.push('    ملاحظات: ' + so.notes);
             });
         } else L.push('  لا توجد تسجيلات خروج لهذه المناوبة.');
+        L.push('');
+        // دورة المستشفيات (اعتماد المالك 2026-08-28): قسم أصيل في السجل المصدَّر —
+        // نفس مصدر التفاصيل (مختوم للمؤرشفة، حي للنشطة). الغائب «—» بصدق، وأرشيف
+        // ما قبل الدورة يُذكر صراحة بدل اختراع بيانات.
+        L.push('── 🏥 المستشفيات ──');
+        if (hospital) {
+            const hs = hospital.summary || {};
+            const hJourneys = Array.isArray(hospital.journeys) ? hospital.journeys : [];
+            const hAlerts = Array.isArray(hospital.alerts) ? hospital.alerts : [];
+            const hTimeline = Array.isArray(hospital.timeline) ? hospital.timeline : [];
+            const hOpen = hJourneys.filter(j => j.episodeState !== 'last-known').length;
+            L.push('  إجمالي الرحلات: ' + hJourneys.length +
+                '    حالية الآن: ' + (hs.currentAtHospital != null ? hs.currentAtHospital : 0) +
+                '    مغلقة: ' + (hJourneys.length - hOpen) +
+                (shift.status === 'archived' && hOpen > 0 ? '    (منها ' + hOpen + ' كانت مفتوحة عند إغلاق المناوبة)' : ''));
+            L.push('  متوسط زمن البقاء: ' + (hs.avgDwellMin != null ? hs.avgDwellMin + ' د' : '—') +
+                '    تجاوز >10د: ' + (hs.exceedances || 0) +
+                '    بلا أزمنة تسليم: ' + (hs.unmeasured || 0));
+            L.push('  التنبيهات: ' + hAlerts.length +
+                '    أُقرّت: ' + hAlerts.filter(a => a.state === 'acknowledged' || (a.ackAt != null)).length +
+                '    محلولة: ' + hAlerts.filter(a => a.state === 'resolved').length);
+            if (hospital.sealedAt) L.push('  لقطة مختومة عند إغلاق المناوبة: ' + _fmtRiyadh(hospital.sealedAt));
+            L.push('');
+            L.push('  ── سجل الرحلات ──');
+            if (hJourneys.length) {
+                hJourneys.forEach((j, i) => {
+                    const jState = j.episodeState !== 'last-known'
+                        ? (shift.status === 'archived' ? 'مفتوحة عند إغلاق المناوبة' : 'حالية — في المنشأة')
+                        : 'سابقة — آخر منشأة معروفة';
+                    L.push('  ' + (i + 1) + '. بلاغ ' + (j.eventId || '—') + ' — ' + (j.southTeam || j.unitCode || '—'));
+                    L.push('     المنشأة: ' + (j.hospitalName || '—') + '    الحالة: ' + jState);
+                    L.push('     أول مشاهدة: ' + _fmtRiyadh(j.firstSeenAt) + '    آخر مشاهدة: ' + _fmtRiyadh(j.lastSeenAt) +
+                        (j.episodeClosedAt ? '    الإغلاق: ' + _fmtRiyadh(j.episodeClosedAt) : ''));
+                });
+            } else L.push('  لا توجد رحلات مستشفيات مسجلة لهذه المناوبة.');
+            L.push('');
+            L.push('  ── التنبيهات ──');
+            if (hAlerts.length) {
+                const A_STATE = { open: 'نشط', acknowledged: 'مُقَرّ', resolved: 'محلول' };
+                hAlerts.forEach(a => {
+                    L.push('  [' + _fmtRiyadh(a.firstRaisedAt) + '] ⚠ تجاوز زمن البقاء — بلاغ ' + (a.eventId || '—') +
+                        ' (' + (a.southTeam || a.unitCode || '—') + ') في ' + (a.facility || '—') +
+                        ' — البقاء: ' + (a.dwellMin != null ? a.dwellMin + ' د' : '—') + ' — الحالة: ' + (A_STATE[a.state] || a.state || '—'));
+                    if (a.ackAt) L.push('      أُقرّ: ' + _fmtRiyadh(a.ackAt) + (a.ackByName ? ' بواسطة ' + a.ackByName : ''));
+                    if (a.resolvedAt) L.push('      حُلّ: ' + _fmtRiyadh(a.resolvedAt) + ' (عودة للخدمة)');
+                });
+            } else L.push('  لا توجد تنبيهات.');
+            L.push('');
+            L.push('  ── Timeline المستشفيات ──');
+            if (hTimeline.length) {
+                const evText = (ev) => {
+                    if (ev.field === 'alert') { // أحداث دورة التنبيه داخل التسلسل
+                        if (ev.alert === 'raised') return '⚠ تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + ev.dwellMin + ' د)' : '');
+                        if (ev.alert === 'acknowledged') return 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + ev.actor : '');
+                        if (ev.alert === 'resolved') return 'حلول التنبيه (عودة للخدمة)';
+                        return 'تنبيه';
+                    }
+                    if (ev.field === 'hospitalName') return ev.from ? ('انتقال المنشأة: ' + ev.from + ' ← ' + ev.to) : ('مشاهدة المنشأة: ' + ev.to);
+                    if (ev.field === 'unitCode') return 'تغيّر رمز الفرقة: ' + (ev.from || '—') + ' ← ' + (ev.to || '—');
+                    if (ev.field === 'episode') return ev.to === 'last-known' ? 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' : 'إعادة فتح الحالة — مشاهدة جديدة';
+                    return ev.field || 'حدث';
+                };
+                hTimeline.forEach(ev => L.push('  [' + _fmtRiyadh(ev.at) + '] ' + (ev.key || '') + ' — ' + evText(ev)));
+            } else L.push('  لا توجد أحداث.');
+        } else {
+            L.push(shift.status === 'archived'
+                ? '  هذه المناوبة أُرشفت قبل دورة المستشفيات — لا يوجد قسم مختوم لها.'
+                : '  لا توجد بيانات مستشفيات لهذه المناوبة.');
+        }
         L.push('');
         L.push('════════════════════════════════════════════');
         L.push('  نهاية السجل — وُلّد خادميًا من السجل الموحد');
@@ -4713,7 +4798,31 @@ app.get('/api/cad-reports/south-teams', cadIntegrationAuth, (req, res, next) => 
 // المستقلة، قاعدة ③)، ولا يُستنتج أي وصول من hospitalName (قاعدة ②).
 // ════════════════════════════════════════════════════════════════════════════
 const { HospitalMonitorService } = require('./services/hospital-monitor-service');
-const hospitalMonitor = new HospitalMonitorService(path.join(STORAGE_PATH, 'hospital-monitor.json'));
+// HOSPITAL_MONITOR_FILE: تجاوز اختباري لمسار المخزن (عزل smoke/الاختبارات عن
+// مخزن الإنتاج الحقيقي) — الافتراضي يبقى data/hospital-monitor.json كما هو.
+const hospitalMonitor = new HospitalMonitorService(process.env.HOSPITAL_MONITOR_FILE || path.join(STORAGE_PATH, 'hospital-monitor.json'));
+
+// دورة المستشفيات → أرشيف المناوبة (اعتماد المالك 2026-08-28): حقن late-binding
+// بنفس نمط signoutService — اللقطة تقرأ من مخزن 1B (مصدر الحقيقة الوحيد) وتختم
+// قسم hospital ضمن shift_snapshots، بلا مصدر موازٍ ولا نسخة تتنافس معه.
+archiveEngine.snapshot.hospitalMonitor = hospitalMonitor;
+archiveEngine.snapshot.hospitalDwellProvider = hospitalDwellByShift;
+
+// مُقيّم التنبيهات الدوري (سيرفري داخلي صِرف — لا طلب CAD ولا polling شبكي ولا
+// قناة جديدة): يعيد تقييم «تجاوز زمن البقاء» للمناوبة النشطة كل 60ث حتى يُرفع
+// التنبيه أثناء رحلة جارية صامتة (بلا مشاهدات جديدة). skip-if-unchanged:
+// evaluateAlerts لا يكتب الملف عند الثبات، ولا نبثّ إلا عند تغيّر فعلي.
+const hospitalAlertTimer = setInterval(async () => {
+    try {
+        if (!opsEngine || !opsEngine.shifts) return;
+        const activeShift = await opsEngine.shifts.getActiveShift();
+        if (!activeShift) return;
+        const dwell = await hospitalDwellByShift(activeShift.id);
+        const changed = hospitalMonitor.evaluateAlerts(dwell, null, activeShift.id);
+        if (changed.length && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+    } catch (e) { console.warn('[HospitalMonitor] alert tick error:', e.message); }
+}, 60000);
+if (hospitalAlertTimer.unref) hospitalAlertTimer.unref();
 
 // كتابة: مفتاح التكامل فقط (الـOverlay عبر الإضافة) — لا JWT ولا مسار يدوي
 app.post('/api/cad-reports/hospital-sighting', cadIntegrationAuth, (req, res, next) => {
@@ -4737,10 +4846,20 @@ app.post('/api/cad-reports/hospital-sighting', cadIntegrationAuth, (req, res, ne
             journeyStepCode: b.journeyStepCode ? String(b.journeyStepCode).slice(0, 40) : null // تتبع فقط — قاعدة ③
         };
         const seenAt = (typeof b.observedAt === 'string' && !isNaN(Date.parse(b.observedAt))) ? b.observedAt : new Date().toISOString();
+        // ختم ملكية المناوبة (اعتماد المالك 2026-08-28): يُشتق سيرفريًا من
+        // المناوبة النشطة فقط — أي shiftId في جسم الطلب يُتجاهل كليًا ولا يُقرأ
+        // (لا ختم من العميل). بلا مناوبة نشطة ← null بصدق، لا اختراع مناوبة.
+        let sightingShiftId = null;
+        try {
+            const activeShift = opsEngine && opsEngine.shifts ? await opsEngine.shifts.getActiveShift() : null;
+            sightingShiftId = activeShift ? activeShift.id : null;
+        } catch (_) { sightingShiftId = null; }
         // إشارة إغلاق (عودة للخدمة): تُغلق «الحالة الحالية» فقط — الاسم يبقى آخر
-        // منشأة معروفة ولا يُمسح (الفصل الدلالي — اعتماد المالك 2026-08-27)
+        // منشأة معروفة ولا يُمسح (الفصل الدلالي — اعتماد المالك 2026-08-27).
+        // وإغلاق الحالة يحلّ تنبيهاتها المفتوحة/المُقَرَّة بالحدث التشغيلي
+        // الصحيح — لا حلول بمجرد اختفاء الرحلة من قائمة CAD.
         if (b.episodeClose === true) {
-            const rc = hospitalMonitor.closeEpisode(base, seenAt);
+            const rc = hospitalMonitor.closeEpisode(base, seenAt, sightingShiftId);
             if (rc.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
             return res.json({ success: true, changed: rc.changed, kind: rc.kind });
         }
@@ -4753,9 +4872,21 @@ app.post('/api/cad-reports/hospital-sighting', cadIntegrationAuth, (req, res, ne
         const southTeam = typeof b.southTeam === 'string' ? b.southTeam.trim().slice(0, 100) : '';
         if (!southTeam)
             return res.status(400).json({ error: 'المشاهدة خارج نطاق قطاع الجنوب' });
-        const r = hospitalMonitor.applySighting({ ...base, southTeam, hospitalName }, seenAt);
+        const r = hospitalMonitor.applySighting({ ...base, southTeam, hospitalName }, seenAt, sightingShiftId);
         // بث لحظي عبر قناة SSE القائمة فقط عند تغيّر فعلي — لا قناة جديدة ولا بث عند الثبات
         if (r.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+        // تقييم فوري لتنبيه «تجاوز زمن البقاء» لهذه الرحلة (الحد المعتمد 10د —
+        // أزمنة Journey قراءة فقط، قاعدة ⑧). تحديث في المكان بهوية
+        // episodeKey+alertType — لا تنبيه جديد مع كل تحديث SSE.
+        try {
+            if (r.key) {
+                const d = await hospitalDwellForKey(r.key);
+                if (d) {
+                    const alertChanged = hospitalMonitor.evaluateAlerts({ [r.key]: d }, seenAt, sightingShiftId);
+                    if (alertChanged.length && !r.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+                }
+            }
+        } catch (e) { console.warn('[HospitalMonitor] sighting alert eval:', e.message); }
         res.json({ success: true, changed: r.changed, kind: r.kind });
     } catch (error) {
         console.error('[HospitalMonitor] sighting error:', error);
@@ -4795,6 +4926,88 @@ function hmDwellFromPhases(phases, nowMin) {
     return { dwellMin: hmDiffMin(s, nowMin), ongoing: true };
 }
 
+// أزمنة البقاء لكل رحلات مناوبة (قراءة report_times قراءة فقط — قاعدة ⑧).
+// المصدر الوحيد لهذا الاشتقاق: يستخدمه endpoint الملخص ومُقيّم التنبيهات
+// ومزوّد الأرشيف المحقون — لا نسخ للمنطق في أماكن متعددة.
+async function hospitalDwellByShift(shiftId) {
+    const dwellByKey = {};
+    if (!shiftId || !opsEngine || !opsEngine.storage) return dwellByKey;
+    const rows = await opsEngine.storage.all(
+        `SELECT t.incident_number, t.cad_run_unit_id, t.cad_unit_id, t.phases
+         FROM report_times t JOIN reports r ON r.id = t.report_id
+         WHERE r.shift_id = ? AND (t.withdrawn IS NULL OR t.withdrawn = 0)
+           AND (t.manual_cancelled IS NULL OR t.manual_cancelled = 0)`, [shiftId]);
+    const nowMin = hmNowMinutesRiyadh();
+    for (const row of rows || []) {
+        let phases = null;
+        try { phases = row.phases ? JSON.parse(row.phases) : null; } catch (_) { phases = null; }
+        const d = hmDwellFromPhases(phases, nowMin);
+        if (!d) continue;
+        const key = row.cad_run_unit_id != null
+            ? String(row.incident_number) + ':' + String(row.cad_run_unit_id)
+            : (row.cad_unit_id != null ? String(row.incident_number) + ':u' + String(row.cad_unit_id) : null);
+        if (!key) continue;
+        // مشاركة واحدة لكل رحلة غالبًا؛ عند التعدد: الأفضل = المكتمل (بلا
+        // ongoing) ثم الأطول زمنًا — لا فقدان صامت لقياس أقوى
+        const prev = dwellByKey[key];
+        if (!prev || (prev.ongoing && !d.ongoing) ||
+            (!!prev.ongoing === !!d.ongoing && d.dwellMin > prev.dwellMin)) dwellByKey[key] = d;
+    }
+    return dwellByKey;
+}
+
+// زمن بقاء رحلة واحدة بمفتاحها (eventId:runUnitId أو eventId:u<unitId>) —
+// للتقييم الفوري عند المشاهدة دون مسح المناوبة كلها. نفس قاعدة «الأفضل».
+async function hospitalDwellForKey(key) {
+    if (!key || !opsEngine || !opsEngine.storage) return null;
+    const idx = String(key).indexOf(':');
+    if (idx <= 0) return null;
+    const eventId = String(key).slice(0, idx);
+    const rest = String(key).slice(idx + 1);
+    const ridStr = rest.startsWith('u') ? null : rest;
+    const uidStr = rest.startsWith('u') ? rest.slice(1) : null;
+    const rows = await opsEngine.storage.all(
+        `SELECT t.phases FROM report_times t JOIN reports r ON r.id = t.report_id
+         WHERE t.incident_number = ? AND (t.withdrawn IS NULL OR t.withdrawn = 0)
+           AND (t.manual_cancelled IS NULL OR t.manual_cancelled = 0)
+           AND ((? IS NOT NULL AND CAST(t.cad_run_unit_id AS TEXT) = ?)
+             OR (? IS NOT NULL AND CAST(t.cad_unit_id AS TEXT) = ?))`,
+        [eventId, ridStr, ridStr, uidStr, uidStr]);
+    const nowMin = hmNowMinutesRiyadh();
+    let best = null;
+    for (const row of rows || []) {
+        let phases = null;
+        try { phases = row.phases ? JSON.parse(row.phases) : null; } catch (_) { phases = null; }
+        const d = hmDwellFromPhases(phases, nowMin);
+        if (!d) continue;
+        if (!best || (best.ongoing && !d.ongoing) ||
+            (!!best.ongoing === !!d.ongoing && d.dwellMin > best.dwellMin)) best = d;
+    }
+    return best;
+}
+
+// قسم المستشفيات الحي لسجل المناوبة — نفس تجميع لقطة الأرشيف (_getHospital)
+// لكن من المصدر الحي: رحلات مملوكة للمناوبة (ختم shiftId) + سقوط النافذة
+// للسجلات القديمة بلا ختم، وأزمنة البقاء من المزوّد الوحيد أعلاه.
+async function buildHospitalLive(shiftId, shift) {
+    let fromTs = null;
+    const st = shift && (shift.start_time || shift.startTime || shift.started_at || shift.startedAt);
+    const parsed = st ? Date.parse(String(st).replace(' ', 'T')) : NaN;
+    if (!isNaN(parsed)) fromTs = parsed;
+    else {
+        const sd = shift && (shift.shift_date || shift.shiftDate);
+        if (sd) { const d = new Date(String(sd) + 'T00:00:00'); if (!isNaN(d.getTime())) fromTs = d.getTime(); }
+    }
+    const dwell = await hospitalDwellByShift(shiftId);
+    const journeys = hospitalMonitor.journeysForShift(shiftId, fromTs, null);
+    const keys = journeys.map(j => j.key);
+    const summary = hospitalMonitor.summarizeJourneys(journeys, dwell, Date.now());
+    const alerts = hospitalMonitor.alertsForKeys(keys);
+    // Timeline: أحداث الرحلات + أحداث دورة التنبيه (مشتقة — بلا تخزين جديد)
+    const timeline = hospitalMonitor.timelineForKeys(keys);
+    return { summary, journeys, alerts, timeline, sealedAt: null };
+}
+
 // قراءة المؤشر: أي مستخدم موثّق — النافذة = المناوبة الحالية (أو from/to صريحان)
 app.get('/api/hospital-monitor/summary', authenticate, async (req, res) => {
     try {
@@ -4823,32 +5036,14 @@ app.get('/api/hospital-monitor/summary', authenticate, async (req, res) => {
         if (fromTs == null) { fromTs = parseDay(new Date().toISOString().slice(0, 10), false); windowLabel = 'today-fallback'; }
 
         // أزمنة Journey المخزنة (قراءة فقط) لمفاتيح الرحلات — لحساب زمن البقاء
-        const dwellByKey = {};
-        if (shiftId && opsEngine.storage) {
-            const rows = await opsEngine.storage.all(
-                `SELECT t.incident_number, t.cad_run_unit_id, t.cad_unit_id, t.phases
-                 FROM report_times t JOIN reports r ON r.id = t.report_id
-                 WHERE r.shift_id = ? AND (t.withdrawn IS NULL OR t.withdrawn = 0)
-                   AND (t.manual_cancelled IS NULL OR t.manual_cancelled = 0)`, [shiftId]);
-            const nowMin = hmNowMinutesRiyadh();
-            for (const row of rows || []) {
-                let phases = null;
-                try { phases = row.phases ? JSON.parse(row.phases) : null; } catch (_) { phases = null; }
-                const d = hmDwellFromPhases(phases, nowMin);
-                if (!d) continue;
-                const key = row.cad_run_unit_id != null
-                    ? String(row.incident_number) + ':' + String(row.cad_run_unit_id)
-                    : (row.cad_unit_id != null ? String(row.incident_number) + ':u' + String(row.cad_unit_id) : null);
-                if (!key) continue;
-                // مشاركة واحدة لكل رحلة غالبًا؛ عند التعدد: الأفضل = المكتمل (بلا
-                // ongoing) ثم الأطول زمنًا — لا فقدان صامت لقياس أقوى
-                const prev = dwellByKey[key];
-                if (!prev || (prev.ongoing && !d.ongoing) ||
-                    (!!prev.ongoing === !!d.ongoing && d.dwellMin > prev.dwellMin)) dwellByKey[key] = d;
-            }
-        }
+        // عبر المزوّد الوحيد المشترك (لا نسخ منطق الاشتقاق هنا)
+        const dwellByKey = await hospitalDwellByShift(shiftId);
         const summary = hospitalMonitor.summarize(fromTs, toTs, dwellByKey);
-        res.json({ success: true, window: { label: windowLabel, from: new Date(fromTs).toISOString(), to: toTs ? new Date(toTs).toISOString() : null }, ...summary });
+        // تنبيهات النافذة (دورة المستشفيات — اعتماد المالك 2026-08-28) من مخزن
+        // 1B نفسه: مفتوحة + مُقَرَّة + محلولة، مع عدّاد النشطة للوحة الحية
+        const alerts = hospitalMonitor.alertsInWindow(fromTs, toTs);
+        res.json({ success: true, window: { label: windowLabel, from: new Date(fromTs).toISOString(), to: toTs ? new Date(toTs).toISOString() : null }, ...summary,
+            alerts, activeAlerts: alerts.filter(a => a.state !== 'resolved').length });
     } catch (error) {
         console.error('[HospitalMonitor] summary error:', error);
         res.status(500).json({ error: 'فشل في جلب مؤشر المستشفيات' });
@@ -4864,6 +5059,25 @@ app.get('/api/hospital-monitor/history', authenticate, (req, res) => {
     } catch (error) {
         console.error('[HospitalMonitor] history error:', error);
         res.status(500).json({ error: 'فشل في جلب تاريخ الرحلة' });
+    }
+});
+
+// إقرار تنبيه (ACK — دورة المستشفيات، اعتماد المالك 2026-08-28): إجراء تشغيلي
+// مقصور على حاملي صلاحية التنبيهات التشغيلية ops.alerts — نفس صلاحية إقرار
+// تنبيهات المناوبة القائمة (لا نظام صلاحيات جديد). يمنع ACK الوهمي (غير موجود
+// ← 404) وإقرار المحلول (409)، والمُقَرّ مسبقًا idempotent بلا كتابة.
+// يحفظ وقت الإقرار وهوية المستخدم. لا تخزين جديد — التحديث في مخزن 1B نفسه.
+app.post('/api/hospital-monitor/alerts/:alertId/ack', authenticate, authorizePerm('ops.alerts'), (req, res) => {
+    try {
+        const id = String(req.params.alertId || '');
+        if (!id) return res.status(400).json({ error: 'معرّف التنبيه مطلوب' });
+        const r = hospitalMonitor.ackAlert(id, req.user);
+        if (!r.ok) return res.status(r.code || 400).json({ error: r.error });
+        if (r.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
+        res.json({ success: true, changed: r.changed, alert: r.alert });
+    } catch (error) {
+        console.error('[HospitalMonitor] ack error:', error);
+        res.status(500).json({ error: 'فشل في إقرار التنبيه' });
     }
 });
 

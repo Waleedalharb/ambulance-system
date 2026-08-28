@@ -724,6 +724,8 @@ body::after {
             <button class="modal-tab-btn" data-mtab="positioning" onclick="switchModalTab('positioning')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-map-marker-alt"></i> التمركزات</button>
             <!-- المرحلة ب: تبويب «تسجيلات الخروج» الثامن — سجل رسمي: الفرقة/أفرادها/وقت الخروج/بواسطة (renderSignoutsTab) -->
             <button class="modal-tab-btn" data-mtab="signouts" onclick="switchModalTab('signouts')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-door-open"></i> تسجيلات الخروج</button>
+            <!-- دورة المستشفيات (اعتماد المالك 2026-08-28): تبويب «🏥 المستشفيات» التاسع — ملخص/رحلات/تنبيهات/Timeline من سجل المناوبة (renderHospitalTab) -->
+            <button class="modal-tab-btn" data-mtab="hospital" onclick="switchModalTab('hospital')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-hospital"></i> المستشفيات</button>
         </div>
         <div class="modal-body" id="shiftDetailBody" style="flex:1;overflow-y:auto">
             <div class="loading"><div class="spinner"></div> جاري التحميل...</div>
@@ -1636,6 +1638,127 @@ var _viewShiftCoreSignouts = viewShift;
 viewShift = async function (id) {
     await _viewShiftCoreSignouts(id);
     if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderSignoutsTab(currentShiftDetail);
+};
+
+// ============================================
+// دورة المستشفيات (اعتماد المالك 2026-08-28): تبويب «🏥 المستشفيات»
+// قسم من أقسام سجل المناوبة (بجانب التمركزات والتكميل والنماذج) — يُبنى من
+// نفس استجابة /api/shifts/:id (hospital: لقطة مختومة للمؤرشفة، حيّة للنشطة).
+// عرض فقط: كل الأرقام/الحالات مشتقة سيرفريًا؛ الغائب يُعرض «—» بصدق.
+// ============================================
+function renderHospitalTab(data) {
+    var body = document.getElementById('shiftDetailBody');
+    if (!body || !data || !(data.shift || data).id) return;
+    var old = document.getElementById('mtab-hospital');
+    if (old) old.remove();
+    var isArchived = ((data.shift || data).status === 'archived');
+    var h = data.hospital || null;
+    var html = '<div id="mtab-hospital" class="modal-tab-panel">';
+    if (!h) {
+        // أرشيف ما قبل دورة المستشفيات أو غياب مصدر — غياب صادق لا اختراع
+        html += '<div class="empty-state"><i class="fas fa-hospital"></i> ' +
+            (isArchived ? 'هذه المناوبة أُرشفت قبل دورة المستشفيات — لا يوجد قسم مختوم لها'
+                        : 'لا توجد بيانات مستشفيات لهذه المناوبة') + '</div></div>';
+        body.insertAdjacentHTML('beforeend', html);
+        return;
+    }
+    var s = h.summary || {};
+    var journeys = Array.isArray(h.journeys) ? h.journeys : [];
+    var alerts = Array.isArray(h.alerts) ? h.alerts : [];
+    var timeline = Array.isArray(h.timeline) ? h.timeline : [];
+    var openAtClose = journeys.filter(function (j) { return j.episodeState !== 'last-known'; }).length;
+    var closedCount = journeys.length - openAtClose;
+    var ackedCount = alerts.filter(function (a) { return a.state === 'acknowledged'; }).length;
+    // ── الملخص ──
+    var chip = function (label, val) {
+        return '<div style="background:var(--gray-100,#f3f4f6); border-radius:10px; padding:8px 14px;">' +
+            '<b style="font-size:1.15rem;">' + val + '</b> <span style="color:var(--gray-600);">' + label + '</span></div>';
+    };
+    html += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; font-size:0.95rem;">' +
+        chip('رحلة مستشفى', journeys.length) +
+        chip('حالية الآن', s.currentAtHospital != null ? s.currentAtHospital : '—') +
+        chip('مغلقة', closedCount) +
+        chip('متوسط البقاء', s.avgDwellMin != null ? (Math.round(s.avgDwellMin * 10) / 10) + ' د' : '—') +
+        chip('تجاوز > 10 د', s.exceedances || 0) +
+        (s.unmeasured ? chip('بلا أزمنة تسليم', s.unmeasured) : '') +
+        chip('تنبيهات', alerts.length) +
+        chip('أُقرّت', ackedCount) +
+        '</div>';
+    if (h.sealedAt) html += '<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;"><i class="fas fa-stamp"></i> لقطة مختومة عند إغلاق المناوبة: ' + fmtDT(h.sealedAt) + '</div>';
+    // ── سجل الرحلات ──
+    html += '<strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-ambulance"></i> سجل الرحلات (' + journeys.length + ')</strong>';
+    if (journeys.length > 0) {
+        html += '<table class="data-table" style="margin-top:0.4rem"><thead><tr>' +
+            '<th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>أول مشاهدة</th><th>آخر مشاهدة</th><th>الإغلاق</th><th>الحالة</th></tr></thead><tbody>';
+        journeys.forEach(function (j) {
+            var isCurrent = j.episodeState !== 'last-known';
+            var stBadge, stText;
+            if (isCurrent && isArchived) { stBadge = 'badge-warning'; stText = 'مفتوحة عند إغلاق المناوبة'; }
+            else if (isCurrent) { stBadge = 'badge-success'; stText = 'حالية — في المنشأة'; }
+            else { stBadge = 'badge-muted'; stText = 'سابقة — آخر منشأة معروفة'; }
+            html += '<tr><td style="font-weight:600; direction:ltr; text-align:right;">' + (j.eventId || '—') + '</td>' +
+                '<td>' + (j.southTeam || j.unitCode || '—') + '</td>' +
+                '<td><i class="fas fa-hospital" style="color:var(--primary)"></i> ' + (j.hospitalName || '—') + '</td>' +
+                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(j.firstSeenAt) + '</td>' +
+                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(j.lastSeenAt) + '</td>' +
+                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (j.episodeClosedAt ? fmtDT(j.episodeClosedAt) : '—') + '</td>' +
+                '<td><span class="badge ' + stBadge + '">' + stText + '</span></td></tr>';
+        });
+        html += '</tbody></table>';
+    } else {
+        html += '<div class="empty-state"><i class="fas fa-hospital"></i> لا توجد رحلات مستشفيات مسجلة لهذه المناوبة</div>';
+    }
+    // ── التنبيهات ──
+    html += '<div style="margin-top:1rem"><strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-bell"></i> التنبيهات (' + alerts.length + ')</strong></div>';
+    if (alerts.length > 0) {
+        var aState = { open: ['badge-danger', 'نشط'], acknowledged: ['badge-info', 'مُقَرّ'], resolved: ['badge-muted', 'محلول'] };
+        html += '<table class="data-table" style="margin-top:0.4rem"><thead><tr>' +
+            '<th>الوقت</th><th>النوع</th><th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>البقاء</th><th>الحالة</th><th>الإقرار</th><th>الحلول</th></tr></thead><tbody>';
+        alerts.forEach(function (a) {
+            var st = aState[a.state] || ['badge-muted', a.state || '—'];
+            html += '<tr><td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(a.firstRaisedAt) + '</td>' +
+                '<td>تجاوز زمن البقاء</td>' +
+                '<td style="direction:ltr; text-align:right;">' + (a.eventId || '—') + '</td>' +
+                '<td>' + (a.southTeam || a.unitCode || '—') + '</td>' +
+                '<td style="font-size:0.8rem;">' + (a.facility || '—') + '</td>' +
+                '<td style="white-space:nowrap">' + (a.dwellMin != null ? (Math.round(a.dwellMin * 10) / 10) + ' د' : '—') + '</td>' +
+                '<td><span class="badge ' + st[0] + '">' + st[1] + '</span></td>' +
+                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (a.ackAt ? fmtDT(a.ackAt) + (a.ackByName ? ' · ' + a.ackByName : '') : '—') + '</td>' +
+                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (a.resolvedAt ? fmtDT(a.resolvedAt) : '—') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+    // ── Timeline (من سجل الأحداث append-only المختوم — الوقت والتسلسل الحقيقيان) ──
+    html += '<div style="margin-top:1rem"><strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-stream"></i> Timeline المستشفيات (' + timeline.length + ')</strong></div>';
+    if (timeline.length > 0) {
+        var evText = function (ev) {
+            if (ev.field === 'alert') { // أحداث دورة التنبيه داخل التسلسل الزمني
+                if (ev.alert === 'raised') return '⚠ تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + (Math.round(ev.dwellMin * 10) / 10) + ' د)' : '');
+                if (ev.alert === 'acknowledged') return 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + ev.actor : '');
+                if (ev.alert === 'resolved') return 'حلول التنبيه (عودة للخدمة)';
+                return 'تنبيه';
+            }
+            if (ev.field === 'hospitalName') return ev.from ? ('انتقال المنشأة: ' + ev.from + ' ← ' + ev.to) : ('مشاهدة المنشأة: ' + ev.to);
+            if (ev.field === 'unitCode') return 'تغيّر رمز الفرقة: ' + (ev.from || '—') + ' ← ' + (ev.to || '—');
+            if (ev.field === 'episode') return ev.to === 'last-known' ? 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' : 'إعادة فتح الحالة — مشاهدة جديدة';
+            return ev.field || 'حدث';
+        };
+        html += '<div style="margin-top:0.4rem; border-right:3px solid var(--gray-200,#e5e7eb); padding-right:12px;">';
+        timeline.forEach(function (ev) {
+            html += '<div style="margin-bottom:8px; font-size:0.82rem;">' +
+                '<span style="color:var(--text-muted); font-size:0.75rem;">' + fmtDT(ev.at) + '</span> — ' +
+                '<b style="direction:ltr; unicode-bidi:embed;">' + (ev.key || '') + '</b> · ' + evText(ev) + '</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+    body.insertAdjacentHTML('beforeend', html);
+}
+
+var _viewShiftCoreHospital = viewShift;
+viewShift = async function (id) {
+    await _viewShiftCoreHospital(id);
+    if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderHospitalTab(currentShiftDetail);
 };
 
 // Init

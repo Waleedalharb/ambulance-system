@@ -15,6 +15,11 @@
 (function () {
     'use strict';
 
+    // طبقة الرسم الموحدة (اعتماد المالك 2026-08-28 — MapAdapter): نفس
+    // واجهة L.* عبر المزود النشط — Leaflet افتراضيًا وMapbox عند تفعيله.
+    // لا قراءة ولا كتابة أي بيانات تشغيلية في طبقة الرسم.
+    var L = (window.MapAdapter && window.MapAdapter.L) || window.L;
+
     var on = false;             // الوضع التاريخي مفعّل؟
     var hmap = null;            // خريطة Leaflet التاريخية الخاصة
     var layers = null;          // { heat, markers, dots } — طبقات الوضع التاريخي
@@ -90,7 +95,7 @@
 
     function ensureMap() {
         if (hmap) return;
-        if (typeof L === 'undefined') {
+        if (typeof L === 'undefined' || (L.__ready && !L.__ready())) {
             dockBody('<div class="smap-hist-warn">تعذّر تحميل مكتبة الخرائط</div>');
             return;
         }

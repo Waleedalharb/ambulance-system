@@ -371,7 +371,8 @@ class ShiftArchiveSnapshot {
             notes: [],
             events: [],
             absences: [],
-            operationalEvents: []
+            operationalEvents: [],
+            hospital: null // دورة المستشفيات — تُملأ عند توفر مخزن 1B المحقون
         };
 
         // 1. جلب بيانات المناوبة الأساسية
@@ -424,6 +425,11 @@ class ShiftArchiveSnapshot {
         snapshot.signouts = await this._getSignouts(shiftId);
         snapshot.signoutEvents = await this._getSignoutEvents(shiftId);
         snapshot.conversations = await this._getConversations(shiftId);
+        // 18. دورة المستشفيات (اعتماد المالك 2026-08-28): ملخص + رحلات + تنبيهات
+        // + Timeline مختومة في اللقطة — قراءة/تجميعًا من مخزن Hospital Monitor 1B
+        // (مصدر الحقيقة الوحيد) عبر حقن late-binding بنفس نمط signoutService؛ بلا
+        // مصدر موازٍ ولا إعادة حساب من CAD. الرحلات الجارية تُختم «مفتوحة» بصدق.
+        snapshot.hospital = await this._getHospital(shiftId, snapshot.shift);
 
         // Calculate integrity hash
         snapshot.metadata.hash = this._calculateHash(snapshot);
@@ -608,6 +614,42 @@ class ShiftArchiveSnapshot {
 
     async _getReportEntries(shiftId) {
         return this._getContentRows('report_entries', shiftId);
+    }
+
+    /**
+     * دورة المستشفيات (اعتماد المالك 2026-08-28) — قسم hospital في اللقطة.
+     * القراءة من مخزن 1B المحقون (this.hospitalMonitor) وأزمنة البقاء من مزوّد
+     * محقون (this.hospitalDwellProvider — قراءة report_times للقراءة فقط تبقى
+     * في server.js ولا تُنسخ هنا). الملكية: الرحلات المختومة بهذه المناوبة +
+     * سقوط النافذة الزمنية للسجلات القديمة بلا ختم (ما قبل الدورة)؛ الرحلات
+     * المختومة بمناوبة أخرى تُستبعد (قرار ②أ — لا ازدواجية أرشيف). الجارية
+     * عند الإغلاق تُختم كما هي «مفتوحة» — لا إغلاق تلقائي ولا أزمنة ملفّقة.
+     */
+    async _getHospital(shiftId, shiftRow) {
+        try {
+            const hm = this.hospitalMonitor;
+            if (!hm) return null;
+            let fromTs = null;
+            const st = shiftRow && (shiftRow.start_time || shiftRow.startTime || shiftRow.started_at || shiftRow.startedAt);
+            const parsed = st ? Date.parse(String(st).replace(' ', 'T')) : NaN;
+            if (!isNaN(parsed)) fromTs = parsed;
+            else {
+                const sd = shiftRow && (shiftRow.shift_date || shiftRow.shiftDate);
+                if (sd) { const d = new Date(String(sd) + 'T00:00:00'); if (!isNaN(d.getTime())) fromTs = d.getTime(); }
+            }
+            const dwell = this.hospitalDwellProvider ? ((await this.hospitalDwellProvider(shiftId)) || {}) : {};
+            const journeys = hm.journeysForShift(shiftId, fromTs, null);
+            const keys = journeys.map(j => j.key);
+            const summary = hm.summarizeJourneys(journeys, dwell, Date.now());
+            const alerts = hm.alertsForKeys(keys);
+            // Timeline: أحداث الرحلات + أحداث دورة التنبيه مدموجة — تُشتق من
+            // سجلَّي history وalerts الموجودين أصلًا (بلا تخزين جديد)
+            const timeline = hm.timelineForKeys(keys);
+            return { summary, journeys, alerts, timeline, sealedAt: new Date().toISOString() };
+        } catch (err) {
+            console.error('[Snapshot] Error getting hospital section:', err.message);
+            return null;
+        }
     }
 
     async _getPositioning(shiftId) {
@@ -1181,7 +1223,8 @@ class ShiftArchiveEngine {
                     notes: snapshot.notes,
                     events: snapshot.events,
                     absences: snapshot.absences,
-                    operationalEvents: snapshot.operationalEvents
+                    operationalEvents: snapshot.operationalEvents,
+                    hospital: snapshot.hospital // دورة المستشفيات مختومة مع السجل
                 };
                 await fs.writeFile(shiftsPath, JSON.stringify(shifts, null, 2));
                 details.push({ step: 'shift_json', status: 'success' });

@@ -144,8 +144,15 @@ const incOf = (sum, num) => (sum.incidents || []).filter(i => i.number === num)[
         const fallbackBlock = appJs.slice(appJs.indexOf('function startFallbackInterval'), appJs.indexOf('function startFallbackInterval') + 900);
         check('L6② الوضع الاحتياطي (بلا SSE) يجلب الملخص مع كل دورة', fallbackBlock.includes('fetchIncidentSummarySafe'));
         const renderBlock = smapJs.slice(smapJs.indexOf('function renderIncidents'), smapJs.indexOf('function refit'));
-        check('L6③ الرسم يمسح طبقة البلاغات كليًا قبل إعادة البناء', renderBlock.includes('layers.incidents.clearLayers()'));
+        // الرسم التفاضلي (اعتماد المالك 2026-08-28): لا مسح كلي لطبقة البلاغات —
+        // بصمات __sig + syncMarkers يحدّثان المتغيّر فقط ويزيلان الغائب فقط
+        check('L6③ الرسم تفاضلي: بصمات + مزامنة فردية بلا مسح كلي لطبقة البلاغات',
+            renderBlock.includes('syncMarkers') && smapJs.includes('__sig')
+            && !renderBlock.includes('layers.incidents.clearLayers()'));
         check('L6④ الرسم يفلتر ببوابة isFinalInc (النشطة فقط)', renderBlock.includes('!isFinalInc(ic)'));
+        check('L6⑤ الطبقات الفرعية (تكرار/كثافة/ساخنة/شوارع) محروسة ببصمات مستقلة — لا إعادة بناء بلا تغيير',
+            renderBlock.includes('lastRender.dupFp') && renderBlock.includes('lastRender.heatFp')
+            && renderBlock.includes('lastRender.hotFp') && renderBlock.includes('lastRender.streetsFp'));
         check('L7① لا شرائح تحليلية في شريط طبقات الحية',
             !/id="smapLayerHot"|id="smapLayerHeat"|id="smapLayerStreets"|id="smapLayerPeak"/.test(indexHtml));
         check('L7② لا لوحات/نوافذ تحليلية في الحية (شوارع/ذروة)',
@@ -185,6 +192,39 @@ const incOf = (sum, num) => (sum.incidents || []).filter(i => i.number === num)[
             /\.smap-kpis \{[^}]*auto-fit/.test(css) && !/repeat\(6, 1fr\)/.test(css));
         check('L10③ أزرار الدليل/الذاكرة بعرض تلقائي — لا قص للنص',
             /\.smap-expand-btn\.smap-guide-btn, \.smap-expand-btn\.smap-history-btn \{[^}]*width: auto/.test(css));
+
+        // 🐞 L11 — قفل Bug «CSS خام يظهر كنص للمستخدم» (لقطة المالك 2026-08-28):
+        // الجذر كان مخلّف قاعدة يتيمة بعد </style> مبكر في index.html؛ المتصفح
+        // ينقل النص الحر من الرأس إلى أعلى الصفحة فيظهر حرفيًا. الفحص: بعد تجريد
+        // كل وسوم <style>/<script>/<!– –> يجب ألا يبقى نص يحمل بنية إعلانات CSS.
+        const stripped = indexHtml
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<[^>]+>/g, ' ');
+        check('L11① صفر CSS خام خارج وسوم <style> في index.html (لا نص يتيم)',
+            !/[a-z-]+\s*:\s*[^;<>{}]+;\s*[a-z-]+\s*:\s*[^;<>{}]+;/i.test(stripped));
+        check('L11② قاعدة .paramedic-no-data الأصلية باقية مكتملة داخل <style> (الإصلاح لم يحذف التصميم)',
+            /\.paramedic-no-data \{[^}]*var\(--gray-400\)[^}]*0\.65rem/.test(indexHtml));
+        check('L11③ توازن وسوم style في index.html (فتح = إغلاق)',
+            (indexHtml.match(/<style[\s>]/gi) || []).length === (indexHtml.match(/<\/style>/gi) || []).length);
+
+        // 🧭 L12 — ضبط تخطيط منطقة الخريطة (توجيه المالك 2026-08-28):
+        // ② المحتوى يبدأ تحت الشريط العلوي الثابت بارتفاعه الكامل (لا تداخل
+        //    بطاقات القوى معه)، ومتغير الارتفاع يُحاذى عند نقطة الجوال 480px
+        // ① مؤشر الضغط النصي يلتف بدل أن يُقص — لكل حالاته وكل عرض شاشة
+        check('L12① إزاحة المحتوى تتبع ارتفاع الشريط الثابت (calc(var(--topbar-height)) — لا تداخل علوي',
+            /\.container \{ padding-top: calc\(var\(--topbar-height, 78px\)/.test(css));
+        check('L12② نقطة 480px تُحاذي متغير الارتفاع مع شريط الجوال 52px',
+            /@media \(max-width: 480px\) \{ :root \{ --topbar-height: 52px/.test(css));
+        check('L12③ مسار مؤشرات الخريطة أوسع (minmax(148px)) — لا قص لعبارات الحالة',
+            /\.smap-kpis \{ grid-template-columns: repeat\(auto-fit, minmax\(148px/.test(css));
+        check('L12④ مؤشر الضغط يلتف بدل القص (overflow:visible + white-space:normal)',
+            /#smapKpiStatus \{ overflow: visible/.test(css)
+            && /#smapKpiStatus > span:last-child \{ white-space: normal/.test(css));
+        check('L12⑤ أزرار زوم Mapbox أسفل اليسار — لا تغطية من بطاقة القرار (أعلى اليسار)',
+            /addControl\(new window\.mapboxgl\.NavigationControl[\s\S]*?'bottom-left'\)/.test(
+                fs.readFileSync(path.join(ROOT, 'public', 'js', 'map-adapter.js'), 'utf8')));
     } catch (e) {
         console.error('خطأ عام:', e);
         failed++;

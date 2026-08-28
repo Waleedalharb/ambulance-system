@@ -654,6 +654,29 @@ body.rc-move-mode .team-card:not(.vehicle-card) { cursor:pointer; border-color:r
 .pm[data-mdrag]:active { cursor:grabbing; }
 .pm.rc-dragging { opacity:0.35; filter:saturate(0.6); }
 
+/* ── سحب المؤشر (Pointer DnD — توجيه المالك 2026-08-28): بديل HTML5 Drag&Drop
+   غير الثابت (كان لا يلتقط إلا بعد Scroll بالصدفة). الالتقاط pointerdown +
+   عتبة حركة، والحالة تستمر مع Scroll عبر rAF + auto-scroll عند الحواف،
+   والإفلات بـ elementFromPoint — مستقل تمامًا عن موضع الـviewport ── */
+.rc-drag-ghost { position:fixed; z-index:6000; pointer-events:none; top:0; left:0;
+    background:rgba(15,23,42,0.95); border:1px solid rgba(45,212,191,0.55); border-radius:10px;
+    padding:7px 14px; font-size:0.8rem; font-weight:800; color:#E8EDF8; white-space:nowrap;
+    box-shadow:0 14px 34px rgba(0,0,0,0.5), 0 0 18px rgba(45,212,191,0.22);
+    transform:translate(-50%, -130%); }
+.rc-drag-ghost .rcg-from { display:block; font-size:0.62rem; font-weight:600; color:#9AA7C4; margin-top:2px; }
+body.rc-pointer-drag, body.rc-pointer-drag * { cursor:grabbing !important; }
+body.rc-pointer-drag { -webkit-user-select:none !important; user-select:none !important; }
+
+/* إدخال رمز الفرقة يدويًا داخل لافتة وضع التوزيع (بند ② — توجيه المالك 2026-08-28):
+   نقل لأي رمز فرقة صالح ومعروف للنظام حتى لو غير مجدولة/غير متاحة بالجدول */
+.mb-manual { display:flex; align-items:center; gap:8px; margin-inline-start:auto; }
+.mb-manual input { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); border-radius:9px;
+    padding:6px 12px; color:#E8EDF8; font-family:inherit; font-size:0.78rem; font-weight:700; width:150px; }
+.mb-manual input:focus { outline:none; border-color:rgba(45,212,191,0.6); }
+.mb-manual button { background:rgba(45,212,191,0.14); color:#2dd4bf; border:1px solid rgba(45,212,191,0.45);
+    border-radius:9px; padding:6px 14px; font-family:inherit; font-size:0.78rem; font-weight:800; cursor:pointer; }
+.mb-manual button:hover { background:rgba(45,212,191,0.24); }
+
 /* ── حارس الطباعة (T2/T3): الأدراج/اللافتات/البحث/مناطق الإسقاط لا تُطبع ── */
 @media print {
     .side-drawer, .drawer-overlay, .move-banner, .wb-search-results, .tc-dropzone { display:none !important; }
@@ -1653,6 +1676,11 @@ function navigateToPage(url) {
      الموظف ← بطاقات الفرق تتوهج ← ضغطة على الفرقة المستهدفة تفتح نافذة التأكيد نفسها -->
 <div class="move-banner" id="moveBanner" style="display:none">
     <span id="moveBannerText"></span>
+    <span class="mb-manual">
+        <input id="moveTeamCode" list="moveTeamCodes" placeholder="أو اكتب رمز الفرقة…" autocomplete="off">
+        <datalist id="moveTeamCodes"></datalist>
+        <button type="button" onclick="submitMoveTeamCode()"><i class="fas fa-arrow-right-to-bracket"></i> نقل إلى الرمز</button>
+    </span>
     <button onclick="cancelMoveMode()"><i class="fas fa-times"></i> إلغاء</button>
 </div>
 <!-- §8 المواصفة: شريط اقتراحات وضع التوزيع — «فرق تحتاج دعمًا الآن» (الناقصة
@@ -3802,9 +3830,10 @@ var redistCtx = null; // { name, fromTeamId, toTeamId, kind, hasBase }
 function startMoveMode(name, fromTeamId) {
     closeEmployeeDrawer();
     moveCtx = { name: name, fromTeamId: fromTeamId || null };
-    document.getElementById('moveBannerText').textContent = '🔀 وضع التوزيع: ' + name + ' — اضغط بطاقة الفرقة المستهدفة (الفرق الناقصة نابضة أوضح)';
+    document.getElementById('moveBannerText').textContent = '🔀 وضع التوزيع: ' + name + ' — اضغط بطاقة الفرقة المستهدفة، أو اكتب رمزها مباشرة (الفرق الناقصة نابضة أوضح)';
     document.getElementById('moveBanner').style.display = 'flex';
     document.body.classList.add('rc-move-mode');
+    fillMoveTeamCodes(); // ② قائمة الرموز المعروفة للإدخال اليدوي
     renderNonRosterTargets();
     renderMoveSuggestions(); // §8 المواصفة: فرق تحتاج دعمًا الآن + تفعيل غير مجدولة
 }
@@ -3814,6 +3843,54 @@ function cancelMoveMode() {
     document.body.classList.remove('rc-move-mode');
     renderNonRosterTargets(); // يخفي شريط الفرق غير المجدولة
     renderMoveSuggestions();  // يخفي شريط الاقتراحات
+}
+// ── بند ② (توجيه المالك 2026-08-28): النقل إلى أي رمز فرقة صالح ومعروف للنظام ──
+// «عدم توفر الفرقة ≠ منع النقل إليها»: الفرقة غير المجدولة اليوم أو بلا حالة
+// جاهزية في الجدول تُقبل (مسارها القائم: activation/إعادة التوزيع). المنع فقط
+// عند رمز غير معروف للنظام أصلًا، أو فرقة معطّلة في سجل الفرق، أو بلا صلاحية
+// (الحسم النهائي سيرفري عبر authorizePerm على المسارات القائمة بلا تغيير).
+function knownTeamCodesMap() {
+    var known = {};
+    try { serverTeamIds().forEach(function (id) { if (id) { known[String(id)] = true; known[serverTeamKey(id)] = true; } }); } catch (_) { }
+    (vbTeamsCache || []).forEach(function (t) { if (t && t.name) known[String(t.name)] = true; });
+    return known;
+}
+function fillMoveTeamCodes() {
+    var dl = document.getElementById('moveTeamCodes');
+    if (!dl) return;
+    var names = {};
+    Object.keys(knownTeamCodesMap()).forEach(function (k) { names[k] = true; });
+    dl.innerHTML = Object.keys(names).sort().map(function (n) {
+        return '<option value="' + escapeHtml(n) + '"></option>';
+    }).join('');
+}
+function submitMoveTeamCode() {
+    if (!moveCtx) { showToast('⚠️ وضع التوزيع غير نشط — ابدأ من «توزيع الموظف» أولًا', 'error'); return; }
+    var inp = document.getElementById('moveTeamCode');
+    var raw = ((inp && inp.value) || '').trim();
+    if (!raw) { showToast('⚠️ اكتب رمز الفرقة أولًا', 'error'); return; }
+    var code = serverTeamKey(raw); // تطبيع «تدخل سريع N» ⇒ «سريع N» (نفس جسر الخادم)
+    var known = knownTeamCodesMap();
+    if (!known[code] && !known[raw]) {
+        showToast('⚠️ رمز الفرقة غير صالح أو غير معروف للنظام: ' + raw, 'error');
+        return;
+    }
+    if (!known[code]) code = raw;
+    // فرقة معروفة لكن معطّلة في سجل الفرق (is_active=0) وغير مجدولة اليوم:
+    // التفعيل عليها سيرفشضه الخادم — رسالة دقيقة وليست «غير متاحة» الجاملة
+    var rec = (vbTeamsCache || []).find(function (t) { return t && t.name === code; });
+    if (rec && Number(rec.is_active) !== 1 && isNonRosterTeam(code)) {
+        showToast('⚠️ الفرقة معطّلة في سجل الفرق (is_active=0) — فعّلها من إدارة الفرق أولًا: ' + code, 'error');
+        return;
+    }
+    if (moveCtx.fromTeamId && serverTeamKey(code) === serverTeamKey(moveCtx.fromTeamId)) {
+        showToast('هو في هذه الفرقة أصلًا');
+        return;
+    }
+    var mv = moveCtx;
+    if (inp) inp.value = '';
+    cancelMoveMode();
+    openRedistModal(mv.name, mv.fromTeamId, code); // نوع الحركة يُشتق كالمعتاد (غير مجدولة ← تفعيل + توزيع)
 }
 // §5: الفرق النشطة في /api/teams وغير المجدولة اليوم تظهر أهداف «تفعيل + توزيع»
 // أثناء وضع التوزيع (أو السحب) فقط — التنفيذ لاحقًا عبر حدث activation القائم
@@ -4145,6 +4222,8 @@ function moveSuggestNonRoster() {
         { sel: 'button[onclick="confirmCoverage()"]',    perm: 'ops.completion' },
         { sel: 'button[onclick="confirmSupport()"]',     perm: 'ops.completion' },
         { sel: 'button[onclick="confirmActivation()"]',  perm: 'ops.completion' },
+        { sel: 'button[onclick="confirmRedistribution()"]', perm: 'ops.completion' }, // ② تأكيد النقل/إعادة التوزيع — صلاحية التكميل (توجيه المالك 2026-08-28)
+        { sel: 'button[onclick="submitMoveTeamCode()"]', perm: 'ops.completion' },    // ② النقل اليدوي برمز الفرقة — نفس الصلاحية
         { sel: 'button[onclick="confirmVolunteer()"]',   perm: 'ops.volunteers' },
         { sel: 'button[onclick="confirmVehicleTeam()"]', perm: 'ops.vehicles' },
         { sel: '#signoutSaveBtn',                        perm: 'ops.team_exit' }
@@ -4179,109 +4258,185 @@ function moveSuggestNonRoster() {
    لأصحاب زر التفعيل (أوفرلاب/متطوع) و«دعم فريق» لغيرهم — مع تعبئة الفريق
    المستهدف مسبقًا إن وُجد في قائمة المودال. الحفظ يبقى بضغطة المستخدم داخل
    المودال نفسه (confirmSupport/confirmActivation كما هي)، وكل الأزرار
-   الأصلية تعمل كما هي دون أي تعديل. السحب يُفعَّل عبر MutationObserver بعد
-   كل إعادة رسم للحوض (innerHTML) — لا مساس بقوالب JS القائمة. ═══ */
+   الأصلية تعمل كما هي دون أي تعديل.
+   (توجيه المالك 2026-08-28): آلية السحب = Pointer DnD موحّد — أُحيل HTML5
+   Drag&Drop للتقاعد لعدم ثبات الالتقاط (كان يتطلب Scroll بالصدفة). ═══ */
 (function () {
-    var dragIdx = null;
-    function grid() { return document.getElementById('supportCards'); }
-    function indexOfCard(card) {
-        var g = grid(); if (!g) return -1;
-        return Array.prototype.indexOf.call(g.children, card);
-    }
+    /* ═══ سحب المؤشر الموحّد (Pointer DnD — توجيه المالك 2026-08-28) ═══
+       يحل محل HTML5 Drag&Drop الذي كان لا يلتقط الموظف بشكل موثوق (أحيانًا
+       لا يتفاعل إلا بعد تحريك الصفحة بالصدفة). المبادئ:
+       - الالتقاط فوري: pointerdown + عتبة حركة 7px — يبدأ من أول محاولة،
+         ومستقل تمامًا عن موضع الـviewport (لا Scroll مسبقًا مطلوب).
+       - الاستمرار: حالة السحب تعيش على document مع حلقة rAF — لا تنقطع
+         مع Scroll الصفحة، وتمرير العجلة يعمل أثناء السحب.
+       - الوصول لأي فرقة: auto-scroll تلقائي عند حافتي النافذة.
+       - الإفلات: elementFromPoint ← نفس الأهداف والتدفقات القائمة حرفيًا
+         (#redistModal للأفراد · التفعيل/الدعم للحوض) — لا إرسال قبل ضغطة
+         المستخدم داخل النافذة.
+       - الإلغاء الآمن: Escape أو pointercancel أو إفلات خارج هدف أو مغادرة
+         النافذة (blur) — بلا أي تغيير.
+       - اللمس: «وضع التوزيع» (startMoveMode) يبقى البديل المعتمد كما هو. ═══ */
+    var THRESH = 7;   // px — عتبة بدء السحب (دونها = ضغطة عادية تفتح درج الموظف)
+    var EDGE = 72;    // px — نطاق auto-scroll عند حواف النافذة
+    var SPEED = 16;   // px لكل إطار rAF أثناء الوقوف عند الحافة
+    var st = null;    // حالة المرشح/السحب الحالي (واحد فقط في كل لحظة)
+
     function clearDropTargets() {
         Array.prototype.forEach.call(document.querySelectorAll('.rc-drop-target'), function (c) { c.classList.remove('rc-drop-target'); });
     }
-    var obs = new MutationObserver(function () {
-        var g = grid(); if (!g) return;
-        Array.prototype.forEach.call(g.querySelectorAll('.support-card'), function (c) {
-            if (!c.hasAttribute('draggable')) c.setAttribute('draggable', 'true');
-        });
-    });
-    document.addEventListener('DOMContentLoaded', function () {
-        var g = grid(); if (g) obs.observe(g, { childList: true });
-    });
-    document.addEventListener('dragstart', function (e) {
-        var card = e.target && e.target.closest ? e.target.closest('.support-card') : null;
-        if (!card) return;
-        dragIdx = indexOfCard(card);
-        if (dragIdx < 0) { dragIdx = null; return; }
-        try { e.dataTransfer.setData('text/plain', String(dragIdx)); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
-        card.classList.add('rc-dragging');
-    });
-    document.addEventListener('dragend', function () {
-        dragIdx = null;
-        Array.prototype.forEach.call(document.querySelectorAll('.rc-dragging'), function (c) { c.classList.remove('rc-dragging'); });
-        clearDropTargets();
-        if (typeof renderAll === 'function') renderAll(); // استدراك أي تحديث أُجّل أثناء السحب
-    });
-    function teamCardOf(e) {
-        var card = e.target && e.target.closest ? e.target.closest('.team-card') : null;
+    // حلّال أهداف الأفراد (المُصدَّر من وحدة T3 أعلاه): بطاقات الفرق + فرق غير
+    // مجدولة (data-nrteam) + صفوف الجدول (tr.wb-trow)
+    function resolveTeam(el) { return (typeof window.rcTeamCardInfoOf === 'function') ? window.rcTeamCardInfoOf(el) : null; }
+    // حلّال أهداف الحوض — نفس نطاق السحب القديم حرفيًا (بطاقات الفرق المجدولة فقط)
+    function resolveTeamForPool(el) {
+        var card = el && el.closest ? el.closest('.team-card') : null;
         if (!card || card.classList.contains('vehicle-card')) return null; // المركبات خارج نطاق السحب
         var bar = card.querySelector('.actions-bar[data-team]');
         return bar ? { card: card, teamId: bar.getAttribute('data-team') } : null;
     }
-    document.addEventListener('dragover', function (e) {
-        if (dragIdx == null) return;
-        var t = teamCardOf(e);
-        if (!t) return;
-        e.preventDefault();
-        try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
-        if (!t.card.classList.contains('rc-drop-target')) {
-            clearDropTargets();
-            t.card.classList.add('rc-drop-target');
-        }
-    });
-    document.addEventListener('dragleave', function (e) {
-        var t = teamCardOf(e);
-        if (t && !t.card.contains(e.relatedTarget)) t.card.classList.remove('rc-drop-target');
-    });
-    document.addEventListener('drop', function (e) {
-        if (dragIdx == null) return;
-        var t = teamCardOf(e);
-        if (!t) return;
-        e.preventDefault();
-        var idx = dragIdx;
-        var g = grid();
-        var card = g ? g.children[idx] : null;
-        var teamId = t.teamId;
-        // نفس التدفقات القائمة حرفيًا: التفعيل لأصحاب «⚡ تفعيل فرقة»، والدعم لزر «🤝 دعم فريق»
-        if (card && card.querySelector('.btn-activate') && typeof openActivationModal === 'function') {
-            openActivationModal(idx);
-            var asel = document.getElementById('activationTeam');
-            if (asel) Array.prototype.forEach.call(asel.options, function (o) { if (o.value === teamId) asel.value = teamId; });
-        } else if (card && card.querySelector('.btn-support') && typeof openSupportModal === 'function') {
-            openSupportModal(idx);
-            var ssel = document.getElementById('supportTargetTeam');
-            if (ssel) Array.prototype.forEach.call(ssel.options, function (o) { if (o.value === teamId) ssel.value = teamId; });
-        }
+    function makeGhost(text, sub) {
+        var g = document.createElement('div');
+        g.className = 'rc-drag-ghost';
+        g.textContent = text;
+        if (sub) { var s = document.createElement('span'); s.className = 'rcg-from'; s.textContent = sub; g.appendChild(s); }
+        document.body.appendChild(g);
+        return g;
+    }
+    function moveGhost(x, y) { if (st && st.ghost) { st.ghost.style.left = x + 'px'; st.ghost.style.top = y + 'px'; } }
+    function autoScrollFrame() {
+        if (!st || !st.dragging) return;
+        if (st.lastY < EDGE) window.scrollBy(0, -SPEED);
+        else if (st.lastY > window.innerHeight - EDGE) window.scrollBy(0, SPEED);
+        st.raf = requestAnimationFrame(autoScrollFrame);
+    }
+    function updateTarget() {
+        if (!st || !st.dragging) return;
+        var el = document.elementFromPoint(st.lastX, st.lastY);
+        var t = st.kind === 'pool' ? resolveTeamForPool(el) : resolveTeam(el);
+        if (t && st.kind === 'pm' && t.teamId === st.fromTeamId) t = null; // نفس الفرقة ليست هدفًا
+        var cur = document.querySelector('.rc-drop-target');
+        if (cur && (!t || cur !== t.card)) cur.classList.remove('rc-drop-target');
+        if (t && !t.card.classList.contains('rc-drop-target')) t.card.classList.add('rc-drop-target');
+        st.target = t || null;
+    }
+    function beginDrag(e) {
+        st.dragging = true;
+        document.body.classList.add('rc-pointer-drag');
+        st.srcEl.classList.add('rc-dragging'); // حارسا إعادة الرسم أثناء السحب يعتمدان على هذا الكلاس
+        st.ghost = makeGhost(st.name, st.fromTeamId ? ('من: ' + st.fromTeamId) : 'من: القوة المتاحة');
+        moveGhost(e.clientX, e.clientY);
+        if (st.kind === 'pm' && typeof renderNonRosterTargets === 'function') renderNonRosterTargets(st.name); // §5: أهداف التفعيل أثناء السحب أيضًا
+        st.raf = requestAnimationFrame(autoScrollFrame);
+        updateTarget();
+    }
+    function cleanup() {
+        if (!st) return;
+        if (st.raf) cancelAnimationFrame(st.raf);
+        if (st.ghost && st.ghost.parentNode) st.ghost.parentNode.removeChild(st.ghost);
+        if (st.srcEl) st.srcEl.classList.remove('rc-dragging');
+        document.body.classList.remove('rc-pointer-drag');
         clearDropTargets();
+        document.removeEventListener('pointermove', onMove, true);
+        document.removeEventListener('pointerup', onUp, true);
+        document.removeEventListener('pointercancel', onCancel, true);
+        var wasDragging = st.dragging, kind = st.kind;
+        st = null;
+        if (wasDragging) {
+            if (kind === 'pm' && typeof renderNonRosterTargets === 'function' && (typeof moveCtx === 'undefined' || !moveCtx)) renderNonRosterTargets(null);
+            if (typeof renderAll === 'function') renderAll(); // استدراك أي تحديث أُجّل أثناء السحب
+        }
+    }
+    function finishDrag() {
+        var t = st && st.target;
+        var kind = st.kind, name = st.name, from = st.fromTeamId, poolIdx = st.poolIdx;
+        cleanup();
+        if (!t) return; // إفلات خارج هدف = إلغاء صامت بلا أي تغيير
+        if (kind === 'pm') {
+            // بوابة التأكيد الوحيدة — لا إرسال قبل ضغطة المستخدم داخل النافذة
+            if (typeof openRedistModal === 'function') openRedistModal(name, from, t.teamId);
+            return;
+        }
+        // الحوض: نفس التدفقات القائمة حرفيًا — التفعيل لأصحاب «⚡ تفعيل فرقة» والدعم لزر «🤝 دعم فريق»
+        var g = document.getElementById('supportCards');
+        var card = g ? g.children[poolIdx] : null;
+        if (card && card.querySelector('.btn-activate') && typeof openActivationModal === 'function') {
+            openActivationModal(poolIdx);
+            var asel = document.getElementById('activationTeam');
+            if (asel) Array.prototype.forEach.call(asel.options, function (o) { if (o.value === t.teamId) asel.value = t.teamId; });
+        } else if (card && card.querySelector('.btn-support') && typeof openSupportModal === 'function') {
+            openSupportModal(poolIdx);
+            var ssel = document.getElementById('supportTargetTeam');
+            if (ssel) Array.prototype.forEach.call(ssel.options, function (o) { if (o.value === t.teamId) ssel.value = t.teamId; });
+        }
+    }
+    function onMove(e) {
+        if (!st || e.pointerId !== st.pointerId) return;
+        st.lastX = e.clientX; st.lastY = e.clientY;
+        if (!st.dragging) {
+            if (Math.abs(e.clientX - st.startX) < THRESH && Math.abs(e.clientY - st.startY) < THRESH) return;
+            beginDrag(e);
+        }
+        if (e.cancelable) e.preventDefault(); // منع تحديد النص/سلوكيات المتصفح أثناء السحب فقط
+        moveGhost(e.clientX, e.clientY);
+        updateTarget();
+    }
+    function onUp(e) {
+        if (!st || e.pointerId !== st.pointerId) return;
+        if (st.dragging) { updateTarget(); finishDrag(); }
+        else cleanup(); // ضغطة بلا سحب — معالج click القائم يفتح درج الموظف كالمعتاد
+    }
+    function onCancel(e) { if (st && (!e || e.pointerId === st.pointerId)) cleanup(); }
+
+    document.addEventListener('pointerdown', function (e) {
+        if (st) return;                                  // سحب واحد فقط
+        if (e.pointerType === 'mouse' && e.button !== 0) return; // الزر الأيسر فقط
+        var t = e.target;
+        // عناصر تفاعلية/نوافذ/لافتة التوزيع/خريطة — لا تبدأ سحبًا منها
+        if (t && t.closest && t.closest('button, a, input, select, textarea, .modal-overlay, .side-drawer, #moveBanner, .mapboxgl-canvas')) return;
+        var pm = t && t.closest ? t.closest('.pm[data-mdrag]') : null;
+        if (pm) {
+            var info = resolveTeam(pm);
+            if (!info) return;
+            st = { kind: 'pm', pointerId: e.pointerId, name: pm.getAttribute('data-emp'), fromTeamId: info.teamId,
+                   startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY,
+                   dragging: false, srcEl: pm, ghost: null, raf: 0, target: null };
+        } else {
+            var sp = t && t.closest ? t.closest('#supportCards .support-card') : null;
+            if (!sp) return;
+            var g = document.getElementById('supportCards');
+            var idx = g ? Array.prototype.indexOf.call(g.children, sp) : -1;
+            if (idx < 0) return;
+            var p = (typeof availableSupport !== 'undefined' && availableSupport) ? availableSupport[idx] : null;
+            st = { kind: 'pool', pointerId: e.pointerId, poolIdx: idx, name: (p && p.name) || 'موظف', fromTeamId: null,
+                   startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY,
+                   dragging: false, srcEl: sp, ghost: null, raf: 0, target: null };
+        }
+        document.addEventListener('pointermove', onMove, true);
+        document.addEventListener('pointerup', onUp, true);
+        document.addEventListener('pointercancel', onCancel, true);
     });
+    // Escape يلغي السحب الجاري فقط — وإلا يمرّ لمعالج T3 القائم (وضع النقل/الأدراج)
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && st && st.dragging) { cleanup(); e.stopPropagation(); }
+    }, true);
+    window.addEventListener('blur', function () { if (st) cleanup(); }); // مغادرة النافذة أثناء السحب = إلغاء آمن
 })();
 </script>
 
 <script>
-/* ═══ T3: سحب/إفلات صفوف الأفراد (.pm[data-mdrag]) بين بطاقات الفرق + فتح درج
-   الموظف بالضغط + وضع النقل (بديل اللمس) — كلها طبقة تفاعل اختيارية:
+/* ═══ T3: تفاعلات صفوف الأفراد (.pm[data-mdrag]) — طبقة اختيارية:
+   - السحب/الإفلات: في وحدة «سحب المؤشر الموحّد» أعلاه (Pointer DnD — توجيه
+     المالك 2026-08-28) وتستخدم حلّال الأهداف المُصدَّر من هنا.
    - الإفلات على بطاقة فرقة يفتح نافذة تأكيد إعادة التوزيع (#redistModal) ولا
      يُرسل أي حدث قبل ضغطة «تأكيد النقل» من المستخدم.
-   - مستقل تمامًا عن سحب حوض الدعم القائم أعلاه (يبقى كما هو حرفيًا).
-   - الضغط العادي (بلا سحب) على صف فرد/بطاقة حوض/نتيجة بحث يفتح درج الموظف. ═══ */
+   - الضغط العادي (بلا سحب) على صف فرد/بطاقة حوض/نتيجة بحث يفتح درج الموظف.
+   - وضع النقل (startMoveMode) = البديل المعتمد للمس. ═══ */
 (function () {
-    var drag = null; // { name, fromTeamId }
-    function clearDropTargets() {
-        Array.prototype.forEach.call(document.querySelectorAll('.rc-drop-target'), function (c) { c.classList.remove('rc-drop-target'); });
-    }
-    var obs = new MutationObserver(function () {
-        Array.prototype.forEach.call(document.querySelectorAll('.pm[data-mdrag]'), function (pm) {
-            if (!pm.hasAttribute('draggable')) pm.setAttribute('draggable', 'true');
-        });
-    });
-    document.addEventListener('DOMContentLoaded', function () {
-        ['centerCards', 'rapidCards', 'specialCards'].forEach(function (id) {
-            var g = document.getElementById(id);
-            if (g) obs.observe(g, { childList: true, subtree: true });
-        });
-    });
+    // (توجيه المالك 2026-08-28): HTML5 Drag&Drop أُحيل للتقاعد — كان لا يلتقط
+    // الموظف إلا بعد Scroll بالصدفة. السحب الآن في وحدة «سحب المؤشر الموحد»
+    // (Pointer DnD) أدناه. هنا يبقى: حلّال أهداف الإفلات (مُصدَّر للوحدة) +
+    // الضغط العادي لفتح الدرج + وضع النقل باللمس + Escape.
+    window.rcTeamCardInfoOf = teamCardInfoOf; // جسر لوحدة Pointer DnD
     function teamCardInfoOf(el) {
         var card = el && el.closest ? el.closest('.team-card') : null;
         if (card && !card.classList.contains('vehicle-card')) {
@@ -4295,48 +4450,6 @@ function moveSuggestNonRoster() {
         if (tr) return { card: tr, teamId: tr.getAttribute('data-team') };
         return null;
     }
-    document.addEventListener('dragstart', function (e) {
-        var pm = e.target && e.target.closest ? e.target.closest('.pm[data-mdrag]') : null;
-        if (!pm) return;
-        var info = teamCardInfoOf(pm);
-        if (!info) return;
-        drag = { name: pm.getAttribute('data-emp'), fromTeamId: info.teamId };
-        try { e.dataTransfer.setData('text/plain', drag.name); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
-        pm.classList.add('rc-dragging');
-        if (typeof renderNonRosterTargets === 'function') renderNonRosterTargets(drag.name); // §5: أهداف التفعيل أثناء السحب أيضًا
-    });
-    document.addEventListener('dragend', function () {
-        drag = null;
-        Array.prototype.forEach.call(document.querySelectorAll('.pm.rc-dragging'), function (c) { c.classList.remove('rc-dragging'); });
-        clearDropTargets();
-        if (typeof renderNonRosterTargets === 'function' && (typeof moveCtx === 'undefined' || !moveCtx)) renderNonRosterTargets(null);
-        if (typeof renderAll === 'function') renderAll(); // استدراك أي تحديث أُجّل أثناء السحب
-    });
-    document.addEventListener('dragover', function (e) {
-        if (!drag) return;
-        var t = teamCardInfoOf(e.target);
-        if (!t || t.teamId === drag.fromTeamId) return;
-        e.preventDefault();
-        try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
-        if (!t.card.classList.contains('rc-drop-target')) {
-            clearDropTargets();
-            t.card.classList.add('rc-drop-target');
-        }
-    });
-    document.addEventListener('dragleave', function (e) {
-        var t = teamCardInfoOf(e.target);
-        if (t && !t.card.contains(e.relatedTarget)) t.card.classList.remove('rc-drop-target');
-    });
-    document.addEventListener('drop', function (e) {
-        if (!drag) return;
-        var t = teamCardInfoOf(e.target);
-        if (!t) return;
-        e.preventDefault();
-        clearDropTargets();
-        if (t.teamId === drag.fromTeamId) return;
-        // بوابة التأكيد الوحيدة — لا إرسال قبل ضغطة المستخدم داخل النافذة
-        if (typeof openRedistModal === 'function') openRedistModal(drag.name, drag.fromTeamId, t.teamId);
-    });
 
     // ضغط (بلا سحب): وضع النقل أولًا، ثم نتائج البحث، ثم صفوف الأفراد، ثم بطاقات الحوض
     document.addEventListener('click', function (e) {
