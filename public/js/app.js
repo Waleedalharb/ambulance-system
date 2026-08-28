@@ -1384,10 +1384,77 @@ function dismissAlert() {
 }
 
 // ============================================
-// نظام الإشعارات
+// نظام الإشعارات — التصميم ④ المعتمد (2026-08-28)
+// شريط تشغيلي بالـTopbar + مركز إشعارات (غير مقروء/مقروء/الكل).
+// عرض فقط فوق GET /api/notifications — لا تغيير بيانات ولا مخطط.
+// الأولوية تُشتق من type، والمصدر من عنوان/نص الإشعار (اشتقاق عرض حرفي).
 // ============================================
 var notifications = [];
 var unreadNotificationsCount = 0;
+var notificationActiveTab = 'unread';
+var notifStripDismissedId = null;   // آخر إشعار أخفاه المستخدم من الشريط يدويًا
+var notifStripTimer = null;         // مؤقّت الإخفاء التلقائي للإشعارات المعلوماتية
+
+// تهريب HTML — صفر undefined/null ولا حقن (متطلب التصميم ④)
+function nc2Esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// وقت نسبي واعي بـUTC (created_at يُخزَّن UTC بنمط naive) — getTimeAgo القديم
+// كان يحلّله كتوقيت محلي فيزيحه 3 ساعات؛ هنا نفس تطبيع TimeRiyadh.
+function notifTimeAgo(v) {
+    if (!v) return '—';
+    var s = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) s += 'Z';
+    var past = new Date(s);
+    if (isNaN(past.getTime())) return '—';
+    var diff = Math.floor((Date.now() - past.getTime()) / 1000);
+    if (diff < 0) diff = 0;
+    if (diff < 60) return 'الآن';
+    if (diff < 3600) return 'منذ ' + Math.floor(diff / 60) + ' د';
+    if (diff < 86400) return 'منذ ' + Math.floor(diff / 3600) + ' س';
+    return 'منذ ' + Math.floor(diff / 86400) + ' يوم';
+}
+
+// الأولوية من النوع: الأحمر=يتطلب إجراء، الأصفر=مراقبة، الأخضر=معلومات/طبيعي
+function notifPriorityOf(typeKey) {
+    if (typeKey === 'danger')  return { key: 'danger',  label: 'يتطلب إجراء' };
+    if (typeKey === 'warning') return { key: 'warning', label: 'مراقبة' };
+    if (typeKey === 'success') return { key: 'success', label: 'طبيعي' };
+    return { key: 'info', label: 'معلومات' };
+}
+
+// اشتقاق مصدر الحدث من العنوان/الرسالة (عرض فقط — لا بيانات جديدة)
+function notifSourceOf(n) {
+    var text = ((n.title || '') + ' ' + (n.message || ''));
+    if (/بلاغ/.test(text)) return 'البلاغات';
+    if (/تمركز/.test(text)) return 'التمركزات';
+    if (/مستشفى|منشأة/.test(text)) return 'المستشفيات';
+    if (/مركبة/.test(text)) return 'المركبات';
+    if (/سير العمل|اعتماد/.test(text)) return 'سير العمل';
+    if (/تكميل/.test(text)) return 'التكميل';
+    if (/جدول|مناوبة/.test(text)) return 'المناوبات';
+    if (/مستند|ملف/.test(text)) return 'الملفات';
+    if (/دخول/.test(text)) return 'الدخول';
+    if (/دعم/.test(text)) return 'الدعم';
+    return 'النظام';
+}
+
+// الإجراء المرتبط بالمصدر (فتح الوجهة المناسبة) — null إن لا وجهة آمنة
+function notifActionFor(source) {
+    var map = {
+        'البلاغات':   { label: 'فتح التوزيع',  run: function () { openModalById('distributionModal'); renderAdvancedDistribution(); } },
+        'التمركزات':  { label: 'الخريطة',      run: function () { var m = document.querySelector('.ops-map-section'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+        'التكميل':    { label: 'فتح التكميل',  run: function () { navigateToPage('radio-completion.html?v=41'); } },
+        'سير العمل':  { label: 'فتح الجداول',  run: function () { navigateToPage('smart-schedule.html?v=41'); } },
+        'المناوبات':  { label: 'سجل المناوبات', run: function () { navigateToPage('operations-dashboard.html'); } },
+        'المستشفيات': { label: 'سجل المناوبات', run: function () { navigateToPage('operations-dashboard.html'); } }
+    };
+    return map[source] || null;
+}
+var NOTIF_ACTIONS = {}; // id → دالة الإجراء (تُملأ عند الرسم)
 
 function loadNotifications() {
     if (!AuthManager.isLoggedIn()) return;
@@ -1395,13 +1462,33 @@ function loadNotifications() {
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (data.success && Array.isArray(data.notifications)) {
-                notifications = data.notifications;
+                notifications = dedupeNotifications(data.notifications);
                 unreadNotificationsCount = notifications.filter(function(n) { return !(n.read || n.is_read); }).length;
                 updateNotificationBadge();
                 renderNotifications();
+                updateNotifStrip();
             }
         })
         .catch(function() {});
+}
+
+// منع تكرار نفس الإشعار (SSE/تداخل تحميل): بالمعرف أولًا ثم ببصمة العنوان+الرسالة
+function dedupeNotifications(list) {
+    var byId = {}, out = [], fp = {};
+    for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (!n) continue;
+        if (n.id !== undefined && n.id !== null) {
+            if (byId[n.id]) continue;
+            byId[n.id] = true;
+        } else {
+            var key = (n.title || '') + '|' + (n.message || '');
+            if (fp[key]) continue;
+            fp[key] = true;
+        }
+        out.push(n);
+    }
+    return out;
 }
 
 function updateNotificationBadge() {
@@ -1416,6 +1503,8 @@ function updateNotificationBadge() {
         }
     }
     if (count) count.textContent = unreadNotificationsCount;
+    var uc = document.getElementById('nc2UnreadCount');
+    if (uc) uc.textContent = unreadNotificationsCount + ' غير مقروء';
 }
 
 function markNotificationsRead() {
@@ -1431,6 +1520,7 @@ function markNotificationsRead() {
             unreadNotificationsCount = 0;
             updateNotificationBadge();
             renderNotifications();
+            updateNotifStrip();
         }
     })
     .catch(function() {});
@@ -1439,8 +1529,8 @@ function markNotificationsRead() {
 function showNotificationPanel() {
     var panel = document.getElementById('notificationPanel');
     if (panel) {
-        panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'block' : 'none';
-        if (panel.style.display === 'block') {
+        panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'flex' : 'none';
+        if (panel.style.display !== 'none') {
             loadNotifications();
         }
     }
@@ -1451,35 +1541,124 @@ function toggleNotificationPanel(event) {
     showNotificationPanel();
 }
 
+// تبويبات المركز: غير مقروء / مقروء / الكل
+function setNotificationTab(tab, event) {
+    if (event) event.stopPropagation();
+    notificationActiveTab = tab;
+    var tabs = document.querySelectorAll('#nc2Tabs .nc2-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', tabs[i].getAttribute('data-nc2tab') === tab);
+    }
+    renderNotifications();
+}
+
 function renderNotifications() {
     var list = document.getElementById('notificationList');
     if (!list) return;
-    if (notifications.length === 0) {
-        list.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><span>لا توجد إشعارات</span></div>';
+    var filtered = notifications.filter(function (n) {
+        var isRead = !!(n.read || n.is_read);
+        if (notificationActiveTab === 'unread') return !isRead;
+        if (notificationActiveTab === 'read') return isRead;
+        return true;
+    });
+    if (filtered.length === 0) {
+        var emptyText = notificationActiveTab === 'unread' ? 'لا توجد إشعارات غير مقروءة'
+            : notificationActiveTab === 'read' ? 'لا توجد إشعارات مقروءة' : 'لا توجد إشعارات';
+        list.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><span>' + emptyText + '</span></div>';
         return;
     }
+    NOTIF_ACTIONS = {};
     var html = '';
-    for (var i = 0; i < notifications.length; i++) {
-        var n = notifications[i];
+    for (var i = 0; i < filtered.length; i++) {
+        var n = filtered[i];
         // عرض فقط: النوع (type) يصل جاهزًا ضمن حمولة GET /api/notifications — لا تغيير منطق/بيانات
         var typeKey = renderNotifications.TYPE_META[n.type] ? n.type : 'info';
         var meta = renderNotifications.TYPE_META[typeKey];
+        var prio = notifPriorityOf(typeKey);
+        var source = notifSourceOf(n);
         var isRead = !!(n.read || n.is_read);
         var timeText = TimeRiyadh.formatDateTime(n.created_at || n.createdAt || n.time);
-        html += '<div class="nc-item nc-' + typeKey + (isRead ? ' is-read' : '') + '">' +
+        var agoText = notifTimeAgo(n.created_at || n.createdAt || n.time);
+        var action = notifActionFor(source);
+        var nid = (n.id !== undefined && n.id !== null) ? n.id : ('x' + i);
+        if (action) NOTIF_ACTIONS[nid] = action.run;
+        html += '<div class="nc-item nc-' + prio.key + (isRead ? ' is-read' : '') + '" onclick="markNotificationRead(' + (typeof nid === 'number' ? nid : "'" + nid + "'") + ')">' +
             '<div class="nc-icon"><i class="fas ' + meta.icon + '"></i></div>' +
             '<div class="nc-body">' +
                 '<div class="nc-head">' +
-                    '<span class="nc-title">' + (n.title || 'إشعار') + '</span>' +
-                    '<span class="nc-chip">' + meta.label + '</span>' +
+                    '<span class="nc-title">' + (nc2Esc(n.title) || 'إشعار') + '</span>' +
+                    '<span class="nc-chip">' + prio.label + '</span>' +
+                    '<span class="nc-source"><i class="fas fa-link" style="font-size:0.55rem;margin-inline-end:3px;"></i>' + source + '</span>' +
                 '</div>' +
-                (n.message ? '<div class="nc-message">' + n.message + '</div>' : '') +
-                '<div class="nc-time"><i class="far fa-clock"></i><span>' + timeText + '</span></div>' +
+                (n.message ? '<div class="nc-message">' + nc2Esc(n.message) + '</div>' : '') +
+                '<div class="nc-meta">' +
+                    '<span class="nc-time" title="' + nc2Esc(timeText) + '"><i class="far fa-clock"></i><span>' + agoText + '</span></span>' +
+                    (action ? '<button class="nc-action" onclick="notifActionRun(' + (typeof nid === 'number' ? nid : "'" + nid + "'") + ', event)"><i class="fas fa-external-link-alt"></i>' + action.label + '</button>' : '') +
+                '</div>' +
             '</div>' +
             (isRead ? '' : '<span class="nc-dot" title="غير مقروء"></span>') +
         '</div>';
     }
     list.innerHTML = html;
+}
+
+// تشغيل إجراء الإشعار: يعلّمه مقروءًا ثم يفتح وجهته
+function notifActionRun(id, event) {
+    if (event) event.stopPropagation();
+    if (typeof id === 'number') markNotificationRead(id);
+    var fn = NOTIF_ACTIONS[id];
+    var panel = document.getElementById('notificationPanel');
+    if (panel) panel.style.display = 'none';
+    if (fn) { try { fn(); } catch (e) {} }
+}
+
+// ── الشريط التشغيلي بالـTopbar ──
+// يعرض آخر إشعار غير مقروء حديث (≤ 30 دقيقة — إشعار قديم لا يظهر كأنه جديد).
+// الحرج/المراقبة يبقيان حتى القراءة أو الإخفاء اليدوي؛ المعلوماتي يختفي بعد 12 ث.
+function updateNotifStrip() {
+    var strip = document.getElementById('notifStrip');
+    if (!strip) return;
+    if (notifStripTimer) { clearTimeout(notifStripTimer); notifStripTimer = null; }
+    var cutoff = Date.now() - 30 * 60 * 1000;
+    var latest = null;
+    for (var i = 0; i < notifications.length; i++) {
+        var n = notifications[i];
+        if (n.read || n.is_read) continue;
+        if (n.id !== undefined && n.id !== null && n.id === notifStripDismissedId) continue;
+        var t = new Date(String(n.created_at || '').replace(' ', 'T') + 'Z').getTime();
+        if (isNaN(t) || t < cutoff) continue; // قديم — لا يظهر كأنه جديد
+        latest = n;
+        break; // القائمة مرتبة تنازليًا من الخادم
+    }
+    if (!latest) { strip.style.display = 'none'; return; }
+    var typeKey = renderNotifications.TYPE_META[latest.type] ? latest.type : 'info';
+    var meta = renderNotifications.TYPE_META[typeKey];
+    var prio = notifPriorityOf(typeKey);
+    strip.className = 'notif-strip ns-' + prio.key;
+    document.getElementById('notifStripIcon').innerHTML = '<i class="fas ' + meta.icon + '"></i>';
+    document.getElementById('notifStripText').textContent = (latest.title || 'إشعار') + (latest.message ? ' — ' + latest.message : '');
+    document.getElementById('notifStripTime').textContent = notifTimeAgo(latest.created_at);
+    strip.style.display = 'inline-flex';
+    strip.setAttribute('data-nid', latest.id !== undefined && latest.id !== null ? latest.id : '');
+    // المعلوماتي يختفي تلقائيًا من الشريط ويبقى في المركز — الحرج/المراقبة يبقيان
+    if (prio.key === 'info' || prio.key === 'success') {
+        notifStripTimer = setTimeout(function () { strip.style.display = 'none'; }, 12000);
+    }
+}
+
+function notifStripClick(event) {
+    if (event) event.stopPropagation();
+    var panel = document.getElementById('notificationPanel');
+    if (panel && panel.style.display === 'none') toggleNotificationPanel(event);
+}
+
+function notifStripDismiss(event) {
+    if (event) event.stopPropagation();
+    var strip = document.getElementById('notifStrip');
+    if (!strip) return;
+    var nid = strip.getAttribute('data-nid');
+    notifStripDismissedId = nid ? parseInt(nid, 10) : null;
+    strip.style.display = 'none';
 }
 
 // خريطة عرض النوع (عرض فقط): تُرجمة عمود type المخزّن في جدول notifications
@@ -1495,6 +1674,7 @@ renderNotifications.TYPE_META = {
 
 function markNotificationRead(id) {
     if (!AuthManager.isLoggedIn() || id === undefined) return;
+    if (typeof id !== 'number') return; // عناصر بلا معرف خادم: لا endpoint لها
     AuthManager.apiRequest('/api/notifications/read/' + id, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -1506,6 +1686,7 @@ function markNotificationRead(id) {
             unreadNotificationsCount = Math.max(0, unreadNotificationsCount - 1);
             updateNotificationBadge();
             renderNotifications();
+            updateNotifStrip();
         }
     })
     .catch(function() {});
@@ -1527,16 +1708,19 @@ function clearAllNotifications() {
         unreadNotificationsCount = 0;
         updateNotificationBadge();
         renderNotifications();
+        updateNotifStrip();
     })
     .catch(function() {});
 }
 
-// إغلاق قائمة الإشعارات عند النقر خارجها
+// إغلاق قائمة الإشعارات عند النقر خارجها — الزر الفعلي notificationBell
+// (كان المعالج يبحث عن notificationBellBtn غير الموجود فلا يعمل إطلاقًا)
 document.addEventListener('click', function(e) {
     var panel = document.getElementById('notificationPanel');
-    var bell = document.getElementById('notificationBellBtn');
-    if (panel && panel.style.display === 'block') {
-        if (!panel.contains(e.target) && (!bell || !bell.contains(e.target))) {
+    var bell = document.getElementById('notificationBell');
+    var strip = document.getElementById('notifStrip');
+    if (panel && panel.style.display !== 'none' && panel.style.display !== '') {
+        if (!panel.contains(e.target) && (!bell || !bell.contains(e.target)) && (!strip || !strip.contains(e.target))) {
             panel.style.display = 'none';
         }
     }

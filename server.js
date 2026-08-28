@@ -757,14 +757,29 @@ app.use(cors({
 app.set('trust proxy', 1);
 
 // 4. Static Files (BEFORE rate limiting — never rate-limit assets)
+// (2026-08-28 — إصلاح سلسلة النشر): كانت كل الملفات بما فيها صفحات HTML
+// تُخبَّأ سنة كاملة، ومع نسيان رفع ?v= لملف CSS متغيّر ظلّت المتصفحات تعرض
+// نسخًا قديمة بعد النشر. السياسة الآن: HTML = no-cache دائمًا (إعادة تحقق
+// رخيصة عبر ETag ← 304) لأنه حامل مراجع الأصول، والأصول البصرية/السكربتات
+// تبقى سنة كاملة لأن كسرها يكون برفع ?v= عند تغيّرها (اتفاق المشروع القائم).
 const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
+function staticCacheHeaders(res, filePath) {
+    if (/\.html?$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-cache');
+    } else {
+        res.setHeader('Cache-Control', process.env.NODE_ENV === 'production'
+            ? 'public, max-age=31536000' : 'no-cache');
+    }
+}
 app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0,
     etag: true,
-    lastModified: true
+    lastModified: true,
+    setHeaders: staticCacheHeaders
 }));
 app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
-    maxAge: process.env.NODE_ENV === 'production' ? ONE_YEAR : 0
+    etag: true,
+    lastModified: true,
+    setHeaders: staticCacheHeaders
 }));
 // ⭐ مهم: الملفات المرفوعة تُقرأ من Render Disk وليس من public/
 // REMOVED: Static /uploads route — files must be downloaded via authenticated /api/download-operational/:id only

@@ -486,6 +486,92 @@ body::after {
 /* ── Empty State ── */
 .empty-state { text-align:center; padding:3rem; color:var(--text-muted); }
 .empty-state i { font-size:3rem; margin-bottom:1rem; display:block; }
+
+/* ── تبويب المستشفيات في سجل المناوبة (جولة UX المعتمدة 2026-08-28) ──
+   داكن بالكامل بهوية الأرشيف — بلا بطاقات بيضاء. عرض فقط. */
+.hosp-head { display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.hosp-head h3 { margin:0; font-size:1.05rem; color:var(--text); }
+.hosp-head h3 i { color:var(--primary); margin-inline-end:8px; }
+.hosp-head .hosp-sub { font-size:0.78rem; color:var(--text-muted); }
+.hosp-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px; margin-bottom:16px; }
+.hosp-kpi { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; display:flex; flex-direction:column; gap:2px; }
+.hosp-kpi .hk-val { font-size:1.3rem; font-weight:700; color:var(--text); line-height:1.2; }
+.hosp-kpi .hk-label { font-size:0.7rem; color:var(--text-muted); display:flex; align-items:center; gap:5px; }
+.hosp-kpi.hk-green  { border-color:rgba(16,185,129,0.30);  background:linear-gradient(168deg, rgba(16,185,129,0.08), transparent); }
+.hosp-kpi.hk-green  .hk-label i { color:var(--success); }
+.hosp-kpi.hk-blue   { border-color:rgba(96,165,250,0.30);  background:linear-gradient(168deg, rgba(96,165,250,0.08), transparent); }
+.hosp-kpi.hk-blue   .hk-label i { color:var(--primary); }
+.hosp-kpi.hk-amber  { border-color:rgba(245,158,11,0.32);  background:linear-gradient(168deg, rgba(245,158,11,0.09), transparent); }
+.hosp-kpi.hk-amber  .hk-label i { color:var(--warning); }
+.hosp-kpi.hk-red    { border-color:rgba(239,68,68,0.32);   background:linear-gradient(168deg, rgba(239,68,68,0.09), transparent); }
+.hosp-kpi.hk-red    .hk-label i { color:var(--danger); }
+.hosp-kpi.hk-muted  .hk-label i { color:var(--text-muted); }
+.hosp-sealed { font-size:0.72rem; color:var(--text-muted); margin-bottom:14px; display:flex; align-items:center; gap:6px; }
+.hosp-section-title { font-size:0.82rem; font-weight:700; color:var(--text-secondary); margin:18px 0 10px; display:flex; align-items:center; gap:7px; }
+.hosp-section-title i { color:var(--primary); }
+.hosp-alert-banner {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:linear-gradient(168deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04));
+    border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius);
+    padding:10px 14px; margin-bottom:14px; font-size:0.82rem; color:#FCA5A5;
+}
+.hosp-alert-banner i { color:var(--danger); }
+.hosp-calm {
+    display:flex; align-items:center; gap:8px;
+    background:var(--card); border:1px dashed var(--border); border-radius:var(--radius);
+    padding:10px 14px; margin-bottom:6px; font-size:0.8rem; color:var(--text-muted);
+}
+.hosp-calm i { color:var(--success); }
+.hosp-journey {
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 14px; margin-bottom:10px; transition:background 0.15s ease;
+}
+.hosp-journey:hover { background:var(--card-hover); }
+.hosp-journey.hj-current { border-inline-start:3px solid var(--success); }
+.hosp-journey.hj-open-at-close { border-inline-start:3px solid var(--warning); }
+.hosp-journey.hj-closed { border-inline-start:3px solid var(--border); }
+.hosp-journey .hj-icon {
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:0.9rem;
+    background:var(--primary-light); color:var(--primary);
+}
+.hosp-journey.hj-current .hj-icon { background:var(--success-light); color:var(--success); }
+.hosp-journey.hj-open-at-close .hj-icon { background:var(--warning-light); color:var(--warning); }
+.hosp-journey .hj-body { flex:1; min-width:0; }
+.hosp-journey .hj-hospital { font-weight:700; font-size:0.92rem; color:var(--text); word-break:break-word; }
+.hosp-journey .hj-meta { display:flex; gap:12px; flex-wrap:wrap; margin-top:5px; font-size:0.74rem; color:var(--text-muted); }
+.hosp-journey .hj-meta b { color:var(--text-secondary); font-weight:600; }
+.hosp-journey .hj-times { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; font-size:0.72rem; color:var(--text-muted); }
+.hosp-journey .hj-state { flex-shrink:0; margin-inline-start:auto; }
+.hosp-timeline { position:relative; margin-top:6px; padding-inline-start:22px; }
+.hosp-timeline::before {
+    content:''; position:absolute; inset-inline-start:7px; top:6px; bottom:6px;
+    width:2px; background:var(--border); border-radius:2px;
+}
+.hosp-tl-item { position:relative; margin-bottom:14px; }
+.hosp-tl-item::before {
+    content:''; position:absolute; inset-inline-start:-20px; top:5px;
+    width:10px; height:10px; border-radius:50%;
+    background:var(--text-muted); border:2px solid var(--bg);
+}
+.hosp-tl-item.tl-seen::before    { background:var(--primary); }
+.hosp-tl-item.tl-change::before  { background:var(--info); }
+.hosp-tl-item.tl-alert::before   { background:var(--warning); box-shadow:0 0 8px rgba(245,158,11,0.45); }
+.hosp-tl-item.tl-ack::before     { background:#60A5FA; }
+.hosp-tl-item.tl-resolved::before{ background:var(--success); box-shadow:0 0 8px rgba(16,185,129,0.45); }
+.hosp-tl-item .ht-time { font-size:0.7rem; color:var(--text-muted); white-space:nowrap; }
+.hosp-tl-item .ht-text { font-size:0.82rem; color:var(--text); margin-top:2px; }
+.hosp-tl-item .ht-sub { font-size:0.72rem; color:var(--text-muted); margin-top:2px; }
+.hosp-alerts-table { width:100%; border-collapse:collapse; margin-top:4px; }
+.hosp-alerts-table th { text-align:right; font-size:0.7rem; color:var(--text-muted); padding:7px 10px; border-bottom:1px solid var(--border); font-weight:600; }
+.hosp-alerts-table td { font-size:0.78rem; color:var(--text-secondary); padding:8px 10px; border-bottom:1px solid var(--border-light); }
+.hosp-alerts-table tr:hover td { background:rgba(255,255,255,0.025); }
+@media (max-width: 640px) {
+    .hosp-kpis { grid-template-columns:repeat(2, 1fr); }
+    .hosp-journey { flex-wrap:wrap; }
+    .hosp-journey .hj-state { margin-inline-start:0; }
+}
 </style>
 <base target="_blank">
 </head>
@@ -1653,10 +1739,17 @@ function renderHospitalTab(data) {
     if (old) old.remove();
     var isArchived = ((data.shift || data).status === 'archived');
     var h = data.hospital || null;
+    var esc = function (v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
     var html = '<div id="mtab-hospital" class="modal-tab-panel">';
+    // ── الترويسة ──
+    html += '<div class="hosp-head"><h3><i class="fas fa-hospital"></i> المستشفيات</h3>' +
+        '<span class="hosp-sub">متابعة رحلات المستشفيات ضمن المناوبة</span></div>';
     if (!h) {
         // أرشيف ما قبل دورة المستشفيات أو غياب مصدر — غياب صادق لا اختراع
-        html += '<div class="empty-state"><i class="fas fa-hospital"></i> ' +
+        html += '<div class="hosp-calm"><i class="fas fa-info-circle"></i> ' +
             (isArchived ? 'هذه المناوبة أُرشفت قبل دورة المستشفيات — لا يوجد قسم مختوم لها'
                         : 'لا توجد بيانات مستشفيات لهذه المناوبة') + '</div></div>';
         body.insertAdjacentHTML('beforeend', html);
@@ -1668,88 +1761,114 @@ function renderHospitalTab(data) {
     var timeline = Array.isArray(h.timeline) ? h.timeline : [];
     var openAtClose = journeys.filter(function (j) { return j.episodeState !== 'last-known'; }).length;
     var closedCount = journeys.length - openAtClose;
+    var openAlerts = alerts.filter(function (a) { return a.state === 'open'; }).length;
     var ackedCount = alerts.filter(function (a) { return a.state === 'acknowledged'; }).length;
-    // ── الملخص ──
-    var chip = function (label, val) {
-        return '<div style="background:var(--gray-100,#f3f4f6); border-radius:10px; padding:8px 14px;">' +
-            '<b style="font-size:1.15rem;">' + val + '</b> <span style="color:var(--gray-600);">' + label + '</span></div>';
-    };
-    html += '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; font-size:0.95rem;">' +
-        chip('رحلة مستشفى', journeys.length) +
-        chip('حالية الآن', s.currentAtHospital != null ? s.currentAtHospital : '—') +
-        chip('مغلقة', closedCount) +
-        chip('متوسط البقاء', s.avgDwellMin != null ? (Math.round(s.avgDwellMin * 10) / 10) + ' د' : '—') +
-        chip('تجاوز > 10 د', s.exceedances || 0) +
-        (s.unmeasured ? chip('بلا أزمنة تسليم', s.unmeasured) : '') +
-        chip('تنبيهات', alerts.length) +
-        chip('أُقرّت', ackedCount) +
-        '</div>';
-    if (h.sealedAt) html += '<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;"><i class="fas fa-stamp"></i> لقطة مختومة عند إغلاق المناوبة: ' + fmtDT(h.sealedAt) + '</div>';
-    // ── سجل الرحلات ──
-    html += '<strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-ambulance"></i> سجل الرحلات (' + journeys.length + ')</strong>';
-    if (journeys.length > 0) {
-        html += '<table class="data-table" style="margin-top:0.4rem"><thead><tr>' +
-            '<th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>أول مشاهدة</th><th>آخر مشاهدة</th><th>الإغلاق</th><th>الحالة</th></tr></thead><tbody>';
-        journeys.forEach(function (j) {
-            var isCurrent = j.episodeState !== 'last-known';
-            var stBadge, stText;
-            if (isCurrent && isArchived) { stBadge = 'badge-warning'; stText = 'مفتوحة عند إغلاق المناوبة'; }
-            else if (isCurrent) { stBadge = 'badge-success'; stText = 'حالية — في المنشأة'; }
-            else { stBadge = 'badge-muted'; stText = 'سابقة — آخر منشأة معروفة'; }
-            html += '<tr><td style="font-weight:600; direction:ltr; text-align:right;">' + (j.eventId || '—') + '</td>' +
-                '<td>' + (j.southTeam || j.unitCode || '—') + '</td>' +
-                '<td><i class="fas fa-hospital" style="color:var(--primary)"></i> ' + (j.hospitalName || '—') + '</td>' +
-                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(j.firstSeenAt) + '</td>' +
-                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(j.lastSeenAt) + '</td>' +
-                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (j.episodeClosedAt ? fmtDT(j.episodeClosedAt) : '—') + '</td>' +
-                '<td><span class="badge ' + stBadge + '">' + stText + '</span></td></tr>';
-        });
-        html += '</tbody></table>';
-    } else {
-        html += '<div class="empty-state"><i class="fas fa-hospital"></i> لا توجد رحلات مستشفيات مسجلة لهذه المناوبة</div>';
+    // ── شريط التنبيهات النشطة — يظهر أعلى القسم عند وجود تنبيه مفتوح ──
+    if (openAlerts > 0) {
+        html += '<div class="hosp-alert-banner"><i class="fas fa-exclamation-triangle"></i>' +
+            '<b>' + openAlerts + ' تنبيه نشط</b><span>تجاوز زمن البقاء في المنشأة — يتطلب متابعة</span></div>';
     }
-    // ── التنبيهات ──
-    html += '<div style="margin-top:1rem"><strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-bell"></i> التنبيهات (' + alerts.length + ')</strong></div>';
+    // ── مؤشرات علوية داكنة ──
+    var kpi = function (cls, icon, val, label) {
+        return '<div class="hosp-kpi ' + cls + '"><span class="hk-val">' + val + '</span>' +
+            '<span class="hk-label"><i class="fas ' + icon + '"></i>' + label + '</span></div>';
+    };
+    html += '<div class="hosp-kpis">' +
+        kpi('hk-green', 'fa-procedures', openAtClose, 'رحلات حالية') +
+        kpi('hk-muted', 'fa-check-circle', closedCount, 'رحلات مغلقة') +
+        kpi('hk-blue', 'fa-ambulance', journeys.length, 'إجمالي الرحلات') +
+        kpi('hk-blue', 'fa-hourglass-half', s.avgDwellMin != null ? (Math.round(s.avgDwellMin * 10) / 10) + ' د' : '—', 'متوسط البقاء') +
+        kpi(openAlerts > 0 ? 'hk-red' : (alerts.length > 0 ? 'hk-amber' : 'hk-muted'), 'fa-bell', alerts.length, 'تنبيهات') +
+        (s.unmeasured ? kpi('hk-amber', 'fa-question-circle', s.unmeasured, 'بلا أزمنة تسليم') : '') +
+        '</div>';
+    if (h.sealedAt) html += '<div class="hosp-sealed"><i class="fas fa-stamp"></i> لقطة مختومة عند إغلاق المناوبة: ' + fmtDT(h.sealedAt) + '</div>';
+    // ── الحالة التشغيلية — بطاقات الرحلات (الحالية أولًا) ──
+    html += '<div class="hosp-section-title"><i class="fas fa-ambulance"></i> سجل الرحلات (' + journeys.length + ')</div>';
+    if (journeys.length > 0) {
+        var sorted = journeys.slice().sort(function (a, b) {
+            var ac = a.episodeState !== 'last-known' ? 0 : 1;
+            var bc = b.episodeState !== 'last-known' ? 0 : 1;
+            return ac - bc;
+        });
+        sorted.forEach(function (j) {
+            var isCurrent = j.episodeState !== 'last-known';
+            var stClass, stBadge, stText;
+            if (isCurrent && isArchived) { stClass = 'hj-open-at-close'; stBadge = 'badge-warning'; stText = 'مفتوحة عند إغلاق المناوبة'; }
+            else if (isCurrent) { stClass = 'hj-current'; stBadge = 'badge-success'; stText = 'حالية — في المنشأة'; }
+            else { stClass = 'hj-closed'; stBadge = 'badge-muted'; stText = 'سابقة — آخر منشأة معروفة'; }
+            html += '<div class="hosp-journey ' + stClass + '">' +
+                '<div class="hj-icon"><i class="fas fa-hospital"></i></div>' +
+                '<div class="hj-body">' +
+                    '<div class="hj-hospital">' + (esc(j.hospitalName) || '—') + '</div>' +
+                    '<div class="hj-meta">' +
+                        '<span><i class="fas fa-users"></i> <b>' + (esc(j.southTeam || j.unitCode) || '—') + '</b></span>' +
+                        '<span><i class="fas fa-file-medical"></i> بلاغ <b style="direction:ltr; unicode-bidi:embed;">' + (esc(j.eventId) || '—') + '</b></span>' +
+                    '</div>' +
+                    '<div class="hj-times">' +
+                        '<span><i class="far fa-clock"></i> أول مشاهدة: ' + fmtDT(j.firstSeenAt) + '</span>' +
+                        '<span>آخر مشاهدة: ' + fmtDT(j.lastSeenAt) + '</span>' +
+                        (j.episodeClosedAt ? '<span><i class="fas fa-door-open"></i> الإغلاق: ' + fmtDT(j.episodeClosedAt) + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="hj-state"><span class="badge ' + stBadge + '">' + stText + '</span></div>' +
+            '</div>';
+        });
+    } else {
+        html += '<div class="hosp-calm"><i class="fas fa-hospital"></i> لا توجد رحلات مستشفيات مسجلة لهذه المناوبة</div>';
+    }
+    // ── التنبيهات — جزء من الصورة التشغيلية؛ الغياب يظهر بهدوء لا فراغًا ──
+    html += '<div class="hosp-section-title"><i class="fas fa-bell"></i> التنبيهات (' + alerts.length + ')</div>';
     if (alerts.length > 0) {
         var aState = { open: ['badge-danger', 'نشط'], acknowledged: ['badge-info', 'مُقَرّ'], resolved: ['badge-muted', 'محلول'] };
-        html += '<table class="data-table" style="margin-top:0.4rem"><thead><tr>' +
-            '<th>الوقت</th><th>النوع</th><th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>البقاء</th><th>الحالة</th><th>الإقرار</th><th>الحلول</th></tr></thead><tbody>';
+        html += '<table class="hosp-alerts-table"><thead><tr>' +
+            '<th>الوقت</th><th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>البقاء</th><th>الحالة</th><th>الإقرار</th><th>الحلول</th></tr></thead><tbody>';
         alerts.forEach(function (a) {
-            var st = aState[a.state] || ['badge-muted', a.state || '—'];
-            html += '<tr><td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + fmtDT(a.firstRaisedAt) + '</td>' +
-                '<td>تجاوز زمن البقاء</td>' +
-                '<td style="direction:ltr; text-align:right;">' + (a.eventId || '—') + '</td>' +
-                '<td>' + (a.southTeam || a.unitCode || '—') + '</td>' +
-                '<td style="font-size:0.8rem;">' + (a.facility || '—') + '</td>' +
+            var st = aState[a.state] || ['badge-muted', esc(a.state) || '—'];
+            html += '<tr><td style="white-space:nowrap">' + fmtDT(a.firstRaisedAt) + '</td>' +
+                '<td style="direction:ltr; text-align:right;">' + (esc(a.eventId) || '—') + '</td>' +
+                '<td>' + (esc(a.southTeam || a.unitCode) || '—') + '</td>' +
+                '<td>' + (esc(a.facility) || '—') + '</td>' +
                 '<td style="white-space:nowrap">' + (a.dwellMin != null ? (Math.round(a.dwellMin * 10) / 10) + ' د' : '—') + '</td>' +
                 '<td><span class="badge ' + st[0] + '">' + st[1] + '</span></td>' +
-                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (a.ackAt ? fmtDT(a.ackAt) + (a.ackByName ? ' · ' + a.ackByName : '') : '—') + '</td>' +
-                '<td style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap">' + (a.resolvedAt ? fmtDT(a.resolvedAt) : '—') + '</td></tr>';
+                '<td style="white-space:nowrap">' + (a.ackAt ? fmtDT(a.ackAt) + (a.ackByName ? ' · ' + esc(a.ackByName) : '') : '—') + '</td>' +
+                '<td style="white-space:nowrap">' + (a.resolvedAt ? fmtDT(a.resolvedAt) : '—') + '</td></tr>';
         });
         html += '</tbody></table>';
+        if (ackedCount > 0) html += '<div class="hosp-sealed" style="margin-top:6px;"><i class="fas fa-check"></i> ' + ackedCount + ' من ' + alerts.length + ' أُقرّت</div>';
+    } else {
+        html += '<div class="hosp-calm"><i class="fas fa-check-circle"></i> لا توجد تنبيهات تشغيلية في هذه المناوبة</div>';
     }
-    // ── Timeline (من سجل الأحداث append-only المختوم — الوقت والتسلسل الحقيقيان) ──
-    html += '<div style="margin-top:1rem"><strong style="color:var(--text-muted); font-size:0.85rem;"><i class="fas fa-stream"></i> Timeline المستشفيات (' + timeline.length + ')</strong></div>';
+    // ── Timeline حقيقي: أيقونة + لون لكل نوع حدث مع الوقت والفرقة والبلاغ ──
+    html += '<div class="hosp-section-title"><i class="fas fa-stream"></i> Hospital Timeline (' + timeline.length + ')</div>';
     if (timeline.length > 0) {
-        var evText = function (ev) {
-            if (ev.field === 'alert') { // أحداث دورة التنبيه داخل التسلسل الزمني
-                if (ev.alert === 'raised') return '⚠ تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + (Math.round(ev.dwellMin * 10) / 10) + ' د)' : '');
-                if (ev.alert === 'acknowledged') return 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + ev.actor : '');
-                if (ev.alert === 'resolved') return 'حلول التنبيه (عودة للخدمة)';
-                return 'تنبيه';
+        var evMeta = function (ev) {
+            if (ev.field === 'alert') {
+                if (ev.alert === 'raised')      return { cls: 'tl-alert',    icon: '⚠️', text: 'تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + (Math.round(ev.dwellMin * 10) / 10) + ' د)' : '') };
+                if (ev.alert === 'acknowledged') return { cls: 'tl-ack',      icon: '🔵', text: 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + esc(ev.actor) : '') };
+                if (ev.alert === 'resolved')     return { cls: 'tl-resolved', icon: '🟢', text: 'عودة للخدمة — حلول التنبيه' };
+                return { cls: 'tl-alert', icon: '⚠️', text: 'تنبيه' };
             }
-            if (ev.field === 'hospitalName') return ev.from ? ('انتقال المنشأة: ' + ev.from + ' ← ' + ev.to) : ('مشاهدة المنشأة: ' + ev.to);
-            if (ev.field === 'unitCode') return 'تغيّر رمز الفرقة: ' + (ev.from || '—') + ' ← ' + (ev.to || '—');
-            if (ev.field === 'episode') return ev.to === 'last-known' ? 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' : 'إعادة فتح الحالة — مشاهدة جديدة';
-            return ev.field || 'حدث';
+            if (ev.field === 'hospitalName') return ev.from
+                ? { cls: 'tl-change', icon: '🔄', text: 'انتقال المنشأة: ' + esc(ev.from) + ' ← ' + esc(ev.to) }
+                : { cls: 'tl-seen',   icon: '👁', text: 'مشاهدة المنشأة: ' + esc(ev.to) };
+            if (ev.field === 'unitCode') return { cls: 'tl-change', icon: '🔄', text: 'تغيّر رمز الفرقة: ' + (esc(ev.from) || '—') + ' ← ' + (esc(ev.to) || '—') };
+            if (ev.field === 'episode') return ev.to === 'last-known'
+                ? { cls: 'tl-resolved', icon: '🟢', text: 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' }
+                : { cls: 'tl-seen', icon: '👁', text: 'إعادة فتح الحالة — مشاهدة جديدة' };
+            return { cls: '', icon: '●', text: esc(ev.field) || 'حدث' };
         };
-        html += '<div style="margin-top:0.4rem; border-right:3px solid var(--gray-200,#e5e7eb); padding-right:12px;">';
+        html += '<div class="hosp-timeline">';
         timeline.forEach(function (ev) {
-            html += '<div style="margin-bottom:8px; font-size:0.82rem;">' +
-                '<span style="color:var(--text-muted); font-size:0.75rem;">' + fmtDT(ev.at) + '</span> — ' +
-                '<b style="direction:ltr; unicode-bidi:embed;">' + (ev.key || '') + '</b> · ' + evText(ev) + '</div>';
+            var m = evMeta(ev);
+            html += '<div class="hosp-tl-item ' + m.cls + '">' +
+                '<div class="ht-time">' + fmtDT(ev.at) + '</div>' +
+                '<div class="ht-text">' + m.icon + ' ' + m.text + '</div>' +
+                (ev.key ? '<div class="ht-sub"><b style="direction:ltr; unicode-bidi:embed;">' + esc(ev.key) + '</b></div>' : '') +
+            '</div>';
         });
         html += '</div>';
+    } else {
+        html += '<div class="hosp-calm"><i class="fas fa-stream"></i> لا توجد أحداث مستشفيات مسجلة لهذه المناوبة</div>';
     }
     html += '</div>';
     body.insertAdjacentHTML('beforeend', html);

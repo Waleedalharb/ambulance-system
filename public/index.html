@@ -54,7 +54,7 @@
     <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
     <link rel="stylesheet" href="css/app.css?v=41">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
-    <link rel="stylesheet" href="css/executive-theme.css?v=4">
+    <link rel="stylesheet" href="css/executive-theme.css?v=5"><!-- v=5 (2026-08-28): الملف تغيّر (+ثيم الخريطة Light Ops) برقم قديم — رُفع لكسر الكاش السنوي
     <!-- طبقة الهوية الموحدة (هوية التكميل المعتمدة FROZEN) — تُحمَّل بعد كل ملفات CSS -->
     <link rel="stylesheet" href="/css/platform-identity.css?v=1">
 <script src="js/shift-codes-config.js"></script>
@@ -654,6 +654,14 @@ window.addEventListener('load', function() {
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge" id="notificationBadge">0</span>
             </button>
+            <!-- التصميم ④ المعتمد (2026-08-28): شريط تشغيلي مدمج بالـTopbar يعرض آخر إشعار غير مقروء.
+                 الحرج/المراقبة يبقيان حتى القراءة، والمعلوماتي يختفي تلقائيًا ويبقى في المركز -->
+            <div class="notif-strip" id="notifStrip" style="display:none;" onclick="notifStripClick(event)" role="status">
+                <span class="notif-strip-icon" id="notifStripIcon"><i class="fas fa-bell"></i></span>
+                <span class="notif-strip-text" id="notifStripText"></span>
+                <span class="notif-strip-time" id="notifStripTime"></span>
+                <button class="notif-strip-close" onclick="notifStripDismiss(event)" title="إخفاء من الشريط — يبقى في مركز الإشعارات"><i class="fas fa-times"></i></button>
+            </div>
             <button class="chat-icon" id="chatToolbarBtn" onclick="ChatIntegration.toggleChatPreview(event)" title="الدردشة">
                 <i class="fas fa-comments"></i>
                 <span class="chat-badge" id="chatBadge" style="display:none">0</span>
@@ -677,13 +685,21 @@ window.addEventListener('load', function() {
         </div>
     </header>
 
-    <!-- Notification Panel -->
+    <!-- Notification Center — التصميم ④ المعتمد (2026-08-28):
+         داكن/زجاجي بهوية المنصة، تبويبات (غير مقروء/مقروء/الكل)،
+         كل إشعار: نوع/أولوية/عنوان/رسالة/وقت/مصدر/إجراء -->
     <div id="notificationPanel" class="notification-panel" style="display:none;">
         <div class="notification-panel-header">
-            <h3>الإشعارات</h3>
+            <h3><i class="fas fa-bell"></i> مركز الإشعارات</h3>
+            <span class="nc2-unread-count" id="nc2UnreadCount">0 غير مقروء</span>
             <button class="notification-close" onclick="toggleNotificationPanel(event)" title="إغلاق">
                 <i class="fas fa-times"></i>
             </button>
+        </div>
+        <div class="nc2-tabs" id="nc2Tabs">
+            <button class="nc2-tab active" data-nc2tab="unread" onclick="setNotificationTab('unread', event)">غير مقروء</button>
+            <button class="nc2-tab" data-nc2tab="read" onclick="setNotificationTab('read', event)">مقروء</button>
+            <button class="nc2-tab" data-nc2tab="all" onclick="setNotificationTab('all', event)">الكل</button>
         </div>
         <div class="notification-panel-body" id="notificationList">
             <div class="notification-empty">
@@ -692,9 +708,11 @@ window.addEventListener('load', function() {
             </div>
         </div>
         <div class="notification-panel-footer">
-            <button class="notification-clear-all" onclick="clearAllNotifications()" title="مسح الكل">
-                <i class="fas fa-trash-alt"></i>
-                <span>مسح الكل</span>
+            <button class="nc2-footer-btn" onclick="markAllNotificationsRead()" title="تعليم الكل كمقروء">
+                <i class="fas fa-check-double"></i><span>تعليم الكل كمقروء</span>
+            </button>
+            <button class="nc2-footer-btn nc2-footer-danger" onclick="clearAllNotifications()" title="مسح الكل">
+                <i class="fas fa-trash-alt"></i><span>مسح الكل</span>
             </button>
         </div>
     </div>
@@ -2646,7 +2664,7 @@ window.addEventListener('load', function() {
 <script src="/js/auth-manager.js"></script>
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
-<script src="js/app.js?v=47" defer></script>
+<script src="js/app.js?v=48" defer></script>
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
 <script src="https://unpkg.com/mapbox-gl@2.15.0/dist/mapbox-gl.js" defer></script><!-- محرك Mapbox GL — يُستخدم فقط عند تفعيله في map-config.local.js -->
@@ -2830,4 +2848,145 @@ input[type="search"], textarea, select {
     box-shadow: 0 0 0 4px rgba(96,165,250,0.12) !important;
 }
 .form-label { color: var(--pi-ink-dim) !important; }
+
+/* ═══ مركز الإشعارات — التصميم ④ المعتمد (2026-08-28) ═══
+   داكن/زجاجي بهوية المنصة: الأحمر=يتطلب إجراء، الأصفر=مراقبة،
+   الأخضر=معلومات/طبيعي. بلا بطاقات بيضاء وبلا Glow مبالغ. */
+.notification-panel {
+    background: linear-gradient(168deg, rgba(17,28,48,0.96), rgba(10,18,34,0.97)) !important;
+    border: 1px solid var(--pi-line) !important;
+    border-radius: var(--pi-r-lg) !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    color: var(--pi-ink) !important;
+    width: min(400px, calc(100vw - 24px)) !important;
+    max-height: min(560px, calc(100vh - 96px)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+.notification-panel[style*="none"] { display: none !important; }
+.notification-panel-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid var(--pi-line-soft) !important;
+    background: rgba(255,255,255,0.03) !important;
+}
+.notification-panel-header h3 { color: var(--pi-ink) !important; font-size: 0.95rem !important; margin: 0 !important; flex: 1; }
+.notification-panel-header h3 i { color: var(--pi-blue); margin-inline-end: 6px; }
+.nc2-unread-count {
+    font-size: 0.7rem; font-weight: 700; color: var(--pi-amber);
+    background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.30);
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.notification-close { color: var(--pi-ink-dim) !important; background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 4px 6px; border-radius: 6px; }
+.notification-close:hover { color: var(--pi-ink) !important; background: rgba(255,255,255,0.06); }
+.nc2-tabs {
+    display: flex; gap: 4px; padding: 8px 12px;
+    border-bottom: 1px solid var(--pi-line-soft);
+    background: rgba(255,255,255,0.015);
+}
+.nc2-tab {
+    flex: 1; padding: 6px 4px; font-size: 0.75rem; font-weight: 700;
+    color: var(--pi-ink-dim); background: none; border: none; cursor: pointer;
+    border-radius: 8px; border-bottom: 2px solid transparent; font-family: inherit;
+}
+.nc2-tab:hover { background: rgba(255,255,255,0.05); color: var(--pi-ink); }
+.nc2-tab.active { color: var(--pi-blue); border-bottom-color: var(--pi-blue); background: rgba(96,165,250,0.08); }
+.notification-panel-body { overflow-y: auto !important; flex: 1; padding: 8px !important; }
+.notification-empty { color: var(--pi-ink-dim) !important; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 12px; font-size: 0.85rem; }
+.notification-empty i { font-size: 1.5rem; opacity: 0.55; }
+.notification-panel-footer {
+    display: flex; gap: 8px; padding: 10px 12px !important;
+    border-top: 1px solid var(--pi-line-soft) !important;
+    background: rgba(255,255,255,0.02) !important;
+}
+.nc2-footer-btn {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px 8px; font-size: 0.75rem; font-weight: 700; font-family: inherit;
+    color: var(--pi-blue); background: rgba(96,165,250,0.10);
+    border: 1px solid rgba(96,165,250,0.30); border-radius: 9px; cursor: pointer;
+}
+.nc2-footer-btn:hover { background: rgba(96,165,250,0.18); }
+.nc2-footer-danger { color: var(--pi-red) !important; background: rgba(248,113,113,0.10) !important; border-color: rgba(248,113,113,0.30) !important; }
+.nc2-footer-danger:hover { background: rgba(248,113,113,0.18) !important; }
+
+/* بطاقة الإشعار — شريط لوني جانبي حسب النوع + نقطة غير المقروء */
+.nc-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid var(--pi-line-soft);
+    border-inline-start: 3px solid var(--pi-blue);
+    border-radius: 11px; padding: 10px 12px; margin-bottom: 8px;
+    cursor: pointer; transition: background 0.15s ease;
+}
+.nc-item:hover { background: rgba(255,255,255,0.06); }
+.nc-item.is-read { opacity: 0.62; }
+.nc-item.nc-danger  { border-inline-start-color: var(--pi-red); }
+.nc-item.nc-warning { border-inline-start-color: var(--pi-amber); }
+.nc-item.nc-success { border-inline-start-color: var(--pi-green); }
+.nc-item.nc-info    { border-inline-start-color: var(--pi-blue); }
+.nc-icon {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+}
+.nc-danger  .nc-icon { background: rgba(248,113,113,0.14); color: var(--pi-red); }
+.nc-warning .nc-icon { background: rgba(251,191,36,0.14); color: var(--pi-amber); }
+.nc-success .nc-icon { background: rgba(52,211,153,0.14); color: var(--pi-green); }
+.nc-info    .nc-icon { background: rgba(96,165,250,0.14); color: var(--pi-blue); }
+.nc-body { flex: 1; min-width: 0; }
+.nc-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nc-title { font-weight: 700; font-size: 0.83rem; color: var(--pi-ink); }
+.nc-chip { font-size: 0.62rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.nc-danger  .nc-chip { background: rgba(248,113,113,0.14); color: var(--pi-red); }
+.nc-warning .nc-chip { background: rgba(251,191,36,0.14); color: var(--pi-amber); }
+.nc-success .nc-chip { background: rgba(52,211,153,0.14); color: var(--pi-green); }
+.nc-info    .nc-chip { background: rgba(96,165,250,0.14); color: var(--pi-blue); }
+.nc-source {
+    font-size: 0.62rem; font-weight: 600; color: var(--pi-ink-dim);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--pi-line-soft);
+    padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+}
+.nc-message { font-size: 0.78rem; color: var(--pi-ink-dim); margin-top: 4px; line-height: 1.55; word-break: break-word; }
+.nc-meta { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.nc-time { font-size: 0.68rem; color: var(--pi-ink-dim); display: inline-flex; align-items: center; gap: 4px; }
+.nc-action {
+    font-size: 0.68rem; font-weight: 700; color: var(--pi-blue);
+    background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.28);
+    padding: 2px 9px; border-radius: 7px; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.nc-action:hover { background: rgba(96,165,250,0.20); }
+.nc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pi-blue); flex-shrink: 0; margin-top: 5px; }
+.nc-danger .nc-dot { background: var(--pi-red); }
+
+/* الشريط التشغيلي المدمج بالـTopbar */
+.notif-strip {
+    display: inline-flex; align-items: center; gap: 8px;
+    max-width: 300px; padding: 5px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--pi-line);
+    cursor: pointer; user-select: none;
+    transition: background 0.15s ease;
+}
+.notif-strip:hover { background: rgba(255,255,255,0.09); }
+.notif-strip-icon { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; flex-shrink: 0; }
+.notif-strip.ns-danger  { border-color: rgba(248,113,113,0.45); }
+.notif-strip.ns-danger  .notif-strip-icon { background: rgba(248,113,113,0.18); color: var(--pi-red); }
+.notif-strip.ns-warning { border-color: rgba(251,191,36,0.40); }
+.notif-strip.ns-warning .notif-strip-icon { background: rgba(251,191,36,0.16); color: var(--pi-amber); }
+.notif-strip.ns-success .notif-strip-icon { background: rgba(52,211,153,0.16); color: var(--pi-green); }
+.notif-strip.ns-info    .notif-strip-icon { background: rgba(96,165,250,0.16); color: var(--pi-blue); }
+.notif-strip-text { font-size: 0.72rem; font-weight: 600; color: var(--pi-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-strip-time { font-size: 0.62rem; color: var(--pi-ink-dim); white-space: nowrap; flex-shrink: 0; }
+.notif-strip-close { background: none; border: none; color: var(--pi-ink-dim); cursor: pointer; font-size: 0.62rem; padding: 2px 4px; border-radius: 50%; flex-shrink: 0; }
+.notif-strip-close:hover { color: var(--pi-ink); background: rgba(255,255,255,0.10); }
+@media (max-width: 900px) {
+    .notif-strip { max-width: 170px; }
+    .notif-strip-time { display: none; }
+}
+@media (max-width: 640px) {
+    .notif-strip { max-width: 120px; padding: 4px 8px; }
+}
 </style>
