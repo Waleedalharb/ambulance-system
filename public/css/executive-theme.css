@@ -2648,6 +2648,9 @@ body #chartsModal .chart-card h3 { font-size: 0.92rem !important; }
     border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 2px 7px;
 }
 .smap-dup-note { font-size: 0.66rem; color: #8A9BB0; margin-top: 7px; line-height: 1.6; }
+/* 2.0: قائمة أسباب القرار داخل بطاقة الأدلة */
+.smap-dup-why { margin: 5px 0 0; padding-inline-start: 16px; font-size: 0.68rem; color: #CBD5E1; line-height: 1.7; }
+.smap-light-ops .smap-dup-why { color: #334155; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    ثيم Light Ops لعناصر عرض الخريطة (اعتماد المالك 2026-08-28)

@@ -809,6 +809,7 @@ class ReportService {
         for (const p of DuplicateDetection.findDuplicates(dupInput)) {
             if (!dupByNumber[p.number]) dupByNumber[p.number] = [];
             dupByNumber[p.number].push({ candidate: p.candidate, score: p.score, level: p.level,
+                decision: p.decision, rule: p.rule, reasons: p.reasons,
                 evidence: p.evidence, cancelledInCad: p.cancelledInCad });
         }
         for (const d of detail) d.duplicates = dupByNumber[d.number] || [];

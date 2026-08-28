@@ -98,17 +98,21 @@
         var over = alertsCache.filter(function (a) { return a.level === 'over'; });
         var near = alertsCache.filter(function (a) { return a.level === 'near'; });
 
-        // تنبيهات احتمال التكرار (اعتماد المالك 2026-08-24 — ملحق note-18): طبقة عرض
-        // مستقلة فوق التنبيه التشغيلي — «احتمال تكرار — يحتاج تحقق» فقط؛ لا دمج
-        // ولا إلغاء ولا سجل مراجعة، والقرار في CAD حصرًا. النشطة فقط تُنبِّه.
+        // تنبيهات احتمال التكرار — Duplicate Detection 2.0 (اعتماد المالك 2026-08-28):
+        // Precision First — التنبيه التشغيلي في الشريط لـ🔴 Confirmed فقط.
+        // 🟠 Likely يبقى في بطاقة البلاغ بلا عداد، و🟡 Similar تحليلي صامت تمامًا:
+        // لا شريط ولا شارة ولا عداد ولا كلمة «مكرر». لا دمج ولا إلغاء — القرار في CAD حصرًا.
         var dupRows = [];
         if (state.summary && state.summary.incidents) {
             state.summary.incidents.forEach(function (ic) {
                 if (isFinalInc(ic) || !ic.duplicates || !ic.duplicates.length) return;
-                var top = ic.duplicates[0]; // مرتبة سيرفريًا: الأعلى نقاطًا ثم الأقرب
-                dupRows.push({ number: String(ic.number), level: top.level, count: ic.duplicates.length });
+                var conf = ic.duplicates.filter(function (d) { return d.level === 'confirmed'; });
+                if (!conf.length) return;
+                var top = conf[0]; // مرتبة سيرفريًا: المستوى ثم النقاط التفسيرية ثم الأقرب
+                dupRows.push({ number: String(ic.number), level: top.level, count: conf.length,
+                    reason: (top.reasons && top.reasons.length ? top.reasons.join(' · ') : '') });
             });
-            var lvlRank = { high: 3, medium: 2, low: 1 };
+            var lvlRank = { confirmed: 3, likely: 2, similar: 1 };
             dupRows.sort(function (x, y) { return (lvlRank[y.level] || 0) - (lvlRank[x.level] || 0); });
         }
 
@@ -168,7 +172,8 @@
                     html += dupRows.slice(0, 3).map(function (d) {
                         return '<button type="button" class="smk-alert-row dup" onclick="SmartMap.focusOn(\'incident\',\'' + esc(d.number) + '\')">'
                             + '<span class="u"><i class="fas fa-clone"></i> بلاغ ' + esc(d.number) + '</span>'
-                            + '<span class="s">' + (d.level === 'high' ? 'اشتباه قوي' : d.level === 'medium' ? 'اشتباه متوسط' : 'اشتباه أولي') + (d.count > 1 ? ' · ' + d.count + ' مرشحين' : '') + '</span>'
+                            + '<span class="s">🔴 تكرار شبه مؤكد' + (d.count > 1 ? ' · ' + d.count + ' مرشحين' : '') + '</span>'
+                            + (d.reason ? '<small class="smk-alert-sub">' + esc(d.reason) + '</small>' : '')
                             + '</button>';
                     }).join('');
                 }
@@ -579,7 +584,9 @@
         incs.forEach(function (ic) {
             if (!hasCoords(ic)) return; // بلا إحداثيات ← لا موقع مختلق إطلاقًا
             var num = String(ic.number);
-            var dups = (ic.duplicates || []).map(function (d) { return String(d.candidate && d.candidate.number); }).join(',');
+            // 2.0: البصمة والشارة وخطوط الربط لـ🔴 Confirmed فقط — Likely/Similar لا يحركان العرض
+            var dups = (ic.duplicates || []).filter(function (d) { return d.level === 'confirmed'; })
+                .map(function (d) { return String(d.candidate && d.candidate.number); }).join(',');
             sigs[num] = [ic.lat, ic.lng, ic.severity || 'yellow', ic.street || ic.district || '', ic.type || '', dups].join('~');
             byNum[num] = ic;
             fpParts.push(num + '=' + sigs[num]);
@@ -599,11 +606,11 @@
         markerIndex.incidents = syncMarkers(layers.incidents, markerIndex.incidents, sigs, function (num) {
             var ic = byNum[num];
             var sev = ic.severity || 'yellow';
-            var hasDup = !!(ic.duplicates && ic.duplicates.length); // note-18: شارة تحقق فوق العلامة
+            var hasDup = !!(ic.duplicates && ic.duplicates.some(function (d) { return d.level === 'confirmed'; })); // 2.0: الشارة لـConfirmed فقط
             var icon = L.divIcon({
                 className: 'smk-inc sev-' + sev,
                 html: '<span class="smk-inc-pin"><i class="fas fa-location-dot"></i></span>'
-                    + (hasDup ? '<span class="smk-dup-dot" title="احتمال تكرار — يحتاج تحقق"><i class="fas fa-clone"></i></span>' : ''),
+                    + (hasDup ? '<span class="smk-dup-dot" title="🔴 تكرار شبه مؤكد — يحتاج تحققًا في CAD"><i class="fas fa-clone"></i></span>' : ''),
                 iconSize: [30, 38], iconAnchor: [15, 36]
             });
             var mk = L.marker([ic.lat, ic.lng], { icon: icon, zIndexOffset: 400 });
@@ -626,6 +633,7 @@
             incs.forEach(function (ic) {
                 if (!hasCoords(ic) || !ic.duplicates || !ic.duplicates.length) return;
                 ic.duplicates.forEach(function (dup) {
+                    if (dup.level !== 'confirmed') return; // 2.0: خط الربط التنبيهي لـConfirmed فقط
                     var candMk = markerIndex.incidents[String(dup.candidate.number)];
                     if (!candMk) return;
                     var ll = candMk.getLatLng();
@@ -946,21 +954,25 @@
                 + timersHtml
                 + '</div>';
         }).join('') || '<div class="smap-card-crew"><span class="u">لا فرق مسجلة بعد</span></div>';
-        // بطاقة أدلة احتمال التكرار (ملحق note-18): «احتمال تكرار — يحتاج تحقق»
-        // تنبيه فقط — Potential Duplicate ≠ Duplicate. لا «تمت المراجعة» ولا سجل،
-        // والقرار والإلغاء في CAD حصرًا. المرشح الملغى يظهر موسومًا «ملغى في CAD»
-        // وإلغاؤه ليس دليلًا بذاته. رقم المبلغ لا يُعرض — الدليل يقول «متطابق» فقط.
+        // بطاقة أدلة احتمال التكرار — Duplicate Detection 2.0 (اعتماد المالك 2026-08-28):
+        // تعرض 🔴 Confirmed و🟠 Likely مع سبب القرار والأدلة كاملة. 🟡 Similar
+        // تحليلي صامت — لا يظهر هنا إطلاقًا ولا يُسمى مكررًا. تنبيه فقط:
+        // Potential Duplicate ≠ Duplicate؛ القرار والإلغاء في CAD حصرًا.
+        // رقم المبلغ لا يُعرض — الدليل يقول «متطابق» فقط.
         var dupHtml = '';
-        if (ic.duplicates && ic.duplicates.length) {
+        var dupShown = (ic.duplicates || []).filter(function (d) { return d.level === 'confirmed' || d.level === 'likely'; });
+        if (dupShown.length) {
             dupHtml = '<div class="smap-dup-box"><div class="smap-dup-title">⚠️ احتمال تكرار — يحتاج تحقق</div>'
-                + ic.duplicates.map(function (dup) {
-                    var lvl = { high: '🔴 اشتباه قوي', medium: '🟠 اشتباه متوسط', low: '🟡 اشتباه أولي' }[dup.level] || '🟡';
+                + dupShown.map(function (dup) {
+                    var lvl = { confirmed: '🔴 تكرار شبه مؤكد', likely: '🟠 تكرار مرجّح — يحتاج تحققًا' }[dup.level] || '🟠';
                     var ev = (dup.evidence || []).map(function (e) { return '<span class="smap-dup-ev">' + esc(e.label) + '</span>'; }).join('');
+                    var why = (dup.reasons || []).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
                     return '<div class="smap-dup-row">'
                         + '<div class="smap-dup-head"><button type="button" class="smap-card-link" onclick="SmartMap.focusOn(\'incident\',\'' + esc(String(dup.candidate.number)) + '\')"><i class="fas fa-location-dot"></i> بلاغ ' + esc(dup.candidate.number) + '</button>'
                         + '<span class="smap-dup-lvl">' + lvl + '</span>'
                         + (dup.cancelledInCad ? '<span class="smap-dup-canc">ملغى في CAD</span>' : '') + '</div>'
                         + '<div class="smap-dup-evs">' + ev + '</div>'
+                        + (why ? '<ul class="smap-dup-why">' + why + '</ul>' : '')
                         + '</div>';
                 }).join('')
                 + '<div class="smap-dup-note">تنبيه آلي فقط — القرار والإلغاء داخل CAD حصرًا؛ المنصة لا تلغي ولا تدمج أي بلاغ.</div></div>';
