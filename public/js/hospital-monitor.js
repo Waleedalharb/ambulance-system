@@ -62,6 +62,7 @@
         var parts = [];
         parts.push('حالية ' + (summary.currentAtHospital != null ? summary.currentAtHospital : '—'));
         parts.push('مغلقة ' + (summary.lastKnownOnly || 0));
+        if (summary.monitoringLost) parts.push('انقطع الرصد ' + summary.monitoringLost);
         if (summary.activeAlerts) parts.push('⚠ تنبيه نشط ' + summary.activeAlerts);
         if (summary.avgDwellMin != null) parts.push('متوسط ' + fmtMin(summary.avgDwellMin));
         setText('hcKpiHospSub', parts.join(' · '));
@@ -75,7 +76,22 @@
         var stateBadge = { open: '<b style="color:var(--pi-red,#dc2626);">نشط</b>',
             acknowledged: '<b style="color:var(--primary-700);">مُقَرّ</b>',
             resolved: '<b style="color:var(--gray-500);">محلول</b>' };
+        // إصلاح دورة المستشفى [5] (اعتماد المالك 2026-08-28): التنبيه المتأثر
+        // بالانقطاع يُوسم صراحة — قيمته «عند آخر مشاهدة» ولا تُقرأ زمنَ بقاء حقيقي.
+        var resBadge = function (a) {
+            if (a.state !== 'resolved') return stateBadge[a.state] || esc(a.state || '—');
+            if (a.resolution === 'monitoring-lost') return stateBadge.resolved + ' <small style="color:var(--pi-amber,#b45309);">انقطع الرصد</small>';
+            if (a.resolution === 'completed-late-sync') return stateBadge.resolved + ' <small style="color:var(--primary-700);">صُحّح لاحقًا</small>';
+            return stateBadge.resolved;
+        };
         var rows = alerts.map(function (a) {
+            // [5] وسم الانقطاع (اعتماد المالك 2026-08-29): قيمة ذات دلالة تُعرض
+            // «عند آخر مشاهدة»، وبلا قيمة موثوقة ← «غير مقاس» — الصفر ممنوع.
+            var dwellCell = a.unreliable
+                ? (a.dwellMin != null
+                    ? '<span style="color:var(--gray-500);">≈ ' + esc(fmtMin(a.dwellMin)) + '</span> <small style="color:var(--pi-amber,#b45309);">عند آخر مشاهدة — الزمن النهائي غير موثوق</small>'
+                    : '<span style="color:var(--gray-400);">غير مقاس</span> <small style="color:var(--pi-amber,#b45309);">انقطع الرصد — الزمن النهائي غير موثوق</small>')
+                : esc(fmtMin(a.dwellMin));
             var ackCell = a.state === 'open'
                 ? (canAck()
                     ? '<button type="button" class="hc-ack-btn" data-ack="' + esc(a.id) + '" ' +
@@ -86,8 +102,8 @@
                 '<td style="padding:4px 8px; direction:ltr; text-align:right;">' + esc(a.eventId || '—') + '</td>' +
                 '<td style="padding:4px 8px;">' + esc(a.southTeam || a.unitCode || '—') + '</td>' +
                 '<td style="padding:4px 8px; font-size:0.8rem;">' + esc(a.facility || '—') + '</td>' +
-                '<td style="padding:4px 8px; white-space:nowrap;">' + esc(fmtMin(a.dwellMin)) + '</td>' +
-                '<td style="padding:4px 8px;">' + (stateBadge[a.state] || esc(a.state || '—')) + '</td>' +
+                '<td style="padding:4px 8px; white-space:nowrap;">' + dwellCell + '</td>' +
+                '<td style="padding:4px 8px;">' + resBadge(a) + '</td>' +
                 '<td style="padding:4px 8px;">' + ackCell + '</td></tr>';
         }).join('');
         return '<div style="border:1px solid var(--pi-amber,#f59e0b); border-radius:12px; padding:10px 14px; margin-bottom:12px;">' +
@@ -121,6 +137,7 @@
             chip('متوسط زمن البقاء', fmtMin(s.avgDwellMin)) +
             chip('تجاوز > 10 د', s.exceedances || 0) +
             chip('تنبيهات نشطة', s.activeAlerts || 0) +
+            (s.monitoringLost ? chip('انقطع الرصد', s.monitoringLost) : '') +
             (s.unmeasured ? chip('بلا أزمنة تسليم', s.unmeasured) : '');
         var alertsHtml = renderAlertsHtml(s);
         if (!s.facilities || !s.facilities.length) {
@@ -130,10 +147,15 @@
         }
         body.innerHTML = alertsHtml + s.facilities.map(function (f) {
             var rows = f.journeys.map(function (j) {
-                var dwell = j.dwellMin == null ? '<span style="color:var(--gray-400);">—</span>'
-                    : esc(fmtMin(j.dwellMin)) + (j.ongoing ? ' <small style="color:var(--pi-amber);">⏳ جارٍ</small>' : '') +
-                      (j.dwellMin > 10 ? ' <small style="color:var(--pi-red);">⚠ تجاوز</small>' : '');
-                var stateBadge = j.episodeState === 'last-known'
+                var dwell = j.dwellMin == null
+                    ? (j.monitoringLost ? '<span style="color:var(--gray-400);">غير مقاس</span>' : '<span style="color:var(--gray-400);">—</span>')
+                    : esc(fmtMin(j.dwellMin)) +
+                      (j.dwellCapped ? ' <small style="color:var(--pi-amber);">⏸ عند آخر مشاهدة</small>'
+                          : (j.ongoing ? ' <small style="color:var(--pi-amber);">⏳ جارٍ</small>' : '')) +
+                      (j.dwellMin > 10 && !j.dwellCapped ? ' <small style="color:var(--pi-red);">⚠ تجاوز</small>' : '');
+                var stateBadge = j.monitoringLost
+                    ? ' <small style="color:var(--pi-amber,#b45309);">(انقطع الرصد — الزمن النهائي غير موثوق)</small>'
+                    : j.episodeState === 'last-known'
                     ? ' <small style="color:var(--gray-500);">(سابقة — آخر منشأة معروفة)</small>' : '';
                 return '<tr><td style="padding:4px 8px; direction:ltr; text-align:right;">' + esc(j.eventId) + '</td>' +
                     '<td style="padding:4px 8px;">' + esc(j.southTeam || j.unitCode || '—') + stateBadge + '</td>' +

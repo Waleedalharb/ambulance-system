@@ -1962,6 +1962,53 @@
         </div>
     </div>
 
+    <!-- ② حارس تعارض الشهر (اعتماد المالك 2026-08-29): تعارض صريح بين شهر الملف
+         والشهر المختار = إيقاف كامل — لا يوجد زر «تأكيد واستبدال» هنا إطلاقًا -->
+    <div class="modal-overlay" id="oiConflictModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#F87171;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    ⚠️ تعارض في الشهر
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-close" onclick="oiCloseModals()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="oiConflictBody" style="font-size:14px;line-height:2;color:#E2E8F0;"></div>
+                <div style="font-size:13px;color:#F87171;margin-top:10px;font-weight:700;">لن يتم الاستيراد حتى يتم تصحيح الشهر.</div>
+                <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                    <button class="btn" onclick="oiCloseModals()">إلغاء الاستيراد</button>
+                    <button class="btn btn-primary" onclick="oiBackToMonthPicker()"><i class="fas fa-edit"></i> تصحيح الشهر</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- تحذير الاستبدال العادي: الشهر المختار مطابق لشهر الملف لكنه موجود مسبقًا —
+         يتطلب تأكيدًا صريحًا ويعرض عدد السجلات القائمة -->
+    <div class="modal-overlay" id="oiReplaceModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#F59E0B;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    الشهر موجود مسبقًا
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-close" onclick="oiCloseModals()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="oiReplaceBody" style="font-size:14px;line-height:2;color:#E2E8F0;"></div>
+                <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                    <button class="btn" onclick="oiCloseModals()">إلغاء</button>
+                    <button class="btn btn-danger" onclick="oiConfirmReplace()"><i class="fas fa-sync-alt"></i> تأكيد الاستبدال</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==========================================
          JavaScript
          ========================================== -->
@@ -4997,8 +5044,56 @@ function oiFindDirectorySheet(workbook) {
 }
 
 // ─── اكتشاف الشهر/السنة — اقتراح متعدد المصادر (قرار المالك: اختيار يدوي باقتراح) ───
+// ─── مسح الترويسة الرقمية لصيغة القطاع — دالة نقية تُستخرج وتُختبر في Node ───
+// صف ترويسة الجدول الرسمي: خلية شهر رقمية (1-12) في أول عمودين + سنة (20xx) في نفس
+// الصف، أو خلية نصية «الشهر: 9». أرقام الأيام (1..31 عبر الأعمدة) لا تُلتقط:
+// الاقتصار على العمودين الأولين للأرقام الصريحة + اشتراط وجود السنة بنفس الصف.
+// يعيد { month, year } أو null. (اعتماد المالك 2026-08-29 — ①)
+function oiScanNumericMonthYear(rows) {
+    for (var r = 0; r < Math.min((rows || []).length, 8); r++) {
+        var row = rows[r] || [];
+        var mn = null, yr = null;
+        for (var c = 0; c < row.length; c++) {
+            var v = row[c];
+            var txt = String(v == null ? '' : v).trim();
+            var mt = txt.match(/الشهر\s*[:：]?\s*(\d{1,2})/);
+            if (mt) { var mv = parseInt(mt[1], 10); if (mv >= 1 && mv <= 12) mn = mv; }
+            var yt = txt.match(/(20\d{2})/);
+            if (yt) yr = parseInt(yt[1], 10);
+            if (typeof v === 'number' && isFinite(v)) {
+                if (c <= 1 && mn === null && v >= 1 && v <= 12 && Math.floor(v) === v) mn = v;
+                if (yr === null && v >= 2000 && v <= 2100 && Math.floor(v) === v) yr = v;
+            }
+        }
+        if (mn && yr) return { month: mn, year: yr };
+    }
+    return null;
+}
+
+// ─── حارس تعارض الشهر — دالة نقية تُستخرج وتُختبر في Node (اعتماد المالك ②) ───
+// «الملف يقول» = شهر مستخرج من محتوى الملف/اسمه فقط (لا تاريخ حفظ ولا آخر استيراد).
+// أي اختلاف بين شهر الملف والشهر المختار = تعارض صارم بلا زر تجاوز.
+function oiCheckMonthConflict(fileMY, chosenMY) {
+    if (!fileMY || !fileMY.month || !chosenMY || !chosenMY.month) return null;
+    var fileYearKnown = !!(fileMY.year && fileMY.year > 2000);
+    var chosenYearKnown = !!(chosenMY.year && chosenMY.year > 2000);
+    if (fileYearKnown && chosenYearKnown && fileMY.year !== chosenMY.year) {
+        return { fileMonth: fileMY.month, fileYear: fileMY.year, chosenMonth: chosenMY.month, chosenYear: chosenMY.year };
+    }
+    if (fileMY.month !== chosenMY.month && (!fileYearKnown || !chosenYearKnown || fileMY.year === chosenMY.year)) {
+        return { fileMonth: fileMY.month, fileYear: fileMY.year, chosenMonth: chosenMY.month, chosenYear: chosenMY.year };
+    }
+    return null;
+}
+
 function oiSuggestMonthYear(workbook, fileName, fileDate) {
     var suggestions = [];
+    // 0) الترويسة الرقمية لصيغة القطاع — أعلى ثقة (الملف نفسه يصرّح بشهره)
+    for (var s0 = 0; s0 < workbook.SheetNames.length; s0++) {
+        var rows0 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[s0]], { header: 1, defval: '' });
+        var num = oiScanNumericMonthYear(rows0);
+        if (num) { suggestions.push({ month: num.month, year: num.year, source: 'ترويسة الملف (الشهر/السنة رقميًا)', conf: 4 }); break; }
+    }
     // 1) نصوص أول الصفوف في كل الأوراق (عنوان مثل «مارس / 2026»)
     for (var s = 0; s < workbook.SheetNames.length && suggestions.length < 3; s++) {
         var rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[s]], { header: 1, defval: '' });
@@ -5147,7 +5242,7 @@ function oiParseOfficial(workbook) {
     return out;
 }
 
-window.__oi = { normalize: oiNormalize, resolveSymbol: oiResolveSymbol, findSheet: oiFindOperationalSheet, suggestMY: oiSuggestMonthYear, parse: oiParseOfficial };
+window.__oi = { normalize: oiNormalize, resolveSymbol: oiResolveSymbol, findSheet: oiFindOperationalSheet, suggestMY: oiSuggestMonthYear, parse: oiParseOfficial, scanNumericMY: oiScanNumericMonthYear, checkMonthConflict: oiCheckMonthConflict };
 })();
 </script>
     <script>
@@ -5173,7 +5268,10 @@ async function oiFileChosen(input) {
         var parsed = window.__oi.parse(wb);
         if (!parsed) { showToast('❌ لم يُعثر على ورقة تشغيلية (أعمدة: الاسم/الكود/رمز/أيام) في أي ورقة', 'error'); return; }
         var sug = window.__oi.suggestMY(wb, file.name, new Date(file.lastModified || Date.now()));
-        oiState = { parsed: parsed, month: sug.month, year: sug.year };
+        // ② «الملف يقول»: شهر مستخرج من محتوى الملف/اسمه فقط (conf≥2) — تاريخ حفظ
+        // الملف و«آخر استيراد» (conf 1) ليسا تصريحًا من الملف فلا يصلحان حارسًا.
+        var fileMY = (sug && sug.conf >= 2 && sug.month) ? { month: sug.month, year: sug.year || 0 } : null;
+        oiState = { parsed: parsed, month: sug.month, year: sug.year, fileMY: fileMY };
         oiShowMonthModal(sug);
     } catch (e) {
         console.error(e);
@@ -5189,18 +5287,76 @@ function oiShowMonthModal(sug) {
     document.getElementById('oiSugSource').textContent = 'الاقتراح من: ' + sug.source + ' — يمكنك تغييره قبل الاستيراد';
     document.getElementById('oiMonthModal').classList.add('active');
 }
-function oiConfirmMonth() {
-    oiState.month = parseInt(document.getElementById('oiMonth').value, 10);
-    oiState.year = parseInt(document.getElementById('oiYear').value, 10);
-    if (!oiState.month || oiState.month < 1 || oiState.month > 12 || !oiState.year) { showToast('⚠️ حدد الشهر والسنة', 'error'); return; }
-    document.getElementById('oiMonthModal').classList.remove('active');
+// ─── ② حارس تعارض الشهر + تحذير الاستبدال (اعتماد المالك 2026-08-29) ───
+function oiMonthName(m) { return ARABIC_MONTHS[parseInt(m, 10) - 1] || String(m); }
+
+function oiProceedToReport() {
     try { localStorage.setItem('officialImport:lastMY', JSON.stringify({ month: oiState.month, year: oiState.year })); } catch (e) {}
     oiState.diff = oiComputeDiff(oiState.parsed, oiState.month, oiState.year);
     oiShowReport();
 }
+
+async function oiConfirmMonth() {
+    oiState.month = parseInt(document.getElementById('oiMonth').value, 10);
+    oiState.year = parseInt(document.getElementById('oiYear').value, 10);
+    if (!oiState.month || oiState.month < 1 || oiState.month > 12 || !oiState.year) { showToast('⚠️ حدد الشهر والسنة', 'error'); return; }
+
+    // تعارض صريح بين شهر الملف والشهر المختار ← إيقاف كامل بلا زر تجاوز
+    var conflict = window.__oi.checkMonthConflict(oiState.fileMY, { month: oiState.month, year: oiState.year });
+    if (conflict) {
+        document.getElementById('oiMonthModal').classList.remove('active');
+        document.getElementById('oiConflictBody').innerHTML =
+            'الملف يحتوي على جدول <b>' + oiMonthName(conflict.fileMonth) + (conflict.fileYear ? ' ' + conflict.fileYear : '') + '</b>' +
+            '<br>بينما اخترت استيراده لشهر <b style="color:#F87171;">' + oiMonthName(conflict.chosenMonth) + ' ' + conflict.chosenYear + '</b>.';
+        document.getElementById('oiConflictModal').classList.add('active');
+        return;
+    }
+
+    // الشهر موجود مسبقًا في القاعدة ← تحذير استبدال صريح بعدد السجلات
+    var ym = oiState.year + '-' + (oiState.month < 10 ? '0' : '') + oiState.month;
+    try {
+        var token = AuthCore.getToken();
+        if (token) {
+            var h = { 'Authorization': 'Bearer ' + token };
+            var mRes = await fetch('/api/shift-roster/months', { headers: h });
+            var mData = mRes.ok ? await mRes.json() : null;
+            if (mData && mData.success && Array.isArray(mData.months) && mData.months.indexOf(ym) !== -1) {
+                var cnt = '';
+                try {
+                    var rRes = await fetch('/api/shift-roster?month=' + oiState.month + '&year=' + oiState.year, { headers: h });
+                    var rData = rRes.ok ? await rRes.json() : null;
+                    if (rData && rData.success && Array.isArray(rData.roster)) cnt = rData.roster.length;
+                } catch (e) { /* العدد تجميلي — التحذير يظهر حتى بلا عدد */ }
+                document.getElementById('oiMonthModal').classList.remove('active');
+                document.getElementById('oiReplaceBody').innerHTML =
+                    '<b>' + oiMonthName(oiState.month) + ' ' + oiState.year + '</b> موجود مسبقًا' +
+                    (cnt !== '' ? ' وله <b>' + cnt + '</b> سجلًا قائمًا' : '') +
+                    '.<br>الاستيراد سيستبدل جدول هذا الشهر الحالي <b>فقط</b> — الأشهر الأخرى لا تتأثر.';
+                document.getElementById('oiReplaceModal').classList.add('active');
+                return; // المتابعة فقط عبر «تأكيد الاستبدال»
+            }
+        }
+    } catch (e) { /* تعذّر فحص الوجود — نكمل للتقرير (الحسم التدميري محسوم بحارس التعارض أعلاه) */ }
+
+    document.getElementById('oiMonthModal').classList.remove('active');
+    oiProceedToReport();
+}
 window.oiConfirmMonth = oiConfirmMonth;
+
+function oiBackToMonthPicker() {
+    document.getElementById('oiConflictModal').classList.remove('active');
+    document.getElementById('oiMonthModal').classList.add('active'); // نفس oiState — يصحّح الشهر فقط
+}
+window.oiBackToMonthPicker = oiBackToMonthPicker;
+
+function oiConfirmReplace() {
+    document.getElementById('oiReplaceModal').classList.remove('active');
+    oiProceedToReport();
+}
+window.oiConfirmReplace = oiConfirmReplace;
+
 function oiCloseModals() {
-    ['oiMonthModal', 'oiReportModal'].forEach(function (id) { document.getElementById(id).classList.remove('active'); });
+    ['oiMonthModal', 'oiReportModal', 'oiConflictModal', 'oiReplaceModal'].forEach(function (id) { document.getElementById(id).classList.remove('active'); });
     oiState = null;
 }
 window.oiCloseModals = oiCloseModals;
@@ -5353,13 +5509,23 @@ async function oiApply() {
     // قناة الحفظ المخصصة للاستيراد الرسمي — POST /api/schedule/official-import
     // محمية بـ schedule.import حصرًا (معتمد 2026-08-17: الاستيراد ≠ إدارة الموظفين اليدوية)
     var saveResult = await oiSaveToServer(false);
-    saveToIndexedDB();
-    saveToLocalStorage();
-    // تحديث الواجهة بالكامل بعد الدمج (نفس مسار التحديث القياسي في الصفحة)
-    try { updateStats(); } catch (e) {}
-    try { renderCharts(); } catch (e) {}
-    try { renderCurrentView(); } catch (e) {}
-    try { populateLocationFilter(); } catch (e) {}
+    // ③ (اعتماد المالك 2026-08-29): بعد الحفظ لا تُعتمد مصفوفة الذاكرة — تُعاد
+    // القراءة من مصدر الحقيقة (القاعدة) فتظهر كل الشهور بلا Reload، ويُحدَّث
+    // الكاشان من نفس المصدر. السقوط للذاكرة المحلية فقط عند تعذّر القاعدة.
+    var refreshed = false;
+    try {
+        var fresh = await fetchEmployeesFromDBSilent();
+        if (fresh) { adoptServerEmployees(fresh); refreshed = true; }
+    } catch (e) { console.warn('[OI] تعذّرت إعادة القراءة من القاعدة بعد الاستيراد:', e); }
+    if (!refreshed) {
+        saveToIndexedDB();
+        saveToLocalStorage();
+        // تحديث الواجهة بالكامل بعد الدمج (نفس مسار التحديث القياسي في الصفحة)
+        try { updateStats(); } catch (e) {}
+        try { renderCharts(); } catch (e) {}
+        try { renderCurrentView(); } catch (e) {}
+        try { populateLocationFilter(); } catch (e) {}
+    }
     if (saveResult === 'conflict') {
         // ظهر مودال التعارض — القرار النهائي (إلغاء/كتابة فوق) بيد المستخدم
         if (typeof showToast === 'function') showToast('⚠️ الاستيراد متوقف بسبب تعارض مع تعديلات يدوية — حدّد قرارك من النافذة', 'info');

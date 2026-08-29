@@ -2927,10 +2927,16 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
             const hJourneys = Array.isArray(hospital.journeys) ? hospital.journeys : [];
             const hAlerts = Array.isArray(hospital.alerts) ? hospital.alerts : [];
             const hTimeline = Array.isArray(hospital.timeline) ? hospital.timeline : [];
-            const hOpen = hJourneys.filter(j => j.episodeState !== 'last-known').length;
+            // إصلاح دورة المستشفى [7] (اعتماد المالك 2026-08-28): الفصل الثلاثي
+            // active/completed/monitoring-lost — مع سقوط صادق للقطات المختومة
+            // القديمة التي لا تحمل episodeClass (اشتقاق من episodeState فقط).
+            const hClsOf = j => j.episodeClass || (j.episodeState !== 'last-known' ? 'active' : 'completed');
+            const hOpen = hJourneys.filter(j => hClsOf(j) === 'active').length;
+            const hMonLost = hJourneys.filter(j => hClsOf(j) === 'monitoring-lost').length;
             L.push('  إجمالي الرحلات: ' + hJourneys.length +
                 '    حالية الآن: ' + (hs.currentAtHospital != null ? hs.currentAtHospital : 0) +
-                '    مغلقة: ' + (hJourneys.length - hOpen) +
+                '    مغلقة: ' + (hJourneys.length - hOpen - hMonLost) +
+                (hMonLost > 0 ? '    انقطع الرصد: ' + hMonLost : '') +
                 (shift.status === 'archived' && hOpen > 0 ? '    (منها ' + hOpen + ' كانت مفتوحة عند إغلاق المناوبة)' : ''));
             L.push('  متوسط زمن البقاء: ' + (hs.avgDwellMin != null ? hs.avgDwellMin + ' د' : '—') +
                 '    تجاوز >10د: ' + (hs.exceedances || 0) +
@@ -2943,8 +2949,9 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
             L.push('  ── سجل الرحلات ──');
             if (hJourneys.length) {
                 hJourneys.forEach((j, i) => {
-                    const jState = j.episodeState !== 'last-known'
-                        ? (shift.status === 'archived' ? 'مفتوحة عند إغلاق المناوبة' : 'حالية — في المنشأة')
+                    const jCls = hClsOf(j);
+                    const jState = jCls === 'monitoring-lost' ? 'انقطع الرصد — الزمن النهائي غير موثوق'
+                        : jCls === 'active' ? (shift.status === 'archived' ? 'مفتوحة عند إغلاق المناوبة' : 'حالية — في المنشأة')
                         : 'سابقة — آخر منشأة معروفة';
                     L.push('  ' + (i + 1) + '. بلاغ ' + (j.eventId || '—') + ' — ' + (j.southTeam || j.unitCode || '—'));
                     L.push('     المنشأة: ' + (j.hospitalName || '—') + '    الحالة: ' + jState);
@@ -2957,11 +2964,17 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
             if (hAlerts.length) {
                 const A_STATE = { open: 'نشط', acknowledged: 'مُقَرّ', resolved: 'محلول' };
                 hAlerts.forEach(a => {
+                    // إصلاح دورة المستشفى [5]: التنبيه المتأثر بالانقطاع يُوسم
+                    // صراحة — قيمته «آخر قيمة موثوقة» لا زمن بقاء حقيقي.
                     L.push('  [' + _fmtRiyadh(a.firstRaisedAt) + '] ⚠ تجاوز زمن البقاء — بلاغ ' + (a.eventId || '—') +
                         ' (' + (a.southTeam || a.unitCode || '—') + ') في ' + (a.facility || '—') +
-                        ' — البقاء: ' + (a.dwellMin != null ? a.dwellMin + ' د' : '—') + ' — الحالة: ' + (A_STATE[a.state] || a.state || '—'));
+                        ' — البقاء: ' + (a.dwellMin != null ? a.dwellMin + ' د' : 'غير مقاس') +
+                        (a.unreliable ? ' (انقطع الرصد — الزمن النهائي غير موثوق)' : '') +
+                        ' — الحالة: ' + (A_STATE[a.state] || a.state || '—'));
                     if (a.ackAt) L.push('      أُقرّ: ' + _fmtRiyadh(a.ackAt) + (a.ackByName ? ' بواسطة ' + a.ackByName : ''));
-                    if (a.resolvedAt) L.push('      حُلّ: ' + _fmtRiyadh(a.resolvedAt) + ' (عودة للخدمة)');
+                    if (a.resolvedAt) L.push('      حُلّ: ' + _fmtRiyadh(a.resolvedAt) +
+                        (a.resolution === 'monitoring-lost' ? ' (انقطع الرصد — الزمن النهائي غير موثوق)'
+                            : a.resolution === 'completed-late-sync' ? ' (صُحّح بنهاية التسليم الحقيقية لاحقًا)' : ' (عودة للخدمة)'));
                 });
             } else L.push('  لا توجد تنبيهات.');
             L.push('');
@@ -2969,14 +2982,17 @@ app.get('/api/shifts/:id(\\d+)/export', authenticate, async (req, res) => {
             if (hTimeline.length) {
                 const evText = (ev) => {
                     if (ev.field === 'alert') { // أحداث دورة التنبيه داخل التسلسل
-                        if (ev.alert === 'raised') return '⚠ تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + ev.dwellMin + ' د)' : '');
+                        if (ev.alert === 'raised') return '⚠ تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + ev.dwellMin + ' د)' : '') + (ev.unreliable ? ' — القيمة عند آخر مشاهدة (انقطع الرصد)' : '');
                         if (ev.alert === 'acknowledged') return 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + ev.actor : '');
-                        if (ev.alert === 'resolved') return 'حلول التنبيه (عودة للخدمة)';
+                        if (ev.alert === 'resolved') return ev.to === 'monitoring-lost' ? 'حلول التنبيه (انقطع الرصد — الزمن النهائي غير موثوق)'
+                            : ev.to === 'completed-late-sync' ? 'حلول التنبيه (صُحّح بنهاية التسليم الحقيقية)' : 'حلول التنبيه (عودة للخدمة)';
                         return 'تنبيه';
                     }
+                    if (ev.field === 'alert-dwell-corrected') return 'تصحيح قيمة البقاء بوصول نهاية التسليم الحقيقية: ' + (ev.from != null ? ev.from + ' د' : '—') + ' ← ' + (ev.to != null ? ev.to + ' د' : '—');
                     if (ev.field === 'hospitalName') return ev.from ? ('انتقال المنشأة: ' + ev.from + ' ← ' + ev.to) : ('مشاهدة المنشأة: ' + ev.to);
                     if (ev.field === 'unitCode') return 'تغيّر رمز الفرقة: ' + (ev.from || '—') + ' ← ' + (ev.to || '—');
-                    if (ev.field === 'episode') return ev.to === 'last-known' ? 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' : 'إعادة فتح الحالة — مشاهدة جديدة';
+                    if (ev.field === 'episode') return ev.step === 'MONITORING_LOST' ? 'انقطع الرصد — إغلاق إداري موثق (لا نهاية تسليم موثوقة)'
+                        : ev.to === 'last-known' ? 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' : 'إعادة فتح الحالة — مشاهدة جديدة';
                     return ev.field || 'حدث';
                 };
                 hTimeline.forEach(ev => L.push('  [' + _fmtRiyadh(ev.at) + '] ' + (ev.key || '') + ' — ' + evText(ev)));
@@ -4894,8 +4910,12 @@ app.post('/api/cad-reports/hospital-sighting', cadIntegrationAuth, (req, res, ne
         // منشأة معروفة ولا يُمسح (الفصل الدلالي — اعتماد المالك 2026-08-27).
         // وإغلاق الحالة يحلّ تنبيهاتها المفتوحة/المُقَرَّة بالحدث التشغيلي
         // الصحيح — لا حلول بمجرد اختفاء الرحلة من قائمة CAD.
+        // إصلاح دورة المستشفى [3] (اعتماد المالك 2026-08-28): الـOverlay يوسم
+        // monitoringLost=true عندما يختفي البلاغ من CAD ولا يجد في detail الأخير
+        // نهاية تسليم حقيقية — إغلاق إداري موثق، ممنوع تسجيل BACK_TO_SERVICE مختلق.
         if (b.episodeClose === true) {
-            const rc = hospitalMonitor.closeEpisode(base, seenAt, sightingShiftId);
+            const rc = hospitalMonitor.closeEpisode(base, seenAt, sightingShiftId,
+                b.monitoringLost === true ? 'monitoring-lost' : 'back-to-service');
             if (rc.changed && typeof broadcast === 'function') broadcast({ type: 'hospital_monitor_updated' });
             return res.json({ success: true, changed: rc.changed, kind: rc.kind });
         }

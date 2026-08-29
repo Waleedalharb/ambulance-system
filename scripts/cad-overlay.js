@@ -28,7 +28,7 @@
   /* ختم البناء — تحقق بصري فوري من نسخة الـOverlay المشغَّلة فعليًا في المتصفح
      (تشخيص 2026-08-22: فشل الاختبار الحي سببه أن Chrome كان يشغّل بناءً قديمًا).
      يظهر في تلميح مقبض اللوحة وفي مسجل دورة الحياة — لا منطق ولا سلوك. */
-  const OVERLAY_BUILD = '2026-08-27.d — 1B: قراءة hospitalName من lastJourneys (معرفة المنشأة فقط — بلا استنتاج وصول/تسليم) + إرسال hospital-sighting عند التغيّر فقط';
+  const OVERLAY_BUILD = '2026-08-29.a — إصلاح دورة المستشفى (اعتماد المالك 2026-08-28): نبضة حضور ~4د + detail أخير قبل حذف المراقبة + إغلاق monitoring-lost عند اختفاء CAD بلا نهاية تسليم حقيقية';
   window.__southBuild = OVERLAY_BUILD;
 
   /* ─── الالتقاط السلبي لإحداثيات البلاغ الأصلية (اعتماد المالك 2026-08-20) ───
@@ -552,9 +552,16 @@
      الفصل الدلالي (تثبيت المالك): BACK_TO_SERVICE مع غياب الاسم = إشارة إغلاق
      «الحالة الحالية» (تُرسل episodeClose مرة واحدة لكل رحلة) — والاسم يبقى
      محفوظًا سيرفريًا كآخر منشأة معروفة، لا يُمسح. */
-  const hospMon = window.__southHospMon = window.__southHospMon || { seen: {}, closed: {} };
+  const hospMon = window.__southHospMon = window.__southHospMon || { seen: {}, closed: {}, beat: {} };
+  if(!hospMon.beat) hospMon.beat = {}; // توافق مع حالة جلسة سابقة (ترقية بلا تحديث صفحة)
+  /* نبضة الحضور (إصلاح دورة المستشفى [2] — اعتماد المالك 2026-08-28): الرحلة
+     الظاهرة غير المتغيّرة تُعاد مشاهدتها كل ~4د كي يبقى lastSeenAt سيرفريًا
+     «آخر تأكيد حضور في قائمة CAD» لا «آخر تغيّر قيمة» — بلا أي طلب جديد على
+     CAD (من نفس لقطة incident-list المستطلعة أصلًا)، وبلا بثّ عند الثبات. */
+  const HOSPITAL_BEAT_MS = 4 * 60 * 1000;
   function hospitalSightingsFromItems(items){
     const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
     const presentKeys = {};
     for(const it of (Array.isArray(items) ? items : [])){
       const evId = it && it.eventId != null ? String(it.eventId) : null;
@@ -577,8 +584,17 @@
           const wasClosed = hospMon.closed[key] === true;
           // dedupe — لا إرسال إلا عند التغيّر؛ إلا بعد إغلاق سابق: إعادة ظهور الاسم
           // (حتى بنفس القيمة) = إعادة فتح حالة يجب أن تصل السيرفر
-          if(hospMon.seen[key] === sig && !wasClosed) continue;
+          if(hospMon.seen[key] === sig && !wasClosed){
+            // نبضة حضور [2]: الرحلة الظاهرة بلا تغيّر تُؤكَّد كل ~4د — وإلا بدت «منقطعة الرصد» وهي ما زالت في القائمة
+            if(nowMs - (hospMon.beat[key] || 0) > HOSPITAL_BEAT_MS){
+              hospMon.beat[key] = nowMs;
+              sendToPlatform('hospital-sighting', { eventId: evId, unitId: unId, runUnitId: runId, unitCode: code,
+                southTeam: team, hospitalName: hn, journeyStepCode: step, observedAt: nowIso });
+            }
+            continue;
+          }
           hospMon.seen[key] = sig;
+          hospMon.beat[key] = nowMs;
           hospMon.closed[key] = false; // قيمة جديدة تلغي علامة الإغلاق (رحلة عادت لقيمة)
           const payload = { eventId: evId, unitId: unId, runUnitId: runId, unitCode: code, southTeam: team,
             hospitalName: hn, journeyStepCode: step, observedAt: nowIso };
@@ -601,7 +617,7 @@
     }
     // تنظيف الذاكرة: مفاتيح غابت عن اللقطات الحالية ولا داعي لبقائها (سقف 2000)
     const keys = Object.keys(hospMon.seen);
-    if(keys.length > 2000) for(const k of keys) if(!presentKeys[k]){ delete hospMon.seen[k]; delete hospMon.closed[k]; }
+    if(keys.length > 2000) for(const k of keys) if(!presentKeys[k]){ delete hospMon.seen[k]; delete hospMon.closed[k]; delete hospMon.beat[k]; }
   }
   const AUTO_MAX_PER_SESSION = 60;
   const DETAIL_REFETCH_MS = 30000;
@@ -1251,10 +1267,48 @@
         ? (now - (lt.lastSeenAt || 0) > LIST_SEEN_TIMEOUT_MS)   // ٦٠ ثانية بلا ظهور في أي قائمة (٦ دورات استطلاع)
         : (now - (w.firstAt || w.at) > LIST_GRACE_MS);           // لم يُرَ أبدًا: مهلة 15 د من التسجيل
       if(lt.absentStreak >= LIST_ABSENT_CONFIRM && goneLong){
-        if(w.crews && w.crews.length){
+        /* [3] دورة المستشفى عند الاختفاء (اعتماد المالك 2026-08-28): قبل حذف
+           المراقبة نجلب detail أخيرًا — إن وُجدت نهاية تسليم حقيقية (HANDOVER/
+           BACK_TO_SERVICE) تُستخدم وتُرسل الأطوار المحدثة، وإلا يُغلق إداريًا
+           monitoring-lost — ممنوع تسجيل BACK_TO_SERVICE مختلق. */
+        const hospKeys = Object.keys(hospMon.seen).filter(k => k.indexOf(num + ':') === 0 && !hospMon.closed[k]);
+        let dLast = null;
+        if(hospKeys.length){ try{ dLast = await fetchIncidentDetail(num); }catch(e){ dLast = null; } }
+        const dCrews = dLast ? crewsFromDetail(dLast) : null;
+        if(dCrews && dCrews.length){
+          const dPhases = Object.assign({}, w.phases || {});
+          dCrews.forEach(c => { if(c.phases) Object.keys(c.phases).forEach(pn => { if(!dPhases[pn]) dPhases[pn] = c.phases[pn]; }); });
+          await apiPost(num, w.code, w.type, dCrews, dPhases, w.createdAt, w.address, w.region,
+            (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled', 'cad-auto',
+            (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
+        } else if(w.crews && w.crews.length){
           await apiPost(num, w.code, w.type, w.crews, w.phases, w.createdAt, w.address, w.region,
             (w.lat != null && w.lng != null) ? { lat: w.lat, lng: w.lng } : null, 'cancelled', 'cad-auto',
             (w.callerNumber || w.description) ? { callerNumber: w.callerNumber, description: w.description } : null);
+        }
+        for(const hk of hospKeys){
+          const rest = hk.slice(String(num).length + 1);
+          const isU = rest.charAt(0) === 'u';
+          const idStr = isU ? rest.slice(1) : rest;
+          let step = null, code = null, realEnd = false;
+          const un = (dLast && Array.isArray(dLast.units)) ? dLast.units.find(u =>
+            isU ? (u && u.unitId != null && String(u.unitId) === idStr)
+                : (u && u.runUnitId != null && String(u.runUnitId) === idStr)) : null;
+          if(un){
+            code = un.unitCode != null ? String(un.unitCode) : null;
+            const jr = (Array.isArray(un.journeys) ? un.journeys : []).filter(s => s && s.journeyStepTime);
+            if(jr.some(s => s.journeyStepCode === 'BACK_TO_SERVICE')){ realEnd = true; step = 'BACK_TO_SERVICE'; }
+            else if(jr.some(s => s.journeyStepCode === 'HANDOVER')){ realEnd = true; step = 'HANDOVER'; } // نهاية تسليم حقيقية تُستخدم
+            else if(jr.length){ const lc = jr[jr.length - 1].journeyStepCode; step = lc ? String(lc) : null; }
+          }
+          hospMon.closed[hk] = true;
+          lifeLog(realEnd ? 'hospital-episode-close' : 'hospital-monitoring-lost', { incident: num, key: hk });
+          sendToPlatform('hospital-sighting', { eventId: String(num),
+            unitId: isU ? idStr : null, runUnitId: isU ? null : idStr, unitCode: code,
+            episodeClose: true, monitoringLost: !realEnd, journeyStepCode: step,
+            observedAt: new Date().toISOString() }).then(r => {
+            if(!r || !r.status || r.status >= 400){ hospMon.closed[hk] = false; lifeLog('hospital-close-fail', { incident: num, status: r ? r.status : 0 }); }
+          });
         }
         delete watch.list[num]; watch.order = watch.order.filter(x => x !== num);
         delete listTrack[num]; watchSave();

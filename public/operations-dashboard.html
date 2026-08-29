@@ -1759,8 +1759,12 @@ function renderHospitalTab(data) {
     var journeys = Array.isArray(h.journeys) ? h.journeys : [];
     var alerts = Array.isArray(h.alerts) ? h.alerts : [];
     var timeline = Array.isArray(h.timeline) ? h.timeline : [];
-    var openAtClose = journeys.filter(function (j) { return j.episodeState !== 'last-known'; }).length;
-    var closedCount = journeys.length - openAtClose;
+    // إصلاح دورة المستشفى [7] (اعتماد المالك 2026-08-28): الفصل الثلاثي —
+    // active/completed/monitoring-lost — مع سقوط صادق للقطات القديمة بلا episodeClass
+    var clsOf = function (j) { return j.episodeClass || (j.episodeState !== 'last-known' ? 'active' : 'completed'); };
+    var openAtClose = journeys.filter(function (j) { return clsOf(j) === 'active'; }).length;
+    var monLostCount = journeys.filter(function (j) { return clsOf(j) === 'monitoring-lost'; }).length;
+    var closedCount = journeys.length - openAtClose - monLostCount;
     var openAlerts = alerts.filter(function (a) { return a.state === 'open'; }).length;
     var ackedCount = alerts.filter(function (a) { return a.state === 'acknowledged'; }).length;
     // ── شريط التنبيهات النشطة — يظهر أعلى القسم عند وجود تنبيه مفتوح ──
@@ -1776,6 +1780,7 @@ function renderHospitalTab(data) {
     html += '<div class="hosp-kpis">' +
         kpi('hk-green', 'fa-procedures', openAtClose, 'رحلات حالية') +
         kpi('hk-muted', 'fa-check-circle', closedCount, 'رحلات مغلقة') +
+        (monLostCount > 0 ? kpi('hk-amber', 'fa-eye-slash', monLostCount, 'انقطع الرصد') : '') +
         kpi('hk-blue', 'fa-ambulance', journeys.length, 'إجمالي الرحلات') +
         kpi('hk-blue', 'fa-hourglass-half', s.avgDwellMin != null ? (Math.round(s.avgDwellMin * 10) / 10) + ' د' : '—', 'متوسط البقاء') +
         kpi(openAlerts > 0 ? 'hk-red' : (alerts.length > 0 ? 'hk-amber' : 'hk-muted'), 'fa-bell', alerts.length, 'تنبيهات') +
@@ -1786,15 +1791,18 @@ function renderHospitalTab(data) {
     html += '<div class="hosp-section-title"><i class="fas fa-ambulance"></i> سجل الرحلات (' + journeys.length + ')</div>';
     if (journeys.length > 0) {
         var sorted = journeys.slice().sort(function (a, b) {
-            var ac = a.episodeState !== 'last-known' ? 0 : 1;
-            var bc = b.episodeState !== 'last-known' ? 0 : 1;
+            // [7] الحالية أولًا ثم منقطعة الرصد ثم المغلقة
+            var ord = { 'active': 0, 'monitoring-lost': 1, 'completed': 2 };
+            var ac = ord[clsOf(a)] != null ? ord[clsOf(a)] : 1;
+            var bc = ord[clsOf(b)] != null ? ord[clsOf(b)] : 1;
             return ac - bc;
         });
         sorted.forEach(function (j) {
-            var isCurrent = j.episodeState !== 'last-known';
+            var jCls = clsOf(j); // [7] الفصل الثلاثي المشتق سيرفريًا (سقوط صادق للقطات القديمة)
             var stClass, stBadge, stText;
-            if (isCurrent && isArchived) { stClass = 'hj-open-at-close'; stBadge = 'badge-warning'; stText = 'مفتوحة عند إغلاق المناوبة'; }
-            else if (isCurrent) { stClass = 'hj-current'; stBadge = 'badge-success'; stText = 'حالية — في المنشأة'; }
+            if (jCls === 'monitoring-lost') { stClass = 'hj-open-at-close'; stBadge = 'badge-warning'; stText = 'انقطع الرصد — الزمن النهائي غير موثوق'; }
+            else if (jCls === 'active' && isArchived) { stClass = 'hj-open-at-close'; stBadge = 'badge-warning'; stText = 'مفتوحة عند إغلاق المناوبة'; }
+            else if (jCls === 'active') { stClass = 'hj-current'; stBadge = 'badge-success'; stText = 'حالية — في المنشأة'; }
             else { stClass = 'hj-closed'; stBadge = 'badge-muted'; stText = 'سابقة — آخر منشأة معروفة'; }
             html += '<div class="hosp-journey ' + stClass + '">' +
                 '<div class="hj-icon"><i class="fas fa-hospital"></i></div>' +
@@ -1824,14 +1832,22 @@ function renderHospitalTab(data) {
             '<th>الوقت</th><th>البلاغ</th><th>الفرقة</th><th>المنشأة</th><th>البقاء</th><th>الحالة</th><th>الإقرار</th><th>الحلول</th></tr></thead><tbody>';
         alerts.forEach(function (a) {
             var st = aState[a.state] || ['badge-muted', esc(a.state) || '—'];
+            // [5] التنبيه المتأثر بالانقطاع يُوسم — قيمة ذات دلالة «عند آخر مشاهدة»
+            // أو «غير مقاس» بلا قيمة موثوقة (الصفر ممنوع — اعتماد المالك 2026-08-29)
+            var dwellTxt = a.dwellMin != null ? (Math.round(a.dwellMin * 10) / 10) + ' د' : '—';
+            if (a.unreliable) dwellTxt = a.dwellMin != null
+                ? '≈ ' + dwellTxt + ' <small>(عند آخر مشاهدة)</small>'
+                : 'غير مقاس <small>(انقطع الرصد)</small>';
+            var resTxt = a.resolvedAt ? fmtDT(a.resolvedAt) +
+                (a.resolution === 'monitoring-lost' ? ' · انقطع الرصد' : a.resolution === 'completed-late-sync' ? ' · صُحّح لاحقًا' : '') : '—';
             html += '<tr><td style="white-space:nowrap">' + fmtDT(a.firstRaisedAt) + '</td>' +
                 '<td style="direction:ltr; text-align:right;">' + (esc(a.eventId) || '—') + '</td>' +
                 '<td>' + (esc(a.southTeam || a.unitCode) || '—') + '</td>' +
                 '<td>' + (esc(a.facility) || '—') + '</td>' +
-                '<td style="white-space:nowrap">' + (a.dwellMin != null ? (Math.round(a.dwellMin * 10) / 10) + ' د' : '—') + '</td>' +
+                '<td style="white-space:nowrap">' + dwellTxt + '</td>' +
                 '<td><span class="badge ' + st[0] + '">' + st[1] + '</span></td>' +
                 '<td style="white-space:nowrap">' + (a.ackAt ? fmtDT(a.ackAt) + (a.ackByName ? ' · ' + esc(a.ackByName) : '') : '—') + '</td>' +
-                '<td style="white-space:nowrap">' + (a.resolvedAt ? fmtDT(a.resolvedAt) : '—') + '</td></tr>';
+                '<td style="white-space:nowrap">' + resTxt + '</td></tr>';
         });
         html += '</tbody></table>';
         if (ackedCount > 0) html += '<div class="hosp-sealed" style="margin-top:6px;"><i class="fas fa-check"></i> ' + ackedCount + ' من ' + alerts.length + ' أُقرّت</div>';
@@ -1843,16 +1859,23 @@ function renderHospitalTab(data) {
     if (timeline.length > 0) {
         var evMeta = function (ev) {
             if (ev.field === 'alert') {
-                if (ev.alert === 'raised')      return { cls: 'tl-alert',    icon: '⚠️', text: 'تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + (Math.round(ev.dwellMin * 10) / 10) + ' د)' : '') };
+                if (ev.alert === 'raised')      return { cls: 'tl-alert',    icon: '⚠️', text: 'تنبيه: تجاوز زمن البقاء' + (ev.dwellMin != null ? ' (' + (Math.round(ev.dwellMin * 10) / 10) + ' د)' : '') + (ev.unreliable ? ' — القيمة عند آخر مشاهدة (انقطع الرصد)' : '') };
                 if (ev.alert === 'acknowledged') return { cls: 'tl-ack',      icon: '🔵', text: 'إقرار التنبيه' + (ev.actor ? ' — بواسطة ' + esc(ev.actor) : '') };
-                if (ev.alert === 'resolved')     return { cls: 'tl-resolved', icon: '🟢', text: 'عودة للخدمة — حلول التنبيه' };
+                if (ev.alert === 'resolved')     return ev.to === 'monitoring-lost'
+                    ? { cls: 'tl-resolved', icon: '⛔', text: 'انقطع الرصد — حلول التنبيه (الزمن النهائي غير موثوق)' }
+                    : ev.to === 'completed-late-sync'
+                    ? { cls: 'tl-resolved', icon: '🟢', text: 'حلول التنبيه — صُحّح بنهاية التسليم الحقيقية' }
+                    : { cls: 'tl-resolved', icon: '🟢', text: 'عودة للخدمة — حلول التنبيه' };
                 return { cls: 'tl-alert', icon: '⚠️', text: 'تنبيه' };
             }
+            if (ev.field === 'alert-dwell-corrected') return { cls: 'tl-resolved', icon: '🟢', text: 'تصحيح قيمة البقاء بوصول نهاية التسليم الحقيقية: ' + (ev.from != null ? (Math.round(ev.from * 10) / 10) + ' د' : '—') + ' ← ' + (ev.to != null ? (Math.round(ev.to * 10) / 10) + ' د' : '—') };
             if (ev.field === 'hospitalName') return ev.from
                 ? { cls: 'tl-change', icon: '🔄', text: 'انتقال المنشأة: ' + esc(ev.from) + ' ← ' + esc(ev.to) }
                 : { cls: 'tl-seen',   icon: '👁', text: 'مشاهدة المنشأة: ' + esc(ev.to) };
             if (ev.field === 'unitCode') return { cls: 'tl-change', icon: '🔄', text: 'تغيّر رمز الفرقة: ' + (esc(ev.from) || '—') + ' ← ' + (esc(ev.to) || '—') };
-            if (ev.field === 'episode') return ev.to === 'last-known'
+            if (ev.field === 'episode') return ev.step === 'MONITORING_LOST'
+                ? { cls: 'tl-alert', icon: '⛔', text: 'انقطع الرصد — إغلاق إداري موثق (لا نهاية تسليم موثوقة)' }
+                : ev.to === 'last-known'
                 ? { cls: 'tl-resolved', icon: '🟢', text: 'عودة للخدمة — إغلاق الحالة (آخر منشأة معروفة محفوظة)' }
                 : { cls: 'tl-seen', icon: '👁', text: 'إعادة فتح الحالة — مشاهدة جديدة' };
             return { cls: '', icon: '●', text: esc(ev.field) || 'حدث' };
