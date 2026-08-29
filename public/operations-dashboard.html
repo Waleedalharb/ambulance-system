@@ -567,10 +567,37 @@ body::after {
 .hosp-alerts-table th { text-align:right; font-size:0.7rem; color:var(--text-muted); padding:7px 10px; border-bottom:1px solid var(--border); font-weight:600; }
 .hosp-alerts-table td { font-size:0.78rem; color:var(--text-secondary); padding:8px 10px; border-bottom:1px solid var(--border-light); }
 .hosp-alerts-table tr:hover td { background:rgba(255,255,255,0.025); }
+/* ══ الجهات والمواقع (PI-4 — اعتماد المالك 2026-08-29): تبويب الأرشيف العاشر — عرض فقط من اللقطة المختومة ══ */
+.pl-type-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; margin-top:6px; }
+.pl-type-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; cursor:pointer; transition:background .15s; }
+.pl-type-card:hover { background:var(--card-hover); }
+.pl-type-card .pt-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:0.85rem; background:var(--primary-light); color:var(--primary); margin-bottom:8px; }
+.pl-type-card .pt-count { font-size:1.4rem; font-weight:800; color:var(--text); line-height:1.1; }
+.pl-type-card .pt-label { font-size:0.74rem; color:var(--text-secondary); font-weight:600; margin-top:2px; }
+.pl-type-card .pt-sub { font-size:0.68rem; color:var(--text-muted); margin-top:4px; }
+.pl-likely-line { font-size:0.7rem; color:var(--warning); margin-top:6px; cursor:pointer; }
+.pl-places { margin:6px 0 4px; border-inline-start:2px solid var(--border); padding-inline-start:10px; }
+.pl-place-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:9px; cursor:pointer; }
+.pl-place-row:hover { background:var(--card-hover); }
+.pl-place-row .pp-name { font-weight:700; font-size:0.84rem; color:var(--text); flex:1; min-width:0; word-break:break-word; }
+.pl-place-row .pp-count { font-size:0.78rem; font-weight:700; color:var(--success); white-space:nowrap; }
+.pl-incidents { border-inline-start:2px dashed var(--border); padding-inline-start:10px; margin:2px 10px 8px; }
+.pl-inc-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:6px 8px; border-radius:8px; cursor:pointer; font-size:0.76rem; color:var(--text-secondary); }
+.pl-inc-row:hover { background:var(--card-hover); }
+.pl-inc-row .pi-id { direction:ltr; unicode-bidi:embed; font-weight:700; color:var(--text); }
+.pl-detail { background:var(--bg); border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; margin:4px 8px 8px; font-size:0.74rem; }
+.pl-detail .pd-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:6px 14px; }
+.pl-detail .pd-item span { color:var(--text-muted); display:block; font-size:0.66rem; }
+.pl-detail .pd-item b { color:var(--text); font-weight:600; }
+.pl-evidence { margin-top:8px; border-top:1px dashed var(--border); padding-top:8px; }
+.pl-evidence .pe-title { font-size:0.7rem; font-weight:700; color:var(--text-secondary); margin-bottom:4px; }
+.pl-evidence .pe-item { font-size:0.7rem; color:var(--text-muted); padding:3px 0; border-bottom:1px solid var(--border-light); word-break:break-word; }
+.pl-unknown-row { margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--card); border:1px dashed var(--border); font-size:0.76rem; color:var(--text-muted); }
 @media (max-width: 640px) {
     .hosp-kpis { grid-template-columns:repeat(2, 1fr); }
     .hosp-journey { flex-wrap:wrap; }
     .hosp-journey .hj-state { margin-inline-start:0; }
+    .pl-type-grid { grid-template-columns:repeat(2, 1fr); }
 }
 </style>
 <base target="_blank">
@@ -812,6 +839,8 @@ body::after {
             <button class="modal-tab-btn" data-mtab="signouts" onclick="switchModalTab('signouts')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-door-open"></i> تسجيلات الخروج</button>
             <!-- دورة المستشفيات (اعتماد المالك 2026-08-28): تبويب «🏥 المستشفيات» التاسع — ملخص/رحلات/تنبيهات/Timeline من سجل المناوبة (renderHospitalTab) -->
             <button class="modal-tab-btn" data-mtab="hospital" onclick="switchModalTab('hospital')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-hospital"></i> المستشفيات</button>
+            <!-- الجهات والمواقع (PI-4 — اعتماد المالك 2026-08-29): تبويب «الجهات والمواقع» العاشر — إحصائية الجهات من اللقطة المختومة بأربعة مستويات حفر حتى Evidence (renderPlacesTab) -->
+            <button class="modal-tab-btn" data-mtab="places" onclick="switchModalTab('places')" style="padding:0.6rem 1rem;border:none;background:none;color:var(--text-secondary);font-weight:600;font-size:0.8rem;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap"><i class="fas fa-map-marked-alt"></i> الجهات والمواقع</button>
         </div>
         <div class="modal-body" id="shiftDetailBody" style="flex:1;overflow-y:auto">
             <div class="loading"><div class="spinner"></div> جاري التحميل...</div>
@@ -1897,10 +1926,149 @@ function renderHospitalTab(data) {
     body.insertAdjacentHTML('beforeend', html);
 }
 
+// ==== PI-4 BEGIN ====
+// الجهات والمواقع (PI-4 — اعتماد المالك 2026-08-29): تبويب الأرشيف العاشر.
+// حاجز ①: المصدر الوحيد data.places (اللقطة المختومة) — لا استعلام حي إطلاقًا.
+// حاجز ② المشدد: صفر Business Logic — القيم/النسب/الترتيب تُعرض كما خُتمت
+// حرفيًا؛ ممنوع إعادة العد/التجميع/إنتاج أرقام جديدة؛ الطي/الفتح ترتيب بصري
+// فقط لا يغيّر الإجماليات المختومة.
+// المستويات: ① نوع الجهة → ② الجهة → ③ البلاغ → ④ بطاقة تدقيق داخلية
+// (Evidence كما خُتمت) — ممنوع الانتقال للبلاغ الحي (قرار المالك).
+function placesTabToggle(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? '' : 'none';
+}
+function renderPlacesTab(data) {
+    var body = document.getElementById('shiftDetailBody');
+    if (!body || !data || !(data.shift || data).id) return;
+    var old = document.getElementById('mtab-places');
+    if (old) old.remove();
+    var isArchived = ((data.shift || data).status === 'archived');
+    var p = data.places || null;
+    var esc = function (v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+    var html = '<div id="mtab-places" class="modal-tab-panel">';
+    html += '<div class="hosp-head"><h3><i class="fas fa-map-marked-alt"></i> الجهات والمواقع</h3>' +
+        '<span class="hosp-sub">إحصائية الجهات من اللقطة المختومة — عرض فقط</span></div>';
+    if (!p) {
+        // حاجز ③: أرشيف ما قبل PI-3 أو مناوبة غير مؤرشفة — غياب صادق هادئ لا اختراع
+        html += '<div class="hosp-calm"><i class="fas fa-info-circle"></i> ' +
+            (isArchived ? 'قسم الجهات غير متوفر لهذه المناوبة — أُرشفت قبل نظام الجهات والمواقع'
+                        : 'يُختم قسم الجهات والمواقع عند أرشفة المناوبة') + '</div></div>';
+        body.insertAdjacentHTML('beforeend', html);
+        return;
+    }
+    var t = p.totals || {};
+    var byType = Array.isArray(p.byType) ? p.byType : [];
+    var TYPE_ICONS = { hospital: 'fa-hospital', health_center: 'fa-briefcase-medical', school: 'fa-school', university: 'fa-graduation-cap', police: 'fa-shield-alt', prison: 'fa-lock', government: 'fa-landmark', mosque: 'fa-mosque', mall: 'fa-store', sports: 'fa-futbol', public_facility: 'fa-building', construction: 'fa-hard-hat', operational_center: 'fa-headset', other: 'fa-map-pin' };
+    // ── مؤشرات علوية — كلها قيم مختومة تُعرض كما هي (لا حساب) ──
+    var kpi = function (cls, icon, val, label) {
+        return '<div class="hosp-kpi ' + cls + '"><span class="hk-val">' + val + '</span>' +
+            '<span class="hk-label"><i class="fas ' + icon + '"></i>' + label + '</span></div>';
+    };
+    html += '<div class="hosp-kpis">' +
+        kpi('hk-blue', 'fa-ambulance', t.incidents != null ? t.incidents : '—', 'إجمالي البلاغات') +
+        kpi('hk-green', 'fa-check-circle', t.confirmedPlaceLinked != null ? t.confirmedPlaceLinked : '—', 'مرتبطة بجهة — مؤكد') +
+        (t.likelyPlaceLinked ? kpi('hk-amber', 'fa-question-circle', t.likelyPlaceLinked, 'محتمل — يحتاج تحقق') : '') +
+        kpi('hk-muted', 'fa-question', t.unknownUnclassified != null ? t.unknownUnclassified : '—', 'غير محسوم') +
+        (t.noResolution ? kpi('hk-muted', 'fa-minus-circle', t.noResolution, 'بلا حسم') : '') +
+        '</div>';
+    if (p.sealedAt) html += '<div class="hosp-sealed"><i class="fas fa-stamp"></i> لقطة مختومة: ' + fmtDT(p.sealedAt) + (p.engineVersion ? ' · محرك ' + esc(p.engineVersion) : '') + '</div>';
+    // حاجز ⑥: المقام يُعرض بنصه المختوم — الواجهة لا تحسب نسبًا بنفسها
+    if (p.denominatorNote) html += '<div class="hosp-sealed"><i class="fas fa-info"></i> ' + esc(p.denominatorNote) + '</div>';
+    // ── المستوى ①: أنواع الجهات — بالترتيب المختوم كما هو ──
+    html += '<div class="hosp-section-title"><i class="fas fa-layer-group"></i> أنواع الجهات (' + byType.length + ')</div>';
+    if (byType.length === 0) {
+        html += '<div class="hosp-calm"><i class="fas fa-map-marked-alt"></i> لا توجد بلاغات مرتبطة بجهات معتمدة في هذه المناوبة</div>';
+    }
+    // المستوى ①: شبكة بطاقات مدمجة — البطاقات فقط (التفصيل بعرض كامل تحتها)
+    html += '<div class="pl-type-grid">';
+    byType.forEach(function (tp, ti) {
+        var icon = TYPE_ICONS[tp.placeType] || 'fa-map-pin';
+        html += '<div class="pl-type-card" onclick="placesTabToggle(\'pl-t-' + ti + '\')">' +
+            '<div class="pt-icon"><i class="fas ' + icon + '"></i></div>' +
+            '<div class="pt-count">' + tp.confirmedCount + '</div>' +
+            '<div class="pt-label">' + esc(tp.label) + ' — بلاغ مؤكد</div>' +
+            '<div class="pt-sub">' + tp.uniquePlaces + ' جهة' + (tp.percentOfConfirmed ? ' · ' + tp.percentOfConfirmed + '%' : '') + '</div>' +
+            // Likely مطوي افتراضيًا ومنفصل — لا يُوهم أنه جزء من الرقم الرسمي (قرار المالك)
+            (tp.likelyCount > 0 ? '<div class="pl-likely-line" onclick="event.stopPropagation(); placesTabToggle(\'pl-likely-t-' + ti + '\')">▸ محتمل — يحتاج تحقق: ' + tp.likelyCount + '</div>' : '') +
+            '</div>';
+    });
+    html += '</div>'; // يغلق .pl-type-grid
+    // منطقة التفصيل بعرض كامل: مستويات ②③④ لكل نوع (مطوية افتراضيًا)
+    byType.forEach(function (tp, ti) {
+        var icon = TYPE_ICONS[tp.placeType] || 'fa-map-pin';
+        // ── المستوى ②: الجهات — بالترتيب المختوم ──
+        html += '<div id="pl-t-' + ti + '" class="pl-places" style="display:none">';
+        (Array.isArray(tp.places) ? tp.places : []).forEach(function (pl, pi) {
+            html += '<div class="pl-place-row" onclick="placesTabToggle(\'pl-i-' + ti + '-' + pi + '\')">' +
+                '<i class="fas ' + icon + '" style="color:var(--text-muted)"></i>' +
+                '<span class="pp-name">' + esc(pl.name) + '</span>' +
+                '<span class="pp-count">' + pl.confirmedCount + ' مؤكد</span>' +
+                (pl.likelyCount > 0 ? '<span class="badge badge-warning">محتمل: ' + pl.likelyCount + '</span>' : '') +
+                '</div>';
+            // ── المستوى ③: البلاغات ──
+            html += '<div id="pl-i-' + ti + '-' + pi + '" class="pl-incidents" style="display:none">';
+            (Array.isArray(pl.incidents) ? pl.incidents : []).forEach(function (inc, ii) {
+                var stBadge = inc.decision === 'confirmed' ? '<span class="badge badge-success">مؤكد</span>' : '<span class="badge badge-warning">محتمل</span>';
+                html += '<div class="pl-inc-row" onclick="placesTabToggle(\'pl-d-' + ti + '-' + pi + '-' + ii + '\')">' +
+                    '<span class="pi-id">' + esc(inc.eventId) + '</span>' + stBadge +
+                    '<span>' + esc(inc.rule) + ' · ثقة ' + inc.confidence + '%</span>' +
+                    '<span style="color:var(--text-muted)">' + fmtDT(inc.resolvedAt) + '</span>' +
+                    '</div>';
+                // ── المستوى ④: بطاقة تدقيق داخلية — من اللقطة حصرًا (لا انتقال للبلاغ الحي) ──
+                html += '<div id="pl-d-' + ti + '-' + pi + '-' + ii + '" class="pl-detail" style="display:none">' +
+                    '<div class="pd-grid">' +
+                    '<div class="pd-item"><span>رقم البلاغ</span><b style="direction:ltr; unicode-bidi:embed;">' + esc(inc.eventId) + '</b></div>' +
+                    '<div class="pd-item"><span>الجهة</span><b>' + esc(pl.name) + '</b></div>' +
+                    '<div class="pd-item"><span>نوع الجهة</span><b>' + esc(tp.label) + '</b></div>' +
+                    '<div class="pd-item"><span>الحالة</span><b>' + (inc.decision === 'confirmed' ? 'مؤكد (Confirmed)' : 'محتمل (Likely)') + '</b></div>' +
+                    '<div class="pd-item"><span>القاعدة</span><b>' + esc(inc.rule) + '</b></div>' +
+                    '<div class="pd-item"><span>الثقة</span><b>' + inc.confidence + '%</b></div>' +
+                    '<div class="pd-item"><span>نسخة السجل</span><b>v' + inc.placesVersion + '</b></div>' +
+                    '<div class="pd-item"><span>وقت الحسم</span><b>' + fmtDT(inc.resolvedAt) + '</b></div>' +
+                    '</div>';
+                // Evidence كما خُتمت — مرجع التدقيق لكل رقم
+                var evs = Array.isArray(inc.evidence) ? inc.evidence : [];
+                html += '<div class="pl-evidence"><div class="pe-title"><i class="fas fa-fingerprint"></i> الأدلة (Evidence) — كما خُتمت</div>';
+                if (evs.length > 0) {
+                    evs.forEach(function (ev) {
+                        var parts = [];
+                        Object.keys(ev || {}).forEach(function (k) {
+                            parts.push(esc(k) + ': ' + esc(typeof ev[k] === 'object' && ev[k] !== null ? JSON.stringify(ev[k]) : ev[k]));
+                        });
+                        html += '<div class="pe-item">• ' + parts.join(' · ') + '</div>';
+                    });
+                } else {
+                    html += '<div class="pe-item">لا أدلة مسجلة</div>';
+                }
+                html += '</div></div>';
+            });
+            html += '</div>';
+        });
+        html += '</div>';
+        // Likely المطوي على مستوى النوع (بلاغات محتملة بلا جهة محددة تُعرض هنا إن وُجدت)
+        if (tp.likelyCount > 0) {
+            html += '<div id="pl-likely-t-' + ti + '" class="pl-unknown-row" style="display:none">' +
+                '<i class="fas fa-question-circle"></i> بلاغات محتملة لهذا النوع: ' + tp.likelyCount + ' — تحتاج تحققًا بشريًا ولا تدخل الرقم الرسمي</div>';
+        }
+    });
+    // ── غير محسوم: سطر معلومة مستقل — لا يُحسب على أي جهة ولا يدخل أي نسبة ──
+    if (t.unknownUnclassified > 0) {
+        html += '<div class="pl-unknown-row"><i class="fas fa-question-circle"></i> غير محسوم: ' + t.unknownUnclassified + ' بلاغًا — لم يرتبط بأي جهة معتمدة وقت الختم</div>';
+    }
+    html += '</div>';
+    body.insertAdjacentHTML('beforeend', html);
+}
+// ==== PI-4 END ====
+
 var _viewShiftCoreHospital = viewShift;
 viewShift = async function (id) {
     await _viewShiftCoreHospital(id);
     if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderHospitalTab(currentShiftDetail);
+    if (currentShiftDetail && (currentShiftDetail.shift || {}).id) renderPlacesTab(currentShiftDetail); // PI-4
 };
 
 // Init

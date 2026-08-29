@@ -2669,6 +2669,10 @@ app.get('/api/shifts/:id(\\d+)', authenticate, async (req, res) => {
                         // هي المرجع التاريخي الثابت — لا إعادة حساب من CAD ولا من
                         // الحالة الحالية. أرشيف ما قبل الدورة (بلا قسم) ← null بصدق.
                         response.hospital = sealed.hospital || null;
+                        // الجهات والمواقع (PI-4 — اعتماد المالك 2026-08-29): اللقطة
+                        // المختومة هي المرجع التاريخي الوحيد — لا استعلام حي ولا
+                        // إعادة حسم هنا. أرشيف ما قبل PI-3 (بلا قسم) ← null بصدق.
+                        response.places = sealed.places || null;
                     } else {
                         const PositioningService = require('./services/positioning-service');
                         const planRows = await db.all('SELECT * FROM peak_plans WHERE shift_id = ? ORDER BY created_at ASC, id ASC', [shiftId]);
@@ -4860,6 +4864,21 @@ const hospitalMonitor = new HospitalMonitorService(process.env.HOSPITAL_MONITOR_
 archiveEngine.snapshot.hospitalMonitor = hospitalMonitor;
 archiveEngine.snapshot.hospitalDwellProvider = hospitalDwellByShift;
 
+// ════════════════════════════════════════════════════════════════════════════
+// Place Intelligence (PI-3 — اعتماد المالك 2026-08-29): محرك التعرف على
+// الجهات/المواقع. مخازنه مستقلة تمامًا (places.json / place-resolutions.json /
+// place-candidates.json تحت STORAGE_PATH) — لا يمس report_times ولا الاحتساب
+// ولا مخزن 1B. الحقن late-binding بنفس نمط hospitalMonitor؛ قسم places في
+// اللقطة قراءة من مخازن المحرك فقط (ممنوع resolve داخل الأرشيف — حاجز ⑧).
+// PLACES_DATA_DIR: تجاوز اختباري لعزل الاختبارات عن بيانات التشغيل.
+// ════════════════════════════════════════════════════════════════════════════
+const { PlaceIntelligenceService } = require('./services/place-intelligence-service');
+const { makeResolutionHook } = require('./services/place-resolution-hook');
+const placeIntel = new PlaceIntelligenceService({ dataDir: process.env.PLACES_DATA_DIR || STORAGE_PATH });
+archiveEngine.snapshot.placeIntel = placeIntel;
+// حاجز ①: طابور تسلسلي — الاستجابة لا تنتظر الحسم، والكتابة ذرّية بلا lost update
+const placeResolutionHook = makeResolutionHook(placeIntel);
+
 // مُقيّم التنبيهات الدوري (سيرفري داخلي صِرف — لا طلب CAD ولا polling شبكي ولا
 // قناة جديدة): يعيد تقييم «تجاوز زمن البقاء» للمناوبة النشطة كل 60ث حتى يُرفع
 // التنبيه أثناء رحلة جارية صامتة (بلا مشاهدات جديدة). skip-if-unchanged:
@@ -5215,6 +5234,18 @@ app.post('/api/cad-reports', cadIntegrationAuth, (req, res, next) => {
               address: cleanAddress, region: cleanRegion, lat: cleanLat, lng: cleanLng,
               status: status || null, source: srcTag,
               callerNumber: cleanCaller, description: cleanDesc }, req.user);
+
+        // Place Intelligence (PI-3 — اعتماد المالك 2026-08-29): حسم موقع البلاغ
+        // وتخزينه سلبيًا بعد نجاح التسجيل — كتلة additive صِرفة: لا تُنتَظر،
+        // وفشلها لا يؤثر على الاستجابة أو البلاغ إطلاقًا (طابور تسلسلي — حاجز ①).
+        // التحديثات اللاحقة لنفس البلاغ تعيد الحسم وتوثَّق في history (حاجز ②).
+        try {
+            placeResolutionHook.enqueue(number.trim(), {
+                lat: cleanLat, lng: cleanLng, address: cleanAddress,
+                district: reportService._parseLocationParts(cleanAddress).district,
+                description: cleanDesc
+            });
+        } catch (hookErr) { console.error('[PlaceIntel] hook: ' + hookErr.message); }
 
         await addAuditLogEntry(result.created ? 'cad_report_created' : 'cad_report_crew_added',
             'بلاغ CAD ' + number.trim() + (result.created ? ' (جديد)' : ' (إلحاق فرقة)') +

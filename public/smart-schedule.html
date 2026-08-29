@@ -3157,7 +3157,7 @@
                     var conflict = await response.json().catch(function () { return {}; });
                     if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
                         window.showImportConflictModal(conflict.conflicts, function () {
-                            toast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
+                            showToast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
                             saveToServer({ confirmOverwriteManual: true });
                         });
                     } else {
@@ -5441,7 +5441,7 @@ async function oiSaveToServer(confirmOverwrite) {
             var conflict = await response.json().catch(function () { return {}; });
             if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
                 window.showImportConflictModal(conflict.conflicts, function () {
-                    toast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
+                    showToast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
                     oiSaveToServer(true);
                 });
             } else {

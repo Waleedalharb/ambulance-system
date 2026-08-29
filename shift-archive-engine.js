@@ -372,7 +372,8 @@ class ShiftArchiveSnapshot {
             events: [],
             absences: [],
             operationalEvents: [],
-            hospital: null // دورة المستشفيات — تُملأ عند توفر مخزن 1B المحقون
+            hospital: null, // دورة المستشفيات — تُملأ عند توفر مخزن 1B المحقون
+            places: null // الجهات والمواقع (PI-3) — تُملأ عند توفر محرك Place Intelligence المحقون
         };
 
         // 1. جلب بيانات المناوبة الأساسية
@@ -430,6 +431,10 @@ class ShiftArchiveSnapshot {
         // (مصدر الحقيقة الوحيد) عبر حقن late-binding بنفس نمط signoutService؛ بلا
         // مصدر موازٍ ولا إعادة حساب من CAD. الرحلات الجارية تُختم «مفتوحة» بصدق.
         snapshot.hospital = await this._getHospital(shiftId, snapshot.shift);
+        // 19. الجهات والمواقع (PI-3 — اعتماد المالك 2026-08-29): إحصائية قابلة
+        // للتدقيق من ناتج محرك Place Intelligence المحقون — قراءة مخازنه فقط
+        // (ممنوع resolve/استنتاج هنا)، مختومة كما عرفها النظام لحظة الختم.
+        snapshot.places = await this._getPlaces(shiftId);
 
         // Calculate integrity hash
         snapshot.metadata.hash = this._calculateHash(snapshot);
@@ -648,6 +653,28 @@ class ShiftArchiveSnapshot {
             return { summary, journeys, alerts, timeline, sealedAt: new Date().toISOString() };
         } catch (err) {
             console.error('[Snapshot] Error getting hospital section:', err.message);
+            return null;
+        }
+    }
+
+    /**
+     * الجهات والمواقع (PI-3 — اعتماد المالك 2026-08-29) — قسم places في اللقطة.
+     * القراءة من محرك Place Intelligence المحقون (this.placeIntel — حقن
+     * late-binding بنفس نمط hospitalMonitor). المحرك يقرأ مخازنه فقط
+     * (place-resolutions + places) — هذا المحرك لا يستدعي resolve إطلاقًا
+     * (حاجز ⑧)، والقسم يمثل ما كان النظام يعرفه لحظة الختم (حاجز ③).
+     */
+    async _getPlaces(shiftId) {
+        try {
+            const pi = this.placeIntel;
+            if (!pi || !this.db || !this.db.all) return null;
+            const rows = await this.db.all(
+                'SELECT number FROM incident_registry WHERE shift_id = ?', [shiftId]
+            );
+            const numbers = (Array.isArray(rows) ? rows : []).map(r => r.number);
+            return pi.archiveSectionForIncidents(numbers);
+        } catch (err) {
+            console.error('[Snapshot] Error getting places section:', err.message);
             return null;
         }
     }
