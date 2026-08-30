@@ -10,7 +10,7 @@
  */
 'use strict';
 
-function makeResolutionHook(placeIntel, logger = console) {
+function makeResolutionHook(placeIntel, logger = console, onResolved = null) {
     let queue = Promise.resolve();
     let enqueued = 0, failed = 0;
 
@@ -19,7 +19,14 @@ function makeResolutionHook(placeIntel, logger = console) {
         enqueued++;
         queue = queue.then(() => {
             try {
-                placeIntel.recordResolution(eventId, incident);
+                const r = placeIntel.recordResolution(eventId, incident);
+                // PI-7 (اعتماد المالك 2026-08-30): ردّة اختيارية بعد نجاح الحسم —
+                // تغذي Discovery الخارجي. إضافية صِرفة: بلا onResolved لا يتغير
+                // أي سلوك. فشل الردّة لا يكسر الطابور (معزولة بـtry).
+                if (onResolved && r && r.ok) {
+                    try { onResolved(eventId, r.resolution, incident); }
+                    catch (cbErr) { logger.error('[PlaceIntel] onResolved: ' + cbErr.message); }
+                }
             } catch (err) {
                 failed++;
                 logger.error('[PlaceIntel] فشل حسم البلاغ ' + eventId + ': ' + err.message);

@@ -2493,11 +2493,15 @@ async function renderAdvancedDistribution() {
                     (ic.district ? ' <small style="color:#2E8B7A;">📍 ' + ic.district + '</small>' : '') +
                     (ic.cadCreatedAt ? ' <small style="opacity:.7;">· أُنشئ ' + ic.cadCreatedAt + '</small>' : '') +
                     batchControls +
-                    '<div style="margin-top:4px;">' + crews + '</div></div>';
+                    '<div style="margin-top:4px;">' + crews + '</div>' +
+                    '<div class="pi-sugg-slot" data-num="' + ic.number + '"></div></div>';
             }).join('') + '</div>';
         var logDiv = document.createElement('div');
         logDiv.innerHTML = logHtml;
         container.appendChild(logDiv.firstElementChild);
+        // PI-7 (اعتماد المالك 2026-08-30): تعبئة «هوية الموقع» لكل بلاغ — قراءة
+        // فقط، وفشلها/403 لا يمس السجل. المعروض تلميح خارجي غير معتمد.
+        if (window.PlaceSuggestion) window.PlaceSuggestion.hydrate(logDiv);
     }
     
     // ─── Sector cards: ONLY ready teams ───
