@@ -3136,10 +3136,19 @@
                 // OV-S5: التخزين المحلي cache غير موثوق — المصدر الوحيد للحقيقة هو الخادم.
                 // لا يُستخدم معرّف مخزّن قبل تأكيده من /api/current-shift؛ عند رد «لا مناوبة»
                 // أو اختلاف المعرّف يُمسح المخزن ويُعامل كعدم وجود مناوبة (لا كتابة بمعرّف بائت).
-                var shiftId = await fetchVerifiedShiftId();
-                var payload = { employees: employees };
-                if (shiftId) {
-                    payload.shift_id = parseInt(shiftId);
+                var payload;
+                if (opts.fixedPayload) {
+                    // G1 (اعتماد المالك 2026-08-30): «كتابة فوق» تعيد إرسال حمولة
+                    // الطلب الأول نفسها — ممنوع إعادة البناء من employees لأنها
+                    // قد تكون استُبدلت بإعادة قراءة من القاعدة بعد الـ409.
+                    payload = opts.fixedPayload;
+                    payload.confirmOverwriteManual = true;
+                } else {
+                    var shiftId = await fetchVerifiedShiftId();
+                    payload = { employees: employees };
+                    if (shiftId) {
+                        payload.shift_id = parseInt(shiftId);
+                    }
                 }
                 if (opts.confirmOverwriteManual === true) {
                     payload.confirmOverwriteManual = true; // تأكيد صريح بعد موافقة المستخدم من مودال التعارض
@@ -3156,9 +3165,13 @@
                 if (response.status === 409) {
                     var conflict = await response.json().catch(function () { return {}; });
                     if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
-                        window.showImportConflictModal(conflict.conflicts, function () {
+                        window.showImportConflictModal(conflict.conflicts, async function () {
                             showToast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
-                            saveToServer({ confirmOverwriteManual: true });
+                            var r2 = await saveToServer({ fixedPayload: payload }); // G1: نفس حمولة الطلب الأول
+                            // بعد نجاح الكتابة فوق: حدّث العرض من مصدر الحقيقة (القاعدة)
+                            if (r2 === 'ok') {
+                                try { var fresh2 = await fetchEmployeesFromDBSilent(); if (fresh2) adoptServerEmployees(fresh2); } catch (e) { /* يكفي التحديث عند إعادة الفتح */ }
+                            }
                         });
                     } else {
                         showToast('⚠️ ' + (conflict.error || 'يوجد تعارض مع تعديلات يدوية'), 'error');
@@ -5421,12 +5434,22 @@ function oiShowReport() {
 // ─── حفظ الاستيراد الرسمي — مسار مخصص محمي بـ schedule.import حصرًا ───
 // نفس منطق saveToServer (نفس الحمولة ونفس مودال التعارض 409) لكن على
 // /api/schedule/official-import حتى لا يتطلب الاستيراد schedule.employees.
-async function oiSaveToServer(confirmOverwrite) {
+async function oiSaveToServer(confirmOverwrite, fixedPayload) {
     try {
         var token = AuthCore.getToken();
-        var shiftId = await fetchVerifiedShiftId();
-        var payload = { employees: employees };
-        if (shiftId) payload.shift_id = parseInt(shiftId);
+        var payload;
+        if (fixedPayload) {
+            // G1 (اعتماد المالك 2026-08-30): «كتابة فوق» تعيد إرسال حمولة
+            // الطلب الأول نفسها — ممنوع إعادة البناء من employees لأن oiApply
+            // يعيد القراءة من القاعدة بعد الـ409 فتُستبدل المصفوفة قبل قرار
+            // المستخدم (سبب «نجاح الحفظ بلا انعكاس شهر 9»).
+            payload = fixedPayload;
+            payload.confirmOverwriteManual = true;
+        } else {
+            var shiftId = await fetchVerifiedShiftId();
+            payload = { employees: employees };
+            if (shiftId) payload.shift_id = parseInt(shiftId);
+        }
         if (confirmOverwrite === true) payload.confirmOverwriteManual = true;
         var response = await fetch('/api/schedule/official-import', {
             method: 'POST',
@@ -5440,9 +5463,13 @@ async function oiSaveToServer(confirmOverwrite) {
         if (response.status === 409) {
             var conflict = await response.json().catch(function () { return {}; });
             if (window.showImportConflictModal && Array.isArray(conflict.conflicts) && conflict.conflicts.length) {
-                window.showImportConflictModal(conflict.conflicts, function () {
+                window.showImportConflictModal(conflict.conflicts, async function () {
                     showToast('⏳ جاري إعادة الاستيراد مع الكتابة فوق التعديلات اليدوية…', 'info');
-                    oiSaveToServer(true);
+                    var r2 = await oiSaveToServer(true, payload); // G1: نفس حمولة الطلب الأول حرفيًا
+                    // بعد نجاح الكتابة فوق: حدّث العرض من مصدر الحقيقة (القاعدة) فورًا
+                    if (r2 === 'ok') {
+                        try { var fresh2 = await fetchEmployeesFromDBSilent(); if (fresh2) adoptServerEmployees(fresh2); } catch (e) { /* يكفي التحديث عند إعادة الفتح */ }
+                    }
                 });
             } else {
                 showToast('⚠️ ' + (conflict.error || 'يوجد تعارض مع تعديلات يدوية'), 'error');

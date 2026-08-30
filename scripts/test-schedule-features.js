@@ -273,13 +273,16 @@ async function main() {
 
     // ═══ 4) حماية التعديل اليدوي من الاستيراد (أخيرًا — يعيد بناء roster) ═══
     // E3: تعيين manual على جنوب 2 (من اختبار 2) — الاستيراد يضعه على جنوب 1 ⇒ تعارض
+    // G2 (اعتماد المالك 2026-08-30): الحمولة بلا أي مدخل بتاريخ صالح أصبحت
+    // مرفوضة 422 (حارس المسح الصامت) — لذا تحمل الحمولة مدخلًا صالحًا واحدًا
+    // لكل موظف؛ دلالة اختبار التعارض (فرق/تعيينات) لا تتغير.
     const importPayload = (confirm) => ({
         employees: [
-            { employeeNumber: 'T001', name: 'اختبار أحمد', phone: '0500000001', team: 'جنوب 2', schedule: [] },
-            { employeeNumber: 'T002', name: 'اختبار بدر', team: 'جنوب 1', schedule: [] },
-            { employeeNumber: 'T003', name: 'اختبار جاسم', phone: '0500000003', team: 'جنوب 1', schedule: [] },
-            { employeeNumber: 'T004', name: 'اختبار داود', team: 'جنوب 1', schedule: [] },
-            { employeeNumber: 'T005', name: 'اختبار هاني', phone: '0500000005', team: 'جنوب 1', schedule: [] }
+            { employeeNumber: 'T001', name: 'اختبار أحمد', phone: '0500000001', team: 'جنوب 2', schedule: [{ date: '2026-08-15', shiftCode: 'D12' }] },
+            { employeeNumber: 'T002', name: 'اختبار بدر', team: 'جنوب 1', schedule: [{ date: '2026-08-15', shiftCode: 'D12' }] },
+            { employeeNumber: 'T003', name: 'اختبار جاسم', phone: '0500000003', team: 'جنوب 1', schedule: [{ date: '2026-08-15', shiftCode: 'D12' }] },
+            { employeeNumber: 'T004', name: 'اختبار داود', team: 'جنوب 1', schedule: [{ date: '2026-08-15', shiftCode: 'D12' }] },
+            { employeeNumber: 'T005', name: 'اختبار هاني', phone: '0500000005', team: 'جنوب 1', schedule: [{ date: '2026-08-15', shiftCode: 'D12' }] }
         ],
         ...(confirm ? { confirmOverwriteManual: true } : {})
     });

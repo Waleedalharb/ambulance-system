@@ -9496,17 +9496,21 @@ async function handleScheduleEmployeesSave(req, res) {
         } else if (!rosterSyncService) {
             return res.status(503).json({ error: 'خدمة مزامنة الكادر غير متاحة' });
         }
-        await writeScheduleEmployees(employees);
-        // SR-2: JSON ملف استيراد فقط — الحفظ يُزامن فورًا إلى القاعدة
-        // (employees upsert بالرمز + إعادة بناء shift_roster) في معاملة ذرية.
-        // فشل المزامنة = فشل الحفظ كله حتى لا تبقى القاعدة بلا كادر محدث.
+        // SR-2 + G2 (اعتماد المالك 2026-08-30): المزامنة أولًا ثم JSON.
+        // فشل المزامنة = فشل الحفظ كله — لا قاعدة ولا JSON لحمولة مرفوضة:
+        // حارس المسح الصامت (422) يُعاد قبل أن تُكتب أي بيانات إطلاقًا.
         let syncStats = null;
         try {
             syncStats = await rosterSyncService.syncFromSchedule(employees, { overwriteManual: confirmOverwriteManual });
         } catch (syncErr) {
+            if (syncErr && syncErr.code === 'EMPTY_PERIODS_GUARD') {
+                return res.status(422).json({ error: syncErr.message, skippedEntries: syncErr.skippedEntries || 0 });
+            }
             console.error('[RosterSync] فشل المزامنة بعد حفظ الجدولة:', syncErr);
             return res.status(500).json({ error: 'فشل في مزامنة الكادر مع قاعدة البيانات' });
         }
+        // JSON ملف استيراد فقط — يُكتب بعد نجاح المزامنة (كاش سقوط مُنحط، ليس SSOT)
+        await writeScheduleEmployees(employees);
         if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
             await addAuditLogEntry('import_overwrite_manual',
                 `استيراد الجدولة مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,
@@ -9706,9 +9710,10 @@ app.delete('/api/schedule/employees', authenticate, authorizePerm('schedule.empl
     try {
         await writeScheduleEmployees([]);
         // SR-2: مسح الجدولة = مسح roster بالكامل + تعطيل جميع الموظفين (لا حذف)
+        // G2: المسار الوحيد المصرَّح له بالمسح الشامل — explicitClear صريح.
         if (rosterSyncService) {
             try {
-                await rosterSyncService.syncFromSchedule([]);
+                await rosterSyncService.syncFromSchedule([], { explicitClear: true });
             } catch (syncErr) {
                 console.error('[RosterSync] فشل مزامنة المسح:', syncErr);
                 return res.status(500).json({ error: 'فشل في مزامنة مسح الكادر مع قاعدة البيانات' });
@@ -11178,7 +11183,17 @@ app.post('/api/shift-roster/import', authenticate, authorizePerm('schedule.impor
                 return res.status(409).json({ error: 'يوجد تعارض مع تعديلات يدوية', conflicts });
             }
         }
-        const syncStats = await rosterSyncService.syncFromSchedule(scheduleModel, { overwriteManual: confirmOverwriteManual });
+        // G2 (اعتماد المالك 2026-08-30): حارس المسح الصامت يُعاد 422 واضحًا —
+        // الاستيراد العادي بلا فترات صالحة ليس «نجاحًا» ولا يمسح شيئًا.
+        let syncStats;
+        try {
+            syncStats = await rosterSyncService.syncFromSchedule(scheduleModel, { overwriteManual: confirmOverwriteManual });
+        } catch (syncErr) {
+            if (syncErr && syncErr.code === 'EMPTY_PERIODS_GUARD') {
+                return res.status(422).json({ error: syncErr.message, skippedEntries: syncErr.skippedEntries || 0 });
+            }
+            throw syncErr;
+        }
         if (confirmOverwriteManual && syncStats.manualOverwritten > 0) {
             await addAuditLogEntry('import_overwrite_manual',
                 `استيراد roster مع تأكيد صريح: استُبدل ${syncStats.manualOverwritten} تعيينًا يدويًا (source='manual')`,

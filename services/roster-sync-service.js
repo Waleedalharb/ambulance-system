@@ -157,6 +157,12 @@ class RosterSyncService {
      */
     async syncFromSchedule(scheduleEmployees, options = {}) {
         const overwriteManual = options && options.overwriteManual === true;
+        // G2 — حارس المسح الصامت (اعتماد المالك 2026-08-30): المسح الشامل
+        // لـ shift_roster (periods فارغة) مسارُ مسحٍ صريح فقط (explicitClear:
+        // DELETE /api/schedule/employees). الاستيراد العادي بحمولة لا تُنتج
+        // أي فترة صالحة يُرفض قبل أي كتابة — ممنوع أن يعود «نجاحًا» وقد
+        // مُسحت كل الشهور (حوادث «الحفظ لا ينعكس» التاريخية).
+        const explicitClear = options && options.explicitClear === true;
         if (!Array.isArray(scheduleEmployees)) {
             throw new Error('RosterSyncService: مصفوفة الجدولة مطلوبة');
         }
@@ -171,6 +177,27 @@ class RosterSyncService {
 
         // ── 1) تطبيع المدخل وإزالة التكرار بالرمز (الأخير يغلب) ──
         const people = this._collectPeople(scheduleEmployees, stats);
+
+        // ── 1ب) G2: فحص مبكر بلا كتابة — هل ستُنتج الحمولة أي فترة صالحة؟ ──
+        // نفس قاعدة الصلاحية المستخدمة في الخطوة 4 (تاريخ ISO حقيقي + رمز غير
+        // فارغ). planned=0 يشمل: مصفوفة فارغة، موظفون بلا مداخل، وتواريخ مشوهة
+        // (مثل 2026-00-XX من فشل كشف الشهر في المحلل الكلاسيكي).
+        if (!explicitClear) {
+            let planned = 0, invalid = 0;
+            for (const p of people.values()) {
+                for (const s of p.entries) {
+                    const d = String((s && s.date) || '').trim();
+                    const c = String((s && (s.shiftCode || s.shift)) || '').trim();
+                    if (this._validIsoDate(d) && c) planned++; else invalid++;
+                }
+            }
+            if (planned === 0) {
+                const guardErr = new Error('حمولة الاستيراد لا تحتوي أي مدخل جدولة بتاريخ صالح — أُوقف الاستيراد قبل أي كتابة (حارس المسح الصامت)');
+                guardErr.code = 'EMPTY_PERIODS_GUARD';
+                guardErr.skippedEntries = invalid;
+                throw guardErr;
+            }
+        }
 
         const teamRows = await this.db.all('SELECT id, name FROM teams');
         const resolveTeam = this._buildTeamResolver(teamRows);
