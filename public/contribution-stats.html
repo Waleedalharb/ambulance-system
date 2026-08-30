@@ -287,6 +287,12 @@ async function loadStats() {
     try {
         var res = await fetch('/api/indicators/contribution?year=' + y + '&month=' + m, { headers: authHeaders() });
         var data = await res.json();
+        // جولة تنظيم الوصول (اعتماد المالك 2026-08-30): 403 = رفض صلاحية سيرفي (indicators.contribution)
+        // وليس خطأ جلب — تُعرض رسالة «غير مصرّح» واضحة بدل رسالة فشل عامة.
+        if (res.status === 403) {
+            box.innerHTML = '<div class="error-box"><i class="fas fa-lock"></i> ⛔ غير مصرّح — هذه الشاشة تتطلب صلاحية «مؤشرات مساهمة الموظفين» (indicators.contribution). اطلب المنحة من مدير النظام.</div>';
+            return;
+        }
         if (!res.ok || !data.success) {
             box.innerHTML = '<div class="error-box"><i class="fas fa-circle-xmark"></i> ' + (data.error || 'فشل الجلب') + '</div>';
             return;

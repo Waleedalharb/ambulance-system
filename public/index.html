@@ -2631,6 +2631,20 @@ window.addEventListener('load', function() {
                 <button class="sidebar-item" onclick="toggleSidebar(); navigateToPage('chat.html');"><i class="fas fa-comments"></i> الرسائل <span class="sidebar-item-badge" id="sbBadgeChat" style="display:none;">0</span></button>
             </div>
         </div>
+        <!-- الإدارة — جولة تنظيم الوصول (اعتماد المالك 2026-08-30): روابط مشروطة بالصلاحيات.
+             الإظهار/الإخفاء ردع بصري فقط؛ الحسم النهائي سيرفي (authorizePerm ← 403). -->
+        <div class="sidebar-group" id="sbAdminGroup" style="display:none;">
+            <div class="group-header" onclick="toggleGroup(this)">
+                <i class="fas fa-user-shield"></i>
+                <span>الإدارة</span>
+                <i class="fas fa-chevron-down group-arrow"></i>
+            </div>
+            <div class="group-items">
+                <button class="sidebar-item" id="sbAdminUsers" style="display:none;" onclick="toggleSidebar(); navigateToPage('admin-users.html');"><i class="fas fa-users"></i> إدارة المستخدمين</button>
+                <button class="sidebar-item" id="sbAssetsCenter" style="display:none;" onclick="toggleSidebar(); navigateToPage('assets-center.html');"><i class="fas fa-box-open"></i> مركز العهد والأجهزة</button>
+                <button class="sidebar-item" id="sbContribution" style="display:none;" onclick="toggleSidebar(); navigateToPage('contribution-stats.html');"><i class="fas fa-chart-line"></i> المساهمة التشغيلية</button>
+            </div>
+        </div>
         <!-- الإعدادات -->
         <div class="sidebar-group">
             <div class="group-header" onclick="toggleGroup(this)">
@@ -2689,7 +2703,34 @@ function navigateToPage(url) {
     setTimeout(function() { window.location.href = url; }, 100);
 }
 
-
+// ═══ بوابة روابط الإدارة في الـSidebar — جولة تنظيم الوصول (اعتماد المالك 2026-08-30) ═══
+// نفس نمط GATES المعتمد في smart-schedule.html: جلب /api/auth/me ← إخفاء الرابط عمّن
+// لا يملك صلاحيته. Fail-Closed: أي فشل في الجلب = الروابط تبقى مخفية.
+// تنبيه معماري: الإخفاء هنا ردع بصري فقط — الحسم الحقيقي سيرفي عبر authorizePerm (403).
+(function gateAdminSidebarLinks() {
+    function apply(perms, star) {
+        var anyVisible = false;
+        function show(id, ok) {
+            var el = document.getElementById(id);
+            if (el && ok) { el.style.display = ''; anyVisible = true; }
+        }
+        show('sbAdminUsers',   star || perms.indexOf('admin.users_manage') !== -1);
+        show('sbAssetsCenter', star || perms.indexOf('assets.view') !== -1 || perms.indexOf('assets.manage') !== -1);
+        show('sbContribution', star || perms.indexOf('indicators.contribution') !== -1);
+        var group = document.getElementById('sbAdminGroup');
+        if (group && anyVisible) group.style.display = '';
+    }
+    try {
+        if (!window.AuthManager || !AuthManager.apiRequest) return; // بلا مصادقة = بلا روابط
+        AuthManager.apiRequest('/api/auth/me').then(function (res) {
+            if (!res || !res.ok) return null; // Fail-Closed
+            return res.json();
+        }).then(function (me) {
+            if (!me) return;
+            apply(Array.isArray(me.permissions) ? me.permissions : [], me.permissions_star === true);
+        }).catch(function () { /* Fail-Closed — الروابط تبقى مخفية */ });
+    } catch (e) { /* Fail-Closed */ }
+})();
 </script>
 </body>
 </html><!-- ===== نافذة سجل العمليات ===== -->

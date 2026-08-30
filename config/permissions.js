@@ -129,7 +129,8 @@ const ROLES_PERMISSIONS = {
         'indicators.contribution',
         'employees.manage',
         'archive.sensitive',
-        'assets.view', 'assets.manage'   // العهد والأصول: الإدارة تعتمد وتراجع (2026-08-23)
+        'assets.view', 'assets.manage',   // العهد والأصول: الإدارة تعتمد وتراجع (2026-08-23)
+        'symbols.manage'                  // إدارة الرموز (جولة تنظيم الوصول، قرار ②ب — 2026-08-30): تثبيت وصول director القائم بعد ربط المسارات
     ],
     user: ['ops.execute']          // المفتاح الشامل القديم — توافق فقط، بلا schedule.*
 };

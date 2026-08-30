@@ -1794,6 +1794,11 @@
                 <button class="btn btn-danger" onclick="clearServerRoster()">
                     <i class="fas fa-trash-alt"></i> مسح كل البيانات
                 </button>
+                <!-- جولة تنظيم الوصول (اعتماد المالك 2026-08-30، قرار ②ب): إدارة الرموز داخل نظام الجداول
+                     وليست في الـSidebar الرئيسية — يُخفى عبر GATES لمن لا يملك symbols.manage -->
+                <button class="btn" id="symbolsAdminBtn" onclick="window.location.href='admin-symbols.html'" style="background:linear-gradient(135deg,#2E8B7A,#1F6B5C);color:#fff;">
+                    <i class="fas fa-cogs"></i> ⚙️ إدارة الرموز
+                </button>
             </div>
             <!-- تفويض «المرحلة الأخيرة قبل الاعتماد الرسمي» (2026-08): تصدير PDF سيرفري لجدول مركز واحد (تذكرة البند ⑤) -->
             <div class="flex flex-wrap gap-2 items-center" style="margin-top:10px;">
@@ -5585,7 +5590,9 @@ window.oiApply = oiApply;
         { sel: 'button[onclick="exportGroupPdf()"]',  perm: 'schedule.export' },
         { sel: 'button[onclick="printSchedule()"]',  perm: 'schedule.print' },
         { sel: '#syncBtn',                           perm: 'schedule.sync' },
-        { sel: 'button[onclick="clearServerRoster()"]', perm: 'schedule.clear' }
+        { sel: 'button[onclick="clearServerRoster()"]', perm: 'schedule.clear' },
+        // إدارة الرموز — جولة تنظيم الوصول (2026-08-30): الحسم سيرفي عبر authorizePerm('symbols.manage')
+        { sel: '#symbolsAdminBtn',                   perm: 'symbols.manage' }
     ];
     function applyGates(perms, star) {
         GATES.forEach(function (g) {

@@ -4606,8 +4606,9 @@ app.get('/api/indicators/dashboard', authenticate, async (req, res) => {
 
 // P1: مؤشر المساهمة التشغيلية — أعداد خام شهرية لكل موظف مصنَّف
 // (DECISION-CONTRIBUTION-INDICATOR-P1.md). قراءة فقط؛ بلا نقاط ولا ترتيب.
-// بيانات أداء موظفين ⇒ امتياز إداري (admin/director).
-app.get('/api/indicators/contribution', authenticate, authorize(['admin', 'director']), async (req, res) => {
+// جولة تنظيم الوصول (اعتماد المالك 2026-08-30، قرار ①): الربط الفعلي بـ
+// indicators.contribution حتى تسري المنحة/السحب الفردي من إدارة المستخدمين.
+app.get('/api/indicators/contribution', authenticate, authorizePerm('indicators.contribution'), async (req, res) => {
     try {
         if (!indicatorService) return res.status(503).json({ error: 'الخدمة غير متوفرة' });
         // الافتراضي: الشهر الحالي بتوقيت الرياض (الطبقة المركزية — TIME-POLICY)
@@ -10813,7 +10814,9 @@ function requireSymbolsUnlock(req, res, next) {
     next();
 }
 
-app.get('/api/schedule-symbols', authenticate, authorize(['admin', 'director']), async (req, res) => {
+// جولة تنظيم الوصول (اعتماد المالك 2026-08-30، قرار ②ب): كل مسارات إدارة الرموز
+// مربوطة فعليًا بـ symbols.manage — والقفل السري requireSymbolsUnlock يبقى طبقة فوقها كما هو.
+app.get('/api/schedule-symbols', authenticate, authorizePerm('symbols.manage'), async (req, res) => {
     try {
         const svc = getSymbolRegistryService();
         const { symbols, patterns } = await svc.list();
@@ -10837,7 +10840,7 @@ app.get('/api/schedule-symbols/runtime', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/schedule-symbols/audit', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.get('/api/schedule-symbols/audit', authenticate, authorizePerm('symbols.manage'), async (req, res) => {
     try {
         const log = await db.SymbolAuditLog.getAll(300);
         res.json({ success: true, log });
@@ -10848,7 +10851,7 @@ app.get('/api/schedule-symbols/audit', authenticate, authorize(['admin', 'direct
 });
 
 // فتح القفل بالرمز السري المستقل
-app.post('/api/schedule-symbols/unlock', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/schedule-symbols/unlock', authenticate, authorizePerm('symbols.manage'), async (req, res) => {
     try {
         const secretRow = await db.SymbolAdminSecret.get();
         if (!secretRow) return res.status(409).json({ error: 'لم يُضبط رمز إدارة الأكواد بعد — اضبطه أولًا', code: 'SECRET_NOT_SET' });
@@ -10865,14 +10868,14 @@ app.post('/api/schedule-symbols/unlock', authenticate, authorize(['admin', 'dire
     }
 });
 
-app.post('/api/schedule-symbols/lock', authenticate, authorize(['admin', 'director']), (req, res) => {
+app.post('/api/schedule-symbols/lock', authenticate, authorizePerm('symbols.manage'), (req, res) => {
     const token = req.headers['x-symbols-unlock'];
     if (token) symbolUnlockTokens.delete(token);
     res.json({ success: true });
 });
 
 // ضبط/تغيير الرمز السري — لا رمز افتراضي في الكود إطلاقًا؛ الضبط الأول من حساب إداري.
-app.post('/api/schedule-symbols/secret', authenticate, authorize(['admin', 'director']), async (req, res) => {
+app.post('/api/schedule-symbols/secret', authenticate, authorizePerm('symbols.manage'), async (req, res) => {
     try {
         const { current, next, confirm } = req.body || {};
         if (!next || String(next).length < 6) return res.status(400).json({ error: 'الرمز الجديد يجب ألا يقل عن 6 أحرف' });
@@ -10897,7 +10900,7 @@ app.post('/api/schedule-symbols/secret', authenticate, authorize(['admin', 'dire
 });
 
 // إضافة رمز جديد — يتطلب قفلًا مفتوحًا
-app.post('/api/schedule-symbols', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, validateBody({
+app.post('/api/schedule-symbols', authenticate, authorizePerm('symbols.manage'), requireSymbolsUnlock, validateBody({
     code: { required: true, type: 'string', minLength: 1, maxLength: 20 },
     symbol_type: { required: true, type: 'string', minLength: 1, maxLength: 30 }
 }), async (req, res) => {
@@ -10912,7 +10915,7 @@ app.post('/api/schedule-symbols', authenticate, authorize(['admin', 'director'])
 });
 
 // تعديل رمز — إن كان له أثر تاريخي يتطلب تأكيدًا صريحًا (confirmHistorical)
-app.put('/api/schedule-symbols/:id', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, async (req, res) => {
+app.put('/api/schedule-symbols/:id', authenticate, authorizePerm('symbols.manage'), requireSymbolsUnlock, async (req, res) => {
     try {
         const svc = getSymbolRegistryService();
         const result = await svc.editSymbol(parseInt(req.params.id, 10), req.body, req.user, req.body.confirmHistorical === true);
@@ -10930,7 +10933,7 @@ app.put('/api/schedule-symbols/:id', authenticate, authorize(['admin', 'director
 });
 
 // تعطيل/تفعيل — لا حذف أبدًا
-app.post('/api/schedule-symbols/:id/status', authenticate, authorize(['admin', 'director']), requireSymbolsUnlock, async (req, res) => {
+app.post('/api/schedule-symbols/:id/status', authenticate, authorizePerm('symbols.manage'), requireSymbolsUnlock, async (req, res) => {
     try {
         const svc = getSymbolRegistryService();
         const status = req.body && req.body.status;
