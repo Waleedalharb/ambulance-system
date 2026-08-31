@@ -2498,10 +2498,14 @@ async function renderAdvancedDistribution() {
             }).join('') + '</div>';
         var logDiv = document.createElement('div');
         logDiv.innerHTML = logHtml;
-        container.appendChild(logDiv.firstElementChild);
+        // PI-8 (اعتماد المالك 2026-08-31): appendChild يَنقل العقدة — لو بقي
+        // hydrate على logDiv لعمل على غلاف فارغ ولَما ظهرت «هوية الموقع»
+        // أبدًا. نحتفظ بالعقدة المنقولة ونمرّرها هي للتعبئة.
+        var logNode = logDiv.firstElementChild;
+        container.appendChild(logNode);
         // PI-7 (اعتماد المالك 2026-08-30): تعبئة «هوية الموقع» لكل بلاغ — قراءة
         // فقط، وفشلها/403 لا يمس السجل. المعروض تلميح خارجي غير معتمد.
-        if (window.PlaceSuggestion) window.PlaceSuggestion.hydrate(logDiv);
+        if (window.PlaceSuggestion) window.PlaceSuggestion.hydrate(logNode);
     }
     
     // ─── Sector cards: ONLY ready teams ───
