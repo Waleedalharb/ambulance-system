@@ -46,8 +46,9 @@
         return null;
     }
 
-    // ---------- النمط البصري: Light Operational / Muted ----------
-    // مع مفتاح Mapbox: Light v11 افتراضيًا (قابل للتجاوز عبر cfg.style).
+    // ---------- النمط البصري: Dark Ops / Muted ----------
+    // مع مفتاح Mapbox: Dark v11 افتراضيًا (اعتماد المالك 2026-08-31 — داكن
+    // هادئ يلائم الواجهة الداكنة، قابل للتجاوز عبر cfg.style).
     // بلا مفتاح (إثبات محلي فقط): نمط raster مؤقت من OSM مُخفَّت الألوان
     // بنفس اتجاه الهوية — يُستبدل بمجرد وضع المفتاح، بلا أي تغيير كود.
     var INTERIM_STYLE = {
@@ -71,7 +72,7 @@
     };
     function resolveStyle() {
         if (cfg.style) return cfg.style;
-        if (cfg.accessToken) return 'mapbox://styles/mapbox/light-v11';
+        if (cfg.accessToken) return 'mapbox://styles/mapbox/dark-v11';
         return INTERIM_STYLE;
     }
 
@@ -216,7 +217,9 @@
         // Viewport المستخدم مقدَّس: resize عند Mapbox يحفظ المركز والزوم
         // أصلًا — smart-map يقرأ هذه العلامة فلا يعيد fitBounds فوق تفاعله
         var fm = { __inner: inner, __st: st, __keepViewport: true };
-        applyLightOpsTheme(id);
+        // ثيم Light Ops للعناصر يُضاف فقط إذا كان النمط المستخدم فاتحًا فعلًا
+        // (اعتماد المالك 2026-08-31: dark-v11 يبقى على القواعد الداكنة الأصلية)
+        if (typeof styleUsed === 'string' && /\/light-v\d+$/.test(styleUsed)) applyLightOpsTheme(id);
         fm.setView = function (ll, zoom) { inner.jumpTo({ center: [ll[1], ll[0]], zoom: zoom }); return fm; };
         fm.fitBounds = function (pts, o) {
             var b = pts.map(function (p) { return [p[1], p[0]]; });

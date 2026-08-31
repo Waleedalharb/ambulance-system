@@ -785,8 +785,10 @@ app.use('/forms', express.static(path.join(__dirname, 'public/forms'), {
 // (اعتماد المالك 2026-08-28 — المسار «ب»): توكن Mapbox العام يُحقن من متغير
 // البيئة MAPBOX_PUBLIC_TOKEN في Render فقط — لا يدخل Git إطلاقًا (Push
 // Protection رفضه، والمالك منع تجاوز الحماية). هذا المسار يقدّم ملف إعداد
-// JavaScript تشغيليًا: إن ضُبط المتغير (وكان pk.) فعّل Mapbox Light v11،
-// وإلا أعاد no-op فيبقى الإعداد الافتراضي/المحلي كما هو حرفيًا.
+// JavaScript تشغيليًا: إن ضُبط المتغير (وكان pk.) فعّل Mapbox Dark v11
+// (اعتماد المالك 2026-08-31: خريطة داكنة هادئة تلائم الواجهة الداكنة — نفس
+// المزود ونفس التوكن ونفس مصدر البيانات)، وإلا أعاد no-op فيبقى الإعداد
+// الافتراضي/المحلي كما هو حرفيًا.
 // صفر منطق تشغيلي هنا — مجرد إعداد مزود الرسم. التوكن لا يُسجَّل في logs
 // ولا يظهر إلا في هذه الاستجابة (مكانه الطبيعي: المتصفح يحتاجه للرسم،
 // وحمايته المعتمدة هي تقييد النطاق من لوحة Mapbox على emsoperations.online).
@@ -797,7 +799,7 @@ app.get('/js/map-config.runtime.js', (req, res) => {
     if (token && /^pk\.[A-Za-z0-9._-]+$/.test(token)) {
         res.send('/* إعداد خريطة الإنتاج — مفعّل من متغير البيئة (لا شيء في Git) */\n' +
             'window.SMAP_MAP_CONFIG = { provider: "mapbox", accessToken: ' + JSON.stringify(token) +
-            ', style: "mapbox://styles/mapbox/light-v11" };\n');
+            ', style: "mapbox://styles/mapbox/dark-v11" };\n');
     } else {
         res.send('/* MAPBOX_PUBLIC_TOKEN غير مضبوط في بيئة الخادم — يبقى الإعداد الافتراضي/المحلي كما هو */\n');
     }
@@ -2021,12 +2023,27 @@ async function readAuditLog() {
         return JSON.parse(data);
     } catch (error) {
         if (error.code === 'ENOENT') return [];
+        // ملف JSON تالف (مثلًا: إيقاف الخدمة وسط كتابة سابقة) — نعزله بدل 500 دائم،
+        // ونحتفظ بنسخة باسم .corrupt-<ts> كدليل بدل الحذف الصامت.
+        if (error instanceof SyntaxError) {
+            try {
+                const corruptPath = AUDIT_LOG_PATH + '.corrupt-' + Date.now();
+                await fs.rename(AUDIT_LOG_PATH, corruptPath);
+                console.error('[AuditLog] ملف تالف — تم عزله إلى:', corruptPath, '|', error.message);
+            } catch (renameErr) {
+                console.error('[AuditLog] فشل عزل الملف التالف:', renameErr.message);
+            }
+            return [];
+        }
         throw error;
     }
 }
 
+// كتابة ذرّية: ملف مؤقت ثم rename — يمنع ملفًا مقطوعًا عند إعادة تشغيل الخدمة وسط الكتابة
 async function writeAuditLog(data) {
-    await fs.writeFile(AUDIT_LOG_PATH, JSON.stringify(data, null, 2));
+    const tmpPath = AUDIT_LOG_PATH + '.tmp';
+    await fs.writeFile(tmpPath, JSON.stringify(data, null, 2));
+    await fs.rename(tmpPath, AUDIT_LOG_PATH);
 }
 
 async function addAuditLogEntry(action, details, category, user, role, userId, shiftId = null) {
@@ -10360,6 +10377,7 @@ app.get('/api/audit-log', authenticate, async (req, res) => {
         }
         res.json({ success: true, logs });
     } catch (error) {
+        console.error('[AuditLog] GET /api/audit-log error:', error);
         res.status(500).json({ error: 'فشل في جلب سجل التدقيق' });
     }
 });

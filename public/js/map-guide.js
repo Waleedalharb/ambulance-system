@@ -248,7 +248,15 @@
         var pw = infoPop.offsetWidth, ph = infoPop.offsetHeight;
         var top = r.bottom + 8;
         if (top + ph > window.innerHeight - 10) top = Math.max(10, r.top - ph - 8); // اقلب فوق العنصر
-        var left = Math.min(Math.max(10, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 10);
+        // اعتماد المالك 2026-08-31: على سطح المكتب تخصم مساحة القائمة الجانبية
+        // المفتوحة من الحد الأيمن — البطاقة تعيد التموضع داخل المساحة المتاحة
+        // بدل أن تدخل تحت القائمة (القائمة يمين الشاشة في RTL)
+        var sbw = 0;
+        try {
+            var sb = document.getElementById('smartSidebar');
+            if (sb && sb.classList.contains('open') && window.innerWidth >= 769) sbw = sb.offsetWidth || 280;
+        } catch (e) { }
+        var left = Math.min(Math.max(10, r.left + r.width / 2 - pw / 2), window.innerWidth - sbw - pw - 10);
         infoPop.style.top = top + 'px';
         infoPop.style.left = left + 'px';
         infoPop.style.visibility = 'visible';

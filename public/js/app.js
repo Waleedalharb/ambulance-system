@@ -10280,7 +10280,12 @@ function toggleSidebar() {
     if (!sidebar) return;
     sidebar.classList.toggle('open');
     if (overlay) overlay.classList.toggle('active');
-    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+    var isOpen = sidebar.classList.contains('open');
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    // اعتماد المالك 2026-08-31: سطح المكتب = دفع تخطيط (لا طفو فوق الخريطة)
+    document.body.classList.toggle('sidebar-open', isOpen);
+    // بعد انتهاء انتقال الدفع: إعلام الخريطة بإعادة القياس (Leaflet يحتاجه، Mapbox trackResize يكفيه)
+    setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) { } }, 340);
 }
 
 function closeSidebarOnMobile() {
@@ -10290,6 +10295,7 @@ function closeSidebarOnMobile() {
         sidebar.classList.remove('open');
         if (overlay) overlay.classList.remove('active');
         document.body.style.overflow = '';
+        document.body.classList.remove('sidebar-open');
     }
 }
 
@@ -10366,6 +10372,8 @@ document.addEventListener('keydown', function(e) {
         if (sidebar) sidebar.classList.remove('open');
         if (overlay) overlay.classList.remove('active');
         document.body.style.overflow = '';
+        document.body.classList.remove('sidebar-open');
+        setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e2) { } }, 340);
     }
 });
 

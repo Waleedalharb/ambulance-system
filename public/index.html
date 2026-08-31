@@ -51,7 +51,7 @@
     <!-- html2pdf.js لتصدير PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <link rel="stylesheet" href="css/smart-toolbar.css?v=3">
+    <link rel="stylesheet" href="css/smart-toolbar.css?v=4">
     <link rel="stylesheet" href="css/app.css?v=35">
     <!-- طبقة التوحيد البصري (المرحلة الثانية) — لغة شاشة الدخول المعتمدة، تحمَّل أخيرًا لتتغلب -->
     <link rel="stylesheet" href="css/executive-theme.css?v=5"><!-- v=5 (2026-08-28): الملف تغيّر (+ثيم الخريطة Light Ops) برقم قديم — رُفع لكسر الكاش السنوي
@@ -2678,7 +2678,7 @@ window.addEventListener('load', function() {
 <script src="/js/auth-manager.js"></script>
 <script src="/js/time-riyadh.js"></script>
 <script src="js/table-sort.js?v=1" defer></script>
-<script src="js/app.js?v=49" defer></script><!-- v=49: PI-8 — إصلاح ترتيب hydrate(logNode) (اعتماد المالك 2026-08-31) -->
+<script src="js/app.js?v=50" defer></script><!-- v=50: دفع تخطيط القائمة الجانبية على سطح المكتب (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-batch-cancel.js?v=1" defer></script><!-- الاختيار الجماعي لفرق البلاغ في توزيع البلاغات — بعد app.js (خطافات عرض فقط) -->
 <script src="js/place-suggestion.js?v=1" defer></script><!-- PI-7: عرض «هوية الموقع» (اقتراح خارجي غير معتمد) — قراءة فقط، بعد app.js -->
 <script src="js/alert-rules.js?v=1" defer></script><!-- قواعد التنبيه التشغيلي النقية — قبل smart-map.js -->
@@ -2686,14 +2686,14 @@ window.addEventListener('load', function() {
 <script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — تفعيل Mapbox إنتاجيًا ينتظر قرار تجاوز حماية GitHub للتوكن -->
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
-<script src="js/map-adapter.js?v=1" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js -->
+<script src="js/map-adapter.js?v=2" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=2: dark-v11 + ثيم العناصر مشروط بالنمط الفاتح (اعتماد المالك 2026-08-31) -->
 <script src="js/smart-map.js?v=6" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
 <script src="js/map-history.js?v=2" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
-<script src="js/map-guide.js?v=1" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات -->
+<script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->
 <script src="js/hospital-monitor.js?v=2" defer></script><!-- Hospital Monitor 1B + دورة التنبيهات: مؤشر المستشفيات + تفصيل المنشآت + ACK — مشترك في ops:sse، بصمة skip-if-unchanged -->
-<script src="js/smart-toolbar.js?v=3" defer></script>
+<script src="js/smart-toolbar.js?v=4" defer></script><!-- v=4: مزامنة body.sidebar-open عند Escape (اعتماد المالك 2026-08-31) -->
 <!-- AI Assistant -->
 <link rel="stylesheet" href="/css/ai-assistant.css?v=2">
 <script src="/js/ai-assistant.js?v=2"></script>

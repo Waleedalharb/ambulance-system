@@ -54,6 +54,7 @@
             if (sidebar) sidebar.classList.remove('open');
             if (sidebarOverlay) sidebarOverlay.classList.remove('active');
             document.body.style.overflow = '';
+            document.body.classList.remove('sidebar-open');
         }
     });
 
