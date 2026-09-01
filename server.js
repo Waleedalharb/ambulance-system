@@ -4827,9 +4827,27 @@ app.get('/api/analytics/coverage', authenticate, async (req, res) => {
     }
 });
 
-// H4 — دعم القرار: مرشحو تمركز + نوافذ + محاكاة أثر — تحليل فقط، لا ينفذ أي إجراء
-app.get('/api/analytics/recommendations', authenticate, async (req, res) => {
+// RC-6 (اعتماد المالك 2026-09-01) — تفصيل بلاغ واحد لبطاقة ذاكرة الخريطة
+// الكسولة: الحمولة الخفيفة في coverage تحمل النقاط فقط، وتفاصيل البطاقة
+// تُحسب هنا لبلاغ مفرد عند فتحها. نفس حارس النطاق ونفس قواعد الاحتساب.
+app.get('/api/analytics/incident-detail', authenticate, async (req, res) => {
     try {
+        if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
+        const range = analyticsRange(req, res);
+        if (!range) return;
+        const shiftId = req.query.shiftId, number = req.query.number;
+        if (!shiftId || !number) return res.status(400).json({ error: 'shiftId و number مطلوبان' });
+        const data = await reportService.getIncidentCoverageDetail(range.fromTs, range.toTs, shiftId, number);
+        if (!data) return res.status(404).json({ error: 'البلاغ غير موجود' });
+        res.json({ success: true, incident: data });
+    } catch (error) {
+        console.error('[Analytics] incident-detail error:', error);
+        res.status(500).json({ error: 'فشل في جلب تفصيل البلاغ' });
+    }
+});
+
+// H4 — دعم القرار: مرشحو تمركز + نوافذ + محاكاة أثر — تحليل فقط، لا ينفذ أي إجراء
+app.get('/api/analytics/recommendations', authenticate, async (req, res) => {    try {
         if (!reportService || !opsEngine) return res.status(503).json({ error: 'Engine unavailable' });
         const range = analyticsRange(req, res);
         if (!range) return;

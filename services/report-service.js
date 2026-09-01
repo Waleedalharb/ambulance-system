@@ -896,7 +896,7 @@ class ReportService {
     }
 
     async getHistoricalSummary(fromTs, toTs) {
-        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData();
+        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData(fromTs, toTs);
         const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
         const partsByKey = {};
         for (const p of parts) {
@@ -1023,9 +1023,11 @@ class ReportService {
      * incident_registry — لا تخزين ولا جداول موازية.
      */
     async getPatterns(fromTs, toTs) {
-        const { incidents } = await this.engine.storage.getIncidentHistoryData();
+        // RC-6: الترشيح الأولي في SQL — نوسّع البداية لتشمل فترة المقارنة السابقة
+        const span0 = toTs - fromTs + 1;
+        const { incidents } = await this.engine.storage.getIncidentHistoryData(fromTs - span0, toTs);
         const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
-        const span = toTs - fromTs + 1;
+        const span = span0;
         const prev = this._incidentsInRange(incidents, fromTs - span, fromTs - 1);
         const build = (list) => {
             const byHour = new Array(24).fill(0);
@@ -1099,9 +1101,11 @@ class ReportService {
      * من لا تمركز معروف له وقت البلاغ يُعرض «بلا تمركز معروف» بصدق — لا تخمين.
      */
     async getCoverage(fromTs, toTs) {
-        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData();
+        // RC-6 (اعتماد المالك 2026-09-01): الترشيح الأولي في SQL — القراءة بحجم
+        // النطاق (بهامش أمان) لا بحجم التاريخ الكامل، والفلتر الدقيق يبقى أدناه.
+        const { incidents, parts } = await this.engine.storage.getIncidentHistoryData(fromTs, toTs);
         const { inRange, unresolvedTimeCount } = this._incidentsInRange(incidents, fromTs, toTs);
-        const posEvents = await this.engine.storage.getPositioningHistory();
+        const posEvents = await this.engine.storage.getPositioningHistory(fromTs, toTs);
         // نوافذ التمركز من لقطات الأحداث — parseRiyadhWall المركزي يفسّر القديم والجديد
         const windows = [];
         for (const ev of posEvents) {
@@ -1158,7 +1162,7 @@ class ReportService {
             if (ic.lat === null || ic.lat === undefined || ic.lng === null || ic.lng === undefined) {
                 noCoords++;
                 detail.push({
-                    number: ic.number, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
+                    number: ic.number, shiftId: ic.shift_id, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
                     district: ic.district || null, street: ic.street || null,
                     cadCreatedAt: ic.cad_created_at || null, lat: null, lng: null,
                     countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
@@ -1174,7 +1178,7 @@ class ReportService {
                 if (own && (!crewPos || own.km < crewPos.km)) { crewPos = own; break; } // أقرب تمركز لفرقة مباشرة
             }
             detail.push({
-                number: ic.number, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
+                number: ic.number, shiftId: ic.shift_id, type: ic.type || null, code: ic.code || null, status: ic.status || 'active',
                 district: ic.district || null, street: ic.street || null,
                 cadCreatedAt: ic.cad_created_at || null, lat: ic.lat, lng: ic.lng,
                 countedUnits, bestArrivalMin, cadHour: new Date(ts).getHours(),
@@ -1233,6 +1237,16 @@ class ReportService {
                 weakReasons
             };
         }).sort((a, b) => b.count - a.count);
+        // RC-6 (اعتماد المالك 2026-09-01): حمولة خفيفة للخريطة — النقاط تحتاج
+        // الرقم والمناوبة والإحداثية والنوع فقط، وcadCreatedAt/district لصفوف
+        // قوائم المناطق كي لا يتغير أي حرف في التصميم. بقية حقول البطاقة
+        // (الفرق المحتسبة/أفضل وصول/أقرب تمركز…) تُجلب عند فتحها فقط عبر
+        // /api/analytics/incident-detail ← getIncidentCoverageDetail.
+        // التفصيل الكامل detail يبقى داخليًا لبناء المناطق والإجماليات كما كان.
+        const incidentsLight = detail.map(d => ({
+            number: d.number, shiftId: d.shiftId, lat: d.lat, lng: d.lng,
+            type: d.type, cadCreatedAt: d.cadCreatedAt, district: d.district, noCoords: d.noCoords
+        }));
         return {
             range: { from: new Date(fromTs).toISOString(), to: new Date(toTs).toISOString() },
             totals: {
@@ -1247,7 +1261,7 @@ class ReportService {
             },
             positioningUnits: Object.values(posPoints), // نقاط فريدة للعرض — من السجل الفعلي فقط
             responseAvgArrival: overallAvgArrival,
-            incidents: detail,
+            incidents: incidentsLight,
             zones,
             constants: { demandZoneMin: R.DEMAND_ZONE_MIN, coverageFarKm: R.COVERAGE_FAR_KM, cellDegrees: '0.01° (~1.1كم)' },
             notes: [
@@ -1256,6 +1270,53 @@ class ReportService {
                 'منطقة الطلب = خلية شبكية ~1.1كم بثلاثة بلاغات فأكثر — قاعدة موثقة قابلة للضبط بقرار',
                 'البلاغات بلا إحداثيات تُحسب في الإجماليات ولا تدخل الخريطة ولا المناطق — لا تخمين مواقع'
             ]
+        };
+    }
+
+    /** RC-6 — تفصيل بلاغ واحد لبطاقة الذاكرة الكسولة: نفس حقول البطاقة التي
+        كانت تُبنى مسبقًا في getCoverage (الفرق المحتسبة/أفضل وصول/أقرب تمركز
+        وقت البلاغ) لكن لبلاغ واحد عند فتح بطاقته فقط. نفس قواعد الاحتساب
+        (isParticipationCounted) ونفس نوافذ التمركز — لا قاعدة جديدة هنا. */
+    async getIncidentCoverageDetail(fromTs, toTs, shiftId, number) {
+        const ic = await this.engine.storage.getIncidentByNumber(shiftId, number);
+        if (!ic) return null;
+        let ts = this._cadDateTimeTs(ic.cad_created_at);
+        if (ts === null && ic.created_at) { const p = Date.parse(ic.created_at); ts = isNaN(p) ? null : p; }
+        const parts = await this.engine.storage.getIncidentParticipationRows(shiftId, number);
+        const counted = parts.filter(p => this.isParticipationCounted(p));
+        const countedUnits = counted.map(p => p.unit);
+        const arrVals = counted.map(p => p.resp_arrival_min).filter(v => v !== null && v !== undefined);
+        const bestArrivalMin = arrVals.length ? Math.min(...arrVals) : null;
+        // أقرب تمركز وقت البلاغ — نفس بناء النوافذ في getCoverage حرفيًا
+        let nearestAny = null;
+        if (ts !== null && ic.lat != null && ic.lng != null) {
+            const posEvents = await this.engine.storage.getPositioningHistory();
+            const windows = [];
+            for (const ev of posEvents) {
+                let pl = null;
+                try { pl = ev.payload ? JSON.parse(ev.payload) : null; } catch (_) { pl = null; }
+                if (!pl) continue;
+                const lat = parseFloat(pl.lat), lng = parseFloat(pl.lng);
+                if (!isFinite(lat) || !isFinite(lng)) continue;
+                const s = PositioningService.parseRiyadhWall(pl.startTime);
+                const e = PositioningService.parseRiyadhWall(pl.endTime);
+                windows.push({ unit: pl.unit || null, location: pl.location || null, lat, lng,
+                    startTs: s ? s.getTime() : null, endTs: e ? e.getTime() : null });
+            }
+            const active = windows.filter(w =>
+                (w.startTs === null || w.startTs <= ts) && (w.endTs === null || w.endTs >= ts));
+            let best = null;
+            for (const w of active) {
+                const km = this._haversineKm(ic.lat, ic.lng, w.lat, w.lng);
+                if (!best || km < best.km) best = { km: Math.round(km * 10) / 10, unit: w.unit, location: w.location };
+            }
+            nearestAny = best;
+        }
+        return {
+            number: ic.number, shiftId: ic.shift_id, type: ic.type || null, code: ic.code || null,
+            status: ic.status || 'active', district: ic.district || null, street: ic.street || null,
+            cadCreatedAt: ic.cad_created_at || null, lat: ic.lat ?? null, lng: ic.lng ?? null,
+            countedUnits, bestArrivalMin, nearestPositioningAtTime: nearestAny
         };
     }
 

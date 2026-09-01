@@ -401,6 +401,77 @@
         return f;
     };
 
+    // ═══ RC-6 (اعتماد المالك 2026-09-01) — طبقة نقاط مجمّعة قابلة للتوسع ═══
+    // بديل dotsFrom القديمة: مصدر GeoJSON واحد + طبقة circle واحدة + مستمع
+    // click واحد (queryRenderedFeatures عبر e.features) + زوج مؤشر واحد —
+    // بدل مصدر+طبقة+3 مستمعين لكل بلاغ (قياس RC-6: 19.2 ثانية تجميد عند 5K).
+    // النقاط: [{lat,lng,number,shiftId}] — الخصائص تصل للنقر عبر feature.properties.
+    // لا بطاقات هنا: الواجهة تبني الـPopup عند الضغط فقط (onPointClick).
+    MB.pointsLayer = function (pts, o) {
+        o = o || {};
+        var f = { __pts: pts || [], __map: null, __sid: null, __lid: null };
+        function toData() {
+            return {
+                type: 'FeatureCollection',
+                features: f.__pts.map(function (p) {
+                    return { type: 'Feature', properties: { number: String(p.number), shiftId: String(p.shiftId) },
+                        geometry: { type: 'Point', coordinates: [p.lng, p.lat] } };
+                })
+            };
+        }
+        f.setData = function (np) {
+            f.__pts = np || [];
+            if (f.__map && f.__sid) {
+                var fm = f.__map;
+                whenReady(fm, function () { var s = fm.__inner.getSource(f.__sid); if (s) s.setData(toData()); });
+            }
+            return f;
+        };
+        f.clearLayers = function () { return f.setData([]); };
+        f.addTo = function (t) { if (t && t.__register) t.__register(f); else if (t) f.__mount(t); return f; };
+        f.__mount = function (fm) {
+            if (f.__sid) return;
+            f.__map = fm;
+            var sid = nextId('pts'), lid = sid + '-c';
+            f.__sid = sid; f.__lid = lid;
+            whenReady(fm, function () {
+                if (fm.__inner.getSource(sid)) return;
+                fm.__inner.addSource(sid, { type: 'geojson', data: toData() });
+                fm.__inner.addLayer({
+                    id: lid, type: 'circle', source: sid,
+                    paint: {
+                        'circle-radius': o.radius || 5,
+                        'circle-color': o.fillColor || '#F59E0B',
+                        'circle-opacity': o.fillOpacity != null ? o.fillOpacity : 0.65,
+                        'circle-stroke-color': o.color || '#FBBF24',
+                        'circle-stroke-width': o.weight != null ? o.weight : 1
+                    }
+                });
+                // مستمع واحد لكل الطبقة — e.features يحمل النقطة المضغوطة
+                if (typeof o.onPointClick === 'function') {
+                    fm.__inner.on('click', lid, function (e) {
+                        var ft = (e.features && e.features[0]) ||
+                            fm.__inner.queryRenderedFeatures(e.point, { layers: [lid] })[0];
+                        if (ft) o.onPointClick(ft.properties, e.lngLat);
+                    });
+                }
+                fm.__inner.on('mouseenter', lid, function () { fm.__inner.getCanvas().style.cursor = 'pointer'; });
+                fm.__inner.on('mouseleave', lid, function () { fm.__inner.getCanvas().style.cursor = ''; });
+            });
+        };
+        f.__unmount = function () {
+            var fm = f.__map;
+            if (fm && f.__sid) {
+                whenReady(fm, function () {
+                    if (fm.__inner.getLayer(f.__lid)) fm.__inner.removeLayer(f.__lid);
+                    if (fm.__inner.getSource(f.__sid)) fm.__inner.removeSource(f.__sid);
+                });
+            }
+            f.__sid = null; f.__lid = null; f.__map = null;
+        };
+        return f;
+    };
+
     MB.polyline = function (latlngs, o) {
         o = o || {};
         var f = { __map: null, __ids: null };
@@ -528,6 +599,32 @@
         if (p === 'leaflet' && window.L && typeof window.L.heatLayer === 'function') return window.L.heatLayer.apply(window.L, arguments);
         return undefined;
     };
+    // RC-6 — طبقة النقاط المجمّعة: Mapbox = مصدر+طبقة+مستمع واحد؛ مسار Leaflet
+    // (احتياطي محلي فقط) يبقي مجموعة circleMarker لكن ببطاقات كسولة عبر onPointClick
+    FL.pointsLayer = function (pts, o) {
+        var p = active();
+        if (p === 'mapbox') return MB.pointsLayer.apply(null, arguments);
+        if (p === 'leaflet' && window.L) {
+            o = o || {};
+            var group = window.L.layerGroup();
+            var paint = { radius: o.radius || 5, color: o.color || '#FBBF24', weight: o.weight != null ? o.weight : 1,
+                fillColor: o.fillColor || '#F59E0B', fillOpacity: o.fillOpacity != null ? o.fillOpacity : 0.65 };
+            function rebuild(list) {
+                group.clearLayers();
+                (list || []).forEach(function (pt) {
+                    var m = window.L.circleMarker([pt.lat, pt.lng], paint);
+                    if (typeof o.onPointClick === 'function') {
+                        m.on('click', function (e) { o.onPointClick({ number: String(pt.number), shiftId: String(pt.shiftId) }, e.latlng); });
+                    }
+                    m.addTo(group);
+                });
+            }
+            rebuild(pts);
+            group.setData = function (np) { rebuild(np); return group; };
+            return group; // addTo/clearLayers أصليان في Leaflet
+        }
+        return undefined;
+    };
     FL.DomEvent = {
         stopPropagation: function (e) {
             var p = active();
@@ -542,6 +639,6 @@
         L: FL,
         provider: active,          // المزود النشط فعلًا الآن
         requested: function () { return requested; },
-        version: '1.2.0-2026-08-28'
+        version: '1.3.0-2026-09-01'
     };
 })();

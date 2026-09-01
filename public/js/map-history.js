@@ -111,7 +111,12 @@
         layers = {
             heat: (typeof L.heatLayer === 'function') ? L.heatLayer([], { radius: 28, blur: 22, maxZoom: 16, minOpacity: 0.25 }) : null,
             markers: L.layerGroup().addTo(hmap),
-            dots: L.layerGroup().addTo(hmap) // نقاط البلاغات الفعلية القابلة للضغط (تتبع الكثافة)
+            // RC-6 (اعتماد المالك 2026-09-01): نقاط البلاغات طبقة مجمّعة واحدة
+            // (مصدر+طبقة+مستمع واحد) بدل circleMarker لكل بلاغ — والبطاقة
+            // تُجلب وتُبنى عند الضغط فقط. fallback لمجموعة عادية إن غابت.
+            dots: (typeof L.pointsLayer === 'function')
+                ? L.pointsLayer([], { onPointClick: onDotClick }).addTo(hmap)
+                : L.layerGroup().addTo(hmap)
         };
         // طبقة الكثافة تبقى ملحقة دائمًا وتُصفَّر بالبيانات فقط — إزالتها ثم
         // setLatLngs تضرب سباق إطار داخلي في leaflet-heat (this._map === null)
@@ -190,13 +195,16 @@
             + '</div>';
     }
     // فتح بطاقة بلاغ على موقعه الفعلي — بلا إحداثية لا موقع مختلق إطلاقًا
+    // RC-6: الإحداثية من الحمولة الخفيفة، ومحتوى البطاقة يُجلب عند الفتح فقط
     function openIncident(num) {
         var d = incByNumber[String(num)];
         if (!d || !hmap) return;
         if (d.lat === null || d.lat === undefined || d.lng === null || d.lng === undefined) return;
         if (hmap.getZoom() < 14) hmap.setView([d.lat, d.lng], 14);
         else hmap.panTo([d.lat, d.lng]);
-        L.popup({ closeButton: true, maxWidth: 320 }).setLatLng([d.lat, d.lng]).setContent(incidentCardHtml(d)).openOn(hmap);
+        fetchIncidentDetail(d.number, d.shiftId).then(function (detail) {
+            popupIncidentAt(detail, d.lat, d.lng);
+        });
     }
     // قائمة بلاغات منطقة: رقم/وقت/نوع/حي — كل زر يفتح بطاقة بلاغه
     function zoneIncListHtml(z, max) {
@@ -213,16 +221,55 @@
         return html;
     }
     // نقاط الكثافة التفاعلية: نقطة صغيرة لكل بلاغ محدد الموقع — الضغط يكشف بطاقته.
-    // الحرارية تبقى للمشهد العام، والنقاط هي طبقة التتبع بنفس البيانات حرفيًا
+    // الحرارية تبقى للمشهد العام، والنقاط هي طبقة التتبع بنفس البيانات حرفيًا.
+    // RC-6: تمرير النقاط دفعة واحدة لطبقة مجمّعة (setData) — بلا بناء بطاقات مسبقًا.
     function dotsFrom(cov) {
         if (!layers || !layers.dots || !cov) return;
-        (cov.incidents || []).forEach(function (d) {
-            if (d.noCoords || d.lat === null || d.lat === undefined) return; // بلا إحداثية ← لا نقطة مختلقة
-            var m = L.circleMarker([d.lat, d.lng], {
-                radius: 5, color: '#FBBF24', weight: 1, fillColor: '#F59E0B', fillOpacity: 0.65
-            });
-            m.bindPopup(incidentCardHtml(d), { maxWidth: 320 });
+        var pts = (cov.incidents || []).filter(function (d) {
+            return !d.noCoords && d.lat !== null && d.lat !== undefined; // بلا إحداثية ← لا نقطة مختلقة
+        }).map(function (d) { return { lat: d.lat, lng: d.lng, number: d.number, shiftId: d.shiftId }; });
+        if (typeof layers.dots.setData === 'function') layers.dots.setData(pts);
+        else pts.forEach(function (p) { // fallback قديم — مسار Leaflet غير المدعوم بـpointsLayer
+            var m = L.circleMarker([p.lat, p.lng], { radius: 5, color: '#FBBF24', weight: 1, fillColor: '#F59E0B', fillOpacity: 0.65 });
+            m.on('click', function () { onDotClick({ number: String(p.number), shiftId: String(p.shiftId) }, { lat: p.lat, lng: p.lng }); });
             m.addTo(layers.dots);
+        });
+    }
+
+    // RC-6 — البطاقة الكسولة: تفصيل البلاغ يُجلب من الخادم عند الضغط فقط
+    // (يحمل الفرق المحتسبة/أفضل وصول/أقرب تمركز — محسوبة بقواعد ReportService
+    // نفسها)، ويُخزَّن مؤقتًا لكل بلاغ. لا بناء HTML مسبقًا لأي بلاغ.
+    var cardCache = {};
+    function fetchIncidentDetail(number, shiftId) {
+        var key = String(shiftId) + '|' + String(number);
+        if (cardCache[key]) return Promise.resolve(cardCache[key]);
+        var r = range();
+        var q = '/api/analytics/incident-detail?from=' + r.from + '&to=' + r.to
+            + '&shiftId=' + encodeURIComponent(shiftId) + '&number=' + encodeURIComponent(number);
+        return AuthManager.apiRequest(q).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        }).then(function (d) {
+            var inc = d && d.incident;
+            if (inc) cardCache[key] = inc;
+            return inc;
+        }).catch(function () { return null; });
+    }
+    function popupIncidentAt(detail, lat, lng) {
+        if (!hmap || lat == null || lng == null) return;
+        var html = detail
+            ? incidentCardHtml(detail)
+            : '<div class="hist-zone-pop"><div class="t">تعذّر جلب تفصيل البلاغ — تحقق من الجلسة ثم أعد المحاولة</div></div>';
+        L.popup({ closeButton: true, maxWidth: 320 }).setLatLng([lat, lng]).setContent(html).openOn(hmap);
+    }
+    function onDotClick(props, lngLat) {
+        if (!props || props.number == null) return;
+        var lat = lngLat && lngLat.lat !== undefined ? lngLat.lat : null;
+        var lng = lngLat && lngLat.lng !== undefined ? lngLat.lng : null;
+        fetchIncidentDetail(props.number, props.shiftId).then(function (detail) {
+            var la = lat, ln = lng;
+            if ((la == null || ln == null) && detail) { la = detail.lat; ln = detail.lng; }
+            popupIncidentAt(detail, la, ln);
         });
     }
 

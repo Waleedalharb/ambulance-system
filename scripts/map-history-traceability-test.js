@@ -98,14 +98,25 @@ function todayCad(time) {
 
         console.log('\n— T1: حقول بطاقة البلاغ متوفرة لكل بلاغ —');
         check('T1① بلاغات الاختبار الخمسة كلها في incidents[]', ours.every(n => incByNum[n]));
-        check('T1② كل بلاغ يحمل type/status/cadCreatedAt/countedUnits',
+        // RC-6: الحمولة خفيفة (نقاط الخريطة) والتفصيل الكامل عبر incident-detail عند الطلب
+        check('T1② الحمولة الخفيفة تحمل number/shiftId/lat/lng/type/cadCreatedAt/district',
             ours.every(n => {
                 const d = incByNum[n];
-                return d && 'type' in d && 'status' in d && 'cadCreatedAt' in d && Array.isArray(d.countedUnits);
+                return d && 'type' in d && 'shiftId' in d && 'cadCreatedAt' in d && 'district' in d && 'lat' in d && 'lng' in d;
             }));
-        check('T1③ النوع والحالة صادقان من المصدر (medical/active)', incByNum[Z[0]].type === 'medical' && incByNum[Z[0]].status === 'active');
-        check('T1④ الفرقة المحتسبة ظاهرة (جنوب 1 تحركت)', incByNum[Z[0]].countedUnits.includes('جنوب 1'));
-        check('T1⑤ أفضل زمن وصول اشتُق من المراحل (٧ دقائق: إنشاء 10:00 ← بحث 10:07)', incByNum[Z[0]].bestArrivalMin === 7, String(incByNum[Z[0]].bestArrivalMin));
+        check('T1②-ب الحمولة الخفيفة لا تشمل الحقول الثقيلة (countedUnits/bestArrivalMin خارجها)',
+            ours.every(n => incByNum[n] && !('countedUnits' in incByNum[n]) && !('bestArrivalMin' in incByNum[n])));
+        // التفصيل الكامل للبطاقة يُجلب عند فتحها — نفس الحقول التي كانت مسبقة
+        const det = await api('/api/analytics/incident-detail?from=2020-01-01&to=2099-12-31&shiftId='
+            + encodeURIComponent(incByNum[Z[0]].shiftId) + '&number=' + Z[0], { token: TK }).then(r => r.data && r.data.incident);
+        check('T1③ incident-detail يعيد النوع والحالة صادقين من المصدر (medical/active)',
+            det && det.type === 'medical' && det.status === 'active');
+        check('T1④ الفرقة المحتسبة ظاهرة في التفصيل (جنوب 1 تحركت)', det && det.countedUnits.includes('جنوب 1'));
+        check('T1⑤ أفضل زمن وصول اشتُق من المراحل (٧ دقائق: إنشاء 10:00 ← بحث 10:07)', det && det.bestArrivalMin === 7, String(det && det.bestArrivalMin));
+        const detNc = await api('/api/analytics/incident-detail?from=2020-01-01&to=2099-12-31&shiftId='
+            + encodeURIComponent(incByNum[NC].shiftId) + '&number=' + NC, { token: TK }).then(r => r.data && r.data.incident);
+        check('T1⑤-ب بلاغ بلا إحداثية: بطاقته تجيء بصدق (بلا موقع وبلا تمركز مخترع)',
+            detNc && detNc.lat === null && detNc.nearestPositioningAtTime === null);
 
         console.log('\n— T2: كل منطقة تكشف بلاغاتها الفعلية —');
         check('T2① كل منطقة تحمل incidentNumbers بطول = count',
@@ -138,7 +149,7 @@ function todayCad(time) {
         check('T6④ الغائب يُعرض «غير متوفر» بلا تخمين', histJs.includes('غير متوفر'));
         check('T6⑤ فتح البطاقة معلن عبر واجهة عامة (MapHistory.openIncident)', histJs.includes('MapHistory.openIncident'));
         check('T6⑥ الذاكرة لا تلمس حالة الخريطة الحية', !histJs.includes('SmartMap'));
-        check('T6⑦ بلا إحداثية لا نقطة مختلقة في طبقة النقاط', /noCoords \|\| d\.lat === null/.test(histJs));
+        check('T6⑦ بلا إحداثية لا نقطة مختلقة في طبقة النقاط', /!d\.noCoords && d\.lat !== null/.test(histJs) || /noCoords \|\| d\.lat === null/.test(histJs));
     } catch (e) {
         console.error('خطأ عام:', e);
         failed++;

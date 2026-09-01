@@ -2686,9 +2686,9 @@ window.addEventListener('load', function() {
 <script src="js/map-config.js?v=1" defer></script><!-- إعداد مزود الخريطة (الافتراضي leaflet) — تفعيل Mapbox إنتاجيًا ينتظر قرار تجاوز حماية GitHub للتوكن -->
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
-<script src="js/map-adapter.js?v=2" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=2: dark-v11 + ثيم العناصر مشروط بالنمط الفاتح (اعتماد المالك 2026-08-31) -->
+<script src="js/map-adapter.js?v=3" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=3: pointsLayer المجمّعة القابلة للتوسع (RC-6، اعتماد المالك 2026-09-01) -->
 <script src="js/smart-map.js?v=6" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
-<script src="js/map-history.js?v=2" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط -->
+<script src="js/map-history.js?v=3" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط · v=3: نقاط مجمّعة + بطاقة كسولة (RC-6) -->
 <script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
 <script src="js/home-command.js?v=2" defer></script><!-- إعادة التشكيل v2: شريط المؤشرات الثمانية + الحالة التشغيلية + البلاغات المختصرة — مشترك في ops:sse، بلا قناة جديدة -->

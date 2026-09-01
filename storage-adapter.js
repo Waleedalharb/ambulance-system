@@ -278,10 +278,23 @@ class StorageAdapter {
         عبر كل المناوبات + مشاركاتها المرقّمة (مع shift_id لأن تفرد الرقم مضمون
         داخل المناوبة فقط). قراءة صرفة بلا قرار — الترشيح الزمني وقواعد الاحتساب
         (لا Journey = لا مشاركة · لا withdrawn/manual_cancelled) كلها في
-        ReportService.getHistoricalSummary حتى تبقى قاعدة الاحتساب واحدة. */
-    async getIncidentHistoryData() {
-        const incidents = await this.db.all(
-            'SELECT * FROM incident_registry ORDER BY created_at ASC, id ASC');
+        ReportService.getHistoricalSummary حتى تبقى قاعدة الاحتساب واحدة.
+
+        RC-6 (اعتماد المالك 2026-09-01): عند تمرير نطاق [fromTs, toTs] تُرشَّح
+        الصفوف في SQL أولًا بـcreated_at (ISO قابلة للمقارنة نصيًا) بهامش أمان
+        ±3 أيام حول النطاق — الهامش يستوعب تأخر وصول وقت CAD عن وقت التسجيل،
+        والفلتر الدقيق (_incidentsInRange بمحلل CAD المركزي) يبقى السلطة النهائية
+        في ReportService كما كان. بلا نطاق ← السلوك القديم حرفيًا. */
+    async getIncidentHistoryData(fromTs, toTs) {
+        let incSql = 'SELECT * FROM incident_registry';
+        const params = [];
+        if (fromTs != null && toTs != null) {
+            const MARGIN = 3 * 24 * 3600 * 1000;
+            incSql += ' WHERE created_at >= ? AND created_at <= ?';
+            params.push(new Date(fromTs - MARGIN).toISOString(), new Date(toTs + MARGIN).toISOString());
+        }
+        incSql += ' ORDER BY created_at ASC, id ASC';
+        const incidents = await this.db.all(incSql, params);
         const parts = await this.db.all(
             `SELECT r.shift_id, t.incident_number, t.timestamp, r.unit, r.created_at AS report_created_at, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
              FROM report_times t JOIN reports r ON r.id = t.report_id
@@ -289,12 +302,38 @@ class StorageAdapter {
         return { incidents, parts };
     }
 
+    /** بلاغ مفرد برقمه داخل مناوبته (RC-6 — بطاقة الذاكرة الكسولة): نفس حقول
+        السجل كما يعيدها getIncidentHistoryData لكن لبلاغ واحد فقط. */
+    async getIncidentByNumber(shiftId, number) {
+        return this.db.get(
+            'SELECT * FROM incident_registry WHERE shift_id = ? AND number = ?', [shiftId, String(number)]);
+    }
+
+    /** مشاركات بلاغ مفرد بكامل حقول الاحتساب (RC-6) — نفس SELECT الكبير في
+        getIncidentHistoryData لكن مقيّدًا ببلاغ واحد، حتى تمرّ على قاعدة
+        isParticipationCounted نفسها بلا أي استثناء. */
+    async getIncidentParticipationRows(shiftId, number) {
+        return this.db.all(
+            `SELECT r.shift_id, t.incident_number, t.timestamp, r.unit, r.created_at AS report_created_at, t.phases, t.resp_arrival_min, t.resp_mubashara_min, t.withdrawn, t.cad_unit_status, t.cad_reached, t.cad_unit_id, t.cad_run_unit_id, t.manual_cancelled, t.manual_cancelled_by, t.manual_cancelled_at, t.manual_cancel_reason
+             FROM report_times t JOIN reports r ON r.id = t.report_id
+             WHERE r.shift_id = ? AND t.incident_number = ?`, [shiftId, String(number)]);
+    }
+
     /** سجل التمركز التاريخي كاملًا (H3/H4 — اعتماد المالك 2026-08-24): كل أحداث
         positioning_events (append-only) بحمولاتها — لقطة الخطة وقت كل حدث.
-        قراءة صرفة: تفسير الحمولة والنوافذ الزمنية في ReportService.getCoverage. */
-    async getPositioningHistory() {
-        return this.db.all(
-            'SELECT id, shift_id, plan_id, event_type, changed_fields, payload, actor_id, actor_name, created_at FROM positioning_events ORDER BY created_at ASC, id ASC');
+        قراءة صرفة: تفسير الحمولة والنوافذ الزمنية في ReportService.getCoverage.
+        RC-6: عند تمرير نطاق تُرشَّح الأحداث في SQL بـcreated_at (النوافذ
+        المتداخلة مع النطاق لا يمكن أن يكون حدثها بعد نهايته + هامش الأمان). */
+    async getPositioningHistory(fromTs, toTs) {
+        let sql = 'SELECT id, shift_id, plan_id, event_type, changed_fields, payload, actor_id, actor_name, created_at FROM positioning_events';
+        const params = [];
+        if (fromTs != null && toTs != null) {
+            const MARGIN = 3 * 24 * 3600 * 1000;
+            sql += ' WHERE created_at <= ?';
+            params.push(new Date(toTs + MARGIN).toISOString());
+        }
+        sql += ' ORDER BY created_at ASC, id ASC';
+        return this.db.all(sql, params);
     }
 
     async deleteLastReportTime(reportId) {
