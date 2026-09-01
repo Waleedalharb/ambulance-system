@@ -241,8 +241,8 @@ console.log('\n— M10: الأقفال البنيوية —');
     check('M10⑤ index.html يحمّل mapbox + الإعداد + الـAdapter قبل smart-map',
         /mapbox-gl@2\.15\.0/.test(index) && /js\/map-config\.js/.test(index) && /js\/map-config\.local\.js/.test(index) && /js\/map-adapter\.js/.test(index)
         && index.indexOf('src="js/map-adapter.js') < index.indexOf('src="js/smart-map.js'));
-    check('M10⑥ إصدارات الكاش محدثة (smart-map v=6 · map-history v=3 · adapter v=3) — smart-map تُرفع لـv=7 مع جولة المرحلة C وحدها',
-        /smart-map\.js\?v=6/.test(index) && /map-history\.js\?v=3/.test(index) && /map-adapter\.js\?v=3/.test(index));
+    check('M10⑥ إصدارات الكاش محدثة (smart-map v=7 · map-history v=3 · adapter v=3) — في commit RC-6 المنفصل (0dc4594) يُتحقق من v=6',
+        /smart-map\.js\?v=7/.test(index) && /map-history\.js\?v=3/.test(index) && /map-adapter\.js\?v=3/.test(index));
     check('M10⑦ CSP يسمح بنطاقات Mapbox وعمال blob', sec.includes('https://api.mapbox.com') && sec.includes('https://events.mapbox.com') && sec.includes('workerSrc'));
     // قفل سبب فشل الخلفية (لقطة المالك 2026-08-28): Mapbox GL يجلب البلاطات
     // النقطية عبر fetch داخل العمال ← connect-src وليس img-src

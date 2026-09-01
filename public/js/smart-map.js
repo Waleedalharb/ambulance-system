@@ -374,7 +374,15 @@
             if (e.key !== 'Escape') return;
             var s = document.getElementById('opsMapSection');
             if (focus) { clearFocus(); closeCard(); return; }
-            if (s && s.classList.contains('smap-expanded')) toggleExpand();
+            // في Fullscreen الحقيقي لا يصل keydown لـEsc (المتصفح يخرج ويلتقطه
+            // fullscreenchange أدناه) — هذا المسار لوضع الـfallback الثابت فقط
+            if (s && s.classList.contains('smap-expanded') && !document.fullscreenElement) toggleExpand();
+        });
+        // مزامنة الخروج من Fullscreen (Esc/إيماءة المتصفح) مع حالة القسم
+        document.addEventListener('fullscreenchange', function () {
+            var s = document.getElementById('opsMapSection');
+            if (!document.fullscreenElement && s && s.classList.contains('smap-expanded')) collapseSection(s);
+            setTimeout(function () { if (map) map.invalidateSize(); }, 200);
         });
         var chipMap = {
             smapLayerTeams: 'teams', smapLayerIncidents: 'incidents', smapLayerCenters: 'centers',
@@ -1059,23 +1067,48 @@
             + '</div>';
     }
 
-    // ---------- الوضع الموسّع ----------
+    // ---------- الوضع الموسّع — Fullscreen API (اعتماد المالك 2026-08-31، المرحلة C) ----------
+    // العزل الحقيقي: requestFullscreen يجعل القسم سطح Top-Layer يفرضه المتصفح —
+    // لا يظهر فوقه أي عنصر من الصفحة (مساعد ذكي/دردشة/مودالات) ولا خلفها أي
+    // محتوى، بلا سباق z-index. .smap-expanded تبقى علامة الحالة الوحيدة للتنسيق
+    // في الوضعين (Fullscreen حقيقي أو fallback ثابت عند تعذر الـAPI).
+    // الخروج: الزر ⛌ أو Esc — المتصفح يخرج من Fullscreen فيلتقطه حدث
+    // fullscreenchange ويُسقط الحالة (لا keydown يصل أثناء Fullscreen).
+    function expandSection(s) {
+        s.classList.add('smap-expanded');
+        var ic = document.querySelector('#smapExpandBtn i');
+        if (ic) ic.className = 'fas fa-compress';
+        var btn = document.getElementById('smapExpandBtn');
+        if (btn) btn.title = 'تصغير الخريطة — العودة للوضع المدمج';
+        document.body.style.overflow = 'hidden';
+        if (s.requestFullscreen) {
+            try { var p = s.requestFullscreen(); if (p && p.catch) p.catch(function () { /* fallback: الوضع الثابت يبقى فعالًا */ }); }
+            catch (e) { /* fallback ثابت */ }
+        }
+        setTimeout(function () { if (map) map.invalidateSize(); }, 320);
+        // توجيه الانتباه: عند الدخول للوضع الموسّع ووجود حالة متجاوزة ← ركّز على أخطر بلاغ (بلا تغيير Zoom)
+        renderAlerts();
+        var crit = alertsCache.filter(function (a) { return a.level === 'over'; })[0];
+        if (crit) setTimeout(function () { focusOn('incident', crit.number); }, 380);
+    }
+    function collapseSection(s) {
+        s.classList.remove('smap-expanded');
+        var ic = document.querySelector('#smapExpandBtn i');
+        if (ic) ic.className = 'fas fa-expand';
+        var btn = document.getElementById('smapExpandBtn');
+        if (btn) btn.title = 'تكبير الخريطة — وضع التشغيل المتقدم';
+        document.body.style.overflow = '';
+        if (document.fullscreenElement && document.exitFullscreen) {
+            try { var p = document.exitFullscreen(); if (p && p.catch) p.catch(function () { }); }
+            catch (e) { }
+        }
+        setTimeout(function () { if (map) map.invalidateSize(); }, 320);
+    }
     function toggleExpand() {
         var s = document.getElementById('opsMapSection');
         if (!s) return;
-        var expanded = s.classList.toggle('smap-expanded');
-        var ic = document.querySelector('#smapExpandBtn i');
-        if (ic) ic.className = expanded ? 'fas fa-compress' : 'fas fa-expand';
-        var btn = document.getElementById('smapExpandBtn');
-        if (btn) btn.title = expanded ? 'تصغير الخريطة — العودة للوضع المدمج' : 'تكبير الخريطة — وضع التشغيل المتقدم';
-        document.body.style.overflow = expanded ? 'hidden' : '';
-        setTimeout(function () { if (map) map.invalidateSize(); }, 320);
-        // توجيه الانتباه: عند الدخول للوضع الموسّع ووجود حالة متجاوزة ← ركّز على أخطر بلاغ (بلا تغيير Zoom)
-        if (expanded) {
-            renderAlerts();
-            var crit = alertsCache.filter(function (a) { return a.level === 'over'; })[0];
-            if (crit) setTimeout(function () { focusOn('incident', crit.number); }, 380);
-        }
+        if (s.classList.contains('smap-expanded')) collapseSection(s);
+        else expandSection(s);
     }
 
     // ---------- الواجهة العامة ----------

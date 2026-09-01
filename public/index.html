@@ -1478,9 +1478,11 @@ window.addEventListener('load', function() {
                              مؤشر تحليلي زمني مكانه ذاكرة الخريطة ← الأنماط الزمنية -->
                         <div class="smap-kpi"><span class="smap-kpi-v sev-green" id="smapKpiAlerts">0</span><span class="smap-kpi-l">حالات حرجة <button type="button" class="smap-info" data-info="kpi-alerts" title="متى تُعد الحالة حرجة؟">ⓘ</button></span></div>
                     </div>
+                    <div class="smap-actions"><!-- RC-4 (المرحلة C): حاوية واحدة بإيقاع موحد — نفس الأزرار والأماكن -->
                     <button type="button" class="smap-expand-btn smap-guide-btn" id="mapGuideBtn" title="دليل استخدام الخريطة — وش تشوف؟ ومن وين جاء الرقم؟"><i class="fas fa-book-open"></i><span>دليل الخريطة</span></button>
                     <button type="button" class="smap-expand-btn smap-history-btn" id="smapHistoryBtn" title="ذاكرة الخريطة — التحليل التاريخي (H1–H4) فوق نفس الخريطة"><i class="fas fa-clock-rotate-left"></i><span>ذاكرة الخريطة</span></button>
                     <button type="button" class="smap-expand-btn" id="smapExpandBtn" title="تكبير الخريطة — وضع التشغيل المتقدم"><i class="fas fa-expand"></i></button>
+                    </div>
                 </div>
                 <div class="smap-layerbar">
                     <span class="smap-layerbar-lbl">الطبقات:</span>
@@ -2687,7 +2689,7 @@ window.addEventListener('load', function() {
 <script src="js/map-config.local.js?v=1" defer onerror="void 0"></script><!-- اختياري محلي خارج Git: مفتاح Mapbox العام المقيّد — غيابه طبيعي -->
 <script src="js/map-config.runtime.js" defer></script><!-- إعداد الإنتاج من متغير البيئة MAPBOX_PUBLIC_TOKEN (المسار «ب» — اعتماد المالك 2026-08-28): لا توكن في Git، وغياب المتغير = no-op -->
 <script src="js/map-adapter.js?v=3" defer></script><!-- MapAdapter: طبقة الرسم الموحدة — قبل smart-map.js وmap-history.js · v=3: pointsLayer المجمّعة القابلة للتوسع (RC-6، اعتماد المالك 2026-09-01) -->
-<script src="js/smart-map.js?v=6" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) -->
+<script src="js/smart-map.js?v=7" defer></script><!-- الخريطة التشغيلية الذكية — بعد app.js (تقرأ جداوله الثابتة) · v=7: Fullscreen API عزل التكبير (المرحلة C، اعتماد المالك 2026-08-31) -->
 <script src="js/map-history.js?v=3" defer></script><!-- ذاكرة الخريطة — الوضع التاريخي التحليلي (H1–H4) داخل نفس الخريطة؛ عرض فقط · v=3: نقاط مجمّعة + بطاقة كسولة (RC-6) -->
 <script src="js/map-guide.js?v=2" defer></script><!-- 📖 دليل استخدام الخريطة التشغيلية داخل المنصة (اعتماد المالك 2026-08-25) — محتوى ثابت يشرح، لا يلمس بيانات · v=2: حدّ بطاقة الشرح يخصم القائمة المفتوحة (اعتماد المالك 2026-08-31) -->
 <script src="js/crew-achievement-board.js?v=1" defer></script><!-- Phase D: لوحة إنجاز الفرق — بعد app.js حتى يسبقها تعريف AuthGate -->
@@ -2695,7 +2697,7 @@ window.addEventListener('load', function() {
 <script src="js/hospital-monitor.js?v=2" defer></script><!-- Hospital Monitor 1B + دورة التنبيهات: مؤشر المستشفيات + تفصيل المنشآت + ACK — مشترك في ops:sse، بصمة skip-if-unchanged -->
 <script src="js/smart-toolbar.js?v=4" defer></script><!-- v=4: مزامنة body.sidebar-open عند Escape (اعتماد المالك 2026-08-31) -->
 <!-- AI Assistant -->
-<link rel="stylesheet" href="/css/ai-assistant.css?v=2">
+<link rel="stylesheet" href="/css/ai-assistant.css?v=3"><!-- v=3 (المرحلة C): نقل الزر واللوحة لليسار — لا تغطية لمقطع الخريطة -->
 <script src="/js/ai-assistant.js?v=2"></script>
 <script>
 function navigateToPage(url) {
@@ -3033,4 +3035,82 @@ input[type="search"], textarea, select {
     /* الجوال: الـTopbar مزدحم — الشريط يُخفى كليًا والـToast السفلي يغطي التنبيه */
     .notif-strip { display: none !important; }
 }
+
+/* ═══ UI-MAP — المرحلة C (اعتماد المالك 2026-08-31) — إصلاح هندسي بلا Redesign ═══
+   RC-1 عزل التكبير (Fullscreen API) · RC-2/RC-5 عناصر Mapbox داكنة ·
+   RC-3 ذاكرة الخريطة تملأ مساحتها · RC-4 إيقاع الأدوات · ⑦ ثيم مودال المستشفيات.
+   تُحمَّل أخيرًا فتكسب بالترتيب؛ !important فقط لكسر قواعد قديمة تحمل !important. */
+
+/* RC-1: عتمة وضع التكبير — القاعدة الأساسية (executive-theme.css:895) تحمل
+   !important بزجاج شبه شفاف (--ex-surface ← --pi-glass-soft) فتهزم قاعدة
+   .smap-expanded ويظهر محتوى الصفحة خلف «الملء» (مثبت: bg محسوبة rgba(0,0,0,0)).
+   العزل الكامل من العوائم يتحقق بنيويًا عبر Fullscreen API في smart-map.js —
+   وهذه القاعدة تضمن السطح المعتم في الوضعين (Fullscreen وfallback) */
+.ops-map-section.smap-expanded {
+    background: #071223 !important;
+    border-radius: 0 !important;
+}
+.ops-map-section.smap-expanded:fullscreen { width: 100%; height: 100%; }
+
+/* RC-3: ذاكرة الخريطة — الشبكة تملأ القسم الممتد (مثبت: 420px من 1520px وتحتها
+   ~1000px فراغ ميت). مقيّد بالوضع التاريخي فقط — الوضع الحي لا يتأثر */
+#opsMapSection.smap-hist-mode .smap-map-grid { flex: 1; min-height: 0; }
+#opsMapSection.smap-hist-mode .smap-maincol { min-height: 0; }
+
+/* RC-2/RC-5: عناصر Mapbox على النمط الداكن — القواعد الداكنة كانت مقيّدة بـ
+   .smap-light-ops (غير نشط مع dark-v11) فظهرت +/− والـattribution والـPopup
+   بالثيم الفاتح الافتراضي (مثبت باللقطات). نفس الهوية: زجاج كحلي وحدود هادئة */
+.ops-map-wrap .mapboxgl-ctrl-group {
+    background: rgba(11, 18, 32, 0.92);
+    border: 1px solid var(--ex-border-soft);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+.ops-map-wrap .mapboxgl-ctrl-group button { width: 36px; height: 36px; background-color: transparent; }
+.ops-map-wrap .mapboxgl-ctrl-group button + button { border-top: 1px solid var(--ex-border-soft); }
+.ops-map-wrap .mapboxgl-ctrl-group button:hover { background-color: rgba(255, 255, 255, 0.08); }
+.ops-map-wrap .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon { filter: invert(0.88); }
+.ops-map-wrap .mapboxgl-ctrl-attrib { background: rgba(11, 18, 32, 0.7) !important; border-radius: 8px; }
+.ops-map-wrap .mapboxgl-ctrl-attrib-inner { background: transparent !important; color: #7C8DA6; }
+.ops-map-wrap .mapboxgl-ctrl-attrib a { color: #7C8DA6 !important; }
+.ops-map-wrap .mapboxgl-ctrl-attrib-button { filter: invert(0.88); background-color: transparent !important; }
+.ops-map-wrap .mapboxgl-popup-content {
+    background: rgba(11, 18, 32, 0.96);
+    color: var(--ex-text);
+    border: 1px solid var(--ex-border);
+    border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    direction: rtl;
+    font-family: inherit;
+}
+.ops-map-wrap .mapboxgl-popup-close-button { color: #8A9BB0; }
+.ops-map-wrap .mapboxgl-popup-close-button:hover { color: #F1F5F9; background: rgba(255, 255, 255, 0.08); }
+.ops-map-wrap .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.ops-map-wrap .mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.ops-map-wrap .mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: rgba(11, 18, 32, 0.96); }
+.ops-map-wrap .mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.ops-map-wrap .mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.ops-map-wrap .mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: rgba(11, 18, 32, 0.96); }
+.ops-map-wrap .mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: rgba(11, 18, 32, 0.96); }
+.ops-map-wrap .mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: rgba(11, 18, 32, 0.96); }
+
+/* RC-5: نصوص الخريطة الباهتة — درجة واحدة أعلى من لوحة الهوية نفسها (لا لون جديد) */
+.ops-map-legend-note { color: var(--ex-text-3); }
+.smap-layerbar-lbl { color: var(--ex-text-3); }
+.smap-empty { color: var(--ex-text-4); }
+.smap-kpi-l { font-size: 0.68rem; }
+
+/* RC-4: إيقاع موحد لأزرار الخريطة الثلاثة — نفس الأزرار والأماكن، حاوية ومحاذاة فقط */
+.smap-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* ⑦ مودال المستشفيات — الرقائق الفاتحة (background:var(--gray-100,#f3f4f6) مضمّن
+   لا يطابقه نمط المعالجة القائم [style*="--gray-100)"] بسبب فاصلة الـfallback)
+   ← سطح داكن من لوحة الهوية. ثيم فقط: لا حسابات ولا أسماء ولا API.
+   بطاقات المنشآت تُنتقى بـ[style*="--gray-200"] حتى لا يُمس حد تنبيهات العنبر */
+#hospitalModalSummary > div { background: var(--ex-surface-2) !important; border: 1px solid var(--ex-border-soft); }
+#hospitalModalSummary > div b { color: var(--ex-text); }
+#hospitalModalSummary > div span { color: var(--ex-text-3) !important; }
+#hospitalModalBody > div[style*="--gray-200"] { border-color: var(--ex-border-soft) !important; }
 </style>

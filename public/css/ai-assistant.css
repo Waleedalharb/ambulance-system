@@ -1,14 +1,15 @@
 /* ============================================
    AI ASSISTANT — RAG-based EMS Chat
    منصة الجنوب — المساعد التشغيلي الذكي
-   Right-side slide-out panel
+   Left-side slide-out panel (المرحلة C، اعتماد المالك 2026-08-31):
+   نُقل لليسار حتى لا يغطي مقطع الخريطة التشغيلية (عمود اليمين) وأدواتها
    ============================================ */
 
-/* Container — Fixed bottom-right */
+/* Container — Fixed bottom-left (الجوال ≤480px يبقى يمينًا — بعيدًا عن زر +/− أسفل يسار الخريطة) */
 .ai-assistant-container {
     position: fixed;
     bottom: 25px;
-    right: 25px;
+    left: 25px;
     z-index: 9999;
     direction: rtl;
 }
@@ -65,17 +66,17 @@
     50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
-/* Slide-out Panel — RIGHT side */
+/* Slide-out Panel — LEFT side (المرحلة C — بعيدًا عن الخريطة) */
 .ai-panel {
     position: fixed;
     top: 0;
-    right: 0;
+    left: 0;
     width: 440px;
     max-width: 100vw;
     height: 100vh;
     background: #FFFFFF;
-    box-shadow: -12px 0 48px rgba(15, 23, 42, 0.15);
-    transform: translateX(100%);
+    box-shadow: 12px 0 48px rgba(15, 23, 42, 0.15);
+    transform: translateX(-100%);
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 10000;
     display: flex;
@@ -478,13 +479,14 @@
     border-radius: 3px;
 }
 
-/* Responsive */
+/* Responsive — الجوال: الزر يبقى يمينًا حتى لا يصادم زر +/− أسفل يسار الخريطة ممتدة العرض */
 @media (max-width: 480px) {
     .ai-panel {
         width: 100vw;
     }
     .ai-assistant-container {
         bottom: 15px;
+        left: auto;
         right: 15px;
     }
     .ai-toggle-btn {
